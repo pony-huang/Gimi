@@ -1,0 +1,88 @@
+package github.ponyhuang.asssistantai.ui.model.list
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import github.ponyhuang.asssistantai.data.ModelProvider
+
+/**
+ * 列表中的单个供应商卡片。
+ *
+ * 视觉：Card 包裹 Row，圆角图标占位 + 服务名 + 启用开关。
+ * - 整行可点击 → [onClick]，进入详情页。
+ * - 末尾 Switch 直接翻转 [item.isEnabled]，调用 [onToggleEnabled]。Switch 自带 hit-testing
+ *   消费，不会冒泡到外层 Card 的 `onClick`，所以切换开关不会顺带跳详情页（与详情页
+ *   `HeaderSection` 里的 Switch 行为一致）。
+ */
+@Composable
+fun ModelServiceCard(
+    item: ModelProvider,
+    onClick: (String) -> Unit,
+    onToggleEnabled: (String, Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        onClick = { onClick(item.serviceId) },
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = RoundedCornerShape(50),
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SmartToy,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+            Text(
+                text = item.serviceName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Switch(
+                checked = item.isEnabled,
+                onCheckedChange = { onToggleEnabled(item.serviceId, it) },
+            )
+        }
+    }
+}

@@ -1,58 +1,87 @@
 package github.ponyhuang.asssistantai.ui.theme
 
-import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.graphics.Color
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+val JetchatDarkColorScheme = darkColorScheme(
+    primary = ChatGptGreen,
+    onPrimary = Color.White,
+    primaryContainer = ChatGptGreenDark,
+    onPrimaryContainer = Color.White,
+    inversePrimary = ChatGptGreen,
+    secondary = ChatGptDarkMutedText,
+    onSecondary = ChatGptDarkBackground,
+    secondaryContainer = ChatGptDarkSurfaceVariant,
+    onSecondaryContainer = ChatGptDarkText,
+    tertiary = ChatGptGreen,
+    onTertiary = Color.White,
+    tertiaryContainer = ChatGptDarkSurfaceVariant,
+    onTertiaryContainer = ChatGptDarkText,
+    error = Red80,
+    onError = Red20,
+    errorContainer = Red30,
+    onErrorContainer = Red90,
+    background = ChatGptDarkBackground,
+    onBackground = ChatGptDarkText,
+    surface = ChatGptDarkSurface,
+    onSurface = ChatGptDarkText,
+    inverseSurface = ChatGptLightSurface,
+    inverseOnSurface = ChatGptLightText,
+    surfaceVariant = ChatGptDarkSurfaceVariant,
+    onSurfaceVariant = ChatGptDarkMutedText,
+    outline = Color(0xFF555555),
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+val JetchatLightColorScheme = lightColorScheme(
+    primary = ChatGptGreen,
     onPrimary = Color.White,
+    primaryContainer = Color(0xFFD9F5EB),
+    onPrimaryContainer = Color(0xFF064E3B),
+    inversePrimary = ChatGptGreen,
+    secondary = ChatGptLightMutedText,
     onSecondary = Color.White,
+    secondaryContainer = ChatGptLightSurfaceVariant,
+    onSecondaryContainer = ChatGptLightText,
+    tertiary = ChatGptGreen,
     onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    tertiaryContainer = Color(0xFFD9F5EB),
+    onTertiaryContainer = Color(0xFF064E3B),
+    error = Red40,
+    onError = Color.White,
+    errorContainer = Red90,
+    onErrorContainer = Red10,
+    background = ChatGptLightBackground,
+    onBackground = ChatGptLightText,
+    surface = ChatGptLightSurface,
+    onSurface = ChatGptLightText,
+    inverseSurface = ChatGptDarkSurface,
+    inverseOnSurface = ChatGptDarkText,
+    surfaceVariant = ChatGptLightSurfaceVariant,
+    onSurfaceVariant = ChatGptLightMutedText,
+    outline = Color(0xFFD4D4D4),
 )
 
 @Composable
 fun AsssistantaiTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
+    val colorScheme = if (darkTheme) JetchatDarkColorScheme else JetchatLightColorScheme
 
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+    // 用户气泡配色独立于 MaterialTheme colorScheme，确保在所有设备上
+    // 都保留 ChatGPT 风格的绿色对话辨识度。
+    val userBubbleColors = if (darkTheme) DarkUserBubbleColors else LightUserBubbleColors
+
+    CompositionLocalProvider(LocalUserBubbleColors provides userBubbleColors) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
     }
-
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
 }

@@ -1,4 +1,18 @@
 <resources>
     <string name="app_name">asssistantai</string>
     <string name="title_activity_main2">MainActivity2</string>
+
+    <!-- AppFunctions metadata — short, agent-facing descriptions referenced by
+         AndroidManifest.xml and res/xml/app_metadata.xml. Keep them concise; the
+         verbose operational guidance lives in app_metadata.xml. -->
+    <string name="app_function_app_description">本地 AI 助手 — 让系统 agent 可以列出已配置的 LLM 服务、切换当前模型、或在不开 app 的前提下向当前激活模型发送文本消息并获得回答。</string>
+    <string name="app_function_app_display_description">asssistantai 本地助手</string>
+    <string name="stream_ai_compose_speech_to_text_idle_button">Voice input</string>
+    <string name="stream_ai_compose_speech_to_text_recording_button">Recording…</string>
+    <string name="stream_ai_compose_composer_mic_permission_message">Microphone permission is required to record audio</string>
+    <string name="stream_ai_compose_composer_mic_permission_action">Settings</string>
+    <string name="stream_ai_compose_composer_input_placeholder">Ask Assistant</string>
+    <string name="stream_ai_compose_composer_stop_button">Stop</string>
+    <string name="stream_ai_compose_composer_send_button">Send</string>
+    <string name="stream_ai_compose_composer_add_attachments_button">Add context</string>
 </resources>

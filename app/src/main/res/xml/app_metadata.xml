@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  LLM-facing description of the app's AppFunctions surface.
+
+  - The `appfn:displayDescription` string is what agents show in their picker UI.
+  - The `appfn:description` text is the long-form prompt the model reads to decide
+    whether and how to call this app's functions. Keep it dense and operational —
+    it is the *only* signal agents get without enumerating every function.
+-->
+<AppFunctionAppMetadata xmlns:appfn="http://schemas.android.com/apk/res-auto"
+    appfn:description="asssistantai 是一款本地 AI 助手应用，调用 OpenAI 兼容 / Anthropic 兼容 的 LLM 提供 chat 能力。
+    当用户希望在不打开 app 的前提下，让系统 agent（或语音意图、Settings 搜索等）帮我做以下事时，使用本 app：
+
+    Operational Patterns:
+    - 想发一句话给当前激活模型时，先调用 listModelServices 拿到当前 store 中
+      所有 (serviceId, groupId, modelId)，必要时再调用 setCurrentModel 切换模型，
+      最后调用 sendMessage(message) 发送文本并返回完整回答（已屏蔽 streaming）。
+    - 想列出当前 app 里配置了哪些模型 / 哪些服务可用：直接调用 listModelServices。
+    - 想换到某个服务下的某个具体模型：调用 setCurrentModel(serviceId, groupId, modelId)。
+    - sendMessage 的返回值即 LLM 生成的最终文本，调用方可以直接念给用户。
+
+    Constraints:
+    - message 不可为空字符串或纯空格；为空时抛 AppFunctionInvalidArgumentException。
+    - 当前没有任何启用模型时，sendMessage 抛 AppFunctionAppUnknownException；
+      此时建议先调 listModelServices 让用户从 UI 启用某个服务。
+    - sendMessage 内部 60 秒超时，超时后抛 AppFunctionAppUnknownException；
+      复杂推理任务可能超过 60 秒，agent 需自行重试或换模型。
+    - setCurrentModel 不会中断正在进行的流式会话；下一次 sendMessage 起生效。
+    - 所有调用都通过用户本机已配置的 API Key 发送请求到对应 LLM 服务；
+      会产生 token 费用，请在用户明确授权后再调用 sendMessage。"
+    appfn:displayDescription="@string/app_function_app_display_description" />

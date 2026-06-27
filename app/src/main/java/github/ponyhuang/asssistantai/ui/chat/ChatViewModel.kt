@@ -1,0 +1,756 @@
+package github.ponyhuang.asssistantai.ui.chat
+
+import android.content.Context
+import android.net.Uri
+import android.util.Log
+import dagger.hilt.android.qualifiers.ApplicationContext
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.google.adk.kt.events.Event
+import com.google.adk.kt.types.FunctionCall
+import com.google.adk.kt.types.FunctionResponse
+import dagger.hilt.android.lifecycle.HiltViewModel
+import github.ponyhuang.asssistantai.agent.AgentChatRunner
+import github.ponyhuang.asssistantai.data.ConversationRepository
+import github.ponyhuang.asssistantai.data.ConversationSettingsStore
+import github.ponyhuang.asssistantai.data.EventMapper
+import github.ponyhuang.asssistantai.data.LastSessionStore
+import github.ponyhuang.asssistantai.data.ModelSelection
+import github.ponyhuang.asssistantai.data.ModelServiceRepository
+import github.ponyhuang.asssistantai.model.FunctionCallView
+import github.ponyhuang.asssistantai.model.FunctionResponseView
+import github.ponyhuang.asssistantai.model.Message
+import github.ponyhuang.asssistantai.model.MessageRole
+import github.ponyhuang.asssistantai.model.ImageAttachment
+import github.ponyhuang.asssistantai.model.Messages
+import github.ponyhuang.asssistantai.model.TextPart
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import javax.inject.Inject
+
+/**
+ * 聊天页 ViewModel — 维护消息列表并把 ADK `Event` 流合并到 UI 友好的 `Message` 模型。
+ *
+ * 核心算法（参考 `~/.claude/projects/E--workplace-adk-web/memory/chat-streaming-and-thought.md`）：
+ * 1. `applyEvent(event)` — 顶层分发：partial 事件合并到上一条；否则当作完整事件。
+ * 2. `mergePartialEvent(last, event)` — 把当前 partial 的所有 part 累积进 last。
+ * 3. `addTextToParts(message, text, thought)` — 同 thought 标志合并到末段；异则新建段。
+ *
+ * 持久化层：`buildMessageFromParts` 改走 `EventMapper.fromEvent(event)`，保证 streaming 与历史回放共用 `Event.id → Message.id` 映射。
+ * 会话管理：通过 [ConversationRepository] 完成"新建 / 切换 / 删除 / 拉取会话列表"；`reset()` 与 `switchSession()` 都走 repository。
+ *
+ * 取消语义：每次 `send` 取消 `currentJob`，避免 partial 流交错。
+ *
+ * DI：通过 Hilt 注入 [AgentChatRunner] / [ConversationRepository] / [LastSessionStore]；UI 端用
+ * `hiltViewModel()` 直接拿到实例，不再走原先的 `ChatViewModel.factory(context)`。
+ */
+@HiltViewModel
+class ChatViewModel @Inject constructor(
+    private val runner: AgentChatRunner,
+    private val repository: ConversationRepository,
+    private val lastSessionStore: LastSessionStore,
+    private val conversationSettings: ConversationSettingsStore,
+    private val modelServices: ModelServiceRepository,
+    @ApplicationContext private val appContext: Context,
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(ChatUiState())
+    val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+    val availableModelServices = modelServices.services
+    private val _currentModelSelection = MutableStateFlow<ModelSelection?>(null)
+    /** 当前打开会话的显式模型选择；未设置时由 AgentFactory 走默认模型回退。 */
+    val currentModelSelection: StateFlow<ModelSelection?> = _currentModelSelection.asStateFlow()
+    private val _pendingToolConfirmation = MutableStateFlow<PendingToolConfirmation?>(null)
+    val pendingToolConfirmation: StateFlow<PendingToolConfirmation?> = _pendingToolConfirmation.asStateFlow()
+
+    /** Sends the user's decision back to ADK, which then either runs or rejects the paused tool. */
+    fun respondToToolConfirmation(confirmed: Boolean) {
+        val request = _pendingToolConfirmation.value ?: return
+        val sessionId = _uiState.value.sessionId
+        if (sessionId.isBlank()) return
+        _pendingToolConfirmation.value = null
+        currentJob?.cancel()
+        currentJob = viewModelScope.launch {
+            _uiState.update { it.copy(isStreaming = true, turnComplete = false) }
+            try {
+                runner.respondToToolConfirmation(
+                    userId = USER_ID,
+                    sessionId = sessionId,
+                    confirmationCallId = request.confirmationCallId,
+                    confirmed = confirmed,
+                ).collect { event ->
+                    Log.i("chat", "tool confirmation event: $event")
+                    applyEvent(event)
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (t: Throwable) {
+                applyError(t.message ?: t::class.simpleName ?: "Unknown error")
+            } finally {
+                _uiState.update { it.copy(isStreaming = false) }
+                repository.refreshConversation(sessionId)
+            }
+        }
+    }
+
+    /**
+     * 会话列表由 [repository.conversations] 转发到 [uiState] 的 [ChatUiState.conversations]
+     * 字段；UI 只订阅 `uiState` 一条流即可同时拿到消息、streaming 标志、会话 id 与会话列表。
+     */
+    init {
+        viewModelScope.launch {
+            repository.conversations.collect { convs ->
+                _uiState.update { it.copy(conversations = convs) }
+            }
+        }
+    }
+
+    private var currentJob: Job? = null
+
+    override fun onCleared() {
+        super.onCleared()
+    }
+
+    /**
+     * 每个 [TextPart] 的文本增量流 — 渲染端用 `rememberStreamingMarkdownState` + `append()`
+     * 做增量解析，避免每次 partial 都重解析整段 markdown。
+     */
+    private val partChannels = mutableMapOf<String, Channel<String>>()
+
+    /**
+     * 返回指定 [TextPart.id] 的文本增量订阅 channel。如果该 part 还没有任何增量发出，返回 `null`。
+     */
+    fun partChannelFor(partId: String): ReceiveChannel<String>? = partChannels[partId]
+
+    private fun emitPartDelta(partId: String, delta: String) {
+        if (delta.isEmpty()) return
+        partChannels.getOrPut(partId) { Channel(Channel.UNLIMITED) }.trySend(delta)
+    }
+
+    /**
+     * 关闭并清空所有 [partChannels]。
+     *
+     * 切换 / 重置会话时调用，避免 channel 跨会话累积（`Channel(UNLIMITED)` 持有挂起的消费者协程，
+     * 仅当 `partChannels` 不再引用时才会被 GC）。
+     */
+    private fun clearPartChannels() {
+        partChannels.values.forEach { it.close() }
+        partChannels.clear()
+    }
+
+    /**
+     * 发送用户消息。
+     *
+     * 行为：
+     * - 取消当前进行中的 send。
+     * - 立刻在消息列表尾部追加一条 `User` 消息（乐观 UI）。
+     * - 兜底确保 [sessionId] 有值 — 若为空（首次安装还没建过会话），先调
+     *   [ConversationRepository.createConversation] 建一个再走 [AgentChatRunner.send]，
+     *   避免 ADK `createSession(SessionKey(id = ""))` 抛 "SessionKey.id must not be blank"。
+     * - 启动协程调用 [AgentChatRunner.send]，把每个 `Event` 送入 [applyEvent]。
+     */
+    fun send(text: String, attachmentUris: List<Uri> = emptyList()) {
+        if (text.isBlank() && attachmentUris.isEmpty()) return
+
+        currentJob?.cancel()
+        // 新一轮 turn 一经提交就进入生成态，让 composer 立即显示停止按钮；不再等待首个
+        // assistant partial event 到达。后续的完成、错误和取消路径仍会负责将其恢复为 false。
+        _uiState.update { it.copy(isStreaming = true, turnComplete = false) }
+
+        val job = viewModelScope.launch {
+            val images = try {
+                readImageAttachments(attachmentUris)
+            } catch (t: Throwable) {
+                applyError("Cannot read selected image: ${t.message ?: "unknown error"}")
+                return@launch
+            }
+            val userMessage = Messages.fromUser(text = text, imageAttachments = images)
+            // 用户消息在附件读取完成后乐观追加；turn 状态已在提交时同步切换。
+            _uiState.update {
+                it.copy(messages = it.messages + userMessage, turnComplete = false)
+            }
+            // 兜底：保证 sessionId 非空再发请求。
+            val sid = ensureSessionId()
+            if (sid.isBlank()) {
+                applyError("Cannot create a session; please retry.")
+                return@launch
+            }
+            try {
+                runner.send(
+                    userId = USER_ID,
+                    sessionId = sid,
+                    text = text,
+                    imageAttachments = images,
+                ).collect { event ->
+                    Log.i("chat", "event: $event")
+                    applyEvent(event)
+                }
+            } catch (ce: CancellationException) {
+                throw ce
+            } catch (t: Throwable) {
+                applyError(t.message ?: t::class.simpleName ?: "Unknown error")
+            } finally {
+                _uiState.update { it.copy(isStreaming = false) }
+                repository.refreshConversation(sid)
+            }
+        }
+        currentJob = job
+    }
+
+    private suspend fun readImageAttachments(uris: List<Uri>): List<ImageAttachment> =
+        withContext(Dispatchers.IO) {
+            uris.map { uri ->
+                val mimeType = appContext.contentResolver.getType(uri)
+                    ?.takeIf { it.startsWith("image/") }
+                    ?: "image/jpeg"
+                val bytes = appContext.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                    ?: throw IllegalStateException("The selected image is no longer available")
+                ImageAttachment(mimeType = mimeType, data = bytes)
+            }
+        }
+
+    /**
+     * 兜底：保证 [sessionId] 非空。当前值为空时调 [ConversationRepository.createConversation] 建一个。
+     *
+     * 注：是 `suspend` 内部方法，调用方必须在协程里调用以确保 `_uiState.value.sessionId` 已更新后再继续。
+     */
+    private suspend fun ensureSessionId(): String {
+        _uiState.value.sessionId.takeIf { it.isNotBlank() }?.let { return it }
+        val newId = repository.createConversation()
+        if (newId.isNotBlank()) {
+            _uiState.update { it.copy(sessionId = newId) }
+            lastSessionStore.set(newId)
+            initializeNewConversationModel(newId)
+            activateConversationSettings(newId)
+        }
+        return _uiState.value.sessionId
+    }
+
+    /**
+     * 启动期会话恢复：依次尝试
+     * 1. [LastSessionStore] 里记录的 id（仍在 Room 中）；
+     * 2. Room 中 `lastUpdateTime` 最大的会话（即最近活跃的）；
+     * 3. 创建一个新的空会话（首次安装 / 全部被删的兜底）。
+     *
+     * 供 [MainScreen] 在 `LaunchedEffect(Unit)` 内调用，让首屏打字前已经有可用 sessionId，
+     * 避免依赖 `send()` 的兜底分支。仅在进程级（`_uiState.value.sessionId` 为空）执行一次；同一 ViewModel 实例内多次调用安全。
+     */
+    fun restoreOrCreateSession() {
+        if (_uiState.value.sessionId.isNotBlank()) return
+        // 同步先把 isInitializing 置 true：让 MainScreen 在第一次 collect 时就拿到
+        // 加载态，避免 history commit 之前出现"旧 messages 残留 → 新 history"的
+        // 单帧闪烁。三个分支都在 commit / 兜底结束时各自把它置回 false。
+        _uiState.update { it.copy(isInitializing = true) }
+        viewModelScope.launch {
+            // 1. prefs 中的 id 优先 — 仅当 Room 里仍存在该 session 才算命中。
+            val remembered = lastSessionStore.get()
+            if (remembered != null) {
+                val history = repository.loadMessages(remembered)
+                if (history != null) {
+                    activateConversationSettings(remembered)
+                    _uiState.update {
+                        it.copy(
+                            sessionId = remembered,
+                            messages = history,
+                            turnComplete = false,
+                            isInitializing = false,
+                        )
+                    }
+                    Log.i(TAG, "restoreOrCreateSession: restored from prefs id=$remembered (events=${history.size}).")
+                    return@launch
+                } else {
+                    // id 已失效（用户删过 / 清理过 Room），清掉 prefs 避免下次再读到。
+                    lastSessionStore.clear()
+                    Log.i(TAG, "restoreOrCreateSession: remembered id=$remembered missing; cleared prefs.")
+                }
+            }
+
+            // 2. fallback：取 Room 里最近活跃的会话。
+            val mostRecent = repository.listConversations().firstOrNull()
+            if (mostRecent != null) {
+                // switchSession 内部会自己维护 isInitializing（置 true → false）。
+                switchSession(mostRecent.id)
+                Log.i(TAG, "restoreOrCreateSession: fell back to most recent id=${mostRecent.id}.")
+                return@launch
+            }
+
+            // 3. 兜底：数据库里一个 session 都没有，建一个空会话（首次安装 / 全删场景）。
+            val newId = repository.createConversation()
+            if (newId.isNotBlank()) {
+                initializeNewConversationModel(newId)
+                activateConversationSettings(newId)
+                _uiState.update { it.copy(sessionId = newId, isInitializing = false) }
+                lastSessionStore.set(newId)
+                Log.i(TAG, "restoreOrCreateSession: created fresh session id=$newId.")
+            } else {
+                // create 失败也别把 spinner 永久卡住。
+                _uiState.update { it.copy(isInitializing = false) }
+                Log.w(TAG, "restoreOrCreateSession: failed to create a fresh session; isInitializing cleared anyway.")
+            }
+        }
+    }
+
+    /**
+     * 开始一个全新的会话 — 调 [ConversationRepository.createConversation] 创建并切到新会话。
+     *
+     * 即使 [ConversationRepository.createConversation] 失败（例如 Room 暂时不可用），也先清掉
+     * 上一会话遗留的 [partChannels]，避免 channel 跨"空 session"残留。
+     */
+    fun reset() {
+        currentJob?.cancel()
+        clearPartChannels()
+        viewModelScope.launch {
+            val newId = repository.createConversation()
+            if (newId.isNotBlank()) {
+                lastSessionStore.set(newId)
+                initializeNewConversationModel(newId)
+                switchSession(newId)
+            } else {
+                Log.w(TAG, "reset() failed to create a new conversation; UI state unchanged.")
+            }
+        }
+    }
+
+    /**
+     * 切换到指定 session：
+     * 1. 取消当前 streaming job。
+     * 2. 关闭并清空 [partChannels]，避免 channel 跨会话累积。
+     * 3. 立即把 `_uiState.isStreaming` 置 false（解锁输入框；用户能立刻开始敲下一句）。
+     * 4. 异步从 [ConversationRepository.loadMessages] 读取历史 events，**一次性** commit `sessionId` + `messages` 到 `_uiState`：
+     *    - 返回 `null`：session 不存在 → 清掉 prefs 里失效的 id（如果是），自动调 [ConversationRepository.createConversation] 建一个新会话（抽屉里的条目已陈旧），把新 sessionId commit 到 UI。
+     *    - 返回非空列表：把历史 messages 灌入 UI，并写 prefs。
+     *    - 返回空列表：session 存在但没有 event（刚创建的空会话）→ 同样一次性 commit sessionId + 空 messages，写 prefs。
+     *
+     * prefs 写入：命中（即 session 存在）时记录为最近打开；不存在分支里新创建的 id 也写入。
+     *
+     * 注：与原实现的关键差异 — 不再在调用入口就清空 messages 造成"空白 → 灌入"
+     * 的两段帧闪烁。代价是首屏到 history 真正可见之间有一帧 loading（依赖 Room 同步读速度，
+     * 实测 < 16ms，可以忽略）。
+     */
+    fun switchSession(sessionId: String) {
+        if (sessionId.isBlank()) return
+        currentJob?.cancel()
+        clearPartChannels()
+        // isStreaming=false 解锁输入；turnComplete=false 重置上一轮的徽章；isInitializing=true
+        // 让 MainScreen 中央 spinner 立刻接管，避免 history commit 之前旧 messages 残留闪烁。
+        _uiState.update { it.copy(isStreaming = false, turnComplete = false, isInitializing = true) }
+        viewModelScope.launch {
+            val history = repository.loadMessages(sessionId)
+            when {
+                history == null -> {
+                    Log.i(TAG, "switchSession($sessionId): session missing; creating a fresh one.")
+                    if (lastSessionStore.get() == sessionId) lastSessionStore.clear()
+                    val newId = repository.createConversation()
+                    if (newId.isNotBlank()) {
+                        initializeNewConversationModel(newId)
+                        activateConversationSettings(newId)
+                        _uiState.update {
+                            it.copy(
+                                sessionId = newId,
+                                messages = emptyList(),
+                                turnComplete = false,
+                                isInitializing = false,
+                            )
+                        }
+                        lastSessionStore.set(newId)
+                    } else {
+                        // create 失败也别把 spinner 永久卡住 — 解锁 UI 让用户能重试。
+                        _uiState.update { it.copy(isInitializing = false) }
+                        Log.w(TAG, "switchSession($sessionId): createConversation failed; isInitializing cleared anyway.")
+                    }
+                }
+                else -> {
+                    // 命中：history 非空 = 旧 session；history 空 = 刚建的空 session。
+                    // 一次性 commit sessionId + messages + isInitializing=false，
+                    // 避免两次 messages 写导致两帧渲染。
+                    activateConversationSettings(sessionId)
+                    _uiState.update {
+                        it.copy(
+                            sessionId = sessionId,
+                            messages = history,
+                            turnComplete = false,
+                            isInitializing = false,
+                        )
+                    }
+                    lastSessionStore.set(sessionId)
+                }
+            }
+        }
+    }
+
+    /**
+     * 触发一次 [ConversationRepository.refresh] 拉取最新会话列表（写到 [conversations]）。
+     */
+    fun refreshConversations() {
+        viewModelScope.launch { repository.refresh() }
+    }
+
+    private fun refreshCurrentConversation() {
+        val sessionId = _uiState.value.sessionId
+        if (sessionId.isBlank()) return
+        viewModelScope.launch { repository.refreshConversation(sessionId) }
+    }
+
+    /**
+     * 删除指定 session，并刷新会话列表。
+     *
+     * 守卫：若 [sessionId] 等于当前 `_uiState.value.sessionId`（即用户正在用的会话），直接 no-op —
+     * 删掉当前会话会把 `sessionId` 留在一个已删除的 id 上，后续 `send()` 会因找不到 session 而失败。
+     *
+     * 副作用：若删的恰好是 [LastSessionStore] 里记录的"最近打开 id"（不是当前打开但可能是上次的），
+     * 顺手清掉 prefs，避免下次冷启动误读到一个已删除的 id。
+     */
+    fun deleteConversation(sessionId: String) {
+        if (sessionId.isBlank()) return
+        if (sessionId == _uiState.value.sessionId) {
+            Log.w(TAG, "deleteConversation($sessionId) refused: this is the active session.")
+            return
+        }
+        viewModelScope.launch {
+            repository.deleteConversation(sessionId)
+            conversationSettings.remove(sessionId)
+            if (lastSessionStore.get() == sessionId) lastSessionStore.clear()
+        }
+    }
+
+    /**
+     * 通知 runner 重建：让 ModelServiceStore 里最新启用的服务在下次新建会话时生效。
+     * 当前正在流式输出的会话不会被中途打断（recreate 只换 runner 引用，下一次 send 才用上）。
+     */
+    fun recreateRunner() {
+        runner.recreate()
+    }
+
+    fun selectModel(selection: ModelSelection) {
+        val sessionId = _uiState.value.sessionId
+        if (sessionId.isBlank()) return
+        conversationSettings.setModelSelection(sessionId, selection)
+        _currentModelSelection.value = selection
+        modelServices.setCurrentSelection(selection)
+        // 当前流式调用已在 AgentChatRunner.send 入口快照 runner，重建不会中断它；
+        // 因此无论是否正在输出，下一条消息都会使用新模型。
+        runner.recreate()
+    }
+
+    /**
+     * 把指定会话持久化的配置装载为当前运行时配置，并重建后续消息使用的 agent。
+     */
+    private fun activateConversationSettings(sessionId: String) {
+        val savedSelection = conversationSettings.get(sessionId).modelSelection
+        val selection = savedSelection
+            ?: modelServices.currentSelection.value
+            ?: modelServices.defaultSelection()
+        if (savedSelection == null && selection != null) {
+            conversationSettings.setModelSelection(sessionId, selection)
+        }
+        _currentModelSelection.value = selection
+        modelServices.setCurrentSelection(selection)
+        runner.recreate()
+    }
+
+    /** 新会话固定使用首个可用模型，不继承最近选择。 */
+    private fun initializeNewConversationModel(sessionId: String) {
+        modelServices.defaultSelection()?.let { default ->
+            conversationSettings.setModelSelection(sessionId, default)
+        }
+    }
+
+    /**
+     * 用户主动中断当前 turn（点击 composer 上的停止按钮）。
+     *
+     * 与 [send] 的 `finally` 块相比，这里**同步**把 `isStreaming` 置 false —
+     * `finally` 是协程挂起后才跑，UI 会延迟一帧才解锁输入框，用户感知明显；
+     * 提前在取消的同一帧更新 state 让 stop 按钮 → 输入框 enable 的过渡即时可见。
+     *
+     * `turnComplete = true` 让 partial message 在 UI 上被当作"已结束的一轮"
+     * （typing 动画 / stop 按钮立即消失），不再被 reducer 当成未完成 event。
+     *
+     * 同步把仍在 `partial` 状态的 assistant message 翻成 `partial = false`：因为是用户主动
+     * 中断,不会有 final non-partial event 到达来触发 [appendCompleteEvent] 的就地翻标志位;
+     * 如果不在这里手动翻,那条 message 会一直停留在 `partial = true`,用户后续滚动离开再
+     * 滚回时,LazyColumn 重新 Composition 后 [TextContent] 会用 `partial = true && chunkChannel != null`
+     * 落到 streaming 路径,但本地 `streamingState` 已被重置为空 → 气泡内容丢失。和流式自然
+     * 完成的滚动回看场景是同一个 root cause family,这里一并兜底。
+     *
+     * 没有进行中的 job 时直接 no-op，避免在非 streaming 状态误触。
+     */
+    fun stopStreaming() {
+        if (currentJob?.isActive != true) return
+        currentJob?.cancel()
+        _uiState.update { state ->
+            val newMessages = state.messages.map { msg ->
+                if (msg.partial && msg.role == MessageRole.Assistant) {
+                    msg.copy(partial = false, turnComplete = true)
+                } else {
+                    msg
+                }
+            }
+            state.copy(
+                messages = newMessages,
+                isStreaming = false,
+                turnComplete = true,
+            )
+        }
+    }
+
+    // ── Reducer ────────────────────────────────────────────────────────────
+
+    /**
+     * 顶层 reducer：partial 合并，否则当作完整事件构造新的 `Message`。
+     */
+    private fun applyEvent(event: Event) {
+        // 错误优先：errorCode / errorMessage 非空 → 错误消息。
+        val errMsg = event.errorMessage
+        if (event.errorCode != null || !errMsg.isNullOrBlank()) {
+            applyError(errMsg ?: event.errorCode ?: "Unknown error", event.invocationId)
+            return
+        }
+
+        if (event.partial) {
+            mergePartialEvent(event)
+        } else {
+            appendCompleteEvent(event)
+        }
+        captureToolConfirmation(event)
+    }
+
+    /** Extracts ADK's synthetic `adk_request_confirmation` function call for the Compose dialog. */
+    private fun captureToolConfirmation(event: Event) {
+        val confirmationCall = event.functionCalls().firstOrNull {
+            it.name == FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME
+        } ?: return
+        val confirmationId = confirmationCall.id ?: return
+        val originalCall = confirmationCall.args[FunctionCall.ORIGINAL_FUNCTION_CALL_KEY] as? Map<*, *> ?: return
+        val toolName = originalCall["name"] as? String ?: return
+        val args = originalCall["args"] as? Map<*, *> ?: emptyMap<Any, Any>()
+        val argsSummary = args.entries.joinToString(
+            prefix = "(",
+            postfix = ")",
+            separator = ", ",
+        ) { (key, value) -> "$key=${summarizeValue(value)}" }
+        _pendingToolConfirmation.value = PendingToolConfirmation(
+            confirmationCallId = confirmationId,
+            title = "Allow tool execution?",
+            summary = "Allow $toolName$argsSummary?",
+        )
+    }
+
+    private fun applyError(message: String, invocationId: String? = null) {
+        _uiState.update {
+            it.copy(
+                messages = it.messages + Messages.fromError(error = message, invocationId = invocationId),
+                isStreaming = false,
+                turnComplete = false,
+            )
+        }
+    }
+
+    /**
+     * Partial 事件合并：必须满足"上一条也是 partial + 同 author"才合并。
+     * 否则作为新消息起一段（保留 partial 流被打断时的鲁棒性）。
+     */
+    private fun mergePartialEvent(event: Event) {
+        val author = event.author
+        val role = authorToRole(author)
+
+        val currentMessages = _uiState.value.messages
+        val existingIndex = currentMessages.indexOfLast { msg ->
+            msg.partial &&
+                msg.author == author &&
+                msg.role == role &&
+                msg.invocationId == event.invocationId
+        }
+
+        if (existingIndex < 0) {
+            // 没有可合并的上一条 — 当成完整事件起一段。
+            appendCompleteEvent(event)
+            return
+        }
+
+        val updated = mergeInto(currentMessages[existingIndex], event)
+        _uiState.update { current ->
+            val newMessages = current.messages.toMutableList().also { it[existingIndex] = updated }
+            current.copy(messages = newMessages)
+        }
+        if (_uiState.value.isStreaming.not()) {
+            _uiState.update { it.copy(isStreaming = true) }
+        }
+    }
+
+    /**
+     * 完整事件（非 partial） — 走 [EventMapper.fromEvent] 构造 [Message]，空 Event 跳过。
+     *
+     * 流式收尾时,已经有一条同 author + invocationId 的 partial message 在 `_uiState.messages` 尾部
+     * (`mergePartialEvent` 累积 typewriter 文本用的就是这一条);此时若再 append 一条
+     * non-partial 完整 message,UI 会看到重复文本。因此这里检测 partial 尾部并就地 replace,
+     * 用 final event 的稳定 id 替换 partial message,既保留打字机视觉效果又避免重复气泡。
+     *
+     * **就地翻标志位**(不要整体替换):原实现用 `buildMessageFromParts(event)` 返回的新 Message 整体
+     * 替换 partial message,新 Message 的 `TextPart.id` 由 `finalEvent.id` 派生,与 partial 阶段累积
+     * 用的 `TextPart.id` 不同,导致 `partChannelProvider(part.id)` 在收尾瞬间查不到 channel,
+     * `TextContent` 的 `partial` 分支条件不成立,会从 streaming 切到 static,触发整段 markdown
+     * 重 parse / 重布局 — 气泡闪一下。这里改为 `old.copy(partial = false, turnComplete = ...)`,
+     * 保留 `TextPart.id`,channel 订阅继续命中,TextContent 不切分支。
+     */
+    private fun appendCompleteEvent(event: Event) {
+        val message = buildMessageFromParts(event) ?: return
+        val current = _uiState.value.messages
+        val mergeIndex = current.indexOfLast { msg ->
+            msg.partial &&
+                msg.author == event.author &&
+                msg.invocationId == event.invocationId
+        }
+        if (mergeIndex >= 0) {
+            // 流式收尾:就地翻 partial 标志位,保留原 Message.id / TextPart.id / channel 订阅。
+            _uiState.update { state ->
+                val newMessages = state.messages.toMutableList().also {
+                    val old = it[mergeIndex]
+                    it[mergeIndex] = old.copy(
+                        partial = false,
+                        turnComplete = message.turnComplete,
+                    )
+                }
+                state.copy(messages = newMessages)
+            }
+        } else {
+            // 首个 partial 尚没有可合并的消息。EventMapper 直接构造了完整的
+            // TextPart，因此必须在发布 UI state 前把它作为初始 chunk 入队；否则
+            // 下一段 partial 才创建 channel 时，StreamingMarkdownState 只会收到
+            // 下一段文本，导致首段文字在流式渲染中丢失。
+            if (message.partial) {
+                message.textParts.forEach { part ->
+                    emitPartDelta(part.id, part.text)
+                }
+            }
+            _uiState.update { it.copy(messages = it.messages + message) }
+        }
+        if (event.partial) {
+            _uiState.update { it.copy(isStreaming = true) }
+        } else if (event.turnComplete) {
+            _uiState.update { it.copy(isStreaming = false, turnComplete = true) }
+            refreshCurrentConversation()
+        } else if (message.partial.not()) {
+            _uiState.update { it.copy(isStreaming = false, turnComplete = false) }
+        }
+    }
+
+    /**
+     * 把单个 Event 映射为 Message（走 [EventMapper]，与历史回放共用同一映射规则）。
+     * 返回 null 表示 Event 内容为空（无 text part / 无 tool call / 无 error），跳过。
+     */
+    private fun buildMessageFromParts(event: Event): Message? = EventMapper.fromEvent(event)
+
+    /**
+     * 把 partial Event 的所有 part 合并进已有 message；tool calls / responses 追加。
+     *
+     * reducer 的合并阶段仍按 part-by-part 累积（保留 streaming typewriter 语义），
+     * [EventMapper] 只负责"完整 Event → Message"的入口（保证历史回放复用）。
+     */
+    private fun mergeInto(message: Message, event: Event): Message {
+        val parts = event.content?.parts.orEmpty()
+        var working = message
+        parts.forEachIndexed { index, part ->
+            val text = part.text
+            if (!text.isNullOrEmpty()) {
+                val thought = part.thought == true
+                working = appendTextPart(working, event, index, text, thought)
+            }
+        }
+        val newCalls = event.functionCalls().map { it.toView() }
+        val newResponses = event.functionResponses().map { it.toView() }
+        if (newCalls.isNotEmpty() || newResponses.isNotEmpty()) {
+            working = working.copy(
+                functionCalls = working.functionCalls + newCalls,
+                functionResponses = working.functionResponses + newResponses,
+            )
+        }
+        return working.copy(
+            partial = true,
+            turnComplete = event.turnComplete,
+        )
+    }
+
+    /**
+     * 与 adk-web `addTextToParts` 等价：
+     * - 若末段的 `thought` 标志与本次相同 → 追加；
+     * - 否则新建段。
+     * - 同时把新增的文本作为 delta 推到对应 TextPart 的 channel，供渲染端做增量 markdown 解析。
+     */
+    private fun appendTextPart(
+        message: Message,
+        event: Event,
+        partIndex: Int,
+        text: String,
+        thought: Boolean,
+    ): Message {
+        if (text.isEmpty()) return message
+        val parts = message.textParts.toMutableList()
+        val last = parts.lastOrNull()
+        if (last != null && last.thought == thought) {
+            parts[parts.lastIndex] = last.copy(text = last.text + text)
+            emitPartDelta(last.id, text)
+        } else {
+            val newPart = TextPart(
+                id = "${event.id}:$partIndex",
+                text = text,
+                thought = thought,
+            )
+            parts += newPart
+            emitPartDelta(newPart.id, text)
+        }
+        return message.copy(textParts = parts)
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+
+    private fun authorToRole(author: String): MessageRole =
+        if (author == "user") MessageRole.User else MessageRole.Assistant
+
+    private fun FunctionCall.toView(): FunctionCallView {
+        if (name == FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME) {
+            return FunctionCallView(id = id.orEmpty(), name = name, argsSummary = "")
+        }
+        val argsText = if (args.isEmpty()) "" else args.entries.joinToString(
+            prefix = "(",
+            postfix = ")",
+            separator = ", ",
+        ) { (k, v) -> "$k=${summarizeValue(v)}" }
+        return FunctionCallView(id = id.orEmpty(), name = name, argsSummary = argsText)
+    }
+
+    private fun FunctionResponse.toView(): FunctionResponseView =
+        FunctionResponseView(id = id.orEmpty(), name = name)
+
+    private fun summarizeValue(v: Any?): String = when (v) {
+        null -> "null"
+        is String -> if (v.length > 16) "\"${v.take(15)}…\"" else "\"$v\""
+        is Number, is Boolean -> v.toString()
+        is Map<*, *> -> "{…}"
+        is List<*> -> "[…]"
+        else -> v.toString()
+    }
+
+    companion object {
+        private const val TAG: String = "ChatViewModel"
+
+        /**
+         * 进程级稳定的 userId — 派生自进程启动时刻，让 Room 里的所有会话都归属于同一 user。
+         */
+        private const val USER_ID: String = "user-default"
+    }
+}
+
+data class PendingToolConfirmation(
+    val confirmationCallId: String,
+    val title: String,
+    val summary: String,
+)

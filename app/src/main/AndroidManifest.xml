@@ -1,8 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:appfn="http://schemas.android.com/apk/androidx.appfunctions"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <application
+        android:name=".AsssistantaiApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -10,11 +21,12 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Asssistantai">
+        android:theme="@style/Theme.Asssistantai"
+        appfn:description="@string/app_function_app_description"
+        appfn:displayDescription="@string/app_function_app_display_description">
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
             android:theme="@style/Theme.Asssistantai"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -24,11 +36,28 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".permission.CalendarPermissionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Asssistantai" />
+        <activity
+            android:name=".permission.LocationPermissionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Asssistantai" />
+        <activity
             android:name=".MainActivity2"
             android:exported="false"
             android:label="@string/title_activity_main2"
             android:theme="@style/Theme.Asssistantai"
-            android:windowSoftInputMode="adjustResize" />
+            android:windowSoftInputMode="adjustResize"
+            tools:ignore="MissingClass" />
+        <!--
+            AppFunctions runtime uses this property to load the LLM-facing description of
+            what this app can do and when its functions should be called. Mirrors the
+            Google ChatApp sample (E:\workplace\appfunctions\ChatApp).
+        -->
+        <property
+            android:name="android.app.appfunctions.app_metadata"
+            android:resource="@xml/app_metadata" />
     </application>
 
 </manifest>

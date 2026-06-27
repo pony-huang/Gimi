@@ -1,0 +1,19 @@
+package github.ponyhuang.asssistantai.ui.navigation
+
+import androidx.navigation3.runtime.NavKey
+import kotlinx.serialization.Serializable
+
+/** Type-safe destinations for the single-activity Compose navigation host. */
+sealed interface AppRoute : NavKey {
+    @Serializable
+    data object Chat : AppRoute
+
+    @Serializable
+    data object Settings : AppRoute
+
+    @Serializable
+    data object ModelServiceList : AppRoute
+
+    @Serializable
+    data class ModelServiceDetail(val serviceId: String) : AppRoute
+}

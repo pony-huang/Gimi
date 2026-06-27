@@ -1,0 +1,49 @@
+package github.ponyhuang.asssistantai.ui.chat
+
+import github.ponyhuang.asssistantai.model.Conversation
+import github.ponyhuang.asssistantai.model.Message
+import github.ponyhuang.asssistantai.model.MessageRole
+
+/**
+ * The current UI state of the chat conversation.
+ *
+ * 由 [ChatViewModel] 持有并以 `StateFlow<ChatUiState>` 暴露给 UI；Composable
+ * 一次 collect 后用字段访问即可获得全部子状态，避免多个 `StateFlow` 各自订阅
+ * 造成的重复 collect。所有字段均有默认值，既方便作为 `stateIn` 的初始值，
+ * 也方便 `@Preview` 桩与测试 override。
+ *
+ * @param messages 已渲染的消息列表（含 partial / 工具调用 / 错误消息）
+ * @param sessionId 当前激活的会话 id；空串表示还没建立会话
+ * @param isStreaming 流式输出是否进行中（输入框锁定 / 新建会话按钮置灰用）
+ * @param turnComplete 当前 turn 是否收到过 `event.turnComplete = true` 的收尾事件。
+ *                     与 [isStreaming] 的差异：`isStreaming` 在收到工具调用响应、
+ *                     仍可能继续产流的事件时会保持 true；而 [turnComplete] 仅在
+ *                     `Event.turnComplete = true` 的最终事件到达时翻为 true。
+ *                     当前没有 UI 消费方，预留给 "Turn complete" 提示 chip / 状态徽章。
+ * @param conversations 会话列表 — 直接转发自 `ConversationRepository.conversations`，
+ *                     仅供 [HistoryDrawer] 渲染。
+ * @param isInitializing 当前是否处于会话/历史初始化阶段 — 启动期
+ *                     [ChatViewModel.restoreOrCreateSession] 或用户切换会话触发的
+ *                     [ChatViewModel.switchSession] 在异步读 Room 期间为 true，
+ *                     commit 完成或兜底分支结束置 false。驱动 [MainScreen] 中
+ *                     `AnimatedContent` 的中央 spinner —— 让用户在历史"灌入"前
+ *                     看到一个加载态，避免旧内容残留闪烁。
+ *
+ *                     与 [isStreaming] 正交：[isStreaming] 锁定输入框 / 灰按钮；
+ *                     [isInitializing] 只用于中央 spinner 的可见性。两者各自承担
+ *                     一段独立的语义，不要混用。
+ */
+data class ChatUiState(
+    val messages: List<Message> = emptyList(),
+    val sessionId: String = "",
+    val isStreaming: Boolean = false,
+    val turnComplete: Boolean = false,
+    val conversations: List<Conversation> = emptyList(),
+    val isInitializing: Boolean = false,
+)
+
+fun ChatUiState.getCurrentUserMessage(): Message? =
+    messages.firstOrNull()?.takeIf { message -> message.role == MessageRole.User }
+
+fun ChatUiState.getCurrentAssistantMessage(): Message? =
+    messages.firstOrNull()?.takeIf { message -> message.role == MessageRole.Assistant }

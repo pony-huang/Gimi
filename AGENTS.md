@@ -37,6 +37,8 @@ When designing or changing Compose UI, always account for system safety insets. 
 
 Use JUnit 4 for unit tests in the matching `app/src/test` package. Name files `*Test.kt` and methods after the behavior checked, for example `fun restoresLastSession()`. Put Android-dependent and Compose interaction coverage in `app/src/androidTest`. Unless explicitly requested, feature work does not require adding or running unit tests; verify it with `./gradlew compileKotlin` instead. Do not make tests depend on live model-provider APIs.
 
+If compilation succeeds but the same automated test repeatedly fails because of the test runner, device environment, or infrastructure rather than a reproducible code failure, stop retrying and hand the case off for manual verification. Record the successful compile command, the repeated test failure, and any manual verification already completed.
+
 ## Commit & Pull Request Guidelines
 
 Existing history uses short imperative subjects (for example, `Refactor settings module`); keep subjects under 72 characters and commits focused. Pull requests should explain user-visible changes, note tests run, link the relevant issue or OpenSpec change, and include screenshots for Compose UI changes.

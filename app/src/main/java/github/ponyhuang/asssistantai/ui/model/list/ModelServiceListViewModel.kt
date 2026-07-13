@@ -19,8 +19,7 @@ import javax.inject.Inject
  * - [query] 当前搜索词，客户端实时过滤（不发起网络请求）。
  * - [filtered] 按 `serviceId` 或 `serviceName`（不区分大小写）包含 [query] 的子集。
  *
- * Store 的种子注入统一在 `AsssistantaiApp.onCreate` 完成，这里不再调用 `seedIfEmpty`，
- * 保证 `AgentFactory` 冷启动拿到的是同一份种子。
+ * Room 目录由 [ModelServiceRepository] 异步初始化；页面通过 [loadState] 区分加载、成功与失败。
  */
 @HiltViewModel
 class ModelServiceListViewModel @Inject constructor(

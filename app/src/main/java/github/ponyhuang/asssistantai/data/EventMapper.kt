@@ -60,6 +60,17 @@ object EventMapper {
             return null
         }
 
+        // ADK 工具确认的选择以 role=user 的 FunctionResponse 回送给 runner。
+        // 它不是用户可读的聊天内容；若仍构造 User Message，聊天气泡会因固定内边距
+        // 被绘制成没有内容的灰色圆角块。只含 function response 的 user event 直接忽略。
+        if (event.author == "user" &&
+            parts.all { it.text.isNullOrEmpty() && it.inlineData == null } &&
+            calls.isEmpty() &&
+            responses.isNotEmpty()
+        ) {
+            return null
+        }
+
         return if (event.author == "user") {
             buildUserMessage(event, parts)
         } else {

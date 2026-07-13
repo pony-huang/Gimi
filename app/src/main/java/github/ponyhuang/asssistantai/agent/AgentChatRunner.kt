@@ -19,6 +19,8 @@ import com.google.adk.kt.types.Role
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import github.ponyhuang.asssistantai.model.ImageAttachment
 
 /**
@@ -36,7 +38,7 @@ import github.ponyhuang.asssistantai.model.ImageAttachment
  * 线程模型：所有调用都通过协程 `Flow` 完成，框架本身不持有任何额外线程。
  */
 class AgentChatRunner(
-    private val factory: () -> BaseAgent,
+    private val factory: suspend () -> BaseAgent,
     private val sessionService: SessionService,
     private val artifactService: ArtifactService?,
 ) {
@@ -48,7 +50,8 @@ class AgentChatRunner(
      * [send] 在 `Dispatchers.IO` 上消费 `runAsync` 返回的 Flow——需要 happens-before。
      */
     @Volatile
-    private var runner: InMemoryRunner = buildRunner(factory())
+    private var runner: InMemoryRunner? = null
+    private val runnerMutex = Mutex()
 
     @OptIn(ExperimentalResumabilityFeature::class)
     private fun buildRunner(agent: BaseAgent): InMemoryRunner = InMemoryRunner(
@@ -67,8 +70,10 @@ class AgentChatRunner(
      * 调用时机："新建对话"按钮——保证下一条消息从新 agent 出发。当前正在 `runAsync` 中的
      * 会话不受影响（快照在 [send] 入口处已取好）。
      */
-    fun recreate() {
-        runner = buildRunner(factory())
+    suspend fun recreate() {
+        runnerMutex.withLock {
+            runner = buildRunner(factory())
+        }
     }
 
     /**
@@ -87,7 +92,7 @@ class AgentChatRunner(
         imageAttachments: List<ImageAttachment> = emptyList(),
     ): Flow<Event> {
         // 快照当前 runner；中途 recreate() 不会改本次 send 的行为。
-        val activeRunner = runner
+        val activeRunner = currentRunner()
         val parts = buildList {
             text.takeIf(String::isNotBlank)?.let { add(Part(text = it)) }
             imageAttachments.forEach { image ->
@@ -115,7 +120,7 @@ class AgentChatRunner(
         confirmationCallId: String,
         confirmed: Boolean,
     ): Flow<Event> {
-        val activeRunner = runner
+        val activeRunner = currentRunner()
         val confirmationResponse = Content(
             role = Role.USER,
             parts = listOf(
@@ -137,6 +142,11 @@ class AgentChatRunner(
             runConfig = RunConfig(streamingMode = StreamingMode.SSE),
         ).flowOn(Dispatchers.IO)
     }
+
+    private suspend fun currentRunner(): InMemoryRunner =
+        runner ?: runnerMutex.withLock {
+            runner ?: buildRunner(factory()).also { runner = it }
+        }
 
     companion object {
         const val APP_NAME: String = "AsssistantaiApp"

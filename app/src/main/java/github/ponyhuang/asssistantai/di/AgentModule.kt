@@ -16,6 +16,8 @@ import github.ponyhuang.asssistantai.agent.AgentChatRunner
 import github.ponyhuang.asssistantai.agent.AgentFactory
 import github.ponyhuang.asssistantai.data.ConversationRepository
 import github.ponyhuang.asssistantai.data.ConversationMetadataDatabase
+import github.ponyhuang.asssistantai.data.ModelServiceDatabase
+import github.ponyhuang.asssistantai.data.ModelServiceRepository
 import java.io.File
 import javax.inject.Singleton
 
@@ -55,8 +57,12 @@ object AgentModule {
         sessionService: SessionService,
         artifactService: ArtifactService,
         agentFactory: AgentFactory,
+        modelServices: ModelServiceRepository,
     ): AgentChatRunner = AgentChatRunner(
-        factory = agentFactory::create,
+        factory = {
+            modelServices.awaitReady()
+            agentFactory.create()
+        },
         sessionService = sessionService,
         artifactService = artifactService,
     )
@@ -86,6 +92,16 @@ object AgentModule {
         context,
         ConversationMetadataDatabase::class.java,
         "conversation-metadata.db",
+    ).build()
+
+    @Provides
+    @Singleton
+    fun provideModelServiceDatabase(
+        @ApplicationContext context: Context,
+    ): ModelServiceDatabase = Room.databaseBuilder(
+        context,
+        ModelServiceDatabase::class.java,
+        "model-services.db",
     ).build()
 
     /**

@@ -222,6 +222,7 @@ class ChatViewModel @Inject constructor(
      * 注：是 `suspend` 内部方法，调用方必须在协程里调用以确保 `_uiState.value.sessionId` 已更新后再继续。
      */
     private suspend fun ensureSessionId(): String {
+        modelServices.awaitReady()
         _uiState.value.sessionId.takeIf { it.isNotBlank() }?.let { return it }
         val newId = repository.createConversation(defaultModelPayload())
         if (newId.isNotBlank()) {
@@ -247,6 +248,7 @@ class ChatViewModel @Inject constructor(
         // 单帧闪烁。三个分支都在 commit / 兜底结束时各自把它置回 false。
         _uiState.update { it.copy(isInitializing = true) }
         viewModelScope.launch {
+            modelServices.awaitReady()
             // 1. 元数据中的当前会话优先 — 仅当 ADK Room 里仍存在该 session 才算命中。
             val remembered = repository.lastConversationId()
             if (remembered != null) {
@@ -302,6 +304,7 @@ class ChatViewModel @Inject constructor(
         currentJob?.cancel()
         clearPartChannels()
         viewModelScope.launch {
+            modelServices.awaitReady()
             val newId = repository.createConversation(defaultModelPayload())
             if (newId.isNotBlank()) {
                 switchSession(newId)
@@ -322,6 +325,7 @@ class ChatViewModel @Inject constructor(
         // 让 MainScreen 中央 spinner 立刻接管，避免 history commit 之前旧 messages 残留闪烁。
         _uiState.update { it.copy(isStreaming = false, turnComplete = false, isInitializing = true) }
         viewModelScope.launch {
+            modelServices.awaitReady()
             val messages = repository.loadMessages(sessionId)
             when {
                 messages == null -> {
@@ -399,7 +403,7 @@ class ChatViewModel @Inject constructor(
      * 当前正在流式输出的会话不会被中途打断（recreate 只换 runner 引用，下一次 send 才用上）。
      */
     fun recreateRunner() {
-        runner.recreate()
+        viewModelScope.launch { runner.recreate() }
     }
 
     fun selectModel(selection: ModelSelection) {
@@ -426,6 +430,7 @@ class ChatViewModel @Inject constructor(
      * 把指定会话持久化的配置装载为当前运行时配置，并重建后续消息使用的 agent。
      */
     private suspend fun activateConversationSettings(sessionId: String) {
+        modelServices.awaitReady()
         val storedModel = repository.activateConversation(sessionId, defaultModelPayload())
         val savedSelection = ModelSelectionCodec.decode(storedModel)
         val selection = savedSelection ?: modelServices.defaultSelection()

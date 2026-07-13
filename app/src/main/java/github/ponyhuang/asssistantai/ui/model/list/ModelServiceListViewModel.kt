@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
 import github.ponyhuang.asssistantai.data.ModelProvider
+import github.ponyhuang.asssistantai.data.ModelCatalogLoadState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +26,8 @@ import javax.inject.Inject
 class ModelServiceListViewModel @Inject constructor(
     private val modelServices: ModelServiceRepository,
 ) : ViewModel() {
+
+    val loadState: StateFlow<ModelCatalogLoadState> = modelServices.loadState
 
     /** 当前搜索词。 */
     val query: MutableStateFlow<String> = MutableStateFlow("")

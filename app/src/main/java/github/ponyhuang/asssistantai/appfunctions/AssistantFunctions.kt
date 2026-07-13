@@ -66,6 +66,7 @@ class AssistantFunctions
         suspend fun listModelServices(
             appFunctionContext: AppFunctionContext,
         ): List<ModelServiceSummary> = withContext(Dispatchers.IO) {
+            modelServices.awaitReady()
             modelServices.services.value.map { provider ->
                 ModelServiceSummary(
                     serviceId = provider.serviceId,
@@ -101,6 +102,7 @@ class AssistantFunctions
             groupId: String,
             modelId: String,
         ) = withContext(Dispatchers.IO) {
+            modelServices.awaitReady()
             val provider = modelServices.getService(serviceId)
                 ?: throw AppFunctionElementNotFoundException(
                     "serviceId '$serviceId' not found",
@@ -150,6 +152,7 @@ class AssistantFunctions
             appFunctionContext: AppFunctionContext,
             message: String,
         ): String = withContext(Dispatchers.IO) {
+            modelServices.awaitReady()
             if (message.isBlank()) {
                 throw AppFunctionInvalidArgumentException("message must not be blank")
             }

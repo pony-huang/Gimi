@@ -9,6 +9,7 @@ import github.ponyhuang.asssistantai.data.ModelItem
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
 import github.ponyhuang.asssistantai.data.ModelProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.SharingStarted
@@ -89,7 +90,8 @@ class ModelServiceDetailViewModel @Inject constructor(
     /**
      * 装载一个服务。返回 `false` 表示 Store 中找不到对应 ID（UI 应 Toast + popBackStack）。
      */
-    fun loadService(id: String): Boolean {
+    suspend fun loadService(id: String): Boolean {
+        modelServices.awaitReady()
         serviceIdFlow.value = id
         val svc = modelServices.getService(id) ?: return false
         // 默认全部展开；保留用户折叠状态（如果该 ID 之前存在）。
@@ -142,15 +144,19 @@ class ModelServiceDetailViewModel @Inject constructor(
 
     fun removeModel(groupId: String, modelId: String) {
         val id = serviceIdFlow.value ?: return
-        modelServices.removeModel(serviceId = id, groupId = groupId, modelId = modelId)
+        viewModelScope.launch {
+            modelServices.removeModel(serviceId = id, groupId = groupId, modelId = modelId)
+        }
     }
 
     fun appendModel(modelId: String) {
         val id = serviceIdFlow.value ?: return
-        modelServices.appendModel(
-            serviceId = id,
-            model = ModelItem(modelId = modelId, modelName = modelId),
-        )
+        viewModelScope.launch {
+            modelServices.appendModel(
+                serviceId = id,
+                model = ModelItem(modelId = modelId, modelName = modelId),
+            )
+        }
     }
 
     /** 使用供应商的 models 端点验证密钥；仅 HTTP 200 视为成功。 */
@@ -189,7 +195,7 @@ class ModelServiceDetailViewModel @Inject constructor(
 
         return runCatching {
             val models = fetchOpenAIModels(current.openAiCompatibleBaseUrl(), current.apiKey)
-            modelServices.upsertModels(serviceId = id, models = models)
+            modelServices.syncRemoteModels(serviceId = id, models = models)
             ModelRefreshResult.Success(models.map { it.modelId })
         }.getOrElse { ModelRefreshResult.Failure }
     }

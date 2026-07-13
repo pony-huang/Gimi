@@ -166,11 +166,6 @@ fun ChatScaffold(
             )
         },
         bottomBar = {
-            // Vertical fade gradient makes the composer feel as if it floats over the
-            // message list — the top edge blends into scrolling messages instead of
-            // presenting a hard cut. Hoisted into `remember(background)` so we don't
-            // rebuild the Brush / Color copies on every recomposition (or on every
-            // theme change beyond a real background swap).
             val background = MaterialTheme.colorScheme.background
             val fadeBrush = remember(background) {
                 Brush.verticalGradient(
@@ -311,16 +306,15 @@ private fun IntentConfirmationDialog(
 fun MainScreen(
     viewModel: ChatViewModel = hiltViewModel(),
 ) {
-    // ── ViewModel 状态订阅 ──────────────────────────────────────
     // Chat content and the history drawer use this single source of truth.
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val currentSessionId = uiState.sessionId
 
-    // ── 历史抽屉状态 ────────────────────────────────────────────
+    // 抽屉状态
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    // ── 可恢复的 Navigation 3 返回栈 ────────────────────────────
+    // 可恢复的 Navigation 3 返回栈
     val backStack = rememberNavBackStack(AppRoute.Chat)
     val goBack: () -> Unit = {
         backStack.removeLastOrNull()
@@ -331,7 +325,7 @@ fun MainScreen(
         }
     }
 
-    // ── 首屏自动加载会话列表 + 恢复上次会话（首次安装时兜底建空会话） ──────────────
+    // 首屏自动加载会话列表 + 恢复上次会话（首次安装时兜底建空会话）
     LaunchedEffect(Unit) {
         viewModel.refreshConversations()
         viewModel.restoreOrCreateSession()

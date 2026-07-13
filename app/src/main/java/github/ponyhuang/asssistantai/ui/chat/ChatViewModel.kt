@@ -3,6 +3,7 @@ package github.ponyhuang.asssistantai.ui.chat
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import android.widget.Toast
 import dagger.hilt.android.qualifiers.ApplicationContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,10 +13,9 @@ import com.google.adk.kt.types.FunctionResponse
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.asssistantai.agent.AgentChatRunner
 import github.ponyhuang.asssistantai.data.ConversationRepository
-import github.ponyhuang.asssistantai.data.ConversationSettingsStore
 import github.ponyhuang.asssistantai.data.EventMapper
-import github.ponyhuang.asssistantai.data.LastSessionStore
 import github.ponyhuang.asssistantai.data.ModelSelection
+import github.ponyhuang.asssistantai.data.ModelSelectionCodec
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
 import github.ponyhuang.asssistantai.model.FunctionCallView
 import github.ponyhuang.asssistantai.model.FunctionResponseView
@@ -50,15 +50,13 @@ import javax.inject.Inject
  *
  * 取消语义：每次 `send` 取消 `currentJob`，避免 partial 流交错。
  *
- * DI：通过 Hilt 注入 [AgentChatRunner] / [ConversationRepository] / [LastSessionStore]；UI 端用
+ * DI：通过 Hilt 注入 [AgentChatRunner] / [ConversationRepository]；UI 端用
  * `hiltViewModel()` 直接拿到实例，不再走原先的 `ChatViewModel.factory(context)`。
  */
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val runner: AgentChatRunner,
     private val repository: ConversationRepository,
-    private val lastSessionStore: LastSessionStore,
-    private val conversationSettings: ConversationSettingsStore,
     private val modelServices: ModelServiceRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
@@ -225,11 +223,9 @@ class ChatViewModel @Inject constructor(
      */
     private suspend fun ensureSessionId(): String {
         _uiState.value.sessionId.takeIf { it.isNotBlank() }?.let { return it }
-        val newId = repository.createConversation()
+        val newId = repository.createConversation(defaultModelPayload())
         if (newId.isNotBlank()) {
             _uiState.update { it.copy(sessionId = newId) }
-            lastSessionStore.set(newId)
-            initializeNewConversationModel(newId)
             activateConversationSettings(newId)
         }
         return _uiState.value.sessionId
@@ -237,7 +233,7 @@ class ChatViewModel @Inject constructor(
 
     /**
      * 启动期会话恢复：依次尝试
-     * 1. [LastSessionStore] 里记录的 id（仍在 Room 中）；
+     * 1. 元数据 RoomDatabase 中 `isLast=true` 的 id（仍在 ADK Room 中）；
      * 2. Room 中 `lastUpdateTime` 最大的会话（即最近活跃的）；
      * 3. 创建一个新的空会话（首次安装 / 全部被删的兜底）。
      *
@@ -251,8 +247,8 @@ class ChatViewModel @Inject constructor(
         // 单帧闪烁。三个分支都在 commit / 兜底结束时各自把它置回 false。
         _uiState.update { it.copy(isInitializing = true) }
         viewModelScope.launch {
-            // 1. prefs 中的 id 优先 — 仅当 Room 里仍存在该 session 才算命中。
-            val remembered = lastSessionStore.get()
+            // 1. 元数据中的当前会话优先 — 仅当 ADK Room 里仍存在该 session 才算命中。
+            val remembered = repository.lastConversationId()
             if (remembered != null) {
                 val history = repository.loadMessages(remembered)
                 if (history != null) {
@@ -268,9 +264,8 @@ class ChatViewModel @Inject constructor(
                     Log.i(TAG, "restoreOrCreateSession: restored from prefs id=$remembered (events=${history.size}).")
                     return@launch
                 } else {
-                    // id 已失效（用户删过 / 清理过 Room），清掉 prefs 避免下次再读到。
-                    lastSessionStore.clear()
-                    Log.i(TAG, "restoreOrCreateSession: remembered id=$remembered missing; cleared prefs.")
+                    repository.discardConversationMetadata(remembered)
+                    Log.i(TAG, "restoreOrCreateSession: remembered id=$remembered missing; cleared metadata.")
                 }
             }
 
@@ -284,12 +279,10 @@ class ChatViewModel @Inject constructor(
             }
 
             // 3. 兜底：数据库里一个 session 都没有，建一个空会话（首次安装 / 全删场景）。
-            val newId = repository.createConversation()
+            val newId = repository.createConversation(defaultModelPayload())
             if (newId.isNotBlank()) {
-                initializeNewConversationModel(newId)
                 activateConversationSettings(newId)
                 _uiState.update { it.copy(sessionId = newId, isInitializing = false) }
-                lastSessionStore.set(newId)
                 Log.i(TAG, "restoreOrCreateSession: created fresh session id=$newId.")
             } else {
                 // create 失败也别把 spinner 永久卡住。
@@ -309,10 +302,8 @@ class ChatViewModel @Inject constructor(
         currentJob?.cancel()
         clearPartChannels()
         viewModelScope.launch {
-            val newId = repository.createConversation()
+            val newId = repository.createConversation(defaultModelPayload())
             if (newId.isNotBlank()) {
-                lastSessionStore.set(newId)
-                initializeNewConversationModel(newId)
                 switchSession(newId)
             } else {
                 Log.w(TAG, "reset() failed to create a new conversation; UI state unchanged.")
@@ -321,20 +312,7 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * 切换到指定 session：
-     * 1. 取消当前 streaming job。
-     * 2. 关闭并清空 [partChannels]，避免 channel 跨会话累积。
-     * 3. 立即把 `_uiState.isStreaming` 置 false（解锁输入框；用户能立刻开始敲下一句）。
-     * 4. 异步从 [ConversationRepository.loadMessages] 读取历史 events，**一次性** commit `sessionId` + `messages` 到 `_uiState`：
-     *    - 返回 `null`：session 不存在 → 清掉 prefs 里失效的 id（如果是），自动调 [ConversationRepository.createConversation] 建一个新会话（抽屉里的条目已陈旧），把新 sessionId commit 到 UI。
-     *    - 返回非空列表：把历史 messages 灌入 UI，并写 prefs。
-     *    - 返回空列表：session 存在但没有 event（刚创建的空会话）→ 同样一次性 commit sessionId + 空 messages，写 prefs。
-     *
-     * prefs 写入：命中（即 session 存在）时记录为最近打开；不存在分支里新创建的 id 也写入。
-     *
-     * 注：与原实现的关键差异 — 不再在调用入口就清空 messages 造成"空白 → 灌入"
-     * 的两段帧闪烁。代价是首屏到 history 真正可见之间有一帧 loading（依赖 Room 同步读速度，
-     * 实测 < 16ms，可以忽略）。
+     * 切换到指定 session
      */
     fun switchSession(sessionId: String) {
         if (sessionId.isBlank()) return
@@ -344,14 +322,13 @@ class ChatViewModel @Inject constructor(
         // 让 MainScreen 中央 spinner 立刻接管，避免 history commit 之前旧 messages 残留闪烁。
         _uiState.update { it.copy(isStreaming = false, turnComplete = false, isInitializing = true) }
         viewModelScope.launch {
-            val history = repository.loadMessages(sessionId)
+            val messages = repository.loadMessages(sessionId)
             when {
-                history == null -> {
+                messages == null -> {
                     Log.i(TAG, "switchSession($sessionId): session missing; creating a fresh one.")
-                    if (lastSessionStore.get() == sessionId) lastSessionStore.clear()
-                    val newId = repository.createConversation()
+                    repository.discardConversationMetadata(sessionId)
+                    val newId = repository.createConversation(defaultModelPayload())
                     if (newId.isNotBlank()) {
-                        initializeNewConversationModel(newId)
                         activateConversationSettings(newId)
                         _uiState.update {
                             it.copy(
@@ -361,7 +338,6 @@ class ChatViewModel @Inject constructor(
                                 isInitializing = false,
                             )
                         }
-                        lastSessionStore.set(newId)
                     } else {
                         // create 失败也别把 spinner 永久卡住 — 解锁 UI 让用户能重试。
                         _uiState.update { it.copy(isInitializing = false) }
@@ -376,12 +352,11 @@ class ChatViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             sessionId = sessionId,
-                            messages = history,
+                            messages = messages,
                             turnComplete = false,
                             isInitializing = false,
                         )
                     }
-                    lastSessionStore.set(sessionId)
                 }
             }
         }
@@ -406,8 +381,7 @@ class ChatViewModel @Inject constructor(
      * 守卫：若 [sessionId] 等于当前 `_uiState.value.sessionId`（即用户正在用的会话），直接 no-op —
      * 删掉当前会话会把 `sessionId` 留在一个已删除的 id 上，后续 `send()` 会因找不到 session 而失败。
      *
-     * 副作用：若删的恰好是 [LastSessionStore] 里记录的"最近打开 id"（不是当前打开但可能是上次的），
-     * 顺手清掉 prefs，避免下次冷启动误读到一个已删除的 id。
+     * 副作用：删除成功后同步移除 RoomDatabase 中对应的会话元数据。
      */
     fun deleteConversation(sessionId: String) {
         if (sessionId.isBlank()) return
@@ -417,8 +391,6 @@ class ChatViewModel @Inject constructor(
         }
         viewModelScope.launch {
             repository.deleteConversation(sessionId)
-            conversationSettings.remove(sessionId)
-            if (lastSessionStore.get() == sessionId) lastSessionStore.clear()
         }
     }
 
@@ -431,26 +403,34 @@ class ChatViewModel @Inject constructor(
     }
 
     fun selectModel(selection: ModelSelection) {
+        // AgentChatRunner snapshots its agent at send entry. Changing the backing model while
+        // a turn is active would make the current UI state disagree with that in-flight call.
+        if (_uiState.value.isStreaming) {
+            Log.i(TAG, "selectModel() ignored while an agent call is in progress.")
+            Toast.makeText(appContext, "正在生成回复，完成后再切换模型", Toast.LENGTH_SHORT).show()
+            return
+        }
         val sessionId = _uiState.value.sessionId
         if (sessionId.isBlank()) return
-        conversationSettings.setModelSelection(sessionId, selection)
-        _currentModelSelection.value = selection
-        modelServices.setCurrentSelection(selection)
-        // 当前流式调用已在 AgentChatRunner.send 入口快照 runner，重建不会中断它；
-        // 因此无论是否正在输出，下一条消息都会使用新模型。
-        runner.recreate()
+        viewModelScope.launch {
+            repository.setConversationModel(sessionId, ModelSelectionCodec.encode(selection))
+            _currentModelSelection.value = selection
+            modelServices.setCurrentSelection(selection)
+            // 当前流式调用已在 AgentChatRunner.send 入口快照 runner，重建不会中断它；
+            // 因此无论是否正在输出，下一条消息都会使用新模型。
+            runner.recreate()
+        }
     }
 
     /**
      * 把指定会话持久化的配置装载为当前运行时配置，并重建后续消息使用的 agent。
      */
-    private fun activateConversationSettings(sessionId: String) {
-        val savedSelection = conversationSettings.get(sessionId).modelSelection
-        val selection = savedSelection
-            ?: modelServices.currentSelection.value
-            ?: modelServices.defaultSelection()
+    private suspend fun activateConversationSettings(sessionId: String) {
+        val storedModel = repository.activateConversation(sessionId, defaultModelPayload())
+        val savedSelection = ModelSelectionCodec.decode(storedModel)
+        val selection = savedSelection ?: modelServices.defaultSelection()
         if (savedSelection == null && selection != null) {
-            conversationSettings.setModelSelection(sessionId, selection)
+            repository.setConversationModel(sessionId, ModelSelectionCodec.encode(selection))
         }
         _currentModelSelection.value = selection
         modelServices.setCurrentSelection(selection)
@@ -458,11 +438,9 @@ class ChatViewModel @Inject constructor(
     }
 
     /** 新会话固定使用首个可用模型，不继承最近选择。 */
-    private fun initializeNewConversationModel(sessionId: String) {
-        modelServices.defaultSelection()?.let { default ->
-            conversationSettings.setModelSelection(sessionId, default)
-        }
-    }
+    private fun defaultModelPayload(): String = modelServices.defaultSelection()
+        ?.let(ModelSelectionCodec::encode)
+        .orEmpty()
 
     /**
      * 用户主动中断当前 turn（点击 composer 上的停止按钮）。

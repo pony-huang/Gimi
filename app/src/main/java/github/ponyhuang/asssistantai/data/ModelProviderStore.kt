@@ -41,10 +41,12 @@ class ModelServiceRepository @Inject constructor(
         Context.MODE_PRIVATE,
     )
     private val _currentSelection = MutableStateFlow<ModelSelection?>(null)
+    private val remoteModelsType = object : TypeToken<Map<String, List<ModelItem>>>() {}.type
+    private val servicesType = object : TypeToken<List<ModelProvider>>() {}.type
 
     /** 当前所有服务列表。订阅本属性可获得变更通知。 */
     val services: StateFlow<List<ModelProvider>> = _services
-    /** 最近激活的模型选择；会在冷启动时从加密偏好恢复。 */
+    /** 当前激活会话的运行时模型选择；会话持久化由 ConversationMetadataDatabase 管理。 */
     val currentSelection: StateFlow<ModelSelection?> = _currentSelection.asStateFlow()
 
     init {
@@ -59,7 +61,6 @@ class ModelServiceRepository @Inject constructor(
             persistServices()
             preferences.edit(commit = true) { remove(remoteModelsKey) }
         }
-        _currentSelection.value = readPersistedCurrentSelection()
     }
 
     /** 全量替换服务列表。仅供测试或受控的数据恢复流程使用。 */
@@ -219,26 +220,6 @@ class ModelServiceRepository @Inject constructor(
         }
     }
 
-    private fun readPersistedCurrentSelection(): ModelSelection? {
-        val encrypted = preferences.getString(currentSelectionKey, null) ?: return null
-        return runCatching {
-            gson.fromJson(decrypt(encrypted), ModelSelection::class.java)
-        }.onFailure { error ->
-            Log.w(TAG, "Unable to restore the current model selection.", error)
-        }.getOrNull()
-    }
-
-    private fun persistCurrentSelection(selection: ModelSelection?) {
-        runCatching {
-            preferences.edit(commit = true) {
-                if (selection == null) remove(currentSelectionKey)
-                else putString(currentSelectionKey, encrypt(gson.toJson(selection)))
-            }
-        }.onFailure { error ->
-            Log.w(TAG, "Unable to persist the current model selection.", error)
-        }
-    }
-
     private fun encrypt(plainText: String): String {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateSecretKey())
@@ -279,9 +260,6 @@ class ModelServiceRepository @Inject constructor(
             .generateKey()
     }
 
-    private val remoteModelsType = object : TypeToken<Map<String, List<ModelItem>>>() {}.type
-    private val servicesType = object : TypeToken<List<ModelProvider>>() {}.type
-
     /** 按服务与模型的存储顺序返回首个可用于新会话的模型。 */
     fun defaultSelection(): ModelSelection? {
         return _services.value.asSequence()
@@ -301,7 +279,7 @@ class ModelServiceRepository @Inject constructor(
     // ── 用户显式选择的"当前模型" ────────────────────────────────────────
     //
     // 这是当前激活会话的运行时镜像，而非持久化源。会话级持久化由
-    // ConversationSettingsStore 负责，ChatViewModel 在打开会话时把配置装载到这里，
+    // ConversationMetadataDatabase 负责，ChatViewModel 在打开会话时把配置装载到这里，
     // 供 AgentFactory.selectModelConfig 创建 runner 使用。
     //
     // 设计要点：
@@ -312,7 +290,6 @@ class ModelServiceRepository @Inject constructor(
     /** 设置或清空用户显式选择的当前模型。传 `null` 回到回退逻辑。 */
     fun setCurrentSelection(selection: ModelSelection?) {
         _currentSelection.value = selection
-        persistCurrentSelection(selection)
     }
 
     /**
@@ -346,7 +323,6 @@ class ModelServiceRepository @Inject constructor(
         const val TAG = "ModelServiceRepository"
         const val preferencesName = "model_service_prefs"
         const val servicesKey = "encrypted_services"
-        const val currentSelectionKey = "encrypted_current_selection"
         const val remoteModelsKey = "remote_models"
         const val keyAlias = "model_service_config_key"
         const val ANDROID_KEY_STORE = "AndroidKeyStore"

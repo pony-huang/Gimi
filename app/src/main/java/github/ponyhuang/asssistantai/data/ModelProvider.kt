@@ -4,14 +4,6 @@ import github.ponyhuang.asssistantai.BuildConfig
 
 /**
  * 模型服务与配置中心 — 数据契约。
- *
- * 单一服务下挂若干模型组（[ModelGroup]），每个模型组下挂若干具体模型（[ModelItem]）。
- * 本文件的所有字段对齐 OpenSpec `model-service-domain-model` spec。
- */
-
-/**
- * 一个模型服务平台（深度求索、MiniMax 等）。
- *
  * @property serviceId 平台唯一 ID（如 `"deepseek"`）。
  * @property serviceName 中文 / 品牌展示名（如 `"深度求索"`）。
  * @property isEnabled 总开关；false 时列表页不显示 ON 胶囊，且 Agent 不应路由到此服务。

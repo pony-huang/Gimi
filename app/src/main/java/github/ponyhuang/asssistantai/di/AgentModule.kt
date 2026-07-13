@@ -2,6 +2,7 @@ package github.ponyhuang.asssistantai.di
 
 import android.content.Context
 import android.util.Log
+import androidx.room.Room
 import com.google.adk.kt.artifacts.ArtifactService
 import com.google.adk.kt.artifacts.FileArtifactService
 import com.google.adk.kt.sessions.SessionService
@@ -14,6 +15,7 @@ import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.asssistantai.agent.AgentChatRunner
 import github.ponyhuang.asssistantai.agent.AgentFactory
 import github.ponyhuang.asssistantai.data.ConversationRepository
+import github.ponyhuang.asssistantai.data.ConversationMetadataDatabase
 import java.io.File
 import javax.inject.Singleton
 
@@ -68,11 +70,23 @@ object AgentModule {
     @Singleton
     fun provideConversationRepository(
         sessionService: SessionService,
+        metadataDatabase: ConversationMetadataDatabase,
     ): ConversationRepository = ConversationRepository(
         appName = AgentChatRunner.APP_NAME,
         userId = USER_ID,
         sessionService = sessionService,
+        metadataDao = metadataDatabase.conversationMetadataDao(),
     )
+
+    @Provides
+    @Singleton
+    fun provideConversationMetadataDatabase(
+        @ApplicationContext context: Context,
+    ): ConversationMetadataDatabase = Room.databaseBuilder(
+        context,
+        ConversationMetadataDatabase::class.java,
+        "conversation-metadata.db",
+    ).build()
 
     /**
      * 选 artifact 根目录：优先外置存储，失败时退到内部 files dir。

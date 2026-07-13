@@ -24,6 +24,7 @@ class ConversationRepository(
     private val appName: String,
     private val userId: String,
     private val sessionService: SessionService,
+    private val metadataDao: ConversationMetadataDao,
 ) {
 
     private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
@@ -49,7 +50,7 @@ class ConversationRepository(
         val key = SessionKey(appName = appName, userId = userId, id = sessionId)
         try {
             val session = sessionService.getSession(key) ?: return
-            val updated = session.toConversation()
+            val updated = session.toConversation(metadataFor(sessionId))
             _conversations.value = _conversations.value
                 .filterNot { it.id == sessionId }
                 .plus(updated)
@@ -94,15 +95,64 @@ class ConversationRepository(
         }
     }
 
+    /** Returns the session selected at the previous app shutdown, if one was recorded. */
+    suspend fun lastConversationId(): String? =
+        try {
+            metadataDao.getLast()?.sessionId
+        } catch (t: Throwable) {
+            Log.w(TAG, "lastConversationId() failed: ${t::class.simpleName}: ${t.message}")
+            null
+        }
+
+    /** Marks an existing session as current and returns its stored model selection payload. */
+    suspend fun activateConversation(sessionId: String, defaultModel: String): String =
+        try {
+            val metadata = metadataDao.activate(sessionId, defaultModel)
+            refreshConversation(sessionId)
+            metadata.model
+        } catch (t: Throwable) {
+            Log.w(TAG, "activateConversation($sessionId) failed: ${t::class.simpleName}: ${t.message}")
+            defaultModel
+        }
+
+    /** Persists the selected model for a conversation and refreshes its drawer row. */
+    suspend fun setConversationModel(sessionId: String, model: String) {
+        if (sessionId.isBlank()) return
+        try {
+            metadataDao.setModel(sessionId, model)
+            refreshConversation(sessionId)
+        } catch (t: Throwable) {
+            Log.w(TAG, "setConversationModel($sessionId) failed: ${t::class.simpleName}: ${t.message}")
+        }
+    }
+
+    /** Removes stale metadata after an ADK session can no longer be found. */
+    suspend fun discardConversationMetadata(sessionId: String) {
+        if (sessionId.isBlank()) return
+        try {
+            metadataDao.delete(sessionId)
+        } catch (t: Throwable) {
+            Log.w(TAG, "discardConversationMetadata($sessionId) failed: ${t::class.simpleName}: ${t.message}")
+        }
+    }
+
     /**
      * 创建一个新会话，返回生成的 sessionId。
      */
-    suspend fun createConversation(): String {
+    suspend fun createConversation(initialModel: String = ""): String {
         val key = SessionKey(appName = appName, userId = userId, id = null)
         return try {
             val created = sessionService.createSession(key)
+            val sessionId = created.key.id.orEmpty()
+            if (sessionId.isNotBlank()) {
+                try {
+                    metadataDao.activate(sessionId, initialModel)
+                } catch (t: Throwable) {
+                    Log.w(TAG, "createConversation($sessionId) metadata write failed: ${t::class.simpleName}: ${t.message}")
+                }
+            }
             refresh()
-            created.key.id.orEmpty()
+            sessionId
         } catch (t: Throwable) {
             Log.w(TAG, "createConversation() failed: ${t::class.simpleName}: ${t.message}")
             ""
@@ -116,6 +166,7 @@ class ConversationRepository(
         val key = SessionKey(appName = appName, userId = userId, id = sessionId)
         try {
             sessionService.deleteSession(key)
+            metadataDao.delete(sessionId)
         } catch (t: Throwable) {
             Log.w(TAG, "deleteConversation($sessionId) failed: ${t::class.simpleName}: ${t.message}")
         }
@@ -124,10 +175,33 @@ class ConversationRepository(
 
     private suspend fun listConversationsInternal(): List<Conversation> {
         val response = sessionService.listSessions(appName = appName, userId = userId)
+        val metadataBySessionId = metadataBySessionId()
+        val sessionIds = response.sessions.mapTo(mutableSetOf()) { it.key.id.orEmpty() }
+        for (metadataSessionId in metadataBySessionId.keys) {
+            if (metadataSessionId !in sessionIds) {
+                discardConversationMetadata(metadataSessionId)
+            }
+        }
         return response.sessions
             .sortedByDescending { it.lastUpdateTime.toEpochMilliseconds() }
-            .map { it.toConversation() }
+            .map { session -> session.toConversation(metadataBySessionId[session.key.id.orEmpty()]) }
     }
+
+    private suspend fun metadataBySessionId(): Map<String, ConversationMetadataEntity> =
+        try {
+            metadataDao.getAll().associateBy { it.sessionId }
+        } catch (t: Throwable) {
+            Log.w(TAG, "metadataBySessionId() failed: ${t::class.simpleName}: ${t.message}")
+            emptyMap()
+        }
+
+    private suspend fun metadataFor(sessionId: String): ConversationMetadataEntity? =
+        try {
+            metadataDao.get(sessionId)
+        } catch (t: Throwable) {
+            Log.w(TAG, "metadataFor($sessionId) failed: ${t::class.simpleName}: ${t.message}")
+            null
+        }
 
     /**
      * ADK [Session] → UI [Conversation]：
@@ -135,7 +209,7 @@ class ConversationRepository(
      * - lastMessage：最后一条非空 text（按事件遍历顺序，截断 64 字符）。
      * - timestamp：`session.lastUpdateTime.toEpochMilliseconds()`。
      */
-    private fun Session.toConversation(): Conversation {
+    private fun Session.toConversation(metadata: ConversationMetadataEntity?): Conversation {
         val sessionId = key.id.orEmpty()
         val persistedTitle = state[CONVERSATION_TITLE_STATE_KEY] as? String
         val titleSource: String? = events.firstOrNull { it.author == "user" }
@@ -162,6 +236,8 @@ class ConversationRepository(
             id = sessionId,
             title = title,
             lastMessage = lastMessage,
+            model = metadata?.model.orEmpty(),
+            isLast = metadata?.isLast ?: false,
             timestamp = lastUpdateTime.toEpochMilliseconds(),
         )
     }

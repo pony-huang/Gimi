@@ -1,5 +1,6 @@
 package github.ponyhuang.asssistantai.ui.chat
 
+import android.widget.Toast
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -44,6 +45,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -329,12 +331,7 @@ private fun ModelPickerRow(
 }
 
 /**
- * 把 TopAppBar 中央"当前模型"标题 + 模型选择对话框聚合成一棵子树。
- *
- * 关键设计：所有模型服务订阅 + 派生状态（服务列表 / 当前选择 / `displayedModelName` / `enabledModels` /
- * `showModelPicker`）都封在这一个 composable 内。这样宿主屏幕（[MainScreenImpl]）的 body
- * 顶层不再订阅这些全局 StateFlow —— 模型服务列表里的任何变更只会让本子树重组，聊天区
- * (LazyColumn / 输入框 / IME 跟随) 不受影响。
+ * 把 TopAppBar 中央"当前模型"标题
  *
  * 点击标题 → 打开 [ModelPickerDialog]；选中行：
  * 1. 写入当前模型选择；
@@ -351,6 +348,7 @@ fun ModelTitleAndPicker(
     isStreaming: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     val services by viewModel.availableModelServices.collectAsStateWithLifecycle()
     val currentSelection by viewModel.currentModelSelection.collectAsStateWithLifecycle()
 
@@ -390,7 +388,13 @@ fun ModelTitleAndPicker(
     ) {
         ModelStatusDisplay(
             modelName = displayedModelName,
-            onClick = { if (displayedModelName != null) showModelPicker = true },
+            onClick = {
+                if (isStreaming) {
+                    Toast.makeText(context, "正在生成回复，完成后再切换模型", Toast.LENGTH_SHORT).show()
+                } else if (displayedModelName != null) {
+                    showModelPicker = true
+                }
+            },
         )
     }
 

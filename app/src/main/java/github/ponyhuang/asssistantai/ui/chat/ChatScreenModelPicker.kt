@@ -23,7 +23,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -53,6 +52,7 @@ import github.ponyhuang.asssistantai.data.ModelGroup
 import github.ponyhuang.asssistantai.data.ModelItem
 import github.ponyhuang.asssistantai.data.ModelProvider
 import github.ponyhuang.asssistantai.data.ModelSelection
+import github.ponyhuang.asssistantai.ui.model.ModelServiceIcon
 import kotlin.math.abs
 
 /**
@@ -77,9 +77,9 @@ data class EnabledModelRow(
 )
 
 /**
- * TopAppBar 中央常驻显示：当前激活模型名称 + sparkles 图标 alpha 脉动 + 下拉 caret。
+ * TopAppBar 中央常驻显示：当前激活模型名称 + 服务品牌图标 + 下拉 caret。
  *
- * - 仅对左侧 sparkles 图标做 1.4s 周期的 alpha 反向循环（0.55 ↔ 1.0），文字本身不动，
+ * - 仅对左侧品牌图标做 1.4s 周期的 alpha 反向循环（0.55 ↔ 1.0），文字本身不动，
  *   避免触发布局抖动与文字偏移。
  * - `modelName == null`（没有任何已启用服务）时跳过动效与 caret，文字改用 error 色。
  *
@@ -89,6 +89,7 @@ data class EnabledModelRow(
 @Composable
 fun ModelStatusDisplay(
     modelName: String?,
+    serviceId: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -115,13 +116,12 @@ fun ModelStatusDisplay(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
         ) {
             if (isActive) {
-                Icon(
-                    imageVector = Icons.Default.AutoAwesome,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                ModelServiceIcon(
+                    serviceId = serviceId.orEmpty(),
                     modifier = Modifier
-                        .size(16.dp)
+                        .size(20.dp)
                         .alpha(iconAlpha),
+                    contentPadding = 3.dp,
                 )
                 Spacer(Modifier.width(6.dp))
             }
@@ -352,16 +352,19 @@ fun ModelTitleAndPicker(
     val services by viewModel.availableModelServices.collectAsStateWithLifecycle()
     val currentSelection by viewModel.currentModelSelection.collectAsStateWithLifecycle()
 
-    // 解析后用于 TopAppBar 中央显示的模型名。显式选择命中走 resolveSelection，
+    // 解析后用于 TopAppBar 中央显示的模型。显式选择命中走 resolveSelection，
     // 否则回退到"第一个启用服务 → 第一个非空组 → 第一个模型"。两个都没有则 null（空态）。
-    val displayedModelName: String? = remember(services, currentSelection) {
-        val resolved = services.resolveSelection(currentSelection)
-        if (resolved != null) return@remember resolved.model.modelName
-        val firstEnabled = services.firstOrNull { it.isEnabled } ?: return@remember null
-        val firstGroup = firstEnabled.modelGroups.firstOrNull { it.models.isNotEmpty() }
-            ?: return@remember null
-        firstGroup.models.first().modelName
+    val displayedModel: EnabledModelRow? = remember(services, currentSelection) {
+        services.resolveSelection(currentSelection) ?: services.asSequence()
+            .filter { it.isEnabled }
+            .flatMap { service ->
+                service.modelGroups.asSequence().flatMap { group ->
+                    group.models.asSequence().map { model -> EnabledModelRow(service, group, model) }
+                }
+            }
+            .firstOrNull()
     }
+    val displayedModelName = displayedModel?.model?.modelName
     // 若会话没有显式选择或选择已失效，选择器应与标题/runner 的回退结果一致，
     // 使用户看到当前正在使用的模型已被勾选。
     val effectiveSelection: ModelSelection? = remember(services, currentSelection) {
@@ -388,6 +391,7 @@ fun ModelTitleAndPicker(
     ) {
         ModelStatusDisplay(
             modelName = displayedModelName,
+            serviceId = displayedModel?.service?.serviceId,
             onClick = {
                 if (isStreaming) {
                     Toast.makeText(context, "正在生成回复，完成后再切换模型", Toast.LENGTH_SHORT).show()

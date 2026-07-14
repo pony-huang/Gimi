@@ -12,6 +12,13 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application
         android:name=".AsssistantaiApp"
         android:allowBackup="true"
@@ -50,6 +57,22 @@
             android:theme="@style/Theme.Asssistantai"
             android:windowSoftInputMode="adjustResize"
             tools:ignore="MissingClass" />
+        <!--
+            Required by MediaSessionManagerTool: the system grants cross-app
+            media-session access only when this app is registered as a
+            notification listener and the user has enabled it in Settings →
+            Notifications → Device & app notifications. The service itself is
+            empty — it exists to satisfy getActiveSessions(ComponentName).
+        -->
+        <service
+            android:name=".agent.tools.systems.MediaNotificationListenerService"
+            android:exported="true"
+            android:label="@string/media_notification_listener_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
         <!--
             AppFunctions runtime uses this property to load the LLM-facing description of
             what this app can do and when its functions should be called. Mirrors the

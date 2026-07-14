@@ -15,4 +15,8 @@
     <string name="stream_ai_compose_composer_stop_button">Stop</string>
     <string name="stream_ai_compose_composer_send_button">Send</string>
     <string name="stream_ai_compose_composer_add_attachments_button">Add context</string>
+
+    <!-- Display name shown in Settings → Notifications → Device & app notifications
+         for MediaSessionManagerTool's notification listener service. -->
+    <string name="media_notification_listener_label">asssistantai media control</string>
 </resources>

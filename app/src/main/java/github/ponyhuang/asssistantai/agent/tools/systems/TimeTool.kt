@@ -1,57 +1,33 @@
 package github.ponyhuang.asssistantai.agent.tools.systems
 
-import android.os.SystemClock
 import com.google.adk.kt.annotations.Tool
-import java.time.DateTimeException
-import java.time.Instant
+import java.time.DayOfWeek
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Gets the current UTC time supplied by Android's network and GNSS time services. */
+/** Gets the current local time on the device. */
 @Singleton
 class TimeTool @Inject constructor() {
 
     @Tool(
         name = "get_current_time",
-        description = "Gets the current UTC time synchronized by the device's Network location provider. Use when network time is required.",
+        description = "Gets the current local time on the device, including the configured timezone.",
         requireConfirmation = false,
         isLongRunning = false,
     )
-    fun getCurrentTime(): Map<String, Any> = try {
-        val epochMillis = SystemClock.currentNetworkTimeClock().millis()
-        mapOf(
-            "success" to true,
-            "timeSource" to "network",
-            "epochMillis" to epochMillis,
-            "utcTime" to Instant.ofEpochMilli(epochMillis).toString(),
-        )
-    } catch (exception: DateTimeException) {
-        mapOf(
-            "success" to false,
-            "timeSource" to "network",
-            "error" to "Network time is not available on this device.",
-        )
-    }
-
-    @Tool(
-        name = "get_current_gnss_time",
-        description = "Gets the current UTC time synchronized by the device's GNSS receiver. Use when satellite-based time is required and network time is unavailable or untrusted.",
-        requireConfirmation = false,
-        isLongRunning = false,
-    )
-    fun getCurrentGnssTime(): Map<String, Any> = try {
-        val epochMillis = SystemClock.currentGnssTimeClock().millis()
-        mapOf(
-            "success" to true,
-            "timeSource" to "gnss",
-            "epochMillis" to epochMillis,
-            "utcTime" to Instant.ofEpochMilli(epochMillis).toString(),
-        )
-    } catch (exception: DateTimeException) {
-        mapOf(
-            "success" to false,
-            "timeSource" to "gnss",
-            "error" to "GNSS time is not available on this device.",
+    fun getCurrentTime(): Map<String, Any> {
+        val now = ZonedDateTime.now()
+        val dayOfWeek = now.dayOfWeek
+        return mapOf(
+            "timestamp" to now.toInstant().toEpochMilli(),
+            "iso8601" to now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")),
+            "date" to now.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE),
+            "time" to now.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
+            "timezone" to now.zone.id,
+            "dayOfWeek" to dayOfWeek.name,
+            "isWeekend" to (dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY),
         )
     }
 }

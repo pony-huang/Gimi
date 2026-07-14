@@ -18,7 +18,6 @@ import com.openai.core.JsonValue
 import com.openai.core.jsonMapper
 import com.openai.errors.BadRequestException
 import com.openai.errors.OpenAIException
-import com.openai.helpers.ChatCompletionAccumulator.Companion.create
 import com.openai.models.FunctionDefinition
 import com.openai.models.FunctionParameters
 import com.openai.models.ReasoningEffort
@@ -58,6 +57,12 @@ open class Openai(
         private val JSON_MAPPER = jsonMapper()
         private val logger = LoggerFactory.getLogger(Openai::class)
         private const val DEFAULT_MAX_COMPLETION_TOKENS = 2048L
+        private val THOUGHT_DELTA_FIELDS = setOf(
+            "reasoning_content",
+            "reasoning",
+            "thinking",
+            "thought",
+        )
     }
 
     override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {
@@ -126,33 +131,29 @@ open class Openai(
      * so the UI can render incrementally. Tool call deltas are buffered
      * by their chunk `index` — OpenAI emits `id` and `function.name` on
      * the first chunk for a tool, then streams the `arguments` JSON
-     * across subsequent chunks. The accumulated tool calls are emitted
-     * as a single non-partial response once the stream ends, mirroring
-     * the non-streaming [ChatCompletion] shape.
+     * across subsequent chunks. A local accumulator is used instead of
+     * `ChatCompletionAccumulator`, because compatible services may include usage data in chunks
+     * that do not conform to the SDK's strict completion shape.
      */
     private suspend fun FlowCollector<LlmResponse>.processStreamingResponse(params: ChatCompletionCreateParams) {
-        val chatCompletionAccumulator = create()
+        val responseAccumulator = StreamingResponseAccumulator()
         try {
             client.chat().completions().createStreaming(params).use { streamResponse ->
-                // Java streams are lazy. The previous pipeline had no terminal operation,
-                // so it never read a chunk or let the SDK observe the final chunk required
-                // by ChatCompletionAccumulator.chatCompletion().
                 val chunks = streamResponse.stream().iterator()
                 while (chunks.hasNext()) {
                     val chunk = chunks.next()
-                    chatCompletionAccumulator.accumulate(chunk)
-                    for (choice in chunk.choices()) {
-                        emitTextDelta(choice)
+                    val choices = chunk.choices()
+                    chunk.usage().orElse(null)?.let(responseAccumulator::setUsage)
+                    for (choice in choices) {
+                        responseAccumulator.accumulateToolCall(choice)
+                        choice.textDeltaOrNull()?.let { text ->
+                            responseAccumulator.appendText(text)
+                            emitTextDelta(text)
+                        }
                     }
                 }
             }
-            val chatCompletion = chatCompletionAccumulator.chatCompletion()
-            val llmResponse = chatCompletion.toLlmResponse()
-            llmResponse.content?.parts?.any {
-                it.functionCall != null || it.functionResponse != null
-            }.let {
-                emit(llmResponse)
-            }
+            emit(responseAccumulator.toLlmResponse())
         } catch (e: OpenAIException) {
             logger.error(e) { "Error processing OpenAI streaming response" }
             emit(mapToErrorResponse(e))
@@ -163,27 +164,94 @@ open class Openai(
     }
 
     /**
-     * Emits one `partial = true` [LlmResponse] for the text delta in [choice] (drives the
-     * typewriter UI) and returns the same delta string so the caller can fold it into the
-     * stream-end accumulator without re-parsing the chunk.
+     * Extracts a regular-text delta from [ChatCompletionChunk.Choice].
+     *
+     * The returned value is used to emit a `partial = true` [LlmResponse] for the typewriter UI.
+     * OpenAI-compatible providers commonly put reasoning in an extension field such as
+     * `reasoning_content`; those deltas are discarded instead of being rendered as text.
      */
-    private suspend fun FlowCollector<LlmResponse>.emitTextDelta(
-        choice: ChatCompletionChunk.Choice,
-    ) {
-        val text = choice.delta().content().orElse(null)
+    private fun ChatCompletionChunk.Choice.textDeltaOrNull(): String? {
+        val delta = delta()
+        // Some compatible providers include a reasoning extension (often with a null value) on
+        // every chunk. A non-empty standard `content` field is always the visible answer and
+        // must take precedence over those extension fields.
+        delta.content().orElse(null)
             ?.takeIf { it.isNotBlank() }
-            ?: return
+            ?.let { return it }
 
+        val thoughtFields = delta._additionalProperties().keys.intersect(THOUGHT_DELTA_FIELDS)
+        if (thoughtFields.isNotEmpty()) {
+            logger.trace { "Ignoring OpenAI streaming thought delta from $thoughtFields" }
+        }
+        return null
+    }
+
+    private suspend fun FlowCollector<LlmResponse>.emitTextDelta(text: String) {
         emit(
             LlmResponse(
                 content = Content(
                     role = Role.MODEL,
-                    parts = listOf(Part(text = text)),
+                    parts = listOf(Part(text = text, thought = false)),
                 ),
                 partial = true,
             ),
         )
     }
+
+    private inner class StreamingResponseAccumulator {
+        private val text = StringBuilder()
+        private val toolCalls = linkedMapOf<Pair<Long, Long>, StreamedToolCall>()
+        private var usage: CompletionUsage? = null
+
+        fun appendText(delta: String) {
+            text.append(delta)
+        }
+
+        fun setUsage(usage: CompletionUsage) {
+            this.usage = usage
+        }
+
+        fun accumulateToolCall(choice: ChatCompletionChunk.Choice) {
+            choice.delta().toolCalls().orElse(emptyList()).forEach { toolCall ->
+                val accumulated = toolCalls.getOrPut(choice.index() to toolCall.index()) {
+                    StreamedToolCall()
+                }
+                toolCall.id().ifPresent { accumulated.id = it }
+                toolCall.function().ifPresent { function ->
+                    function.name().ifPresent { accumulated.name = it }
+                    function.arguments().ifPresent { accumulated.arguments.append(it) }
+                }
+            }
+        }
+
+        fun toLlmResponse(): LlmResponse {
+            val parts = buildList {
+                text.takeIf { it.isNotEmpty() }?.let { add(Part(text = it.toString(), thought = false)) }
+                toolCalls.values.forEach { toolCall ->
+                    val name = toolCall.name ?: return@forEach
+                    add(
+                        Part(
+                            functionCall = FunctionCall(
+                                id = toolCall.id,
+                                name = name,
+                                args = parseJsonArgs(toolCall.arguments.toString().ifEmpty { "{}" }),
+                            )
+                        )
+                    )
+                }
+            }
+            return LlmResponse(
+                content = Content(role = Role.MODEL, parts = parts),
+                usageMetadata = usage?.toUsageMetadata(),
+            )
+        }
+    }
+
+    private class StreamedToolCall(
+        var id: String? = null,
+        var name: String? = null,
+        val arguments: StringBuilder = StringBuilder(),
+    )
 
 
     private fun ChatCompletion.toLlmResponse(): LlmResponse = LlmResponse(
@@ -315,7 +383,11 @@ open class Openai(
     }
 
     private fun FunctionDeclaration.toChatCompletionTool(): ChatCompletionTool {
-        val parameters = parameters?.toOpenAiParameters() ?: emptyMap()
+        // ADK represents parameterless functions with `parameters == null`, while OpenAI
+        // requires every function's parameters schema to have an object root.
+        val parameters = parameters?.toOpenAiParameters()?.toMutableMap() ?: mutableMapOf()
+        parameters["type"] = JsonValue.from("object")
+        parameters.putIfAbsent("properties", JsonValue.from(emptyMap<String, JsonValue>()))
         val functionDef = FunctionDefinition.builder()
             .name(name)
             .description(description)

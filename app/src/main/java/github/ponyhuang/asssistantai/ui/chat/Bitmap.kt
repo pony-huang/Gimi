@@ -6,6 +6,15 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import androidx.exifinterface.media.ExifInterface
 import android.net.Uri
+import github.ponyhuang.asssistantai.model.ImageAttachment
+import java.io.ByteArrayOutputStream
+
+private const val ATTACHMENT_MAX_DIMENSION_PX = 1280
+private const val ATTACHMENT_MAX_BYTES = 512 * 1024
+private const val INITIAL_JPEG_QUALITY = 85
+private const val MIN_JPEG_QUALITY = 45
+private const val JPEG_QUALITY_STEP = 10
+private const val MAX_RESIZE_ATTEMPTS = 4
 
 /**
  * Decodes a bitmap from a URI, downsampling it to approximately the target size
@@ -48,6 +57,57 @@ internal fun decodeSampledBitmap(
     } ?: ExifInterface.ORIENTATION_NORMAL
 
     return rotateBitmap(bitmap, orientation)
+}
+
+/**
+ * Prepares an image for a chat event.
+ *
+ * ADK persists inline message data in Room. Keeping the encoded attachment bounded avoids a
+ * single StorageEvent row exceeding Android's CursorWindow capacity when the conversation is
+ * restored. The normalized JPEG is also the exact image shown in restored message history and
+ * sent to the model.
+ */
+internal fun prepareImageAttachment(
+    contentResolver: ContentResolver,
+    uri: Uri,
+): ImageAttachment {
+    var bitmap = decodeSampledBitmap(
+        contentResolver = contentResolver,
+        uri = uri,
+        targetSize = ATTACHMENT_MAX_DIMENSION_PX,
+    ) ?: throw IllegalArgumentException("The selected image could not be decoded")
+
+    try {
+        repeat(MAX_RESIZE_ATTEMPTS) {
+            compressAsBoundedJpeg(bitmap)?.let { bytes ->
+                return ImageAttachment(mimeType = "image/jpeg", data = bytes)
+            }
+
+            val nextWidth = (bitmap.width * 3 / 4).coerceAtLeast(1)
+            val nextHeight = (bitmap.height * 3 / 4).coerceAtLeast(1)
+            if (nextWidth == bitmap.width && nextHeight == bitmap.height) return@repeat
+
+            val resized = Bitmap.createScaledBitmap(bitmap, nextWidth, nextHeight, true)
+            if (resized != bitmap) {
+                bitmap.recycle()
+                bitmap = resized
+            }
+        }
+    } finally {
+        bitmap.recycle()
+    }
+
+    throw IllegalArgumentException("The selected image is too large after compression")
+}
+
+private fun compressAsBoundedJpeg(bitmap: Bitmap): ByteArray? {
+    for (quality in INITIAL_JPEG_QUALITY downTo MIN_JPEG_QUALITY step JPEG_QUALITY_STEP) {
+        val output = ByteArrayOutputStream()
+        val compressed = bitmap.compress(Bitmap.CompressFormat.JPEG, quality, output)
+        val bytes = output.toByteArray()
+        if (compressed && bytes.size <= ATTACHMENT_MAX_BYTES) return bytes
+    }
+    return null
 }
 
 /** Decodes in-memory image bytes into a thumbnail without retaining the full bitmap. */

@@ -207,12 +207,7 @@ class ChatViewModel @Inject constructor(
     private suspend fun readImageAttachments(uris: List<Uri>): List<ImageAttachment> =
         withContext(Dispatchers.IO) {
             uris.map { uri ->
-                val mimeType = appContext.contentResolver.getType(uri)
-                    ?.takeIf { it.startsWith("image/") }
-                    ?: "image/jpeg"
-                val bytes = appContext.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                    ?: throw IllegalStateException("The selected image is no longer available")
-                ImageAttachment(mimeType = mimeType, data = bytes)
+                prepareImageAttachment(appContext.contentResolver, uri)
             }
         }
 

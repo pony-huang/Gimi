@@ -1,6 +1,8 @@
 package github.ponyhuang.asssistantai.data
 
+import androidx.annotation.DrawableRes
 import github.ponyhuang.asssistantai.BuildConfig
+import github.ponyhuang.asssistantai.R
 
 /**
  * 模型服务与配置中心 — 数据契约。
@@ -10,6 +12,8 @@ import github.ponyhuang.asssistantai.BuildConfig
  * @property apiKey API 密钥；可填多个，逗号分隔（UI HelperText 已说明）。
  * @property baseType 接口标准类型，决定预览拼接路径。
  * @property modelGroups 该服务下的模型组列表。
+ * @property iconRes 品牌图标 drawable 资源 ID；null 时回退到默认机器人图标。
+ *                  新增厂商时只需在 [DefaultModelServices] 中赋值即可，无需改 UI 调用点。
  * @property homepageUrl 平台官方主页（Header 外链目标）。
  * @property keyHelpUrl "点击这里获取密钥" 富文本跳转目标。
  * @property docsUrl "深度求索 文档" 富文本跳转目标。
@@ -24,6 +28,7 @@ data class ModelProvider(
     val baseType: ApiBaseType = ApiBaseType.Standard,
     val anthropicBaseUrl: String = apiBaseUrl,
     val modelGroups: List<ModelGroup> = emptyList(),
+    @DrawableRes val iconRes: Int? = null,
     val homepageUrl: String = "",
     val keyHelpUrl: String = "",
     val docsUrl: String = "",
@@ -67,17 +72,16 @@ data class ModelItem(
 
 /**
  * API 地址接口标准。
- *
- * - [Standard]：OpenAI 兼容，chat completions 路径 `/v1/chat/completions`。
- * - [Anthropic]：Anthropic 兼容，messages 路径 `/v1/messages`。
- *
- * UI 层根据 [suffix] 渲染下拉选项、根据 [previewPath] 拼预览 URL。
  */
 enum class ApiBaseType(val suffix: String, val previewPath: String) {
     Standard(suffix = "standard", previewPath = "/v1/chat/completions"),
     Anthropic(suffix = "anthropic", previewPath = "/v1/messages"),
 }
 
+/**
+ * 内置 / 默认模型服务清单。新增厂商时在这里追加一条 [ModelProvider]，
+ * 同时给 [ModelProvider.iconRes] 赋值，品牌图标就会在所有 UI 调用点自动生效。
+ */
 object DefaultModelServices {
 
     val services: List<ModelProvider> = listOf(
@@ -97,15 +101,16 @@ object DefaultModelServices {
                     models = listOf(
                         ModelItem(
                             modelId = "deepseek-v4-pro",
-                            modelName = "DeepSeek V4 Pro",
+                            modelName = "deepseek-v4-pro",
                         ),
                         ModelItem(
                             modelId = "deepseek-v4-flash",
-                            modelName = "DeepSeek V4 Flash",
+                            modelName = "deepseek-v4-flash",
                         ),
                     ),
                 ),
             ),
+            iconRes = R.drawable.ic_model_provider_deepseek,
             homepageUrl = "https://www.deepseek.com/",
             keyHelpUrl = "https://platform.deepseek.com/api_keys",
             docsUrl = "https://api-docs.deepseek.com/",
@@ -127,15 +132,24 @@ object DefaultModelServices {
                     models = listOf(
                         ModelItem(
                             modelId = "MiniMax-M3",
-                            modelName = "MiniMax M3",
+                            modelName = "MiniMax-M3",
                         ),
                     ),
                 ),
             ),
+            iconRes = R.drawable.ic_model_provider_minimax,
             homepageUrl = "https://www.minimaxi.com/",
             keyHelpUrl = "https://platform.minimaxi.com/user-center/basic-information/interface-key",
             docsUrl = "https://platform.minimaxi.com/document",
             modelsUrl = "https://platform.minimaxi.com/document/Models",
-        )
+        ),
     )
+
+    /**
+     * 按 [serviceId] 查找品牌图标。供 UI 层在仅有 serviceId 时使用
+     * （例如聊天 TopAppBar 中 [ModelServiceIcon]）。
+     * 给列表里没声明 [ModelProvider.iconRes] 的服务提供兜底。
+     */
+    fun iconFor(serviceId: String): Int? =
+        services.firstOrNull { it.serviceId == serviceId }?.iconRes
 }

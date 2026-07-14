@@ -217,6 +217,9 @@ class ModelServiceRepository @Inject constructor(
                     models = group.models.map { ModelItem(it.modelId, it.modelName) },
                 )
             },
+            // 品牌图标是静态元数据，按 serviceId 从默认清单回填，
+            // 新增厂商只需在 DefaultModelServices 配 iconRes，UI 自动生效。
+            iconRes = DefaultModelServices.iconFor(entity.serviceId),
             homepageUrl = entity.homepageUrl,
             keyHelpUrl = entity.keyHelpUrl,
             docsUrl = entity.docsUrl,

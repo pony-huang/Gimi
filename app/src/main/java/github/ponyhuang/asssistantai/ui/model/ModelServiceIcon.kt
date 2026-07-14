@@ -1,6 +1,5 @@
 package github.ponyhuang.asssistantai.ui.model
 
-import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -17,16 +16,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.asssistantai.R
+import github.ponyhuang.asssistantai.data.DefaultModelServices
 
-/** Consistent, brand-faithful icon treatment for model service surfaces. */
+/**
+ * Consistent, brand-faithful icon treatment for model service surfaces.
+ *
+ * 图标来源：[DefaultModelServices] 按 [serviceId] 查表得到 `iconRes`。
+ * 新增厂商只需在 [DefaultModelServices] 给对应 [github.ponyhuang.asssistantai.data.ModelProvider]
+ * 配 `iconRes`，本组件无需任何改动即可渲染品牌图标。
+ */
 @Composable
 fun ModelServiceIcon(
     serviceId: String,
     modifier: Modifier = Modifier,
     contentPadding: Dp = 10.dp,
 ) {
-    val icon = serviceId.brandIcon()
+    val icon = DefaultModelServices.iconFor(serviceId)
     Box(
         modifier = modifier
             .background(
@@ -51,11 +56,4 @@ fun ModelServiceIcon(
             )
         }
     }
-}
-
-@DrawableRes
-private fun String.brandIcon(): Int? = when (this) {
-    "deepseek" -> R.drawable.ic_model_provider_deepseek
-    "minimax" -> R.drawable.ic_model_provider_minimax
-    else -> null
 }

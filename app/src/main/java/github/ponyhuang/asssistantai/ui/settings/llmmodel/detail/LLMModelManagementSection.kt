@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.ui.model.detail
+package github.ponyhuang.asssistantai.ui.settings.llmmodel.detail
 
 import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
@@ -43,13 +43,13 @@ import kotlinx.coroutines.launch
  * 详情页外层是 Column(verticalScroll)，嵌套 LazyColumn 会触发 Compose 非法约束崩溃）。
  */
 @Composable
-fun ModelManagementSection(
+fun LLMModelManagementSection(
     service: LLMModelProvider,
-    rows: List<ModelRow>,
+    rows: List<LLMModelRow>,
     onToggleGroup: (String) -> Unit,
     onRemoveModel: (groupId: String, modelId: String) -> Unit,
     onAppendModel: (String) -> Unit,
-    onRefreshRemote: suspend () -> ModelRefreshResult,
+    onRefreshRemote: suspend () -> LLMModelRefreshResult,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -81,14 +81,14 @@ fun ModelManagementSection(
                     refreshing = true
                     scope.launch {
                         when (val result = onRefreshRemote()) {
-                            is ModelRefreshResult.Success -> {
+                            is LLMModelRefreshResult.Success -> {
                                 Toast.makeText(
                                     context,
                                     "已同步远端：${result.modelIds.size} 条",
                                     Toast.LENGTH_SHORT,
                                 ).show()
                             }
-                            ModelRefreshResult.Failure -> {
+                            LLMModelRefreshResult.Failure -> {
                                 Toast.makeText(context, "同步远端模型失败", Toast.LENGTH_SHORT).show()
                             }
                         }
@@ -109,11 +109,11 @@ fun ModelManagementSection(
         // 扁平列表（普通 Column — 行数很少，无需 LazyColumn；且不允许嵌套在外层 verticalScroll 内）
         rows.forEach { row ->
             when (row) {
-                is ModelRow.GroupHeader -> GroupHeaderRow(
+                is LLMModelRow.GroupHeader -> GroupHeaderRow(
                     row = row,
                     onToggle = { onToggleGroup(row.groupId) },
                 )
-                is ModelRow.ModelItemRow -> ModelItemRow(
+                is LLMModelRow.LLMModelItemRow -> ModelItemRow(
                     row = row,
                     onRemove = { onRemoveModel(row.groupId, row.item.modelId) },
                 )
@@ -135,14 +135,14 @@ fun ModelManagementSection(
     }
 }
 
-private fun rowKey(row: ModelRow): String = when (row) {
-    is ModelRow.GroupHeader -> "header-${row.groupId}"
-    is ModelRow.ModelItemRow -> "item-${row.groupId}-${row.item.modelId}"
+private fun rowKey(row: LLMModelRow): String = when (row) {
+    is LLMModelRow.GroupHeader -> "header-${row.groupId}"
+    is LLMModelRow.LLMModelItemRow -> "item-${row.groupId}-${row.item.modelId}"
 }
 
 @Composable
 private fun GroupHeaderRow(
-    row: ModelRow.GroupHeader,
+    row: LLMModelRow.GroupHeader,
     onToggle: () -> Unit,
 ) {
     val rotation by animateFloatAsState(
@@ -177,7 +177,7 @@ private fun GroupHeaderRow(
 
 @Composable
 private fun ModelItemRow(
-    row: ModelRow.ModelItemRow,
+    row: LLMModelRow.LLMModelItemRow,
     onRemove: () -> Unit,
 ) {
     Row(

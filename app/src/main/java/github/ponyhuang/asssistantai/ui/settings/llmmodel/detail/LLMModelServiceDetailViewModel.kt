@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.ui.model.detail
+package github.ponyhuang.asssistantai.ui.settings.llmmodel.detail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -26,7 +26,7 @@ import javax.inject.Inject
  * 设计：
  * - [serviceId] 通过 `loadService` 注入；找不到对应服务时为 `null`。
  * - [service] 派生自模型服务仓库，跟随更新自动重组。
- * - [rows] 把 `modelGroups` 拍扁为 [ModelRow] 列表，按 [expandedGroupIds] 折叠。
+ * - [rows] 把 `modelGroups` 拍扁为 [LLMModelRow] 列表，按 [expandedGroupIds] 折叠。
  * - [expandedGroupIds] 是详情页本地状态（不写入 Store），让用户切走再回来时折叠状态不丢。
  */
 @HiltViewModel
@@ -57,7 +57,7 @@ class ModelServiceDetailViewModel @Inject constructor(
     /**
      * 扁平化的模型行（组头 + 子项）。折叠的组不渲染子项。
      */
-    val rows: StateFlow<List<ModelRow>> = combine(
+    val rows: StateFlow<List<LLMModelRow>> = combine(
         service,
         expandedFlow,
     ) { svc, expanded ->
@@ -67,7 +67,7 @@ class ModelServiceDetailViewModel @Inject constructor(
             buildList {
                 svc.LLMModelGroups.forEach { group ->
                     add(
-                        ModelRow.GroupHeader(
+                        LLMModelRow.GroupHeader(
                             groupId = group.groupId,
                             groupName = group.groupName,
                             isExpanded = group.groupId in expanded.orEmpty(),
@@ -75,7 +75,7 @@ class ModelServiceDetailViewModel @Inject constructor(
                     )
                     if (group.groupId in expanded.orEmpty()) {
                         group.models.forEach { item ->
-                            add(ModelRow.ModelItemRow(groupId = group.groupId, item = item))
+                            add(LLMModelRow.LLMModelItemRow(groupId = group.groupId, item = item))
                         }
                     }
                 }
@@ -188,16 +188,16 @@ class ModelServiceDetailViewModel @Inject constructor(
      * Anthropic 类型仍保留给实际聊天请求；部分服务不支持 Anthropic 的 models API，
      * 因此不能用其 SDK 来同步模型。
      */
-    suspend fun refreshRemoteModels(): ModelRefreshResult {
-        val current = service.value ?: return ModelRefreshResult.Failure
-        val id = serviceIdFlow.value ?: return ModelRefreshResult.Failure
-        if (current.apiKey.isBlank()) return ModelRefreshResult.Failure
+    suspend fun refreshRemoteModels(): LLMModelRefreshResult {
+        val current = service.value ?: return LLMModelRefreshResult.Failure
+        val id = serviceIdFlow.value ?: return LLMModelRefreshResult.Failure
+        if (current.apiKey.isBlank()) return LLMModelRefreshResult.Failure
 
         return runCatching {
             val models = fetchOpenAIModels(current.openAiCompatibleBaseUrl(), current.apiKey)
             modelServices.syncRemoteModels(serviceId = id, models = models)
-            ModelRefreshResult.Success(models.map { it.modelId })
-        }.getOrElse { ModelRefreshResult.Failure }
+            LLMModelRefreshResult.Success(models.map { it.modelId })
+        }.getOrElse { LLMModelRefreshResult.Failure }
     }
 
     private suspend fun fetchOpenAIModels(baseUrl: String, apiKey: String): List<LLMModelItem> = withContext(Dispatchers.IO) {
@@ -226,23 +226,23 @@ private fun LLMModelProvider.openAiCompatibleBaseUrl(): String {
     return apiBaseUrl.trim().trimEnd('/')
 }
 
-sealed interface ModelRefreshResult {
-    data class Success(val modelIds: List<String>) : ModelRefreshResult
-    data object Failure : ModelRefreshResult
+sealed interface LLMModelRefreshResult {
+    data class Success(val modelIds: List<String>) : LLMModelRefreshResult
+    data object Failure : LLMModelRefreshResult
 }
 
 /**
  * 详情页 LazyColumn 的扁平行。
  */
-sealed interface ModelRow {
+sealed interface LLMModelRow {
     data class GroupHeader(
         val groupId: String,
         val groupName: String,
         val isExpanded: Boolean,
-    ) : ModelRow
+    ) : LLMModelRow
 
-    data class ModelItemRow(
+    data class LLMModelItemRow(
         val groupId: String,
         val item: LLMModelItem,
-    ) : ModelRow
+    ) : LLMModelRow
 }

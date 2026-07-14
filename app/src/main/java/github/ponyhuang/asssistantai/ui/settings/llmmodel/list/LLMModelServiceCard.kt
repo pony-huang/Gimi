@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.ui.model.list
+package github.ponyhuang.asssistantai.ui.settings.llmmodel.list
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -18,7 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.data.LLMModelProvider
-import github.ponyhuang.asssistantai.ui.model.ModelServiceIcon
+import github.ponyhuang.asssistantai.ui.settings.llmmodel.LLMModelServiceIcon
 
 /**
  * 列表中的单个供应商卡片。
@@ -52,7 +52,7 @@ fun ModelServiceCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            ModelServiceIcon(
+            LLMModelServiceIcon(
                 serviceId = item.serviceId,
                 modifier = Modifier.size(44.dp),
             )

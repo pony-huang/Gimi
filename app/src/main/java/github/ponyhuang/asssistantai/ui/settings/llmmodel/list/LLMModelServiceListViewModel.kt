@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.ui.model.list
+package github.ponyhuang.asssistantai.ui.settings.llmmodel.list
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -22,7 +22,7 @@ import javax.inject.Inject
  * Room 目录由 [ModelServiceRepository] 异步初始化；页面通过 [loadState] 区分加载、成功与失败。
  */
 @HiltViewModel
-class ModelServiceListViewModel @Inject constructor(
+class LLMModelServiceListViewModel @Inject constructor(
     private val modelServices: ModelServiceRepository,
 ) : ViewModel() {
 

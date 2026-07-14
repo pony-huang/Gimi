@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.ui.model.detail
+package github.ponyhuang.asssistantai.ui.settings.llmmodel.detail
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -22,7 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.data.LLMModelProvider
-import github.ponyhuang.asssistantai.ui.model.ModelServiceIcon
+import github.ponyhuang.asssistantai.ui.settings.llmmodel.LLMModelServiceIcon
 
 /**
  * 详情页头部：服务图标 + 大标题 + 总开关 + 外链 IconButton。
@@ -41,7 +41,7 @@ fun HeaderSection(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ModelServiceIcon(
+        LLMModelServiceIcon(
             serviceId = service.serviceId,
             modifier = Modifier.size(48.dp),
         )

@@ -65,9 +65,9 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import github.ponyhuang.asssistantai.model.Message
 import github.ponyhuang.asssistantai.model.MessageRole
-import github.ponyhuang.asssistantai.ui.history.ChatDrawer
-import github.ponyhuang.asssistantai.ui.model.detail.ModelServiceDetailRoute
-import github.ponyhuang.asssistantai.ui.model.list.ModelServiceListRoute
+import github.ponyhuang.asssistantai.ui.conversation.ChatDrawer
+import github.ponyhuang.asssistantai.ui.settings.llmmodel.detail.LLMModelServiceDetailRoute
+import github.ponyhuang.asssistantai.ui.settings.llmmodel.list.ModelServiceListRoute
 import github.ponyhuang.asssistantai.ui.navigation.AppRoute
 import github.ponyhuang.asssistantai.ui.navigation.SettingsScaffold
 import github.ponyhuang.asssistantai.ui.settings.SettingsScreen
@@ -392,7 +392,7 @@ fun MainScreen(
                             title = "服务详情",
                             onBack = goBack,
                         ) { modifier ->
-                            ModelServiceDetailRoute(
+                            LLMModelServiceDetailRoute(
                                 serviceId = route.serviceId,
                                 onBack = goBack,
                                 modifier = modifier,

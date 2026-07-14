@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.ui.model
+package github.ponyhuang.asssistantai.ui.settings.llmmodel
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -26,7 +26,7 @@ import github.ponyhuang.asssistantai.data.DefaultModelServices
  * 配 `iconRes`，本组件无需任何改动即可渲染品牌图标。
  */
 @Composable
-fun ModelServiceIcon(
+fun LLMModelServiceIcon(
     serviceId: String,
     modifier: Modifier = Modifier,
     contentPadding: Dp = 10.dp,

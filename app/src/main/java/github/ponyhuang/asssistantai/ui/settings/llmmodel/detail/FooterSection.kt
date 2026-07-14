@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.ui.model.detail
+package github.ponyhuang.asssistantai.ui.settings.llmmodel.detail
 
 import android.content.ActivityNotFoundException
 import android.content.Intent

@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.ui.model.detail
+package github.ponyhuang.asssistantai.ui.settings.llmmodel.detail
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -59,7 +59,7 @@ fun ModelServiceDetailScreen(
             }
             SettingsSectionTitle(text = "模型", modifier = Modifier.padding(top = 20.dp))
             SettingsCard(modifier = Modifier.padding(horizontal = 16.dp)) {
-                ModelManagementSection(
+                LLMModelManagementSection(
                     service = svc,
                     rows = rows,
                     onToggleGroup = viewModel::toggleGroupExpanded,

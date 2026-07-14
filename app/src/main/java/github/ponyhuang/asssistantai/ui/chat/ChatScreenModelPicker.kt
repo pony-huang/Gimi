@@ -52,7 +52,7 @@ import github.ponyhuang.asssistantai.data.LLMModelGroup
 import github.ponyhuang.asssistantai.data.LLMModelItem
 import github.ponyhuang.asssistantai.data.LLMModelProvider
 import github.ponyhuang.asssistantai.data.LLMModelSelection
-import github.ponyhuang.asssistantai.ui.model.ModelServiceIcon
+import github.ponyhuang.asssistantai.ui.settings.llmmodel.LLMModelServiceIcon
 import kotlin.math.abs
 
 /**
@@ -116,7 +116,7 @@ fun ModelStatusDisplay(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
         ) {
             if (isActive) {
-                ModelServiceIcon(
+                LLMModelServiceIcon(
                     serviceId = serviceId.orEmpty(),
                     modifier = Modifier
                         .size(20.dp)

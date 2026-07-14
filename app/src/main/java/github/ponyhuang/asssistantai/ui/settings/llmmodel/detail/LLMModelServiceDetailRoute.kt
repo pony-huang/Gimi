@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.ui.model.detail
+package github.ponyhuang.asssistantai.ui.settings.llmmodel.detail
 
 import android.widget.Toast
 import androidx.compose.runtime.Composable
@@ -14,7 +14,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
  * - 找到 → 渲染 [ModelServiceDetailScreen]。
  */
 @Composable
-fun ModelServiceDetailRoute(
+fun LLMModelServiceDetailRoute(
     serviceId: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,

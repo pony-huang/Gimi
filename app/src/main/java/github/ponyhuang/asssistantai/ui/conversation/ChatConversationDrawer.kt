@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.ui.history
+package github.ponyhuang.asssistantai.ui.conversation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable

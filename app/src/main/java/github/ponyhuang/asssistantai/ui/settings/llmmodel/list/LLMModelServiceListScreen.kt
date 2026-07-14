@@ -1,8 +1,9 @@
-package github.ponyhuang.asssistantai.ui.model.list
+package github.ponyhuang.asssistantai.ui.settings.llmmodel.list
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,12 +24,12 @@ import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
 /**
  * 模型服务列表页，仅展示已配置且可实际编辑的服务。
  *
- * 数据来源：[ModelServiceListViewModel.filtered]。
+ * 数据来源：[LLMModelServiceListViewModel.filtered]。
  * 点击列表 → [onNavigateToDetail]。
  */
 @Composable
-fun ModelServiceListScreen(
-    viewModel: ModelServiceListViewModel,
+fun LLMModelServiceListScreen(
+    viewModel: LLMModelServiceListViewModel,
     onNavigateToDetail: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -55,7 +56,7 @@ fun ModelServiceListScreen(
 
                 ModelCatalogLoadState.Ready -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                    contentPadding = PaddingValues(
                         start = 16.dp,
                         end = 16.dp,
                         bottom = 24.dp,

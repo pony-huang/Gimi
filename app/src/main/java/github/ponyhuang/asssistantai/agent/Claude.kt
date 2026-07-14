@@ -262,7 +262,7 @@ open class Claude(
                     .id(fc.id.toString())
                     .name(fc.name)
                     .type(from("tool_use"))
-                    .input(from(fc.partialArgs))
+                    .input(fc.toAnthropicToolUseInput())
                     .build()
             )
         }
@@ -330,3 +330,15 @@ open class Claude(
         else e.message
     )
 }
+
+/**
+ * Converts ADK's completed function-call arguments to the object required by an Anthropic
+ * `tool_use` content block. [FunctionCall.partialArgs] represents streaming fragments and must
+ * never be replayed as the completed tool input.
+ */
+internal fun FunctionCall.toAnthropicToolUseInput(): ToolUseBlockParam.Input =
+    ToolUseBlockParam.Input.builder()
+        .additionalProperties(
+            args.mapValues { (_, value) -> from(value) }
+        )
+        .build()

@@ -63,7 +63,7 @@ internal fun defaultModelServiceEntities(gson: Gson = Gson()): List<ModelService
             serviceName = provider.serviceName,
             displayOrder = index,
             modelGroupsJson = gson.toJson(
-                provider.modelGroups.map { group ->
+                provider.LLMModelGroups.map { group ->
                     StoredModelGroup(
                         groupId = group.groupId,
                         groupName = group.groupName,

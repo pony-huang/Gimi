@@ -14,8 +14,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.asssistantai.agent.AgentChatRunner
 import github.ponyhuang.asssistantai.data.ConversationRepository
 import github.ponyhuang.asssistantai.data.EventMapper
-import github.ponyhuang.asssistantai.data.ModelSelection
-import github.ponyhuang.asssistantai.data.ModelSelectionCodec
+import github.ponyhuang.asssistantai.data.LLMModelSelection
+import github.ponyhuang.asssistantai.data.LLMModelSelectionCodec
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
 import github.ponyhuang.asssistantai.model.FunctionCallView
 import github.ponyhuang.asssistantai.model.FunctionResponseView
@@ -64,9 +64,9 @@ class ChatViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
     val availableModelServices = modelServices.services
-    private val _currentModelSelection = MutableStateFlow<ModelSelection?>(null)
+    private val _currentLLMModelSelection = MutableStateFlow<LLMModelSelection?>(null)
     /** 当前打开会话的显式模型选择；未设置时由 AgentFactory 走默认模型回退。 */
-    val currentModelSelection: StateFlow<ModelSelection?> = _currentModelSelection.asStateFlow()
+    val currentLLMModelSelection: StateFlow<LLMModelSelection?> = _currentLLMModelSelection.asStateFlow()
     private val _pendingToolConfirmation = MutableStateFlow<PendingToolConfirmation?>(null)
     val pendingToolConfirmation: StateFlow<PendingToolConfirmation?> = _pendingToolConfirmation.asStateFlow()
 
@@ -401,7 +401,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch { runner.recreate() }
     }
 
-    fun selectModel(selection: ModelSelection) {
+    fun selectModel(selection: LLMModelSelection) {
         // AgentChatRunner snapshots its agent at send entry. Changing the backing model while
         // a turn is active would make the current UI state disagree with that in-flight call.
         if (_uiState.value.isStreaming) {
@@ -412,8 +412,8 @@ class ChatViewModel @Inject constructor(
         val sessionId = _uiState.value.sessionId
         if (sessionId.isBlank()) return
         viewModelScope.launch {
-            repository.setConversationModel(sessionId, ModelSelectionCodec.encode(selection))
-            _currentModelSelection.value = selection
+            repository.setConversationModel(sessionId, LLMModelSelectionCodec.encode(selection))
+            _currentLLMModelSelection.value = selection
             modelServices.setCurrentSelection(selection)
             // 当前流式调用已在 AgentChatRunner.send 入口快照 runner，重建不会中断它；
             // 因此无论是否正在输出，下一条消息都会使用新模型。
@@ -427,19 +427,19 @@ class ChatViewModel @Inject constructor(
     private suspend fun activateConversationSettings(sessionId: String) {
         modelServices.awaitReady()
         val storedModel = repository.activateConversation(sessionId, defaultModelPayload())
-        val savedSelection = ModelSelectionCodec.decode(storedModel)
+        val savedSelection = LLMModelSelectionCodec.decode(storedModel)
         val selection = savedSelection ?: modelServices.defaultSelection()
         if (savedSelection == null && selection != null) {
-            repository.setConversationModel(sessionId, ModelSelectionCodec.encode(selection))
+            repository.setConversationModel(sessionId, LLMModelSelectionCodec.encode(selection))
         }
-        _currentModelSelection.value = selection
+        _currentLLMModelSelection.value = selection
         modelServices.setCurrentSelection(selection)
         runner.recreate()
     }
 
     /** 新会话固定使用首个可用模型，不继承最近选择。 */
     private fun defaultModelPayload(): String = modelServices.defaultSelection()
-        ?.let(ModelSelectionCodec::encode)
+        ?.let(LLMModelSelectionCodec::encode)
         .orEmpty()
 
     /**

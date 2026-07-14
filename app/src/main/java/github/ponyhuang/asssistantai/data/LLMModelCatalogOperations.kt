@@ -16,7 +16,7 @@ internal fun appendUserModel(
     groups: List<StoredModelGroup>,
     serviceId: String,
     serviceName: String,
-    model: ModelItem,
+    model: LLMModelItem,
 ): List<StoredModelGroup> {
     val stored = StoredModel(model.modelId, model.modelName, StoredModelSource.USER)
     if (groups.isEmpty()) {
@@ -41,7 +41,7 @@ internal fun syncStoredRemoteModels(
     existingGroups: List<StoredModelGroup>,
     serviceId: String,
     serviceName: String,
-    models: List<ModelItem>,
+    models: List<LLMModelItem>,
 ): List<StoredModelGroup> {
     val groups = existingGroups.ifEmpty {
         listOf(

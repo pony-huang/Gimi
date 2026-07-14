@@ -7,7 +7,7 @@ package github.ponyhuang.asssistantai.data
  * @property groupId 模型组唯一 ID（同一服务下可能多组）。
  * @property modelId 平台精确模型 ID（如 `deepseek-v4-pro`）。
  */
-data class ModelSelection(
+data class LLMModelSelection(
     val serviceId: String,
     val groupId: String,
     val modelId: String,

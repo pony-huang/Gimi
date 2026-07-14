@@ -11,7 +11,7 @@ import com.google.adk.kt.types.Part
 import dagger.Lazy
 import github.ponyhuang.asssistantai.agent.AgentChatRunner
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
-import github.ponyhuang.asssistantai.data.ModelSelection
+import github.ponyhuang.asssistantai.data.LLMModelSelection
 import java.util.UUID
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
@@ -71,7 +71,7 @@ class AssistantFunctions
                 ModelServiceSummary(
                     serviceId = provider.serviceId,
                     serviceName = provider.serviceName,
-                    availableModels = provider.modelGroups.flatMap { group ->
+                    availableModels = provider.LLMModelGroups.flatMap { group ->
                         group.models.map { it.modelId }
                     },
                 )
@@ -107,7 +107,7 @@ class AssistantFunctions
                 ?: throw AppFunctionElementNotFoundException(
                     "serviceId '$serviceId' not found",
                 )
-            val group = provider.modelGroups.firstOrNull { it.groupId == groupId }
+            val group = provider.LLMModelGroups.firstOrNull { it.groupId == groupId }
                 ?: throw AppFunctionElementNotFoundException(
                     "groupId '$groupId' not found in service '$serviceId'",
                 )
@@ -119,7 +119,7 @@ class AssistantFunctions
             // 仅在 service / group / model 三元组全部命中后才落盘 + 重建 runner；
             // 出错时 recreate 不应触发，保持 store 的单 state-of-truth 假设。
             modelServices.setCurrentSelection(
-                ModelSelection(
+                LLMModelSelection(
                     serviceId = provider.serviceId,
                     groupId = group.groupId,
                     modelId = model.modelId,

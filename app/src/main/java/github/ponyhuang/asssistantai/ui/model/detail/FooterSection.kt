@@ -16,19 +16,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.padding
-import github.ponyhuang.asssistantai.data.ModelProvider
+import github.ponyhuang.asssistantai.data.LLMModelProvider
 
 /**
  * 详情页底部脚注：
  *
  * > 查看 深度求索 文档 和 模型 获取更多详情
  *
- * "深度求索 文档" 与 "模型" 均为可点击富文本，分别跳转到 [ModelProvider.docsUrl] 与
- * [ModelProvider.modelsUrl]。
+ * "深度求索 文档" 与 "模型" 均为可点击富文本，分别跳转到 [LLMModelProvider.docsUrl] 与
+ * [LLMModelProvider.modelsUrl]。
  */
 @Composable
 fun FooterSection(
-    service: ModelProvider,
+    service: LLMModelProvider,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current

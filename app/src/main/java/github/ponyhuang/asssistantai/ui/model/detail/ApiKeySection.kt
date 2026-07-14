@@ -36,7 +36,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.asssistantai.data.ModelProvider
+import github.ponyhuang.asssistantai.data.LLMModelProvider
 import kotlinx.coroutines.launch
 
 /**
@@ -48,7 +48,7 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun ApiKeySection(
-    service: ModelProvider,
+    service: LLMModelProvider,
     onApiKeyChange: (String) -> Unit,
     onTest: suspend () -> ApiKeyTestResult,
     modifier: Modifier = Modifier,

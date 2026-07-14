@@ -23,9 +23,9 @@ class ModelCatalogOperationsTest {
             serviceId = "service",
             serviceName = "Service",
             models = listOf(
-                ModelItem("fresh", "Fresh"),
-                ModelItem("custom", "Remote duplicate"),
-                ModelItem("fresh", "Duplicate"),
+                LLMModelItem("fresh", "Fresh"),
+                LLMModelItem("custom", "Remote duplicate"),
+                LLMModelItem("fresh", "Duplicate"),
             ),
         )
 
@@ -40,7 +40,7 @@ class ModelCatalogOperationsTest {
             groups = emptyList(),
             serviceId = "service",
             serviceName = "Service",
-            model = ModelItem("custom", "Custom"),
+            model = LLMModelItem("custom", "Custom"),
         )
 
         val removed = removeStoredModel(appended, "service-default", "custom")

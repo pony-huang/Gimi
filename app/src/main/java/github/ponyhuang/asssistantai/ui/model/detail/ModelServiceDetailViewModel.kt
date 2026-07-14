@@ -5,9 +5,9 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import com.openai.client.okhttp.OpenAIOkHttpClient
 import github.ponyhuang.asssistantai.data.ApiBaseType
-import github.ponyhuang.asssistantai.data.ModelItem
+import github.ponyhuang.asssistantai.data.LLMModelItem
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
-import github.ponyhuang.asssistantai.data.ModelProvider
+import github.ponyhuang.asssistantai.data.LLMModelProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,7 +43,7 @@ class ModelServiceDetailViewModel @Inject constructor(
     val serviceId: StateFlow<String?> = serviceIdFlow
 
     /** 当前服务（找不到时为 `null`）。 */
-    val service: StateFlow<ModelProvider?> = combine(
+    val service: StateFlow<LLMModelProvider?> = combine(
         modelServices.services,
         serviceIdFlow,
     ) { all, id ->
@@ -65,7 +65,7 @@ class ModelServiceDetailViewModel @Inject constructor(
             emptyList()
         } else {
             buildList {
-                svc.modelGroups.forEach { group ->
+                svc.LLMModelGroups.forEach { group ->
                     add(
                         ModelRow.GroupHeader(
                             groupId = group.groupId,
@@ -95,8 +95,8 @@ class ModelServiceDetailViewModel @Inject constructor(
         serviceIdFlow.value = id
         val svc = modelServices.getService(id) ?: return false
         // 默认全部展开；保留用户折叠状态（如果该 ID 之前存在）。
-        if (expandedFlow.value == null && svc.modelGroups.isNotEmpty()) {
-            expandedFlow.value = svc.modelGroups.map { it.groupId }.toSet()
+        if (expandedFlow.value == null && svc.LLMModelGroups.isNotEmpty()) {
+            expandedFlow.value = svc.LLMModelGroups.map { it.groupId }.toSet()
         }
         return true
     }
@@ -134,7 +134,7 @@ class ModelServiceDetailViewModel @Inject constructor(
         val current = expandedFlow.value
         // 第一次没显式记录过 → 以"全展开"为基线；空集合代表已收起全部。
         val baseline = current
-            ?: (service.value?.modelGroups?.map { it.groupId }?.toSet() ?: emptySet())
+            ?: (service.value?.LLMModelGroups?.map { it.groupId }?.toSet() ?: emptySet())
         expandedFlow.value = if (groupId in baseline) {
             baseline - groupId
         } else {
@@ -154,7 +154,7 @@ class ModelServiceDetailViewModel @Inject constructor(
         viewModelScope.launch {
             modelServices.appendModel(
                 serviceId = id,
-                model = ModelItem(modelId = modelId, modelName = modelId),
+                model = LLMModelItem(modelId = modelId, modelName = modelId),
             )
         }
     }
@@ -200,13 +200,13 @@ class ModelServiceDetailViewModel @Inject constructor(
         }.getOrElse { ModelRefreshResult.Failure }
     }
 
-    private suspend fun fetchOpenAIModels(baseUrl: String, apiKey: String): List<ModelItem> = withContext(Dispatchers.IO) {
+    private suspend fun fetchOpenAIModels(baseUrl: String, apiKey: String): List<LLMModelItem> = withContext(Dispatchers.IO) {
         val client = OpenAIOkHttpClient.builder()
             .baseUrl(baseUrl)
             .apiKey(apiKey)
             .build()
         client.models().list().data()
-            .map { ModelItem(modelId = it.id(), modelName = it.id()) }
+            .map { LLMModelItem(modelId = it.id(), modelName = it.id()) }
     }
 
 }
@@ -217,12 +217,12 @@ sealed interface ApiKeyTestResult {
     data object Failure : ApiKeyTestResult
 }
 
-private fun ModelProvider.modelsEndpointUrl(): String {
+private fun LLMModelProvider.modelsEndpointUrl(): String {
     return "${openAiCompatibleBaseUrl()}/models"
 }
 
 /** 将 Anthropic 兼容入口还原为同一供应商的 OpenAI 兼容 API 根地址。 */
-private fun ModelProvider.openAiCompatibleBaseUrl(): String {
+private fun LLMModelProvider.openAiCompatibleBaseUrl(): String {
     return apiBaseUrl.trim().trimEnd('/')
 }
 
@@ -243,6 +243,6 @@ sealed interface ModelRow {
 
     data class ModelItemRow(
         val groupId: String,
-        val item: ModelItem,
+        val item: LLMModelItem,
     ) : ModelRow
 }

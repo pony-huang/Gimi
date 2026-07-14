@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
-import github.ponyhuang.asssistantai.data.ModelProvider
+import github.ponyhuang.asssistantai.data.LLMModelProvider
 import github.ponyhuang.asssistantai.data.ModelCatalogLoadState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,7 +32,7 @@ class ModelServiceListViewModel @Inject constructor(
     val query: MutableStateFlow<String> = MutableStateFlow("")
 
     /** 过滤后的供应商列表（按种子数据原始顺序）。 */
-    val filtered: StateFlow<List<ModelProvider>> = combine(
+    val filtered: StateFlow<List<LLMModelProvider>> = combine(
         modelServices.services,
         query,
     ) { all, q ->

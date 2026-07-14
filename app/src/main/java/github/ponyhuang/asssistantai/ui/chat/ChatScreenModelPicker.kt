@@ -48,10 +48,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import github.ponyhuang.asssistantai.data.ModelGroup
-import github.ponyhuang.asssistantai.data.ModelItem
-import github.ponyhuang.asssistantai.data.ModelProvider
-import github.ponyhuang.asssistantai.data.ModelSelection
+import github.ponyhuang.asssistantai.data.LLMModelGroup
+import github.ponyhuang.asssistantai.data.LLMModelItem
+import github.ponyhuang.asssistantai.data.LLMModelProvider
+import github.ponyhuang.asssistantai.data.LLMModelSelection
 import github.ponyhuang.asssistantai.ui.model.ModelServiceIcon
 import kotlin.math.abs
 
@@ -68,12 +68,12 @@ import kotlin.math.abs
  */
 
 /**
- * 一行可选项的视图模型 — 同时携带所属服务与组，供对话框展示二级文案与构造 [ModelSelection]。
+ * 一行可选项的视图模型 — 同时携带所属服务与组，供对话框展示二级文案与构造 [LLMModelSelection]。
  */
 data class EnabledModelRow(
-    val service: ModelProvider,
-    val group: ModelGroup,
-    val model: ModelItem,
+    val service: LLMModelProvider,
+    val group: LLMModelGroup,
+    val model: LLMModelItem,
 )
 
 /**
@@ -158,7 +158,7 @@ fun ModelStatusDisplay(
 @Composable
 fun ModelPickerDialog(
     rows: List<EnabledModelRow>,
-    currentSelection: ModelSelection?,
+    currentSelection: LLMModelSelection?,
     onPick: (EnabledModelRow) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -350,7 +350,7 @@ fun ModelTitleAndPicker(
 ) {
     val context = LocalContext.current
     val services by viewModel.availableModelServices.collectAsStateWithLifecycle()
-    val currentSelection by viewModel.currentModelSelection.collectAsStateWithLifecycle()
+    val currentSelection by viewModel.currentLLMModelSelection.collectAsStateWithLifecycle()
 
     // 解析后用于 TopAppBar 中央显示的模型。显式选择命中走 resolveSelection，
     // 否则回退到"第一个启用服务 → 第一个非空组 → 第一个模型"。两个都没有则 null（空态）。
@@ -358,7 +358,7 @@ fun ModelTitleAndPicker(
         services.resolveSelection(currentSelection) ?: services.asSequence()
             .filter { it.isEnabled }
             .flatMap { service ->
-                service.modelGroups.asSequence().flatMap { group ->
+                service.LLMModelGroups.asSequence().flatMap { group ->
                     group.models.asSequence().map { model -> EnabledModelRow(service, group, model) }
                 }
             }
@@ -367,7 +367,7 @@ fun ModelTitleAndPicker(
     val displayedModelName = displayedModel?.model?.modelName
     // 若会话没有显式选择或选择已失效，选择器应与标题/runner 的回退结果一致，
     // 使用户看到当前正在使用的模型已被勾选。
-    val effectiveSelection: ModelSelection? = remember(services, currentSelection) {
+    val effectiveSelection: LLMModelSelection? = remember(services, currentSelection) {
         if (services.resolveSelection(currentSelection) != null) {
             currentSelection
         } else {
@@ -377,7 +377,7 @@ fun ModelTitleAndPicker(
     // 对话框候选：所有 isEnabled=true 的服务下的所有 ModelItem。
     val enabledModels: List<EnabledModelRow> = remember(services) {
         services.filter { it.isEnabled }.flatMap { svc ->
-            svc.modelGroups.flatMap { grp ->
+            svc.LLMModelGroups.flatMap { grp ->
                 grp.models.map { m -> EnabledModelRow(svc, grp, m) }
             }
         }
@@ -409,7 +409,7 @@ fun ModelTitleAndPicker(
             currentSelection = effectiveSelection,
             onPick = { row ->
                 viewModel.selectModel(
-                    ModelSelection(
+                    LLMModelSelection(
                         serviceId = row.service.serviceId,
                         groupId = row.group.groupId,
                         modelId = row.model.modelId,
@@ -422,20 +422,20 @@ fun ModelTitleAndPicker(
     }
 }
 
-private fun List<ModelProvider>.resolveSelection(selection: ModelSelection?): EnabledModelRow? {
+private fun List<LLMModelProvider>.resolveSelection(selection: LLMModelSelection?): EnabledModelRow? {
     if (selection == null) return null
     val service = firstOrNull { it.serviceId == selection.serviceId && it.isEnabled } ?: return null
-    val group = service.modelGroups.firstOrNull { it.groupId == selection.groupId } ?: return null
+    val group = service.LLMModelGroups.firstOrNull { it.groupId == selection.groupId } ?: return null
     val model = group.models.firstOrNull { it.modelId == selection.modelId } ?: return null
     return EnabledModelRow(service, group, model)
 }
 
-private fun List<ModelProvider>.firstEnabledSelection(): ModelSelection? {
+private fun List<LLMModelProvider>.firstEnabledSelection(): LLMModelSelection? {
     return asSequence()
         .filter { it.isEnabled }
         .mapNotNull { service ->
-            service.modelGroups.firstOrNull { it.models.isNotEmpty() }?.let { group ->
-                ModelSelection(
+            service.LLMModelGroups.firstOrNull { it.models.isNotEmpty() }?.let { group ->
+                LLMModelSelection(
                     serviceId = service.serviceId,
                     groupId = group.groupId,
                     modelId = group.models.first().modelId,

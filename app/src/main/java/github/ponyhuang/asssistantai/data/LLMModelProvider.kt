@@ -11,7 +11,7 @@ import github.ponyhuang.asssistantai.R
  * @property isEnabled 总开关；false 时列表页不显示 ON 胶囊，且 Agent 不应路由到此服务。
  * @property apiKey API 密钥；可填多个，逗号分隔（UI HelperText 已说明）。
  * @property baseType 接口标准类型，决定预览拼接路径。
- * @property modelGroups 该服务下的模型组列表。
+ * @property LLMModelGroups 该服务下的模型组列表。
  * @property iconRes 品牌图标 drawable 资源 ID；null 时回退到默认机器人图标。
  *                  新增厂商时只需在 [DefaultModelServices] 中赋值即可，无需改 UI 调用点。
  * @property homepageUrl 平台官方主页（Header 外链目标）。
@@ -19,7 +19,7 @@ import github.ponyhuang.asssistantai.R
  * @property docsUrl "深度求索 文档" 富文本跳转目标。
  * @property modelsUrl "模型" 富文本跳转目标。
  */
-data class ModelProvider(
+data class LLMModelProvider(
     val serviceId: String,
     val serviceName: String,
     val isEnabled: Boolean,
@@ -27,7 +27,7 @@ data class ModelProvider(
     val apiBaseUrl: String,
     val baseType: ApiBaseType = ApiBaseType.Standard,
     val anthropicBaseUrl: String = apiBaseUrl,
-    val modelGroups: List<ModelGroup> = emptyList(),
+    val LLMModelGroups: List<LLMModelGroup> = emptyList(),
     @DrawableRes val iconRes: Int? = null,
     val homepageUrl: String = "",
     val keyHelpUrl: String = "",
@@ -50,11 +50,11 @@ data class ModelProvider(
  * @property isExpanded UI 默认展开状态；详情页用本地 `Set<String>` 覆盖此默认值。
  * @property models 组内具体模型列表。
  */
-data class ModelGroup(
+data class LLMModelGroup(
     val groupId: String,
     val groupName: String,
     val isExpanded: Boolean = true,
-    val models: List<ModelItem> = emptyList(),
+    val models: List<LLMModelItem> = emptyList(),
 )
 
 /**
@@ -64,7 +64,7 @@ data class ModelGroup(
  * @property modelName 模型展示名（如 `DeepSeek V4 Pro`）。
  * @property isChildPanelExpanded 占位字段 — 后续可挂"子配置面板"。
  */
-data class ModelItem(
+data class LLMModelItem(
     val modelId: String,
     val modelName: String,
     val isChildPanelExpanded: Boolean = false,
@@ -79,13 +79,13 @@ enum class ApiBaseType(val suffix: String, val previewPath: String) {
 }
 
 /**
- * 内置 / 默认模型服务清单。新增厂商时在这里追加一条 [ModelProvider]，
- * 同时给 [ModelProvider.iconRes] 赋值，品牌图标就会在所有 UI 调用点自动生效。
+ * 内置 / 默认模型服务清单。新增厂商时在这里追加一条 [LLMModelProvider]，
+ * 同时给 [LLMModelProvider.iconRes] 赋值，品牌图标就会在所有 UI 调用点自动生效。
  */
 object DefaultModelServices {
 
-    val services: List<ModelProvider> = listOf(
-        ModelProvider(
+    val services: List<LLMModelProvider> = listOf(
+        LLMModelProvider(
             serviceId = "deepseek",
             serviceName = "深度求索",
             isEnabled = true,
@@ -93,17 +93,17 @@ object DefaultModelServices {
             apiBaseUrl = "https://api.deepseek.com",
             baseType = ApiBaseType.Anthropic,
             anthropicBaseUrl = "https://api.deepseek.com/anthropic",
-            modelGroups = listOf(
-                ModelGroup(
+            LLMModelGroups = listOf(
+                LLMModelGroup(
                     groupId = "deepseek-chat",
                     groupName = "DeepSeek Chat",
                     isExpanded = true,
                     models = listOf(
-                        ModelItem(
+                        LLMModelItem(
                             modelId = "deepseek-v4-pro",
                             modelName = "deepseek-v4-pro",
                         ),
-                        ModelItem(
+                        LLMModelItem(
                             modelId = "deepseek-v4-flash",
                             modelName = "deepseek-v4-flash",
                         ),
@@ -116,7 +116,7 @@ object DefaultModelServices {
             docsUrl = "https://api-docs.deepseek.com/",
             modelsUrl = "https://api-docs.deepseek.com/quick_start/pricing",
         ),
-        ModelProvider(
+        LLMModelProvider(
             serviceId = "minimax",
             serviceName = "MiniMax",
             isEnabled = true,
@@ -124,13 +124,13 @@ object DefaultModelServices {
             apiBaseUrl = "https://api.minimaxi.com/v1",
             baseType = ApiBaseType.Standard,
             anthropicBaseUrl = "https://api.minimaxi.com/anthropic",
-            modelGroups = listOf(
-                ModelGroup(
+            LLMModelGroups = listOf(
+                LLMModelGroup(
                     groupId = "minimax-chat",
                     groupName = "MiniMax Chat",
                     isExpanded = true,
                     models = listOf(
-                        ModelItem(
+                        LLMModelItem(
                             modelId = "MiniMax-M3",
                             modelName = "MiniMax-M3",
                         ),
@@ -148,7 +148,7 @@ object DefaultModelServices {
     /**
      * 按 [serviceId] 查找品牌图标。供 UI 层在仅有 serviceId 时使用
      * （例如聊天 TopAppBar 中 [ModelServiceIcon]）。
-     * 给列表里没声明 [ModelProvider.iconRes] 的服务提供兜底。
+     * 给列表里没声明 [LLMModelProvider.iconRes] 的服务提供兜底。
      */
     fun iconFor(serviceId: String): Int? =
         services.firstOrNull { it.serviceId == serviceId }?.iconRes

@@ -21,7 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.asssistantai.data.ModelProvider
+import github.ponyhuang.asssistantai.data.LLMModelProvider
 import github.ponyhuang.asssistantai.ui.model.ModelServiceIcon
 
 /**
@@ -29,7 +29,7 @@ import github.ponyhuang.asssistantai.ui.model.ModelServiceIcon
  */
 @Composable
 fun HeaderSection(
-    service: ModelProvider,
+    service: LLMModelProvider,
     onToggleEnabled: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {

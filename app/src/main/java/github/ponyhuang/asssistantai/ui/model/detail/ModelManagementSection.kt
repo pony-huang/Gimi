@@ -35,7 +35,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.asssistantai.data.ModelProvider
+import github.ponyhuang.asssistantai.data.LLMModelProvider
 import kotlinx.coroutines.launch
 
 /**
@@ -44,7 +44,7 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun ModelManagementSection(
-    service: ModelProvider,
+    service: LLMModelProvider,
     rows: List<ModelRow>,
     onToggleGroup: (String) -> Unit,
     onRemoveModel: (groupId: String, modelId: String) -> Unit,
@@ -57,7 +57,7 @@ fun ModelManagementSection(
     var showAddDialog by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
 
-    val totalCount = service.modelGroups.sumOf { it.models.size }
+    val totalCount = service.LLMModelGroups.sumOf { it.models.size }
 
     Column(
         modifier = modifier

@@ -22,7 +22,7 @@ import github.ponyhuang.asssistantai.data.DefaultModelServices
  * Consistent, brand-faithful icon treatment for model service surfaces.
  *
  * 图标来源：[DefaultModelServices] 按 [serviceId] 查表得到 `iconRes`。
- * 新增厂商只需在 [DefaultModelServices] 给对应 [github.ponyhuang.asssistantai.data.ModelProvider]
+ * 新增厂商只需在 [DefaultModelServices] 给对应 [github.ponyhuang.asssistantai.data.LLMModelProvider]
  * 配 `iconRes`，本组件无需任何改动即可渲染品牌图标。
  */
 @Composable

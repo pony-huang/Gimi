@@ -18,7 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.data.ApiBaseType
-import github.ponyhuang.asssistantai.data.ModelProvider
+import github.ponyhuang.asssistantai.data.LLMModelProvider
 
 /**
  * API 地址下拉 + 输入框 + 灰色预览。
@@ -28,7 +28,7 @@ import github.ponyhuang.asssistantai.data.ModelProvider
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ApiBaseUrlSection(
-    service: ModelProvider,
+    service: LLMModelProvider,
     onBaseTypeChange: (ApiBaseType) -> Unit,
     onBaseUrlChange: (String) -> Unit,
     modifier: Modifier = Modifier,

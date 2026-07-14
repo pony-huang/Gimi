@@ -69,13 +69,13 @@ class ModelServiceRepository @Inject constructor(
         provider.serviceId to provider.toSettings()
     }
     private val settings = MutableStateFlow(readSettings() ?: defaultSettings.also(::persistSettings))
-    private val _services = MutableStateFlow<List<ModelProvider>>(emptyList())
+    private val _services = MutableStateFlow<List<LLMModelProvider>>(emptyList())
     private val _loadState = MutableStateFlow<ModelCatalogLoadState>(ModelCatalogLoadState.Loading)
-    private val _currentSelection = MutableStateFlow<ModelSelection?>(null)
+    private val _currentSelection = MutableStateFlow<LLMModelSelection?>(null)
 
-    val services: StateFlow<List<ModelProvider>> = _services.asStateFlow()
+    val services: StateFlow<List<LLMModelProvider>> = _services.asStateFlow()
     val loadState: StateFlow<ModelCatalogLoadState> = _loadState.asStateFlow()
-    val currentSelection: StateFlow<ModelSelection?> = _currentSelection.asStateFlow()
+    val currentSelection: StateFlow<LLMModelSelection?> = _currentSelection.asStateFlow()
 
     init {
         scope.launch {
@@ -100,11 +100,11 @@ class ModelServiceRepository @Inject constructor(
         ready.await()
     }
 
-    fun getService(serviceId: String): ModelProvider? =
+    fun getService(serviceId: String): LLMModelProvider? =
         _services.value.firstOrNull { it.serviceId == serviceId }
 
     /** Updates encrypted connection settings; public catalog fields are intentionally ignored. */
-    fun updateService(serviceId: String, transform: (ModelProvider) -> ModelProvider) {
+    fun updateService(serviceId: String, transform: (LLMModelProvider) -> LLMModelProvider) {
         val current = getService(serviceId) ?: return
         val updated = transform(current).toSettings()
         settings.value = settings.value + (serviceId to updated)
@@ -122,7 +122,7 @@ class ModelServiceRepository @Inject constructor(
         }
     }
 
-    suspend fun appendModel(serviceId: String, model: ModelItem) {
+    suspend fun appendModel(serviceId: String, model: LLMModelItem) {
         mutateCatalog(serviceId) { groups ->
             appendUserModel(
                 groups = groups,
@@ -134,7 +134,7 @@ class ModelServiceRepository @Inject constructor(
     }
 
     /** Replaces the remote catalog snapshot while preserving manually entered models. */
-    suspend fun syncRemoteModels(serviceId: String, models: List<ModelItem>) {
+    suspend fun syncRemoteModels(serviceId: String, models: List<LLMModelItem>) {
         mutateCatalog(serviceId) { existingGroups ->
             syncStoredRemoteModels(
                 existingGroups = existingGroups,
@@ -145,32 +145,32 @@ class ModelServiceRepository @Inject constructor(
         }
     }
 
-    fun defaultSelection(): ModelSelection? = _services.value.asSequence()
+    fun defaultSelection(): LLMModelSelection? = _services.value.asSequence()
         .filter { it.isEnabled }
         .mapNotNull { service ->
-            service.modelGroups.firstOrNull { it.models.isNotEmpty() }?.let { group ->
-                ModelSelection(service.serviceId, group.groupId, group.models.first().modelId)
+            service.LLMModelGroups.firstOrNull { it.models.isNotEmpty() }?.let { group ->
+                LLMModelSelection(service.serviceId, group.groupId, group.models.first().modelId)
             }
         }
         .firstOrNull()
 
-    fun setCurrentSelection(selection: ModelSelection?) {
+    fun setCurrentSelection(selection: LLMModelSelection?) {
         _currentSelection.value = selection
     }
 
-    fun resolveSelection(selection: ModelSelection?): ResolvedModel? {
+    fun resolveSelection(selection: LLMModelSelection?): ResolvedModel? {
         if (selection == null) return null
         val provider = getService(selection.serviceId) ?: return null
         if (!provider.isEnabled) return null
-        val group = provider.modelGroups.firstOrNull { it.groupId == selection.groupId } ?: return null
+        val group = provider.LLMModelGroups.firstOrNull { it.groupId == selection.groupId } ?: return null
         val model = group.models.firstOrNull { it.modelId == selection.modelId } ?: return null
         return ResolvedModel(provider, group, model)
     }
 
     data class ResolvedModel(
-        val provider: ModelProvider,
-        val group: ModelGroup,
-        val model: ModelItem,
+        val provider: LLMModelProvider,
+        val group: LLMModelGroup,
+        val model: LLMModelItem,
     )
 
     private suspend fun seedCatalogIfEmpty() {
@@ -197,11 +197,11 @@ class ModelServiceRepository @Inject constructor(
         }
     }
 
-    private fun entityToProvider(entity: ModelServiceEntity): ModelProvider {
+    private fun entityToProvider(entity: ModelServiceEntity): LLMModelProvider {
         val providerSettings = settings.value[entity.serviceId]
             ?: defaultSettings[entity.serviceId]
             ?: ModelServiceSettings(false, "", "", ApiBaseType.Standard, "")
-        return ModelProvider(
+        return LLMModelProvider(
             serviceId = entity.serviceId,
             serviceName = entity.serviceName,
             isEnabled = providerSettings.isEnabled,
@@ -209,12 +209,12 @@ class ModelServiceRepository @Inject constructor(
             apiBaseUrl = providerSettings.apiBaseUrl,
             baseType = providerSettings.baseType,
             anthropicBaseUrl = providerSettings.anthropicBaseUrl,
-            modelGroups = decodeGroups(entity.modelGroupsJson).map { group ->
-                ModelGroup(
+            LLMModelGroups = decodeGroups(entity.modelGroupsJson).map { group ->
+                LLMModelGroup(
                     groupId = group.groupId,
                     groupName = group.groupName,
                     isExpanded = group.isExpanded,
-                    models = group.models.map { ModelItem(it.modelId, it.modelName) },
+                    models = group.models.map { LLMModelItem(it.modelId, it.modelName) },
                 )
             },
             // 品牌图标是静态元数据，按 serviceId 从默认清单回填，
@@ -230,7 +230,7 @@ class ModelServiceRepository @Inject constructor(
     private fun decodeGroups(json: String): List<StoredModelGroup> =
         gson.fromJson<List<StoredModelGroup>>(json, groupsType).orEmpty()
 
-    private fun ModelProvider.toSettings(): ModelServiceSettings = ModelServiceSettings(
+    private fun LLMModelProvider.toSettings(): ModelServiceSettings = ModelServiceSettings(
         isEnabled = isEnabled,
         apiKey = apiKey,
         apiBaseUrl = apiBaseUrl,
@@ -238,7 +238,7 @@ class ModelServiceRepository @Inject constructor(
         anthropicBaseUrl = anthropicBaseUrl,
     )
 
-    private fun ModelProvider.applySettings(value: ModelServiceSettings): ModelProvider = copy(
+    private fun LLMModelProvider.applySettings(value: ModelServiceSettings): LLMModelProvider = copy(
         isEnabled = value.isEnabled,
         apiKey = value.apiKey,
         apiBaseUrl = value.apiBaseUrl,

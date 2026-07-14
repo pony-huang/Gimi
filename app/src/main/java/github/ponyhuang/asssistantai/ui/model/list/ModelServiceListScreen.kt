@@ -15,7 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import github.ponyhuang.asssistantai.data.ModelProvider
+import github.ponyhuang.asssistantai.data.LLMModelProvider
 import github.ponyhuang.asssistantai.data.ModelCatalogLoadState
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
 import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
@@ -62,7 +62,7 @@ fun ModelServiceListScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    items(items = items, key = { it.serviceId }) { item: ModelProvider ->
+                    items(items = items, key = { it.serviceId }) { item: LLMModelProvider ->
                         ModelServiceCard(
                             item = item,
                             onClick = onNavigateToDetail,

@@ -4,7 +4,7 @@ import androidx.appfunctions.AppFunctionSerializable
 
 /**
  * 给 AppFunction 返回/入参使用的轻量"模型服务摘要"数据类 — 与 UI 层的
- * [github.ponyhuang.asssistantai.data.ModelProvider] 完全解耦，避免把内部
+ * [github.ponyhuang.asssistantai.data.LLMModelProvider] 完全解耦，避免把内部
  * `apiKey` / `apiBaseUrl` 等敏感字段意外暴露给 system agent。
  *
  * KSP 约束（参考 `~/.claude/skills/appfunctions/SKILL.md` 与 reference

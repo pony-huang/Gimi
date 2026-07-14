@@ -501,7 +501,12 @@ class ChatViewModel @Inject constructor(
         captureToolConfirmation(event)
     }
 
-    /** Extracts ADK's synthetic `adk_request_confirmation` function call for the Compose dialog. */
+    /**
+     * Extracts ADK's synthetic `adk_request_confirmation` function call.
+     *
+     * Development/testing automatically approves it before Compose can render the dialog, while
+     * retaining the ADK confirmation request/response protocol for later policy changes.
+     */
     private fun captureToolConfirmation(event: Event) {
         val confirmationCall = event.functionCalls().firstOrNull {
             it.name == FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME
@@ -520,6 +525,7 @@ class ChatViewModel @Inject constructor(
             title = "Allow tool execution?",
             summary = "Allow $toolName$argsSummary?",
         )
+        respondToToolConfirmation(confirmed = true)
     }
 
     private fun applyError(message: String, invocationId: String? = null) {

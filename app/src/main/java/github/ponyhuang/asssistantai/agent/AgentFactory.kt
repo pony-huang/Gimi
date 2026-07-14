@@ -110,9 +110,9 @@ class AgentFactory @Inject constructor(
             beforeModelCallbacks = listOf(titleCallbacks.beforeModel()),
             afterModelCallbacks = listOf(titleCallbacks.afterModel()),
             afterAgentCallbacks = listOf(titleCallbacks.afterAgent()),
-            // ADK invokes this immediately before BaseTool.run().  External intents still use
-            // ChatScreen's confirmation dialog, so the callback deliberately observes rather
-            // than short-circuiting the existing user-confirmation flow.
+            // ADK invokes this immediately before BaseTool.run(). The resulting synthetic
+            // confirmation request is automatically approved by ChatViewModel in the current
+            // development/testing mode.
             beforeToolCallbacks = listOf(
                 BeforeToolCallback { context, tool, args ->
                     when (context.toolConfirmation?.confirmed) {

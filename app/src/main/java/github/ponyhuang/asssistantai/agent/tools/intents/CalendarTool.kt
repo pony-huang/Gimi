@@ -2,6 +2,7 @@ package github.ponyhuang.asssistantai.agent.tools.intents
 
 import android.Manifest
 import android.content.ContentUris
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -10,6 +11,10 @@ import com.google.adk.kt.annotations.Param
 import com.google.adk.kt.annotations.Tool
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.asssistantai.permission.CalendarPermissionActivity
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -86,35 +91,44 @@ class CalendarTool @Inject constructor(
     fun createCalendarEvent(
         @Param("Calendar ID returned by listCalendars, represented as a decimal string.") calendarId: String,
         @Param("Event title.") title: String,
-        @Param("Event start time as a Unix epoch milliseconds decimal string.") startTimeMillis: String,
-        @Param("Event end time as a Unix epoch milliseconds decimal string. It must be later than the start time.") endTimeMillis: String,
+        @Param("Event start time in yyyymmddhhmmss format, interpreted in the device's local timezone.") startTimeMillis: String,
+        @Param("Event end time in yyyymmddhhmmss format, interpreted in the device's local timezone. It must be later than the start time.") endTimeMillis: String,
         @Param("Optional event description.") description: String? = null,
     ): Map<String, Any> {
         val parsedCalendarId = calendarId.toLongOrNull()
             ?: return invalidNumberError("calendarId")
-        val parsedStartTimeMillis = startTimeMillis.toLongOrNull()
-            ?: return invalidNumberError("startTimeMillis")
-        val parsedEndTimeMillis = endTimeMillis.toLongOrNull()
-            ?: return invalidNumberError("endTimeMillis")
+        val parsedStartTimeMillis = parseLocalDateTimeMillis(startTimeMillis)
+            ?: return invalidTimeError("startTimeMillis")
+        val parsedEndTimeMillis = parseLocalDateTimeMillis(endTimeMillis)
+            ?: return invalidTimeError("endTimeMillis")
         if (parsedEndTimeMillis <= parsedStartTimeMillis) {
             return mapOf("success" to false, "error" to "endTimeMillis must be later than startTimeMillis.")
         }
-        return queue.request(
-            "Create calendar event",
-            "Open Calendar to create '$title'.",
-            Intent(Intent.ACTION_INSERT).setData(CalendarContract.Events.CONTENT_URI)
-                .putExtra(CalendarContract.Events.TITLE, title)
-                .putExtra(CalendarContract.Events.DTSTART, parsedStartTimeMillis)
-                .putExtra(CalendarContract.Events.DTEND, parsedEndTimeMillis)
-                .putExtra(CalendarContract.Events.DESCRIPTION, description)
-                .putExtra(CalendarContract.Events.CALENDAR_ID, parsedCalendarId),
+        if (!hasPermission(Manifest.permission.WRITE_CALENDAR)) return writePermissionError()
+        val values = ContentValues().apply {
+            put(CalendarContract.Events.CALENDAR_ID, parsedCalendarId)
+            put(CalendarContract.Events.DTSTART, parsedStartTimeMillis)
+            put(CalendarContract.Events.DTEND, parsedEndTimeMillis)
+            put(CalendarContract.Events.TITLE, title)
+            put(CalendarContract.Events.DESCRIPTION, description)
+            put(CalendarContract.Events.EVENT_TIMEZONE, TimeZone.getDefault().id)
+        }
+        val uri = try {
+            resolver.insert(CalendarContract.Events.CONTENT_URI, values)
+        } catch (_: SecurityException) {
+            return writePermissionError()
+        } ?: return mapOf("success" to false, "error" to "Calendar provider rejected the insert.")
+        return mapOf(
+            "success" to true,
+            "eventId" to ContentUris.parseId(uri),
+            "uri" to uri.toString(),
         )
     }
 
-    @Tool(name = "request_calendar_permissions", description = "Requests the calendar permissions required to read calendars and create events.")
+    @Tool(name = "request_calendar_permissions", description = "Requests the calendar permissions required to read and write calendars.")
     fun requestCalendarPermissions(): Map<String, Any> = queue.request(
         "Grant calendar access",
-        "Request permission to read your calendars for upcoming-event queries.",
+        "Request permission to read and write your calendars for upcoming-event queries and direct event creation.",
         Intent(context, CalendarPermissionActivity::class.java),
     )
 
@@ -126,16 +140,36 @@ class CalendarTool @Inject constructor(
         "error" to "READ_CALENDAR permission is required. Call requestCalendarPermissions and grant calendar access.",
     )
 
+    private fun writePermissionError(): Map<String, Any> = mapOf(
+        "success" to false,
+        "error" to "WRITE_CALENDAR permission is required. Call requestCalendarPermissions and grant calendar access.",
+    )
 
     private fun invalidNumberError(parameter: String): Map<String, Any> = mapOf(
         "success" to false,
         "error" to "$parameter must be a valid decimal integer string.",
     )
 
+    private fun invalidTimeError(parameter: String): Map<String, Any> = mapOf(
+        "success" to false,
+        "error" to "$parameter must be a yyyymmddhhmmss string.",
+    )
+
+    private fun parseLocalDateTimeMillis(value: String): Long? = try {
+        LocalDateTime.parse(value, LOCAL_DATE_TIME_FORMATTER)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+    } catch (_: Exception) {
+        null
+    }
+
     private companion object {
         const val MILLIS_PER_DAY = 24 * 60 * 60 * 1000L
         const val MAXIMUM_QUERY_DAYS = 31
         const val MAXIMUM_RETURNED_EVENTS = 50
+
+        val LOCAL_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
 
         val CALENDAR_PROJECTION = arrayOf(
             CalendarContract.Calendars._ID,

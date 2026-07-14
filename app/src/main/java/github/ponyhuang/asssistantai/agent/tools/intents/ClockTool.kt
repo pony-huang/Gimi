@@ -12,7 +12,7 @@ import javax.inject.Singleton
 class ClockTool @Inject constructor(
     private val queue: IntentActionQueue,
 ) {
-    @Tool(name = "set_alarm", description = "Opens the system clock app with a new alarm configured for the requested time.")
+    @Tool(name = "set_alarm", description = "Creates an alarm in the system clock for the requested time without showing a confirmation screen.")
     fun setAlarm(
         @Param("Alarm hour in 24-hour time, from 0 to 23.") hour: Int,
         @Param("Alarm minute, from 0 to 59.") minute: Int,
@@ -28,11 +28,11 @@ class ClockTool @Inject constructor(
                 .putExtra(AlarmClock.EXTRA_HOUR, appliedHour)
                 .putExtra(AlarmClock.EXTRA_MINUTES, appliedMinute)
                 .putExtra(AlarmClock.EXTRA_MESSAGE, appliedLabel)
-                .putExtra(AlarmClock.EXTRA_SKIP_UI, false),
+                .putExtra(AlarmClock.EXTRA_SKIP_UI, true),
         )
     }
 
-    @Tool(name = "set_timer", description = "Opens the system clock app with a countdown timer configured for the requested duration.")
+    @Tool(name = "set_timer", description = "Starts a countdown timer in the system clock app for the requested duration without showing a confirmation screen.")
     fun setTimer(
         @Param("Timer duration in seconds. Must be at least one second.") durationSeconds: Int,
         @Param("Optional label shown by the system timer app.") label: String? = null,
@@ -45,7 +45,7 @@ class ClockTool @Inject constructor(
             Intent(AlarmClock.ACTION_SET_TIMER)
                 .putExtra(AlarmClock.EXTRA_LENGTH, appliedDuration)
                 .putExtra(AlarmClock.EXTRA_MESSAGE, appliedLabel)
-                .putExtra(AlarmClock.EXTRA_SKIP_UI, false),
+                .putExtra(AlarmClock.EXTRA_SKIP_UI, true),
         )
     }
 

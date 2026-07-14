@@ -66,6 +66,8 @@ fun ModelServiceCard(
             )
             Switch(
                 checked = item.isEnabled,
+                // 没有 apiKey 时不允许启用；详情页 Key 区填好后会自动重新可点。
+                enabled = item.apiKey.isNotBlank(),
                 onCheckedChange = { onToggleEnabled(item.serviceId, it) },
             )
         }

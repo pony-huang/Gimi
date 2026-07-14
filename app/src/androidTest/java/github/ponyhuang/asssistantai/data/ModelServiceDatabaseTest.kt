@@ -31,16 +31,31 @@ class ModelServiceDatabaseTest {
     }
 
     @Test
-    fun seedOnlyWritesAnEmptyCatalog() = runBlocking {
-        seedModelCatalogIfEmpty(database)
+    fun seedSkipsExistingServiceIds() = runBlocking {
+        seedMissingModelCatalog(database)
         val seeded = database.modelServiceDao().getAll()
         assertEquals(DefaultModelServices.services.map { it.serviceId }, seeded.map { it.serviceId })
 
         val renamed = seeded.first().copy(serviceName = "Edited")
         database.modelServiceDao().upsert(renamed)
-        seedModelCatalogIfEmpty(database)
+        seedMissingModelCatalog(database)
 
         assertEquals("Edited", database.modelServiceDao().get(renamed.serviceId)?.serviceName)
+    }
+
+    @Test
+    fun seedInsertsProvidersMissingFromExistingCatalog() = runBlocking {
+        val first = DefaultModelServices.services.first()
+        database.modelServiceDao().upsert(
+            defaultModelServiceEntities().first { it.serviceId == first.serviceId },
+        )
+        assertEquals(1, database.modelServiceDao().count())
+
+        seedMissingModelCatalog(database)
+
+        val ids = database.modelServiceDao().getAll().map { it.serviceId }
+        assertEquals(DefaultModelServices.services.map { it.serviceId }.toSet(), ids.toSet())
+        assertEquals(DefaultModelServices.services.size, ids.size)
     }
 
     @Test

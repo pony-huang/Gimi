@@ -81,13 +81,23 @@ internal fun defaultModelServiceEntities(gson: Gson = Gson()): List<ModelService
         )
     }
 
-internal suspend fun seedModelCatalogIfEmpty(
+/**
+ * 把 [DefaultModelServices] 里缺的 provider 增量写进 Room。判断标准是 [ModelServiceEntity.serviceId]：
+ * serviceId 已存在就跳过该条，未存在才 upsert。这样新加的 [LLMModelProvider] 在已有用户数据上也能
+ * 顺利进入设置页，同时不会覆盖用户已经修改过的服务名 / 模型组等。
+ *
+ * 调用时机：每次启动 [ModelServiceRepository] 时执行一次；幂等，安全。
+ */
+internal suspend fun seedMissingModelCatalog(
     database: ModelServiceDatabase,
     gson: Gson = Gson(),
 ) {
     database.withTransaction {
         val dao = database.modelServiceDao()
-        if (dao.count() == 0) dao.upsertAll(defaultModelServiceEntities(gson))
+        val existingIds = dao.getAll().mapTo(HashSet()) { it.serviceId }
+        val missing = defaultModelServiceEntities(gson)
+            .filterNot { it.serviceId in existingIds }
+        if (missing.isNotEmpty()) dao.upsertAll(missing)
     }
 }
 

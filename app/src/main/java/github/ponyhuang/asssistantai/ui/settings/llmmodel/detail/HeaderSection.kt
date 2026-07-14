@@ -55,6 +55,8 @@ fun HeaderSection(
         )
         Switch(
             checked = service.isEnabled,
+            // 未配置 API 密钥时禁用总开关；下方 ApiKeySection 填好后会自动重新可点。
+            enabled = service.apiKey.isNotBlank(),
             onCheckedChange = onToggleEnabled,
         )
         IconButton(

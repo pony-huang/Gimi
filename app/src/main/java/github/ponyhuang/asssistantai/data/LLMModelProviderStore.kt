@@ -112,8 +112,19 @@ class ModelServiceRepository @Inject constructor(
         refreshMergedServices()
     }
 
-    fun setEnabled(serviceId: String, enabled: Boolean) {
+    /**
+     * 切换总开关。返回是否真的发生了状态变化：
+     * - `enabled=true` 但 apiKey 为空 → 拒绝并返回 `false`（保护用户，避免无密钥启用后调用失败）。
+     * - 其他情况正常切换并返回 `true`。
+     */
+    fun setEnabled(serviceId: String, enabled: Boolean): Boolean {
+        val current = getService(serviceId) ?: return false
+        if (enabled && current.apiKey.isBlank()) {
+            Log.w(TAG, "Refusing to enable '$serviceId' — apiKey is blank.")
+            return false
+        }
         updateService(serviceId) { it.copy(isEnabled = enabled) }
+        return true
     }
 
     suspend fun removeModel(serviceId: String, groupId: String, modelId: String) {
@@ -174,7 +185,7 @@ class ModelServiceRepository @Inject constructor(
     )
 
     private suspend fun seedCatalogIfEmpty() {
-        seedModelCatalogIfEmpty(database, gson)
+        seedMissingModelCatalog(database, gson)
     }
 
     private suspend fun mutateCatalog(

@@ -73,9 +73,9 @@ data class LLMModelItem(
 /**
  * API 地址接口标准。
  */
-enum class ApiBaseType(val suffix: String, val previewPath: String) {
-    Standard(suffix = "standard", previewPath = "/v1/chat/completions"),
-    Anthropic(suffix = "anthropic", previewPath = "/v1/messages"),
+enum class ApiBaseType() {
+    Standard,
+    Anthropic,
 }
 
 /**
@@ -142,6 +142,41 @@ object DefaultModelServices {
             keyHelpUrl = "https://platform.minimaxi.com/user-center/basic-information/interface-key",
             docsUrl = "https://platform.minimaxi.com/document",
             modelsUrl = "https://platform.minimaxi.com/document/Models",
+        ),
+        LLMModelProvider(
+            serviceId = "mimo",
+            serviceName = "Xiaomi MIMO",
+            isEnabled = false,
+            apiKey = "",
+            apiBaseUrl = "https://api.xiaomimimo.com/v1",
+            baseType = ApiBaseType.Standard,
+            anthropicBaseUrl = "https://api.xiaomimimo.com/anthropic",
+            LLMModelGroups = listOf(
+                LLMModelGroup(
+                    groupId = "MiMo-V2.5",
+                    groupName = "MiMo-V2.5",
+                    isExpanded = true,
+                    models = listOf(
+                        LLMModelItem(
+                            modelId = "mimo-v2.5-pro-ultraspeed",
+                            modelName = "mimo-v2.5-pro-ultraspeed",
+                        ),
+                        LLMModelItem(
+                            modelId = "mimo-v2.5-pro",
+                            modelName = "mimo-v2.5-pro",
+                        ),
+                        LLMModelItem(
+                            modelId = "mimo-v2.5",
+                            modelName = "mimo-v2.5",
+                        ),
+                    ),
+                ),
+            ),
+            iconRes = R.drawable.ic_model_provider_xiaomimimo,
+            homepageUrl = "https://mimo.mi.com/",
+            keyHelpUrl = "https://platform.xiaomimimo.com/console/api-keys",
+            docsUrl = "https://mimo.mi.com/docs",
+            modelsUrl = "https://mimo.mi.com/docs/zh-CN/quick-start/summary/model",
         ),
     )
 

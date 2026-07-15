@@ -437,7 +437,7 @@ class ChatViewModel @Inject constructor(
         runner.recreate()
     }
 
-    /** 新会话固定使用首个可用模型，不继承最近选择。 */
+    /** New conversations use the saved default assistant model, with a first-available fallback. */
     private fun defaultModelPayload(): String = modelServices.defaultSelection()
         ?.let(LLMModelSelectionCodec::encode)
         .orEmpty()

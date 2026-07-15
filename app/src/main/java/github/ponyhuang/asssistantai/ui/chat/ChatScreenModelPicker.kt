@@ -159,6 +159,7 @@ fun ModelStatusDisplay(
 fun ModelPickerDialog(
     rows: List<EnabledModelRow>,
     currentSelection: LLMModelSelection?,
+    title: String = "选择当前模型",
     onPick: (EnabledModelRow) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -182,7 +183,7 @@ fun ModelPickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("选择当前模型") },
+        title = { Text(title) },
         text = {
             if (rows.isEmpty()) {
                 Text(

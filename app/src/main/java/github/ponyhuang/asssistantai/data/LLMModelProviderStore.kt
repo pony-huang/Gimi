@@ -65,6 +65,7 @@ class ModelServiceRepository @Inject constructor(
     )
     private val settingsType = object : TypeToken<Map<String, ModelServiceSettings>>() {}.type
     private val groupsType = object : TypeToken<List<StoredModelGroup>>() {}.type
+    private val selectionType = object : TypeToken<LLMModelSelection>() {}.type
     private val defaultSettings = DefaultModelServices.services.associate { provider ->
         provider.serviceId to provider.toSettings()
     }
@@ -72,10 +73,16 @@ class ModelServiceRepository @Inject constructor(
     private val _services = MutableStateFlow<List<LLMModelProvider>>(emptyList())
     private val _loadState = MutableStateFlow<ModelCatalogLoadState>(ModelCatalogLoadState.Loading)
     private val _currentSelection = MutableStateFlow<LLMModelSelection?>(null)
+    private val _defaultAssistantSelection = MutableStateFlow(readSelection(DEFAULT_ASSISTANT_MODEL_KEY))
+    private val _fastModelSelection = MutableStateFlow(readSelection(FAST_MODEL_KEY))
 
     val services: StateFlow<List<LLMModelProvider>> = _services.asStateFlow()
     val loadState: StateFlow<ModelCatalogLoadState> = _loadState.asStateFlow()
     val currentSelection: StateFlow<LLMModelSelection?> = _currentSelection.asStateFlow()
+    /** User-configured model used to initialize new assistant conversations. */
+    val defaultAssistantSelection: StateFlow<LLMModelSelection?> = _defaultAssistantSelection.asStateFlow()
+    /** User-configured low-latency model for features that require a quick response. */
+    val fastModelSelection: StateFlow<LLMModelSelection?> = _fastModelSelection.asStateFlow()
 
     init {
         scope.launch {
@@ -156,7 +163,15 @@ class ModelServiceRepository @Inject constructor(
         }
     }
 
-    fun defaultSelection(): LLMModelSelection? = _services.value.asSequence()
+    /**
+     * Resolves the default assistant model, falling back to the first usable model when the
+     * saved selection is absent or has since been disabled/removed.
+     */
+    fun defaultSelection(): LLMModelSelection? =
+        _defaultAssistantSelection.value?.takeIf { resolveSelection(it) != null }
+            ?: firstAvailableSelection()
+
+    private fun firstAvailableSelection(): LLMModelSelection? = _services.value.asSequence()
         .filter { it.isEnabled }
         .mapNotNull { service ->
             service.LLMModelGroups.firstOrNull { it.models.isNotEmpty() }?.let { group ->
@@ -164,6 +179,16 @@ class ModelServiceRepository @Inject constructor(
             }
         }
         .firstOrNull()
+
+    fun setDefaultAssistantSelection(selection: LLMModelSelection?) {
+        _defaultAssistantSelection.value = selection
+        persistSelection(DEFAULT_ASSISTANT_MODEL_KEY, selection)
+    }
+
+    fun setFastModelSelection(selection: LLMModelSelection?) {
+        _fastModelSelection.value = selection
+        persistSelection(FAST_MODEL_KEY, selection)
+    }
 
     fun setCurrentSelection(selection: LLMModelSelection?) {
         _currentSelection.value = selection
@@ -272,6 +297,15 @@ class ModelServiceRepository @Inject constructor(
         }.onFailure { Log.w(TAG, "Unable to persist model service settings.", it) }
     }
 
+    private fun readSelection(key: String): LLMModelSelection? = preferences.getString(key, null)
+        ?.let { encoded -> runCatching { gson.fromJson<LLMModelSelection>(encoded, selectionType) }.getOrNull() }
+
+    private fun persistSelection(key: String, selection: LLMModelSelection?) {
+        preferences.edit(commit = true) {
+            if (selection == null) remove(key) else putString(key, gson.toJson(selection))
+        }
+    }
+
     private fun encrypt(plainText: String): String {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateSecretKey())
@@ -315,6 +349,8 @@ class ModelServiceRepository @Inject constructor(
         const val TAG = "ModelServiceRepository"
         const val PREFERENCES_NAME = "model_service_settings_v1"
         const val SETTINGS_KEY = "encrypted_settings"
+        const val DEFAULT_ASSISTANT_MODEL_KEY = "default_assistant_model"
+        const val FAST_MODEL_KEY = "fast_model"
         const val KEY_ALIAS = "model_service_settings_key_v1"
         const val ANDROID_KEY_STORE = "AndroidKeyStore"
         const val TRANSFORMATION = "AES/GCM/NoPadding"

@@ -39,6 +39,21 @@ Use JUnit 4 for unit tests in the matching `app/src/test` package. Name files `*
 
 If compilation succeeds but the same automated test repeatedly fails because of the test runner, device environment, or infrastructure rather than a reproducible code failure, stop retrying and hand the case off for manual verification. Record the successful compile command, the repeated test failure, and any manual verification already completed.
 
+## Meizu Device UI Verification
+
+The shared Meizu 20 Pro can be reached through wireless ADB when it appears in `adb devices -l`. Use the displayed serial dynamically rather than hard-coding it, then build and install the debug APK:
+
+```powershell
+$serial = (adb devices | Select-String '\sdevice$' | Select-Object -First 1).ToString().Split()[0]
+.\gradlew.bat app:assembleDebug
+adb -s $serial install -r app\build\outputs\apk\debug\app-debug.apk
+adb -s $serial shell monkey -p github.ponyhuang.asssistantai -c android.intent.category.LAUNCHER 1
+```
+
+For visual Compose checks, use `adb shell input tap <x> <y>` to navigate, capture the screen with `adb -s $serial exec-out screencap -p > build\device-screen.png`, and inspect the PNG visually. Pair this with `adb -s $serial shell uiautomator dump /sdcard/window.xml` when confirming text, click targets, and bounds. Check that interactive elements clear the status bar and gesture-navigation area.
+
+The device may be asleep. After user authorization, wake it with `adb -s $serial shell input keyevent KEYCODE_WAKEUP`. Do not attempt to bypass a password, pattern, or biometric lock. Keep any intentional model-selection test change visible in the final report, because it persists in the app's settings.
+
 ## Commit & Pull Request Guidelines
 
 Existing history uses short imperative subjects (for example, `Refactor settings module`); keep subjects under 72 characters and commits focused. Pull requests should explain user-visible changes, note tests run, link the relevant issue or OpenSpec change, and include screenshots for Compose UI changes.

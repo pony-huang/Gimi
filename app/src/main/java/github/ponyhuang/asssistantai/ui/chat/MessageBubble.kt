@@ -1,14 +1,24 @@
 package github.ponyhuang.asssistantai.ui.chat
 
+import android.content.ClipData
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.model.FunctionCallView
@@ -19,6 +29,7 @@ import github.ponyhuang.asssistantai.model.Messages
 import github.ponyhuang.asssistantai.model.TextPart
 import github.ponyhuang.asssistantai.ui.theme.AsssistantaiTheme
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.launch
 
 
 /**
@@ -119,6 +130,57 @@ fun MessageBubble(
                     )
                 }
             }
+
+            assistantReplyTextForCopy(message)?.let { text ->
+                AssistantMessageActions(text = text)
+            }
+        }
+    }
+}
+
+/**
+ * Returns the original Markdown body that may be copied from a completed assistant reply.
+ * Thought content and tool activity are intentionally excluded from the user-facing reply.
+ */
+private fun assistantReplyTextForCopy(message: Message): String? {
+    if (message.role != MessageRole.Assistant || message.partial) return null
+
+    return message.textParts
+        .asSequence()
+        .filterNot { it.thought }
+        .joinToString(separator = "") { it.text }
+        .takeIf(String::isNotBlank)
+}
+
+/** A compact action row shown after a completed assistant reply. */
+@Composable
+private fun AssistantMessageActions(
+    text: String,
+) {
+    val clipboard = LocalClipboard.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(
+            onClick = {
+                scope.launch {
+                    clipboard.setClipEntry(
+                        ClipEntry(ClipData.newPlainText("assistant response", text)),
+                    )
+                    Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+                }
+            },
+        ) {
+            Icon(
+                imageVector = Icons.Default.ContentCopy,
+                contentDescription = "复制回复",
+            )
         }
     }
 }

@@ -52,7 +52,7 @@ adb -s $serial shell monkey -p github.ponyhuang.asssistantai -c android.intent.c
 
 For visual Compose checks, use `adb shell input tap <x> <y>` to navigate, capture the screen with `adb -s $serial exec-out screencap -p > build\device-screen.png`, and inspect the PNG visually. Pair this with `adb -s $serial shell uiautomator dump /sdcard/window.xml` when confirming text, click targets, and bounds. Check that interactive elements clear the status bar and gesture-navigation area.
 
-The device may be asleep. After user authorization, wake it with `adb -s $serial shell input keyevent KEYCODE_WAKEUP`. Do not attempt to bypass a password, pattern, or biometric lock. Keep any intentional model-selection test change visible in the final report, because it persists in the app's settings.
+The device may be asleep. If an initial screenshot or UI dump shows the keyguard or the app is not foregrounded, first wake it with `adb -s $serial shell input keyevent KEYCODE_WAKEUP`, then re-check the UI before reporting a test blocker. The shared test device normally has no authentication lock, so waking it is sufficient; do not attempt to bypass a password, pattern, or biometric lock if one is actually present. Keep any intentional model-selection test change visible in the final report, because it persists in the app's settings.
 
 ## Commit & Pull Request Guidelines
 

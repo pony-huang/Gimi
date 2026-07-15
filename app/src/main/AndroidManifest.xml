@@ -12,6 +12,9 @@
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
     <queries>
         <intent>
@@ -49,6 +52,10 @@
             android:theme="@style/Theme.Asssistantai" />
         <activity
             android:name=".permission.LocationPermissionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Asssistantai" />
+        <activity
+            android:name=".permission.MediaPermissionActivity"
             android:exported="false"
             android:theme="@style/Theme.Asssistantai" />
         <activity

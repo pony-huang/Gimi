@@ -14,6 +14,9 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -35,20 +38,30 @@ import github.ponyhuang.asssistantai.ui.chat.EnabledModelRow
 import github.ponyhuang.asssistantai.ui.chat.ModelPickerDialog
 import dagger.hilt.android.lifecycle.HiltViewModel
 import androidx.lifecycle.ViewModel
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
+import github.ponyhuang.asssistantai.data.DocumentDirectoryRepository
 import javax.inject.Inject
 
 @HiltViewModel
 class DefaultModelSettingsViewModel @Inject constructor(
     private val modelServices: ModelServiceRepository,
+    private val documentDirectories: DocumentDirectoryRepository,
 ) : ViewModel() {
     val services = modelServices.services
     val defaultAssistantSelection = modelServices.defaultAssistantSelection
     val fastModelSelection = modelServices.fastModelSelection
+    val directories = documentDirectories.directories
 
     fun setDefaultAssistantModel(selection: LLMModelSelection) =
         modelServices.setDefaultAssistantSelection(selection)
 
     fun setFastModel(selection: LLMModelSelection) = modelServices.setFastModelSelection(selection)
+
+    fun addDocumentDirectory(uri: Uri) = documentDirectories.addDirectory(uri)
+
+    fun removeDocumentDirectory(uri: Uri) = documentDirectories.removeDirectory(uri)
 }
 
 /** Settings landing page containing only available settings capabilities. */
@@ -62,6 +75,10 @@ fun SettingsScreen(
     val services by viewModel.services.collectAsStateWithLifecycle()
     val defaultAssistantSelection by viewModel.defaultAssistantSelection.collectAsStateWithLifecycle()
     val fastModelSelection by viewModel.fastModelSelection.collectAsStateWithLifecycle()
+    val documentDirectories by viewModel.directories.collectAsStateWithLifecycle()
+    val documentTreeLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri -> uri?.let(viewModel::addDocumentDirectory) }
     val enabledModels = remember(services) {
         services.filter { it.isEnabled }.flatMap { service ->
             service.LLMModelGroups.flatMap { group ->
@@ -129,6 +146,58 @@ fun SettingsScreen(
                         rows = enabledModels,
                         onClick = { selectingFastModel = true },
                     )
+                }
+            }
+            item { Spacer(modifier = Modifier.height(20.dp)) }
+            item {
+                SettingsSectionTitle(
+                    text = "本机文件搜索",
+                    modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 8.dp),
+                )
+                SettingsCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    androidx.compose.material3.ListItem(
+                        headlineContent = {
+                            Text("文档搜索目录", fontWeight = FontWeight.Medium)
+                        },
+                        supportingContent = {
+                            Text(
+                                if (documentDirectories.isEmpty()) {
+                                    "选择允许助手搜索的文件夹"
+                                } else {
+                                    "已授权 ${documentDirectories.size} 个目录"
+                                },
+                            )
+                        },
+                        leadingContent = { Icon(Icons.Default.Folder, contentDescription = null) },
+                        trailingContent = {
+                            IconButton(onClick = { documentTreeLauncher.launch(null) }) {
+                                Icon(Icons.Default.Add, contentDescription = "添加文档搜索目录")
+                            }
+                        },
+                    )
+                    documentDirectories.forEach { uri ->
+                        androidx.compose.material3.ListItem(
+                            headlineContent = {
+                                Text(
+                                    uri.lastPathSegment ?: uri.toString(),
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                )
+                            },
+                            supportingContent = {
+                                Text(
+                                    uri.authority.orEmpty(),
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                )
+                            },
+                            trailingContent = {
+                                IconButton(onClick = { viewModel.removeDocumentDirectory(uri) }) {
+                                    Icon(Icons.Default.Delete, contentDescription = "移除目录")
+                                }
+                            },
+                        )
+                    }
                 }
             }
             item { Spacer(modifier = Modifier.height(20.dp)) }

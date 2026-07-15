@@ -31,6 +31,7 @@ import github.ponyhuang.asssistantai.agent.tools.systems.PackageManagerTool
 import github.ponyhuang.asssistantai.agent.tools.systems.TimeTool
 import github.ponyhuang.asssistantai.agent.tools.intents.generatedTools
 import github.ponyhuang.asssistantai.agent.tools.systems.LocationTool
+import github.ponyhuang.asssistantai.agent.tools.systems.LocalFileSearchTool
 import github.ponyhuang.asssistantai.agent.tools.systems.generatedTools
 import github.ponyhuang.asssistantai.data.ApiBaseType
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
@@ -61,6 +62,7 @@ class AgentFactory @Inject constructor(
     private val locationTool: LocationTool,
     private val mediaSessionManagerTool: MediaSessionManagerTool,
     private val packageManagerTool: PackageManagerTool,
+    private val localFileSearchTool: LocalFileSearchTool,
 ) {
 
     private val defaultInstruction: String =
@@ -100,6 +102,7 @@ class AgentFactory @Inject constructor(
             addAll(locationTool.generatedTools())
             addAll(mediaSessionManagerTool.generatedTools())
             addAll(packageManagerTool.generatedTools())
+            addAll(localFileSearchTool.generatedTools())
             addAll(messagingTool.generatedTools())
 //            addAll(notesTool.generatedTools())
             addAll(phoneTool.generatedTools())

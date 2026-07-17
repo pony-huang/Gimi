@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Folder
@@ -21,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,17 +44,20 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
 import github.ponyhuang.asssistantai.data.DocumentDirectoryRepository
+import github.ponyhuang.asssistantai.data.ChatDisplayPreferences
 import javax.inject.Inject
 
 @HiltViewModel
 class DefaultModelSettingsViewModel @Inject constructor(
     private val modelServices: ModelServiceRepository,
     private val documentDirectories: DocumentDirectoryRepository,
+    private val chatDisplayPreferences: ChatDisplayPreferences,
 ) : ViewModel() {
     val services = modelServices.services
     val defaultAssistantSelection = modelServices.defaultAssistantSelection
     val fastModelSelection = modelServices.fastModelSelection
     val directories = documentDirectories.directories
+    val showToolActivity = chatDisplayPreferences.showToolActivity
 
     fun setDefaultAssistantModel(selection: LLMModelSelection) =
         modelServices.setDefaultAssistantSelection(selection)
@@ -62,6 +67,8 @@ class DefaultModelSettingsViewModel @Inject constructor(
     fun addDocumentDirectory(uri: Uri) = documentDirectories.addDirectory(uri)
 
     fun removeDocumentDirectory(uri: Uri) = documentDirectories.removeDirectory(uri)
+
+    fun setShowToolActivity(show: Boolean) = chatDisplayPreferences.setShowToolActivity(show)
 }
 
 /** Settings landing page containing only available settings capabilities. */
@@ -76,6 +83,7 @@ fun SettingsScreen(
     val defaultAssistantSelection by viewModel.defaultAssistantSelection.collectAsStateWithLifecycle()
     val fastModelSelection by viewModel.fastModelSelection.collectAsStateWithLifecycle()
     val documentDirectories by viewModel.directories.collectAsStateWithLifecycle()
+    val showToolActivity by viewModel.showToolActivity.collectAsStateWithLifecycle()
     val documentTreeLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
     ) { uri -> uri?.let(viewModel::addDocumentDirectory) }
@@ -145,6 +153,39 @@ fun SettingsScreen(
                         selection = fastModelSelection,
                         rows = enabledModels,
                         onClick = { selectingFastModel = true },
+                    )
+                }
+            }
+            item { Spacer(modifier = Modifier.height(20.dp)) }
+            item {
+                SettingsSectionTitle(
+                    text = "聊天显示",
+                    modifier = Modifier
+                        .padding(horizontal = 24.dp)
+                        .padding(bottom = 8.dp),
+                )
+                SettingsCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    androidx.compose.material3.ListItem(
+                        headlineContent = {
+                            Text("显示工具调用", fontWeight = FontWeight.Medium)
+                        },
+                        supportingContent = {
+                            Text("在对话中显示工具调用和返回结果")
+                        },
+                        leadingContent = {
+                            Icon(Icons.Default.Build, contentDescription = null)
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = showToolActivity,
+                                onCheckedChange = viewModel::setShowToolActivity,
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                viewModel.setShowToolActivity(!showToolActivity)
+                            },
                     )
                 }
             }

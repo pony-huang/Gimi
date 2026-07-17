@@ -91,6 +91,7 @@ fun ChatBubbleText(
 fun MessageBubble(
     message: Message,
     partChannelProvider: (partId: String) -> ReceiveChannel<String>?,
+    showToolActivity: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val role = message.role
@@ -98,7 +99,7 @@ fun MessageBubble(
     ChatBubble(role = role, modifier = modifier) {
         Column(modifier = if (fillsBubbleWidth) Modifier.fillMaxWidth() else Modifier) {
             // 1. 工具调用 chip 行
-            if (message.functionCalls.isNotEmpty()) {
+            if (showToolActivity && message.functionCalls.isNotEmpty()) {
                 ChipRow(fillAvailableWidth = fillsBubbleWidth) {
                     message.functionCalls.forEach { call ->
                         ToolCallChip(call = call)
@@ -107,7 +108,7 @@ fun MessageBubble(
             }
 
             // 2. 工具响应 chip 行
-            if (message.functionResponses.isNotEmpty()) {
+            if (showToolActivity && message.functionResponses.isNotEmpty()) {
                 ChipRow(fillAvailableWidth = fillsBubbleWidth) {
                     message.functionResponses.forEach { response ->
                         ToolResponseChip(response = response)

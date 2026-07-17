@@ -116,16 +116,20 @@ fun ChatScaffold(
     val scope = rememberCoroutineScope()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val messages = state.messages
+    val showToolActivity by viewModel.showToolActivity.collectAsStateWithLifecycle()
+    val visibleMessages = remember(messages, showToolActivity) {
+        messages.filter { message -> message.isVisibleInChat(showToolActivity) }
+    }
     val isStreaming = state.isStreaming
     val pendingToolConfirmation by viewModel.pendingToolConfirmation.collectAsStateWithLifecycle()
     // 只要用户仍停留在底部，就让流式内容增长持续跟随；用户向上浏览历史时则停止抢占滚动。
     var shouldFollowLatest by remember { mutableStateOf(true) }
-    val latestItemIndex by rememberUpdatedState(messages.size)
+    val latestItemIndex by rememberUpdatedState(visibleMessages.size)
 
-    LaunchedEffect(messages.size) {
+    LaunchedEffect(visibleMessages.size) {
         if (state.getCurrentUserMessage() != null) {
             delay(100.milliseconds)
-            listState.animateScrollToItem(messages.size)
+            listState.animateScrollToItem(visibleMessages.size)
         }
     }
 
@@ -194,7 +198,7 @@ fun ChatScaffold(
                     onClick = {
                         shouldFollowLatest = true
                         scope.launch {
-                            listState.animateScrollToItem(messages.size)
+                            listState.animateScrollToItem(visibleMessages.size)
                         }
                     },
                 ) {
@@ -227,7 +231,7 @@ fun ChatScaffold(
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     items(
-                        items = messages,
+                        items = visibleMessages,
                         key = { it.id },
                         contentType = { msg ->
                             when {
@@ -240,7 +244,8 @@ fun ChatScaffold(
                     ) { msg ->
                         MessageRow(
                             message = msg,
-                            partChannelProvider = viewModel::partChannelFor
+                            partChannelProvider = viewModel::partChannelFor,
+                            showToolActivity = showToolActivity,
                         )
                     }
                     item(
@@ -513,6 +518,7 @@ private fun ChatTopBar(
 private fun MessageRow(
     message: Message,
     partChannelProvider: (partId: String) -> ReceiveChannel<String>?,
+    showToolActivity: Boolean,
     modifier: Modifier = Modifier
 ) {
     if (message.error != null) {
@@ -521,6 +527,7 @@ private fun MessageRow(
         MessageBubble(
             message = message,
             partChannelProvider = partChannelProvider,
+            showToolActivity = showToolActivity,
             modifier = modifier
         )
     }

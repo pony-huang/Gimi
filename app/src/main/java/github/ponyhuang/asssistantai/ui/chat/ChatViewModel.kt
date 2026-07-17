@@ -13,6 +13,7 @@ import com.google.adk.kt.types.FunctionResponse
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.asssistantai.agent.AgentChatRunner
 import github.ponyhuang.asssistantai.data.ConversationRepository
+import github.ponyhuang.asssistantai.data.ChatDisplayPreferences
 import github.ponyhuang.asssistantai.data.EventMapper
 import github.ponyhuang.asssistantai.data.LLMModelSelection
 import github.ponyhuang.asssistantai.data.LLMModelSelectionCodec
@@ -58,12 +59,14 @@ class ChatViewModel @Inject constructor(
     private val runner: AgentChatRunner,
     private val repository: ConversationRepository,
     private val modelServices: ModelServiceRepository,
+    private val chatDisplayPreferences: ChatDisplayPreferences,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
     val availableModelServices = modelServices.services
+    val showToolActivity = chatDisplayPreferences.showToolActivity
     private val _currentLLMModelSelection = MutableStateFlow<LLMModelSelection?>(null)
     /** 当前打开会话的显式模型选择；未设置时由 AgentFactory 走默认模型回退。 */
     val currentLLMModelSelection: StateFlow<LLMModelSelection?> = _currentLLMModelSelection.asStateFlow()

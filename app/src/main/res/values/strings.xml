@@ -15,6 +15,9 @@
     <string name="stream_ai_compose_composer_stop_button">Stop</string>
     <string name="stream_ai_compose_composer_send_button">Send</string>
     <string name="stream_ai_compose_composer_add_attachments_button">Add context</string>
+    <string name="stream_ai_compose_composer_take_photo">Take photo</string>
+    <string name="stream_ai_compose_composer_choose_photos">Choose from photos</string>
+    <string name="stream_ai_compose_composer_camera_error">Unable to open the camera</string>
 
     <!-- Display name shown in Settings → Notifications → Device & app notifications
          for MediaSessionManagerTool's notification listener service. -->

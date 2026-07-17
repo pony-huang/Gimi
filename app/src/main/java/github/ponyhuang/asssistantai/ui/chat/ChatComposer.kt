@@ -1,21 +1,36 @@
 package github.ponyhuang.asssistantai.ui.chat
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,11 +40,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
+import github.ponyhuang.asssistantai.R
 
 /**
  * Chat composer with attach, voice, and send buttons.
@@ -71,7 +89,11 @@ public fun ChatComposer(
     var messageData by rememberSaveable(stateSaver = MessageData.Saver) {
         mutableStateOf(messageData)
     }
+    var showAttachmentOptions by rememberSaveable { mutableStateOf(false) }
+    var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingCameraPath by rememberSaveable { mutableStateOf<String?>(null) }
 
+    val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
     val handleSendClick = {
@@ -84,6 +106,38 @@ public fun ChatComposer(
         contract = PickMultipleVisualMedia(),
     ) { uris ->
         messageData = messageData.copy(attachments = messageData.attachments + uris)
+    }
+
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture(),
+    ) { captured ->
+        val capturedUri = pendingCameraUri?.toUri()
+        if (captured && capturedUri != null) {
+            messageData = messageData.copy(attachments = messageData.attachments + capturedUri)
+        } else {
+            deletePendingCameraAttachment(pendingCameraPath)
+        }
+        pendingCameraUri = null
+        pendingCameraPath = null
+    }
+
+    val cameraErrorMessage = stringResource(R.string.stream_ai_compose_composer_camera_error)
+
+    fun launchCamera() {
+        val pendingAttachment = runCatching { createPendingCameraAttachment(context) }
+            .getOrElse {
+                Toast.makeText(context, cameraErrorMessage, Toast.LENGTH_SHORT).show()
+                return
+            }
+        pendingCameraUri = pendingAttachment.uri.toString()
+        pendingCameraPath = pendingAttachment.path
+        runCatching { takePictureLauncher.launch(pendingAttachment.uri) }
+            .onFailure {
+                deletePendingCameraAttachment(pendingAttachment.path)
+                pendingCameraUri = null
+                pendingCameraPath = null
+                Toast.makeText(context, cameraErrorMessage, Toast.LENGTH_SHORT).show()
+            }
     }
 
     val componentFactory = LocalChatAiComponentFactory.current
@@ -110,14 +164,7 @@ public fun ChatComposer(
                     ComposerLeadingContent(
                         ComposerLeadingContentParams(
                             isGenerating = isGenerating,
-                            onAttachmentsClick = {
-                                photoPickerLauncher.launch(
-                                    PickVisualMediaRequest(
-                                        mediaType = ActivityResultContracts.PickVisualMedia.ImageOnly,
-                                        maxItems = 3,
-                                    ),
-                                )
-                            },
+                            onAttachmentsClick = { showAttachmentOptions = true },
                         ),
                     )
 
@@ -128,6 +175,7 @@ public fun ChatComposer(
                             onTextChange = { messageData = messageData.copy(text = it) },
                             onRemoveAttachment = { uri ->
                                 messageData = messageData.copy(attachments = messageData.attachments - uri)
+                                deleteCameraAttachment(context, uri)
                             },
                             onSendClick = handleSendClick,
                             onStopClick = onStopClick,
@@ -151,6 +199,63 @@ public fun ChatComposer(
                 .zIndex(1f),
         ) {
             AITypingIndicator()
+        }
+    }
+
+    if (showAttachmentOptions) {
+        AttachmentSourceSheet(
+            onDismiss = { showAttachmentOptions = false },
+            onTakePhoto = {
+                showAttachmentOptions = false
+                launchCamera()
+            },
+            onChoosePhotos = {
+                showAttachmentOptions = false
+                photoPickerLauncher.launch(
+                    PickVisualMediaRequest(
+                        mediaType = ActivityResultContracts.PickVisualMedia.ImageOnly,
+                        maxItems = 3,
+                    ),
+                )
+            },
+        )
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun AttachmentSourceSheet(
+    onDismiss: () -> Unit,
+    onTakePhoto: () -> Unit,
+    onChoosePhotos: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.stream_ai_compose_composer_take_photo)) },
+                leadingContent = {
+                    Icon(
+                        imageVector = Icons.Default.CameraAlt,
+                        contentDescription = null,
+                    )
+                },
+                modifier = Modifier.clickable(onClick = onTakePhoto),
+            )
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.stream_ai_compose_composer_choose_photos)) },
+                leadingContent = {
+                    Icon(
+                        imageVector = Icons.Default.PhotoLibrary,
+                        contentDescription = null,
+                    )
+                },
+                modifier = Modifier.clickable(onClick = onChoosePhotos),
+            )
+            Spacer(
+                modifier = Modifier
+                    .navigationBarsPadding()
+                    .windowInsetsPadding(WindowInsets.safeDrawing),
+            )
         }
     }
 }

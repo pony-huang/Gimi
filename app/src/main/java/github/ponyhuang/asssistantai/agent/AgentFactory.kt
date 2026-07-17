@@ -65,11 +65,6 @@ class AgentFactory @Inject constructor(
     private val localFileSearchTool: LocalFileSearchTool,
     private val mcpToolRegistry: McpToolRegistry,
 ) {
-
-    private val defaultInstruction: String =
-        """You are a helpful Android assistant."""
-
-
     suspend fun create(): BaseAgent {
         val cfg = selectModelConfig()
         val model = createModel(cfg)
@@ -102,7 +97,7 @@ class AgentFactory @Inject constructor(
         return LlmAgent(
             name = "DefaultAssistant",
             model = model,
-            instruction = Instruction(defaultInstruction),
+            instruction = Instruction(AgentPrompts.DEFAULT_ASSISTANT_INSTRUCTION),
             tools = tools,
             beforeModelCallbacks = listOf(titleCallbacks.beforeModel()),
             afterModelCallbacks = listOf(titleCallbacks.afterModel()),

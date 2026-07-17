@@ -24,7 +24,7 @@ import java.util.concurrent.ConcurrentHashMap
  * the conversation's event history and avoids exposing the chat agent's tools.
  */
 class ConversationTitleCallbacks(
-    private val titleModel: Model,
+    private val model: Model,
 ) {
     fun beforeModel() = BeforeModelCallback { context, request ->
         if (isTitleFlowCompleted(context)) {
@@ -116,16 +116,15 @@ class ConversationTitleCallbacks(
             Assistant response:
             $assistantText
         """.trimIndent()
-        val responses = titleModel.generateContent(
+        val responses = model.generateContent(
             request = LlmRequest(
-                model = titleModel,
+                model = model,
                 contents = listOf(Content(role = Role.USER, parts = listOf(Part(text = prompt)))),
                 config = GenerateContentConfig(
                     systemInstruction = Content(
                         parts = listOf(
                             Part(
-                                text = "Summarize this conversation as a concise title in the user's language. " +
-                                    "Use at most 10 words. Output only the title without quotation marks.",
+                                text = AgentPrompts.CONVERSATION_TITLE_INSTRUCTION,
                             ),
                         ),
                     ),

@@ -63,13 +63,14 @@ class AgentFactory @Inject constructor(
     private val mediaSessionManagerTool: MediaSessionManagerTool,
     private val packageManagerTool: PackageManagerTool,
     private val localFileSearchTool: LocalFileSearchTool,
+    private val mcpToolRegistry: McpToolRegistry,
 ) {
 
     private val defaultInstruction: String =
         """You are a helpful Android assistant."""
 
 
-    fun create(): BaseAgent {
+    suspend fun create(): BaseAgent {
         val cfg = selectModelConfig()
         val model = createModel(cfg)
         val titleModelConfig = selectFastModelConfig() ?: cfg
@@ -95,6 +96,7 @@ class AgentFactory @Inject constructor(
             addAll(rideHailingTool.generatedTools())
             addAll(searchTool.generatedTools())
             addAll(settingsTool.generatedTools())
+            addAll(mcpToolRegistry.tools())
         }
         val titleCallbacks = ConversationTitleCallbacks(titleModel)
         return LlmAgent(

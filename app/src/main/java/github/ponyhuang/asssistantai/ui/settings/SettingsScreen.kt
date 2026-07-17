@@ -76,6 +76,7 @@ class DefaultModelSettingsViewModel @Inject constructor(
 fun SettingsScreen(
     onBack: () -> Unit,
     onNavigateToModelService: () -> Unit,
+    onNavigateToMcpServers: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DefaultModelSettingsViewModel = hiltViewModel(),
 ) {
@@ -126,6 +127,16 @@ fun SettingsScreen(
                     title = "模型服务",
                     subtitle = "配置 API 密钥、地址和模型列表",
                     onClick = onNavigateToModelService,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
+            item { Spacer(modifier = Modifier.height(12.dp)) }
+            item {
+                SettingsNavigationCard(
+                    icon = Icons.Default.Build,
+                    title = "MCP 服务器",
+                    subtitle = "配置远程 MCP 工具服务",
+                    onClick = onNavigateToMcpServers,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }

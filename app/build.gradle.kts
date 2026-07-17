@@ -85,6 +85,8 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.openai.java)
     implementation(libs.okhttp)
+    implementation(libs.mcp.kotlin.sdk.client)
+    implementation(libs.ktor.client.okhttp)
     implementation(libs.gson)
     implementation(libs.multiplatform.markdown.renderer.m3)
     implementation(libs.hilt.android)

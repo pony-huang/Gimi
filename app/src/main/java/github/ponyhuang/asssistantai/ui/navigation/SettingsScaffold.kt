@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 fun SettingsScaffold(
     title: String,
     onBack: () -> Unit,
+    actions: @Composable () -> Unit = {},
     content: @Composable (Modifier) -> Unit,
 ) {
     Scaffold(
@@ -42,6 +43,7 @@ fun SettingsScaffold(
                         )
                     }
                 },
+                actions = { actions() },
             )
         },
     ) { innerPadding ->

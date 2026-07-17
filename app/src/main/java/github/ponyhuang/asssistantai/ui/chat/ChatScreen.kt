@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Psychology
@@ -71,6 +72,10 @@ import github.ponyhuang.asssistantai.ui.settings.llmmodel.list.ModelServiceListR
 import github.ponyhuang.asssistantai.ui.navigation.AppRoute
 import github.ponyhuang.asssistantai.ui.navigation.SettingsScaffold
 import github.ponyhuang.asssistantai.ui.settings.SettingsScreen
+import github.ponyhuang.asssistantai.ui.settings.McpServerListScreen
+import github.ponyhuang.asssistantai.ui.settings.McpServerEditorScreen
+import github.ponyhuang.asssistantai.ui.settings.McpServerImportScreen
+import github.ponyhuang.asssistantai.ui.settings.McpServerAddOptionsScreen
 import github.ponyhuang.asssistantai.ui.theme.AsssistantaiTheme
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
@@ -379,7 +384,42 @@ fun MainScreen(
                             onNavigateToModelService = {
                                 backStack.add(AppRoute.ModelServiceList)
                             },
+                            onNavigateToMcpServers = {
+                                backStack.add(AppRoute.McpServerList)
+                            },
                         )
+
+                        AppRoute.McpServerList -> SettingsScaffold(
+                            title = "MCP 服务器",
+                            onBack = goBack,
+                            actions = {
+                                IconButton(onClick = { backStack.add(AppRoute.McpServerAddOptions) }) {
+                                    Icon(Icons.Default.Add, contentDescription = "添加 MCP 服务器")
+                                }
+                            },
+                        ) { modifier -> McpServerListScreen(
+                            onNavigateToEditor = { serverId -> backStack.add(AppRoute.McpServerEditor(serverId)) },
+                            modifier = modifier,
+                        ) }
+
+                        AppRoute.McpServerAddOptions -> SettingsScaffold(
+                            title = "添加 MCP 服务",
+                            onBack = goBack,
+                        ) { modifier -> McpServerAddOptionsScreen(
+                            onCreate = { backStack.add(AppRoute.McpServerEditor()) },
+                            onImport = { backStack.add(AppRoute.McpServerImport) },
+                            modifier = modifier,
+                        ) }
+
+                        AppRoute.McpServerImport -> SettingsScaffold(
+                            title = "导入 MCP 配置",
+                            onBack = goBack,
+                        ) { modifier -> McpServerImportScreen(goBack, modifier) }
+
+                        is AppRoute.McpServerEditor -> SettingsScaffold(
+                            title = if (route.serverId == null) "添加 MCP 服务器" else "编辑 MCP 服务器",
+                            onBack = goBack,
+                        ) { modifier -> McpServerEditorScreen(route.serverId, goBack, modifier = modifier) }
 
                         AppRoute.ModelServiceList -> SettingsScaffold(
                             title = "模型服务",

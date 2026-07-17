@@ -15,6 +15,8 @@ lifecycleRuntimeKtx = "2.11.0"
 navigation3 = "1.0.0"
 activityCompose = "1.13.0"
 kotlin = "2.4.0"
+mcpKotlinSdk = "0.10.0"
+ktor = "3.2.3"
 composeBom = "2026.02.01"
 openaiJava = "4.41.0"
 okhttp = "4.12.0"
@@ -67,6 +69,8 @@ androidx-appfunctions = { module = "androidx.appfunctions:appfunctions", version
 androidx-appfunctions-compiler = { module = "androidx.appfunctions:appfunctions-compiler", version.ref = "appfunctions" }
 androidx-appfunctions-service = { module = "androidx.appfunctions:appfunctions-service", version.ref = "appfunctions" }
 multiplatform-markdown-renderer-m3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-m3", version.ref = "multiplatformMarkdownRenderer" }
+mcp-kotlin-sdk-client = { module = "io.modelcontextprotocol:kotlin-sdk-client", version.ref = "mcpKotlinSdk" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }

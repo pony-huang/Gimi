@@ -5,11 +5,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -25,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 
 /**
@@ -84,55 +88,69 @@ public fun ChatComposer(
 
     val componentFactory = LocalChatAiComponentFactory.current
 
-    Surface(
+    Box(
         modifier = modifier
             .imePadding()
             .navigationBarsPadding()
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 2.dp,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.Bottom,
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 2.dp,
         ) {
-            with(componentFactory) {
-                ComposerLeadingContent(
-                    ComposerLeadingContentParams(
-                        isGenerating = isGenerating,
-                        onAttachmentsClick = {
-                            photoPickerLauncher.launch(
-                                PickVisualMediaRequest(
-                                    mediaType = ActivityResultContracts.PickVisualMedia.ImageOnly,
-                                    maxItems = 3,
-                                ),
-                            )
-                        },
-                    ),
-                )
+            Row(
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                with(componentFactory) {
+                    ComposerLeadingContent(
+                        ComposerLeadingContentParams(
+                            isGenerating = isGenerating,
+                            onAttachmentsClick = {
+                                photoPickerLauncher.launch(
+                                    PickVisualMediaRequest(
+                                        mediaType = ActivityResultContracts.PickVisualMedia.ImageOnly,
+                                        maxItems = 3,
+                                    ),
+                                )
+                            },
+                        ),
+                    )
 
-                ComposerInputContent(
-                    ComposerInputContentParams(
-                        messageData = messageData,
-                        isGenerating = isGenerating,
-                        onTextChange = { messageData = messageData.copy(text = it) },
-                        onRemoveAttachment = { uri ->
-                            messageData = messageData.copy(attachments = messageData.attachments - uri)
-                        },
-                        onSendClick = handleSendClick,
-                        onStopClick = onStopClick,
-                        onVoiceInputStart = onVoiceInputStart,
-                        onVoiceInputStop = onVoiceInputStop,
-                        onVoiceAudioChunk = onVoiceAudioChunk,
-                        onVoiceInputError = onVoiceInputError,
-                    ),
-                )
+                    ComposerInputContent(
+                        ComposerInputContentParams(
+                            messageData = messageData,
+                            isGenerating = isGenerating,
+                            onTextChange = { messageData = messageData.copy(text = it) },
+                            onRemoveAttachment = { uri ->
+                                messageData = messageData.copy(attachments = messageData.attachments - uri)
+                            },
+                            onSendClick = handleSendClick,
+                            onStopClick = onStopClick,
+                            onVoiceInputStart = onVoiceInputStart,
+                            onVoiceInputStop = onVoiceInputStop,
+                            onVoiceAudioChunk = onVoiceAudioChunk,
+                            onVoiceInputError = onVoiceInputError,
+                        ),
+                    )
 
-                ComposerTrailingContent(ComposerTrailingContentParams(isGenerating = isGenerating))
+                    ComposerTrailingContent(ComposerTrailingContentParams(isGenerating = isGenerating))
+                }
             }
+        }
+
+        AnimatedVisibility(
+            visible = isGenerating,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .offset(x = 16.dp, y = (-18).dp)
+                .zIndex(1f),
+        ) {
+            AITypingIndicator()
         }
     }
 }

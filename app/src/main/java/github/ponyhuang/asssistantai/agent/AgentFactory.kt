@@ -71,23 +71,9 @@ class AgentFactory @Inject constructor(
 
     fun create(): BaseAgent {
         val cfg = selectModelConfig()
-        val model: Model = when (cfg.baseType) {
-            ApiBaseType.Standard -> Openai(
-                name = cfg.modelId,
-                client = OpenAIOkHttpClient.builder()
-                    .baseUrl(cfg.fullBaseUrl)
-                    .apiKey(cfg.apiKey)
-                    .build(),
-            )
-
-            ApiBaseType.Anthropic -> Claude(
-                name = cfg.modelId,
-                client = AnthropicOkHttpClient.builder()
-                    .baseUrl(cfg.fullBaseUrl)
-                    .apiKey(cfg.apiKey)
-                    .build(),
-            )
-        }
+        val model = createModel(cfg)
+        val titleModelConfig = selectFastModelConfig() ?: cfg
+        val titleModel = if (titleModelConfig == cfg) model else createModel(titleModelConfig)
         val tools: List<BaseTool> = buildList {
             addAll(clockTool.generatedTools())
             addAll(audioTool.generatedTools())
@@ -110,7 +96,7 @@ class AgentFactory @Inject constructor(
             addAll(searchTool.generatedTools())
             addAll(settingsTool.generatedTools())
         }
-        val titleCallbacks = ConversationTitleCallbacks(model)
+        val titleCallbacks = ConversationTitleCallbacks(titleModel)
         return LlmAgent(
             name = "DefaultAssistant",
             model = model,
@@ -151,6 +137,24 @@ class AgentFactory @Inject constructor(
         )
     }
 
+    private fun createModel(cfg: ModelConfig): Model = when (cfg.baseType) {
+        ApiBaseType.Standard -> Openai(
+            name = cfg.modelId,
+            client = OpenAIOkHttpClient.builder()
+                .baseUrl(cfg.fullBaseUrl)
+                .apiKey(cfg.apiKey)
+                .build(),
+        )
+
+        ApiBaseType.Anthropic -> Claude(
+            name = cfg.modelId,
+            client = AnthropicOkHttpClient.builder()
+                .baseUrl(cfg.fullBaseUrl)
+                .apiKey(cfg.apiKey)
+                .build(),
+        )
+    }
+
     /**
      * 从 [ModelServiceRepository] 选当前模型配置。
      *
@@ -187,6 +191,20 @@ class AgentFactory @Inject constructor(
             serviceId = svc.serviceId,
             baseType = svc.baseType,
             modelId = resolvedFallback.model.modelId,
+            apiKey = svc.apiKey,
+            fullBaseUrl = composeUrl(svc.activeApiBaseUrl),
+        )
+    }
+
+    /** Returns the configured low-latency model, or null so callers can use the chat model. */
+    private fun selectFastModelConfig(): ModelConfig? {
+        val resolved = modelServices.resolveSelection(modelServices.fastModelSelection.value)
+            ?: return null
+        val svc = resolved.provider
+        return ModelConfig(
+            serviceId = svc.serviceId,
+            baseType = svc.baseType,
+            modelId = resolved.model.modelId,
             apiKey = svc.apiKey,
             fullBaseUrl = composeUrl(svc.activeApiBaseUrl),
         )

@@ -19,11 +19,12 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Carries first-turn title context through ADK callbacks and persists the final title in session state.
  *
- * The callbacks deliberately use the chat model directly for the title request. This keeps the
- * request out of the conversation's event history and avoids exposing the chat agent's tools.
+ * The callbacks use the configured fast model for the title request, falling back to the chat
+ * model when no valid fast model is available. The direct request keeps title generation out of
+ * the conversation's event history and avoids exposing the chat agent's tools.
  */
 class ConversationTitleCallbacks(
-    private val model: Model,
+    private val titleModel: Model,
 ) {
     fun beforeModel() = BeforeModelCallback { context, request ->
         if (isTitleFlowCompleted(context)) {
@@ -115,9 +116,9 @@ class ConversationTitleCallbacks(
             Assistant response:
             $assistantText
         """.trimIndent()
-        val responses = model.generateContent(
+        val responses = titleModel.generateContent(
             request = LlmRequest(
-                model = model,
+                model = titleModel,
                 contents = listOf(Content(role = Role.USER, parts = listOf(Part(text = prompt)))),
                 config = GenerateContentConfig(
                     systemInstruction = Content(

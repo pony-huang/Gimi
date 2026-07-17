@@ -68,7 +68,7 @@ class ChatViewModel @Inject constructor(
     val availableModelServices = modelServices.services
     val showToolActivity = chatDisplayPreferences.showToolActivity
     private val _currentLLMModelSelection = MutableStateFlow<LLMModelSelection?>(null)
-    /** 当前打开会话的显式模型选择；未设置时由 AgentFactory 走默认模型回退。 */
+    /** 当前打开会话的有效模型选择；无可用模型时为 null。 */
     val currentLLMModelSelection: StateFlow<LLMModelSelection?> = _currentLLMModelSelection.asStateFlow()
     private val _pendingToolConfirmation = MutableStateFlow<PendingToolConfirmation?>(null)
     val pendingToolConfirmation: StateFlow<PendingToolConfirmation?> = _pendingToolConfirmation.asStateFlow()
@@ -426,18 +426,36 @@ class ChatViewModel @Inject constructor(
 
     /**
      * 把指定会话持久化的配置装载为当前运行时配置，并重建后续消息使用的 agent。
+     *
+     * 已保存且仍可用的模型优先；新会话或模型已失效时使用当前默认模型。若没有任何
+     * 可用模型，则清空运行时选择和旧 runner，保留空会话等待用户完成模型配置。
      */
     private suspend fun activateConversationSettings(sessionId: String) {
         modelServices.awaitReady()
         val storedModel = repository.activateConversation(sessionId, defaultModelPayload())
         val savedSelection = LLMModelSelectionCodec.decode(storedModel)
-        val selection = savedSelection ?: modelServices.defaultSelection()
-        if (savedSelection == null && selection != null) {
-            repository.setConversationModel(sessionId, LLMModelSelectionCodec.encode(selection))
+        val validSavedSelection = savedSelection?.takeIf {
+            modelServices.resolveSelection(it) != null
+        }
+        val selection = validSavedSelection ?: modelServices.defaultSelection()
+        if (savedSelection != selection) {
+            repository.setConversationModel(
+                sessionId = sessionId,
+                model = selection?.let(LLMModelSelectionCodec::encode).orEmpty(),
+            )
         }
         _currentLLMModelSelection.value = selection
         modelServices.setCurrentSelection(selection)
-        runner.recreate()
+        if (selection == null) {
+            runner.invalidate()
+            Log.w(TAG, "activateConversationSettings($sessionId): no available model; runner invalidated.")
+            return
+        }
+        runCatching { runner.recreate() }
+            .onFailure { error ->
+                runner.invalidate()
+                Log.w(TAG, "activateConversationSettings($sessionId): runner recreation failed.", error)
+            }
     }
 
     /** New conversations use the saved default assistant model, with a first-available fallback. */

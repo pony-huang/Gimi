@@ -77,6 +77,18 @@ class AgentChatRunner(
     }
 
     /**
+     * Drops the current runner without creating a replacement.
+     *
+     * Used when no model is currently available, so a runner built from a model that has since
+     * been disabled or removed cannot continue serving later requests.
+     */
+    suspend fun invalidate() {
+        runnerMutex.withLock {
+            runner = null
+        }
+    }
+
+    /**
      * 把用户文本发送给 Agent，返回一个 Event 流。
      *
      * @param userId 用户 id（用于会话归属）

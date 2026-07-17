@@ -116,7 +116,9 @@ open class Openai(
 
         request.config.thinkingConfig?.let {
             if (it.includeThoughts == false) {
-                builder.reasoningEffort(ReasoningEffort.NONE)
+                // OpenAI-compatible APIs no longer accept "none"; LOW keeps lightweight
+                // requests such as title generation within the supported enum values.
+                builder.reasoningEffort(ReasoningEffort.LOW)
             }
         }
 

@@ -63,12 +63,14 @@ data class LLMModelGroup(
  * @property modelId 平台精确模型 ID（如 `deepseek-v4-pro`），用于请求体。
  * @property modelName 模型展示名（如 `DeepSeek V4 Pro`）。
  * @property isStt 是否为专用语音识别模型；此类模型不能用于普通聊天。
+ * @property isTts 是否为专用语音合成模型；此类模型不能用于普通聊天。
  * @property isChildPanelExpanded 占位字段 — 后续可挂"子配置面板"。
  */
 data class LLMModelItem(
     val modelId: String,
     val modelName: String,
     val isStt: Boolean = false,
+    val isTts: Boolean = false,
     val isChildPanelExpanded: Boolean = false,
 )
 
@@ -182,6 +184,18 @@ object DefaultModelServices {
                             modelId = "mimo-v2.5-asr",
                             modelName = "mimo-v2.5-asr",
                             isStt = true,
+                        ),
+                    ),
+                ),
+                LLMModelGroup(
+                    groupId = "MiMo-V2.5-TTS",
+                    groupName = "MiMo-V2.5 TTS",
+                    isExpanded = true,
+                    models = listOf(
+                        LLMModelItem(
+                            modelId = "mimo-v2.5-tts",
+                            modelName = "mimo-v2.5-tts",
+                            isTts = true,
                         ),
                     ),
                 ),

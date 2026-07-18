@@ -15,12 +15,12 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,7 +49,7 @@ fun LLMModelManagementSection(
     rows: List<LLMModelRow>,
     onToggleGroup: (String) -> Unit,
     onRemoveModel: (groupId: String, modelId: String) -> Unit,
-    onAppendModel: (String, Boolean) -> Unit,
+    onAppendModel: (String, Boolean, Boolean) -> Unit,
     onRefreshRemote: suspend () -> LLMModelRefreshResult,
     modifier: Modifier = Modifier,
 ) {
@@ -127,8 +127,8 @@ fun LLMModelManagementSection(
 
     if (showAddDialog) {
         AddModelDialog(
-            onConfirm = { id, isStt ->
-                onAppendModel(id, isStt)
+            onConfirm = { id, kind ->
+                onAppendModel(id, kind == ModelKind.Stt, kind == ModelKind.Tts)
                 showAddDialog = false
             },
             onDismiss = { showAddDialog = false },
@@ -210,6 +210,14 @@ private fun ModelItemRow(
                 modifier = Modifier.padding(horizontal = 8.dp),
             )
         }
+        if (row.item.isTts) {
+            Text(
+                text = "TTS",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(horizontal = 8.dp),
+            )
+        }
         IconButton(onClick = onRemove) {
             Icon(
                 imageVector = Icons.Default.Remove,
@@ -223,11 +231,11 @@ private fun ModelItemRow(
 
 @Composable
 private fun AddModelDialog(
-    onConfirm: (String, Boolean) -> Unit,
+    onConfirm: (String, ModelKind) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var input by remember { mutableStateOf("custom-model") }
-    var isStt by remember { mutableStateOf(false) }
+    var kind by remember { mutableStateOf(ModelKind.Chat) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("添加自定义模型") },
@@ -239,21 +247,23 @@ private fun AddModelDialog(
                     singleLine = true,
                     label = { Text("模型 ID") },
                 )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { isStt = !isStt }
-                        .padding(top = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Checkbox(checked = isStt, onCheckedChange = { isStt = it })
-                    Text("语音识别模型")
+                ModelKind.entries.forEach { option ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { kind = option }
+                            .padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = kind == option, onClick = { kind = option })
+                        Text(option.label)
+                    }
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = {
-                if (input.isNotBlank()) onConfirm(input.trim(), isStt)
+                if (input.isNotBlank()) onConfirm(input.trim(), kind)
             }) {
                 Text("确认")
             }
@@ -262,4 +272,10 @@ private fun AddModelDialog(
             TextButton(onClick = onDismiss) { Text("取消") }
         },
     )
+}
+
+private enum class ModelKind(val label: String) {
+    Chat("聊天模型"),
+    Stt("语音识别模型（STT）"),
+    Tts("语音合成模型（TTS）"),
 }

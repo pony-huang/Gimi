@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -17,12 +19,16 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -46,6 +52,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
 import github.ponyhuang.asssistantai.data.DocumentDirectoryRepository
 import github.ponyhuang.asssistantai.data.ChatDisplayPreferences
+import github.ponyhuang.asssistantai.speech.MiMoTtsVoices
+import github.ponyhuang.asssistantai.speech.TtsVoice
 import javax.inject.Inject
 
 @HiltViewModel
@@ -58,6 +66,8 @@ class DefaultModelSettingsViewModel @Inject constructor(
     val defaultAssistantSelection = modelServices.defaultAssistantSelection
     val fastModelSelection = modelServices.fastModelSelection
     val defaultSpeechSelection = modelServices.defaultSpeechSelection
+    val defaultTtsSelection = modelServices.defaultTtsSelection
+    val defaultTtsVoice = modelServices.defaultTtsVoice
     val directories = documentDirectories.directories
     val showToolActivity = chatDisplayPreferences.showToolActivity
 
@@ -68,6 +78,11 @@ class DefaultModelSettingsViewModel @Inject constructor(
 
     fun setDefaultSpeechModel(selection: LLMModelSelection) =
         modelServices.setDefaultSpeechSelection(selection)
+
+    fun setDefaultTtsModel(selection: LLMModelSelection) =
+        modelServices.setDefaultTtsSelection(selection)
+
+    fun setDefaultTtsVoice(voiceId: String) = modelServices.setDefaultTtsVoice(voiceId)
 
     fun addDocumentDirectory(uri: Uri) = documentDirectories.addDirectory(uri)
 
@@ -89,6 +104,8 @@ fun SettingsScreen(
     val defaultAssistantSelection by viewModel.defaultAssistantSelection.collectAsStateWithLifecycle()
     val fastModelSelection by viewModel.fastModelSelection.collectAsStateWithLifecycle()
     val defaultSpeechSelection by viewModel.defaultSpeechSelection.collectAsStateWithLifecycle()
+    val defaultTtsSelection by viewModel.defaultTtsSelection.collectAsStateWithLifecycle()
+    val defaultTtsVoice by viewModel.defaultTtsVoice.collectAsStateWithLifecycle()
     val documentDirectories by viewModel.directories.collectAsStateWithLifecycle()
     val showToolActivity by viewModel.showToolActivity.collectAsStateWithLifecycle()
     val documentTreeLauncher = rememberLauncherForActivityResult(
@@ -97,7 +114,7 @@ fun SettingsScreen(
     val enabledChatModels = remember(services) {
         services.filter { it.isEnabled }.flatMap { service ->
             service.LLMModelGroups.flatMap { group ->
-                group.models.filterNot { it.isStt }.map { model -> EnabledModelRow(service, group, model) }
+                group.models.filterNot { it.isStt || it.isTts }.map { model -> EnabledModelRow(service, group, model) }
             }
         }
     }
@@ -108,9 +125,18 @@ fun SettingsScreen(
             }
         }
     }
+    val enabledTtsModels = remember(services) {
+        services.filter { it.isEnabled && it.apiKey.isNotBlank() }.flatMap { service ->
+            service.LLMModelGroups.flatMap { group ->
+                group.models.filter { it.isTts }.map { model -> EnabledModelRow(service, group, model) }
+            }
+        }
+    }
     var selectingDefaultAssistant by remember { mutableStateOf(false) }
     var selectingFastModel by remember { mutableStateOf(false) }
     var selectingDefaultSpeech by remember { mutableStateOf(false) }
+    var selectingDefaultTts by remember { mutableStateOf(false) }
+    var selectingTtsVoice by remember { mutableStateOf(false) }
 
     SettingsPageContainer(modifier = modifier) {
         LazyColumn(
@@ -186,6 +212,19 @@ fun SettingsScreen(
                         selection = defaultSpeechSelection,
                         rows = enabledSpeechModels,
                         onClick = { selectingDefaultSpeech = true },
+                    )
+                    DefaultModelOption(
+                        icon = Icons.AutoMirrored.Filled.VolumeUp,
+                        title = "默认语音播放模型",
+                        subtitle = "用于朗读助手回复；仅显示语音合成模型",
+                        selection = defaultTtsSelection,
+                        rows = enabledTtsModels,
+                        onClick = { selectingDefaultTts = true },
+                    )
+                    TtsVoiceOption(
+                        selectedVoiceId = defaultTtsVoice,
+                        enabled = enabledTtsModels.any { it.toSelection() == defaultTtsSelection },
+                        onClick = { selectingTtsVoice = true },
                     )
                 }
             }
@@ -340,6 +379,82 @@ fun SettingsScreen(
             onDismiss = { selectingDefaultSpeech = false },
         )
     }
+    if (selectingDefaultTts) {
+        ModelPickerDialog(
+            rows = enabledTtsModels,
+            currentSelection = defaultTtsSelection,
+            title = "选择默认语音播放模型",
+            onPick = { row ->
+                viewModel.setDefaultTtsModel(row.toSelection())
+                selectingDefaultTts = false
+            },
+            onDismiss = { selectingDefaultTts = false },
+        )
+    }
+    if (selectingTtsVoice) {
+        TtsVoicePickerDialog(
+            voices = MiMoTtsVoices.all,
+            selectedVoiceId = defaultTtsVoice,
+            onPick = { voice ->
+                viewModel.setDefaultTtsVoice(voice.id)
+                selectingTtsVoice = false
+            },
+            onDismiss = { selectingTtsVoice = false },
+        )
+    }
+}
+
+@Composable
+private fun TtsVoiceOption(
+    selectedVoiceId: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val voice = MiMoTtsVoices.all.firstOrNull { it.id == selectedVoiceId }
+    androidx.compose.material3.ListItem(
+        headlineContent = { Text("语音播放音色", fontWeight = FontWeight.Medium) },
+        supportingContent = { Text(voice?.name ?: selectedVoiceId) },
+        leadingContent = { Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null) },
+        trailingContent = { Icon(Icons.Default.Tune, contentDescription = "选择语音播放音色") },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick),
+    )
+}
+
+@Composable
+private fun TtsVoicePickerDialog(
+    voices: List<TtsVoice>,
+    selectedVoiceId: String,
+    onPick: (TtsVoice) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("选择语音播放音色") },
+        text = {
+            LazyColumn(modifier = Modifier.heightIn(max = 480.dp)) {
+                items(voices, key = TtsVoice::id) { voice ->
+                    androidx.compose.material3.ListItem(
+                        headlineContent = { Text(voice.name) },
+                        supportingContent = {
+                            val detail = listOfNotNull(voice.language, voice.gender).joinToString(" · ")
+                            if (detail.isNotEmpty()) Text(detail)
+                        },
+                        leadingContent = {
+                            RadioButton(
+                                selected = voice.id == selectedVoiceId,
+                                onClick = { onPick(voice) },
+                            )
+                        },
+                        modifier = Modifier.clickable { onPick(voice) },
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+    )
 }
 
 @Composable

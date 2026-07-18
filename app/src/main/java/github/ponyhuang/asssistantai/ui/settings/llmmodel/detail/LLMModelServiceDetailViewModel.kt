@@ -149,12 +149,17 @@ class ModelServiceDetailViewModel @Inject constructor(
         }
     }
 
-    fun appendModel(modelId: String, isStt: Boolean) {
+    fun appendModel(modelId: String, isStt: Boolean, isTts: Boolean) {
         val id = serviceIdFlow.value ?: return
         viewModelScope.launch {
             modelServices.appendModel(
                 serviceId = id,
-                model = LLMModelItem(modelId = modelId, modelName = modelId, isStt = isStt),
+                model = LLMModelItem(
+                    modelId = modelId,
+                    modelName = modelId,
+                    isStt = isStt,
+                    isTts = isTts,
+                ),
             )
         }
     }

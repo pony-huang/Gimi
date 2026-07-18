@@ -19,7 +19,9 @@ import github.ponyhuang.asssistantai.data.ConversationMetadataDatabase
 import github.ponyhuang.asssistantai.data.ModelServiceDatabase
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
 import github.ponyhuang.asssistantai.speech.OpenAiCompatibleSpeechRecognitionClient
+import github.ponyhuang.asssistantai.speech.MiMoSpeechSynthesisClient
 import github.ponyhuang.asssistantai.speech.SpeechRecognitionClient
+import github.ponyhuang.asssistantai.speech.SpeechSynthesisClient
 import java.io.File
 import javax.inject.Singleton
 
@@ -41,6 +43,11 @@ object AgentModule {
     @Singleton
     fun provideSpeechRecognitionClient(): SpeechRecognitionClient =
         OpenAiCompatibleSpeechRecognitionClient()
+
+    @Provides
+    @Singleton
+    fun provideSpeechSynthesisClient(): SpeechSynthesisClient =
+        MiMoSpeechSynthesisClient()
 
     @Provides
     @Singleton

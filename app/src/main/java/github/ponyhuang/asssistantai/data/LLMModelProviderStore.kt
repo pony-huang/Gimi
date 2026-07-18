@@ -76,6 +76,10 @@ class ModelServiceRepository @Inject constructor(
     private val _defaultAssistantSelection = MutableStateFlow(readSelection(DEFAULT_ASSISTANT_MODEL_KEY))
     private val _fastModelSelection = MutableStateFlow(readSelection(FAST_MODEL_KEY))
     private val _defaultSpeechSelection = MutableStateFlow(readSelection(DEFAULT_SPEECH_MODEL_KEY))
+    private val _defaultTtsSelection = MutableStateFlow(readSelection(DEFAULT_TTS_MODEL_KEY))
+    private val _defaultTtsVoice = MutableStateFlow(
+        preferences.getString(DEFAULT_TTS_VOICE_KEY, null) ?: DEFAULT_TTS_VOICE,
+    )
 
     val services: StateFlow<List<LLMModelProvider>> = _services.asStateFlow()
     val loadState: StateFlow<ModelCatalogLoadState> = _loadState.asStateFlow()
@@ -86,6 +90,9 @@ class ModelServiceRepository @Inject constructor(
     val fastModelSelection: StateFlow<LLMModelSelection?> = _fastModelSelection.asStateFlow()
     /** Explicitly configured speech-to-text model; there is intentionally no implicit fallback. */
     val defaultSpeechSelection: StateFlow<LLMModelSelection?> = _defaultSpeechSelection.asStateFlow()
+    /** Explicitly configured text-to-speech model; there is intentionally no implicit fallback. */
+    val defaultTtsSelection: StateFlow<LLMModelSelection?> = _defaultTtsSelection.asStateFlow()
+    val defaultTtsVoice: StateFlow<String> = _defaultTtsVoice.asStateFlow()
 
     init {
         scope.launch {
@@ -179,7 +186,7 @@ class ModelServiceRepository @Inject constructor(
         .filter { it.isEnabled }
         .mapNotNull { service ->
             service.LLMModelGroups.asSequence().mapNotNull { group ->
-                group.models.firstOrNull { !it.isStt }?.let { model ->
+                group.models.firstOrNull { !it.isStt && !it.isTts }?.let { model ->
                     LLMModelSelection(service.serviceId, group.groupId, model.modelId)
                 }
             }.firstOrNull()
@@ -201,17 +208,32 @@ class ModelServiceRepository @Inject constructor(
         persistSelection(DEFAULT_SPEECH_MODEL_KEY, selection)
     }
 
+    fun setDefaultTtsSelection(selection: LLMModelSelection?) {
+        _defaultTtsSelection.value = selection
+        persistSelection(DEFAULT_TTS_MODEL_KEY, selection)
+    }
+
+    fun setDefaultTtsVoice(voiceId: String) {
+        val normalized = voiceId.trim().ifEmpty { DEFAULT_TTS_VOICE }
+        _defaultTtsVoice.value = normalized
+        preferences.edit(commit = true) { putString(DEFAULT_TTS_VOICE_KEY, normalized) }
+    }
+
     fun setCurrentSelection(selection: LLMModelSelection?) {
         _currentSelection.value = selection
     }
 
     /** Resolves a normal chat model and rejects dedicated speech models. */
     fun resolveChatSelection(selection: LLMModelSelection?): ResolvedModel? =
-        resolveRawSelection(selection)?.takeIf { !it.model.isStt }
+        resolveRawSelection(selection)?.takeIf { !it.model.isStt && !it.model.isTts }
 
     /** Resolves a configured STT model only when its enabled provider has a usable API key. */
     fun resolveSpeechSelection(selection: LLMModelSelection?): ResolvedModel? =
         resolveRawSelection(selection)?.takeIf { it.model.isStt && it.provider.apiKey.isNotBlank() }
+
+    /** Resolves a configured TTS model only when its enabled provider has a usable API key. */
+    fun resolveTtsSelection(selection: LLMModelSelection?): ResolvedModel? =
+        resolveRawSelection(selection)?.takeIf { it.model.isTts && it.provider.apiKey.isNotBlank() }
 
     private fun resolveRawSelection(selection: LLMModelSelection?): ResolvedModel? {
         if (selection == null) return null
@@ -280,6 +302,7 @@ class ModelServiceRepository @Inject constructor(
                             modelId = it.modelId,
                             modelName = it.modelName,
                             isStt = it.isStt,
+                            isTts = it.isTts,
                         )
                     },
                 )
@@ -383,8 +406,11 @@ class ModelServiceRepository @Inject constructor(
         const val DEFAULT_ASSISTANT_MODEL_KEY = "default_assistant_model"
         const val FAST_MODEL_KEY = "fast_model"
         const val DEFAULT_SPEECH_MODEL_KEY = "default_speech_model"
+        const val DEFAULT_TTS_MODEL_KEY = "default_tts_model"
+        const val DEFAULT_TTS_VOICE_KEY = "default_tts_voice"
+        const val DEFAULT_TTS_VOICE = "mimo_default"
         const val CATALOG_METADATA_VERSION_KEY = "catalog_metadata_version"
-        const val CATALOG_METADATA_VERSION = 1
+        const val CATALOG_METADATA_VERSION = 2
         const val KEY_ALIAS = "model_service_settings_key_v1"
         const val ANDROID_KEY_STORE = "AndroidKeyStore"
         const val TRANSFORMATION = "AES/GCM/NoPadding"

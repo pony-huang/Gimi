@@ -74,6 +74,7 @@ internal fun defaultModelServiceEntities(gson: Gson = Gson()): List<ModelService
                                 modelName = it.modelName,
                                 source = StoredModelSource.REMOTE,
                                 isStt = it.isStt,
+                                isTts = it.isTts,
                             )
                         },
                     )
@@ -153,4 +154,5 @@ internal data class StoredModel(
     val modelName: String,
     val source: StoredModelSource,
     val isStt: Boolean = false,
+    val isTts: Boolean = false,
 )

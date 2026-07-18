@@ -7,8 +7,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
@@ -28,6 +32,8 @@ import github.ponyhuang.asssistantai.model.MessageRole
 import github.ponyhuang.asssistantai.model.Messages
 import github.ponyhuang.asssistantai.model.TextPart
 import github.ponyhuang.asssistantai.ui.theme.AsssistantaiTheme
+import github.ponyhuang.asssistantai.speech.SpeechPlaybackState
+import github.ponyhuang.asssistantai.speech.SpeechPlaybackStatus
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
 
@@ -92,6 +98,8 @@ fun MessageBubble(
     message: Message,
     partChannelProvider: (partId: String) -> ReceiveChannel<String>?,
     showToolActivity: Boolean = true,
+    speechPlaybackState: SpeechPlaybackState = SpeechPlaybackState(),
+    onToggleSpeechPlayback: (messageId: String, text: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val role = message.role
@@ -133,7 +141,12 @@ fun MessageBubble(
             }
 
             assistantReplyTextForCopy(message)?.let { text ->
-                AssistantMessageActions(text = text)
+                AssistantMessageActions(
+                    messageId = message.id,
+                    text = text,
+                    speechPlaybackState = speechPlaybackState,
+                    onToggleSpeechPlayback = onToggleSpeechPlayback,
+                )
             }
         }
     }
@@ -156,7 +169,10 @@ private fun assistantReplyTextForCopy(message: Message): String? {
 /** A compact action row shown after a completed assistant reply. */
 @Composable
 private fun AssistantMessageActions(
+    messageId: String,
     text: String,
+    speechPlaybackState: SpeechPlaybackState,
+    onToggleSpeechPlayback: (messageId: String, text: String) -> Unit,
 ) {
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
@@ -182,6 +198,26 @@ private fun AssistantMessageActions(
                 imageVector = Icons.Default.ContentCopy,
                 contentDescription = "复制回复",
             )
+        }
+        val isCurrent = speechPlaybackState.messageId == messageId
+        val status = if (isCurrent) speechPlaybackState.status else SpeechPlaybackStatus.Idle
+        IconButton(onClick = { onToggleSpeechPlayback(messageId, text) }) {
+            when (status) {
+                SpeechPlaybackStatus.Loading -> CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                )
+                SpeechPlaybackStatus.Playing -> Icon(
+                    imageVector = Icons.Default.Pause,
+                    contentDescription = "暂停朗读",
+                )
+                SpeechPlaybackStatus.Paused,
+                SpeechPlaybackStatus.Idle,
+                -> Icon(
+                    imageVector = Icons.AutoMirrored.Filled.VolumeUp,
+                    contentDescription = if (status == SpeechPlaybackStatus.Paused) "继续朗读" else "朗读回复",
+                )
+            }
         }
     }
 }

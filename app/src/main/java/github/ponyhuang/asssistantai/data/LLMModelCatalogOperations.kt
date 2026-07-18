@@ -23,6 +23,7 @@ internal fun appendUserModel(
         modelName = model.modelName,
         source = StoredModelSource.USER,
         isStt = model.isStt,
+        isTts = model.isTts,
     )
     if (groups.isEmpty()) {
         return listOf(
@@ -70,21 +71,22 @@ internal fun syncStoredRemoteModels(
                 modelName = model.modelName,
                 source = StoredModelSource.REMOTE,
                 isStt = existingById[model.modelId]?.isStt ?: model.isStt,
+                isTts = existingById[model.modelId]?.isTts ?: model.isTts,
             )
         }
     val remoteById = remoteModels.associateBy { it.modelId }
     val existingRemoteSpeechIds = groups.flatMap { group ->
-        group.models.filter { it.source == StoredModelSource.REMOTE && it.isStt }
+        group.models.filter { it.source == StoredModelSource.REMOTE && (it.isStt || it.isTts) }
     }.mapTo(mutableSetOf()) { it.modelId }
     val newRemoteSpeechModels = remoteModels.filter {
-        it.isStt && it.modelId !in existingRemoteSpeechIds
+        (it.isStt || it.isTts) && it.modelId !in existingRemoteSpeechIds
     }
-    val remoteChatModels = remoteModels.filterNot { it.isStt }
+    val remoteChatModels = remoteModels.filterNot { it.isStt || it.isTts }
 
     return groups.mapIndexed { index, group ->
         val userModels = group.models.filter { it.source == StoredModelSource.USER }
         val speechModels = group.models
-            .filter { it.source == StoredModelSource.REMOTE && it.isStt }
+            .filter { it.source == StoredModelSource.REMOTE && (it.isStt || it.isTts) }
             .map { remoteById[it.modelId] ?: it }
         if (index == 0) {
             group.copy(models = remoteChatModels + speechModels + newRemoteSpeechModels + userModels)
@@ -107,7 +109,7 @@ internal fun mergeDefaultModelMetadata(
         group.copy(
             models = group.models.map { model ->
                 defaultsByModel[model.modelId]?.let { default ->
-                    model.copy(isStt = default.isStt)
+                    model.copy(isStt = default.isStt, isTts = default.isTts)
                 } ?: model
             } + defaults.models.filterNot { it.modelId in existingModelIds },
         )

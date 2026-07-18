@@ -1,5 +1,7 @@
 package github.ponyhuang.asssistantai.ui.settings
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +24,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.BluetoothAudio
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
@@ -30,14 +33,20 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import github.ponyhuang.asssistantai.BuildConfig
@@ -54,6 +63,9 @@ import github.ponyhuang.asssistantai.data.DocumentDirectoryRepository
 import github.ponyhuang.asssistantai.data.ChatDisplayPreferences
 import github.ponyhuang.asssistantai.speech.MiMoTtsVoices
 import github.ponyhuang.asssistantai.speech.TtsVoice
+import github.ponyhuang.asssistantai.voice.BluetoothVoiceController
+import github.ponyhuang.asssistantai.voice.BluetoothVoiceStatus
+import github.ponyhuang.asssistantai.voice.WakeModelStatus
 import javax.inject.Inject
 
 @HiltViewModel
@@ -61,6 +73,7 @@ class DefaultModelSettingsViewModel @Inject constructor(
     private val modelServices: ModelServiceRepository,
     private val documentDirectories: DocumentDirectoryRepository,
     private val chatDisplayPreferences: ChatDisplayPreferences,
+    private val bluetoothVoiceController: BluetoothVoiceController,
 ) : ViewModel() {
     val services = modelServices.services
     val defaultAssistantSelection = modelServices.defaultAssistantSelection
@@ -70,6 +83,7 @@ class DefaultModelSettingsViewModel @Inject constructor(
     val defaultTtsVoice = modelServices.defaultTtsVoice
     val directories = documentDirectories.directories
     val showToolActivity = chatDisplayPreferences.showToolActivity
+    val bluetoothVoiceState = bluetoothVoiceController.state
 
     fun setDefaultAssistantModel(selection: LLMModelSelection) =
         modelServices.setDefaultAssistantSelection(selection)
@@ -89,6 +103,15 @@ class DefaultModelSettingsViewModel @Inject constructor(
     fun removeDocumentDirectory(uri: Uri) = documentDirectories.removeDirectory(uri)
 
     fun setShowToolActivity(show: Boolean) = chatDisplayPreferences.setShowToolActivity(show)
+
+    fun setBluetoothWakeKeyword(keyword: String): Result<Unit> =
+        bluetoothVoiceController.setKeyword(keyword)
+
+    fun installBluetoothWakeModel() = bluetoothVoiceController.installModel()
+
+    fun startBluetoothVoice() = bluetoothVoiceController.start()
+
+    fun stopBluetoothVoice() = bluetoothVoiceController.stop()
 }
 
 /** Settings landing page containing only available settings capabilities. */
@@ -108,6 +131,8 @@ fun SettingsScreen(
     val defaultTtsVoice by viewModel.defaultTtsVoice.collectAsStateWithLifecycle()
     val documentDirectories by viewModel.directories.collectAsStateWithLifecycle()
     val showToolActivity by viewModel.showToolActivity.collectAsStateWithLifecycle()
+    val bluetoothVoiceState by viewModel.bluetoothVoiceState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val documentTreeLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
     ) { uri -> uri?.let(viewModel::addDocumentDirectory) }
@@ -137,6 +162,31 @@ fun SettingsScreen(
     var selectingDefaultSpeech by remember { mutableStateOf(false) }
     var selectingDefaultTts by remember { mutableStateOf(false) }
     var selectingTtsVoice by remember { mutableStateOf(false) }
+    var wakeKeywordDraft by remember { mutableStateOf(bluetoothVoiceState.keyword) }
+    var wakeKeywordError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(bluetoothVoiceState.keyword) {
+        if (wakeKeywordDraft != bluetoothVoiceState.keyword) {
+            wakeKeywordDraft = bluetoothVoiceState.keyword
+        }
+    }
+    val voicePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { grants ->
+        if (grants.values.all { it }) viewModel.startBluetoothVoice()
+    }
+    val requiredVoicePermissions = arrayOf(
+        Manifest.permission.RECORD_AUDIO,
+        Manifest.permission.BLUETOOTH_CONNECT,
+        Manifest.permission.POST_NOTIFICATIONS,
+    )
+    val requestVoiceStart = {
+        val missing = requiredVoicePermissions.filter {
+            ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isEmpty()) viewModel.startBluetoothVoice()
+        else voicePermissionLauncher.launch(missing.toTypedArray())
+    }
+    val defaultSpeechReady = enabledSpeechModels.any { it.toSelection() == defaultSpeechSelection }
 
     SettingsPageContainer(modifier = modifier) {
         LazyColumn(
@@ -179,6 +229,107 @@ fun SettingsScreen(
                     onClick = onNavigateToMcpServers,
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
+            }
+            item { Spacer(modifier = Modifier.height(24.dp)) }
+            item {
+                SettingsSectionTitle(
+                    text = "蓝牙语音唤醒",
+                    modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 8.dp),
+                )
+                SettingsCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    androidx.compose.material3.ListItem(
+                        headlineContent = { Text("后台监听", fontWeight = FontWeight.Medium) },
+                        supportingContent = {
+                            Text(bluetoothVoiceStatusText(bluetoothVoiceState.status, bluetoothVoiceState.message))
+                        },
+                        leadingContent = { Icon(Icons.Default.BluetoothAudio, contentDescription = null) },
+                        trailingContent = {
+                            Switch(
+                                checked = bluetoothVoiceState.isRunning,
+                                onCheckedChange = { enabled ->
+                                    if (enabled) {
+                                        when {
+                                            bluetoothVoiceState.model.status != WakeModelStatus.Ready ->
+                                                viewModel.installBluetoothWakeModel()
+                                            enabledChatModels.isEmpty() || !defaultSpeechReady -> Unit
+                                            else -> requestVoiceStart()
+                                        }
+                                    } else {
+                                        viewModel.stopBluetoothVoice()
+                                    }
+                                },
+                            )
+                        },
+                    )
+                    if (bluetoothVoiceState.deviceName != null) {
+                        Text(
+                            text = "当前设备：${bluetoothVoiceState.deviceName}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                        )
+                    }
+                    OutlinedTextField(
+                        value = wakeKeywordDraft,
+                        onValueChange = {
+                            wakeKeywordDraft = it
+                            wakeKeywordError = null
+                        },
+                        label = { Text("唤醒词") },
+                        supportingText = {
+                            Text(wakeKeywordError ?: "2–20 个字符，例如：你好助手")
+                        },
+                        isError = wakeKeywordError != null,
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    )
+                    Button(
+                        onClick = {
+                            viewModel.setBluetoothWakeKeyword(wakeKeywordDraft)
+                                .onFailure { wakeKeywordError = it.message }
+                        },
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Text("保存唤醒词")
+                    }
+                    androidx.compose.material3.ListItem(
+                        headlineContent = { Text("离线中文唤醒模型") },
+                        supportingContent = {
+                            when (bluetoothVoiceState.model.status) {
+                                WakeModelStatus.Missing -> Text("已内置 APK，首次启用时安装")
+                                WakeModelStatus.Downloading -> {
+                                    androidx.compose.foundation.layout.Column {
+                                        Text("正在读取内置模型 ${(bluetoothVoiceState.model.progress * 100).toInt()}%")
+                                        LinearProgressIndicator(
+                                            progress = { bluetoothVoiceState.model.progress },
+                                            modifier = Modifier.fillMaxWidth(),
+                                        )
+                                    }
+                                }
+                                WakeModelStatus.Extracting -> Text("正在安装模型")
+                                WakeModelStatus.Ready -> Text("已安装，仅在本机识别唤醒词")
+                                WakeModelStatus.Error -> Text(bluetoothVoiceState.model.message ?: "安装失败")
+                            }
+                        },
+                        trailingContent = {
+                            if (bluetoothVoiceState.model.status == WakeModelStatus.Missing ||
+                                bluetoothVoiceState.model.status == WakeModelStatus.Error
+                            ) {
+                                TextButton(onClick = viewModel::installBluetoothWakeModel) {
+                                    Text(if (bluetoothVoiceState.model.status == WakeModelStatus.Error) "重试" else "安装")
+                                }
+                            }
+                        },
+                    )
+                    if (enabledChatModels.isEmpty() || !defaultSpeechReady) {
+                        Text(
+                            text = "启用前请配置可用的默认助手模型和语音识别模型。",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                        )
+                    }
+                }
             }
             item { Spacer(modifier = Modifier.height(24.dp)) }
             item {
@@ -403,6 +554,20 @@ fun SettingsScreen(
         )
     }
 }
+
+private fun bluetoothVoiceStatusText(status: BluetoothVoiceStatus, message: String?): String =
+    message ?: when (status) {
+        BluetoothVoiceStatus.Stopped -> "已停止"
+        BluetoothVoiceStatus.Starting -> "正在启动"
+        BluetoothVoiceStatus.WaitingForBluetooth -> "等待蓝牙耳机"
+        BluetoothVoiceStatus.Listening -> "正在监听"
+        BluetoothVoiceStatus.CapturingCommand -> "正在录制任务"
+        BluetoothVoiceStatus.Transcribing -> "正在识别任务"
+        BluetoothVoiceStatus.RunningAgent -> "Agent 正在执行"
+        BluetoothVoiceStatus.Speaking -> "正在播报结果"
+        BluetoothVoiceStatus.Paused -> "已暂停"
+        BluetoothVoiceStatus.Error -> "发生错误"
+    }
 
 @Composable
 private fun TtsVoiceOption(

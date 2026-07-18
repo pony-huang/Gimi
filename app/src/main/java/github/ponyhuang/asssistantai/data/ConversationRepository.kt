@@ -139,14 +139,24 @@ class ConversationRepository(
     /**
      * 创建一个新会话，返回生成的 sessionId。
      */
-    suspend fun createConversation(initialModel: String = ""): String {
+    suspend fun createConversation(initialModel: String = "", activate: Boolean = true): String {
         val key = SessionKey(appName = appName, userId = userId, id = null)
         return try {
             val created = sessionService.createSession(key)
             val sessionId = created.key.id.orEmpty()
             if (sessionId.isNotBlank()) {
                 try {
-                    metadataDao.activate(sessionId, initialModel)
+                    if (activate) {
+                        metadataDao.activate(sessionId, initialModel)
+                    } else {
+                        metadataDao.upsert(
+                            ConversationMetadataEntity(
+                                sessionId = sessionId,
+                                model = initialModel,
+                                isLast = false,
+                            ),
+                        )
+                    }
                 } catch (t: Throwable) {
                     Log.w(TAG, "createConversation($sessionId) metadata write failed: ${t::class.simpleName}: ${t.message}")
                 }

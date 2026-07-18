@@ -22,6 +22,7 @@ import github.ponyhuang.asssistantai.speech.OpenAiCompatibleSpeechRecognitionCli
 import github.ponyhuang.asssistantai.speech.MiMoSpeechSynthesisClient
 import github.ponyhuang.asssistantai.speech.SpeechRecognitionClient
 import github.ponyhuang.asssistantai.speech.SpeechSynthesisClient
+import github.ponyhuang.asssistantai.voice.VoiceAgentRunner
 import java.io.File
 import javax.inject.Singleton
 
@@ -96,6 +97,23 @@ object AgentModule {
         userId = USER_ID,
         sessionService = sessionService,
         metadataDao = metadataDatabase.conversationMetadataDao(),
+    )
+
+    @Provides
+    @Singleton
+    @VoiceAgentRunner
+    fun provideVoiceAgentChatRunner(
+        sessionService: SessionService,
+        artifactService: ArtifactService,
+        agentFactory: AgentFactory,
+        modelServices: ModelServiceRepository,
+    ): AgentChatRunner = AgentChatRunner(
+        factory = {
+            modelServices.awaitReady()
+            agentFactory.create(modelServices.defaultSelection())
+        },
+        sessionService = sessionService,
+        artifactService = artifactService,
     )
 
     @Provides

@@ -26,6 +26,7 @@ roomCompiler = "2.8.4"
 roomKtx = "2.8.4"
 roomRuntime = "2.8.4"
 roomTesting = "2.8.4"
+voskAndroid = "0.3.75"
 foundationLayout = "1.11.4"
 foundation = "1.11.4"
 exifinterface = "1.3.6"
@@ -37,6 +38,7 @@ androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref =
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomKtx" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomRuntime" }
 androidx-room-testing = { module = "androidx.room:room-testing", version.ref = "roomTesting" }
+vosk-android = { module = "com.alphacephei:vosk-android", version.ref = "voskAndroid" }
 anthropic-java = { module = "com.anthropic:anthropic-java", version.ref = "anthropicJava" }
 google-adk-kotlin-core = { module = "com.google.adk:google-adk-kotlin-core", version.ref = "googleAdkKotlinCore" }
 google-adk-kotlin-processor = { module = "com.google.adk:google-adk-kotlin-processor", version.ref = "googleAdkKotlinProcessor" }

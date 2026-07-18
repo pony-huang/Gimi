@@ -33,6 +33,7 @@ import github.ponyhuang.asssistantai.agent.tools.system.LocationTool
 import github.ponyhuang.asssistantai.agent.tools.system.LocalFileSearchTool
 import github.ponyhuang.asssistantai.agent.tools.system.ScreenTimeoutTool
 import github.ponyhuang.asssistantai.data.ApiBaseType
+import github.ponyhuang.asssistantai.data.LLMModelSelection
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -64,8 +65,8 @@ class AgentFactory @Inject constructor(
     private val screenTimeoutTool: ScreenTimeoutTool,
     private val mcpToolRegistry: McpToolRegistry,
 ) {
-    suspend fun create(): BaseAgent {
-        val cfg = selectModelConfig()
+    suspend fun create(selection: LLMModelSelection? = null): BaseAgent {
+        val cfg = selectModelConfig(selection)
         val model = createModel(cfg)
         val titleModelConfig = selectFastModelConfig() ?: cfg
         val titleModel = if (titleModelConfig == cfg) model else createModel(titleModelConfig)
@@ -162,8 +163,21 @@ class AgentFactory @Inject constructor(
      * Settings → Model Service 启用至少一个服务。不再使用任何硬编码兜底配置——
      * 模型密钥与地址必须来自 Store，由 [SeedData] 在 `AsssistantaiApp.onCreate` 注入。
      */
-    private fun selectModelConfig(): ModelConfig {
-        // 1. 优先用用户显式选择
+    private fun selectModelConfig(explicitSelection: LLMModelSelection?): ModelConfig {
+        // 1. Explicit callers (for example the detached Bluetooth voice runner) do not mutate
+        // the chat screen's process-wide current selection.
+        val explicit = modelServices.resolveChatSelection(explicitSelection)
+        if (explicit != null) {
+            val svc = explicit.provider
+            return ModelConfig(
+                serviceId = svc.serviceId,
+                baseType = svc.baseType,
+                modelId = explicit.model.modelId,
+                apiKey = svc.apiKey,
+                fullBaseUrl = composeUrl(svc.activeApiBaseUrl),
+            )
+        }
+        // 2. Prefer the model explicitly selected in the chat screen.
         val resolved = modelServices.resolveChatSelection(
             modelServices.currentSelection.value
         )
@@ -177,7 +191,7 @@ class AgentFactory @Inject constructor(
                 fullBaseUrl = composeUrl(svc.activeApiBaseUrl),
             )
         }
-        // 2. 回退到首个启用且含模型的服务，和新会话默认选择保持一致。
+        // 3. Fall back to the configured default/first available chat model.
         val fallback = modelServices.defaultSelection()
             ?: error("No enabled model service with a configured model. Enable one in Settings → Model Service.")
         val resolvedFallback = modelServices.resolveChatSelection(fallback)

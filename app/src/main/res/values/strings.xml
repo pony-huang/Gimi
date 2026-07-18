@@ -22,4 +22,6 @@
     <!-- Display name shown in Settings → Notifications → Device & app notifications
          for MediaSessionManagerTool's notification listener service. -->
     <string name="media_notification_listener_label">asssistantai media control</string>
+    <string name="bluetooth_voice_channel_name">蓝牙语音唤醒</string>
+    <string name="bluetooth_voice_notification_title">蓝牙语音助手</string>
 </resources>

@@ -321,6 +321,8 @@ private fun IntentConfirmationDialog(
 @Composable
 fun MainScreen(
     viewModel: ChatViewModel = hiltViewModel(),
+    requestedSessionId: String? = null,
+    onRequestedSessionHandled: () -> Unit = {},
 ) {
     // Chat content and the history drawer use this single source of truth.
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -342,9 +344,14 @@ fun MainScreen(
     }
 
     // 首屏自动加载会话列表 + 恢复上次会话（首次安装时兜底建空会话）
-    LaunchedEffect(Unit) {
+    LaunchedEffect(requestedSessionId) {
         viewModel.refreshConversations()
-        viewModel.restoreOrCreateSession()
+        if (requestedSessionId.isNullOrBlank()) {
+            viewModel.restoreOrCreateSession()
+        } else {
+            viewModel.switchSession(requestedSessionId)
+            onRequestedSessionHandled()
+        }
     }
 
     ChatDrawer(

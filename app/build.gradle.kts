@@ -88,6 +88,7 @@ dependencies {
     implementation(libs.mcp.kotlin.sdk.client)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.gson)
+    implementation(libs.vosk.android)
     implementation(libs.multiplatform.markdown.renderer.m3)
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)

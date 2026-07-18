@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent.tools.intents
+package github.ponyhuang.asssistantai.agent.tools.system
 
 import android.content.Intent
 import android.provider.Settings
@@ -8,7 +8,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class SettingsTool @Inject constructor(private val queue: IntentActionQueue) {
+class SettingsNavigationTool @Inject constructor(private val queue: IntentActionQueue) {
     @Tool(name = "open_settings", description = "Opens the requested Android system settings page.") fun openSettings(@Param("Settings page: general, wireless, airplane, wifi, bluetooth, date, locale, input, display, security, location, storage.") page: String): Map<String, Any> {
         val normalized = page.trim().lowercase()
         val action = when (normalized) {

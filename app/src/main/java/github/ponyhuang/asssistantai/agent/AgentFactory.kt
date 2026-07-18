@@ -10,29 +10,27 @@ import com.google.adk.kt.callbacks.CallbackChoice
 import com.google.adk.kt.models.Model
 import com.google.adk.kt.tools.BaseTool
 import com.openai.client.okhttp.OpenAIOkHttpClient
-import github.ponyhuang.asssistantai.agent.tools.intents.ClockTool
-import github.ponyhuang.asssistantai.agent.tools.systems.BrightnessTool
-import github.ponyhuang.asssistantai.agent.tools.intents.CalendarTool
-import github.ponyhuang.asssistantai.agent.tools.intents.MediaPlaybackTool
-import github.ponyhuang.asssistantai.agent.tools.intents.CameraTool
-import github.ponyhuang.asssistantai.agent.tools.intents.ContactsTool
-import github.ponyhuang.asssistantai.agent.tools.intents.EmailTool
-import github.ponyhuang.asssistantai.agent.tools.intents.FileStorageTool
-import github.ponyhuang.asssistantai.agent.tools.intents.MapsTool
-import github.ponyhuang.asssistantai.agent.tools.intents.MessagingTool
-import github.ponyhuang.asssistantai.agent.tools.intents.NotesTool
-import github.ponyhuang.asssistantai.agent.tools.intents.PhoneTool
-import github.ponyhuang.asssistantai.agent.tools.intents.RideHailingTool
-import github.ponyhuang.asssistantai.agent.tools.intents.SearchTool
-import github.ponyhuang.asssistantai.agent.tools.intents.SettingsTool
-import github.ponyhuang.asssistantai.agent.tools.systems.AudioTool
-import github.ponyhuang.asssistantai.agent.tools.systems.MediaSessionManagerTool
-import github.ponyhuang.asssistantai.agent.tools.systems.PackageManagerTool
-import github.ponyhuang.asssistantai.agent.tools.systems.TimeTool
-import github.ponyhuang.asssistantai.agent.tools.intents.generatedTools
-import github.ponyhuang.asssistantai.agent.tools.systems.LocationTool
-import github.ponyhuang.asssistantai.agent.tools.systems.LocalFileSearchTool
-import github.ponyhuang.asssistantai.agent.tools.systems.generatedTools
+import github.ponyhuang.asssistantai.agent.tools.system.ClockTool
+import github.ponyhuang.asssistantai.agent.tools.system.BrightnessTool
+import github.ponyhuang.asssistantai.agent.tools.system.CalendarTool
+import github.ponyhuang.asssistantai.agent.tools.system.MediaPlaybackTool
+import github.ponyhuang.asssistantai.agent.tools.system.CameraTool
+import github.ponyhuang.asssistantai.agent.tools.system.ContactsTool
+import github.ponyhuang.asssistantai.agent.tools.system.EmailTool
+import github.ponyhuang.asssistantai.agent.tools.system.FileStorageTool
+import github.ponyhuang.asssistantai.agent.tools.system.MapsTool
+import github.ponyhuang.asssistantai.agent.tools.system.MessagingTool
+import github.ponyhuang.asssistantai.agent.tools.system.NotesTool
+import github.ponyhuang.asssistantai.agent.tools.system.PhoneTool
+import github.ponyhuang.asssistantai.agent.tools.system.RideHailingTool
+import github.ponyhuang.asssistantai.agent.tools.system.SearchTool
+import github.ponyhuang.asssistantai.agent.tools.system.SettingsNavigationTool
+import github.ponyhuang.asssistantai.agent.tools.system.VolumeTool
+import github.ponyhuang.asssistantai.agent.tools.system.MediaSessionManagerTool
+import github.ponyhuang.asssistantai.agent.tools.system.PackageManagerTool
+import github.ponyhuang.asssistantai.agent.tools.system.generatedTools
+import github.ponyhuang.asssistantai.agent.tools.system.LocationTool
+import github.ponyhuang.asssistantai.agent.tools.system.LocalFileSearchTool
 import github.ponyhuang.asssistantai.data.ApiBaseType
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
 import javax.inject.Inject
@@ -56,9 +54,8 @@ class AgentFactory @Inject constructor(
     private val phoneTool: PhoneTool,
     private val rideHailingTool: RideHailingTool,
     private val searchTool: SearchTool,
-    private val settingsTool: SettingsTool,
-    private val audioTool: AudioTool,
-    private val timeTool: TimeTool,
+    private val settingsNavigationTool: SettingsNavigationTool,
+    private val volumeTool: VolumeTool,
     private val locationTool: LocationTool,
     private val mediaSessionManagerTool: MediaSessionManagerTool,
     private val packageManagerTool: PackageManagerTool,
@@ -72,8 +69,7 @@ class AgentFactory @Inject constructor(
         val titleModel = if (titleModelConfig == cfg) model else createModel(titleModelConfig)
         val tools: List<BaseTool> = buildList {
             addAll(clockTool.generatedTools())
-            addAll(audioTool.generatedTools())
-            addAll(timeTool.generatedTools())
+            addAll(volumeTool.generatedTools())
             addAll(brightnessTool.generatedTools())
             addAll(calendarTool.generatedTools())
             addAll(mediaPlaybackTool.generatedTools())
@@ -90,7 +86,7 @@ class AgentFactory @Inject constructor(
             addAll(phoneTool.generatedTools())
 //            addAll(rideHailingTool.generatedTools())
             addAll(searchTool.generatedTools())
-            addAll(settingsTool.generatedTools())
+            addAll(settingsNavigationTool.generatedTools())
             addAll(mcpToolRegistry.tools())
         }
         val titleCallbacks = ConversationTitleCallbacks(titleModel)

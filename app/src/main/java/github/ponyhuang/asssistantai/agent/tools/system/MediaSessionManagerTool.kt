@@ -1,8 +1,9 @@
-package github.ponyhuang.asssistantai.agent.tools.systems
+package github.ponyhuang.asssistantai.agent.tools.system
 
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
@@ -11,7 +12,6 @@ import androidx.core.app.NotificationManagerCompat
 import com.google.adk.kt.annotations.Param
 import com.google.adk.kt.annotations.Tool
 import dagger.hilt.android.qualifiers.ApplicationContext
-import github.ponyhuang.asssistantai.agent.tools.intents.IntentActionQueue
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -200,10 +200,10 @@ class MediaSessionManagerTool @Inject constructor(
         val playbackState = controller.playbackState
         return mapOf(
             "packageName" to controller.packageName,
-            "title" to (metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE).orEmpty()),
-            "artist" to (metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST).orEmpty()),
-            "album" to (metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM).orEmpty()),
-            "durationMillis" to (metadata?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: 0L),
+            "title" to (metadata?.getString(MediaMetadata.METADATA_KEY_TITLE).orEmpty()),
+            "artist" to (metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST).orEmpty()),
+            "album" to (metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM).orEmpty()),
+            "durationMillis" to (metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L),
             "playbackState" to playbackStateName(playbackState?.state),
             "playing" to (playbackState?.state == PlaybackState.STATE_PLAYING),
         )

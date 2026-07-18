@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent.tools.systems
+package github.ponyhuang.asssistantai.agent.tools.system
 
 import android.content.Context
 import android.content.Intent
@@ -9,6 +9,7 @@ import com.google.adk.kt.annotations.Tool
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import androidx.core.net.toUri
 
 /** Controls the device's system screen brightness and automatic-brightness setting. */
 @Singleton
@@ -60,7 +61,7 @@ class BrightnessTool @Inject constructor(
         context.startActivity(
             Intent(
                 Settings.ACTION_MANAGE_WRITE_SETTINGS,
-                Uri.parse("package:${context.packageName}"),
+                "package:${context.packageName}".toUri(),
             ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
         return brightnessState() + mapOf("permissionSettingsOpened" to true)

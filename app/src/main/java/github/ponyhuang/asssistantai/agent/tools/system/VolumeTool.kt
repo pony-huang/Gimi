@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent.tools.systems
+package github.ponyhuang.asssistantai.agent.tools.system
 
 import android.content.Context
 import android.media.AudioManager
@@ -10,7 +10,7 @@ import javax.inject.Singleton
 
 /** Controls the device media-volume stream. */
 @Singleton
-class AudioTool @Inject constructor(
+class VolumeTool @Inject constructor(
     @ApplicationContext context: Context,
 ) {
     private val audioManager = context.getSystemService(AudioManager::class.java)
@@ -50,6 +50,7 @@ class AudioTool @Inject constructor(
 
     private fun setMediaVolumeGradually(targetLevel: Int) {
         var level = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        // 丝滑音调
         while (level != targetLevel) {
             level += if (targetLevel > level) 1 else -1
             audioManager.setStreamVolume(

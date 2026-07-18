@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent.tools.systems
+package github.ponyhuang.asssistantai.agent.tools.system
 
 import android.content.Context
 import android.content.Intent
@@ -6,7 +6,6 @@ import android.content.pm.PackageManager
 import com.google.adk.kt.annotations.Param
 import com.google.adk.kt.annotations.Tool
 import dagger.hilt.android.qualifiers.ApplicationContext
-import github.ponyhuang.asssistantai.agent.tools.intents.IntentActionQueue
 import javax.inject.Inject
 import javax.inject.Singleton
 

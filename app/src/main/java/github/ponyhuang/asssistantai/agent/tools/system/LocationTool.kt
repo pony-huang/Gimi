@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent.tools.systems
+package github.ponyhuang.asssistantai.agent.tools.system
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -10,11 +10,11 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
 import android.os.Looper
+import android.provider.Settings
 import com.google.adk.kt.annotations.Param
 import com.google.adk.kt.annotations.Tool
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.asssistantai.permission.LocationPermissionActivity
-import github.ponyhuang.asssistantai.agent.tools.intents.IntentActionQueue
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -90,7 +90,7 @@ class LocationTool @Inject constructor(
     fun openLocationSettings(): Map<String, Any> = queue.request(
         "Open Location settings",
         "Open system Location settings to enable location services.",
-        Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+        Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
     )
 

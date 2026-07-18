@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent.tools.systems
+package github.ponyhuang.asssistantai.agent.tools.system
 
 import android.service.notification.NotificationListenerService
 

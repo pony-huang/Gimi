@@ -1,7 +1,6 @@
-package github.ponyhuang.asssistantai.agent.tools.intents
+package github.ponyhuang.asssistantai.agent.tools.system
 
 import android.content.Intent
-import android.net.Uri
 import com.google.adk.kt.annotations.Param
 import com.google.adk.kt.annotations.Tool
 import javax.inject.Inject

@@ -41,8 +41,8 @@ import javax.inject.Singleton
 
 @Singleton
 class AgentFactory @Inject constructor(
-    private val clockTool: ClockTool,
     private val modelServices: ModelServiceRepository,
+    private val clockTool: ClockTool,
     private val brightnessTool: BrightnessTool,
     private val calendarTool: CalendarTool,
     private val mediaPlaybackTool: MediaPlaybackTool,
@@ -88,7 +88,7 @@ class AgentFactory @Inject constructor(
             addAll(messagingTool.generatedTools())
 //            addAll(notesTool.generatedTools())
             addAll(phoneTool.generatedTools())
-            addAll(rideHailingTool.generatedTools())
+//            addAll(rideHailingTool.generatedTools())
             addAll(searchTool.generatedTools())
             addAll(settingsTool.generatedTools())
             addAll(mcpToolRegistry.tools())

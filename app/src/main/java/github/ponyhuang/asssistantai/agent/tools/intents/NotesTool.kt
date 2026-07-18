@@ -7,6 +7,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
+@Deprecated("")
 class NotesTool @Inject constructor(private val queue: IntentActionQueue) {
     @Tool(name = "create_note", description = "Opens a compatible notes app with a new note prefilled with the provided title and text.") fun createNote(@Param("Note title.") title: String, @Param("Note body.") text: String): Map<String, Any> = queue.request(
         "Create note", "Open a note app with the supplied title and text.",

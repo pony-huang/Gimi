@@ -8,6 +8,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
+@Deprecated("")
 class EmailTool @Inject constructor(private val queue: IntentActionQueue) {
     @Tool(name = "compose_email", description = "Opens an email app with a composed draft. The user reviews and sends it.") fun composeEmail(
         @Param("Recipient email addresses.") recipients: List<String>,

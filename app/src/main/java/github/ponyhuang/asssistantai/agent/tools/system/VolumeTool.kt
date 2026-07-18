@@ -15,12 +15,15 @@ class VolumeTool @Inject constructor(
 ) {
     private val audioManager = context.getSystemService(AudioManager::class.java)
 
-    @Tool
+    @Tool(name = "get_media_volume", description = "Gets the current, minimum, and maximum media-volume levels on the device.")
     fun getMediaVolume(): Map<String, Int> = mediaVolumeState()
 
-    @Tool
+    @Tool(
+        name = "set_media_volume",
+        description = "Sets the device media volume to an absolute level, ramping gradually so the change feels smooth. The applied level is clamped to the device's minimum and maximum.",
+    )
     fun setMediaVolume(
-        @Param("Target media volume level. The volume changes gradually. Use getMediaVolume first to learn the device's minimum and maximum levels.")
+        @Param("Target media volume level. The volume changes gradually. Use get_media_volume first to learn the device's minimum and maximum levels.")
         level: Int,
     ): Map<String, Int> {
         val minimum = audioManager.getStreamMinVolume(AudioManager.STREAM_MUSIC)
@@ -33,7 +36,10 @@ class VolumeTool @Inject constructor(
         )
     }
 
-    @Tool
+    @Tool(
+        name = "adjust_media_volume",
+        description = "Adjusts the device media volume relative to its current level by a signed number of steps, ramping gradually so the change feels smooth.",
+    )
     fun adjustMediaVolume(
         @Param("Number of media-volume levels to add or subtract. Use a positive number to increase volume and a negative number to decrease it.")
         delta: Int,

@@ -18,10 +18,13 @@ class BrightnessTool @Inject constructor(
 ) {
     private val resolver = context.contentResolver
 
-    @Tool
+    @Tool(name = "get_screen_brightness", description = "Gets the current screen brightness level, automatic-brightness setting, and whether the WRITE_SETTINGS permission is granted.")
     fun getScreenBrightness(): Map<String, Any> = brightnessState()
 
-    @Tool
+    @Tool(
+        name = "set_screen_brightness",
+        description = "Sets the screen brightness to an absolute level from 1 (darkest) to 255 (brightest). Disables automatic brightness. Requires the WRITE_SETTINGS permission; otherwise the request fails with a hint to grant it first.",
+    )
     fun setScreenBrightness(
         @Param("Target screen brightness from 1 (darkest) to 255 (brightest). This disables automatic brightness.")
         level: Int,
@@ -39,7 +42,10 @@ class BrightnessTool @Inject constructor(
         )
     }
 
-    @Tool
+    @Tool(
+        name = "set_automatic_brightness",
+        description = "Enables or disables automatic screen brightness. Requires the WRITE_SETTINGS permission; otherwise the request fails with a hint to grant it first.",
+    )
     fun setAutomaticBrightness(
         @Param("Whether automatic screen brightness should be enabled.")
         enabled: Boolean,
@@ -53,7 +59,10 @@ class BrightnessTool @Inject constructor(
         brightnessState()
     }
 
-    @Tool
+    @Tool(
+        name = "open_brightness_permission_settings",
+        description = "Opens the system screen that lets the user grant the WRITE_SETTINGS permission required to change screen brightness. Returns the current permission state.",
+    )
     fun openBrightnessPermissionSettings(): Map<String, Any> {
         if (Settings.System.canWrite(context)) {
             return brightnessState() + mapOf("permissionSettingsOpened" to false)

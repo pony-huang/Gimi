@@ -6,6 +6,7 @@ import com.google.adk.kt.annotations.Param
 import com.google.adk.kt.annotations.Tool
 import javax.inject.Inject
 import javax.inject.Singleton
+import androidx.core.net.toUri
 
 /** Opens a music or video URL in a compatible app installed on the device. */
 @Singleton
@@ -19,7 +20,7 @@ class MediaPlaybackTool @Inject constructor(
         @Param("Media type to play: music or video.")
         mediaType: String,
     ): Map<String, Any> {
-        val uri = Uri.parse(url.trim())
+        val uri = url.trim().toUri()
         if (uri.scheme !in SUPPORTED_SCHEMES || uri.schemeSpecificPart.isNullOrBlank()) {
             return mapOf(
                 "success" to false,

@@ -26,6 +26,8 @@ import github.ponyhuang.asssistantai.model.ImageAttachment
 import github.ponyhuang.asssistantai.model.Messages
 import github.ponyhuang.asssistantai.model.TextPart
 import github.ponyhuang.asssistantai.speech.SpeechRecognitionRepository
+import github.ponyhuang.asssistantai.speech.SpeechPlaybackController
+import github.ponyhuang.asssistantai.speech.markdownToSpeechText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -65,6 +67,7 @@ class ChatViewModel @Inject constructor(
     private val modelServices: ModelServiceRepository,
     private val chatDisplayPreferences: ChatDisplayPreferences,
     private val speechRecognitionRepository: SpeechRecognitionRepository,
+    private val speechPlaybackController: SpeechPlaybackController,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -83,9 +86,14 @@ class ChatViewModel @Inject constructor(
     val currentLLMModelSelection: StateFlow<LLMModelSelection?> = _currentLLMModelSelection.asStateFlow()
     private val _pendingToolConfirmation = MutableStateFlow<PendingToolConfirmation?>(null)
     val pendingToolConfirmation: StateFlow<PendingToolConfirmation?> = _pendingToolConfirmation.asStateFlow()
+    val speechPlaybackState = speechPlaybackController.state
 
     suspend fun transcribeVoice(pcm16: ByteArray): String =
         speechRecognitionRepository.transcribe(pcm16)
+
+    fun toggleSpeechPlayback(messageId: String, markdown: String) {
+        speechPlaybackController.toggle(messageId, markdownToSpeechText(markdown))
+    }
 
     /** Sends the user's decision back to ADK, which then either runs or rejects the paused tool. */
     fun respondToToolConfirmation(confirmed: Boolean) {
@@ -93,9 +101,10 @@ class ChatViewModel @Inject constructor(
         val sessionId = _uiState.value.sessionId
         if (sessionId.isBlank()) return
         _pendingToolConfirmation.value = null
-        currentJob?.cancel()
+        cancelCurrentRun()
+        val runToken = agentRunOwnership.claim()
+        _uiState.update { it.copy(isAgentRunning = true, turnComplete = false) }
         currentJob = viewModelScope.launch {
-            _uiState.update { it.copy(isStreaming = true, turnComplete = false) }
             try {
                 runner.respondToToolConfirmation(
                     userId = USER_ID,
@@ -111,7 +120,7 @@ class ChatViewModel @Inject constructor(
             } catch (t: Throwable) {
                 applyError(t.message ?: t::class.simpleName ?: "Unknown error")
             } finally {
-                _uiState.update { it.copy(isStreaming = false) }
+                finishRunIfOwned(runToken)
                 repository.refreshConversation(sessionId)
             }
         }
@@ -127,11 +136,30 @@ class ChatViewModel @Inject constructor(
                 _uiState.update { it.copy(conversations = convs) }
             }
         }
+        viewModelScope.launch {
+            speechPlaybackController.errors.collect { message ->
+                Toast.makeText(appContext, message, Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private var currentJob: Job? = null
+    private val agentRunOwnership = AgentRunOwnership()
+
+    private fun cancelCurrentRun() {
+        agentRunOwnership.invalidate()
+        currentJob?.cancel()
+        currentJob = null
+    }
+
+    private fun finishRunIfOwned(runToken: Any) {
+        if (!agentRunOwnership.isOwnedBy(runToken)) return
+        currentJob = null
+        _uiState.update { it.copy(isAgentRunning = false) }
+    }
 
     override fun onCleared() {
+        speechPlaybackController.clearSession()
         super.onCleared()
     }
 
@@ -176,10 +204,11 @@ class ChatViewModel @Inject constructor(
     fun send(text: String, attachmentUris: List<Uri> = emptyList()) {
         if (text.isBlank() && attachmentUris.isEmpty()) return
 
-        currentJob?.cancel()
+        cancelCurrentRun()
+        val runToken = agentRunOwnership.claim()
         // 新一轮 turn 一经提交就进入生成态，让 composer 立即显示停止按钮；不再等待首个
         // assistant partial event 到达。后续的完成、错误和取消路径仍会负责将其恢复为 false。
-        _uiState.update { it.copy(isStreaming = true, turnComplete = false) }
+        _uiState.update { it.copy(isAgentRunning = true, turnComplete = false) }
 
         val job = viewModelScope.launch {
             val images = try {
@@ -214,7 +243,7 @@ class ChatViewModel @Inject constructor(
             } catch (t: Throwable) {
                 applyError(t.message ?: t::class.simpleName ?: "Unknown error")
             } finally {
-                _uiState.update { it.copy(isStreaming = false) }
+                finishRunIfOwned(runToken)
                 repository.refreshConversation(sid)
             }
         }
@@ -313,7 +342,9 @@ class ChatViewModel @Inject constructor(
      * 上一会话遗留的 [partChannels]，避免 channel 跨"空 session"残留。
      */
     fun reset() {
-        currentJob?.cancel()
+        cancelCurrentRun()
+        speechPlaybackController.clearSession()
+        _uiState.update { it.copy(isAgentRunning = false, turnComplete = false) }
         clearPartChannels()
         viewModelScope.launch {
             modelServices.awaitReady()
@@ -331,11 +362,12 @@ class ChatViewModel @Inject constructor(
      */
     fun switchSession(sessionId: String) {
         if (sessionId.isBlank()) return
-        currentJob?.cancel()
+        cancelCurrentRun()
+        speechPlaybackController.clearSession()
         clearPartChannels()
-        // isStreaming=false 解锁输入；turnComplete=false 重置上一轮的徽章；isInitializing=true
+        // isAgentRunning=false 解锁输入；turnComplete=false 重置上一轮的徽章；isInitializing=true
         // 让 MainScreen 中央 spinner 立刻接管，避免 history commit 之前旧 messages 残留闪烁。
-        _uiState.update { it.copy(isStreaming = false, turnComplete = false, isInitializing = true) }
+        _uiState.update { it.copy(isAgentRunning = false, turnComplete = false, isInitializing = true) }
         viewModelScope.launch {
             modelServices.awaitReady()
             val messages = repository.loadMessages(sessionId)
@@ -421,7 +453,7 @@ class ChatViewModel @Inject constructor(
     fun selectModel(selection: LLMModelSelection) {
         // AgentChatRunner snapshots its agent at send entry. Changing the backing model while
         // a turn is active would make the current UI state disagree with that in-flight call.
-        if (_uiState.value.isStreaming) {
+        if (_uiState.value.isAgentRunning) {
             Log.i(TAG, "selectModel() ignored while an agent call is in progress.")
             Toast.makeText(appContext, "正在生成回复，完成后再切换模型", Toast.LENGTH_SHORT).show()
             return
@@ -480,12 +512,12 @@ class ChatViewModel @Inject constructor(
     /**
      * 用户主动中断当前 turn（点击 composer 上的停止按钮）。
      *
-     * 与 [send] 的 `finally` 块相比，这里**同步**把 `isStreaming` 置 false —
+     * 与 [send] 的 `finally` 块相比，这里**同步**把 `isAgentRunning` 置 false —
      * `finally` 是协程挂起后才跑，UI 会延迟一帧才解锁输入框，用户感知明显；
      * 提前在取消的同一帧更新 state 让 stop 按钮 → 输入框 enable 的过渡即时可见。
      *
-     * `turnComplete = true` 让 partial message 在 UI 上被当作"已结束的一轮"
-     * （typing 动画 / stop 按钮立即消失），不再被 reducer 当成未完成 event。
+     * `partial = false` 让未完成的 assistant message 在 UI 上结束流式渲染。
+     * 用户取消不是正常完成，所以 `turnComplete` 保持 false。
      *
      * 同步把仍在 `partial` 状态的 assistant message 翻成 `partial = false`：因为是用户主动
      * 中断,不会有 final non-partial event 到达来触发 [appendCompleteEvent] 的就地翻标志位;
@@ -498,19 +530,19 @@ class ChatViewModel @Inject constructor(
      */
     fun stopStreaming() {
         if (currentJob?.isActive != true) return
-        currentJob?.cancel()
+        cancelCurrentRun()
         _uiState.update { state ->
             val newMessages = state.messages.map { msg ->
                 if (msg.partial && msg.role == MessageRole.Assistant) {
-                    msg.copy(partial = false, turnComplete = true)
+                    msg.copy(partial = false, turnComplete = false)
                 } else {
                     msg
                 }
             }
             state.copy(
                 messages = newMessages,
-                isStreaming = false,
-                turnComplete = true,
+                isAgentRunning = false,
+                turnComplete = false,
             )
         }
     }
@@ -533,7 +565,25 @@ class ChatViewModel @Inject constructor(
         } else {
             appendCompleteEvent(event)
         }
+        applyAgentRunEvent(event)
         captureToolConfirmation(event)
+    }
+
+    private fun applyAgentRunEvent(event: Event) {
+        _uiState.update { state ->
+            val status = AgentRunStatus(
+                isRunning = state.isAgentRunning,
+                turnComplete = state.turnComplete,
+            ).afterEvent(
+                partial = event.partial,
+                turnComplete = event.turnComplete,
+            )
+            state.copy(
+                isAgentRunning = status.isRunning,
+                turnComplete = status.turnComplete,
+            )
+        }
+        if (event.turnComplete) refreshCurrentConversation()
     }
 
     /**
@@ -567,7 +617,7 @@ class ChatViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 messages = it.messages + Messages.fromError(error = message, invocationId = invocationId),
-                isStreaming = false,
+                isAgentRunning = false,
                 turnComplete = false,
             )
         }
@@ -599,9 +649,6 @@ class ChatViewModel @Inject constructor(
         _uiState.update { current ->
             val newMessages = current.messages.toMutableList().also { it[existingIndex] = updated }
             current.copy(messages = newMessages)
-        }
-        if (_uiState.value.isStreaming.not()) {
-            _uiState.update { it.copy(isStreaming = true) }
         }
     }
 
@@ -651,14 +698,6 @@ class ChatViewModel @Inject constructor(
                 }
             }
             _uiState.update { it.copy(messages = it.messages + message) }
-        }
-        if (event.partial) {
-            _uiState.update { it.copy(isStreaming = true) }
-        } else if (event.turnComplete) {
-            _uiState.update { it.copy(isStreaming = false, turnComplete = true) }
-            refreshCurrentConversation()
-        } else if (message.partial.not()) {
-            _uiState.update { it.copy(isStreaming = false, turnComplete = false) }
         }
     }
 

@@ -93,10 +93,10 @@ import kotlin.time.Duration.Companion.milliseconds
  * 列表滚动状态、流式跟随信号、FAB 可见性、`didInitialScroll` 首次守卫都内化在本 Composable 内，
  * 宿主不直接持有 `LazyListState`，避免不相关的状态变化触发整屏重组。
  *
- * ## [isStreaming] 的两个用途
- * - **"新建对话"按钮** — 流式输出期间保留旧 runner 不动；[onNewConversation] 由宿主自行实现
+ * ## [isAgentRunning] 的两个用途
+ * - **"新建对话"按钮** — Agent turn 进行期间保留旧 runner 不动；[onNewConversation] 由宿主自行实现
  *   "recreate runner + 重置会话"，但调用时机由本 Composable 决定。
- * - **"发送"按钮** — 流式期间保持禁用，实际发送由 [ChatComposer] 触发。
+ * - **"发送"按钮** — Agent turn 进行期间保持禁用，实际发送由 [ChatComposer] 触发。
  *
  * ## 宿主契约
  * 宿主负责：草稿随 session 重置（`remember(currentSessionId)`）、抽屉开合、session 切换 /
@@ -126,7 +126,8 @@ fun ChatScaffold(
     val visibleMessages = remember(messages, showToolActivity) {
         messages.filter { message -> message.isVisibleInChat(showToolActivity) }
     }
-    val isStreaming = state.isStreaming
+    val isAgentRunning = state.isAgentRunning
+    val speechPlaybackState by viewModel.speechPlaybackState.collectAsStateWithLifecycle()
     val pendingToolConfirmation by viewModel.pendingToolConfirmation.collectAsStateWithLifecycle()
     // 只要用户仍停留在底部，就让流式内容增长持续跟随；用户向上浏览历史时则停止抢占滚动。
     var shouldFollowLatest by remember { mutableStateOf(true) }
@@ -141,13 +142,13 @@ fun ChatScaffold(
 
     // `TextContent` 从 channel 接收增量后只会改变气泡尺寸，不会改变 messages 引用。
     // 监听可见项的布局边界，确保每次气泡增长到新行时都能把底部锚点带回视口。
-    LaunchedEffect(listState, isStreaming) {
+    LaunchedEffect(listState, isAgentRunning) {
         snapshotFlow {
             listState.layoutInfo.visibleItemsInfo.lastOrNull()?.let { item ->
                 item.index to (item.offset + item.size)
             }
         }.collect {
-            if (isStreaming && shouldFollowLatest) {
+            if (isAgentRunning && shouldFollowLatest) {
                 listState.scrollToItem(latestItemIndex)
             }
         }
@@ -169,7 +170,7 @@ fun ChatScaffold(
         topBar = {
             ChatTopBar(
                 viewModel = viewModel,
-                isStreaming = isStreaming,
+                isAgentRunning = isAgentRunning,
                 onOpenDrawer = onOpenDrawer,
                 onOpenSettings = onOpenSettings,
                 onNewConversation = onNewConversation,
@@ -193,7 +194,7 @@ fun ChatScaffold(
                     viewModel.send(data.text, data.attachments)
                 },
                 onStopClick = viewModel::stopStreaming,
-                isGenerating = isStreaming,
+                isGenerating = isAgentRunning,
                 isVoiceInputAvailable = isSpeechRecognitionAvailable,
                 onTranscribeVoice = viewModel::transcribeVoice,
             )
@@ -254,6 +255,8 @@ fun ChatScaffold(
                             message = msg,
                             partChannelProvider = viewModel::partChannelFor,
                             showToolActivity = showToolActivity,
+                            speechPlaybackState = speechPlaybackState,
+                            onToggleSpeechPlayback = viewModel::toggleSpeechPlayback,
                         )
                     }
                     item(
@@ -300,7 +303,7 @@ private fun IntentConfirmationDialog(
  * 应用主屏幕：聊天界面 + 历史对话抽屉。
  *
  * 状态来源：[ChatViewModel.uiState] — 一次 `collectAsStateWithLifecycle` 拿到完整聊天会话 UI 状态，
- * 再按字段（`messages` / `isStreaming` / `sessionId` / `conversations`）向下传递，确保抽屉
+ * 再按字段（`messages` / `isAgentRunning` / `sessionId` / `conversations`）向下传递，确保抽屉
  * 与聊天内容共享同一个 [ChatViewModel] 的会话状态；模型选择（服务列表 / 当前选择）的订阅仍下沉到
  * [ModelTitleAndPicker]。
  *
@@ -471,7 +474,7 @@ fun MainScreen(
 @Composable
 private fun ChatTopBar(
     viewModel: ChatViewModel,
-    isStreaming: Boolean,
+    isAgentRunning: Boolean,
     onOpenDrawer: () -> Unit,
     onOpenSettings: () -> Unit,
     onNewConversation: () -> Unit,
@@ -502,7 +505,7 @@ private fun ChatTopBar(
 
         ModelTitleAndPicker(
             viewModel = viewModel,
-            isStreaming = isStreaming,
+            isAgentRunning = isAgentRunning,
             modifier = Modifier.weight(1f),
         )
 
@@ -537,7 +540,7 @@ private fun ChatTopBar(
                 )
                 IconButton(
                     onClick = onNewConversation,
-                    enabled = !isStreaming,
+                    enabled = !isAgentRunning,
                     modifier = Modifier.size(48.dp),
                 ) {
                     Icon(
@@ -562,6 +565,8 @@ private fun MessageRow(
     message: Message,
     partChannelProvider: (partId: String) -> ReceiveChannel<String>?,
     showToolActivity: Boolean,
+    speechPlaybackState: github.ponyhuang.asssistantai.speech.SpeechPlaybackState,
+    onToggleSpeechPlayback: (messageId: String, text: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (message.error != null) {
@@ -571,6 +576,8 @@ private fun MessageRow(
             message = message,
             partChannelProvider = partChannelProvider,
             showToolActivity = showToolActivity,
+            speechPlaybackState = speechPlaybackState,
+            onToggleSpeechPlayback = onToggleSpeechPlayback,
             modifier = modifier
         )
     }

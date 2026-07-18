@@ -14,9 +14,10 @@ import github.ponyhuang.asssistantai.model.MessageRole
  *
  * @param messages 已渲染的消息列表（含 partial / 工具调用 / 错误消息）
  * @param sessionId 当前激活的会话 id；空串表示还没建立会话
- * @param isStreaming 流式输出是否进行中（输入框锁定 / 新建会话按钮置灰用）
+ * @param isAgentRunning Agent turn 是否仍在进行（包括思考、流式输出和工具执行）。
+ *                       用于显示思考/停止状态并锁定会话级操作。
  * @param turnComplete 当前 turn 是否收到过 `event.turnComplete = true` 的收尾事件。
- *                     与 [isStreaming] 的差异：`isStreaming` 在收到工具调用响应、
+ *                     与 [isAgentRunning] 的差异：`isAgentRunning` 在收到工具调用响应、
  *                     仍可能继续产流的事件时会保持 true；而 [turnComplete] 仅在
  *                     `Event.turnComplete = true` 的最终事件到达时翻为 true。
  *                     当前没有 UI 消费方，预留给 "Turn complete" 提示 chip / 状态徽章。
@@ -29,14 +30,14 @@ import github.ponyhuang.asssistantai.model.MessageRole
  *                     `AnimatedContent` 的中央 spinner —— 让用户在历史"灌入"前
  *                     看到一个加载态，避免旧内容残留闪烁。
  *
- *                     与 [isStreaming] 正交：[isStreaming] 锁定输入框 / 灰按钮；
+ *                     与 [isAgentRunning] 正交：[isAgentRunning] 描述 Agent turn；
  *                     [isInitializing] 只用于中央 spinner 的可见性。两者各自承担
  *                     一段独立的语义，不要混用。
  */
 data class ChatUiState(
     val messages: List<Message> = emptyList(),
     val sessionId: String = "",
-    val isStreaming: Boolean = false,
+    val isAgentRunning: Boolean = false,
     val turnComplete: Boolean = false,
     val conversations: List<Conversation> = emptyList(),
     val isInitializing: Boolean = false,

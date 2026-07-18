@@ -340,13 +340,13 @@ private fun ModelPickerRow(
  * 3. [ChatViewModel.selectModel] 持久化当前会话的选择并重建后续消息使用的 agent。
  *
  * @param viewModel    [ChatViewModel]；选中新模型后持久化会话配置。
- * @param isStreaming  当前是否正在流式输出。
+ * @param isAgentRunning 当前 Agent turn 是否仍在进行。
  * @param modifier     修饰符，会透传给根 `Box`（用于在 TopAppBar 内做居中布局）。
  */
 @Composable
 fun ModelTitleAndPicker(
     viewModel: ChatViewModel,
-    isStreaming: Boolean,
+    isAgentRunning: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -396,7 +396,7 @@ fun ModelTitleAndPicker(
             modelName = displayedModelName,
             serviceId = displayedModel?.service?.serviceId,
             onClick = {
-                if (isStreaming) {
+                if (isAgentRunning) {
                     Toast.makeText(context, "正在生成回复，完成后再切换模型", Toast.LENGTH_SHORT).show()
                 } else if (displayedModelName != null) {
                     showModelPicker = true

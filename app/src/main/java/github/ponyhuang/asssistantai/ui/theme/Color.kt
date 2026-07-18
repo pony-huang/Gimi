@@ -2,12 +2,13 @@ package github.ponyhuang.asssistantai.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// ── ChatGPT palette ───────────────────────────────────────────
+// ── DeepSeek-inspired brand + neutral palette ────────────────
 // The chat experience deliberately uses a stable neutral palette instead of
 // Material You colours, so conversation surfaces remain recognisable across
 // devices and wallpapers.
-val ChatGptGreen = Color(0xFF10A37F)
-val ChatGptGreenDark = Color(0xFF0E8C6D)
+val DeepSeekBlue = Color(0xFF4D6BFE)
+val DeepSeekBlueContainer = Color(0xFFE3E8FF)
+val DeepSeekBlueDarkContainer = Color(0xFF27366D)
 val ChatGptDarkBackground = Color(0xFF212121)
 val ChatGptDarkSurface = Color(0xFF2F2F2F)
 val ChatGptDarkSurfaceVariant = Color(0xFF383838)

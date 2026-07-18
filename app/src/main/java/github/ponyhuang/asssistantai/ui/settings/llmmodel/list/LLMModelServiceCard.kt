@@ -5,10 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,40 +33,31 @@ fun ModelServiceCard(
     onToggleEnabled: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        onClick = { onClick(item.serviceId) },
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onClick(item.serviceId) }
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            LLMModelServiceIcon(
-                serviceId = item.serviceId,
-                modifier = Modifier.size(44.dp),
-            )
-            Text(
-                text = item.serviceName,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Switch(
-                checked = item.isEnabled,
-                // 没有 apiKey 时不允许启用；详情页 Key 区填好后会自动重新可点。
-                enabled = item.apiKey.isNotBlank(),
-                onCheckedChange = { onToggleEnabled(item.serviceId, it) },
-            )
-        }
+        LLMModelServiceIcon(
+            serviceId = item.serviceId,
+            modifier = Modifier.size(44.dp),
+        )
+        Text(
+            text = item.serviceName,
+            style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Switch(
+            checked = item.isEnabled,
+            // 没有 apiKey 时不允许启用；详情页 Key 区填好后会自动重新可点。
+            enabled = item.apiKey.isNotBlank(),
+            onCheckedChange = { onToggleEnabled(item.serviceId, it) },
+        )
     }
 }

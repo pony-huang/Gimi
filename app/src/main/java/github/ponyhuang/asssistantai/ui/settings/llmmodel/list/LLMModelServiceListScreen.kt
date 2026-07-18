@@ -1,6 +1,5 @@
 package github.ponyhuang.asssistantai.ui.settings.llmmodel.list
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -57,11 +56,8 @@ fun LLMModelServiceListScreen(
                 ModelCatalogLoadState.Ready -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
                         bottom = 24.dp,
                     ),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(items = items, key = { it.serviceId }) { item: LLMModelProvider ->
                         ModelServiceCard(

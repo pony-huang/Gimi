@@ -8,20 +8,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 
-val JetchatDarkColorScheme = darkColorScheme(
-    primary = ChatGptGreen,
+val DeepSeekDarkColorScheme = darkColorScheme(
+    primary = DeepSeekBlue,
     onPrimary = Color.White,
-    primaryContainer = ChatGptGreenDark,
-    onPrimaryContainer = Color.White,
-    inversePrimary = ChatGptGreen,
+    primaryContainer = DeepSeekBlueDarkContainer,
+    onPrimaryContainer = Color(0xFFE3E8FF),
+    inversePrimary = Color(0xFFAEBBFF),
     secondary = ChatGptDarkMutedText,
     onSecondary = ChatGptDarkBackground,
     secondaryContainer = ChatGptDarkSurfaceVariant,
     onSecondaryContainer = ChatGptDarkText,
-    tertiary = ChatGptGreen,
+    tertiary = DeepSeekBlue,
     onTertiary = Color.White,
-    tertiaryContainer = ChatGptDarkSurfaceVariant,
-    onTertiaryContainer = ChatGptDarkText,
+    tertiaryContainer = DeepSeekBlueDarkContainer,
+    onTertiaryContainer = Color(0xFFE3E8FF),
     error = Red80,
     onError = Red20,
     errorContainer = Red30,
@@ -37,20 +37,20 @@ val JetchatDarkColorScheme = darkColorScheme(
     outline = Color(0xFF555555),
 )
 
-val JetchatLightColorScheme = lightColorScheme(
-    primary = ChatGptGreen,
+val DeepSeekLightColorScheme = lightColorScheme(
+    primary = DeepSeekBlue,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFD9F5EB),
-    onPrimaryContainer = Color(0xFF064E3B),
-    inversePrimary = ChatGptGreen,
+    primaryContainer = DeepSeekBlueContainer,
+    onPrimaryContainer = Color(0xFF10205C),
+    inversePrimary = Color(0xFFAEBBFF),
     secondary = ChatGptLightMutedText,
     onSecondary = Color.White,
     secondaryContainer = ChatGptLightSurfaceVariant,
     onSecondaryContainer = ChatGptLightText,
-    tertiary = ChatGptGreen,
+    tertiary = DeepSeekBlue,
     onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFD9F5EB),
-    onTertiaryContainer = Color(0xFF064E3B),
+    tertiaryContainer = DeepSeekBlueContainer,
+    onTertiaryContainer = Color(0xFF10205C),
     error = Red40,
     onError = Color.White,
     errorContainer = Red90,
@@ -71,10 +71,9 @@ fun AsssistantaiTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) JetchatDarkColorScheme else JetchatLightColorScheme
+    val colorScheme = if (darkTheme) DeepSeekDarkColorScheme else DeepSeekLightColorScheme
 
-    // 用户气泡配色独立于 MaterialTheme colorScheme，确保在所有设备上
-    // 都保留 ChatGPT 风格的绿色对话辨识度。
+    // 用户气泡配色独立于品牌主题，确保主题色变化不会降低消息角色辨识度。
     val userBubbleColors = if (darkTheme) DarkUserBubbleColors else LightUserBubbleColors
 
     CompositionLocalProvider(LocalUserBubbleColors provides userBubbleColors) {

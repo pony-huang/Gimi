@@ -71,11 +71,14 @@ import github.ponyhuang.asssistantai.ui.settings.llmmodel.detail.LLMModelService
 import github.ponyhuang.asssistantai.ui.settings.llmmodel.list.ModelServiceListRoute
 import github.ponyhuang.asssistantai.ui.navigation.AppRoute
 import github.ponyhuang.asssistantai.ui.navigation.SettingsScaffold
+import github.ponyhuang.asssistantai.ui.settings.DefaultModelSettingsScreen
 import github.ponyhuang.asssistantai.ui.settings.SettingsScreen
 import github.ponyhuang.asssistantai.ui.settings.McpServerListScreen
 import github.ponyhuang.asssistantai.ui.settings.McpServerEditorScreen
 import github.ponyhuang.asssistantai.ui.settings.McpServerImportScreen
 import github.ponyhuang.asssistantai.ui.settings.McpServerAddOptionsScreen
+import github.ponyhuang.asssistantai.ui.settings.VoiceWakeSettingsScreen
+import github.ponyhuang.asssistantai.ui.settings.WorkFilesSettingsScreen
 import github.ponyhuang.asssistantai.ui.theme.AsssistantaiTheme
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
@@ -392,15 +395,50 @@ fun MainScreen(
                             )
                         }
 
-                        AppRoute.Settings -> SettingsScreen(
+                        AppRoute.Settings -> SettingsScaffold(
+                            title = "设置",
                             onBack = goBack,
-                            onNavigateToModelService = {
-                                backStack.add(AppRoute.ModelServiceList)
-                            },
-                            onNavigateToMcpServers = {
-                                backStack.add(AppRoute.McpServerList)
-                            },
-                        )
+                        ) { modifier ->
+                            SettingsScreen(
+                                onNavigateToModelService = {
+                                    backStack.add(AppRoute.ModelServiceList)
+                                },
+                                onNavigateToDefaultModels = {
+                                    backStack.add(AppRoute.DefaultModelSettings)
+                                },
+                                onNavigateToVoiceWake = {
+                                    backStack.add(AppRoute.VoiceWakeSettings)
+                                },
+                                onNavigateToMcpServers = {
+                                    backStack.add(AppRoute.McpServerList)
+                                },
+                                onNavigateToWorkFiles = {
+                                    backStack.add(AppRoute.WorkFilesSettings)
+                                },
+                                modifier = modifier,
+                            )
+                        }
+
+                        AppRoute.DefaultModelSettings -> SettingsScaffold(
+                            title = "默认模型",
+                            onBack = goBack,
+                        ) { modifier ->
+                            DefaultModelSettingsScreen(modifier = modifier)
+                        }
+
+                        AppRoute.VoiceWakeSettings -> SettingsScaffold(
+                            title = "语音唤醒",
+                            onBack = goBack,
+                        ) { modifier ->
+                            VoiceWakeSettingsScreen(modifier = modifier)
+                        }
+
+                        AppRoute.WorkFilesSettings -> SettingsScaffold(
+                            title = "工作文件",
+                            onBack = goBack,
+                        ) { modifier ->
+                            WorkFilesSettingsScreen(modifier = modifier)
+                        }
 
                         AppRoute.McpServerList -> SettingsScaffold(
                             title = "MCP 服务器",

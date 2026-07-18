@@ -3,6 +3,8 @@ package github.ponyhuang.asssistantai.ui.settings
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -28,8 +32,10 @@ import androidx.compose.material.icons.filled.BluetoothAudio
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
@@ -43,6 +49,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
@@ -581,24 +589,66 @@ private fun TtsVoicePickerDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("选择语音播放音色") },
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        title = {
+            Text(
+                text = "选择语音播放音色",
+                style = MaterialTheme.typography.headlineSmall,
+            )
+        },
         text = {
-            LazyColumn(modifier = Modifier.heightIn(max = 480.dp)) {
+            LazyColumn(
+                contentPadding = PaddingValues(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.heightIn(max = 400.dp),
+            ) {
                 items(voices, key = TtsVoice::id) { voice ->
-                    androidx.compose.material3.ListItem(
-                        headlineContent = { Text(voice.name) },
-                        supportingContent = {
-                            val detail = listOfNotNull(voice.language, voice.gender).joinToString(" · ")
-                            if (detail.isNotEmpty()) Text(detail)
+                    val selected = voice.id == selectedVoiceId
+                    Surface(
+                        color = if (selected) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            Color.Transparent
                         },
-                        leadingContent = {
-                            RadioButton(
-                                selected = voice.id == selectedVoiceId,
-                                onClick = { onPick(voice) },
-                            )
-                        },
-                        modifier = Modifier.clickable { onPick(voice) },
-                    )
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        androidx.compose.material3.ListItem(
+                            headlineContent = {
+                                Text(
+                                    text = voice.name,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                                )
+                            },
+                            supportingContent = {
+                                val detail = listOfNotNull(voice.language, voice.gender)
+                                    .joinToString(" · ")
+                                if (detail.isNotEmpty()) {
+                                    Text(
+                                        text = detail,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            },
+                            leadingContent = {
+                                RadioButton(
+                                    selected = selected,
+                                    onClick = null,
+                                )
+                            },
+                            colors = ListItemDefaults.colors(
+                                containerColor = Color.Transparent,
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = selected,
+                                    role = Role.RadioButton,
+                                    onClick = { onPick(voice) },
+                                ),
+                        )
+                    }
                 }
             }
         },

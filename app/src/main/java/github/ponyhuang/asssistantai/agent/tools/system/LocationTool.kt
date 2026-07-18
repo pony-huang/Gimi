@@ -30,10 +30,10 @@ class LocationTool @Inject constructor(
 
     @Tool(
         name = "get_current_location",
-        description = "Returns the device's current geographic location (latitude, longitude, accuracy, and other available fields) read from enabled system location providers (fused, GPS, network, passive). Requires the ACCESS_FINE_LOCATION or ACCESS_COARSE_LOCATION runtime permission, and the device's location services to be enabled.",
+        description = "Returns the device's current geographic location (latitude, longitude, accuracy, and other available fields) from enabled system providers. Requires the location permission and that location services are turned on.",
     )
     fun getCurrentLocation(
-        @Param("If true, attempt to acquire a fresh location fix from the highest-accuracy enabled provider and fall back to the most recent cached fix if no fresh fix arrives within a short timeout. If false, return the most recent cached fix without requesting an update. Defaults to true.")
+        @Param("If true, request a fresh fix from the highest-accuracy enabled provider and fall back to the cached fix on timeout. If false, return the cached fix without requesting an update. Defaults to true.")
         preferFreshFix: Boolean? = true,
     ): Map<String, Any> {
         if (!hasLocationPermission()) return locationPermissionError()
@@ -58,7 +58,7 @@ class LocationTool @Inject constructor(
 
     @Tool(
         name = "request_location_permissions",
-        description = "Launches the runtime prompt for ACCESS_FINE_LOCATION and ACCESS_COARSE_LOCATION, which are required to read the device location.",
+        description = "Prompts the user to grant location permission, required to read the device location.",
     )
     fun requestLocationPermissions(): Map<String, Any> = queue.request(
         "Grant location access",
@@ -68,7 +68,7 @@ class LocationTool @Inject constructor(
 
     @Tool(
         name = "is_location_enabled",
-        description = "Returns whether at least one system location provider (fused, GPS, network) is currently enabled on the device.",
+        description = "Returns whether any system location provider (fused, GPS, network) is currently enabled.",
     )
     fun isLocationEnabled(): Map<String, Any> {
         val manager = locationManager ?: return mapOf(

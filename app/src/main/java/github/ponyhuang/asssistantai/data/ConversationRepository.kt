@@ -6,8 +6,12 @@ import com.google.adk.kt.sessions.SessionKey
 import com.google.adk.kt.sessions.SessionService
 import github.ponyhuang.asssistantai.model.Conversation
 import github.ponyhuang.asssistantai.model.Message
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
@@ -29,6 +33,24 @@ class ConversationRepository(
 
     private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
     val conversations: StateFlow<List<Conversation>> = _conversations.asStateFlow()
+
+    /**
+     * Process-local invalidations for session content written outside [ChatViewModel].
+     *
+     * ADK's [SessionService] persists events but does not expose an observable event stream. The
+     * background voice runner therefore publishes the changed session id here after a complete
+     * turn, allowing an already-open chat screen to reload that session from Room.
+     */
+    private val _conversationContentUpdates = MutableSharedFlow<String>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val conversationContentUpdates: SharedFlow<String> = _conversationContentUpdates.asSharedFlow()
+
+    fun notifyConversationContentChanged(sessionId: String) {
+        if (sessionId.isBlank()) return
+        _conversationContentUpdates.tryEmit(sessionId)
+    }
 
     /**
      * 拉取最新会话列表并 emit 到 [conversations]。

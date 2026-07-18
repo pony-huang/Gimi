@@ -59,6 +59,7 @@ class VoiceAgentTaskExecutor @Inject constructor(
             }
         }
         repository.refreshConversation(sessionId)
+        repository.notifyConversationContentChanged(sessionId)
         VoiceAgentResult(
             sessionId = sessionId,
             responseText = accumulator.result().ifBlank { "任务已完成" },

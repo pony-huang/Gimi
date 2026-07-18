@@ -137,6 +137,11 @@ class ChatViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            repository.conversationContentUpdates.collect { sessionId ->
+                handleConversationContentUpdate(sessionId)
+            }
+        }
+        viewModelScope.launch {
             speechPlaybackController.errors.collect { message ->
                 Toast.makeText(appContext, message, Toast.LENGTH_SHORT).show()
             }
@@ -144,6 +149,10 @@ class ChatViewModel @Inject constructor(
     }
 
     private var currentJob: Job? = null
+    private var sessionLoadJob: Job? = null
+    private var activeSessionLoadToken: Any? = null
+    private var loadingSessionId: String? = null
+    private var pendingContentRefreshSessionId: String? = null
     private val agentRunOwnership = AgentRunOwnership()
 
     private fun cancelCurrentRun() {
@@ -156,6 +165,7 @@ class ChatViewModel @Inject constructor(
         if (!agentRunOwnership.isOwnedBy(runToken)) return
         currentJob = null
         _uiState.update { it.copy(isAgentRunning = false) }
+        viewModelScope.launch { flushPendingConversationContentUpdate() }
     }
 
     override fun onCleared() {
@@ -188,6 +198,78 @@ class ChatViewModel @Inject constructor(
     private fun clearPartChannels() {
         partChannels.values.forEach { it.close() }
         partChannels.clear()
+    }
+
+    /**
+     * Reloads a session changed by the background voice runner when that session is visible.
+     *
+     * A foreground turn owns the in-memory partial reducer, while a session switch owns the
+     * initial history snapshot. In either case replacing [ChatUiState.messages] immediately would
+     * lose newer UI state, so the invalidation is retained and flushed by the owner on completion.
+     */
+    private suspend fun handleConversationContentUpdate(sessionId: String) {
+        val loadingId = loadingSessionId
+        if (loadingId != null) {
+            if (loadingId == sessionId) pendingContentRefreshSessionId = sessionId
+            return
+        }
+
+        val state = _uiState.value
+        if (state.sessionId != sessionId) return
+        if (state.isAgentRunning || state.isInitializing) {
+            pendingContentRefreshSessionId = sessionId
+            return
+        }
+        reloadConversationMessages(sessionId)
+    }
+
+    private suspend fun reloadConversationMessages(sessionId: String) {
+        val beforeLoad = _uiState.value
+        if (beforeLoad.sessionId != sessionId || beforeLoad.isAgentRunning ||
+            beforeLoad.isInitializing || loadingSessionId != null
+        ) {
+            if (beforeLoad.sessionId == sessionId || loadingSessionId == sessionId) {
+                pendingContentRefreshSessionId = sessionId
+            }
+            return
+        }
+
+        val messages = repository.loadMessages(sessionId) ?: return
+        val afterLoad = _uiState.value
+        if (afterLoad.sessionId != sessionId || afterLoad.isAgentRunning ||
+            afterLoad.isInitializing || loadingSessionId != null
+        ) {
+            if (afterLoad.sessionId == sessionId || loadingSessionId == sessionId) {
+                pendingContentRefreshSessionId = sessionId
+            }
+            return
+        }
+
+        clearPartChannels()
+        _uiState.update { current ->
+            if (current.sessionId == sessionId && !current.isAgentRunning &&
+                !current.isInitializing && loadingSessionId == null
+            ) {
+                current.copy(messages = messages, turnComplete = false)
+            } else {
+                current
+            }
+        }
+    }
+
+    private suspend fun flushPendingConversationContentUpdate(expectedSessionId: String? = null) {
+        val pendingId = pendingContentRefreshSessionId ?: return
+        if (expectedSessionId != null && pendingId != expectedSessionId) return
+
+        val state = _uiState.value
+        if (loadingSessionId != null || state.isAgentRunning || state.isInitializing) return
+        if (state.sessionId != pendingId) {
+            pendingContentRefreshSessionId = null
+            return
+        }
+
+        pendingContentRefreshSessionId = null
+        reloadConversationMessages(pendingId)
     }
 
     /**
@@ -363,48 +445,67 @@ class ChatViewModel @Inject constructor(
     fun switchSession(sessionId: String) {
         if (sessionId.isBlank()) return
         cancelCurrentRun()
+        sessionLoadJob?.cancel()
         speechPlaybackController.clearSession()
         clearPartChannels()
+        val loadToken = Any()
+        activeSessionLoadToken = loadToken
+        loadingSessionId = sessionId
+        if (pendingContentRefreshSessionId != sessionId) pendingContentRefreshSessionId = null
         // isAgentRunning=false 解锁输入；turnComplete=false 重置上一轮的徽章；isInitializing=true
         // 让 MainScreen 中央 spinner 立刻接管，避免 history commit 之前旧 messages 残留闪烁。
         _uiState.update { it.copy(isAgentRunning = false, turnComplete = false, isInitializing = true) }
-        viewModelScope.launch {
-            modelServices.awaitReady()
-            val messages = repository.loadMessages(sessionId)
-            when {
-                messages == null -> {
-                    Log.i(TAG, "switchSession($sessionId): session missing; creating a fresh one.")
-                    repository.discardConversationMetadata(sessionId)
-                    val newId = repository.createConversation(defaultModelPayload())
-                    if (newId.isNotBlank()) {
-                        activateConversationSettings(newId)
+        sessionLoadJob = viewModelScope.launch {
+            try {
+                modelServices.awaitReady()
+                val messages = repository.loadMessages(sessionId)
+                if (activeSessionLoadToken !== loadToken) return@launch
+                when {
+                    messages == null -> {
+                        Log.i(TAG, "switchSession($sessionId): session missing; creating a fresh one.")
+                        repository.discardConversationMetadata(sessionId)
+                        val newId = repository.createConversation(defaultModelPayload())
+                        if (activeSessionLoadToken !== loadToken) return@launch
+                        if (newId.isNotBlank()) {
+                            activateConversationSettings(newId)
+                            if (activeSessionLoadToken !== loadToken) return@launch
+                            _uiState.update {
+                                it.copy(
+                                    sessionId = newId,
+                                    messages = emptyList(),
+                                    turnComplete = false,
+                                    isInitializing = false,
+                                )
+                            }
+                        } else {
+                            // create 失败也别把 spinner 永久卡住 — 解锁 UI 让用户能重试。
+                            _uiState.update { it.copy(isInitializing = false) }
+                            Log.w(TAG, "switchSession($sessionId): createConversation failed; isInitializing cleared anyway.")
+                        }
+                    }
+
+                    else -> {
+                        // 命中：history 非空 = 旧 session；history 空 = 刚建的空 session。
+                        // 一次性 commit sessionId + messages + isInitializing=false，
+                        // 避免两次 messages 写导致两帧渲染。
+                        activateConversationSettings(sessionId)
+                        if (activeSessionLoadToken !== loadToken) return@launch
                         _uiState.update {
                             it.copy(
-                                sessionId = newId,
-                                messages = emptyList(),
+                                sessionId = sessionId,
+                                messages = messages,
                                 turnComplete = false,
                                 isInitializing = false,
                             )
                         }
-                    } else {
-                        // create 失败也别把 spinner 永久卡住 — 解锁 UI 让用户能重试。
-                        _uiState.update { it.copy(isInitializing = false) }
-                        Log.w(TAG, "switchSession($sessionId): createConversation failed; isInitializing cleared anyway.")
                     }
                 }
-                else -> {
-                    // 命中：history 非空 = 旧 session；history 空 = 刚建的空 session。
-                    // 一次性 commit sessionId + messages + isInitializing=false，
-                    // 避免两次 messages 写导致两帧渲染。
-                    activateConversationSettings(sessionId)
-                    _uiState.update {
-                        it.copy(
-                            sessionId = sessionId,
-                            messages = messages,
-                            turnComplete = false,
-                            isInitializing = false,
-                        )
-                    }
+            } finally {
+                if (activeSessionLoadToken === loadToken) {
+                    activeSessionLoadToken = null
+                    loadingSessionId = null
+                    sessionLoadJob = null
+                    flushPendingConversationContentUpdate(expectedSessionId = sessionId)
                 }
             }
         }

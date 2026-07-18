@@ -64,7 +64,6 @@ import github.ponyhuang.asssistantai.data.ChatDisplayPreferences
 import github.ponyhuang.asssistantai.speech.MiMoTtsVoices
 import github.ponyhuang.asssistantai.speech.TtsVoice
 import github.ponyhuang.asssistantai.voice.BluetoothVoiceController
-import github.ponyhuang.asssistantai.voice.BluetoothVoiceStatus
 import github.ponyhuang.asssistantai.voice.WakeModelStatus
 import javax.inject.Inject
 
@@ -240,7 +239,7 @@ fun SettingsScreen(
                     androidx.compose.material3.ListItem(
                         headlineContent = { Text("后台监听", fontWeight = FontWeight.Medium) },
                         supportingContent = {
-                            Text(bluetoothVoiceStatusText(bluetoothVoiceState.status, bluetoothVoiceState.message))
+                            Text("连接蓝牙耳机后，可通过唤醒词在后台执行任务")
                         },
                         leadingContent = { Icon(Icons.Default.BluetoothAudio, contentDescription = null) },
                         trailingContent = {
@@ -554,20 +553,6 @@ fun SettingsScreen(
         )
     }
 }
-
-private fun bluetoothVoiceStatusText(status: BluetoothVoiceStatus, message: String?): String =
-    message ?: when (status) {
-        BluetoothVoiceStatus.Stopped -> "已停止"
-        BluetoothVoiceStatus.Starting -> "正在启动"
-        BluetoothVoiceStatus.WaitingForBluetooth -> "等待蓝牙耳机"
-        BluetoothVoiceStatus.Listening -> "正在监听"
-        BluetoothVoiceStatus.CapturingCommand -> "正在录制任务"
-        BluetoothVoiceStatus.Transcribing -> "正在识别任务"
-        BluetoothVoiceStatus.RunningAgent -> "Agent 正在执行"
-        BluetoothVoiceStatus.Speaking -> "正在播报结果"
-        BluetoothVoiceStatus.Paused -> "已暂停"
-        BluetoothVoiceStatus.Error -> "发生错误"
-    }
 
 @Composable
 private fun TtsVoiceOption(

@@ -88,7 +88,9 @@ open class Claude(
             ?.joinToString("\n")
             .orEmpty()
 
-        val messages = request.contents.stream()
+        val messages = request.contents
+            .normalizeForAnthropic()
+            .stream()
             .map { contentToAnthropicMessageParam(it) }
             .collect(Collectors.toList())
 
@@ -342,3 +344,38 @@ internal fun FunctionCall.toAnthropicToolUseInput(): ToolUseBlockParam.Input =
             args.mapValues { (_, value) -> from(value) }
         )
         .build()
+
+/**
+ * Normalizes ADK's event-shaped history into Anthropic's message protocol.
+ *
+ * ADK may retain text, function-call, and function-response events as separate adjacent
+ * [Content] values with the same role. Anthropic treats a client tool exchange as exactly one
+ * assistant message containing `tool_use`, immediately followed by one user message whose leading
+ * blocks are the matching `tool_result` values. Explicitly merging and ordering the history keeps
+ * Anthropic-compatible providers from interpreting an adjacent ADK fragment as an intervening
+ * message.
+ */
+internal fun List<Content>.normalizeForAnthropic(): List<Content> {
+    val merged = mutableListOf<Content>()
+    for (content in this) {
+        if (content.parts.isEmpty()) continue
+        val role = content.role.toAnthropicContentRole()
+        val previous = merged.lastOrNull()
+        if (previous?.role == role) {
+            merged[merged.lastIndex] = previous.copy(parts = previous.parts + content.parts)
+        } else {
+            merged += content.copy(role = role)
+        }
+    }
+
+    return merged.map { content ->
+        if (content.role != Role.USER) return@map content
+        val (toolResults, otherParts) = content.parts.partition { it.functionResponse != null }
+        content.copy(parts = toolResults + otherParts)
+    }
+}
+
+private fun String?.toAnthropicContentRole(): String = when (this) {
+    Role.MODEL, "assistant" -> Role.MODEL
+    else -> Role.USER
+}

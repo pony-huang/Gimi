@@ -86,7 +86,7 @@ public interface ChatAiComponentFactory {
      */
     @Composable
     public fun SpeechToTextButtonIdleContent(params: SpeechToTextButtonIdleContentParams) {
-        DefaultIdleContent(onClick = params.onClick)
+        DefaultIdleContent(onClick = params.onClick, enabled = params.enabled)
     }
 
     /**
@@ -98,7 +98,11 @@ public interface ChatAiComponentFactory {
      */
     @Composable
     public fun SpeechToTextButtonRecordingContent(params: SpeechToTextButtonRecordingContentParams) {
-        DefaultRecordingContent(onClick = params.onClick, rmsdB = params.rmsdB)
+        DefaultRecordingContent(
+            onClick = params.onClick,
+            rmsdB = params.rmsdB,
+            remainingSeconds = params.remainingSeconds,
+        )
     }
 }
 

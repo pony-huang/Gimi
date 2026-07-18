@@ -33,6 +33,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -48,6 +50,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import github.ponyhuang.asssistantai.R
+import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 
 /**
  * Chat composer with attach, voice, and send buttons.
@@ -85,6 +90,8 @@ public fun ChatComposer(
     onVoiceInputStop: () -> Unit = { },
     onVoiceAudioChunk: (ByteArray) -> Unit = { },
     onVoiceInputError: (Throwable) -> Unit = { },
+    isVoiceInputAvailable: Boolean = false,
+    onTranscribeVoice: suspend (ByteArray) -> String = { error("未配置语音识别") },
 ) {
     var messageData by rememberSaveable(stateSaver = MessageData.Saver) {
         mutableStateOf(messageData)
@@ -92,6 +99,10 @@ public fun ChatComposer(
     var showAttachmentOptions by rememberSaveable { mutableStateOf(false) }
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCameraPath by rememberSaveable { mutableStateOf<String?>(null) }
+    var isTranscribing by remember { mutableStateOf(false) }
+    var voiceErrorMessage by remember { mutableStateOf<String?>(null) }
+    val voiceAudio = remember { VoicePcmBuffer() }
+    val coroutineScope = rememberCoroutineScope()
 
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -163,7 +174,7 @@ public fun ChatComposer(
                 with(componentFactory) {
                     ComposerLeadingContent(
                         ComposerLeadingContentParams(
-                            isGenerating = isGenerating,
+                            isGenerating = isGenerating || isTranscribing,
                             onAttachmentsClick = { showAttachmentOptions = true },
                         ),
                     )
@@ -172,6 +183,10 @@ public fun ChatComposer(
                         ComposerInputContentParams(
                             messageData = messageData,
                             isGenerating = isGenerating,
+                            isTranscribing = isTranscribing,
+                            isVoiceInputAvailable = isVoiceInputAvailable,
+                            voiceErrorMessage = voiceErrorMessage,
+                            onVoiceErrorShown = { voiceErrorMessage = null },
                             onTextChange = { messageData = messageData.copy(text = it) },
                             onRemoveAttachment = { uri ->
                                 messageData = messageData.copy(attachments = messageData.attachments - uri)
@@ -179,10 +194,43 @@ public fun ChatComposer(
                             },
                             onSendClick = handleSendClick,
                             onStopClick = onStopClick,
-                            onVoiceInputStart = onVoiceInputStart,
-                            onVoiceInputStop = onVoiceInputStop,
-                            onVoiceAudioChunk = onVoiceAudioChunk,
-                            onVoiceInputError = onVoiceInputError,
+                            onVoiceInputStart = {
+                                voiceAudio.reset()
+                                onVoiceInputStart()
+                            },
+                            onVoiceInputStop = {
+                                onVoiceInputStop()
+                                val pcm = voiceAudio.drain()
+                                if (pcm.isEmpty()) {
+                                    voiceErrorMessage = "没有录制到语音，请重试"
+                                } else if (!isTranscribing) {
+                                    coroutineScope.launch {
+                                        isTranscribing = true
+                                        try {
+                                            val transcript = onTranscribeVoice(pcm)
+                                            messageData = messageData.copy(
+                                                text = appendTranscript(messageData.text, transcript),
+                                            )
+                                        } catch (error: CancellationException) {
+                                            throw error
+                                        } catch (error: Throwable) {
+                                            voiceErrorMessage = error.message ?: "语音识别失败，请重试"
+                                            onVoiceInputError(error)
+                                        } finally {
+                                            isTranscribing = false
+                                        }
+                                    }
+                                }
+                            },
+                            onVoiceAudioChunk = { chunk ->
+                                voiceAudio.append(chunk)
+                                onVoiceAudioChunk(chunk)
+                            },
+                            onVoiceInputError = { error ->
+                                voiceAudio.reset()
+                                voiceErrorMessage = error.message ?: "录音失败，请重试"
+                                onVoiceInputError(error)
+                            },
                         ),
                     )
 
@@ -220,6 +268,30 @@ public fun ChatComposer(
             },
         )
     }
+}
+
+internal fun appendTranscript(draft: String, transcript: String): String {
+    val recognized = transcript.trim()
+    if (recognized.isEmpty()) return draft
+    if (draft.isBlank()) return recognized
+    return "${draft.trimEnd()} $recognized"
+}
+
+internal class VoicePcmBuffer {
+    private val output = ByteArrayOutputStream()
+
+    @Synchronized
+    fun append(chunk: ByteArray) {
+        output.write(chunk)
+    }
+
+    @Synchronized
+    fun reset() {
+        output.reset()
+    }
+
+    @Synchronized
+    fun drain(): ByteArray = output.toByteArray().also { output.reset() }
 }
 
 @Composable

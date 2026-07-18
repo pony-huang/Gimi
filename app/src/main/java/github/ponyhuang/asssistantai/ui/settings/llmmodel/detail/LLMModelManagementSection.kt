@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,7 +49,7 @@ fun LLMModelManagementSection(
     rows: List<LLMModelRow>,
     onToggleGroup: (String) -> Unit,
     onRemoveModel: (groupId: String, modelId: String) -> Unit,
-    onAppendModel: (String) -> Unit,
+    onAppendModel: (String, Boolean) -> Unit,
     onRefreshRemote: suspend () -> LLMModelRefreshResult,
     modifier: Modifier = Modifier,
 ) {
@@ -126,8 +127,8 @@ fun LLMModelManagementSection(
 
     if (showAddDialog) {
         AddModelDialog(
-            onConfirm = { id ->
-                onAppendModel(id)
+            onConfirm = { id, isStt ->
+                onAppendModel(id, isStt)
                 showAddDialog = false
             },
             onDismiss = { showAddDialog = false },
@@ -201,6 +202,14 @@ private fun ModelItemRow(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        if (row.item.isStt) {
+            Text(
+                text = "STT",
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(horizontal = 8.dp),
+            )
+        }
         IconButton(onClick = onRemove) {
             Icon(
                 imageVector = Icons.Default.Remove,
@@ -214,24 +223,37 @@ private fun ModelItemRow(
 
 @Composable
 private fun AddModelDialog(
-    onConfirm: (String) -> Unit,
+    onConfirm: (String, Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var input by remember { mutableStateOf("custom-model") }
+    var isStt by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("添加自定义模型") },
         text = {
-            OutlinedTextField(
-                value = input,
-                onValueChange = { input = it },
-                singleLine = true,
-                label = { Text("模型 ID") },
-            )
+            Column {
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = { input = it },
+                    singleLine = true,
+                    label = { Text("模型 ID") },
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { isStt = !isStt }
+                        .padding(top = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(checked = isStt, onCheckedChange = { isStt = it })
+                    Text("语音识别模型")
+                }
+            }
         },
         confirmButton = {
             TextButton(onClick = {
-                if (input.isNotBlank()) onConfirm(input.trim())
+                if (input.isNotBlank()) onConfirm(input.trim(), isStt)
             }) {
                 Text("确认")
             }

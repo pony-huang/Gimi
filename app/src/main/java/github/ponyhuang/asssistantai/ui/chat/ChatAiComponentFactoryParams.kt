@@ -31,6 +31,10 @@ public data class ComposerLeadingContentParams(
 public data class ComposerInputContentParams(
     val messageData: MessageData,
     val isGenerating: Boolean,
+    val isTranscribing: Boolean,
+    val isVoiceInputAvailable: Boolean,
+    val voiceErrorMessage: String?,
+    val onVoiceErrorShown: () -> Unit,
     val onTextChange: (String) -> Unit,
     val onRemoveAttachment: (Uri) -> Unit,
     val onSendClick: () -> Unit,
@@ -75,6 +79,7 @@ public data class AITypingIndicatorIndicatorParams(
  */
 public data class SpeechToTextButtonIdleContentParams(
     val onClick: () -> Unit,
+    val enabled: Boolean = true,
 )
 
 /**
@@ -86,4 +91,5 @@ public data class SpeechToTextButtonIdleContentParams(
 public data class SpeechToTextButtonRecordingContentParams(
     val onClick: () -> Unit,
     val rmsdB: Float,
+    val remainingSeconds: Int = 60,
 )

@@ -123,11 +123,15 @@ public fun SpeechToTextButton(
 }
 
 @Composable
-internal fun DefaultIdleContent(onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
+internal fun DefaultIdleContent(onClick: () -> Unit, enabled: Boolean = true) {
+    IconButton(onClick = onClick, enabled = enabled) {
         Icon(
             painter = painterResource(R.drawable.stream_ai_compose_ic_mic),
-            contentDescription = stringResource(R.string.stream_ai_compose_speech_to_text_idle_button),
+            contentDescription = if (enabled) {
+                stringResource(R.string.stream_ai_compose_speech_to_text_idle_button)
+            } else {
+                "请先在设置中配置默认语音模型"
+            },
         )
     }
 }
@@ -136,14 +140,24 @@ internal fun DefaultIdleContent(onClick: () -> Unit) {
 internal fun DefaultRecordingContent(
     onClick: () -> Unit,
     rmsdB: Float,
+    remainingSeconds: Int = 60,
 ) {
-    IconButton(
-        onClick = onClick,
-        colors = IconButtonDefaults.iconButtonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-        ),
+    androidx.compose.foundation.layout.Row(
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
     ) {
-        VoiceRecordingBars(rmsdB = rmsdB)
+        androidx.compose.material3.Text(
+            text = "${remainingSeconds}s",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        IconButton(
+            onClick = onClick,
+            colors = IconButtonDefaults.iconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+            ),
+        ) {
+            VoiceRecordingBars(rmsdB = rmsdB)
+        }
     }
 }
 

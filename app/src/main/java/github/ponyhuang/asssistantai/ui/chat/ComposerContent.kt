@@ -15,11 +15,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -39,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -55,6 +58,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.R
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 /**
  * Default implementation of the leading content of the chat composer.
@@ -92,12 +96,19 @@ internal fun DefaultComposerInputContent(
 
     val trailingButton = when {
         params.isGenerating -> ComposerTrailingButton.Stop
+        params.isTranscribing -> null
         (params.messageData.text.isNotBlank() || params.messageData.attachments.isNotEmpty()) &&
             !isRecording.value -> ComposerTrailingButton.Send
         else -> null
     }
 
     val interactionSource = remember { MutableInteractionSource() }
+
+    LaunchedEffect(params.voiceErrorMessage) {
+        val message = params.voiceErrorMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        params.onVoiceErrorShown()
+    }
 
     Column(modifier = modifier) {
         SnackbarHost(hostState = snackbarHostState)
@@ -108,7 +119,7 @@ internal fun DefaultComposerInputContent(
                 .defaultMinSize(minHeight = LocalMinimumInteractiveComponentSize.current),
             value = params.messageData.text,
             onValueChange = params.onTextChange,
-            enabled = !params.isGenerating && !isRecording.value,
+            enabled = !params.isGenerating && !params.isTranscribing && !isRecording.value,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
             keyboardActions = KeyboardActions(onSend = { params.onSendClick() }),
             textStyle = resolveTextFieldStyle(interactionSource, disabled = params.isGenerating),
@@ -130,6 +141,8 @@ internal fun DefaultComposerInputContent(
                         )
                         VoiceButton(
                             isGenerating = params.isGenerating,
+                            isTranscribing = params.isTranscribing,
+                            isVoiceInputAvailable = params.isVoiceInputAvailable,
                             isRecording = isRecording,
                             snackbarHostState = snackbarHostState,
                             onVoiceInputStart = params.onVoiceInputStart,
@@ -213,6 +226,8 @@ private fun TextInput(
 @Composable
 private fun VoiceButton(
     isGenerating: Boolean,
+    isTranscribing: Boolean,
+    isVoiceInputAvailable: Boolean,
     isRecording: MutableState<Boolean>,
     snackbarHostState: SnackbarHostState,
     onVoiceInputStart: () -> Unit,
@@ -223,27 +238,29 @@ private fun VoiceButton(
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     val recorder = remember { VoiceAudioRecorder() }
+    var remainingSeconds by remember { mutableIntStateOf(MAX_RECORDING_SECONDS) }
     val currentOnVoiceInputStart by rememberUpdatedState(onVoiceInputStart)
     val currentOnVoiceInputStop by rememberUpdatedState(onVoiceInputStop)
     val currentOnVoiceAudioChunk by rememberUpdatedState(onVoiceAudioChunk)
     val currentOnVoiceInputError by rememberUpdatedState(onVoiceInputError)
 
-    fun stopRecording() {
+    fun stopRecording(submitForRecognition: Boolean = true) {
         if (isRecording.value) {
             recorder.stop()
             isRecording.value = false
-            currentOnVoiceInputStop()
+            if (submitForRecognition) currentOnVoiceInputStop()
         }
     }
 
     fun startRecording() {
-        if (!isRecording.value) {
+        if (!isRecording.value && isVoiceInputAvailable && !isTranscribing) {
+            remainingSeconds = MAX_RECORDING_SECONDS
             val started = recorder.start(
                 onAudioChunk = { currentOnVoiceAudioChunk(it) },
                 onError = { error ->
                     coroutineScope.launch {
                         if (isRecording.value) {
-                            stopRecording()
+                            stopRecording(submitForRecognition = false)
                         }
                         currentOnVoiceInputError(error)
                     }
@@ -258,18 +275,36 @@ private fun VoiceButton(
 
     LaunchedEffect(isGenerating) {
         if (isGenerating) {
-            stopRecording()
+            stopRecording(submitForRecognition = false)
         }
+    }
+
+    LaunchedEffect(isRecording.value) {
+        while (isRecording.value && remainingSeconds > 0) {
+            delay(1_000)
+            if (isRecording.value) remainingSeconds--
+        }
+        if (isRecording.value && remainingSeconds == 0) stopRecording()
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            stopRecording()
+            stopRecording(submitForRecognition = false)
             recorder.release()
         }
     }
 
-    AnimatedContent(targetState = !isGenerating) { showVoiceButton ->
+    AnimatedContent(targetState = isTranscribing) { transcribing ->
+        if (transcribing) {
+            Box(
+                modifier = Modifier.size(48.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+            }
+            return@AnimatedContent
+        }
+        val showVoiceButton = !isGenerating
         if (showVoiceButton) {
             val snackbarMessage = stringResource(R.string.stream_ai_compose_composer_mic_permission_message)
             val actionLabel = stringResource(R.string.stream_ai_compose_composer_mic_permission_action)
@@ -294,6 +329,8 @@ private fun VoiceButton(
             val onClick = {
                 if (isRecording.value) {
                     stopRecording()
+                } else if (!isVoiceInputAvailable) {
+                    Unit
                 } else if (
                     androidx.core.content.ContextCompat.checkSelfPermission(
                         context,
@@ -311,17 +348,23 @@ private fun VoiceButton(
                         SpeechToTextButtonRecordingContentParams(
                             onClick = onClick,
                             rmsdB = 0f,
+                            remainingSeconds = remainingSeconds,
                         ),
                     )
                 } else {
                     SpeechToTextButtonIdleContent(
-                        SpeechToTextButtonIdleContentParams(onClick = onClick),
+                        SpeechToTextButtonIdleContentParams(
+                            onClick = onClick,
+                            enabled = isVoiceInputAvailable,
+                        ),
                     )
                 }
             }
         }
     }
 }
+
+private const val MAX_RECORDING_SECONDS = 60
 
 private enum class ComposerTrailingButton { Send, Stop }
 

@@ -122,6 +122,7 @@ fun ChatScaffold(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val messages = state.messages
     val showToolActivity by viewModel.showToolActivity.collectAsStateWithLifecycle()
+    val isSpeechRecognitionAvailable by viewModel.isSpeechRecognitionAvailable.collectAsStateWithLifecycle()
     val visibleMessages = remember(messages, showToolActivity) {
         messages.filter { message -> message.isVisibleInChat(showToolActivity) }
     }
@@ -193,6 +194,8 @@ fun ChatScaffold(
                 },
                 onStopClick = viewModel::stopStreaming,
                 isGenerating = isStreaming,
+                isVoiceInputAvailable = isSpeechRecognitionAvailable,
+                onTranscribeVoice = viewModel::transcribeVoice,
             )
         },
         floatingActionButton = {

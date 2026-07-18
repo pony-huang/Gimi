@@ -69,7 +69,12 @@ internal fun defaultModelServiceEntities(gson: Gson = Gson()): List<ModelService
                         groupName = group.groupName,
                         isExpanded = group.isExpanded,
                         models = group.models.map {
-                            StoredModel(it.modelId, it.modelName, StoredModelSource.REMOTE)
+                            StoredModel(
+                                modelId = it.modelId,
+                                modelName = it.modelName,
+                                source = StoredModelSource.REMOTE,
+                                isStt = it.isStt,
+                            )
                         },
                     )
                 },
@@ -101,6 +106,35 @@ internal suspend fun seedMissingModelCatalog(
     }
 }
 
+/**
+ * Applies new built-in model metadata once for existing providers without replacing user models.
+ * The caller persists a catalog version only after this transaction succeeds.
+ */
+internal suspend fun upgradeDefaultModelMetadata(
+    database: ModelServiceDatabase,
+    gson: Gson = Gson(),
+) {
+    database.withTransaction {
+        val dao = database.modelServiceDao()
+        val defaultsById = defaultModelServiceEntities(gson).associateBy { it.serviceId }
+        dao.getAll().forEach { entity ->
+            val defaultEntity = defaultsById[entity.serviceId] ?: return@forEach
+            val existingGroups = gson.fromJson<Array<StoredModelGroup>>(
+                entity.modelGroupsJson,
+                Array<StoredModelGroup>::class.java,
+            ).orEmpty().toList()
+            val defaultGroups = gson.fromJson<Array<StoredModelGroup>>(
+                defaultEntity.modelGroupsJson,
+                Array<StoredModelGroup>::class.java,
+            ).orEmpty().toList()
+            val upgraded = mergeDefaultModelMetadata(existingGroups, defaultGroups)
+            if (upgraded != existingGroups) {
+                dao.upsert(entity.copy(modelGroupsJson = gson.toJson(upgraded)))
+            }
+        }
+    }
+}
+
 /** Persistence-only model origin used to reconcile remote and manually entered models. */
 internal enum class StoredModelSource {
     REMOTE,
@@ -118,4 +152,5 @@ internal data class StoredModel(
     val modelId: String,
     val modelName: String,
     val source: StoredModelSource,
+    val isStt: Boolean = false,
 )

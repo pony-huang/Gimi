@@ -75,6 +75,7 @@ class ModelServiceRepository @Inject constructor(
     private val _currentSelection = MutableStateFlow<LLMModelSelection?>(null)
     private val _defaultAssistantSelection = MutableStateFlow(readSelection(DEFAULT_ASSISTANT_MODEL_KEY))
     private val _fastModelSelection = MutableStateFlow(readSelection(FAST_MODEL_KEY))
+    private val _defaultSpeechSelection = MutableStateFlow(readSelection(DEFAULT_SPEECH_MODEL_KEY))
 
     val services: StateFlow<List<LLMModelProvider>> = _services.asStateFlow()
     val loadState: StateFlow<ModelCatalogLoadState> = _loadState.asStateFlow()
@@ -83,11 +84,14 @@ class ModelServiceRepository @Inject constructor(
     val defaultAssistantSelection: StateFlow<LLMModelSelection?> = _defaultAssistantSelection.asStateFlow()
     /** User-configured low-latency model for features that require a quick response. */
     val fastModelSelection: StateFlow<LLMModelSelection?> = _fastModelSelection.asStateFlow()
+    /** Explicitly configured speech-to-text model; there is intentionally no implicit fallback. */
+    val defaultSpeechSelection: StateFlow<LLMModelSelection?> = _defaultSpeechSelection.asStateFlow()
 
     init {
         scope.launch {
             runCatching {
                 seedCatalogIfEmpty()
+                upgradeCatalogMetadataIfNeeded()
                 dao.observeAll().collectLatest { entities ->
                     _services.value = entities.map(::entityToProvider)
                     if (!ready.isCompleted) {
@@ -168,15 +172,17 @@ class ModelServiceRepository @Inject constructor(
      * saved selection is absent or has since been disabled/removed.
      */
     fun defaultSelection(): LLMModelSelection? =
-        _defaultAssistantSelection.value?.takeIf { resolveSelection(it) != null }
+        _defaultAssistantSelection.value?.takeIf { resolveChatSelection(it) != null }
             ?: firstAvailableSelection()
 
     private fun firstAvailableSelection(): LLMModelSelection? = _services.value.asSequence()
         .filter { it.isEnabled }
         .mapNotNull { service ->
-            service.LLMModelGroups.firstOrNull { it.models.isNotEmpty() }?.let { group ->
-                LLMModelSelection(service.serviceId, group.groupId, group.models.first().modelId)
-            }
+            service.LLMModelGroups.asSequence().mapNotNull { group ->
+                group.models.firstOrNull { !it.isStt }?.let { model ->
+                    LLMModelSelection(service.serviceId, group.groupId, model.modelId)
+                }
+            }.firstOrNull()
         }
         .firstOrNull()
 
@@ -190,11 +196,24 @@ class ModelServiceRepository @Inject constructor(
         persistSelection(FAST_MODEL_KEY, selection)
     }
 
+    fun setDefaultSpeechSelection(selection: LLMModelSelection?) {
+        _defaultSpeechSelection.value = selection
+        persistSelection(DEFAULT_SPEECH_MODEL_KEY, selection)
+    }
+
     fun setCurrentSelection(selection: LLMModelSelection?) {
         _currentSelection.value = selection
     }
 
-    fun resolveSelection(selection: LLMModelSelection?): ResolvedModel? {
+    /** Resolves a normal chat model and rejects dedicated speech models. */
+    fun resolveChatSelection(selection: LLMModelSelection?): ResolvedModel? =
+        resolveRawSelection(selection)?.takeIf { !it.model.isStt }
+
+    /** Resolves a configured STT model only when its enabled provider has a usable API key. */
+    fun resolveSpeechSelection(selection: LLMModelSelection?): ResolvedModel? =
+        resolveRawSelection(selection)?.takeIf { it.model.isStt && it.provider.apiKey.isNotBlank() }
+
+    private fun resolveRawSelection(selection: LLMModelSelection?): ResolvedModel? {
         if (selection == null) return null
         val provider = getService(selection.serviceId) ?: return null
         if (!provider.isEnabled) return null
@@ -211,6 +230,12 @@ class ModelServiceRepository @Inject constructor(
 
     private suspend fun seedCatalogIfEmpty() {
         seedMissingModelCatalog(database, gson)
+    }
+
+    private suspend fun upgradeCatalogMetadataIfNeeded() {
+        if (preferences.getInt(CATALOG_METADATA_VERSION_KEY, 0) >= CATALOG_METADATA_VERSION) return
+        upgradeDefaultModelMetadata(database, gson)
+        preferences.edit { putInt(CATALOG_METADATA_VERSION_KEY, CATALOG_METADATA_VERSION) }
     }
 
     private suspend fun mutateCatalog(
@@ -250,7 +275,13 @@ class ModelServiceRepository @Inject constructor(
                     groupId = group.groupId,
                     groupName = group.groupName,
                     isExpanded = group.isExpanded,
-                    models = group.models.map { LLMModelItem(it.modelId, it.modelName) },
+                    models = group.models.map {
+                        LLMModelItem(
+                            modelId = it.modelId,
+                            modelName = it.modelName,
+                            isStt = it.isStt,
+                        )
+                    },
                 )
             },
             // 品牌图标是静态元数据，按 serviceId 从默认清单回填，
@@ -351,6 +382,9 @@ class ModelServiceRepository @Inject constructor(
         const val SETTINGS_KEY = "encrypted_settings"
         const val DEFAULT_ASSISTANT_MODEL_KEY = "default_assistant_model"
         const val FAST_MODEL_KEY = "fast_model"
+        const val DEFAULT_SPEECH_MODEL_KEY = "default_speech_model"
+        const val CATALOG_METADATA_VERSION_KEY = "catalog_metadata_version"
+        const val CATALOG_METADATA_VERSION = 1
         const val KEY_ALIAS = "model_service_settings_key_v1"
         const val ANDROID_KEY_STORE = "AndroidKeyStore"
         const val TRANSFORMATION = "AES/GCM/NoPadding"

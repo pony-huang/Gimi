@@ -18,7 +18,12 @@ internal fun appendUserModel(
     serviceName: String,
     model: LLMModelItem,
 ): List<StoredModelGroup> {
-    val stored = StoredModel(model.modelId, model.modelName, StoredModelSource.USER)
+    val stored = StoredModel(
+        modelId = model.modelId,
+        modelName = model.modelName,
+        source = StoredModelSource.USER,
+        isStt = model.isStt,
+    )
     if (groups.isEmpty()) {
         return listOf(
             StoredModelGroup(
@@ -55,17 +60,57 @@ internal fun syncStoredRemoteModels(
         .flatMap { it.models }
         .filter { it.source == StoredModelSource.USER }
         .mapTo(mutableSetOf()) { it.modelId }
+    val existingById = groups.flatMap { it.models }.associateBy { it.modelId }
     val remoteModels = models
         .distinctBy { it.modelId }
         .filterNot { it.modelId in userModelIds }
-        .map { StoredModel(it.modelId, it.modelName, StoredModelSource.REMOTE) }
+        .map { model ->
+            StoredModel(
+                modelId = model.modelId,
+                modelName = model.modelName,
+                source = StoredModelSource.REMOTE,
+                isStt = existingById[model.modelId]?.isStt ?: model.isStt,
+            )
+        }
+    val remoteById = remoteModels.associateBy { it.modelId }
+    val existingRemoteSpeechIds = groups.flatMap { group ->
+        group.models.filter { it.source == StoredModelSource.REMOTE && it.isStt }
+    }.mapTo(mutableSetOf()) { it.modelId }
+    val newRemoteSpeechModels = remoteModels.filter {
+        it.isStt && it.modelId !in existingRemoteSpeechIds
+    }
+    val remoteChatModels = remoteModels.filterNot { it.isStt }
 
     return groups.mapIndexed { index, group ->
         val userModels = group.models.filter { it.source == StoredModelSource.USER }
+        val speechModels = group.models
+            .filter { it.source == StoredModelSource.REMOTE && it.isStt }
+            .map { remoteById[it.modelId] ?: it }
         if (index == 0) {
-            group.copy(models = remoteModels + userModels)
+            group.copy(models = remoteChatModels + speechModels + newRemoteSpeechModels + userModels)
         } else {
-            group.copy(models = userModels)
+            group.copy(models = speechModels + userModels)
         }
     }
+}
+
+internal fun mergeDefaultModelMetadata(
+    existingGroups: List<StoredModelGroup>,
+    defaultGroups: List<StoredModelGroup>,
+): List<StoredModelGroup> {
+    val defaultsByGroup = defaultGroups.associateBy { it.groupId }
+    val existingGroupIds = existingGroups.mapTo(mutableSetOf()) { it.groupId }
+    val mergedExisting = existingGroups.map { group ->
+        val defaults = defaultsByGroup[group.groupId] ?: return@map group
+        val defaultsByModel = defaults.models.associateBy { it.modelId }
+        val existingModelIds = group.models.mapTo(mutableSetOf()) { it.modelId }
+        group.copy(
+            models = group.models.map { model ->
+                defaultsByModel[model.modelId]?.let { default ->
+                    model.copy(isStt = default.isStt)
+                } ?: model
+            } + defaults.models.filterNot { it.modelId in existingModelIds },
+        )
+    }
+    return mergedExisting + defaultGroups.filterNot { it.groupId in existingGroupIds }
 }

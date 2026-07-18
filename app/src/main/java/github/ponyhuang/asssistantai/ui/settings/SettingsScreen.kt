@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Icon
@@ -56,6 +57,7 @@ class DefaultModelSettingsViewModel @Inject constructor(
     val services = modelServices.services
     val defaultAssistantSelection = modelServices.defaultAssistantSelection
     val fastModelSelection = modelServices.fastModelSelection
+    val defaultSpeechSelection = modelServices.defaultSpeechSelection
     val directories = documentDirectories.directories
     val showToolActivity = chatDisplayPreferences.showToolActivity
 
@@ -63,6 +65,9 @@ class DefaultModelSettingsViewModel @Inject constructor(
         modelServices.setDefaultAssistantSelection(selection)
 
     fun setFastModel(selection: LLMModelSelection) = modelServices.setFastModelSelection(selection)
+
+    fun setDefaultSpeechModel(selection: LLMModelSelection) =
+        modelServices.setDefaultSpeechSelection(selection)
 
     fun addDocumentDirectory(uri: Uri) = documentDirectories.addDirectory(uri)
 
@@ -83,20 +88,29 @@ fun SettingsScreen(
     val services by viewModel.services.collectAsStateWithLifecycle()
     val defaultAssistantSelection by viewModel.defaultAssistantSelection.collectAsStateWithLifecycle()
     val fastModelSelection by viewModel.fastModelSelection.collectAsStateWithLifecycle()
+    val defaultSpeechSelection by viewModel.defaultSpeechSelection.collectAsStateWithLifecycle()
     val documentDirectories by viewModel.directories.collectAsStateWithLifecycle()
     val showToolActivity by viewModel.showToolActivity.collectAsStateWithLifecycle()
     val documentTreeLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
     ) { uri -> uri?.let(viewModel::addDocumentDirectory) }
-    val enabledModels = remember(services) {
+    val enabledChatModels = remember(services) {
         services.filter { it.isEnabled }.flatMap { service ->
             service.LLMModelGroups.flatMap { group ->
-                group.models.map { model -> EnabledModelRow(service, group, model) }
+                group.models.filterNot { it.isStt }.map { model -> EnabledModelRow(service, group, model) }
+            }
+        }
+    }
+    val enabledSpeechModels = remember(services) {
+        services.filter { it.isEnabled && it.apiKey.isNotBlank() }.flatMap { service ->
+            service.LLMModelGroups.flatMap { group ->
+                group.models.filter { it.isStt }.map { model -> EnabledModelRow(service, group, model) }
             }
         }
     }
     var selectingDefaultAssistant by remember { mutableStateOf(false) }
     var selectingFastModel by remember { mutableStateOf(false) }
+    var selectingDefaultSpeech by remember { mutableStateOf(false) }
 
     SettingsPageContainer(modifier = modifier) {
         LazyColumn(
@@ -154,7 +168,7 @@ fun SettingsScreen(
                         title = "默认助手模型",
                         subtitle = "创建新助手时使用的模型；未设置时使用第一个可用模型",
                         selection = defaultAssistantSelection,
-                        rows = enabledModels,
+                        rows = enabledChatModels,
                         onClick = { selectingDefaultAssistant = true },
                     )
                     DefaultModelOption(
@@ -162,8 +176,16 @@ fun SettingsScreen(
                         title = "快速模型",
                         subtitle = "用于需要快速响应的助手功能",
                         selection = fastModelSelection,
-                        rows = enabledModels,
+                        rows = enabledChatModels,
                         onClick = { selectingFastModel = true },
+                    )
+                    DefaultModelOption(
+                        icon = Icons.Default.Mic,
+                        title = "默认语音模型",
+                        subtitle = "用于语音输入；仅显示语音识别模型",
+                        selection = defaultSpeechSelection,
+                        rows = enabledSpeechModels,
+                        onClick = { selectingDefaultSpeech = true },
                     )
                 }
             }
@@ -284,7 +306,7 @@ fun SettingsScreen(
 
     if (selectingDefaultAssistant) {
         ModelPickerDialog(
-            rows = enabledModels,
+            rows = enabledChatModels,
             currentSelection = defaultAssistantSelection,
             title = "选择默认助手模型",
             onPick = { row ->
@@ -296,7 +318,7 @@ fun SettingsScreen(
     }
     if (selectingFastModel) {
         ModelPickerDialog(
-            rows = enabledModels,
+            rows = enabledChatModels,
             currentSelection = fastModelSelection,
             title = "选择快速模型",
             onPick = { row ->
@@ -304,6 +326,18 @@ fun SettingsScreen(
                 selectingFastModel = false
             },
             onDismiss = { selectingFastModel = false },
+        )
+    }
+    if (selectingDefaultSpeech) {
+        ModelPickerDialog(
+            rows = enabledSpeechModels,
+            currentSelection = defaultSpeechSelection,
+            title = "选择默认语音模型",
+            onPick = { row ->
+                viewModel.setDefaultSpeechModel(row.toSelection())
+                selectingDefaultSpeech = false
+            },
+            onDismiss = { selectingDefaultSpeech = false },
         )
     }
 }

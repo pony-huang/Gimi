@@ -360,7 +360,9 @@ fun ModelTitleAndPicker(
             .filter { it.isEnabled }
             .flatMap { service ->
                 service.LLMModelGroups.asSequence().flatMap { group ->
-                    group.models.asSequence().map { model -> EnabledModelRow(service, group, model) }
+                    group.models.asSequence()
+                        .filterNot { it.isStt }
+                        .map { model -> EnabledModelRow(service, group, model) }
                 }
             }
             .firstOrNull()
@@ -379,7 +381,7 @@ fun ModelTitleAndPicker(
     val enabledModels: List<EnabledModelRow> = remember(services) {
         services.filter { it.isEnabled }.flatMap { svc ->
             svc.LLMModelGroups.flatMap { grp ->
-                grp.models.map { m -> EnabledModelRow(svc, grp, m) }
+                grp.models.filterNot { it.isStt }.map { m -> EnabledModelRow(svc, grp, m) }
             }
         }
     }
@@ -427,7 +429,9 @@ private fun List<LLMModelProvider>.resolveSelection(selection: LLMModelSelection
     if (selection == null) return null
     val service = firstOrNull { it.serviceId == selection.serviceId && it.isEnabled } ?: return null
     val group = service.LLMModelGroups.firstOrNull { it.groupId == selection.groupId } ?: return null
-    val model = group.models.firstOrNull { it.modelId == selection.modelId } ?: return null
+    val model = group.models.firstOrNull {
+        it.modelId == selection.modelId && !it.isStt
+    } ?: return null
     return EnabledModelRow(service, group, model)
 }
 
@@ -435,13 +439,14 @@ private fun List<LLMModelProvider>.firstEnabledSelection(): LLMModelSelection? {
     return asSequence()
         .filter { it.isEnabled }
         .mapNotNull { service ->
-            service.LLMModelGroups.firstOrNull { it.models.isNotEmpty() }?.let { group ->
+            service.LLMModelGroups.asSequence().mapNotNull { group ->
+                val model = group.models.firstOrNull { !it.isStt } ?: return@mapNotNull null
                 LLMModelSelection(
                     serviceId = service.serviceId,
                     groupId = group.groupId,
-                    modelId = group.models.first().modelId,
+                    modelId = model.modelId,
                 )
-            }
+            }.firstOrNull()
         }
         .firstOrNull()
 }

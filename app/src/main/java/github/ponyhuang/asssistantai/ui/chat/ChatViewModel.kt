@@ -25,6 +25,7 @@ import github.ponyhuang.asssistantai.model.MessageRole
 import github.ponyhuang.asssistantai.model.ImageAttachment
 import github.ponyhuang.asssistantai.model.Messages
 import github.ponyhuang.asssistantai.model.TextPart
+import github.ponyhuang.asssistantai.speech.SpeechRecognitionRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -33,6 +34,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -60,6 +64,7 @@ class ChatViewModel @Inject constructor(
     private val repository: ConversationRepository,
     private val modelServices: ModelServiceRepository,
     private val chatDisplayPreferences: ChatDisplayPreferences,
+    private val speechRecognitionRepository: SpeechRecognitionRepository,
     @ApplicationContext private val appContext: Context,
 ) : ViewModel() {
 
@@ -67,11 +72,20 @@ class ChatViewModel @Inject constructor(
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
     val availableModelServices = modelServices.services
     val showToolActivity = chatDisplayPreferences.showToolActivity
+    val isSpeechRecognitionAvailable: StateFlow<Boolean> = combine(
+        modelServices.services,
+        modelServices.defaultSpeechSelection,
+    ) { _, _ ->
+        speechRecognitionRepository.isAvailable()
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     private val _currentLLMModelSelection = MutableStateFlow<LLMModelSelection?>(null)
     /** 当前打开会话的有效模型选择；无可用模型时为 null。 */
     val currentLLMModelSelection: StateFlow<LLMModelSelection?> = _currentLLMModelSelection.asStateFlow()
     private val _pendingToolConfirmation = MutableStateFlow<PendingToolConfirmation?>(null)
     val pendingToolConfirmation: StateFlow<PendingToolConfirmation?> = _pendingToolConfirmation.asStateFlow()
+
+    suspend fun transcribeVoice(pcm16: ByteArray): String =
+        speechRecognitionRepository.transcribe(pcm16)
 
     /** Sends the user's decision back to ADK, which then either runs or rejects the paused tool. */
     fun respondToToolConfirmation(confirmed: Boolean) {
@@ -435,7 +449,7 @@ class ChatViewModel @Inject constructor(
         val storedModel = repository.activateConversation(sessionId, defaultModelPayload())
         val savedSelection = LLMModelSelectionCodec.decode(storedModel)
         val validSavedSelection = savedSelection?.takeIf {
-            modelServices.resolveSelection(it) != null
+            modelServices.resolveChatSelection(it) != null
         }
         val selection = validSavedSelection ?: modelServices.defaultSelection()
         if (savedSelection != selection) {

@@ -18,6 +18,8 @@ import github.ponyhuang.asssistantai.data.ConversationRepository
 import github.ponyhuang.asssistantai.data.ConversationMetadataDatabase
 import github.ponyhuang.asssistantai.data.ModelServiceDatabase
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
+import github.ponyhuang.asssistantai.speech.OpenAiCompatibleSpeechRecognitionClient
+import github.ponyhuang.asssistantai.speech.SpeechRecognitionClient
 import java.io.File
 import javax.inject.Singleton
 
@@ -34,6 +36,11 @@ import javax.inject.Singleton
 object AgentModule {
 
     private const val TAG: String = "AgentModule"
+
+    @Provides
+    @Singleton
+    fun provideSpeechRecognitionClient(): SpeechRecognitionClient =
+        OpenAiCompatibleSpeechRecognitionClient()
 
     @Provides
     @Singleton

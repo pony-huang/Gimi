@@ -165,7 +165,7 @@ class AgentFactory @Inject constructor(
      */
     private fun selectModelConfig(): ModelConfig {
         // 1. 优先用用户显式选择
-        val resolved = modelServices.resolveSelection(
+        val resolved = modelServices.resolveChatSelection(
             modelServices.currentSelection.value
         )
         if (resolved != null) {
@@ -181,7 +181,7 @@ class AgentFactory @Inject constructor(
         // 2. 回退到首个启用且含模型的服务，和新会话默认选择保持一致。
         val fallback = modelServices.defaultSelection()
             ?: error("No enabled model service with a configured model. Enable one in Settings → Model Service.")
-        val resolvedFallback = modelServices.resolveSelection(fallback)
+        val resolvedFallback = modelServices.resolveChatSelection(fallback)
             ?: error("The default model selection is unavailable.")
         val svc = resolvedFallback.provider
         return ModelConfig(
@@ -195,7 +195,7 @@ class AgentFactory @Inject constructor(
 
     /** Returns the configured low-latency model, or null so callers can use the chat model. */
     private fun selectFastModelConfig(): ModelConfig? {
-        val resolved = modelServices.resolveSelection(modelServices.fastModelSelection.value)
+        val resolved = modelServices.resolveChatSelection(modelServices.fastModelSelection.value)
             ?: return null
         val svc = resolved.provider
         return ModelConfig(

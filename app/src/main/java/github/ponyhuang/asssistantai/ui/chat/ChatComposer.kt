@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -40,6 +41,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.platform.LocalContext
@@ -312,6 +314,7 @@ private fun AttachmentSourceSheet(
                     )
                 },
                 modifier = Modifier.clickable(onClick = onTakePhoto),
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             )
             ListItem(
                 headlineContent = { Text(stringResource(R.string.stream_ai_compose_composer_choose_photos)) },
@@ -322,6 +325,7 @@ private fun AttachmentSourceSheet(
                     )
                 },
                 modifier = Modifier.clickable(onClick = onChoosePhotos),
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
             )
             Spacer(
                 modifier = Modifier

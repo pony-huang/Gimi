@@ -46,9 +46,17 @@ android {
         release {
             buildConfigField("String", "MINIMAX_API_KEY", "\"\"")
             buildConfigField("String", "DEEPSEEK_API_KEY", "\"\"")
-            optimization {
-                enable = false
-            }
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            // TODO: replace with a real upload keystore before Play Store publish.
+            // For local Meizu verification we sign with the auto-generated debug
+            // keystore so `assembleRelease` produces an installable APK without
+            // standing up a keystore just to test R8 / shrink behavior.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -68,12 +76,41 @@ android {
                 "META-INF/INDEX.LIST",
                 "META-INF/io.netty.versions.properties",
                 "META-INF/DEPENDENCIES",
+                // GraalVM native-image metadata shipped by google-genai, google-auth,
+                // google-http-client, jansi, opentelemetry. Useless on Android runtime.
+                "META-INF/native-image/**",
+                "META-INF/proguard/**",
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*",
             )
+        }
+    }
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            // minSdk = 35 — 32-bit ABIs are no longer required by Google Play
+            // for API 35+ targets. arm64 covers real devices; x86_64 covers the
+            // Meizu emulator and CI emulators. isUniversalApk = true keeps a
+            // fat APK so ADB install works without picking an ABI.
+            include("arm64-v8a", "x86_64")
+            isUniversalApk = true
         }
     }
 }
 
 dependencies {
+    // Drop kxml2 from the release runtime configurations only. Android's
+    // framework already provides android.content.res.XmlResourceParser which
+    // implements the same org.xmlpull.v1.XmlPullParser interface, so keeping
+    // both jars in the runtime classpath makes R8 fail with "Library class
+    // implements program class". Excluding kxml2 from runtime/compile lets
+    // the Android implementation take over at runtime, while leaving it on
+    // lint/testAndroid configurations so build-time tooling keeps working.
+    listOf("releaseRuntimeClasspath", "releaseCompileClasspath", "releaseRuntimeOnly").forEach { configName ->
+        configurations.findByName(configName)?.exclude(group = "net.sf.kxml", module = "kxml2")
+    }
+
     implementation(libs.androidx.compose.foundation.layout)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.exifinterface)
@@ -86,6 +123,10 @@ dependencies {
     implementation(libs.openai.java)
     implementation(libs.okhttp)
     implementation(libs.mcp.kotlin.sdk.client)
+    // ktor-client-okhttp is the OkHttp engine for the Ktor client. McpToolRegistry
+    // constructs HttpClient(OkHttp) explicitly to share the okhttp connection pool
+    // pulled in by openai-java and anthropic-java — the engine artifact is required,
+    // not redundant.
     implementation(libs.ktor.client.okhttp)
     implementation(libs.gson)
     implementation(libs.vosk.android)

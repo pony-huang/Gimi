@@ -8,31 +8,19 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,9 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,16 +37,16 @@ import github.ponyhuang.asssistantai.data.LLMModelGroup
 import github.ponyhuang.asssistantai.data.LLMModelItem
 import github.ponyhuang.asssistantai.data.LLMModelProvider
 import github.ponyhuang.asssistantai.data.LLMModelSelection
+import github.ponyhuang.asssistantai.ui.common.PickerSingleChoiceDialog
 import github.ponyhuang.asssistantai.ui.settings.llmmodel.LLMModelServiceIcon
-import kotlin.math.abs
 
 /**
  * 聊天 TopAppBar 中央"当前模型显示与切换"组件。
  *
  * - [ModelStatusDisplay]：常驻显示当前激活模型名称，带 sparkles 图标 alpha 脉动微动效；
  *                       `modelName == null` 时显示空态文字（无动效、无 caret）。
- * - [ModelPickerDialog]：点击后弹出的模型选择对话框，列出所有已启用服务下的模型；
- *                       点击行即提交（不重置当前会话）。
+ * - 点击 pill 后弹出 [`PickerSingleChoiceDialog`] 列出所有已启用服务下的模型；
+ *   点击行即提交（不重置当前会话）。
  * - [ModelTitleAndPicker]：把上述两个组件 + 内部订阅模型服务状态 + 弹窗显示
  *                       状态打包成单棵子树，避免宿主屏幕（[MainScreenImpl]）顶层订阅全局
  *                       服务列表 / 当前选择后整段重组。
@@ -149,192 +134,9 @@ fun ModelStatusDisplay(
 }
 
 /**
- * 模型选择对话框。
- *
- * - 搜索词仅在本次弹窗显示期间存在，实时匹配模型、服务与分组的所有可见标识。
- * - 候选区使用 [LazyColumn]：大量模型时只组合可视行，搜索框始终固定在列表外。
- * - 复用 `confirmButton` 槽位做"取消"按钮（点击行即提交，无需 apply 步骤）。
- */
-@Composable
-fun ModelPickerDialog(
-    rows: List<EnabledModelRow>,
-    currentSelection: LLMModelSelection?,
-    title: String = "选择当前模型",
-    onPick: (EnabledModelRow) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var query by remember { mutableStateOf("") }
-    val normalizedQuery = query.trim()
-    val filteredRows = remember(rows, normalizedQuery) {
-        if (normalizedQuery.isEmpty()) {
-            rows
-        } else {
-            rows.filter { row ->
-                row.model.modelId.contains(normalizedQuery, ignoreCase = true) ||
-                    row.model.modelName.contains(normalizedQuery, ignoreCase = true) ||
-                    row.service.serviceId.contains(normalizedQuery, ignoreCase = true) ||
-                    row.service.serviceName.contains(normalizedQuery, ignoreCase = true) ||
-                    row.group.groupId.contains(normalizedQuery, ignoreCase = true) ||
-                    row.group.groupName.contains(normalizedQuery, ignoreCase = true)
-            }
-        }
-    }
-    val listState = rememberLazyListState()
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            if (rows.isEmpty()) {
-                Text(
-                    "暂无可用模型，请先在 设置 → 模型服务 启用至少一个模型。",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            } else {
-                Column(
-                    modifier = Modifier
-                        .heightIn(max = 440.dp),
-                ) {
-                    OutlinedTextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        singleLine = true,
-                        placeholder = { Text("搜索模型、服务或分组") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Search,
-                                contentDescription = null,
-                            )
-                        },
-                        trailingIcon = if (query.isNotEmpty()) {
-                            {
-                                TextButton(onClick = { query = "" }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "清除搜索",
-                                    )
-                                }
-                            }
-                        } else {
-                            null
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-
-                    Spacer(Modifier.size(8.dp))
-
-                    if (filteredRows.isEmpty()) {
-                        Text(
-                            text = "未找到匹配模型",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 16.dp),
-                        )
-                    } else {
-                        LazyColumn(
-                            state = listState,
-                            // 5 行紧凑模型项（每行 36dp）+ 两端 8dp 的轮状留白；其余结果滚动查看。
-                            contentPadding = PaddingValues(vertical = 8.dp),
-                            modifier = Modifier
-                                .heightIn(max = 196.dp)
-                                .weight(1f, fill = false),
-                        ) {
-                            items(
-                                items = filteredRows,
-                                key = { row ->
-                                    "${row.service.serviceId}/${row.group.groupId}/${row.model.modelId}"
-                                },
-                                contentType = { "model-picker-row" },
-                            ) { row ->
-                                val key = "${row.service.serviceId}/${row.group.groupId}/${row.model.modelId}"
-                                val itemInfo = listState.layoutInfo.visibleItemsInfo
-                                    .firstOrNull { it.key == key }
-                                // 与 scrollableArea 示例相同：以可视区域中心为轮轴，按项目中心
-                                // 到轮轴的距离缩放。LazyColumn 只提供当前可见项，因此仍可按需组合。
-                                val viewportStart = listState.layoutInfo.viewportStartOffset
-                                val viewportEnd = listState.layoutInfo.viewportEndOffset
-                                val viewportCenter = (viewportStart + viewportEnd) / 2f
-                                val itemCenter = itemInfo?.let { it.offset + it.size / 2f }
-                                val distanceRatio = itemCenter?.let { center ->
-                                    abs(center - viewportCenter) /
-                                        (viewportEnd - viewportStart).coerceAtLeast(1)
-                                } ?: 0f
-                                val scale = (1f - distanceRatio * 0.28f).coerceIn(0.72f, 1f)
-
-                                ModelPickerRow(
-                                    row = row,
-                                    isSelected = currentSelection?.let { sel ->
-                                        sel.serviceId == row.service.serviceId
-                                            && sel.groupId == row.group.groupId
-                                            && sel.modelId == row.model.modelId
-                                    } ?: false,
-                                    onClick = { onPick(row) },
-                                    modifier = Modifier.graphicsLayer {
-                                        scaleX = scale
-                                        scaleY = scale
-                                        transformOrigin = TransformOrigin.Center
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
-        },
-    )
-}
-
-/**
- * 对话框内单行：仅展示模型显示名，保持大量模型列表的紧凑性。
- */
-@Composable
-private fun ModelPickerRow(
-    row: EnabledModelRow,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val bg = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        Color.Transparent
-    }
-    Surface(
-        onClick = onClick,
-        color = bg,
-        shape = RoundedCornerShape(12.dp),
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 0.dp),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-        ) {
-            Text(
-                text = row.model.modelName,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f),
-            )
-            if (isSelected) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "已选",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-        }
-    }
-}
-
-/**
  * 把 TopAppBar 中央"当前模型"标题
  *
- * 点击标题 → 打开 [ModelPickerDialog]；选中行：
+ * 点击标题 → 打开模型选择弹窗（[PickerSingleChoiceDialog]）；选中行：
  * 1. 写入当前模型选择；
  * 2. 关闭弹窗；
  * 3. [ChatViewModel.selectModel] 持久化当前会话的选择并重建后续消息使用的 agent。
@@ -407,9 +209,20 @@ fun ModelTitleAndPicker(
 
     // ── 模型选择对话框（"软切换"：不重置当前会话） ───────────────────────
     if (showModelPicker) {
-        ModelPickerDialog(
-            rows = enabledModels,
-            currentSelection = effectiveSelection,
+        PickerSingleChoiceDialog(
+            options = enabledModels,
+            selected = { row ->
+                effectiveSelection?.let { sel ->
+                    sel.serviceId == row.service.serviceId &&
+                        sel.groupId == row.group.groupId &&
+                        sel.modelId == row.model.modelId
+                } ?: false
+            },
+            key = { row -> "${row.service.serviceId}/${row.group.groupId}/${row.model.modelId}" },
+            title = "选择当前模型",
+            optionTitle = { it.model.modelName },
+            optionSubtitle = { "${it.service.serviceName} · ${it.group.groupName}" },
+            emptyText = "暂无可用模型，请先在模型服务中启用至少一个模型。",
             onPick = { row ->
                 viewModel.selectModel(
                     LLMModelSelection(

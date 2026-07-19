@@ -77,6 +77,7 @@ import github.ponyhuang.asssistantai.ui.settings.McpServerListScreen
 import github.ponyhuang.asssistantai.ui.settings.McpServerEditorScreen
 import github.ponyhuang.asssistantai.ui.settings.McpServerImportScreen
 import github.ponyhuang.asssistantai.ui.settings.McpServerAddOptionsScreen
+import github.ponyhuang.asssistantai.ui.settings.PermissionSettingsScreen
 import github.ponyhuang.asssistantai.ui.settings.VoiceWakeSettingsScreen
 import github.ponyhuang.asssistantai.ui.settings.WorkFilesSettingsScreen
 import github.ponyhuang.asssistantai.ui.theme.AsssistantaiTheme
@@ -117,6 +118,7 @@ fun ChatScaffold(
     viewModel: ChatViewModel,
     onOpenDrawer: () -> Unit,
     onOpenSettings: () -> Unit,
+    onConfigureModels: () -> Unit,
     onNewConversation: () -> Unit,
 ) {
 
@@ -176,6 +178,7 @@ fun ChatScaffold(
                 isAgentRunning = isAgentRunning,
                 onOpenDrawer = onOpenDrawer,
                 onOpenSettings = onOpenSettings,
+                onConfigureModels = onConfigureModels,
                 onNewConversation = onNewConversation,
             )
         },
@@ -388,6 +391,7 @@ fun MainScreen(
                                 viewModel = viewModel,
                                 onOpenDrawer = { scope.launch { drawerState.open() } },
                                 onOpenSettings = { backStack.add(AppRoute.Settings) },
+                                onConfigureModels = { backStack.add(AppRoute.ModelServiceList) },
                                 onNewConversation = {
                                     viewModel.recreateRunner()
                                     viewModel.reset()
@@ -415,6 +419,9 @@ fun MainScreen(
                                 onNavigateToWorkFiles = {
                                     backStack.add(AppRoute.WorkFilesSettings)
                                 },
+                                onNavigateToPermissions = {
+                                    backStack.add(AppRoute.PermissionSettings)
+                                },
                                 modifier = modifier,
                             )
                         }
@@ -438,6 +445,13 @@ fun MainScreen(
                             onBack = goBack,
                         ) { modifier ->
                             WorkFilesSettingsScreen(modifier = modifier)
+                        }
+
+                        AppRoute.PermissionSettings -> SettingsScaffold(
+                            title = "权限管理",
+                            onBack = goBack,
+                        ) { modifier ->
+                            PermissionSettingsScreen(modifier = modifier)
                         }
 
                         AppRoute.McpServerList -> SettingsScaffold(
@@ -522,6 +536,7 @@ private fun ChatTopBar(
     isAgentRunning: Boolean,
     onOpenDrawer: () -> Unit,
     onOpenSettings: () -> Unit,
+    onConfigureModels: () -> Unit,
     onNewConversation: () -> Unit,
 ) {
     Row(
@@ -551,6 +566,7 @@ private fun ChatTopBar(
         ModelTitleAndPicker(
             viewModel = viewModel,
             isAgentRunning = isAgentRunning,
+            onConfigureModels = onConfigureModels,
             modifier = Modifier.weight(1f),
         )
 

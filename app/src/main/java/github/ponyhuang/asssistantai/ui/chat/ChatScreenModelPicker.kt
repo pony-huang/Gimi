@@ -37,6 +37,9 @@ import github.ponyhuang.asssistantai.data.LLMModelGroup
 import github.ponyhuang.asssistantai.data.LLMModelItem
 import github.ponyhuang.asssistantai.data.LLMModelProvider
 import github.ponyhuang.asssistantai.data.LLMModelSelection
+import github.ponyhuang.asssistantai.data.ModelCatalogLoadState
+import github.ponyhuang.asssistantai.data.isChatModel
+import github.ponyhuang.asssistantai.data.isConfiguredForChat
 import github.ponyhuang.asssistantai.ui.common.PickerSingleChoiceDialog
 import github.ponyhuang.asssistantai.ui.settings.llmmodel.LLMModelServiceIcon
 
@@ -69,13 +72,15 @@ data class EnabledModelRow(
  * - `modelName == null`（没有任何已启用服务）时跳过动效与 caret，文字改用 error 色。
  *
  * @param modelName 当前应显示的模型名；`null` 时进入"未选择模型"空态。
- * @param onClick 整行点击回调；空态也允许点击（会弹出空列表对话框，提示用户去启用服务）。
+ * @param onClick 整行点击回调；加载态传入 `null` 时禁用点击。
  */
 @Composable
 fun ModelStatusDisplay(
     modelName: String?,
     serviceId: String?,
-    onClick: () -> Unit,
+    emptyText: String,
+    isLoading: Boolean,
+    onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val isActive = modelName != null
@@ -91,7 +96,8 @@ fun ModelStatusDisplay(
     )
 
     Surface(
-        onClick = onClick,
+        onClick = { onClick?.invoke() },
+        enabled = onClick != null,
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface,
         modifier = modifier,
@@ -111,12 +117,12 @@ fun ModelStatusDisplay(
                 Spacer(Modifier.width(6.dp))
             }
             Text(
-                text = modelName ?: "未选择模型",
+                text = modelName ?: emptyText,
                 style = MaterialTheme.typography.titleMedium,
-                color = if (isActive) {
-                    MaterialTheme.colorScheme.onSurface
-                } else {
-                    MaterialTheme.colorScheme.error
+                color = when {
+                    isActive -> MaterialTheme.colorScheme.onSurface
+                    isLoading -> MaterialTheme.colorScheme.onSurfaceVariant
+                    else -> MaterialTheme.colorScheme.error
                 },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -149,21 +155,23 @@ fun ModelStatusDisplay(
 fun ModelTitleAndPicker(
     viewModel: ChatViewModel,
     isAgentRunning: Boolean,
+    onConfigureModels: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val services by viewModel.availableModelServices.collectAsStateWithLifecycle()
     val currentSelection by viewModel.currentLLMModelSelection.collectAsStateWithLifecycle()
+    val loadState by viewModel.modelCatalogLoadState.collectAsStateWithLifecycle()
 
     // 解析后用于 TopAppBar 中央显示的模型。显式选择命中走 resolveSelection，
     // 否则回退到"第一个启用服务 → 第一个非空组 → 第一个模型"。两个都没有则 null（空态）。
     val displayedModel: EnabledModelRow? = remember(services, currentSelection) {
         services.resolveSelection(currentSelection) ?: services.asSequence()
-            .filter { it.isEnabled }
+            .filter { it.isConfiguredForChat }
             .flatMap { service ->
                 service.LLMModelGroups.asSequence().flatMap { group ->
                     group.models.asSequence()
-                        .filterNot { it.isStt }
+                        .filter { it.isChatModel }
                         .map { model -> EnabledModelRow(service, group, model) }
                 }
             }
@@ -176,14 +184,14 @@ fun ModelTitleAndPicker(
         if (services.resolveSelection(currentSelection) != null) {
             currentSelection
         } else {
-            services.firstEnabledSelection()
+            services.firstConfiguredChatSelection()
         }
     }
-    // 对话框候选：所有 isEnabled=true 的服务下的所有 ModelItem。
+    // 对话框候选：所有已启用且已配置服务下的普通聊天模型。
     val enabledModels: List<EnabledModelRow> = remember(services) {
-        services.filter { it.isEnabled }.flatMap { svc ->
+        services.filter { it.isConfiguredForChat }.flatMap { svc ->
             svc.LLMModelGroups.flatMap { grp ->
-                grp.models.filterNot { it.isStt }.map { m -> EnabledModelRow(svc, grp, m) }
+                grp.models.filter { it.isChatModel }.map { m -> EnabledModelRow(svc, grp, m) }
             }
         }
     }
@@ -197,12 +205,22 @@ fun ModelTitleAndPicker(
         ModelStatusDisplay(
             modelName = displayedModelName,
             serviceId = displayedModel?.service?.serviceId,
-            onClick = {
-                if (isAgentRunning) {
-                    Toast.makeText(context, "正在生成回复，完成后再切换模型", Toast.LENGTH_SHORT).show()
-                } else if (displayedModelName != null) {
-                    showModelPicker = true
-                }
+            emptyText = when (loadState) {
+                ModelCatalogLoadState.Loading -> "模型加载中"
+                ModelCatalogLoadState.Ready -> "请先配置模型"
+                is ModelCatalogLoadState.Failed -> "模型加载失败"
+            },
+            isLoading = loadState == ModelCatalogLoadState.Loading,
+            onClick = when {
+                loadState == ModelCatalogLoadState.Loading -> null
+                displayedModelName == null -> onConfigureModels
+                else -> {{
+                    if (isAgentRunning) {
+                        Toast.makeText(context, "正在生成回复，完成后再切换模型", Toast.LENGTH_SHORT).show()
+                    } else {
+                        showModelPicker = true
+                    }
+                }}
             },
         )
     }
@@ -240,20 +258,22 @@ fun ModelTitleAndPicker(
 
 private fun List<LLMModelProvider>.resolveSelection(selection: LLMModelSelection?): EnabledModelRow? {
     if (selection == null) return null
-    val service = firstOrNull { it.serviceId == selection.serviceId && it.isEnabled } ?: return null
+    val service = firstOrNull {
+        it.serviceId == selection.serviceId && it.isConfiguredForChat
+    } ?: return null
     val group = service.LLMModelGroups.firstOrNull { it.groupId == selection.groupId } ?: return null
     val model = group.models.firstOrNull {
-        it.modelId == selection.modelId && !it.isStt
+        it.modelId == selection.modelId && it.isChatModel
     } ?: return null
     return EnabledModelRow(service, group, model)
 }
 
-private fun List<LLMModelProvider>.firstEnabledSelection(): LLMModelSelection? {
+private fun List<LLMModelProvider>.firstConfiguredChatSelection(): LLMModelSelection? {
     return asSequence()
-        .filter { it.isEnabled }
+        .filter { it.isConfiguredForChat }
         .mapNotNull { service ->
             service.LLMModelGroups.asSequence().mapNotNull { group ->
-                val model = group.models.firstOrNull { !it.isStt } ?: return@mapNotNull null
+                val model = group.models.firstOrNull { it.isChatModel } ?: return@mapNotNull null
                 LLMModelSelection(
                     serviceId = service.serviceId,
                     groupId = group.groupId,

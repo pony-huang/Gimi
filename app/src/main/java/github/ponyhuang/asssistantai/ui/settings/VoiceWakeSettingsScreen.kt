@@ -41,6 +41,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.asssistantai.data.LLMModelSelection
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
+import github.ponyhuang.asssistantai.data.isChatModel
+import github.ponyhuang.asssistantai.data.isConfiguredForChat
 import github.ponyhuang.asssistantai.ui.chat.EnabledModelRow
 import github.ponyhuang.asssistantai.voice.BluetoothVoiceController
 import github.ponyhuang.asssistantai.voice.BluetoothVoiceUiState
@@ -76,10 +78,10 @@ fun VoiceWakeSettingsScreen(
     val context = LocalContext.current
 
     val enabledChatModels = remember(services) {
-        services.filter { it.isEnabled }.flatMap { service ->
+        services.filter { it.isConfiguredForChat }.flatMap { service ->
             service.LLMModelGroups.flatMap { group ->
                 group.models
-                    .filterNot { it.isStt || it.isTts }
+                    .filter { it.isChatModel }
                     .map { model -> EnabledModelRow(service, group, model) }
             }
         }

@@ -69,7 +69,7 @@ class ModelServiceRepository @Inject constructor(
     private val defaultSettings = DefaultModelServices.services.associate { provider ->
         provider.serviceId to provider.toSettings()
     }
-    private val settings = MutableStateFlow(readSettings() ?: defaultSettings.also(::persistSettings))
+    private val settings = MutableStateFlow(readInitialSettings())
     private val _services = MutableStateFlow<List<LLMModelProvider>>(emptyList())
     private val _loadState = MutableStateFlow<ModelCatalogLoadState>(ModelCatalogLoadState.Loading)
     private val _currentSelection = MutableStateFlow<LLMModelSelection?>(null)
@@ -183,10 +183,10 @@ class ModelServiceRepository @Inject constructor(
             ?: firstAvailableSelection()
 
     private fun firstAvailableSelection(): LLMModelSelection? = _services.value.asSequence()
-        .filter { it.isEnabled }
+        .filter { it.isConfiguredForChat }
         .mapNotNull { service ->
             service.LLMModelGroups.asSequence().mapNotNull { group ->
-                group.models.firstOrNull { !it.isStt && !it.isTts }?.let { model ->
+                group.models.firstOrNull { it.isChatModel }?.let { model ->
                     LLMModelSelection(service.serviceId, group.groupId, model.modelId)
                 }
             }.firstOrNull()
@@ -225,7 +225,9 @@ class ModelServiceRepository @Inject constructor(
 
     /** Resolves a normal chat model and rejects dedicated speech models. */
     fun resolveChatSelection(selection: LLMModelSelection?): ResolvedModel? =
-        resolveRawSelection(selection)?.takeIf { !it.model.isStt && !it.model.isTts }
+        resolveRawSelection(selection)?.takeIf {
+            it.provider.apiKey.isNotBlank() && it.model.isChatModel
+        }
 
     /** Resolves a configured STT model only when its enabled provider has a usable API key. */
     fun resolveSpeechSelection(selection: LLMModelSelection?): ResolvedModel? =
@@ -343,6 +345,42 @@ class ModelServiceRepository @Inject constructor(
         }.onFailure { Log.w(TAG, "Unable to restore model service settings.", it) }.getOrNull()
     }
 
+    /**
+     * Restores encrypted settings and repairs the legacy built-in state where DeepSeek and
+     * MiniMax were enabled even though no API key had been configured. Valid configured services
+     * and every explicit disabled state are preserved.
+     */
+    private fun readInitialSettings(): Map<String, ModelServiceSettings> {
+        val restored = readSettings()
+        if (restored == null) {
+            persistSettings(defaultSettings)
+            preferences.edit(commit = true) {
+                putInt(SETTINGS_MIGRATION_VERSION_KEY, SETTINGS_MIGRATION_VERSION)
+            }
+            return defaultSettings
+        }
+        if (preferences.getInt(SETTINGS_MIGRATION_VERSION_KEY, 0) >= SETTINGS_MIGRATION_VERSION) {
+            return restored
+        }
+
+        val migrated = restored.mapValues { (serviceId, value) ->
+            if (
+                serviceId in LEGACY_AUTO_ENABLED_SERVICE_IDS &&
+                value.isEnabled &&
+                value.apiKey.isBlank()
+            ) {
+                value.copy(isEnabled = false)
+            } else {
+                value
+            }
+        }
+        persistSettings(migrated)
+        preferences.edit(commit = true) {
+            putInt(SETTINGS_MIGRATION_VERSION_KEY, SETTINGS_MIGRATION_VERSION)
+        }
+        return migrated
+    }
+
     private fun persistSettings(value: Map<String, ModelServiceSettings>) {
         runCatching {
             preferences.edit(commit = true) {
@@ -403,6 +441,8 @@ class ModelServiceRepository @Inject constructor(
         const val TAG = "ModelServiceRepository"
         const val PREFERENCES_NAME = "model_service_settings_v1"
         const val SETTINGS_KEY = "encrypted_settings"
+        const val SETTINGS_MIGRATION_VERSION_KEY = "settings_migration_version"
+        const val SETTINGS_MIGRATION_VERSION = 1
         const val DEFAULT_ASSISTANT_MODEL_KEY = "default_assistant_model"
         const val FAST_MODEL_KEY = "fast_model"
         const val DEFAULT_SPEECH_MODEL_KEY = "default_speech_model"
@@ -415,5 +455,6 @@ class ModelServiceRepository @Inject constructor(
         const val ANDROID_KEY_STORE = "AndroidKeyStore"
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val GCM_TAG_LENGTH_BITS = 128
+        val LEGACY_AUTO_ENABLED_SERVICE_IDS = setOf("deepseek", "minimax")
     }
 }

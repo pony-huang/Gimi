@@ -58,8 +58,6 @@ fun LLMModelManagementSection(
     var showAddDialog by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
 
-    val totalCount = service.LLMModelGroups.sumOf { it.models.size }
-
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -71,7 +69,7 @@ fun LLMModelManagementSection(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "模型 ($totalCount)",
+                text = "模型",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),

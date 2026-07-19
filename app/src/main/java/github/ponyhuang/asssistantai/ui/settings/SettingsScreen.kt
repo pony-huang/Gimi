@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.BluetoothAudio
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Switch
@@ -44,6 +45,7 @@ fun SettingsScreen(
     onNavigateToVoiceWake: () -> Unit,
     onNavigateToMcpServers: () -> Unit,
     onNavigateToWorkFiles: () -> Unit,
+    onNavigateToPermissions: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -56,6 +58,7 @@ fun SettingsScreen(
         onNavigateToVoiceWake = onNavigateToVoiceWake,
         onNavigateToMcpServers = onNavigateToMcpServers,
         onNavigateToWorkFiles = onNavigateToWorkFiles,
+        onNavigateToPermissions = onNavigateToPermissions,
         onToggleToolActivity = viewModel::setShowToolActivity,
         modifier = modifier,
     )
@@ -69,6 +72,7 @@ private fun SettingsHomeContent(
     onNavigateToVoiceWake: () -> Unit,
     onNavigateToMcpServers: () -> Unit,
     onNavigateToWorkFiles: () -> Unit,
+    onNavigateToPermissions: () -> Unit,
     onToggleToolActivity: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -132,6 +136,14 @@ private fun SettingsHomeContent(
                 )
             }
             item {
+                SettingsNavigationCard(
+                    icon = Icons.Default.Security,
+                    title = "权限管理",
+                    subtitle = "预先授权聊天任务和语音功能所需权限",
+                    onClick = onNavigateToPermissions,
+                )
+            }
+            item {
                 SettingsListItem(
                     icon = Icons.Default.Info,
                     title = "关于",
@@ -159,6 +171,7 @@ private fun SettingsHomePreview() {
                 onNavigateToVoiceWake = {},
                 onNavigateToMcpServers = {},
                 onNavigateToWorkFiles = {},
+                onNavigateToPermissions = {},
                 onToggleToolActivity = {},
                 modifier = modifier,
             )

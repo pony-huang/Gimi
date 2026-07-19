@@ -74,6 +74,7 @@ class ChatViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
     val availableModelServices = modelServices.services
+    val modelCatalogLoadState = modelServices.loadState
     val showToolActivity = chatDisplayPreferences.showToolActivity
     val isSpeechRecognitionAvailable: StateFlow<Boolean> = combine(
         modelServices.services,
@@ -285,6 +286,13 @@ class ChatViewModel @Inject constructor(
      */
     fun send(text: String, attachmentUris: List<Uri> = emptyList()) {
         if (text.isBlank() && attachmentUris.isEmpty()) return
+        val usableSelection = _currentLLMModelSelection.value
+            ?.takeIf { modelServices.resolveChatSelection(it) != null }
+            ?: modelServices.defaultSelection()
+        if (usableSelection == null) {
+            Toast.makeText(appContext, "请先在模型服务中配置并启用聊天模型", Toast.LENGTH_SHORT).show()
+            return
+        }
 
         cancelCurrentRun()
         val runToken = agentRunOwnership.claim()

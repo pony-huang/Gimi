@@ -24,6 +24,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.asssistantai.data.LLMModelSelection
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
+import github.ponyhuang.asssistantai.data.isChatModel
+import github.ponyhuang.asssistantai.data.isConfiguredForChat
 import github.ponyhuang.asssistantai.speech.MiMoTtsVoices
 import github.ponyhuang.asssistantai.speech.TtsVoice
 import github.ponyhuang.asssistantai.ui.chat.EnabledModelRow
@@ -68,10 +70,10 @@ fun DefaultModelSettingsScreen(
     val defaultTtsVoice by viewModel.defaultTtsVoice.collectAsStateWithLifecycle()
 
     val enabledChatModels = remember(services) {
-        services.filter { it.isEnabled }.flatMap { service ->
+        services.filter { it.isConfiguredForChat }.flatMap { service ->
             service.LLMModelGroups.flatMap { group ->
                 group.models
-                    .filterNot { it.isStt || it.isTts }
+                    .filter { it.isChatModel }
                     .map { model -> EnabledModelRow(service, group, model) }
             }
         }

@@ -57,8 +57,9 @@ fun ModelServiceDetailScreen(
                     onBaseUrlChange = viewModel::onApiBaseUrlChange,
                 )
             }
-            SettingsSectionTitle(text = "模型", modifier = Modifier.padding(top = 20.dp))
-            SettingsCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+            SettingsCard(
+                modifier = Modifier.padding(start = 16.dp, top = 20.dp, end = 16.dp),
+            ) {
                 LLMModelManagementSection(
                     service = svc,
                     rows = rows,

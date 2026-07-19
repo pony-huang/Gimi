@@ -74,6 +74,14 @@ data class LLMModelItem(
     val isChildPanelExpanded: Boolean = false,
 )
 
+/** Whether this model can be used for ordinary assistant chat. */
+val LLMModelItem.isChatModel: Boolean
+    get() = !isStt && !isTts
+
+/** Whether this provider is fully configured and allowed to serve chat requests. */
+val LLMModelProvider.isConfiguredForChat: Boolean
+    get() = isEnabled && apiKey.isNotBlank()
+
 /**
  * API 地址接口标准。
  */
@@ -92,7 +100,7 @@ object DefaultModelServices {
         LLMModelProvider(
             serviceId = "deepseek",
             serviceName = "深度求索",
-            isEnabled = true,
+            isEnabled = false,
             apiKey = BuildConfig.DEEPSEEK_API_KEY,
             apiBaseUrl = "https://api.deepseek.com",
             baseType = ApiBaseType.Anthropic,
@@ -123,7 +131,7 @@ object DefaultModelServices {
         LLMModelProvider(
             serviceId = "minimax",
             serviceName = "MiniMax",
-            isEnabled = true,
+            isEnabled = false,
             apiKey = BuildConfig.MINIMAX_API_KEY,
             apiBaseUrl = "https://api.minimaxi.com/v1",
             baseType = ApiBaseType.Standard,

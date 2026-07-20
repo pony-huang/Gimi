@@ -46,6 +46,7 @@ fun SettingsScreen(
     onNavigateToMcpServers: () -> Unit,
     onNavigateToWorkFiles: () -> Unit,
     onNavigateToPermissions: () -> Unit,
+    onNavigateToToolAuthorization: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -60,6 +61,7 @@ fun SettingsScreen(
         onNavigateToMcpServers = onNavigateToMcpServers,
         onNavigateToWorkFiles = onNavigateToWorkFiles,
         onNavigateToPermissions = onNavigateToPermissions,
+        onNavigateToToolAuthorization = onNavigateToToolAuthorization,
         onToggleToolActivity = viewModel::setShowToolActivity,
         modifier = modifier,
     )
@@ -75,6 +77,7 @@ private fun SettingsHomeContent(
     onNavigateToMcpServers: () -> Unit,
     onNavigateToWorkFiles: () -> Unit,
     onNavigateToPermissions: () -> Unit,
+    onNavigateToToolAuthorization: () -> Unit,
     onToggleToolActivity: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -139,6 +142,14 @@ private fun SettingsHomeContent(
             }
             item {
                 SettingsNavigationCard(
+                    icon = Icons.Default.Build,
+                    title = "工具授权",
+                    subtitle = "选择允许助手使用的本地工具",
+                    onClick = onNavigateToToolAuthorization,
+                )
+            }
+            item {
+                SettingsNavigationCard(
                     icon = Icons.Default.Security,
                     title = "权限管理",
                     subtitle = "预先授权聊天任务和语音功能所需权限",
@@ -175,6 +186,7 @@ private fun SettingsHomePreview() {
                 onNavigateToMcpServers = {},
                 onNavigateToWorkFiles = {},
                 onNavigateToPermissions = {},
+                onNavigateToToolAuthorization = {},
                 onToggleToolActivity = {},
                 modifier = modifier,
             )

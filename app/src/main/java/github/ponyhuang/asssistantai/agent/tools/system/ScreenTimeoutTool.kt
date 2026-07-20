@@ -26,6 +26,7 @@ class ScreenTimeoutTool @Inject constructor(
     @Tool(
         name = "set_screen_timeout",
         description = "Sets the screen timeout in seconds. The value is clamped to the supported range. Requires the WRITE_SETTINGS permission; otherwise the request fails with a hint to grant it first.",
+        requireConfirmation = true,
     )
     fun setScreenTimeout(
         @Param("Target screen timeout in seconds. Will be clamped to the supported range; use get_screen_timeout to inspect it.")

@@ -21,6 +21,7 @@ class VolumeTool @Inject constructor(
     @Tool(
         name = "set_media_volume",
         description = "Sets the device media volume to an absolute level, ramping gradually so the change feels smooth. The applied level is clamped to the device's minimum and maximum.",
+        requireConfirmation = true,
     )
     fun setMediaVolume(
         @Param("Target media volume level. The volume changes gradually. Use get_media_volume first to learn the device's minimum and maximum levels.")
@@ -39,6 +40,7 @@ class VolumeTool @Inject constructor(
     @Tool(
         name = "adjust_media_volume",
         description = "Adjusts the device media volume relative to its current level by a signed number of steps, ramping gradually so the change feels smooth.",
+        requireConfirmation = true,
     )
     fun adjustMediaVolume(
         @Param("Number of media-volume levels to add or subtract. Use a positive number to increase volume and a negative number to decrease it.")

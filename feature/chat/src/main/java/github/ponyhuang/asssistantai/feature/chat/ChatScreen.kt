@@ -7,6 +7,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
@@ -26,7 +27,6 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.conversation.model.Message
 import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
@@ -118,7 +119,7 @@ fun ChatScaffold(
     var shouldFollowLatest by remember { mutableStateOf(true) }
     val latestItemIndex by rememberUpdatedState(visibleMessages.size)
 
-    LaunchedEffect(visibleMessages.size) {
+    LaunchedEffect(visibleMessages.size, pendingToolConfirmation?.confirmationCallId) {
         if (state.getCurrentUserMessage() != null) {
             delay(100.milliseconds)
             listState.animateScrollToItem(visibleMessages.size)
@@ -247,6 +248,18 @@ fun ChatScaffold(
                             onToggleSpeechPlayback = onToggleSpeechPlayback,
                         )
                     }
+                    pendingToolConfirmation?.let { request ->
+                        item(
+                            key = "tool-confirmation-${request.confirmationCallId}",
+                            contentType = "tool_confirmation",
+                        ) {
+                            ToolConfirmationCard(
+                                request = request,
+                                onConfirm = { onToolConfirmation(true) },
+                                onReject = { onToolConfirmation(false) },
+                            )
+                        }
+                    }
                     item(
                         key = "chat-bottom-anchor",
                         contentType = "bottom_anchor",
@@ -259,31 +272,43 @@ fun ChatScaffold(
         }
 
     }
-    pendingToolConfirmation?.let { request ->
-        IntentConfirmationDialog(
-            title = request.title,
-            summary = request.summary,
-            confirmLabel = "Execute",
-            onConfirm = { onToolConfirmation(true) },
-            onDismiss = { onToolConfirmation(false) },
-        )
-    }
 }
+
 @Composable
-private fun IntentConfirmationDialog(
-    title: String,
-    summary: String,
-    confirmLabel: String = "Continue",
+private fun ToolConfirmationCard(
+    request: PendingToolConfirmation,
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
+    onReject: () -> Unit,
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { Text(summary) },
-        confirmButton = { TextButton(onClick = onConfirm) { Text(confirmLabel) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        tonalElevation = 2.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text("允许执行工具？", style = MaterialTheme.typography.titleMedium)
+            Text(request.toolName, style = MaterialTheme.typography.labelLarge)
+            Text(request.description, style = MaterialTheme.typography.bodyMedium)
+            if (request.arguments.isNotBlank()) {
+                Text(
+                    request.arguments,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onReject) { Text("拒绝") }
+                TextButton(onClick = onConfirm) { Text("允许") }
+            }
+        }
+    }
 }
 
 /** Floating chat header modelled after the compact ChatGPT mobile controls. */

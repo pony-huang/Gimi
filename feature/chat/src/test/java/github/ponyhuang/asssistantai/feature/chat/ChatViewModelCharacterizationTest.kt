@@ -3,7 +3,9 @@ package github.ponyhuang.asssistantai.feature.chat
 import github.ponyhuang.asssistantai.core.testing.MainDispatcherRule
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunPart
+import github.ponyhuang.asssistantai.domain.conversation.model.ChatFunctionCall
 import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
+import github.ponyhuang.asssistantai.domain.conversation.model.ToolConfirmationRequest
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatDisplayRepository
@@ -19,6 +21,8 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalog
 import github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackState
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechPlaybackRepository
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechRecognitionRepository
+import github.ponyhuang.asssistantai.domain.toolauthorization.model.ToolDescriptor
+import github.ponyhuang.asssistantai.domain.toolauthorization.repository.ToolAuthorizationRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -81,7 +85,35 @@ class ChatViewModelCharacterizationTest {
         assertEquals(null, fixture.viewModel.uiState.value.notice)
     }
 
-    private fun fixture(configured: Boolean): Fixture {
+    @Test
+    fun confirmationRequestsAreQueuedAndSensitiveArgumentsAreRedacted() = runTest {
+        val fixture = fixture(
+            configured = true,
+            events = listOf(
+                confirmationEvent(
+                    confirmation("confirm-1", "compose_message", mapOf("phone" to "13800138000")),
+                    confirmation("confirm-2", "read_file", mapOf("path" to "/secret/private.txt")),
+                ),
+            ),
+        )
+
+        fixture.viewModel.send("执行工具")
+        advanceUntilIdle()
+
+        val state = fixture.viewModel.uiState.value
+        assertEquals(listOf("confirm-1", "confirm-2"), state.pendingToolConfirmations.map { it.confirmationCallId })
+        assertTrue(state.pendingToolConfirmations.first().arguments.contains("••••"))
+        assertFalse(state.pendingToolConfirmations.first().arguments.contains("13800138000"))
+        assertTrue(state.isAgentRunning)
+    }
+
+    private fun fixture(
+        configured: Boolean,
+        events: List<ChatRunEvent> = listOf(
+            event(partial = true, turnComplete = false),
+            event(partial = false, turnComplete = true),
+        ),
+    ): Fixture {
         val selection = ModelSelection("service", "chat", "model")
         val services = if (configured) listOf(service()) else emptyList()
         val catalog = mockk<ModelCatalogRepository>(relaxed = true) {
@@ -99,10 +131,7 @@ class ChatViewModelCharacterizationTest {
         }
         val agent = mockk<ChatAgentRepository>(relaxed = true) {
             coEvery { activateModel(any()) } returns Result.success(Unit)
-            coEvery { send(any(), any(), any()) } returns flowOf(
-                event(partial = true, turnComplete = false),
-                event(partial = false, turnComplete = true),
-            )
+            coEvery { send(any(), any(), any()) } returns flowOf(*events.toTypedArray())
         }
         val display = mockk<ChatDisplayRepository> {
             every { showToolActivity } returns MutableStateFlow(true)
@@ -117,6 +146,18 @@ class ChatViewModelCharacterizationTest {
         val attachments = mockk<ChatAttachmentRepository> {
             coEvery { read(any()) } returns emptyList()
         }
+        val toolAuthorization = mockk<ToolAuthorizationRepository>(relaxed = true) {
+            every { tools } returns MutableStateFlow(
+                listOf(
+                    ToolDescriptor(
+                        id = "compose_message",
+                        name = "compose_message",
+                        description = "撰写短信",
+                        isEnabled = true,
+                    ),
+                ),
+            )
+        }
         return Fixture(
             viewModel = ChatViewModel(
                 runner = agent,
@@ -126,6 +167,7 @@ class ChatViewModelCharacterizationTest {
                 speechRecognitionRepository = recognition,
                 speechPlaybackController = playback,
                 attachments = attachments,
+                toolAuthorization = toolAuthorization,
             ),
             conversations = conversations,
             agent = agent,
@@ -144,6 +186,27 @@ class ChatViewModelCharacterizationTest {
         errorCode = null,
         errorMessage = null,
         timestamp = 1L,
+    )
+
+    private fun confirmationEvent(vararg calls: ChatFunctionCall) = ChatRunEvent(
+        id = "confirmation-event",
+        invocationId = "invocation-1",
+        author = "assistant",
+        parts = emptyList(),
+        functionCalls = calls.toList(),
+        functionResponses = emptyList(),
+        partial = false,
+        turnComplete = false,
+        errorCode = null,
+        errorMessage = null,
+        timestamp = 1L,
+    )
+
+    private fun confirmation(id: String, toolName: String, args: Map<String, Any?>) = ChatFunctionCall(
+        id = id,
+        name = "adk_request_confirmation",
+        args = emptyMap(),
+        confirmationRequest = ToolConfirmationRequest(toolName = toolName, args = args),
     )
 
     private fun service() = ModelService(

@@ -25,6 +25,7 @@ dependencies {
     implementation(project(":domain:conversation"))
     implementation(project(":domain:modelcatalog"))
     implementation(project(":domain:speech"))
+    implementation(project(":domain:toolauthorization"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation)

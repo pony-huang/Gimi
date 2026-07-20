@@ -29,6 +29,7 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalog
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechRecognitionRepository
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechPlaybackRepository
 import github.ponyhuang.asssistantai.domain.speech.usecase.markdownToSpeechText
+import github.ponyhuang.asssistantai.domain.toolauthorization.repository.ToolAuthorizationRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -62,6 +63,7 @@ class ChatViewModel @Inject constructor(
     private val repository: ConversationRepository,
     private val modelServices: ModelCatalogRepository,
     private val chatDisplayPreferences: ChatDisplayRepository,
+    private val toolAuthorization: ToolAuthorizationRepository,
     private val speechRecognitionRepository: SpeechRecognitionRepository,
     private val speechPlaybackController: SpeechPlaybackRepository,
     private val attachments: ChatAttachmentRepository,
@@ -85,7 +87,18 @@ class ChatViewModel @Inject constructor(
         val request = _uiState.value.pendingToolConfirmation ?: return
         val sessionId = _uiState.value.sessionId
         if (sessionId.isBlank()) return
-        _uiState.update { it.copy(pendingToolConfirmation = null) }
+        if (confirmed) {
+            approvedToolsThisTurn += request.toolName
+        } else {
+            approvedToolsThisTurn.clear()
+        }
+        _uiState.update { state ->
+            state.copy(
+                pendingToolConfirmations = state.pendingToolConfirmations.filterNot {
+                    it.confirmationCallId == request.confirmationCallId
+                },
+            )
+        }
         cancelCurrentRun()
         val runToken = agentRunOwnership.claim()
         _uiState.update { it.copy(isAgentRunning = true, turnComplete = false) }
@@ -163,6 +176,7 @@ class ChatViewModel @Inject constructor(
     private var loadingSessionId: String? = null
     private var pendingContentRefreshSessionId: String? = null
     private val agentRunOwnership = AgentRunOwnership()
+    private val approvedToolsThisTurn = mutableSetOf<String>()
 
     private fun cancelCurrentRun() {
         agentRunOwnership.invalidate()
@@ -173,8 +187,19 @@ class ChatViewModel @Inject constructor(
     private fun finishRunIfOwned(runToken: Any) {
         if (!agentRunOwnership.isOwnedBy(runToken)) return
         currentJob = null
-        _uiState.update { it.copy(isAgentRunning = false) }
+        val pending = _uiState.value.pendingToolConfirmation
+        _uiState.update { it.copy(isAgentRunning = pending != null) }
+        if (pending != null && pending.toolName in approvedToolsThisTurn) {
+            respondToToolConfirmation(confirmed = true)
+        } else if (pending == null && _uiState.value.turnComplete) {
+            approvedToolsThisTurn.clear()
+        }
         viewModelScope.launch { flushPendingConversationContentUpdate() }
+    }
+
+    private fun clearToolConfirmationState() {
+        approvedToolsThisTurn.clear()
+        _uiState.update { it.copy(pendingToolConfirmations = emptyList()) }
     }
 
     override fun onCleared() {
@@ -294,6 +319,7 @@ class ChatViewModel @Inject constructor(
      */
     fun send(text: String, attachmentReferences: List<String> = emptyList()) {
         if (text.isBlank() && attachmentReferences.isEmpty()) return
+        if (_uiState.value.pendingToolConfirmation != null) return
         val usableSelection = _uiState.value.currentModelSelection
             ?.takeIf(::isUsableChatSelection)
             ?: defaultSelection()
@@ -303,6 +329,7 @@ class ChatViewModel @Inject constructor(
         }
 
         cancelCurrentRun()
+        clearToolConfirmationState()
         val runToken = agentRunOwnership.claim()
         // 新一轮 turn 一经提交就进入生成态，让 composer 立即显示停止按钮；不再等待首个
         // assistant partial event 到达。后续的完成、错误和取消路径仍会负责将其恢复为 false。
@@ -433,6 +460,7 @@ class ChatViewModel @Inject constructor(
      */
     fun reset() {
         cancelCurrentRun()
+        clearToolConfirmationState()
         speechPlaybackController.clearSession()
         _uiState.update { it.copy(isAgentRunning = false, turnComplete = false) }
         clearPartChannels()
@@ -453,6 +481,7 @@ class ChatViewModel @Inject constructor(
     fun switchSession(sessionId: String) {
         if (sessionId.isBlank()) return
         cancelCurrentRun()
+        clearToolConfirmationState()
         sessionLoadJob?.cancel()
         speechPlaybackController.clearSession()
         clearPartChannels()
@@ -655,7 +684,12 @@ class ChatViewModel @Inject constructor(
      * 没有进行中的 job 时直接 no-op，避免在非 streaming 状态误触。
      */
     fun stopStreaming() {
-        if (currentJob?.isActive != true) return
+        if (currentJob?.isActive != true && _uiState.value.pendingToolConfirmation == null) return
+        if (_uiState.value.pendingToolConfirmation != null) {
+            approvedToolsThisTurn.clear()
+            respondToToolConfirmation(confirmed = false)
+            return
+        }
         cancelCurrentRun()
         _uiState.update { state ->
             val newMessages = state.messages.map { msg ->
@@ -712,38 +746,40 @@ class ChatViewModel @Inject constructor(
         if (event.turnComplete) refreshCurrentConversation()
     }
 
-    /**
-     * Extracts ADK's synthetic `adk_request_confirmation` function call.
-     *
-     * Development/testing automatically approves it before Compose can render the dialog, while
-     * retaining the ADK confirmation request/response protocol for later policy changes.
-     */
+    /** Extracts queued ADK confirmation requests without allowing later calls to overwrite them. */
     private fun captureToolConfirmation(event: ChatRunEvent) {
-        val confirmationCall = event.functionCalls.firstOrNull {
-            it.confirmationRequest != null
-        } ?: return
-        val confirmationId = confirmationCall.id ?: return
-        val request = confirmationCall.confirmationRequest ?: return
-        val toolName = request.toolName
-        val args = request.args
-        val argsSummary = args.entries.joinToString(
-            prefix = "(",
-            postfix = ")",
-            separator = ", ",
-        ) { (key, value) -> "$key=${summarizeValue(value)}" }
-        _uiState.update {
-            it.copy(
-                pendingToolConfirmation = PendingToolConfirmation(
-                    confirmationCallId = confirmationId,
-                    title = "Allow tool execution?",
-                    summary = "Allow $toolName$argsSummary?",
-                ),
+        val incoming = event.functionCalls.mapNotNull { call ->
+            val confirmationId = call.id ?: return@mapNotNull null
+            val request = call.confirmationRequest ?: return@mapNotNull null
+            val description = toolAuthorization.tools.value
+                .firstOrNull { it.id == request.toolName }
+                ?.description
+                ?: "远程工具请求执行操作"
+            PendingToolConfirmation(
+                confirmationCallId = confirmationId,
+                toolName = request.toolName,
+                description = description,
+                arguments = request.args.entries.joinToString(separator = "\n") { (key, value) ->
+                    "$key: ${summarizeConfirmationArgument(key, value)}"
+                },
             )
         }
-        respondToToolConfirmation(confirmed = true)
+        if (incoming.isEmpty()) return
+        _uiState.update { state ->
+            val knownIds = state.pendingToolConfirmations.mapTo(mutableSetOf()) {
+                it.confirmationCallId
+            }
+            state.copy(
+                pendingToolConfirmations = state.pendingToolConfirmations + incoming.filter {
+                    knownIds.add(it.confirmationCallId)
+                },
+                isAgentRunning = true,
+            )
+        }
     }
 
     private fun applyError(message: String, invocationId: String? = null) {
+        clearToolConfirmationState()
         _uiState.update {
             it.copy(
                 messages = it.messages + Messages.fromError(error = message, invocationId = invocationId),
@@ -912,9 +948,27 @@ class ChatViewModel @Inject constructor(
 
 data class PendingToolConfirmation(
     val confirmationCallId: String,
-    val title: String,
-    val summary: String,
+    val toolName: String,
+    val description: String,
+    val arguments: String,
 )
+
+private fun summarizeConfirmationArgument(key: String, value: Any?): String {
+    val sensitiveKey = listOf(
+        "phone",
+        "contact",
+        "message",
+        "text",
+        "content",
+        "uri",
+        "path",
+        "file",
+        "email",
+        "token",
+        "key",
+    ).any { marker -> key.contains(marker, ignoreCase = true) }
+    return if (sensitiveKey) "••••" else summarizeValue(value).take(120)
+}
 
 private fun List<ModelService>.isUsableChatSelection(selection: ModelSelection): Boolean {
     val service = firstOrNull { it.id == selection.serviceId } ?: return false

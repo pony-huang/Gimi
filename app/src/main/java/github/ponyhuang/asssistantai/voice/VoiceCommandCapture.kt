@@ -28,6 +28,8 @@ internal class PcmPreRollBuffer(
 internal class VoiceCommandCapture(
     preRoll: ByteArray,
     private val startedAtMs: Long,
+    private val speechStartTimeoutMs: Long = SPEECH_START_TIMEOUT_MS,
+    private val maxCaptureMs: Long = MAX_CAPTURE_MS,
 ) {
     private val output = ByteArrayOutputStream().apply { write(preRoll) }
     private var speechDetected = false
@@ -40,8 +42,12 @@ internal class VoiceCommandCapture(
             lastSpeechAtMs = nowMs
         }
         return when {
-            nowMs - startedAtMs >= MAX_CAPTURE_MS -> CaptureDecision.Complete(output.toByteArray())
-            !speechDetected && nowMs - startedAtMs >= SPEECH_START_TIMEOUT_MS -> CaptureDecision.Cancel
+            nowMs - startedAtMs >= maxCaptureMs -> if (speechDetected) {
+                CaptureDecision.Complete(output.toByteArray())
+            } else {
+                CaptureDecision.Cancel
+            }
+            !speechDetected && nowMs - startedAtMs >= speechStartTimeoutMs -> CaptureDecision.Cancel
             speechDetected && nowMs - lastSpeechAtMs >= SILENCE_TO_FINISH_MS ->
                 CaptureDecision.Complete(output.toByteArray())
             else -> CaptureDecision.Continue

@@ -13,7 +13,7 @@ import androidx.core.net.toUri
 class MediaPlaybackTool @Inject constructor(
     private val queue: IntentActionQueue,
 ) {
-    @Tool(name = "play_media", description = "Opens a media app to play audio or video from a direct URL.")
+    @Tool(name = "play_media", description = "Opens a media app to play audio or video from a direct URL.", requireConfirmation = true)
     fun playMedia(
         @Param("A direct music or video URL. Supported schemes are https, http, and content.")
         url: String,

@@ -94,36 +94,42 @@ class MediaSessionManagerTool @Inject constructor(
     @Tool(
         name = "skip_to_next_track",
         description = "Sends skip-to-next to the most recent active media session. Requires notification access.",
+        requireConfirmation = true,
     )
     fun skipToNextTrack(): Map<String, Any> = sendTransportCommand(MediaAction.NEXT)
 
     @Tool(
         name = "skip_to_previous_track",
         description = "Sends skip-to-previous to the most recent active media session. Requires notification access.",
+        requireConfirmation = true,
     )
     fun skipToPreviousTrack(): Map<String, Any> = sendTransportCommand(MediaAction.PREVIOUS)
 
     @Tool(
         name = "play_media_session",
         description = "Resumes playback on the most recent active media session. Requires notification access.",
+        requireConfirmation = true,
     )
     fun playMediaSession(): Map<String, Any> = sendTransportCommand(MediaAction.PLAY)
 
     @Tool(
         name = "pause_media_session",
         description = "Pauses playback on the most recent active media session. Requires notification access.",
+        requireConfirmation = true,
     )
     fun pauseMediaSession(): Map<String, Any> = sendTransportCommand(MediaAction.PAUSE)
 
     @Tool(
         name = "stop_media_session",
         description = "Stops playback on the most recent active media session. Requires notification access.",
+        requireConfirmation = true,
     )
     fun stopMediaSession(): Map<String, Any> = sendTransportCommand(MediaAction.STOP)
 
     @Tool(
         name = "toggle_play_pause_media_session",
         description = "Toggles play / pause on the most recent active media session: pauses when playing, plays otherwise. Requires notification access.",
+        requireConfirmation = true,
     )
     fun togglePlayPauseMediaSession(): Map<String, Any> {
         if (!isNotificationAccessGranted()) return notificationAccessRequired()
@@ -147,6 +153,7 @@ class MediaSessionManagerTool @Inject constructor(
         name = "media_control",
         description = "Dispatches a transport command to the most recent active media session. " +
             "Action must be one of: next, previous, play, pause, stop. Requires notification access.",
+        requireConfirmation = true,
     )
     fun mediaControl(
         @Param("Transport command. One of: next, previous, play, pause, stop.")

@@ -24,6 +24,9 @@ sealed interface AppRoute : NavKey {
     data object PermissionSettings : AppRoute
 
     @Serializable
+    data object ToolAuthorizationSettings : AppRoute
+
+    @Serializable
     data object ModelServiceList : AppRoute
 
     @Serializable

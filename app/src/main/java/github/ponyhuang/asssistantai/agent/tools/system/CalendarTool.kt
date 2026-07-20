@@ -87,7 +87,7 @@ class CalendarTool @Inject constructor(
         )
     }
 
-    @Tool(name = "create_calendar_event", description = "Creates a calendar event in a selected device calendar. Requires calendar write permission.")
+    @Tool(name = "create_calendar_event", description = "Creates a calendar event in a selected device calendar. Requires calendar write permission.", requireConfirmation = true)
     fun createCalendarEvent(
         @Param("Calendar ID returned by listCalendars, represented as a decimal string.") calendarId: String,
         @Param("Event title.") title: String,

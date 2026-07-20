@@ -13,7 +13,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.asssistantai.agent.AgentChatRunner
 import github.ponyhuang.asssistantai.agent.AgentFactory
+import github.ponyhuang.asssistantai.agent.LocalToolCatalog
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
+import github.ponyhuang.asssistantai.domain.toolauthorization.repository.LocalToolDefinitionSource
+import github.ponyhuang.asssistantai.domain.toolauthorization.repository.ToolAuthorizationRepository
 import github.ponyhuang.asssistantai.voice.VoiceAgentRunner
 import java.io.File
 import javax.inject.Singleton
@@ -31,6 +34,12 @@ import javax.inject.Singleton
 object AgentModule {
 
     private const val TAG: String = "AgentModule"
+
+    @Provides
+    @Singleton
+    fun provideLocalToolDefinitionSource(
+        catalog: LocalToolCatalog,
+    ): LocalToolDefinitionSource = catalog
 
     @Provides
     @Singleton
@@ -55,6 +64,7 @@ object AgentModule {
         artifactService: ArtifactService,
         agentFactory: AgentFactory,
         modelServices: ModelServiceRepository,
+        toolAuthorization: ToolAuthorizationRepository,
     ): AgentChatRunner = AgentChatRunner(
         factory = {
             modelServices.awaitReady()
@@ -62,6 +72,7 @@ object AgentModule {
         },
         sessionService = sessionService,
         artifactService = artifactService,
+        configurationRevision = { toolAuthorization.revision.value },
     )
 
     @Provides
@@ -72,6 +83,7 @@ object AgentModule {
         artifactService: ArtifactService,
         agentFactory: AgentFactory,
         modelServices: ModelServiceRepository,
+        toolAuthorization: ToolAuthorizationRepository,
     ): AgentChatRunner = AgentChatRunner(
         factory = {
             modelServices.awaitReady()
@@ -79,6 +91,7 @@ object AgentModule {
         },
         sessionService = sessionService,
         artifactService = artifactService,
+        configurationRevision = { toolAuthorization.revision.value },
     )
 
     /**

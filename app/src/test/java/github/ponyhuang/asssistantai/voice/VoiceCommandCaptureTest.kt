@@ -37,6 +37,33 @@ class VoiceCommandCaptureTest {
         assertEquals(listOf<Byte>(4, 5, 6), buffer.snapshot().toList())
     }
 
+    @Test
+    fun confirmationOnlyAcceptsExplicitAllowWords() {
+        assertTrue(isVoiceConfirmationApproved("确认执行"))
+        assertTrue(isVoiceConfirmationApproved("允许"))
+        assertTrue(isVoiceConfirmationApproved("执行"))
+    }
+
+    @Test
+    fun rejectionWordsTakePriorityAndAmbiguousSpeechFailsClosed() {
+        assertEquals(false, isVoiceConfirmationApproved("不要执行"))
+        assertEquals(false, isVoiceConfirmationApproved("取消"))
+        assertEquals(false, isVoiceConfirmationApproved("好的"))
+        assertEquals(false, isVoiceConfirmationApproved(""))
+    }
+
+    @Test
+    fun confirmationCaptureCancelsAtConfiguredFifteenSecondDeadline() {
+        val capture = VoiceCommandCapture(
+            preRoll = byteArrayOf(),
+            startedAtMs = 0L,
+            speechStartTimeoutMs = 15_000L,
+            maxCaptureMs = 15_000L,
+        )
+
+        assertEquals(CaptureDecision.Cancel, capture.append(silentPcm(), 15_000L))
+    }
+
     private fun silentPcm(): ByteArray = ByteArray(3_200)
 
     private fun voicedPcm(): ByteArray = ByteArray(3_200).also { bytes ->

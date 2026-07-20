@@ -25,6 +25,7 @@ class LocalFileSearchTool @Inject constructor(
     @Tool(
         name = "request_media_file_permissions",
         description = "Launches Android's runtime prompt for permission to search shared images, videos, and audio files.",
+        requireConfirmation = true,
     )
     fun requestMediaFilePermissions(): Map<String, Any> = queue.request(
         "Grant media search access",
@@ -35,6 +36,7 @@ class LocalFileSearchTool @Inject constructor(
     @Tool(
         name = "search_media_files",
         description = "Searches shared image, video, and audio file names on this device. Returns up to 50 newest matching files and their content URIs. Requires the matching Android media permission.",
+        requireConfirmation = true,
     )
     fun searchMediaFiles(
         @Param("A non-blank file-name query.") query: String,
@@ -68,6 +70,7 @@ class LocalFileSearchTool @Inject constructor(
     @Tool(
         name = "search_documents",
         description = "Recursively searches file names in document directories the user has authorized in Settings. Returns up to 50 newest matching files and their content URIs.",
+        requireConfirmation = true,
     )
     fun searchDocuments(@Param("A non-blank file-name query.") query: String): Map<String, Any> {
         val value = query.trim()
@@ -91,6 +94,7 @@ class LocalFileSearchTool @Inject constructor(
     @Tool(
         name = "open_local_file",
         description = "Opens a local media-search result or a document-search result in a compatible app for preview. The URI must have been returned by a local search tool.",
+        requireConfirmation = true,
     )
     fun openLocalFile(@Param("The contentUri returned by search_media_files or search_documents.") contentUri: String): Map<String, Any> {
         val uri = runCatching { Uri.parse(contentUri) }.getOrNull() ?: return error("contentUri is invalid.")
@@ -206,10 +210,12 @@ class LocalFileSearchTool @Inject constructor(
 
     private companion object {
         const val MAX_RESULTS = 50
-        val MEDIA_COLLECTIONS = listOf(
-            MediaCollection("image", MediaStore.Images.Media.EXTERNAL_CONTENT_URI, Manifest.permission.READ_MEDIA_IMAGES),
-            MediaCollection("video", MediaStore.Video.Media.EXTERNAL_CONTENT_URI, Manifest.permission.READ_MEDIA_VIDEO),
-            MediaCollection("audio", MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, Manifest.permission.READ_MEDIA_AUDIO),
-        )
+        val MEDIA_COLLECTIONS by lazy {
+            listOf(
+                MediaCollection("image", MediaStore.Images.Media.EXTERNAL_CONTENT_URI, Manifest.permission.READ_MEDIA_IMAGES),
+                MediaCollection("video", MediaStore.Video.Media.EXTERNAL_CONTENT_URI, Manifest.permission.READ_MEDIA_VIDEO),
+                MediaCollection("audio", MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, Manifest.permission.READ_MEDIA_AUDIO),
+            )
+        }
     }
 }

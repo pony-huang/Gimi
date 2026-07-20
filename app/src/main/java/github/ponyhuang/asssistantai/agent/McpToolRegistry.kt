@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.agent
 
 import com.google.adk.kt.tools.BaseTool
+import com.google.adk.kt.tools.FunctionTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Schema
@@ -95,9 +96,10 @@ class McpToolRegistry @Inject constructor(
     private inner class McpRemoteTool(
         private val server: McpServer,
         private val remote: Tool,
-    ) : BaseTool(
+    ) : FunctionTool(
         name = "mcp_${server.id.take(8)}_${remote.name}".replace(Regex("[^A-Za-z0-9_-]"), "_"),
         description = "MCP (${server.name}): ${remote.description ?: remote.name}",
+        requiresConfirmation = true,
     ) {
         override fun declaration(): FunctionDeclaration = FunctionDeclaration(
             name = name,
@@ -105,7 +107,7 @@ class McpToolRegistry @Inject constructor(
             parameters = remote.inputSchema.toAdkSchema(),
         )
 
-        override suspend fun run(context: ToolContext, args: Map<String, Any>): Any =
+        override suspend fun execute(context: ToolContext, args: Map<String, Any>): Any =
             connect(server).use { it.call(remote, args) }
     }
 }

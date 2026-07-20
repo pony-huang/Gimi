@@ -37,6 +37,7 @@ import github.ponyhuang.asssistantai.feature.modelsettings.defaults.DefaultModel
 import github.ponyhuang.asssistantai.feature.modelsettings.detail.LLMModelServiceDetailRoute
 import github.ponyhuang.asssistantai.feature.modelsettings.list.ModelServiceListRoute
 import github.ponyhuang.asssistantai.feature.permissions.PermissionSettingsRoute
+import github.ponyhuang.asssistantai.feature.toolauthorization.ToolAuthorizationRoute
 import github.ponyhuang.asssistantai.feature.voicewake.VoiceWakeSettingsRoute
 import github.ponyhuang.asssistantai.feature.workfiles.WorkFilesSettingsRoute
 import github.ponyhuang.asssistantai.ui.navigation.AppRoute
@@ -146,6 +147,9 @@ fun MainScreen(
                                 onNavigateToMcpServers = { backStack.add(AppRoute.McpServerList) },
                                 onNavigateToWorkFiles = { backStack.add(AppRoute.WorkFilesSettings) },
                                 onNavigateToPermissions = { backStack.add(AppRoute.PermissionSettings) },
+                                onNavigateToToolAuthorization = {
+                                    backStack.add(AppRoute.ToolAuthorizationSettings)
+                                },
                                 modifier = modifier,
                             )
                         }
@@ -164,6 +168,10 @@ fun MainScreen(
 
                         AppRoute.PermissionSettings -> SettingsScaffold("权限管理", goBack) {
                             PermissionSettingsRoute(modifier = it)
+                        }
+
+                        AppRoute.ToolAuthorizationSettings -> SettingsScaffold("工具授权", goBack) {
+                            ToolAuthorizationRoute(modifier = it)
                         }
 
                         AppRoute.McpServerList -> SettingsScaffold(

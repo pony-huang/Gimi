@@ -23,6 +23,7 @@ import github.ponyhuang.asssistantai.domain.speech.repository.SpeechRecognitionR
 import github.ponyhuang.asssistantai.domain.speech.usecase.markdownToSpeechText
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -32,6 +33,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 @AndroidEntryPoint
 class BluetoothVoiceService : Service() {
@@ -228,7 +230,7 @@ class BluetoothVoiceService : Service() {
                     "正在执行：${command.take(NOTIFICATION_PREVIEW_LENGTH)}",
                     lastCommand = command,
                 )
-                val result = agentTasks.execute(command)
+                val result = agentTasks.execute(command, ::confirmVoiceTool)
                 val activeRoute = runCatching { audioRouter.findRoute() }.getOrNull()
                 if (activeRoute != null && speechPlayer.isAvailable()) {
                     setStatus(
@@ -259,6 +261,63 @@ class BluetoothVoiceService : Service() {
                 if (!pausedByUser) reconcileBluetoothRoute()
             }
         }
+    }
+
+    private suspend fun confirmVoiceTool(request: VoiceToolConfirmation): Boolean {
+        val activeRoute = runCatching { audioRouter.findRoute() }.getOrNull() ?: return false
+        if (!speechPlayer.isAvailable()) return false
+        setStatus(
+            BluetoothVoiceStatus.Speaking,
+            "等待确认：${request.toolName}",
+            deviceName = activeRoute.name,
+        )
+        val promptPlayed = speechPlayer.play(
+            "需要执行工具 ${request.toolName}。请说确认、允许或执行；如需取消，请说取消、拒绝或不要。",
+            activeRoute,
+        )
+        if (!promptPlayed) return false
+
+        setStatus(
+            BluetoothVoiceStatus.CapturingCommand,
+            "请在 15 秒内确认或拒绝",
+            deviceName = activeRoute.name,
+        )
+        val audio = CompletableDeferred<ByteArray?>()
+        val startedAt = SystemClock.elapsedRealtime()
+        val confirmationCapture = VoiceCommandCapture(
+            preRoll = ByteArray(0),
+            startedAtMs = startedAt,
+            speechStartTimeoutMs = CONFIRMATION_TIMEOUT_MS,
+            maxCaptureMs = CONFIRMATION_TIMEOUT_MS,
+        )
+        val confirmationRecorder = BluetoothPcmRecorder()
+        synchronized(audioLock) { recorder = confirmationRecorder }
+        val started = confirmationRecorder.start(
+            route = activeRoute,
+            onChunk = { chunk ->
+                when (val decision = confirmationCapture.append(chunk, SystemClock.elapsedRealtime())) {
+                    CaptureDecision.Continue -> Unit
+                    CaptureDecision.Cancel -> audio.complete(null)
+                    is CaptureDecision.Complete -> audio.complete(decision.pcm16)
+                }
+            },
+            onError = { audio.complete(null) },
+        )
+        if (!started) {
+            synchronized(audioLock) { if (recorder === confirmationRecorder) recorder = null }
+            confirmationRecorder.release()
+            return false
+        }
+        val pcm16 = try {
+            withTimeoutOrNull(CONFIRMATION_TIMEOUT_MS) { audio.await() }
+        } finally {
+            synchronized(audioLock) { if (recorder === confirmationRecorder) recorder = null }
+            confirmationRecorder.release()
+        } ?: return false
+
+        setStatus(BluetoothVoiceStatus.Transcribing, "正在识别确认口令")
+        val transcript = runCatching { speechRecognition.transcribe(pcm16) }.getOrNull() ?: return false
+        return isVoiceConfirmationApproved(transcript)
     }
 
     private suspend fun recoverFromAudioError(error: Throwable) {
@@ -382,6 +441,14 @@ class BluetoothVoiceService : Service() {
         private const val NOTIFICATION_CHANNEL_ID = "bluetooth_voice_wake"
         private const val NOTIFICATION_ID = 4107
         private const val WAKE_COOLDOWN_MS = 2_000L
+        private const val CONFIRMATION_TIMEOUT_MS = 15_000L
         private const val NOTIFICATION_PREVIEW_LENGTH = 120
     }
+}
+
+internal fun isVoiceConfirmationApproved(transcript: String): Boolean {
+    val normalized = transcript.trim().lowercase()
+    val rejected = listOf("取消", "拒绝", "不要").any(normalized::contains)
+    if (rejected) return false
+    return listOf("确认", "允许", "执行").any(normalized::contains)
 }

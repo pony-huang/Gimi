@@ -19,6 +19,11 @@ data class VoiceAgentResult(
     val responseText: String,
 )
 
+data class VoiceToolConfirmation(
+    val callId: String,
+    val toolName: String,
+)
+
 @Singleton
 class VoiceAgentTaskExecutor @Inject constructor(
     @VoiceAgentRunner private val runner: AgentChatRunner,
@@ -28,7 +33,10 @@ class VoiceAgentTaskExecutor @Inject constructor(
 ) {
     private val mutex = Mutex()
 
-    suspend fun execute(command: String): VoiceAgentResult = mutex.withLock {
+    suspend fun execute(
+        command: String,
+        confirmTool: suspend (VoiceToolConfirmation) -> Boolean,
+    ): VoiceAgentResult = mutex.withLock {
         modelServices.awaitReady()
         val selection = defaultSelection()
             ?: error("请先配置可用的默认助手模型")
@@ -38,26 +46,33 @@ class VoiceAgentTaskExecutor @Inject constructor(
         runner.recreate()
 
         val accumulator = VoiceResponseAccumulator()
-        var confirmationId: String? = null
+        val pendingConfirmations = ArrayDeque<VoiceToolConfirmation>()
+        val seenConfirmationIds = mutableSetOf<String>()
+        val approvedTools = mutableSetOf<String>()
         runner.send(
             userId = USER_ID,
             sessionId = sessionId,
             text = command,
         ).collect { event ->
             accumulator.accept(event)
-            confirmationId = event.confirmationId() ?: confirmationId
+            event.enqueueConfirmations(pendingConfirmations, seenConfirmationIds)
         }
-        while (confirmationId != null) {
-            val currentId = confirmationId ?: break
-            confirmationId = null
+        while (pendingConfirmations.isNotEmpty()) {
+            val request = pendingConfirmations.removeFirst()
+            val confirmed = request.toolName in approvedTools || confirmTool(request)
+            if (confirmed) {
+                approvedTools += request.toolName
+            } else {
+                approvedTools.clear()
+            }
             runner.respondToToolConfirmation(
                 userId = USER_ID,
                 sessionId = sessionId,
-                confirmationCallId = currentId,
-                confirmed = true,
+                confirmationCallId = request.callId,
+                confirmed = confirmed,
             ).collect { event ->
                 accumulator.accept(event)
-                confirmationId = event.confirmationId() ?: confirmationId
+                event.enqueueConfirmations(pendingConfirmations, seenConfirmationIds)
             }
         }
         repository.refreshConversation(sessionId)
@@ -92,9 +107,21 @@ class VoiceAgentTaskExecutor @Inject constructor(
             .firstOrNull()
     }
 
-    private fun Event.confirmationId(): String? = functionCalls().firstOrNull {
-        it.name == FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME
-    }?.id
+    private fun Event.enqueueConfirmations(
+        target: ArrayDeque<VoiceToolConfirmation>,
+        seenIds: MutableSet<String>,
+    ) {
+        functionCalls().filter {
+            it.name == FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME
+        }.forEach { call ->
+            val callId = call.id ?: return@forEach
+            if (!seenIds.add(callId)) return@forEach
+            val original = call.args[FunctionCall.ORIGINAL_FUNCTION_CALL_KEY] as? Map<*, *>
+                ?: return@forEach
+            val toolName = original["name"] as? String ?: return@forEach
+            target += VoiceToolConfirmation(callId = callId, toolName = toolName)
+        }
+    }
 
     private companion object {
         const val USER_ID = "user-default"

@@ -41,6 +41,7 @@ class AgentChatRunner(
     private val factory: suspend () -> BaseAgent,
     private val sessionService: SessionService,
     private val artifactService: ArtifactService?,
+    private val configurationRevision: () -> Long = { 0L },
 ) {
 
     /**
@@ -51,6 +52,8 @@ class AgentChatRunner(
      */
     @Volatile
     private var runner: InMemoryRunner? = null
+    @Volatile
+    private var runnerRevision: Long = Long.MIN_VALUE
     private val runnerMutex = Mutex()
 
     @OptIn(ExperimentalResumabilityFeature::class)
@@ -73,6 +76,7 @@ class AgentChatRunner(
     suspend fun recreate() {
         runnerMutex.withLock {
             runner = buildRunner(factory())
+            runnerRevision = configurationRevision()
         }
     }
 
@@ -85,6 +89,7 @@ class AgentChatRunner(
     suspend fun invalidate() {
         runnerMutex.withLock {
             runner = null
+            runnerRevision = Long.MIN_VALUE
         }
     }
 
@@ -104,7 +109,7 @@ class AgentChatRunner(
         imageAttachments: List<ImageAttachment> = emptyList(),
     ): Flow<Event> {
         // 快照当前 runner；中途 recreate() 不会改本次 send 的行为。
-        val activeRunner = currentRunner()
+        val activeRunner = currentRunnerForNewTurn()
         val parts = buildList {
             text.takeIf(String::isNotBlank)?.let { add(Part(text = it)) }
             imageAttachments.forEach { image ->
@@ -132,7 +137,7 @@ class AgentChatRunner(
         confirmationCallId: String,
         confirmed: Boolean,
     ): Flow<Event> {
-        val activeRunner = currentRunner()
+        val activeRunner = currentRunnerForResume()
         val confirmationResponse = Content(
             role = Role.USER,
             parts = listOf(
@@ -155,10 +160,23 @@ class AgentChatRunner(
         ).flowOn(Dispatchers.IO)
     }
 
-    private suspend fun currentRunner(): InMemoryRunner =
-        runner ?: runnerMutex.withLock {
-            runner ?: buildRunner(factory()).also { runner = it }
+    private suspend fun currentRunnerForNewTurn(): InMemoryRunner {
+        val expectedRevision = configurationRevision()
+        runner?.takeIf { runnerRevision == expectedRevision }?.let { return it }
+        return runnerMutex.withLock {
+            runner?.takeIf { runnerRevision == expectedRevision } ?: buildRunner(factory()).also {
+                runner = it
+                runnerRevision = expectedRevision
+            }
         }
+    }
+
+    private suspend fun currentRunnerForResume(): InMemoryRunner = runner ?: runnerMutex.withLock {
+        runner ?: buildRunner(factory()).also {
+            runner = it
+            runnerRevision = configurationRevision()
+        }
+    }
 
     companion object {
         const val APP_NAME: String = "AsssistantaiApp"

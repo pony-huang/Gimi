@@ -50,10 +50,13 @@ data class ChatUiState(
     val currentModelSelection: ModelSelection? = null,
     val showToolActivity: Boolean = true,
     val isSpeechRecognitionAvailable: Boolean = false,
-    val pendingToolConfirmation: PendingToolConfirmation? = null,
+    val pendingToolConfirmations: List<PendingToolConfirmation> = emptyList(),
     val speechPlaybackState: SpeechPlaybackState = SpeechPlaybackState(),
     val notice: ChatNotice? = null,
 )
+
+val ChatUiState.pendingToolConfirmation: PendingToolConfirmation?
+    get() = pendingToolConfirmations.firstOrNull()
 
 sealed interface ChatNotice {
     data object ConfigureChatModel : ChatNotice

@@ -23,7 +23,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.asssistantai.feature.permissions.R
 import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
 import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
@@ -39,7 +41,7 @@ fun PermissionSettingsScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
-            item { SettingsSectionTitle(text = "普通权限") }
+            item { SettingsSectionTitle(text = stringResource(R.string.permissions_section_regular)) }
             item {
                 Column(
                     modifier = Modifier
@@ -56,15 +58,15 @@ fun PermissionSettingsScreen(
                     ) {
                         Text(
                             if (state.allRuntimeGranted) {
-                                "普通权限已全部授权"
+                                stringResource(R.string.permissions_regular_all_granted)
                             } else {
-                                "一键授权普通权限"
+                                stringResource(R.string.permissions_grant_all)
                             },
                         )
                     }
                     if (state.permanentlyDenied.isNotEmpty()) {
                         Text(
-                            text = "部分权限已被系统阻止，请前往应用设置手动开启。",
+                            text = stringResource(R.string.permissions_partial_blocked),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -73,7 +75,7 @@ fun PermissionSettingsScreen(
                                 onAction(PermissionSettingsAction.OpenApplicationSettings)
                             },
                         ) {
-                            Text("打开应用设置")
+                            Text(stringResource(R.string.permissions_open_settings))
                         }
                     }
                 }
@@ -82,8 +84,8 @@ fun PermissionSettingsScreen(
                 item(key = group.kind) {
                     SettingsListItem(
                         icon = group.kind.icon,
-                        title = group.title,
-                        subtitle = group.subtitle,
+                        title = stringResource(group.titleRes),
+                        subtitle = stringResource(group.subtitleRes),
                         onClick = if (group.status == PermissionGroupStatus.Granted) {
                             null
                         } else {
@@ -92,19 +94,19 @@ fun PermissionSettingsScreen(
                         trailingContent = {
                             PermissionStatusText(
                                 granted = group.status == PermissionGroupStatus.Granted,
-                                text = group.status.label,
+                                text = group.status.label(),
                             )
                         },
                     )
                 }
             }
 
-            item { SettingsSectionTitle(text = "特殊权限") }
+            item { SettingsSectionTitle(text = stringResource(R.string.permissions_section_special)) }
             item {
                 SettingsListItem(
                     icon = Icons.Default.Tune,
-                    title = "修改系统设置",
-                    subtitle = "用于调整屏幕亮度和自动息屏时间",
+                    title = stringResource(R.string.permissions_special_modify_settings_title),
+                    subtitle = stringResource(R.string.permissions_special_modify_settings_subtitle),
                     onClick = if (state.writeSettingsGranted) {
                         null
                     } else {
@@ -118,8 +120,8 @@ fun PermissionSettingsScreen(
             item {
                 SettingsListItem(
                     icon = Icons.Default.NotificationsActive,
-                    title = "通知使用权",
-                    subtitle = "用于读取并控制其他应用的媒体播放",
+                    title = stringResource(R.string.permissions_special_notification_access_title),
+                    subtitle = stringResource(R.string.permissions_special_notification_access_subtitle),
                     onClick = if (state.notificationAccessGranted) {
                         null
                     } else {
@@ -137,7 +139,11 @@ fun PermissionSettingsScreen(
 @Composable
 private fun PermissionStatusText(
     granted: Boolean,
-    text: String = if (granted) "已授权" else "未授权",
+    text: String = if (granted) {
+        stringResource(R.string.permissions_status_granted)
+    } else {
+        stringResource(R.string.permissions_status_not_granted)
+    },
 ) {
     Text(
         text = text,
@@ -160,9 +166,9 @@ private val PermissionGroupKind.icon: ImageVector
         PermissionGroupKind.Notifications -> Icons.Default.Notifications
     }
 
-private val PermissionGroupStatus.label: String
-    get() = when (this) {
-        PermissionGroupStatus.Granted -> "已授权"
-        PermissionGroupStatus.Denied -> "未授权"
-        PermissionGroupStatus.PartiallyGranted -> "部分授权"
-    }
+@Composable
+private fun PermissionGroupStatus.label(): String = when (this) {
+    PermissionGroupStatus.Granted -> stringResource(R.string.permissions_status_granted)
+    PermissionGroupStatus.Denied -> stringResource(R.string.permissions_status_not_granted)
+    PermissionGroupStatus.PartiallyGranted -> stringResource(R.string.permissions_status_partially_granted)
+}

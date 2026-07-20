@@ -1,0 +1,38 @@
+<resources>
+    <string name="mcp_section_servers">MCP servers</string>
+    <string name="mcp_no_servers">No servers configured yet</string>
+    <string name="mcp_section_add_methods">Add methods</string>
+    <string name="mcp_method_new_title">New</string>
+    <string name="mcp_method_new_subtitle">Manually configure an SSE or Streamable HTTP service</string>
+    <string name="mcp_method_import_title">Import</string>
+    <string name="mcp_method_import_subtitle">Paste an mcpServers JSON configuration</string>
+    <string name="mcp_section_import_mcp">Import MCP configuration</string>
+    <string name="mcp_import_help">Paste a JSON configuration containing mcpServers. SSE and Streamable HTTP are supported.</string>
+    <string name="mcp_import_action">Import MCP service</string>
+    <string name="mcp_cancel">Cancel</string>
+    <string name="mcp_stdio_skip_notice">stdio entries containing command / args will be skipped because Android apps cannot safely spawn local processes.</string>
+    <string name="mcp_transport_sse">Server-Sent Events (SSE)</string>
+    <string name="mcp_transport_streamable_http">Streamable HTTP</string>
+
+    <string name="mcp_section_basic_info">Basic information</string>
+    <string name="mcp_field_name_required">Name *</string>
+    <string name="mcp_field_description">Description</string>
+    <string name="mcp_field_type_required">Type *</string>
+    <string name="mcp_field_endpoint_required">Server endpoint *</string>
+    <string name="mcp_field_bearer_token_optional">Bearer Token (optional)</string>
+    <string name="mcp_field_header_optional">Custom headers (optional)</string>
+    <string name="mcp_field_header_help">One per line, format: Header-Name=value</string>
+    <string name="mcp_field_enable_server">Enable this server</string>
+    <string name="mcp_sse_help">SSE and Streamable HTTP are supported. stdio mode requires a local subprocess and cannot be run safely inside an Android app.</string>
+    <string name="mcp_save">Save</string>
+    <string name="mcp_delete_server">Delete server</string>
+
+    <!-- Navigation screen titles (consumed by :app SettingsScaffold) -->
+    <string name="mcp_list_title">MCP servers</string>
+    <string name="mcp_add_options_title">Add MCP service</string>
+    <string name="mcp_import_title">Import MCP configuration</string>
+    <string name="mcp_add_server">Add MCP server</string>
+    <string name="mcp_edit_server">Edit MCP server</string>
+
+    <string name="mcp_agent_mutation_blocked">An agent task is running. Please stop it before making changes.</string>
+</resources>

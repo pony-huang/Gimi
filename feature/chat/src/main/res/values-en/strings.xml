@@ -1,0 +1,54 @@
+<resources>
+    <string name="stream_ai_compose_speech_to_text_idle_button">Voice input</string>
+    <string name="stream_ai_compose_speech_to_text_recording_button">Recording…</string>
+    <string name="stream_ai_compose_composer_mic_permission_message">Microphone permission is required to record audio</string>
+    <string name="stream_ai_compose_composer_mic_permission_action">Settings</string>
+    <string name="stream_ai_compose_composer_input_placeholder">Ask Assistant</string>
+    <string name="stream_ai_compose_composer_stop_button">Stop</string>
+    <string name="stream_ai_compose_composer_send_button">Send</string>
+    <string name="stream_ai_compose_composer_add_attachments_button">Add context</string>
+    <string name="stream_ai_compose_composer_take_photo">Take photo</string>
+    <string name="stream_ai_compose_composer_choose_photos">Choose from photos</string>
+    <string name="stream_ai_compose_composer_camera_error">Unable to open the camera</string>
+
+    <string name="chat_fab_back_to_latest">Back to latest</string>
+    <string name="chat_open_drawer">Open history drawer</string>
+    <string name="chat_new_conversation">New conversation</string>
+    <string name="chat_settings">Settings</string>
+    <string name="chat_tool_confirmation_title">Allow running this tool?</string>
+    <string name="chat_action_reject">Reject</string>
+    <string name="chat_action_allow">Allow</string>
+
+    <string name="chat_model_picker_change">Select model</string>
+    <string name="chat_model_loading">Loading models…</string>
+    <string name="chat_model_empty_configure">Please configure a model first</string>
+    <string name="chat_model_load_failed">Failed to load models</string>
+    <string name="chat_model_picker_title">Select current model</string>
+    <string name="chat_model_empty_enable_first">No models available. Please enable at least one model in Model Services first.</string>
+
+    <string name="chat_voice_default_transcribe_error">Speech recognition is not configured</string>
+    <string name="chat_voice_no_audio_captured">No audio captured. Please try again.</string>
+    <string name="chat_voice_transcription_failed">Speech recognition failed. Please try again.</string>
+    <string name="chat_voice_recording_failed">Recording failed. Please try again.</string>
+
+    <string name="chat_stt_configure_default_first">Please configure the default voice model in Settings first</string>
+
+    <string name="chat_drawer_empty_history">No history yet</string>
+    <string name="chat_drawer_current_session_protected">The current session cannot be deleted</string>
+    <string name="chat_drawer_switch_first">Please switch to another session first</string>
+    <string name="chat_drawer_delete_conversation">Delete conversation</string>
+
+    <string name="chat_message_copied">Copied</string>
+    <string name="chat_message_copy">Copy reply</string>
+    <string name="chat_message_pause_playback">Pause playback</string>
+    <string name="chat_message_resume_playback">Resume playback</string>
+    <string name="chat_message_play_reply">Read reply aloud</string>
+
+    <string name="chat_agent_mutation_blocked">An agent task is running. Please stop it before making changes.</string>
+
+    <!-- ChatNotice text (consumed by :app LaunchedEffect -> Toast/notification) -->
+    <string name="chat_notice_configure_chat_model">Please configure and enable a chat model in Model services first</string>
+    <string name="chat_notice_model_switch_blocked">The assistant is still generating a reply. Please wait before switching models.</string>
+
+    <string name="chat_tool_unknown_description">A remote tool is requesting to perform an action</string>
+</resources>

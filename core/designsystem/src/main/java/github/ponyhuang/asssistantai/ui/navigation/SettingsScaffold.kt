@@ -15,6 +15,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import github.ponyhuang.asssistantai.core.designsystem.R
 
 /** Shared settings-page shell that preserves the existing app-bar and back behavior. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,7 +41,7 @@ fun SettingsScaffold(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.common_back),
                         )
                     }
                 },

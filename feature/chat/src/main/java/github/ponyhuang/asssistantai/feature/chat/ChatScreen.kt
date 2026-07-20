@@ -55,6 +55,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.conversation.model.Message
 import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
@@ -206,7 +207,7 @@ fun ChatScaffold(
                 ) {
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = "回到最新",
+                        contentDescription = stringResource(R.string.chat_fab_back_to_latest),
                     )
                 }
             }
@@ -294,9 +295,16 @@ private fun ToolConfirmationCard(
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("允许执行工具？", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.chat_tool_confirmation_title), style = MaterialTheme.typography.titleMedium)
             Text(request.toolName, style = MaterialTheme.typography.labelLarge)
-            Text(request.description, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                if (request.description.isBlank()) {
+                    stringResource(R.string.chat_tool_unknown_description)
+                } else {
+                    request.description
+                },
+                style = MaterialTheme.typography.bodyMedium,
+            )
             if (request.arguments.isNotBlank()) {
                 Text(
                     request.arguments,
@@ -308,8 +316,8 @@ private fun ToolConfirmationCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                TextButton(onClick = onReject) { Text("拒绝") }
-                TextButton(onClick = onConfirm) { Text("允许") }
+                TextButton(onClick = onReject) { Text(stringResource(R.string.chat_action_reject)) }
+                TextButton(onClick = onConfirm) { Text(stringResource(R.string.chat_action_allow)) }
             }
         }
     }
@@ -346,7 +354,7 @@ private fun ChatTopBar(
             ) {
                 Icon(
                     imageVector = Icons.Default.Menu,
-                    contentDescription = "打开历史对话抽屉",
+                    contentDescription = stringResource(R.string.chat_open_drawer),
                 )
             }
         }
@@ -374,7 +382,7 @@ private fun ChatTopBar(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
-                        contentDescription = "新建对话",
+                        contentDescription = stringResource(R.string.chat_new_conversation),
                     )
                 }
                 VerticalDivider(
@@ -388,7 +396,7 @@ private fun ChatTopBar(
                     Box(modifier = Modifier.size(28.dp)) {
                         Icon(
                             imageVector = Icons.Default.Settings,
-                            contentDescription = "设置",
+                            contentDescription = stringResource(R.string.chat_settings),
                             modifier = Modifier.size(24.dp),
                         )
                     }

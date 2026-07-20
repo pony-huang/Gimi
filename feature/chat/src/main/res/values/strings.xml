@@ -1,13 +1,63 @@
 <resources>
-    <string name="stream_ai_compose_speech_to_text_idle_button">Voice input</string>
-    <string name="stream_ai_compose_speech_to_text_recording_button">Recording…</string>
-    <string name="stream_ai_compose_composer_mic_permission_message">Microphone permission is required to record audio</string>
-    <string name="stream_ai_compose_composer_mic_permission_action">Settings</string>
-    <string name="stream_ai_compose_composer_input_placeholder">Ask Assistant</string>
-    <string name="stream_ai_compose_composer_stop_button">Stop</string>
-    <string name="stream_ai_compose_composer_send_button">Send</string>
-    <string name="stream_ai_compose_composer_add_attachments_button">Add context</string>
-    <string name="stream_ai_compose_composer_take_photo">Take photo</string>
-    <string name="stream_ai_compose_composer_choose_photos">Choose from photos</string>
-    <string name="stream_ai_compose_composer_camera_error">Unable to open the camera</string>
+    <!-- 现有 ChatComposer 键 -->
+    <string name="stream_ai_compose_speech_to_text_idle_button">语音输入</string>
+    <string name="stream_ai_compose_speech_to_text_recording_button">录音中…</string>
+    <string name="stream_ai_compose_composer_mic_permission_message">录制音频需要麦克风权限</string>
+    <string name="stream_ai_compose_composer_mic_permission_action">设置</string>
+    <string name="stream_ai_compose_composer_input_placeholder">问问助手</string>
+    <string name="stream_ai_compose_composer_stop_button">停止</string>
+    <string name="stream_ai_compose_composer_send_button">发送</string>
+    <string name="stream_ai_compose_composer_add_attachments_button">添加上下文</string>
+    <string name="stream_ai_compose_composer_take_photo">拍照</string>
+    <string name="stream_ai_compose_composer_choose_photos">从相册中选择</string>
+    <string name="stream_ai_compose_composer_camera_error">无法打开相机</string>
+
+    <!-- ChatScreen / ChatTopBar / ToolConfirmationCard -->
+    <string name="chat_fab_back_to_latest">回到最新</string>
+    <string name="chat_open_drawer">打开历史对话抽屉</string>
+    <string name="chat_new_conversation">新建对话</string>
+    <string name="chat_settings">设置</string>
+    <string name="chat_tool_confirmation_title">允许执行工具？</string>
+    <string name="chat_action_reject">拒绝</string>
+    <string name="chat_action_allow">允许</string>
+
+    <!-- ChatScreenModelPicker -->
+    <string name="chat_model_picker_change">选择模型</string>
+    <string name="chat_model_loading">模型加载中</string>
+    <string name="chat_model_empty_configure">请先配置模型</string>
+    <string name="chat_model_load_failed">模型加载失败</string>
+    <string name="chat_model_picker_title">选择当前模型</string>
+    <string name="chat_model_empty_enable_first">暂无可用模型，请先在模型服务中启用至少一个模型。</string>
+
+    <!-- ChatComposer 错误提示 -->
+    <string name="chat_voice_default_transcribe_error">未配置语音识别</string>
+    <string name="chat_voice_no_audio_captured">没有录制到语音，请重试</string>
+    <string name="chat_voice_transcription_failed">语音识别失败，请重试</string>
+    <string name="chat_voice_recording_failed">录音失败，请重试</string>
+
+    <!-- SpeechToTextButton 提示 -->
+    <string name="chat_stt_configure_default_first">请先在设置中配置默认语音模型</string>
+
+    <!-- ChatConversationDrawer -->
+    <string name="chat_drawer_empty_history">暂无历史对话</string>
+    <string name="chat_drawer_current_session_protected">当前会话不可删除</string>
+    <string name="chat_drawer_switch_first">请先切换到其他会话</string>
+    <string name="chat_drawer_delete_conversation">删除对话</string>
+
+    <!-- MessageBubble 助手回复操作 -->
+    <string name="chat_message_copied">已复制</string>
+    <string name="chat_message_copy">复制回复</string>
+    <string name="chat_message_pause_playback">暂停朗读</string>
+    <string name="chat_message_resume_playback">继续朗读</string>
+    <string name="chat_message_play_reply">朗读回复</string>
+
+    <!-- 共享文案：Agent 任务进行中 -->
+    <string name="chat_agent_mutation_blocked">Agent 任务进行中，请先停止任务后再修改。</string>
+
+    <!-- ChatNotice 文案（由 :app 的 LaunchedEffect 解析为 Toast/通知） -->
+    <string name="chat_notice_configure_chat_model">请先在模型服务中配置并启用聊天模型</string>
+    <string name="chat_notice_model_switch_blocked">正在生成回复，完成后再切换模型</string>
+
+    <!-- 工具确认卡片：未在本地目录中找到的工具 -->
+    <string name="chat_tool_unknown_description">远程工具请求执行操作</string>
 </resources>

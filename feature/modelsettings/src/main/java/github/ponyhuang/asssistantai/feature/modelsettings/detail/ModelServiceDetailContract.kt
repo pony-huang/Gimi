@@ -1,8 +1,10 @@
 package github.ponyhuang.asssistantai.feature.modelsettings.detail
 
+import androidx.annotation.StringRes
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.feature.modelsettings.R
 
 data class ModelServiceDetailUiState(
     val isLoading: Boolean = true,
@@ -64,8 +66,8 @@ sealed interface ModelServiceDetailRow {
     ) : ModelServiceDetailRow
 }
 
-enum class NewModelKind(val label: String) {
-    Chat("聊天模型"),
-    Stt("语音识别模型（STT）"),
-    Tts("语音合成模型（TTS）"),
+enum class NewModelKind(@StringRes val labelRes: Int) {
+    Chat(R.string.modelsettings_new_model_chat),
+    Stt(R.string.modelsettings_new_model_stt),
+    Tts(R.string.modelsettings_new_model_tts),
 }

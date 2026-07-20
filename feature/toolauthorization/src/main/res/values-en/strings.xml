@@ -1,0 +1,13 @@
+<resources>
+    <string name="toolauth_count_label">Enabled %1$d / %2$d</string>
+    <string name="toolauth_enable_all">Enable all</string>
+    <string name="toolauth_disable_all">Disable all</string>
+    <string name="toolauth_search_label">Search tools</string>
+    <string name="toolauth_empty_state">No configurable local tools</string>
+    <string name="toolauth_no_match">No matching tools</string>
+
+    <!-- Tool authorization screen title (consumed by :app SettingsScaffold) -->
+    <string name="toolauth_screen_title">Tool authorization</string>
+
+    <string name="toolauth_agent_mutation_blocked">An agent task is running. Please stop it before making changes.</string>
+</resources>

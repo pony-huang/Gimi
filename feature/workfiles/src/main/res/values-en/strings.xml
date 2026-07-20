@@ -1,0 +1,10 @@
+<resources>
+    <string name="workfiles_title">Working folders</string>
+    <string name="workfiles_subtitle">Add local folders the assistant is allowed to search</string>
+    <string name="workfiles_auth_count">%1$d folders authorized</string>
+    <string name="workfiles_add_action">Add working folder</string>
+    <string name="workfiles_section_authorized">Authorized folders</string>
+    <string name="workfiles_empty_state">No working folders added yet</string>
+    <string name="workfiles_remove_action">Remove working folder</string>
+    <string name="workfiles_screen_title">Working files</string>
+</resources>

@@ -14,10 +14,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.speech.model.MiMoTtsVoices
 import github.ponyhuang.asssistantai.domain.speech.model.TtsVoice
+import github.ponyhuang.asssistantai.feature.modelsettings.R
 import github.ponyhuang.asssistantai.ui.common.PickerSingleChoiceDialog
 import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
@@ -33,10 +35,11 @@ fun DefaultModelSettingsScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
-            if (state.isMutationBlocked || state.notice != null) {
+            if (state.isMutationBlocked || !state.notice.isNullOrBlank()) {
                 item {
                     Text(
-                        text = state.notice ?: "Agent 任务进行中，请先停止任务后再修改。",
+                        text = state.notice?.takeUnless { it.isBlank() }
+                            ?: stringResource(R.string.modelsettings_agent_mutation_blocked),
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                     )
@@ -45,8 +48,8 @@ fun DefaultModelSettingsScreen(
             item {
                 DefaultModelOption(
                     icon = Icons.AutoMirrored.Filled.Chat,
-                    title = "默认助手模型",
-                    subtitle = "创建新助手时使用的模型",
+                    title = stringResource(R.string.modelsettings_defaults_assistant_title),
+                    subtitle = stringResource(R.string.modelsettings_defaults_assistant_subtitle),
                     selection = state.assistantSelection,
                     rows = state.chatModels,
                     onClick = if (state.isMutationBlocked) null else {
@@ -57,8 +60,8 @@ fun DefaultModelSettingsScreen(
             item {
                 DefaultModelOption(
                     icon = Icons.Default.FlashOn,
-                    title = "快速模型",
-                    subtitle = "用于需要快速响应的助手功能",
+                    title = stringResource(R.string.modelsettings_defaults_quick_title),
+                    subtitle = stringResource(R.string.modelsettings_defaults_quick_subtitle),
                     selection = state.fastSelection,
                     rows = state.chatModels,
                     onClick = if (state.isMutationBlocked) null else {
@@ -69,8 +72,8 @@ fun DefaultModelSettingsScreen(
             item {
                 DefaultModelOption(
                     icon = Icons.Default.Mic,
-                    title = "默认语音模型",
-                    subtitle = "用于语音输入，仅显示语音识别模型",
+                    title = stringResource(R.string.modelsettings_defaults_stt_title),
+                    subtitle = stringResource(R.string.modelsettings_defaults_stt_subtitle),
                     selection = state.speechSelection,
                     rows = state.speechModels,
                     onClick = if (state.isMutationBlocked) null else {
@@ -81,8 +84,8 @@ fun DefaultModelSettingsScreen(
             item {
                 DefaultModelOption(
                     icon = Icons.AutoMirrored.Filled.VolumeUp,
-                    title = "默认语音播放模型",
-                    subtitle = "用于朗读助手回复，仅显示语音合成模型",
+                    title = stringResource(R.string.modelsettings_defaults_tts_title),
+                    subtitle = stringResource(R.string.modelsettings_defaults_tts_subtitle),
                     selection = state.ttsSelection,
                     rows = state.ttsModels,
                     onClick = if (state.isMutationBlocked) null else {
@@ -95,7 +98,7 @@ fun DefaultModelSettingsScreen(
                 val enabled = state.ttsModels.any { it.selection() == state.ttsSelection }
                 SettingsListItem(
                     icon = Icons.AutoMirrored.Filled.VolumeUp,
-                    title = "语音播放音色",
+                    title = stringResource(R.string.modelsettings_defaults_voice_title),
                     subtitle = voice?.name ?: state.ttsVoiceId,
                     onClick = if (enabled && !state.isMutationBlocked) {
                         { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.TtsVoice)) }
@@ -116,28 +119,28 @@ fun DefaultModelSettingsScreen(
         DefaultModelDialog.Assistant -> ModelChoiceDialog(
             rows = state.chatModels,
             currentSelection = state.assistantSelection,
-            title = "选择默认助手模型",
+            title = stringResource(R.string.modelsettings_dialog_pick_assistant),
             target = DefaultModelDialog.Assistant,
             onAction = onAction,
         )
         DefaultModelDialog.Fast -> ModelChoiceDialog(
             rows = state.chatModels,
             currentSelection = state.fastSelection,
-            title = "选择快速模型",
+            title = stringResource(R.string.modelsettings_dialog_pick_quick),
             target = DefaultModelDialog.Fast,
             onAction = onAction,
         )
         DefaultModelDialog.Speech -> ModelChoiceDialog(
             rows = state.speechModels,
             currentSelection = state.speechSelection,
-            title = "选择默认语音模型",
+            title = stringResource(R.string.modelsettings_dialog_pick_stt),
             target = DefaultModelDialog.Speech,
             onAction = onAction,
         )
         DefaultModelDialog.Tts -> ModelChoiceDialog(
             rows = state.ttsModels,
             currentSelection = state.ttsSelection,
-            title = "选择默认语音播放模型",
+            title = stringResource(R.string.modelsettings_dialog_pick_tts),
             target = DefaultModelDialog.Tts,
             onAction = onAction,
         )
@@ -145,10 +148,10 @@ fun DefaultModelSettingsScreen(
             options = MiMoTtsVoices.all,
             selected = { it.id == state.ttsVoiceId },
             key = TtsVoice::id,
-            title = "选择语音播放音色",
+            title = stringResource(R.string.modelsettings_dialog_pick_voice),
             optionTitle = TtsVoice::name,
             optionSubtitle = { listOfNotNull(it.language, it.gender).joinToString(" · ") },
-            emptyText = "暂无可用音色",
+            emptyText = stringResource(R.string.modelsettings_dialog_no_voices),
             onPick = { onAction(DefaultModelSettingsAction.SelectVoice(it.id)) },
             onDismiss = { onAction(DefaultModelSettingsAction.DismissDialog) },
         )
@@ -189,7 +192,7 @@ private fun ModelChoiceDialog(
         title = title,
         optionTitle = { it.model.name },
         optionSubtitle = { "${it.service.name} · ${it.group.name}" },
-        emptyText = "暂无可用模型，请先在模型服务中启用至少一个模型。",
+        emptyText = stringResource(R.string.modelsettings_dialog_no_models),
         onPick = {
             onAction(DefaultModelSettingsAction.SelectModel(target, it.selection()))
         },

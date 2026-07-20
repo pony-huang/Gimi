@@ -10,8 +10,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import github.ponyhuang.asssistantai.feature.modelsettings.R
 
 @Composable
 fun LLMModelServiceDetailRoute(
@@ -23,13 +25,31 @@ fun LLMModelServiceDetailRoute(
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
+    val noBrowserMessage = stringResource(R.string.modelsettings_no_browser)
+    val serviceNotFoundMessage = stringResource(R.string.modelsettings_notice_service_not_found)
+    val connectionSucceededMessage = stringResource(R.string.modelsettings_notice_connection_succeeded)
+    val connectionFailedMessage = stringResource(R.string.modelsettings_notice_connection_failed)
+    val modelsSyncFailedMessage = stringResource(R.string.modelsettings_notice_models_sync_failed)
+    val agentBlockedMessage = stringResource(R.string.modelsettings_agent_mutation_blocked)
+
     LaunchedEffect(serviceId) {
         viewModel.onAction(ModelServiceDetailAction.Load(serviceId))
     }
 
     LaunchedEffect(state.notice) {
         val notice = state.notice ?: return@LaunchedEffect
-        Toast.makeText(context, notice.message(), Toast.LENGTH_SHORT).show()
+        val message = when (notice) {
+            ModelServiceDetailNotice.ServiceNotFound -> serviceNotFoundMessage
+            ModelServiceDetailNotice.ConnectionSucceeded -> connectionSucceededMessage
+            ModelServiceDetailNotice.ConnectionFailed -> connectionFailedMessage
+            is ModelServiceDetailNotice.ModelsSynchronized -> context.getString(
+                R.string.modelsettings_notice_models_synchronized,
+                notice.count,
+            )
+            ModelServiceDetailNotice.ModelSynchronizationFailed -> modelsSyncFailedMessage
+            ModelServiceDetailNotice.AgentMutationBlocked -> agentBlockedMessage
+        }
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         viewModel.onAction(ModelServiceDetailAction.NoticeConsumed)
     }
 
@@ -43,21 +63,12 @@ fun LLMModelServiceDetailRoute(
     ModelServiceDetailScreen(
         state = state,
         onAction = viewModel::onAction,
-        onOpenUrl = { url, missingMessage -> context.openUrl(url, missingMessage) },
+        onOpenUrl = { url, missingMessage -> context.openUrl(url, missingMessage, noBrowserMessage) },
         modifier = modifier,
     )
 }
 
-private fun ModelServiceDetailNotice.message(): String = when (this) {
-    ModelServiceDetailNotice.ServiceNotFound -> "未找到该服务"
-    ModelServiceDetailNotice.ConnectionSucceeded -> "检测成功"
-    ModelServiceDetailNotice.ConnectionFailed -> "检测失败"
-    is ModelServiceDetailNotice.ModelsSynchronized -> "已同步远端：$count 条"
-    ModelServiceDetailNotice.ModelSynchronizationFailed -> "同步远端模型失败"
-    ModelServiceDetailNotice.AgentMutationBlocked -> "Agent 任务进行中，请先停止任务后再修改。"
-}
-
-private fun Context.openUrl(url: String, missingMessage: String) {
+private fun Context.openUrl(url: String, missingMessage: String, noBrowserMessage: String) {
     if (url.isBlank()) {
         Toast.makeText(this, missingMessage, Toast.LENGTH_SHORT).show()
         return
@@ -68,6 +79,6 @@ private fun Context.openUrl(url: String, missingMessage: String) {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     } catch (_: ActivityNotFoundException) {
-        Toast.makeText(this, "未找到可用的浏览器", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, noBrowserMessage, Toast.LENGTH_SHORT).show()
     }
 }

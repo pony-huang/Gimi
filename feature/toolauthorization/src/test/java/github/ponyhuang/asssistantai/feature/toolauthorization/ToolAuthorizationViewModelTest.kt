@@ -47,7 +47,7 @@ class ToolAuthorizationViewModelTest {
 
             verify(exactly = 0) { repository.setAllEnabled(any()) }
             assertTrue(state.isMutationBlocked)
-            assertEquals("Agent 任务进行中，请先停止任务后再修改。", state.notice)
+            assertEquals("", state.notice)
             cancelAndIgnoreRemainingEvents()
         }
     }

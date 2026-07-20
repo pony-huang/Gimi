@@ -12,8 +12,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.CatalogLoadState
+import github.ponyhuang.asssistantai.feature.modelsettings.R
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
 import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
 
@@ -26,10 +28,14 @@ fun LLMModelServiceListScreen(
 ) {
     SettingsPageContainer(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
-            SettingsSectionTitle(text = "已配置服务", modifier = Modifier.padding(top = 12.dp))
-            if (state.isMutationBlocked || state.notice != null) {
+            SettingsSectionTitle(
+                text = stringResource(R.string.modelsettings_list_section_configured),
+                modifier = Modifier.padding(top = 12.dp),
+            )
+            if (state.isMutationBlocked || !state.notice.isNullOrBlank()) {
                 Text(
-                    text = state.notice ?: "Agent 任务进行中，请先停止任务后再修改。",
+                    text = state.notice?.takeUnless { it.isBlank() }
+                        ?: stringResource(R.string.modelsettings_agent_mutation_blocked),
                     color = androidx.compose.material3.MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 )
@@ -45,7 +51,7 @@ fun LLMModelServiceListScreen(
                     modifier = Modifier.fillMaxSize().padding(24.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("模型目录加载失败")
+                    Text(stringResource(R.string.modelsettings_list_load_failed))
                 }
                 CatalogLoadState.Ready -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),

@@ -1,5 +1,6 @@
 package github.ponyhuang.asssistantai.feature.permissions
 
+import androidx.annotation.StringRes
 import github.ponyhuang.asssistantai.domain.permissions.model.AppPermission
 
 enum class PermissionGroupKind {
@@ -19,8 +20,8 @@ enum class PermissionGroupStatus {
 
 data class PermissionGroupUiModel(
     val kind: PermissionGroupKind,
-    val title: String,
-    val subtitle: String,
+    @StringRes val titleRes: Int,
+    @StringRes val subtitleRes: Int,
     val permissions: List<AppPermission>,
     val status: PermissionGroupStatus,
 )

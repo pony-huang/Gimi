@@ -26,8 +26,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.mcp.model.McpTransport
+import github.ponyhuang.asssistantai.feature.mcp.R
 import github.ponyhuang.asssistantai.ui.settings.SettingsCard
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
 import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
@@ -57,14 +59,15 @@ fun McpServerEditorScreen(
                 .padding(vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (state.isMutationBlocked || state.notice != null) {
+            if (state.isMutationBlocked || !state.notice.isNullOrBlank()) {
                 Text(
-                    text = state.notice ?: "Agent 任务进行中，请先停止任务后再修改。",
+                    text = state.notice?.takeUnless { it.isBlank() }
+                        ?: stringResource(R.string.mcp_agent_mutation_blocked),
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 24.dp),
                 )
             }
-            SettingsSectionTitle(text = "基本信息")
+            SettingsSectionTitle(text = stringResource(R.string.mcp_section_basic_info))
             SettingsCard(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -75,7 +78,7 @@ fun McpServerEditorScreen(
                         onValueChange = {
                             onAction(McpSettingsAction.EditorChanged(draft.copy(name = it)))
                         },
-                        label = { Text("名称 *") },
+                        label = { Text(stringResource(R.string.mcp_field_name_required)) },
                         enabled = !state.isMutationBlocked,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -84,7 +87,7 @@ fun McpServerEditorScreen(
                         onValueChange = {
                             onAction(McpSettingsAction.EditorChanged(draft.copy(description = it)))
                         },
-                        label = { Text("描述") },
+                        label = { Text(stringResource(R.string.mcp_field_description)) },
                         enabled = !state.isMutationBlocked,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -97,11 +100,11 @@ fun McpServerEditorScreen(
                         },
                     ) {
                         OutlinedTextField(
-                            value = draft.transport.label,
+                            value = draft.transport.displayName(),
                             onValueChange = {},
                             readOnly = true,
                             enabled = !state.isMutationBlocked,
-                            label = { Text("类型 *") },
+                            label = { Text(stringResource(R.string.mcp_field_type_required)) },
                             trailingIcon = {
                                 ExposedDropdownMenuDefaults.TrailingIcon(
                                     state.isTransportMenuExpanded,
@@ -119,7 +122,7 @@ fun McpServerEditorScreen(
                         ) {
                             McpTransport.entries.forEach { option ->
                                 DropdownMenuItem(
-                                    text = { Text(option.label) },
+                                    text = { Text(option.displayName()) },
                                     onClick = {
                                         onAction(McpSettingsAction.TransportSelected(option))
                                     },
@@ -132,7 +135,7 @@ fun McpServerEditorScreen(
                         onValueChange = {
                             onAction(McpSettingsAction.EditorChanged(draft.copy(endpointUrl = it)))
                         },
-                        label = { Text("服务器端点 *") },
+                        label = { Text(stringResource(R.string.mcp_field_endpoint_required)) },
                         enabled = !state.isMutationBlocked,
                         placeholder = { Text("https://example.com/mcp") },
                         modifier = Modifier.fillMaxWidth(),
@@ -142,7 +145,7 @@ fun McpServerEditorScreen(
                         onValueChange = {
                             onAction(McpSettingsAction.EditorChanged(draft.copy(bearerToken = it)))
                         },
-                        label = { Text("Bearer Token（可选）") },
+                        label = { Text(stringResource(R.string.mcp_field_bearer_token_optional)) },
                         enabled = !state.isMutationBlocked,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -151,15 +154,15 @@ fun McpServerEditorScreen(
                         onValueChange = {
                             onAction(McpSettingsAction.EditorChanged(draft.copy(headers = it)))
                         },
-                        label = { Text("请求头参数（可选）") },
+                        label = { Text(stringResource(R.string.mcp_field_header_optional)) },
                         enabled = !state.isMutationBlocked,
                         placeholder = { Text("X-Api-Key=your-key\nX-Client=assistant") },
-                        supportingText = { Text("每行一个，格式：Header-Name=value") },
+                        supportingText = { Text(stringResource(R.string.mcp_field_header_help)) },
                         minLines = 3,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     ListItem(
-                        headlineContent = { Text("启用此服务器") },
+                        headlineContent = { Text(stringResource(R.string.mcp_field_enable_server)) },
                         trailingContent = {
                             Switch(
                                 checked = draft.isEnabled,
@@ -175,7 +178,7 @@ fun McpServerEditorScreen(
                         },
                     )
                     Text(
-                        "支持 SSE 与 Streamable HTTP。stdio 命令模式需要本机子进程，不能在 Android 应用中安全运行。",
+                        stringResource(R.string.mcp_sse_help),
                     )
                 }
             }
@@ -190,7 +193,7 @@ fun McpServerEditorScreen(
                             draft.name.isNotBlank() && draft.endpointUrl.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("保存")
+                        Text(stringResource(R.string.mcp_save))
                     }
                     if (!draft.isNew) {
                         TextButton(
@@ -199,7 +202,7 @@ fun McpServerEditorScreen(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = null)
-                            Text("删除服务器")
+                            Text(stringResource(R.string.mcp_delete_server))
                         }
                     }
                 }

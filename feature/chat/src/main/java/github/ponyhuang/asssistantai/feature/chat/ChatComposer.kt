@@ -93,7 +93,7 @@ public fun ChatComposer(
     onVoiceAudioChunk: (ByteArray) -> Unit = { },
     onVoiceInputError: (Throwable) -> Unit = { },
     isVoiceInputAvailable: Boolean = false,
-    onTranscribeVoice: suspend (ByteArray) -> String = { error("未配置语音识别") },
+    onTranscribeVoice: suspend (ByteArray) -> String = { error("transcription not configured") },
 ) {
     var messageData by rememberSaveable(stateSaver = MessageData.Saver) {
         mutableStateOf(messageData)
@@ -108,6 +108,9 @@ public fun ChatComposer(
 
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val voiceNoAudioMessage = stringResource(R.string.chat_voice_no_audio_captured)
+    val voiceTranscriptionFailedMessage = stringResource(R.string.chat_voice_transcription_failed)
+    val voiceRecordingFailedMessage = stringResource(R.string.chat_voice_recording_failed)
 
     val handleSendClick = {
         keyboardController?.hide()
@@ -204,7 +207,7 @@ public fun ChatComposer(
                                 onVoiceInputStop()
                                 val pcm = voiceAudio.drain()
                                 if (pcm.isEmpty()) {
-                                    voiceErrorMessage = "没有录制到语音，请重试"
+                                    voiceErrorMessage = voiceNoAudioMessage
                                 } else if (!isTranscribing) {
                                     coroutineScope.launch {
                                         isTranscribing = true
@@ -216,7 +219,7 @@ public fun ChatComposer(
                                         } catch (error: CancellationException) {
                                             throw error
                                         } catch (error: Throwable) {
-                                            voiceErrorMessage = error.message ?: "语音识别失败，请重试"
+                                            voiceErrorMessage = error.message ?: voiceTranscriptionFailedMessage
                                             onVoiceInputError(error)
                                         } finally {
                                             isTranscribing = false
@@ -230,7 +233,7 @@ public fun ChatComposer(
                             },
                             onVoiceInputError = { error ->
                                 voiceAudio.reset()
-                                voiceErrorMessage = error.message ?: "录音失败，请重试"
+                                voiceErrorMessage = error.message ?: voiceRecordingFailedMessage
                                 onVoiceInputError(error)
                             },
                         ),

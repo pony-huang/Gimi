@@ -27,10 +27,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.feature.modelsettings.R
 
 @Composable
 fun LLMModelManagementSection(
@@ -51,7 +53,7 @@ fun LLMModelManagementSection(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "模型",
+                text = stringResource(R.string.modelsettings_section_models),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
@@ -62,11 +64,17 @@ fun LLMModelManagementSection(
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
-                    contentDescription = if (isRefreshing) "同步中..." else "刷新",
+                    contentDescription = stringResource(
+                        if (isRefreshing) R.string.modelsettings_sync_refreshing
+                        else R.string.modelsettings_sync_refresh,
+                    ),
                 )
             }
             IconButton(onClick = { onAction(ModelServiceDetailAction.ShowAddDialog) }) {
-                Icon(Icons.Default.Add, contentDescription = "添加模型")
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = stringResource(R.string.modelsettings_dialog_add_custom_model_title),
+                )
             }
         }
 
@@ -128,7 +136,10 @@ private fun GroupHeaderRow(
     ) {
         Icon(
             imageVector = Icons.Default.KeyboardArrowDown,
-            contentDescription = if (row.isExpanded) "收起" else "展开",
+            contentDescription = stringResource(
+                if (row.isExpanded) R.string.modelsettings_sync_collapse
+                else R.string.modelsettings_sync_expand,
+            ),
             modifier = Modifier.size(20.dp).rotate(rotation),
         )
         Text(
@@ -182,7 +193,7 @@ private fun ModelItemRow(
         IconButton(onClick = onRemove) {
             Icon(
                 imageVector = Icons.Default.Remove,
-                contentDescription = "移除模型",
+                contentDescription = stringResource(R.string.modelsettings_remove_model),
                 modifier = Modifier.size(18.dp),
                 tint = MaterialTheme.colorScheme.error,
             )
@@ -201,14 +212,14 @@ private fun AddModelDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("添加自定义模型") },
+        title = { Text(stringResource(R.string.modelsettings_dialog_add_custom_model_title)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = input,
                     onValueChange = onInputChange,
                     singleLine = true,
-                    label = { Text("模型 ID") },
+                    label = { Text(stringResource(R.string.modelsettings_dialog_model_id)) },
                 )
                 NewModelKind.entries.forEach { option ->
                     Row(
@@ -222,18 +233,18 @@ private fun AddModelDialog(
                             selected = kind == option,
                             onClick = { onKindChange(option) },
                         )
-                        Text(option.label)
+                        Text(stringResource(option.labelRes))
                     }
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("确认")
+                Text(stringResource(R.string.modelsettings_dialog_confirm))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.modelsettings_dialog_cancel)) }
         },
     )
 }

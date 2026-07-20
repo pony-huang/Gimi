@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.CatalogLoadState
@@ -35,6 +36,7 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.feature.chat.R
 import github.ponyhuang.asssistantai.ui.common.PickerSingleChoiceDialog
 import github.ponyhuang.asssistantai.ui.settings.llmmodel.LLMModelServiceIcon
 
@@ -126,7 +128,7 @@ fun ModelStatusDisplay(
                 Spacer(Modifier.width(2.dp))
                 Icon(
                     imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = "选择模型",
+                    contentDescription = stringResource(R.string.chat_model_picker_change),
                     modifier = Modifier.size(18.dp),
                 )
             }
@@ -200,9 +202,9 @@ fun ModelTitleAndPicker(
             modelName = displayedModelName,
             serviceId = displayedModel?.service?.id,
             emptyText = when (loadState) {
-                CatalogLoadState.Loading -> "模型加载中"
-                CatalogLoadState.Ready -> "请先配置模型"
-                is CatalogLoadState.Failed -> "模型加载失败"
+                CatalogLoadState.Loading -> stringResource(R.string.chat_model_loading)
+                CatalogLoadState.Ready -> stringResource(R.string.chat_model_empty_configure)
+                is CatalogLoadState.Failed -> stringResource(R.string.chat_model_load_failed)
             },
             isLoading = loadState == CatalogLoadState.Loading,
             onClick = when {
@@ -231,10 +233,10 @@ fun ModelTitleAndPicker(
                 } ?: false
             },
             key = { row -> "${row.service.id}/${row.group.id}/${row.model.id}" },
-            title = "选择当前模型",
+            title = stringResource(R.string.chat_model_picker_title),
             optionTitle = { it.model.name },
             optionSubtitle = { "${it.service.name} · ${it.group.name}" },
-            emptyText = "暂无可用模型，请先在模型服务中启用至少一个模型。",
+            emptyText = stringResource(R.string.chat_model_empty_enable_first),
             onPick = { row ->
                 onSelectModel(
                     ModelSelection(

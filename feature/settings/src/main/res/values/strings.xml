@@ -1,0 +1,30 @@
+<resources>
+    <string name="settings_title">设置</string>
+
+    <string name="settings_model_service_title">模型服务</string>
+    <string name="settings_model_service_subtitle">API 密钥 · 服务地址 · 模型列表</string>
+
+    <string name="settings_default_model_title">默认模型</string>
+    <string name="settings_default_model_subtitle">助手 · 快速响应 · 语音识别与播放</string>
+
+    <string name="settings_voice_wake_title">语音唤醒</string>
+    <string name="settings_voice_wake_subtitle">蓝牙耳机 · 唤醒词 · 离线模型</string>
+
+    <string name="settings_mcp_title">MCP 服务器</string>
+    <string name="settings_mcp_subtitle">远程工具服务 · 连接与授权</string>
+
+    <string name="settings_chat_display_title">聊天显示</string>
+    <string name="settings_chat_display_subtitle">显示工具调用和返回结果</string>
+
+    <string name="settings_work_files_title">工作文件</string>
+    <string name="settings_work_files_subtitle">授权助手搜索的本机文件夹</string>
+
+    <string name="settings_tool_authorization_title">工具授权</string>
+    <string name="settings_tool_authorization_subtitle">选择允许助手使用的本地工具</string>
+
+    <string name="settings_permissions_title">权限管理</string>
+    <string name="settings_permissions_subtitle">预先授权聊天任务和语音功能所需权限</string>
+
+    <string name="settings_about_title">关于</string>
+    <string name="settings_about_subtitle">Asssistant AI %1$s</string>
+</resources>

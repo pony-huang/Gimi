@@ -1,0 +1,33 @@
+<resources>
+    <!-- PermissionSettingsScreen -->
+    <string name="permissions_screen_title">权限管理</string>
+    <string name="permissions_section_regular">普通权限</string>
+    <string name="permissions_regular_all_granted">普通权限已全部授权</string>
+    <string name="permissions_grant_all">一键授权普通权限</string>
+    <string name="permissions_partial_blocked">部分权限已被系统阻止，请前往应用设置手动开启。</string>
+    <string name="permissions_open_settings">打开应用设置</string>
+
+    <string name="permissions_section_special">特殊权限</string>
+    <string name="permissions_special_modify_settings_title">修改系统设置</string>
+    <string name="permissions_special_modify_settings_subtitle">用于调整屏幕亮度和自动息屏时间</string>
+    <string name="permissions_special_notification_access_title">通知使用权</string>
+    <string name="permissions_special_notification_access_subtitle">用于读取并控制其他应用的媒体播放</string>
+
+    <string name="permissions_status_granted">已授权</string>
+    <string name="permissions_status_not_granted">未授权</string>
+    <string name="permissions_status_partially_granted">部分授权</string>
+
+    <!-- PermissionSettingsViewModel 各权限项 -->
+    <string name="permission_name_location">位置</string>
+    <string name="permission_desc_location">允许助手获取当前位置并执行位置相关任务</string>
+    <string name="permission_name_calendar">日历</string>
+    <string name="permission_desc_calendar">允许助手读取、创建和更新日历事件</string>
+    <string name="permission_name_media">媒体文件</string>
+    <string name="permission_desc_media">允许助手搜索共享图片、视频和音频</string>
+    <string name="permission_name_microphone">麦克风</string>
+    <string name="permission_desc_microphone">用于语音输入和蓝牙语音唤醒</string>
+    <string name="permission_name_bluetooth">蓝牙设备</string>
+    <string name="permission_desc_bluetooth">用于连接耳机并执行语音唤醒任务</string>
+    <string name="permission_name_notifications">通知</string>
+    <string name="permission_desc_notifications">用于显示后台语音任务的运行状态</string>
+</resources>

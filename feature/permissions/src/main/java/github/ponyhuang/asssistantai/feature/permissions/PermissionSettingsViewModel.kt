@@ -1,5 +1,6 @@
 package github.ponyhuang.asssistantai.feature.permissions
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.asssistantai.domain.permissions.model.AppPermission
@@ -108,8 +109,8 @@ private fun PermissionSnapshot.toUiState(): PermissionSettingsUiState {
         val grantedCount = definition.permissions.count(::isGranted)
         PermissionGroupUiModel(
             kind = definition.kind,
-            title = definition.title,
-            subtitle = definition.subtitle,
+            titleRes = definition.titleRes,
+            subtitleRes = definition.subtitleRes,
             permissions = definition.permissions,
             status = when (grantedCount) {
                 definition.permissions.size -> PermissionGroupStatus.Granted
@@ -130,26 +131,26 @@ private fun PermissionSnapshot.toUiState(): PermissionSettingsUiState {
 
 private enum class PermissionGroupDefinition(
     val kind: PermissionGroupKind,
-    val title: String,
-    val subtitle: String,
+    @StringRes val titleRes: Int,
+    @StringRes val subtitleRes: Int,
     val permissions: List<AppPermission>,
 ) {
     Location(
         PermissionGroupKind.Location,
-        "位置",
-        "允许助手获取当前位置并执行位置相关任务",
+        R.string.permission_name_location,
+        R.string.permission_desc_location,
         listOf(AppPermission.FineLocation, AppPermission.CoarseLocation),
     ),
     Calendar(
         PermissionGroupKind.Calendar,
-        "日历",
-        "允许助手读取、创建和更新日历事件",
+        R.string.permission_name_calendar,
+        R.string.permission_desc_calendar,
         listOf(AppPermission.ReadCalendar, AppPermission.WriteCalendar),
     ),
     Media(
         PermissionGroupKind.Media,
-        "媒体文件",
-        "允许助手搜索共享图片、视频和音频",
+        R.string.permission_name_media,
+        R.string.permission_desc_media,
         listOf(
             AppPermission.ReadMediaImages,
             AppPermission.ReadMediaVideo,
@@ -158,20 +159,20 @@ private enum class PermissionGroupDefinition(
     ),
     Microphone(
         PermissionGroupKind.Microphone,
-        "麦克风",
-        "用于语音输入和蓝牙语音唤醒",
+        R.string.permission_name_microphone,
+        R.string.permission_desc_microphone,
         listOf(AppPermission.RecordAudio),
     ),
     Bluetooth(
         PermissionGroupKind.Bluetooth,
-        "蓝牙设备",
-        "用于连接耳机并执行语音唤醒任务",
+        R.string.permission_name_bluetooth,
+        R.string.permission_desc_bluetooth,
         listOf(AppPermission.BluetoothConnect),
     ),
     Notifications(
         PermissionGroupKind.Notifications,
-        "通知",
-        "用于显示后台语音任务的运行状态",
+        R.string.permission_name_notifications,
+        R.string.permission_desc_notifications,
         listOf(AppPermission.PostNotifications),
     ),
 }

@@ -14,9 +14,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.feature.modelsettings.R
 import github.ponyhuang.asssistantai.ui.settings.llmmodel.LLMModelServiceIcon
 
 @Composable
@@ -45,7 +47,10 @@ fun HeaderSection(
             onCheckedChange = onToggleEnabled,
         )
         IconButton(onClick = onOpenHomepage, modifier = Modifier.padding(start = 4.dp)) {
-            Icon(Icons.Default.OpenInNew, contentDescription = "打开主页")
+            Icon(
+                Icons.Default.OpenInNew,
+                contentDescription = stringResource(R.string.modelsettings_open_homepage),
+            )
         }
     }
 }

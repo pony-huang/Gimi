@@ -16,6 +16,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -24,6 +25,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatDisplayRepository
+import github.ponyhuang.asssistantai.feature.settings.R
 import github.ponyhuang.asssistantai.ui.navigation.SettingsScaffold
 import github.ponyhuang.asssistantai.ui.theme.AsssistantaiTheme
 import javax.inject.Inject
@@ -89,40 +91,40 @@ private fun SettingsHomeContent(
             item {
                 SettingsNavigationCard(
                     icon = Icons.Default.Tune,
-                    title = "模型服务",
-                    subtitle = "API 密钥 · 服务地址 · 模型列表",
+                    title = stringResource(R.string.settings_model_service_title),
+                    subtitle = stringResource(R.string.settings_model_service_subtitle),
                     onClick = onNavigateToModelService,
                 )
             }
             item {
                 SettingsNavigationCard(
                     icon = Icons.AutoMirrored.Filled.Chat,
-                    title = "默认模型",
-                    subtitle = "助手 · 快速响应 · 语音识别与播放",
+                    title = stringResource(R.string.settings_default_model_title),
+                    subtitle = stringResource(R.string.settings_default_model_subtitle),
                     onClick = onNavigateToDefaultModels,
                 )
             }
             item {
                 SettingsNavigationCard(
                     icon = Icons.Default.BluetoothAudio,
-                    title = "语音唤醒",
-                    subtitle = "蓝牙耳机 · 唤醒词 · 离线模型",
+                    title = stringResource(R.string.settings_voice_wake_title),
+                    subtitle = stringResource(R.string.settings_voice_wake_subtitle),
                     onClick = onNavigateToVoiceWake,
                 )
             }
             item {
                 SettingsNavigationCard(
                     icon = Icons.Default.Build,
-                    title = "MCP 服务器",
-                    subtitle = "远程工具服务 · 连接与授权",
+                    title = stringResource(R.string.settings_mcp_title),
+                    subtitle = stringResource(R.string.settings_mcp_subtitle),
                     onClick = onNavigateToMcpServers,
                 )
             }
             item {
                 SettingsListItem(
                     icon = Icons.Default.Visibility,
-                    title = "聊天显示",
-                    subtitle = "显示工具调用和返回结果",
+                    title = stringResource(R.string.settings_chat_display_title),
+                    subtitle = stringResource(R.string.settings_chat_display_subtitle),
                     onClick = { onToggleToolActivity(!showToolActivity) },
                     trailingContent = {
                         Switch(
@@ -135,32 +137,32 @@ private fun SettingsHomeContent(
             item {
                 SettingsNavigationCard(
                     icon = Icons.Default.Folder,
-                    title = "工作文件",
-                    subtitle = "授权助手搜索的本机文件夹",
+                    title = stringResource(R.string.settings_work_files_title),
+                    subtitle = stringResource(R.string.settings_work_files_subtitle),
                     onClick = onNavigateToWorkFiles,
                 )
             }
             item {
                 SettingsNavigationCard(
                     icon = Icons.Default.Build,
-                    title = "工具授权",
-                    subtitle = "选择允许助手使用的本地工具",
+                    title = stringResource(R.string.settings_tool_authorization_title),
+                    subtitle = stringResource(R.string.settings_tool_authorization_subtitle),
                     onClick = onNavigateToToolAuthorization,
                 )
             }
             item {
                 SettingsNavigationCard(
                     icon = Icons.Default.Security,
-                    title = "权限管理",
-                    subtitle = "预先授权聊天任务和语音功能所需权限",
+                    title = stringResource(R.string.settings_permissions_title),
+                    subtitle = stringResource(R.string.settings_permissions_subtitle),
                     onClick = onNavigateToPermissions,
                 )
             }
             item {
                 SettingsListItem(
                     icon = Icons.Default.Info,
-                    title = "关于",
-                    subtitle = "Asssistant AI $appVersionName",
+                    title = stringResource(R.string.settings_about_title),
+                    subtitle = stringResource(R.string.settings_about_subtitle, appVersionName),
                 )
             }
         }
@@ -176,7 +178,7 @@ private annotation class SettingsFormFactorPreviews
 @Composable
 private fun SettingsHomePreview() {
     AsssistantaiTheme {
-        SettingsScaffold(title = "设置", onBack = {}) { modifier ->
+        SettingsScaffold(title = stringResource(R.string.settings_title), onBack = {}) { modifier ->
             SettingsHomeContent(
                 showToolActivity = true,
                 appVersionName = "1.0",

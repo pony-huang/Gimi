@@ -18,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavEntry
@@ -28,18 +29,26 @@ import github.ponyhuang.asssistantai.feature.chat.ChatNotice
 import github.ponyhuang.asssistantai.feature.chat.ChatScaffold
 import github.ponyhuang.asssistantai.feature.chat.ChatViewModel
 import github.ponyhuang.asssistantai.feature.chat.ViewModelStore
+import github.ponyhuang.asssistantai.feature.chat.R as ChatR
 import github.ponyhuang.asssistantai.feature.conversation.ChatDrawer
 import github.ponyhuang.asssistantai.feature.mcp.McpServerAddOptionsScreen
 import github.ponyhuang.asssistantai.feature.mcp.McpServerEditorRoute
 import github.ponyhuang.asssistantai.feature.mcp.McpServerImportRoute
 import github.ponyhuang.asssistantai.feature.mcp.McpServerListRoute
+import github.ponyhuang.asssistantai.feature.mcp.R as McpR
 import github.ponyhuang.asssistantai.feature.modelsettings.defaults.DefaultModelSettingsRoute
 import github.ponyhuang.asssistantai.feature.modelsettings.detail.LLMModelServiceDetailRoute
 import github.ponyhuang.asssistantai.feature.modelsettings.list.ModelServiceListRoute
+import github.ponyhuang.asssistantai.feature.modelsettings.R as ModelsettingsR
 import github.ponyhuang.asssistantai.feature.permissions.PermissionSettingsRoute
+import github.ponyhuang.asssistantai.feature.permissions.R as PermissionsR
+import github.ponyhuang.asssistantai.feature.settings.R as SettingsR
 import github.ponyhuang.asssistantai.feature.toolauthorization.ToolAuthorizationRoute
+import github.ponyhuang.asssistantai.feature.toolauthorization.R as ToolauthR
 import github.ponyhuang.asssistantai.feature.voicewake.VoiceWakeSettingsRoute
+import github.ponyhuang.asssistantai.feature.voicewake.R as VoicewakeR
 import github.ponyhuang.asssistantai.feature.workfiles.WorkFilesSettingsRoute
+import github.ponyhuang.asssistantai.feature.workfiles.R as WorkfilesR
 import github.ponyhuang.asssistantai.ui.navigation.AppRoute
 import github.ponyhuang.asssistantai.ui.navigation.SettingsScaffold
 import github.ponyhuang.asssistantai.ui.settings.SettingsScreen
@@ -60,6 +69,8 @@ fun MainScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val currentSessionId = uiState.sessionId
     val context = LocalContext.current
+    val chatNoticeConfigureChatModel = stringResource(ChatR.string.chat_notice_configure_chat_model)
+    val chatNoticeModelSwitchBlocked = stringResource(ChatR.string.chat_notice_model_switch_blocked)
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val backStack = rememberNavBackStack(AppRoute.Chat)
@@ -80,8 +91,8 @@ fun MainScreen(
 
     LaunchedEffect(uiState.notice) {
         val message = when (val notice = uiState.notice) {
-            ChatNotice.ConfigureChatModel -> "请先在模型服务中配置并启用聊天模型"
-            ChatNotice.ModelSwitchBlocked -> "正在生成回复，完成后再切换模型"
+            ChatNotice.ConfigureChatModel -> chatNoticeConfigureChatModel
+            ChatNotice.ModelSwitchBlocked -> chatNoticeModelSwitchBlocked
             is ChatNotice.Message -> notice.text
             null -> return@LaunchedEffect
         }
@@ -125,7 +136,7 @@ fun MainScreen(
                                 onModelSwitchBlocked = {
                                     Toast.makeText(
                                         context,
-                                        "正在生成回复，完成后再切换模型",
+                                        chatNoticeModelSwitchBlocked,
                                         Toast.LENGTH_SHORT,
                                     ).show()
                                 },
@@ -138,7 +149,10 @@ fun MainScreen(
                             )
                         }
 
-                        AppRoute.Settings -> SettingsScaffold("设置", goBack) { modifier ->
+                        AppRoute.Settings -> SettingsScaffold(
+                            stringResource(SettingsR.string.settings_title),
+                            goBack,
+                        ) { modifier ->
                             SettingsScreen(
                                 appVersionName = BuildConfig.VERSION_NAME,
                                 onNavigateToModelService = { backStack.add(AppRoute.ModelServiceList) },
@@ -154,32 +168,50 @@ fun MainScreen(
                             )
                         }
 
-                        AppRoute.DefaultModelSettings -> SettingsScaffold("默认模型", goBack) {
+                        AppRoute.DefaultModelSettings -> SettingsScaffold(
+                            stringResource(ModelsettingsR.string.modelsettings_defaults_screen_title),
+                            goBack,
+                        ) {
                             DefaultModelSettingsRoute(modifier = it)
                         }
 
-                        AppRoute.VoiceWakeSettings -> SettingsScaffold("语音唤醒", goBack) {
+                        AppRoute.VoiceWakeSettings -> SettingsScaffold(
+                            stringResource(VoicewakeR.string.voicewake_screen_title),
+                            goBack,
+                        ) {
                             VoiceWakeSettingsRoute(modifier = it)
                         }
 
-                        AppRoute.WorkFilesSettings -> SettingsScaffold("工作文件", goBack) {
+                        AppRoute.WorkFilesSettings -> SettingsScaffold(
+                            stringResource(WorkfilesR.string.workfiles_screen_title),
+                            goBack,
+                        ) {
                             WorkFilesSettingsRoute(modifier = it)
                         }
 
-                        AppRoute.PermissionSettings -> SettingsScaffold("权限管理", goBack) {
+                        AppRoute.PermissionSettings -> SettingsScaffold(
+                            stringResource(PermissionsR.string.permissions_screen_title),
+                            goBack,
+                        ) {
                             PermissionSettingsRoute(modifier = it)
                         }
 
-                        AppRoute.ToolAuthorizationSettings -> SettingsScaffold("工具授权", goBack) {
+                        AppRoute.ToolAuthorizationSettings -> SettingsScaffold(
+                            stringResource(ToolauthR.string.toolauth_screen_title),
+                            goBack,
+                        ) {
                             ToolAuthorizationRoute(modifier = it)
                         }
 
                         AppRoute.McpServerList -> SettingsScaffold(
-                            title = "MCP 服务器",
+                            title = stringResource(McpR.string.mcp_list_title),
                             onBack = goBack,
                             actions = {
                                 IconButton(onClick = { backStack.add(AppRoute.McpServerAddOptions) }) {
-                                    Icon(Icons.Default.Add, contentDescription = "添加 MCP 服务器")
+                                    Icon(
+                                        Icons.Default.Add,
+                                        contentDescription = stringResource(McpR.string.mcp_add_server),
+                                    )
                                 }
                             },
                         ) { modifier ->
@@ -189,7 +221,10 @@ fun MainScreen(
                             )
                         }
 
-                        AppRoute.McpServerAddOptions -> SettingsScaffold("添加 MCP 服务", goBack) {
+                        AppRoute.McpServerAddOptions -> SettingsScaffold(
+                            stringResource(McpR.string.mcp_add_options_title),
+                            goBack,
+                        ) {
                             McpServerAddOptionsScreen(
                                 onCreate = { backStack.add(AppRoute.McpServerEditor()) },
                                 onImport = { backStack.add(AppRoute.McpServerImport) },
@@ -197,25 +232,37 @@ fun MainScreen(
                             )
                         }
 
-                        AppRoute.McpServerImport -> SettingsScaffold("导入 MCP 配置", goBack) {
+                        AppRoute.McpServerImport -> SettingsScaffold(
+                            stringResource(McpR.string.mcp_import_title),
+                            goBack,
+                        ) {
                             McpServerImportRoute(goBack, it)
                         }
 
                         is AppRoute.McpServerEditor -> SettingsScaffold(
-                            if (route.serverId == null) "添加 MCP 服务器" else "编辑 MCP 服务器",
+                            stringResource(
+                                if (route.serverId == null) McpR.string.mcp_add_server
+                                else McpR.string.mcp_edit_server,
+                            ),
                             goBack,
                         ) {
                             McpServerEditorRoute(route.serverId, goBack, modifier = it)
                         }
 
-                        AppRoute.ModelServiceList -> SettingsScaffold("模型服务", goBack) {
+                        AppRoute.ModelServiceList -> SettingsScaffold(
+                            stringResource(ModelsettingsR.string.modelsettings_list_title),
+                            goBack,
+                        ) {
                             ModelServiceListRoute(
                                 onNavigateToDetail = { id -> backStack.add(AppRoute.ModelServiceDetail(id)) },
                                 modifier = it,
                             )
                         }
 
-                        is AppRoute.ModelServiceDetail -> SettingsScaffold("服务详情", goBack) {
+                        is AppRoute.ModelServiceDetail -> SettingsScaffold(
+                            stringResource(ModelsettingsR.string.modelsettings_detail_title),
+                            goBack,
+                        ) {
                             LLMModelServiceDetailRoute(route.serviceId, goBack, modifier = it)
                         }
                     }

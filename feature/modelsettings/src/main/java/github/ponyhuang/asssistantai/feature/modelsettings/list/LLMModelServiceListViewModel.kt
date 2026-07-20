@@ -69,6 +69,6 @@ class LLMModelServiceListViewModel @Inject constructor(
     }
 
     private companion object {
-        const val BLOCKED_MESSAGE = "Agent 任务进行中，请先停止任务后再修改。"
+        const val BLOCKED_MESSAGE = ""
     }
 }

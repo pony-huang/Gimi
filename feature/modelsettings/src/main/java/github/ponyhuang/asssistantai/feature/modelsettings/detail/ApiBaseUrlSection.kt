@@ -12,9 +12,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.feature.modelsettings.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,8 +30,8 @@ fun ApiBaseUrlSection(
     modifier: Modifier = Modifier,
 ) {
     val options = listOf(
-        ApiProtocol.Standard to "标准 API 地址",
-        ApiProtocol.Anthropic to "Anthropic API 地址",
+        ApiProtocol.Standard to stringResource(R.string.modelsettings_api_protocol_standard),
+        ApiProtocol.Anthropic to stringResource(R.string.modelsettings_api_protocol_anthropic),
     )
 
     Column(
@@ -44,7 +46,7 @@ fun ApiBaseUrlSection(
                 value = options.first { it.first == service.apiProtocol }.second,
                 onValueChange = {},
                 readOnly = true,
-                label = { Text("API 地址") },
+                label = { Text(stringResource(R.string.modelsettings_api_url_label)) },
                 trailingIcon = {
                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = isMenuExpanded)
                 },
@@ -67,7 +69,7 @@ fun ApiBaseUrlSection(
             value = service.activeApiBaseUrl,
             onValueChange = onBaseUrlChange,
             singleLine = true,
-            label = { Text("Base URL") },
+            label = { Text(stringResource(R.string.modelsettings_api_url_label)) },
             modifier = Modifier.fillMaxWidth(),
         )
     }

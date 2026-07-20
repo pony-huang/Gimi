@@ -23,8 +23,8 @@ class PermissionSettingsScreenTest {
                         groups = listOf(
                             PermissionGroupUiModel(
                                 kind = PermissionGroupKind.Microphone,
-                                title = "麦克风",
-                                subtitle = "用于语音输入和蓝牙语音唤醒",
+                                titleRes = R.string.permission_name_microphone,
+                                subtitleRes = R.string.permission_desc_microphone,
                                 permissions = listOf(AppPermission.RecordAudio),
                                 status = PermissionGroupStatus.Denied,
                             ),

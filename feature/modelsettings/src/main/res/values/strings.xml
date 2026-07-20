@@ -1,0 +1,82 @@
+<resources>
+    <!-- ApiKeySection -->
+    <string name="modelsettings_api_key_label">API 密钥</string>
+    <string name="modelsettings_api_key_test">检测</string>
+    <string name="modelsettings_api_key_get_key">点击这里获取密钥</string>
+    <string name="modelsettings_api_key_hide">隐藏密钥</string>
+    <string name="modelsettings_api_key_show">显示密钥</string>
+
+    <!-- ApiBaseUrlSection -->
+    <string name="modelsettings_api_url_label">API 地址</string>
+    <string name="modelsettings_api_protocol_standard">标准 API 地址</string>
+    <string name="modelsettings_api_protocol_anthropic">Anthropic API 地址</string>
+
+    <!-- HeaderSection -->
+    <string name="modelsettings_open_homepage">打开主页</string>
+
+    <!-- LLMModelManagementSection -->
+    <string name="modelsettings_section_models">模型</string>
+    <string name="modelsettings_sync_refreshing">同步中…</string>
+    <string name="modelsettings_sync_refresh">刷新</string>
+    <string name="modelsettings_sync_collapse">收起</string>
+    <string name="modelsettings_sync_expand">展开</string>
+    <string name="modelsettings_remove_model">移除模型</string>
+    <string name="modelsettings_dialog_add_custom_model_title">添加自定义模型</string>
+    <string name="modelsettings_dialog_model_id">模型 ID</string>
+    <string name="modelsettings_dialog_confirm">确认</string>
+    <string name="modelsettings_dialog_cancel">取消</string>
+
+    <!-- LLMModelServiceDetailScreen / Route -->
+    <string name="modelsettings_section_connection">连接配置</string>
+    <string name="modelsettings_homepage_missing">未配置主页链接</string>
+    <string name="modelsettings_key_url_missing">未配置密钥获取链接</string>
+    <string name="modelsettings_no_link_configured">未配置对应链接</string>
+    <string name="modelsettings_no_browser">未找到可用的浏览器</string>
+    <string name="modelsettings_notice_service_not_found">未找到该服务</string>
+    <string name="modelsettings_notice_connection_succeeded">检测成功</string>
+    <string name="modelsettings_notice_connection_failed">检测失败</string>
+    <string name="modelsettings_notice_models_synchronized">已同步远端：%1$d 条</string>
+    <string name="modelsettings_notice_models_sync_failed">同步远端模型失败</string>
+
+    <!-- LLMModelServiceListScreen -->
+    <string name="modelsettings_list_section_configured">已配置服务</string>
+    <string name="modelsettings_list_load_failed">模型目录加载失败</string>
+
+    <!-- DefaultModelSettingsScreen -->
+    <string name="modelsettings_defaults_assistant_title">默认助手模型</string>
+    <string name="modelsettings_defaults_assistant_subtitle">创建新助手时使用的模型</string>
+    <string name="modelsettings_defaults_quick_title">快速模型</string>
+    <string name="modelsettings_defaults_quick_subtitle">用于需要快速响应的助手功能</string>
+    <string name="modelsettings_defaults_stt_title">默认语音模型</string>
+    <string name="modelsettings_defaults_stt_subtitle">用于语音输入，仅显示语音识别模型</string>
+    <string name="modelsettings_defaults_tts_title">默认语音播放模型</string>
+    <string name="modelsettings_defaults_tts_subtitle">用于朗读助手回复，仅显示语音合成模型</string>
+    <string name="modelsettings_defaults_voice_title">语音播放音色</string>
+
+    <string name="modelsettings_dialog_pick_assistant">选择默认助手模型</string>
+    <string name="modelsettings_dialog_pick_quick">选择快速模型</string>
+    <string name="modelsettings_dialog_pick_stt">选择默认语音模型</string>
+    <string name="modelsettings_dialog_pick_tts">选择默认语音播放模型</string>
+    <string name="modelsettings_dialog_pick_voice">选择语音播放音色</string>
+    <string name="modelsettings_dialog_no_voices">暂无可用音色</string>
+    <string name="modelsettings_dialog_no_models">暂无可用模型，请先在模型服务中启用至少一个模型。</string>
+
+    <!-- FooterSection -->
+    <string name="modelsettings_new_model_chat">聊天模型</string>
+    <string name="modelsettings_new_model_stt">语音识别模型（STT）</string>
+    <string name="modelsettings_new_model_tts">语音合成模型（TTS）</string>
+
+    <string name="modelsettings_footer_intro_label">查看 </string>
+    <string name="modelsettings_footer_docs_label">%1$s 文档</string>
+    <string name="modelsettings_footer_and_label"> 和 </string>
+    <string name="modelsettings_footer_models_label">模型</string>
+    <string name="modelsettings_footer_tail_label"> 获取更多详情</string>
+
+    <!-- 路由标题（由 :app 注入 SettingsScaffold 使用） -->
+    <string name="modelsettings_list_title">模型服务</string>
+    <string name="modelsettings_defaults_screen_title">默认模型</string>
+    <string name="modelsettings_detail_title">服务详情</string>
+
+    <!-- 共享：Agent 任务进行中 -->
+    <string name="modelsettings_agent_mutation_blocked">Agent 任务进行中，请先停止任务后再修改。</string>
+</resources>

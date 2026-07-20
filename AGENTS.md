@@ -101,6 +101,12 @@ No formatter or linter is currently configured; match nearby code and keep impor
 
 When designing or changing Compose UI, always account for system safety insets. Edge-to-edge screens must keep interactive controls and primary content clear of status bars, display cutouts, navigation bars, and gesture areas by applying the appropriate inset padding (for example, `statusBarsPadding`, `navigationBarsPadding`, or `safeDrawingPadding`). Visually review screenshot/device output to ensure back buttons, app bars, and bottom controls are not crowded by system UI.
 
+## Internationalization (i18n)
+
+Default locale is Chinese (`values/`); English lives in `values-en/`. Each module owns its own `res/values/strings.xml` + `res/values-en/strings.xml`; shared business-agnostic copy lives in `:core:designsystem`.
+
+All user-facing text (`Text`, `contentDescription`, dialog titles, field labels/supporting text, surfaced toasts) MUST come from `stringResource(R.string.xxx)`. Doc comments and `@Preview` fixtures are exempt.
+
 ## Testing Guidelines
 
 Use JUnit 4 for JVM unit tests in the owning module's `src/test` source set. Name files `*Test.kt` and methods after the behavior checked, for example `fun restoresLastSession()`. Put Android-dependent and Compose interaction coverage in the owning module's `src/androidTest` source set.

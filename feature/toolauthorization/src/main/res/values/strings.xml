@@ -1,0 +1,13 @@
+<resources>
+    <!-- ToolAuthorizationScreen -->
+    <string name="toolauth_screen_title">工具授权</string>
+    <string name="toolauth_count_label">已启用 %1$d / %2$d</string>
+    <string name="toolauth_enable_all">全部启用</string>
+    <string name="toolauth_disable_all">全部关闭</string>
+    <string name="toolauth_search_label">搜索工具</string>
+    <string name="toolauth_empty_state">暂无可配置的本地工具</string>
+    <string name="toolauth_no_match">没有匹配的工具</string>
+
+    <!-- 共享：Agent 任务进行中 -->
+    <string name="toolauth_agent_mutation_blocked">Agent 任务进行中，请先停止任务后再修改。</string>
+</resources>

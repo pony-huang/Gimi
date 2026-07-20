@@ -130,7 +130,7 @@ internal fun DefaultIdleContent(onClick: () -> Unit, enabled: Boolean = true) {
             contentDescription = if (enabled) {
                 stringResource(R.string.stream_ai_compose_speech_to_text_idle_button)
             } else {
-                "请先在设置中配置默认语音模型"
+                stringResource(R.string.chat_stt_configure_default_first)
             },
         )
     }

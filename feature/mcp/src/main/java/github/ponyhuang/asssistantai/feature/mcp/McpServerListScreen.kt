@@ -27,11 +27,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
 import github.ponyhuang.asssistantai.domain.mcp.model.McpTransport
+import github.ponyhuang.asssistantai.feature.mcp.R
 import github.ponyhuang.asssistantai.ui.settings.SettingsCard
 import github.ponyhuang.asssistantai.ui.settings.SettingsNavigationCard
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
@@ -46,10 +48,14 @@ fun McpServerListScreen(
 ) {
     SettingsPageContainer(modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
-            SettingsSectionTitle(text = "MCP 服务", modifier = Modifier.padding(top = 12.dp))
-            if (state.isMutationBlocked || state.notice != null) {
+            SettingsSectionTitle(
+                text = stringResource(R.string.mcp_section_servers),
+                modifier = Modifier.padding(top = 12.dp),
+            )
+            if (state.isMutationBlocked || !state.notice.isNullOrBlank()) {
                 Text(
-                    text = state.notice ?: "Agent 任务进行中，请先停止任务后再修改。",
+                    text = state.notice?.takeUnless { it.isBlank() }
+                        ?: stringResource(R.string.mcp_agent_mutation_blocked),
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 )
@@ -61,7 +67,7 @@ fun McpServerListScreen(
                 if (state.servers.isEmpty()) {
                     item {
                         Text(
-                            "尚未配置服务器",
+                            stringResource(R.string.mcp_no_servers),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 18.dp),
                         )
@@ -95,18 +101,18 @@ fun McpServerAddOptionsScreen(
                 .padding(vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            SettingsSectionTitle(text = "添加方式")
+            SettingsSectionTitle(text = stringResource(R.string.mcp_section_add_methods))
             SettingsNavigationCard(
                 icon = Icons.Default.Add,
-                title = "新建",
-                subtitle = "手动配置 SSE 或 Streamable HTTP 服务",
+                title = stringResource(R.string.mcp_method_new_title),
+                subtitle = stringResource(R.string.mcp_method_new_subtitle),
                 onClick = onCreate,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
             SettingsNavigationCard(
                 icon = Icons.Default.ContentPaste,
-                title = "导入",
-                subtitle = "粘贴 mcpServers JSON 配置",
+                title = stringResource(R.string.mcp_method_import_title),
+                subtitle = stringResource(R.string.mcp_method_import_subtitle),
                 onClick = onImport,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
@@ -129,13 +135,13 @@ fun McpServerImportScreen(
                 .padding(vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            SettingsSectionTitle(text = "导入 MCP 配置")
+            SettingsSectionTitle(text = stringResource(R.string.mcp_section_import_mcp))
             SettingsCard(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text("粘贴包含 mcpServers 的 JSON 配置。支持 SSE 和 Streamable HTTP。")
+                    Text(stringResource(R.string.mcp_import_help))
                     OutlinedTextField(
                         value = state.importJson,
                         onValueChange = { onAction(McpSettingsAction.ImportJsonChanged(it)) },
@@ -152,18 +158,18 @@ fun McpServerImportScreen(
                         enabled = state.importJson.isNotBlank() && !state.isMutationBlocked,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("导入 MCP 服务")
+                        Text(stringResource(R.string.mcp_import_action))
                     }
                     OutlinedButton(
                         onClick = onCancel,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("取消")
+                        Text(stringResource(R.string.mcp_cancel))
                     }
                 }
             }
             Text(
-                "包含 command / args 的 stdio 配置会被跳过，因为 Android 应用无法安全启动本机命令。",
+                stringResource(R.string.mcp_stdio_skip_notice),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 24.dp),
             )
@@ -201,7 +207,7 @@ private fun McpServerCard(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                "${server.transport.label} · ${server.endpointUrl}",
+                "${server.transport.displayName()} · ${server.endpointUrl}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -216,8 +222,8 @@ private fun McpServerCard(
     }
 }
 
-internal val McpTransport.label: String
-    get() = when (this) {
-        McpTransport.SSE -> "服务器发送事件 (SSE)"
-        McpTransport.STREAMABLE_HTTP -> "可流式传输的 HTTP"
-    }
+@Composable
+internal fun McpTransport.displayName(): String = when (this) {
+    McpTransport.SSE -> stringResource(R.string.mcp_transport_sse)
+    McpTransport.STREAMABLE_HTTP -> stringResource(R.string.mcp_transport_streamable_http)
+}

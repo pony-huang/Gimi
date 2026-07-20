@@ -19,9 +19,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.asssistantai.feature.workfiles.R
 import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
 import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
@@ -40,11 +42,11 @@ fun WorkFilesSettingsScreen(
             item {
                 SettingsListItem(
                     icon = Icons.Default.Folder,
-                    title = "工作文件夹",
+                    title = stringResource(R.string.workfiles_title),
                     subtitle = if (state.directories.isEmpty()) {
-                        "添加允许助手搜索的本机文件夹"
+                        stringResource(R.string.workfiles_subtitle)
                     } else {
-                        "已授权 ${state.directories.size} 个文件夹"
+                        stringResource(R.string.workfiles_auth_count, state.directories.size)
                     },
                     onClick = {
                         onAction(WorkFilesSettingsAction.RequestAddDirectory)
@@ -55,16 +57,19 @@ fun WorkFilesSettingsScreen(
                                 onAction(WorkFilesSettingsAction.RequestAddDirectory)
                             },
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "添加工作文件夹")
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = stringResource(R.string.workfiles_add_action),
+                            )
                         }
                     },
                 )
             }
-            item { SettingsSectionTitle(text = "已授权文件夹") }
+            item { SettingsSectionTitle(text = stringResource(R.string.workfiles_section_authorized)) }
             if (state.directories.isEmpty()) {
                 item {
                     Text(
-                        text = "尚未添加工作文件夹",
+                        text = stringResource(R.string.workfiles_empty_state),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
@@ -101,7 +106,10 @@ fun WorkFilesSettingsScreen(
                                 onAction(WorkFilesSettingsAction.RemoveDirectory(directory.uri))
                             },
                         ) {
-                            Icon(Icons.Default.Delete, contentDescription = "移除工作文件夹")
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = stringResource(R.string.workfiles_remove_action),
+                            )
                         }
                     },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),

@@ -1,0 +1,73 @@
+<resources>
+    <string name="modelsettings_api_key_label">API key</string>
+    <string name="modelsettings_api_key_test">Test</string>
+    <string name="modelsettings_api_key_get_key">Click here to get an API key</string>
+    <string name="modelsettings_api_key_hide">Hide key</string>
+    <string name="modelsettings_api_key_show">Show key</string>
+
+    <string name="modelsettings_api_url_label">API endpoint</string>
+    <string name="modelsettings_api_protocol_standard">Standard API endpoint</string>
+    <string name="modelsettings_api_protocol_anthropic">Anthropic API endpoint</string>
+
+    <string name="modelsettings_open_homepage">Open homepage</string>
+
+    <string name="modelsettings_section_models">Models</string>
+    <string name="modelsettings_sync_refreshing">Syncing…</string>
+    <string name="modelsettings_sync_refresh">Refresh</string>
+    <string name="modelsettings_sync_collapse">Collapse</string>
+    <string name="modelsettings_sync_expand">Expand</string>
+    <string name="modelsettings_remove_model">Remove model</string>
+    <string name="modelsettings_dialog_add_custom_model_title">Add custom model</string>
+    <string name="modelsettings_dialog_model_id">Model ID</string>
+    <string name="modelsettings_dialog_confirm">Confirm</string>
+    <string name="modelsettings_dialog_cancel">Cancel</string>
+
+    <string name="modelsettings_section_connection">Connection</string>
+    <string name="modelsettings_homepage_missing">Homepage URL is not configured</string>
+    <string name="modelsettings_key_url_missing">API key help URL is not configured</string>
+    <string name="modelsettings_no_link_configured">The corresponding URL is not configured</string>
+    <string name="modelsettings_no_browser">No browser available</string>
+    <string name="modelsettings_notice_service_not_found">Service not found</string>
+    <string name="modelsettings_notice_connection_succeeded">Connection succeeded</string>
+    <string name="modelsettings_notice_connection_failed">Connection failed</string>
+    <string name="modelsettings_notice_models_synchronized">Synced %1$d models from the remote catalog</string>
+    <string name="modelsettings_notice_models_sync_failed">Failed to sync remote models</string>
+
+    <string name="modelsettings_list_section_configured">Configured services</string>
+    <string name="modelsettings_list_load_failed">Failed to load the model catalog</string>
+
+    <string name="modelsettings_defaults_assistant_title">Default assistant model</string>
+    <string name="modelsettings_defaults_assistant_subtitle">Model used when creating a new assistant</string>
+    <string name="modelsettings_defaults_quick_title">Quick model</string>
+    <string name="modelsettings_defaults_quick_subtitle">Used for assistant features that need fast responses</string>
+    <string name="modelsettings_defaults_stt_title">Default voice input model</string>
+    <string name="modelsettings_defaults_stt_subtitle">Used for voice input. Only speech-to-text models are listed.</string>
+    <string name="modelsettings_defaults_tts_title">Default voice playback model</string>
+    <string name="modelsettings_defaults_tts_subtitle">Used for reading assistant replies aloud. Only text-to-speech models are listed.</string>
+    <string name="modelsettings_defaults_voice_title">Voice playback voice</string>
+
+    <string name="modelsettings_dialog_pick_assistant">Select default assistant model</string>
+    <string name="modelsettings_dialog_pick_quick">Select quick model</string>
+    <string name="modelsettings_dialog_pick_stt">Select default voice input model</string>
+    <string name="modelsettings_dialog_pick_tts">Select default voice playback model</string>
+    <string name="modelsettings_dialog_pick_voice">Select voice playback voice</string>
+    <string name="modelsettings_dialog_no_voices">No voices available</string>
+    <string name="modelsettings_dialog_no_models">No models available. Please enable at least one model in Model Services first.</string>
+
+    <string name="modelsettings_new_model_chat">Chat model</string>
+    <string name="modelsettings_new_model_stt">Speech recognition model (STT)</string>
+    <string name="modelsettings_new_model_tts">Speech synthesis model (TTS)</string>
+
+    <string name="modelsettings_footer_intro_label">View </string>
+    <string name="modelsettings_footer_docs_label">the %1$s docs</string>
+    <string name="modelsettings_footer_and_label"> and </string>
+    <string name="modelsettings_footer_models_label">the model list</string>
+    <string name="modelsettings_footer_tail_label"> for more details</string>
+
+    <!-- Navigation screen titles (consumed by :app SettingsScaffold) -->
+    <string name="modelsettings_list_title">Model services</string>
+    <string name="modelsettings_defaults_screen_title">Default models</string>
+    <string name="modelsettings_detail_title">Service details</string>
+
+    <string name="modelsettings_agent_mutation_blocked">An agent task is running. Please stop it before making changes.</string>
+</resources>

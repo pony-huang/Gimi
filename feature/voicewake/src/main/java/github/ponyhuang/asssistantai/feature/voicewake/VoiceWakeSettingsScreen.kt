@@ -22,10 +22,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.speech.model.VoiceWakeState
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelStatus
+import github.ponyhuang.asssistantai.feature.voicewake.R
 import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
 import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
@@ -41,12 +43,12 @@ fun VoiceWakeSettingsScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
-            item { SettingsSectionTitle(text = "监听") }
+            item { SettingsSectionTitle(text = stringResource(R.string.voicewake_section_listening)) }
             item {
                 SettingsListItem(
                     icon = Icons.Default.BluetoothAudio,
-                    title = "后台监听",
-                    subtitle = "连接蓝牙耳机后，可通过唤醒词在后台执行任务",
+                    title = stringResource(R.string.voicewake_listening_title),
+                    subtitle = stringResource(R.string.voicewake_listening_subtitle),
                     onClick = {
                         onAction(VoiceWakeSettingsAction.ToggleListening(!state.voiceState.isRunning))
                     },
@@ -61,7 +63,7 @@ fun VoiceWakeSettingsScreen(
                 )
             }
 
-            item { SettingsSectionTitle(text = "唤醒词") }
+            item { SettingsSectionTitle(text = stringResource(R.string.voicewake_section_keyword)) }
             item {
                 Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)) {
                     OutlinedTextField(
@@ -69,9 +71,16 @@ fun VoiceWakeSettingsScreen(
                         onValueChange = {
                             onAction(VoiceWakeSettingsAction.KeywordChanged(it))
                         },
-                        label = { Text("唤醒词") },
+                        label = { Text(stringResource(R.string.voicewake_keyword_label)) },
                         supportingText = {
-                            Text(state.keywordError ?: "2–20 个字符，例如：你好助手")
+                            val errorText = state.keywordError
+                            Text(
+                                if (errorText != null) {
+                                    stringResource(R.string.voicewake_keyword_error)
+                                } else {
+                                    stringResource(R.string.voicewake_keyword_hint)
+                                },
+                            )
                         },
                         isError = state.keywordError != null,
                         singleLine = true,
@@ -83,14 +92,14 @@ fun VoiceWakeSettingsScreen(
                             .fillMaxWidth()
                             .padding(top = 12.dp),
                     ) {
-                        Text("保存唤醒词")
+                        Text(stringResource(R.string.voicewake_save_keyword))
                     }
                 }
             }
 
             item {
                 SettingsSectionTitle(
-                    text = "离线模型",
+                    text = stringResource(R.string.voicewake_offline_model),
                     modifier = Modifier.padding(top = 12.dp),
                 )
             }
@@ -103,7 +112,7 @@ fun VoiceWakeSettingsScreen(
             if (!state.configurationReady) {
                 item {
                     Text(
-                        text = "启用前请配置可用的默认助手模型和语音识别模型。",
+                        text = stringResource(R.string.voicewake_offline_setup_required),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
@@ -120,20 +129,34 @@ private fun WakeModelRow(
     onInstall: () -> Unit,
 ) {
     ListItem(
-        headlineContent = { Text("离线中文唤醒模型", fontWeight = FontWeight.Medium) },
+        headlineContent = {
+            Text(
+                stringResource(R.string.voicewake_offline_model_name),
+                fontWeight = FontWeight.Medium,
+            )
+        },
         supportingContent = {
             when (voiceState.model.status) {
-                WakeModelStatus.Missing -> Text("已内置 APK，首次启用时安装")
+                WakeModelStatus.Missing -> Text(stringResource(R.string.voicewake_model_status_bundled))
                 WakeModelStatus.Downloading -> Column {
-                    Text("正在读取内置模型 ${(voiceState.model.progress * 100).toInt()}%")
+                    val progressPercent = (voiceState.model.progress * 100).toInt()
+                    Text(
+                        stringResource(
+                            R.string.voicewake_model_extracting_progress,
+                            progressPercent,
+                        ),
+                    )
                     LinearProgressIndicator(
                         progress = { voiceState.model.progress },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                WakeModelStatus.Extracting -> Text("正在安装模型")
-                WakeModelStatus.Ready -> Text("已安装，仅在本机识别唤醒词")
-                WakeModelStatus.Error -> Text(voiceState.model.message ?: "安装失败")
+                WakeModelStatus.Extracting -> Text(stringResource(R.string.voicewake_model_installing))
+                WakeModelStatus.Ready -> Text(stringResource(R.string.voicewake_model_ready))
+                WakeModelStatus.Error -> Text(
+                    voiceState.model.message
+                        ?: stringResource(R.string.voicewake_model_install_failed),
+                )
             }
         },
         leadingContent = {
@@ -148,7 +171,12 @@ private fun WakeModelRow(
                 voiceState.model.status == WakeModelStatus.Error
             ) {
                 TextButton(onClick = onInstall) {
-                    Text(if (voiceState.model.status == WakeModelStatus.Error) "重试" else "安装")
+                    Text(
+                        stringResource(
+                            if (voiceState.model.status == WakeModelStatus.Error) R.string.voicewake_action_retry
+                            else R.string.voicewake_action_install,
+                        ),
+                    )
                 }
             }
         },

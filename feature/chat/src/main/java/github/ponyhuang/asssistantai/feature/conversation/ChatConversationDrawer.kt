@@ -40,11 +40,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.conversation.model.Conversation
+import github.ponyhuang.asssistantai.feature.chat.R
 import github.ponyhuang.asssistantai.ui.theme.AsssistantaiTheme
 
 /**
@@ -132,7 +134,7 @@ private fun HistoryDrawerContent(
             if (conversations.isEmpty()) {
                 item {
                     Text(
-                        text = "暂无历史对话",
+                        text = stringResource(R.string.chat_drawer_empty_history),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 24.dp),
@@ -175,7 +177,7 @@ private fun HistoryDrawerContent(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = "设置",
+                text = stringResource(R.string.chat_settings),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(start = 20.dp),
@@ -247,9 +249,16 @@ private fun ConversationActionSheet(
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         ListItem(
-            headlineContent = { Text(if (isCurrent) "当前会话不可删除" else "删除对话") },
+            headlineContent = {
+                Text(
+                    stringResource(
+                        if (isCurrent) R.string.chat_drawer_current_session_protected
+                        else R.string.chat_drawer_delete_conversation,
+                    ),
+                )
+            },
             supportingContent = {
-                if (isCurrent) Text("请先切换到其他会话")
+                if (isCurrent) Text(stringResource(R.string.chat_drawer_switch_first))
             },
             leadingContent = {
                 Icon(

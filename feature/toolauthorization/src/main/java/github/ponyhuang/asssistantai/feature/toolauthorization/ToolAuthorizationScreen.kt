@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.asssistantai.domain.toolauthorization.model.ToolDescriptor
+import github.ponyhuang.asssistantai.feature.toolauthorization.R
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
 
 @Composable
@@ -55,12 +57,17 @@ fun ToolAuthorizationScreen(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = "已启用 ${state.enabledCount} / ${state.tools.size}",
+                        text = stringResource(
+                            R.string.toolauth_count_label,
+                            state.enabledCount,
+                            state.tools.size,
+                        ),
                         style = MaterialTheme.typography.titleMedium,
                     )
-                    if (state.isMutationBlocked || state.notice != null) {
+                    if (state.isMutationBlocked || !state.notice.isNullOrBlank()) {
                         Text(
-                            text = state.notice ?: "Agent 任务进行中，请先停止任务后再修改。",
+                            text = state.notice?.takeUnless { it.isBlank() }
+                                ?: stringResource(R.string.toolauth_agent_mutation_blocked),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.error,
                         )
@@ -73,19 +80,19 @@ fun ToolAuthorizationScreen(
                             onClick = { onAction(ToolAuthorizationAction.SetAllEnabled(true)) },
                             enabled = !state.isMutationBlocked,
                             modifier = Modifier.weight(1f),
-                        ) { Text("全部启用") }
+                        ) { Text(stringResource(R.string.toolauth_enable_all)) }
                         Button(
                             onClick = { onAction(ToolAuthorizationAction.SetAllEnabled(false)) },
                             enabled = !state.isMutationBlocked,
                             modifier = Modifier.weight(1f),
-                        ) { Text("全部关闭") }
+                        ) { Text(stringResource(R.string.toolauth_disable_all)) }
                     }
                     OutlinedTextField(
                         value = state.query,
                         onValueChange = { onAction(ToolAuthorizationAction.Search(it)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        label = { Text("搜索工具") },
+                        label = { Text(stringResource(R.string.toolauth_search_label)) },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     )
                 }
@@ -93,7 +100,11 @@ fun ToolAuthorizationScreen(
             if (state.visibleTools.isEmpty()) {
                 item {
                     Text(
-                        text = if (state.query.isBlank()) "暂无可配置的本地工具" else "没有匹配的工具",
+                        text = if (state.query.isBlank()) {
+                            stringResource(R.string.toolauth_empty_state)
+                        } else {
+                            stringResource(R.string.toolauth_no_match)
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(vertical = 24.dp),

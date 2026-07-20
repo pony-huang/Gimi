@@ -1,0 +1,5 @@
+<resources>
+    <!-- 共用文案 -->
+    <string name="common_back">返回</string>
+    <string name="common_settings">设置</string>
+</resources>

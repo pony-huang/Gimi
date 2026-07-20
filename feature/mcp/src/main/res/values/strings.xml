@@ -1,0 +1,41 @@
+<resources>
+    <!-- 路由标题（由 :app 注入 SettingsScaffold 使用） -->
+    <string name="mcp_list_title">MCP 服务器</string>
+    <string name="mcp_add_options_title">添加 MCP 服务</string>
+    <string name="mcp_import_title">导入 MCP 配置</string>
+    <string name="mcp_add_server">添加 MCP 服务器</string>
+    <string name="mcp_edit_server">编辑 MCP 服务器</string>
+
+    <!-- McpServerListScreen -->
+    <string name="mcp_section_servers">MCP 服务</string>
+    <string name="mcp_no_servers">尚未配置服务器</string>
+    <string name="mcp_section_add_methods">添加方式</string>
+    <string name="mcp_method_new_title">新建</string>
+    <string name="mcp_method_new_subtitle">手动配置 SSE 或 Streamable HTTP 服务</string>
+    <string name="mcp_method_import_title">导入</string>
+    <string name="mcp_method_import_subtitle">粘贴 mcpServers JSON 配置</string>
+    <string name="mcp_section_import_mcp">导入 MCP 配置</string>
+    <string name="mcp_import_help">粘贴包含 mcpServers 的 JSON 配置。支持 SSE 和 Streamable HTTP。</string>
+    <string name="mcp_import_action">导入 MCP 服务</string>
+    <string name="mcp_cancel">取消</string>
+    <string name="mcp_stdio_skip_notice">包含 command / args 的 stdio 配置会被跳过，因为 Android 应用无法安全启动本机命令。</string>
+    <string name="mcp_transport_sse">服务器发送事件 (SSE)</string>
+    <string name="mcp_transport_streamable_http">可流式传输的 HTTP</string>
+
+    <!-- McpServerEditorScreen -->
+    <string name="mcp_section_basic_info">基本信息</string>
+    <string name="mcp_field_name_required">名称 *</string>
+    <string name="mcp_field_description">描述</string>
+    <string name="mcp_field_type_required">类型 *</string>
+    <string name="mcp_field_endpoint_required">服务器端点 *</string>
+    <string name="mcp_field_bearer_token_optional">Bearer Token（可选）</string>
+    <string name="mcp_field_header_optional">请求头参数（可选）</string>
+    <string name="mcp_field_header_help">每行一个，格式：Header-Name=value</string>
+    <string name="mcp_field_enable_server">启用此服务器</string>
+    <string name="mcp_sse_help">支持 SSE 与 Streamable HTTP。stdio 命令模式需要本机子进程，不能在 Android 应用中安全运行。</string>
+    <string name="mcp_save">保存</string>
+    <string name="mcp_delete_server">删除服务器</string>
+
+    <!-- 共享：Agent 任务进行中 -->
+    <string name="mcp_agent_mutation_blocked">Agent 任务进行中，请先停止任务后再修改。</string>
+</resources>

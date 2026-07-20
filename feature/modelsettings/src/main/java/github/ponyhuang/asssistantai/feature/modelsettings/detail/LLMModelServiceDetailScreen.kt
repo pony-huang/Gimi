@@ -10,7 +10,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.asssistantai.feature.modelsettings.R
 import github.ponyhuang.asssistantai.ui.settings.SettingsCard
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
 import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
@@ -27,6 +29,10 @@ fun ModelServiceDetailScreen(
         if (!state.isMutationBlocked || !action.changesAgentConfiguration()) onAction(action)
     }
 
+    val homepageMissing = stringResource(R.string.modelsettings_homepage_missing)
+    val keyUrlMissing = stringResource(R.string.modelsettings_key_url_missing)
+    val noLinkConfigured = stringResource(R.string.modelsettings_no_link_configured)
+
     SettingsPageContainer(modifier = modifier) {
         Column(
             modifier = Modifier
@@ -36,7 +42,7 @@ fun ModelServiceDetailScreen(
         ) {
             if (state.isMutationBlocked) {
                 Text(
-                    text = "Agent 任务进行中，请先停止任务后再修改。",
+                    text = stringResource(R.string.modelsettings_agent_mutation_blocked),
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 )
@@ -51,11 +57,14 @@ fun ModelServiceDetailScreen(
                         dispatch(ModelServiceDetailAction.EnabledChanged(it))
                     },
                     onOpenHomepage = {
-                        onOpenUrl(service.homepageUrl, "未配置主页链接")
+                        onOpenUrl(service.homepageUrl, homepageMissing)
                     },
                 )
             }
-            SettingsSectionTitle(text = "连接配置", modifier = Modifier.padding(top = 20.dp))
+            SettingsSectionTitle(
+                text = stringResource(R.string.modelsettings_section_connection),
+                modifier = Modifier.padding(top = 20.dp),
+            )
             SettingsCard(modifier = Modifier.padding(horizontal = 16.dp)) {
                 ApiKeySection(
                     apiKey = service.apiKey,
@@ -70,7 +79,7 @@ fun ModelServiceDetailScreen(
                     },
                     onTest = { dispatch(ModelServiceDetailAction.TestConnection) },
                     onOpenKeyHelp = {
-                        onOpenUrl(service.keyHelpUrl, "未配置密钥获取链接")
+                        onOpenUrl(service.keyHelpUrl, keyUrlMissing)
                     },
                 )
             }
@@ -108,7 +117,7 @@ fun ModelServiceDetailScreen(
             ) {
                 FooterSection(
                     service = service,
-                    onOpenUrl = { url -> onOpenUrl(url, "未配置对应链接") },
+                    onOpenUrl = { url -> onOpenUrl(url, noLinkConfigured) },
                 )
             }
         }

@@ -1,0 +1,33 @@
+<resources>
+    <string name="permissions_section_regular">Regular permissions</string>
+    <string name="permissions_regular_all_granted">All regular permissions are granted</string>
+    <string name="permissions_grant_all">Grant all regular permissions</string>
+    <string name="permissions_partial_blocked">Some permissions are blocked by the system. Please open the app settings to enable them manually.</string>
+    <string name="permissions_open_settings">Open app settings</string>
+
+    <string name="permissions_section_special">Special permissions</string>
+    <string name="permissions_special_modify_settings_title">Modify system settings</string>
+    <string name="permissions_special_modify_settings_subtitle">Used to adjust screen brightness and auto screen-off</string>
+    <string name="permissions_special_notification_access_title">Notification access</string>
+    <string name="permissions_special_notification_access_subtitle">Used to read and control media playback of other apps</string>
+
+    <string name="permissions_status_granted">Granted</string>
+    <string name="permissions_status_not_granted">Not granted</string>
+    <string name="permissions_status_partially_granted">Partially granted</string>
+
+    <string name="permission_name_location">Location</string>
+    <string name="permission_desc_location">Allows the assistant to fetch your current location and run location-related tasks</string>
+    <string name="permission_name_calendar">Calendar</string>
+    <string name="permission_desc_calendar">Allows the assistant to read, create, and update calendar events</string>
+    <string name="permission_name_media">Media files</string>
+    <string name="permission_desc_media">Allows the assistant to search shared images, videos, and audio</string>
+    <string name="permission_name_microphone">Microphone</string>
+    <string name="permission_desc_microphone">Used for voice input and Bluetooth voice wake</string>
+    <string name="permission_name_bluetooth">Bluetooth devices</string>
+    <string name="permission_desc_bluetooth">Used to connect to a headset and run voice wake tasks</string>
+    <string name="permission_name_notifications">Notifications</string>
+    <string name="permission_desc_notifications">Used to display the running state of background voice tasks</string>
+
+    <!-- Permission screen title (consumed by :app SettingsScaffold) -->
+    <string name="permissions_screen_title">Permissions</string>
+</resources>

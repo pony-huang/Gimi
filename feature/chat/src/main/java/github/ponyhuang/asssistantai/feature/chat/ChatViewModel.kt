@@ -809,7 +809,7 @@ class ChatViewModel @Inject constructor(
             val description = toolAuthorization.tools.value
                 .firstOrNull { it.id == request.toolName }
                 ?.description
-                ?: "远程工具请求执行操作"
+                ?: ""
             PendingToolConfirmation(
                 confirmationCallId = confirmationId,
                 toolName = request.toolName,

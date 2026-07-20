@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.conversation.model.FunctionCallView
@@ -31,6 +32,7 @@ import github.ponyhuang.asssistantai.domain.conversation.model.Message
 import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
 import github.ponyhuang.asssistantai.domain.conversation.model.Messages
 import github.ponyhuang.asssistantai.domain.conversation.model.TextPart
+import github.ponyhuang.asssistantai.feature.chat.R
 import github.ponyhuang.asssistantai.ui.theme.AsssistantaiTheme
 import github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackState
 import github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackStatus
@@ -184,19 +186,20 @@ private fun AssistantMessageActions(
             .padding(top = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val copiedMessage = stringResource(R.string.chat_message_copied)
         IconButton(
             onClick = {
                 scope.launch {
                     clipboard.setClipEntry(
                         ClipEntry(ClipData.newPlainText("assistant response", text)),
                     )
-                    Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
                 }
             },
         ) {
             Icon(
                 imageVector = Icons.Default.ContentCopy,
-                contentDescription = "复制回复",
+                contentDescription = stringResource(R.string.chat_message_copy),
             )
         }
         val isCurrent = speechPlaybackState.messageId == messageId
@@ -209,13 +212,16 @@ private fun AssistantMessageActions(
                 )
                 SpeechPlaybackStatus.Playing -> Icon(
                     imageVector = Icons.Default.Pause,
-                    contentDescription = "暂停朗读",
+                    contentDescription = stringResource(R.string.chat_message_pause_playback),
                 )
                 SpeechPlaybackStatus.Paused,
                 SpeechPlaybackStatus.Idle,
                 -> Icon(
                     imageVector = Icons.AutoMirrored.Filled.VolumeUp,
-                    contentDescription = if (status == SpeechPlaybackStatus.Paused) "继续朗读" else "朗读回复",
+                    contentDescription = stringResource(
+                        if (status == SpeechPlaybackStatus.Paused) R.string.chat_message_resume_playback
+                        else R.string.chat_message_play_reply,
+                    ),
                 )
             }
         }

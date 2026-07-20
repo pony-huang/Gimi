@@ -18,6 +18,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -26,6 +27,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.asssistantai.feature.modelsettings.R
 
 @Composable
 fun ApiKeySection(
@@ -46,7 +48,7 @@ fun ApiKeySection(
         OutlinedTextField(
             value = apiKey,
             onValueChange = onApiKeyChange,
-            label = { Text("API 密钥") },
+            label = { Text(stringResource(R.string.modelsettings_api_key_label)) },
             singleLine = true,
             visualTransformation = if (isVisible) {
                 VisualTransformation.None
@@ -58,14 +60,17 @@ fun ApiKeySection(
                     IconButton(onClick = onToggleVisibility) {
                         Icon(
                             imageVector = if (isVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                            contentDescription = if (isVisible) "隐藏密钥" else "显示密钥",
+                            contentDescription = stringResource(
+                                if (isVisible) R.string.modelsettings_api_key_hide
+                                else R.string.modelsettings_api_key_show,
+                            ),
                         )
                     }
                     TextButton(
                         enabled = apiKey.isNotBlank() && !isTesting,
                         onClick = onTest,
                     ) {
-                        Text("检测")
+                        Text(stringResource(R.string.modelsettings_api_key_test))
                     }
                 }
             },
@@ -76,7 +81,7 @@ fun ApiKeySection(
         val text = buildAnnotatedString {
             withStyle(SpanStyle(color = primary, fontWeight = FontWeight.Medium)) {
                 pushStringAnnotation(tag = TAG_KEY_HELP, annotation = keyHelpUrl)
-                append("点击这里获取密钥")
+                append(stringResource(R.string.modelsettings_api_key_get_key))
                 pop()
             }
         }

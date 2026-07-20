@@ -3,6 +3,9 @@ package github.ponyhuang.asssistantai.feature.modelsettings.detail
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentMutationResult
+import github.ponyhuang.asssistantai.domain.conversation.runtime.isBusy
+import github.ponyhuang.asssistantai.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
@@ -25,6 +28,7 @@ class ModelServiceDetailViewModel @Inject constructor(
     private val updateModelService: UpdateModelServiceUseCase,
     private val testConnection: TestModelServiceConnectionUseCase,
     private val refreshCatalog: RefreshModelCatalogUseCase,
+    private val runWhenAgentIdle: RunWhenAgentIdleUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ModelServiceDetailUiState())
     val uiState = _uiState.asStateFlow()
@@ -32,6 +36,14 @@ class ModelServiceDetailViewModel @Inject constructor(
     private var serviceId: String? = null
     private var expandedGroupIds: Set<String> = emptySet()
     private var observationJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            runWhenAgentIdle.state.collect { runtimeState ->
+                _uiState.update { it.copy(isMutationBlocked = runtimeState.isBusy) }
+            }
+        }
+    }
 
     fun onAction(action: ModelServiceDetailAction) {
         when (action) {
@@ -69,7 +81,10 @@ class ModelServiceDetailViewModel @Inject constructor(
         if (serviceId == id && observationJob?.isActive == true) return
         observationJob?.cancel()
         serviceId = id
-        _uiState.value = ModelServiceDetailUiState(isLoading = true)
+        _uiState.value = ModelServiceDetailUiState(
+            isLoading = true,
+            isMutationBlocked = _uiState.value.isMutationBlocked,
+        )
 
         viewModelScope.launch {
             val initial = loadModelService(id)
@@ -104,41 +119,49 @@ class ModelServiceDetailViewModel @Inject constructor(
 
     private fun changeApiKey(value: String) {
         val id = serviceId ?: return
-        _uiState.update { state ->
-            state.copy(service = state.service?.copy(apiKey = value))
+        mutate {
+            updateModelService.apiKey(id, value)
+            _uiState.update { state ->
+                state.copy(service = state.service?.copy(apiKey = value))
+            }
         }
-        updateModelService.apiKey(id, value)
     }
 
     private fun changeBaseUrl(value: String) {
         val id = serviceId ?: return
-        _uiState.update { state ->
-            val service = state.service ?: return@update state
-            state.copy(
-                service = when (service.apiProtocol) {
-                    ApiProtocol.Standard -> service.copy(apiBaseUrl = value)
-                    ApiProtocol.Anthropic -> service.copy(anthropicBaseUrl = value)
-                },
-            )
+        mutate {
+            updateModelService.baseUrl(id, value)
+            _uiState.update { state ->
+                val service = state.service ?: return@update state
+                state.copy(
+                    service = when (service.apiProtocol) {
+                        ApiProtocol.Standard -> service.copy(apiBaseUrl = value)
+                        ApiProtocol.Anthropic -> service.copy(anthropicBaseUrl = value)
+                    },
+                )
+            }
         }
-        updateModelService.baseUrl(id, value)
     }
 
     private fun changeProtocol(protocol: ApiProtocol) {
         val id = serviceId ?: return
-        _uiState.update { state ->
-            state.copy(
-                service = state.service?.copy(apiProtocol = protocol),
-                isProtocolMenuExpanded = false,
-            )
+        mutate {
+            updateModelService.protocol(id, protocol)
+            _uiState.update { state ->
+                state.copy(
+                    service = state.service?.copy(apiProtocol = protocol),
+                    isProtocolMenuExpanded = false,
+                )
+            }
         }
-        updateModelService.protocol(id, protocol)
     }
 
     private fun changeEnabled(enabled: Boolean) {
         val id = serviceId ?: return
-        if (!updateModelService.enabled(id, enabled)) return
-        _uiState.update { state -> state.copy(service = state.service?.copy(isEnabled = enabled)) }
+        mutate {
+            if (!updateModelService.enabled(id, enabled)) return@mutate
+            _uiState.update { state -> state.copy(service = state.service?.copy(isEnabled = enabled)) }
+        }
     }
 
     private fun toggleGroup(groupId: String) {
@@ -154,7 +177,7 @@ class ModelServiceDetailViewModel @Inject constructor(
 
     private fun removeModel(groupId: String, modelId: String) {
         val id = serviceId ?: return
-        viewModelScope.launch { updateModelService.removeModel(id, groupId, modelId) }
+        mutate { updateModelService.removeModel(id, groupId, modelId) }
     }
 
     private fun addModel() {
@@ -163,8 +186,7 @@ class ModelServiceDetailViewModel @Inject constructor(
         val modelId = state.newModelId.trim()
         if (modelId.isBlank()) return
         val kind = state.newModelKind
-        resetAddDialog()
-        viewModelScope.launch {
+        mutate {
             updateModelService.addModel(
                 id,
                 Model(
@@ -174,6 +196,7 @@ class ModelServiceDetailViewModel @Inject constructor(
                     isTts = kind == NewModelKind.Tts,
                 ),
             )
+            resetAddDialog()
         }
     }
 
@@ -209,7 +232,7 @@ class ModelServiceDetailViewModel @Inject constructor(
     private fun refreshModels() {
         val service = _uiState.value.service ?: return
         if (_uiState.value.isRefreshing) return
-        viewModelScope.launch {
+        mutate {
             _uiState.update { it.copy(isRefreshing = true) }
             val result = refreshCatalog(service)
             _uiState.update {
@@ -220,6 +243,17 @@ class ModelServiceDetailViewModel @Inject constructor(
                         onFailure = { ModelServiceDetailNotice.ModelSynchronizationFailed },
                     ),
                 )
+            }
+        }
+    }
+
+    private fun mutate(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            when (runWhenAgentIdle(block)) {
+                is AgentMutationResult.Applied -> Unit
+                AgentMutationResult.BlockedByActiveAgent -> _uiState.update {
+                    it.copy(notice = ModelServiceDetailNotice.AgentMutationBlocked)
+                }
             }
         }
     }

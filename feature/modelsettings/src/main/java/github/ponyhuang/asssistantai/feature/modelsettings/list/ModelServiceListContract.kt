@@ -7,6 +7,8 @@ data class ModelServiceListUiState(
     val loadState: CatalogLoadState = CatalogLoadState.Loading,
     val query: String = "",
     val items: List<ModelService> = emptyList(),
+    val isMutationBlocked: Boolean = false,
+    val notice: String? = null,
 )
 
 sealed interface ModelServiceListAction {

@@ -2,6 +2,7 @@ package github.ponyhuang.asssistantai.feature.modelsettings.defaults
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -9,6 +10,7 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -31,6 +33,15 @@ fun DefaultModelSettingsScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
+            if (state.isMutationBlocked || state.notice != null) {
+                item {
+                    Text(
+                        text = state.notice ?: "Agent 任务进行中，请先停止任务后再修改。",
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                    )
+                }
+            }
             item {
                 DefaultModelOption(
                     icon = Icons.AutoMirrored.Filled.Chat,
@@ -38,7 +49,9 @@ fun DefaultModelSettingsScreen(
                     subtitle = "创建新助手时使用的模型",
                     selection = state.assistantSelection,
                     rows = state.chatModels,
-                    onClick = { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Assistant)) },
+                    onClick = if (state.isMutationBlocked) null else {
+                        { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Assistant)) }
+                    },
                 )
             }
             item {
@@ -48,7 +61,9 @@ fun DefaultModelSettingsScreen(
                     subtitle = "用于需要快速响应的助手功能",
                     selection = state.fastSelection,
                     rows = state.chatModels,
-                    onClick = { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Fast)) },
+                    onClick = if (state.isMutationBlocked) null else {
+                        { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Fast)) }
+                    },
                 )
             }
             item {
@@ -58,7 +73,9 @@ fun DefaultModelSettingsScreen(
                     subtitle = "用于语音输入，仅显示语音识别模型",
                     selection = state.speechSelection,
                     rows = state.speechModels,
-                    onClick = { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Speech)) },
+                    onClick = if (state.isMutationBlocked) null else {
+                        { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Speech)) }
+                    },
                 )
             }
             item {
@@ -68,7 +85,9 @@ fun DefaultModelSettingsScreen(
                     subtitle = "用于朗读助手回复，仅显示语音合成模型",
                     selection = state.ttsSelection,
                     rows = state.ttsModels,
-                    onClick = { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Tts)) },
+                    onClick = if (state.isMutationBlocked) null else {
+                        { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Tts)) }
+                    },
                 )
             }
             item {
@@ -78,7 +97,7 @@ fun DefaultModelSettingsScreen(
                     icon = Icons.AutoMirrored.Filled.VolumeUp,
                     title = "语音播放音色",
                     subtitle = voice?.name ?: state.ttsVoiceId,
-                    onClick = if (enabled) {
+                    onClick = if (enabled && !state.isMutationBlocked) {
                         { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.TtsVoice)) }
                     } else {
                         null
@@ -144,7 +163,7 @@ private fun DefaultModelOption(
     subtitle: String,
     selection: ModelSelection?,
     rows: List<SelectableModelRow>,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
 ) {
     val selected = rows.firstOrNull { it.selection() == selection }
     SettingsListItem(

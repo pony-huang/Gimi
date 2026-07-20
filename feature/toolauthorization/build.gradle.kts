@@ -21,6 +21,7 @@ android {
 
 dependencies {
     implementation(project(":core:designsystem"))
+    implementation(project(":domain:conversation"))
     implementation(project(":domain:toolauthorization"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.foundation)
@@ -35,8 +36,10 @@ dependencies {
     ksp(libs.hilt.android.compiler)
 
     testImplementation(libs.junit)
+    testImplementation(project(":core:testing"))
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
+    testImplementation(libs.turbine)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.junit)

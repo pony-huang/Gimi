@@ -58,16 +58,25 @@ fun ToolAuthorizationScreen(
                         text = "已启用 ${state.enabledCount} / ${state.tools.size}",
                         style = MaterialTheme.typography.titleMedium,
                     )
+                    if (state.isMutationBlocked || state.notice != null) {
+                        Text(
+                            text = state.notice ?: "Agent 任务进行中，请先停止任务后再修改。",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Button(
                             onClick = { onAction(ToolAuthorizationAction.SetAllEnabled(true)) },
+                            enabled = !state.isMutationBlocked,
                             modifier = Modifier.weight(1f),
                         ) { Text("全部启用") }
                         Button(
                             onClick = { onAction(ToolAuthorizationAction.SetAllEnabled(false)) },
+                            enabled = !state.isMutationBlocked,
                             modifier = Modifier.weight(1f),
                         ) { Text("全部关闭") }
                     }
@@ -92,7 +101,7 @@ fun ToolAuthorizationScreen(
                 }
             } else {
                 items(state.visibleTools, key = ToolDescriptor::id) { tool ->
-                    ToolAuthorizationRow(tool) { enabled ->
+                    ToolAuthorizationRow(tool, enabled = !state.isMutationBlocked) { enabled ->
                         onAction(ToolAuthorizationAction.SetEnabled(tool.id, enabled))
                     }
                 }
@@ -104,12 +113,13 @@ fun ToolAuthorizationScreen(
 @Composable
 private fun ToolAuthorizationRow(
     tool: ToolDescriptor,
+    enabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(role = Role.Switch) { onEnabledChange(!tool.isEnabled) }
+            .clickable(enabled = enabled, role = Role.Switch) { onEnabledChange(!tool.isEnabled) }
             .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -132,6 +142,10 @@ private fun ToolAuthorizationRow(
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
-        Switch(checked = tool.isEnabled, onCheckedChange = onEnabledChange)
+        Switch(
+            checked = tool.isEnabled,
+            onCheckedChange = onEnabledChange,
+            enabled = enabled,
+        )
     }
 }

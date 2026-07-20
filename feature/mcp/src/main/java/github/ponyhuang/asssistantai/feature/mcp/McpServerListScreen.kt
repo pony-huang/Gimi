@@ -47,6 +47,13 @@ fun McpServerListScreen(
     SettingsPageContainer(modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
             SettingsSectionTitle(text = "MCP 服务", modifier = Modifier.padding(top = 12.dp))
+            if (state.isMutationBlocked || state.notice != null) {
+                Text(
+                    text = state.notice ?: "Agent 任务进行中，请先停止任务后再修改。",
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                )
+            }
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 24.dp),
@@ -63,6 +70,7 @@ fun McpServerListScreen(
                 items(state.servers, key = McpServer::id) { server ->
                     McpServerCard(
                         server = server,
+                        mutationEnabled = !state.isMutationBlocked,
                         onClick = { onNavigateToEditor(server.id) },
                         onToggleEnabled = {
                             onAction(McpSettingsAction.ToggleServer(server, it))
@@ -141,7 +149,7 @@ fun McpServerImportScreen(
                     }
                     Button(
                         onClick = { onAction(McpSettingsAction.ImportServers) },
-                        enabled = state.importJson.isNotBlank(),
+                        enabled = state.importJson.isNotBlank() && !state.isMutationBlocked,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text("导入 MCP 服务")
@@ -166,6 +174,7 @@ fun McpServerImportScreen(
 @Composable
 private fun McpServerCard(
     server: McpServer,
+    mutationEnabled: Boolean,
     onClick: () -> Unit,
     onToggleEnabled: (Boolean) -> Unit,
 ) {
@@ -199,7 +208,11 @@ private fun McpServerCard(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Switch(checked = server.isEnabled, onCheckedChange = onToggleEnabled)
+        Switch(
+            checked = server.isEnabled,
+            onCheckedChange = onToggleEnabled,
+            enabled = mutationEnabled,
+        )
     }
 }
 

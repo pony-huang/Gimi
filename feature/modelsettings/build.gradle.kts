@@ -21,6 +21,7 @@ android {
 
 dependencies {
     implementation(project(":core:designsystem"))
+    implementation(project(":domain:conversation"))
     implementation(project(":domain:modelcatalog"))
     implementation(project(":domain:speech"))
     implementation(platform(libs.androidx.compose.bom))

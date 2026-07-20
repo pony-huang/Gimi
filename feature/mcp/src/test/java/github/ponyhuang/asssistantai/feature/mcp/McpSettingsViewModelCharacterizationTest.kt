@@ -7,12 +7,14 @@ import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
 import github.ponyhuang.asssistantai.domain.mcp.repository.McpRepository
 import github.ponyhuang.asssistantai.domain.mcp.usecase.ManageMcpServersUseCase
 import github.ponyhuang.asssistantai.domain.mcp.usecase.ObserveMcpServersUseCase
+import github.ponyhuang.asssistantai.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.advanceUntilIdle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -35,6 +37,7 @@ class McpSettingsViewModelCharacterizationTest {
             assertEquals(listOf(server), state.servers)
 
             viewModel.onAction(McpSettingsAction.ToggleServer(server, enabled = false))
+            advanceUntilIdle()
             verify { repository.save(server.copy(isEnabled = false)) }
             cancelAndIgnoreRemainingEvents()
         }
@@ -77,6 +80,7 @@ class McpSettingsViewModelCharacterizationTest {
             )
             viewModel.onAction(McpSettingsAction.EditorChanged(draft))
             viewModel.onAction(McpSettingsAction.SaveEditor)
+            advanceUntilIdle()
 
             verify { repository.save(match { it.name == "Server" && it.endpointUrl == "https://example.com/mcp" }) }
             do {
@@ -90,6 +94,7 @@ class McpSettingsViewModelCharacterizationTest {
     private fun viewModel(repository: McpRepository) = McpSettingsViewModel(
         observeServers = ObserveMcpServersUseCase(repository),
         manageServers = ManageMcpServersUseCase(repository),
+        runWhenAgentIdle = RunWhenAgentIdleUseCase(TestAgentRuntimeGate()),
     )
 
     private fun repository(servers: List<McpServer> = emptyList()): McpRepository =

@@ -69,6 +69,7 @@ fun ChatDrawer(
     drawerState: DrawerState,
     conversations: List<Conversation>,
     currentSessionId: String,
+    isConversationSwitchEnabled: Boolean = true,
     onConversationClick: (Conversation) -> Unit,
     onDeleteClick: (Conversation) -> Unit,
     onSettingsClick: () -> Unit,
@@ -85,6 +86,7 @@ fun ChatDrawer(
                 HistoryDrawerContent(
                     conversations = conversations,
                     currentSessionId = currentSessionId,
+                    isConversationSwitchEnabled = isConversationSwitchEnabled,
                     onConversationClick = onConversationClick,
                     onDeleteClick = onDeleteClick,
                     onSettingsClick = onSettingsClick,
@@ -104,6 +106,7 @@ fun ChatDrawer(
 private fun HistoryDrawerContent(
     conversations: List<Conversation>,
     currentSessionId: String,
+    isConversationSwitchEnabled: Boolean,
     onConversationClick: (Conversation) -> Unit,
     onDeleteClick: (Conversation) -> Unit,
     onSettingsClick: () -> Unit,
@@ -143,6 +146,7 @@ private fun HistoryDrawerContent(
                 ConversationListItem(
                     conversation = conversation,
                     isCurrent = conversation.id == currentSessionId,
+                    enabled = isConversationSwitchEnabled,
                     onClick = { onConversationClick(conversation) },
                     onLongClick = { menuConversation = conversation },
                     modifier = Modifier.padding(bottom = 4.dp),
@@ -202,6 +206,7 @@ private fun HistoryDrawerContent(
 private fun ConversationListItem(
     conversation: Conversation,
     isCurrent: Boolean,
+    enabled: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -215,6 +220,7 @@ private fun ConversationListItem(
             .clip(RoundedCornerShape(20.dp))
             .background(containerColor)
             .combinedClickable(
+                enabled = enabled,
                 onClick = onClick,
                 onLongClick = onLongClick,
             )
@@ -227,7 +233,7 @@ private fun ConversationListItem(
             fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            color = contentColor,
+            color = if (enabled) contentColor else contentColor.copy(alpha = 0.45f),
         )
     }
 }

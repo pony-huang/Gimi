@@ -41,7 +41,7 @@ class AgentChatRunner(
     private val factory: suspend () -> BaseAgent,
     private val sessionService: SessionService,
     private val artifactService: ArtifactService?,
-    private val configurationRevision: () -> Long = { 0L },
+    private val configurationRevision: () -> Any = { Unit },
 ) {
 
     /**
@@ -53,7 +53,7 @@ class AgentChatRunner(
     @Volatile
     private var runner: InMemoryRunner? = null
     @Volatile
-    private var runnerRevision: Long = Long.MIN_VALUE
+    private var runnerRevision: Any? = null
     private val runnerMutex = Mutex()
 
     @OptIn(ExperimentalResumabilityFeature::class)
@@ -89,7 +89,7 @@ class AgentChatRunner(
     suspend fun invalidate() {
         runnerMutex.withLock {
             runner = null
-            runnerRevision = Long.MIN_VALUE
+            runnerRevision = null
         }
     }
 

@@ -22,6 +22,8 @@ data class McpSettingsUiState(
     val editor: McpEditorDraft? = null,
     val isTransportMenuExpanded: Boolean = false,
     val shouldClose: Boolean = false,
+    val isMutationBlocked: Boolean = false,
+    val notice: String? = null,
 )
 
 sealed interface McpSettingsAction {

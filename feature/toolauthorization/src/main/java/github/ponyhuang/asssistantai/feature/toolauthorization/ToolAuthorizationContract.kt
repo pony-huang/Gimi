@@ -5,6 +5,8 @@ import github.ponyhuang.asssistantai.domain.toolauthorization.model.ToolDescript
 data class ToolAuthorizationUiState(
     val query: String = "",
     val tools: List<ToolDescriptor> = emptyList(),
+    val isMutationBlocked: Boolean = false,
+    val notice: String? = null,
 ) {
     val visibleTools: List<ToolDescriptor>
         get() {

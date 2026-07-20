@@ -27,6 +27,13 @@ fun LLMModelServiceListScreen(
     SettingsPageContainer(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
             SettingsSectionTitle(text = "已配置服务", modifier = Modifier.padding(top = 12.dp))
+            if (state.isMutationBlocked || state.notice != null) {
+                Text(
+                    text = state.notice ?: "Agent 任务进行中，请先停止任务后再修改。",
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                )
+            }
             when (state.loadState) {
                 CatalogLoadState.Loading -> Box(
                     modifier = Modifier.fillMaxSize(),
@@ -47,6 +54,7 @@ fun LLMModelServiceListScreen(
                     items(items = state.items, key = { it.id }) { item ->
                         ModelServiceCard(
                             item = item,
+                            mutationEnabled = !state.isMutationBlocked,
                             onClick = onNavigateToDetail,
                             onToggleEnabled = { id, enabled ->
                                 onAction(ModelServiceListAction.EnabledChanged(id, enabled))

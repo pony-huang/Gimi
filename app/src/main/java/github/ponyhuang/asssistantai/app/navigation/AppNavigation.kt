@@ -93,6 +93,7 @@ fun MainScreen(
         drawerState = drawerState,
         conversations = uiState.conversations,
         currentSessionId = currentSessionId,
+        isConversationSwitchEnabled = !uiState.isAgentMutationBlocked,
         onConversationClick = { conversation ->
             viewModel.switchSession(conversation.id)
             returnToChat()
@@ -132,7 +133,6 @@ fun MainScreen(
                                 onOpenSettings = { backStack.add(AppRoute.Settings) },
                                 onConfigureModels = { backStack.add(AppRoute.ModelServiceList) },
                                 onNewConversation = {
-                                    viewModel.recreateRunner()
                                     viewModel.reset()
                                 },
                             )

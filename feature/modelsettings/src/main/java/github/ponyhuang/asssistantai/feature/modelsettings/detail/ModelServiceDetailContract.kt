@@ -17,6 +17,7 @@ data class ModelServiceDetailUiState(
     val isAddDialogVisible: Boolean = false,
     val newModelId: String = "custom-model",
     val newModelKind: NewModelKind = NewModelKind.Chat,
+    val isMutationBlocked: Boolean = false,
 )
 
 sealed interface ModelServiceDetailAction {
@@ -47,6 +48,7 @@ sealed interface ModelServiceDetailNotice {
     data object ConnectionFailed : ModelServiceDetailNotice
     data class ModelsSynchronized(val count: Int) : ModelServiceDetailNotice
     data object ModelSynchronizationFailed : ModelServiceDetailNotice
+    data object AgentMutationBlocked : ModelServiceDetailNotice
 }
 
 sealed interface ModelServiceDetailRow {

@@ -10,12 +10,15 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.UpdateDefaultModelSettingsUseCase
+import github.ponyhuang.asssistantai.domain.conversation.usecase.RunWhenAgentIdleUseCase
+import github.ponyhuang.asssistantai.feature.modelsettings.TestAgentRuntimeGate
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.advanceUntilIdle
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -53,6 +56,7 @@ class DefaultModelSettingsViewModelCharacterizationTest {
             DefaultModelSettingsAction.SelectModel(DefaultModelDialog.Assistant, selection),
         )
         viewModel.onAction(DefaultModelSettingsAction.SelectVoice("female-shaonv"))
+        advanceUntilIdle()
 
         verify { repository.selectAssistantModel(selection) }
         verify { repository.selectTtsVoice("female-shaonv") }
@@ -62,6 +66,7 @@ class DefaultModelSettingsViewModelCharacterizationTest {
     private fun viewModel(repository: ModelCatalogRepository) = DefaultModelSettingsViewModel(
         observeSettings = ObserveDefaultModelSettingsUseCase(repository),
         updateSettings = UpdateDefaultModelSettingsUseCase(repository),
+        runWhenAgentIdle = RunWhenAgentIdleUseCase(TestAgentRuntimeGate()),
     )
 
     private fun repository(): ModelCatalogRepository = mockk(relaxed = true) {

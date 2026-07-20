@@ -3,8 +3,11 @@ package github.ponyhuang.asssistantai.domain.mcp.repository
 import github.ponyhuang.asssistantai.domain.mcp.model.McpImportResult
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 
 interface McpRepository {
+    val revision: StateFlow<Long>
+
     fun observeServers(): Flow<List<McpServer>>
 
     fun currentServers(): List<McpServer>

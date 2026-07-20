@@ -54,6 +54,7 @@ private fun ModelServiceDetailNotice.message(): String = when (this) {
     ModelServiceDetailNotice.ConnectionFailed -> "检测失败"
     is ModelServiceDetailNotice.ModelsSynchronized -> "已同步远端：$count 条"
     ModelServiceDetailNotice.ModelSynchronizationFailed -> "同步远端模型失败"
+    ModelServiceDetailNotice.AgentMutationBlocked -> "Agent 任务进行中，请先停止任务后再修改。"
 }
 
 private fun Context.openUrl(url: String, missingMessage: String) {

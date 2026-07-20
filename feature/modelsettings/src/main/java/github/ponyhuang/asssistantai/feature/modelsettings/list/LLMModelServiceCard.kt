@@ -31,6 +31,7 @@ fun ModelServiceCard(
     item: ModelService,
     onClick: (String) -> Unit,
     onToggleEnabled: (String, Boolean) -> Unit,
+    mutationEnabled: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -56,7 +57,7 @@ fun ModelServiceCard(
         Switch(
             checked = item.isEnabled,
             // 没有 apiKey 时不允许启用；详情页 Key 区填好后会自动重新可点。
-            enabled = item.apiKey.isNotBlank(),
+            enabled = mutationEnabled && item.apiKey.isNotBlank(),
             onCheckedChange = { onToggleEnabled(item.id, it) },
         )
     }

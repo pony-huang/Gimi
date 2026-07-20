@@ -11,6 +11,12 @@ import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRep
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatDisplayRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentMutationResult
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentRunLease
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentRuntimeGate
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentTaskPhase
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentTaskSource
+import github.ponyhuang.asssistantai.domain.conversation.runtime.isBusy
 import github.ponyhuang.asssistantai.domain.conversation.model.FunctionCallView
 import github.ponyhuang.asssistantai.domain.conversation.model.FunctionResponseView
 import github.ponyhuang.asssistantai.domain.conversation.model.Message
@@ -19,6 +25,7 @@ import github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment
 import github.ponyhuang.asssistantai.domain.conversation.model.Messages
 import github.ponyhuang.asssistantai.domain.conversation.model.TextPart
 import github.ponyhuang.asssistantai.domain.conversation.usecase.ChatRunEventMapper
+import github.ponyhuang.asssistantai.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import github.ponyhuang.asssistantai.domain.conversation.usecase.summarizeValue
 import github.ponyhuang.asssistantai.domain.conversation.usecase.toView
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.CatalogLoadState
@@ -60,6 +67,8 @@ import javax.inject.Inject
 @HiltViewModel
 class ChatViewModel @Inject constructor(
     private val runner: ChatAgentRepository,
+    private val agentRuntimeGate: AgentRuntimeGate,
+    private val runWhenAgentIdle: RunWhenAgentIdleUseCase,
     private val repository: ConversationRepository,
     private val modelServices: ModelCatalogRepository,
     private val chatDisplayPreferences: ChatDisplayRepository,
@@ -99,11 +108,12 @@ class ChatViewModel @Inject constructor(
                 },
             )
         }
-        cancelCurrentRun()
+        cancelCurrentRun(releaseLease = false)
         val runToken = agentRunOwnership.claim()
         _uiState.update { it.copy(isAgentRunning = true, turnComplete = false) }
         currentJob = viewModelScope.launch {
             try {
+                ensureRunLease().updatePhase(AgentTaskPhase.GENERATING)
                 runner.respondToToolConfirmation(
                     sessionId = sessionId,
                     confirmationCallId = request.confirmationCallId,
@@ -128,6 +138,11 @@ class ChatViewModel @Inject constructor(
      * 字段；UI 只订阅 `uiState` 一条流即可同时拿到消息、streaming 标志、会话 id 与会话列表。
      */
     init {
+        viewModelScope.launch {
+            agentRuntimeGate.state.collect { runtimeState ->
+                _uiState.update { it.copy(isAgentMutationBlocked = runtimeState.isBusy) }
+            }
+        }
         viewModelScope.launch {
             repository.conversations.collect { convs ->
                 _uiState.update { it.copy(conversations = convs) }
@@ -171,6 +186,7 @@ class ChatViewModel @Inject constructor(
     }
 
     private var currentJob: Job? = null
+    private var currentRunLease: AgentRunLease? = null
     private var sessionLoadJob: Job? = null
     private var activeSessionLoadToken: Any? = null
     private var loadingSessionId: String? = null
@@ -178,21 +194,40 @@ class ChatViewModel @Inject constructor(
     private val agentRunOwnership = AgentRunOwnership()
     private val approvedToolsThisTurn = mutableSetOf<String>()
 
-    private fun cancelCurrentRun() {
+    private fun cancelCurrentRun(releaseLease: Boolean = true) {
         agentRunOwnership.invalidate()
         currentJob?.cancel()
         currentJob = null
+        if (releaseLease) {
+            val lease = currentRunLease
+            currentRunLease = null
+            lease?.release()
+        }
     }
 
-    private fun finishRunIfOwned(runToken: Any) {
+    private suspend fun ensureRunLease(): AgentRunLease {
+        currentRunLease?.let { return it }
+        return agentRuntimeGate.acquire(AgentTaskSource.CHAT).also { currentRunLease = it }
+    }
+
+    private fun releaseRunLease() {
+        currentRunLease?.release()
+        currentRunLease = null
+    }
+
+    private suspend fun finishRunIfOwned(runToken: Any) {
         if (!agentRunOwnership.isOwnedBy(runToken)) return
         currentJob = null
         val pending = _uiState.value.pendingToolConfirmation
         _uiState.update { it.copy(isAgentRunning = pending != null) }
         if (pending != null && pending.toolName in approvedToolsThisTurn) {
+            currentRunLease?.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
             respondToToolConfirmation(confirmed = true)
-        } else if (pending == null && _uiState.value.turnComplete) {
+        } else if (pending != null) {
+            currentRunLease?.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
+        } else {
             approvedToolsThisTurn.clear()
+            releaseRunLease()
         }
         viewModelScope.launch { flushPendingConversationContentUpdate() }
     }
@@ -203,6 +238,8 @@ class ChatViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        currentRunLease?.release()
+        currentRunLease = null
         speechPlaybackController.clearSession()
         super.onCleared()
     }
@@ -336,10 +373,12 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(isAgentRunning = true, turnComplete = false) }
 
         val job = viewModelScope.launch {
+            ensureRunLease().updatePhase(AgentTaskPhase.GENERATING)
             val images = try {
                 attachments.read(attachmentReferences)
             } catch (t: Throwable) {
                 applyError("Cannot read selected image: ${t.message ?: "unknown error"}")
+                finishRunIfOwned(runToken)
                 return@launch
             }
             val userMessage = Messages.fromUser(text = text, imageAttachments = images)
@@ -351,6 +390,7 @@ class ChatViewModel @Inject constructor(
             val sid = ensureSessionId()
             if (sid.isBlank()) {
                 applyError("Cannot create a session; please retry.")
+                finishRunIfOwned(runToken)
                 return@launch
             }
             try {
@@ -459,18 +499,22 @@ class ChatViewModel @Inject constructor(
      * 上一会话遗留的 [partChannels]，避免 channel 跨"空 session"残留。
      */
     fun reset() {
-        cancelCurrentRun()
-        clearToolConfirmationState()
-        speechPlaybackController.clearSession()
-        _uiState.update { it.copy(isAgentRunning = false, turnComplete = false) }
-        clearPartChannels()
         viewModelScope.launch {
-            modelServices.awaitReady()
-            val newId = repository.createConversation(defaultModelPayload())
-            if (newId.isNotBlank()) {
-                switchSession(newId)
-            } else {
-                Log.w(TAG, "reset() failed to create a new conversation; UI state unchanged.")
+            when (runWhenAgentIdle {
+                clearToolConfirmationState()
+                speechPlaybackController.clearSession()
+                _uiState.update { it.copy(isAgentRunning = false, turnComplete = false) }
+                clearPartChannels()
+                modelServices.awaitReady()
+                val newId = repository.createConversation(defaultModelPayload())
+                if (newId.isNotBlank()) {
+                    switchSessionUnchecked(newId)
+                } else {
+                    Log.w(TAG, "reset() failed to create a new conversation; UI state unchanged.")
+                }
+            }) {
+                is AgentMutationResult.Applied -> Unit
+                AgentMutationResult.BlockedByActiveAgent -> showAgentMutationBlocked()
             }
         }
     }
@@ -480,7 +524,16 @@ class ChatViewModel @Inject constructor(
      */
     fun switchSession(sessionId: String) {
         if (sessionId.isBlank()) return
-        cancelCurrentRun()
+        viewModelScope.launch {
+            when (runWhenAgentIdle { switchSessionUnchecked(sessionId) }) {
+                is AgentMutationResult.Applied -> Unit
+                AgentMutationResult.BlockedByActiveAgent -> showAgentMutationBlocked()
+            }
+        }
+    }
+
+    private fun switchSessionUnchecked(sessionId: String) {
+        if (sessionId.isBlank()) return
         clearToolConfirmationState()
         sessionLoadJob?.cancel()
         speechPlaybackController.clearSession()
@@ -580,30 +633,24 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    /**
-     * 通知 runner 重建：让 ModelServiceStore 里最新启用的服务在下次新建会话时生效。
-     * 当前正在流式输出的会话不会被中途打断（recreate 只换 runner 引用，下一次 send 才用上）。
-     */
-    fun recreateRunner() {
-        viewModelScope.launch { runner.recreate() }
-    }
-
     fun selectModel(selection: ModelSelection) {
-        // AgentChatRunner snapshots its agent at send entry. Changing the backing model while
-        // a turn is active would make the current UI state disagree with that in-flight call.
-        if (_uiState.value.isAgentRunning) {
-            Log.i(TAG, "selectModel() ignored while an agent call is in progress.")
-            _uiState.update { it.copy(notice = ChatNotice.ModelSwitchBlocked) }
-            return
-        }
         val sessionId = _uiState.value.sessionId
         if (sessionId.isBlank()) return
         viewModelScope.launch {
-            repository.setConversationModel(sessionId, ModelSelectionCodec.encode(selection))
-            _uiState.update { it.copy(currentModelSelection = selection) }
-            // 当前流式调用已在 AgentChatRunner.send 入口快照 runner，重建不会中断它；
-            // 因此无论是否正在输出，下一条消息都会使用新模型。
-            runner.activateModel(selection)
+            when (runWhenAgentIdle {
+                repository.setConversationModel(sessionId, ModelSelectionCodec.encode(selection))
+                _uiState.update { it.copy(currentModelSelection = selection) }
+                runner.activateModel(selection)
+            }) {
+                is AgentMutationResult.Applied -> Unit
+                AgentMutationResult.BlockedByActiveAgent -> showAgentMutationBlocked()
+            }
+        }
+    }
+
+    private fun showAgentMutationBlocked() {
+        _uiState.update {
+            it.copy(notice = ChatNotice.Message("Agent 任务进行中，请先停止任务后再修改。"))
         }
     }
 
@@ -730,6 +777,14 @@ class ChatViewModel @Inject constructor(
     }
 
     private fun applyAgentRunEvent(event: ChatRunEvent) {
+        val phase = when {
+            event.functionCalls.any { it.confirmationRequest == null } -> AgentTaskPhase.EXECUTING_TOOL
+            event.functionResponses.isNotEmpty() -> AgentTaskPhase.GENERATING
+            else -> null
+        }
+        if (phase != null) {
+            viewModelScope.launch { currentRunLease?.updatePhase(phase) }
+        }
         _uiState.update { state ->
             val status = AgentRunStatus(
                 isRunning = state.isAgentRunning,
@@ -765,6 +820,9 @@ class ChatViewModel @Inject constructor(
             )
         }
         if (incoming.isEmpty()) return
+        viewModelScope.launch {
+            currentRunLease?.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
+        }
         _uiState.update { state ->
             val knownIds = state.pendingToolConfirmations.mapTo(mutableSetOf()) {
                 it.confirmationCallId

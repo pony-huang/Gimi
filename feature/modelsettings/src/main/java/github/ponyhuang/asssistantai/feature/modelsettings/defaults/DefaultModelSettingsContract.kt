@@ -23,6 +23,8 @@ data class DefaultModelSettingsUiState(
     val speechModels: List<SelectableModelRow> = emptyList(),
     val ttsModels: List<SelectableModelRow> = emptyList(),
     val dialog: DefaultModelDialog? = null,
+    val isMutationBlocked: Boolean = false,
+    val notice: String? = null,
 )
 
 enum class DefaultModelDialog {

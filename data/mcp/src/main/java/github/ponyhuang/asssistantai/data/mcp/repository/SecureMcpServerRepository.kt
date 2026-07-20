@@ -20,6 +20,9 @@ class SecureMcpServerRepository @Inject constructor(
     private val gson = Gson()
     private val type = object : TypeToken<List<McpServer>>() {}.type
     private val servers = MutableStateFlow(load())
+    private val _revision = MutableStateFlow(0L)
+
+    override val revision = _revision.asStateFlow()
 
     override fun observeServers() = servers.asStateFlow()
 
@@ -72,8 +75,10 @@ class SecureMcpServerRepository @Inject constructor(
     }.getOrDefault(emptyList())
 
     private fun persist(value: List<McpServer>) {
+        if (value == servers.value) return
         storage.write(gson.toJson(value, type))
         servers.value = value
+        _revision.value += 1
     }
 }
 

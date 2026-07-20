@@ -3,6 +3,9 @@ package github.ponyhuang.asssistantai.feature.mcp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentMutationResult
+import github.ponyhuang.asssistantai.domain.conversation.runtime.isBusy
+import github.ponyhuang.asssistantai.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
 import github.ponyhuang.asssistantai.domain.mcp.usecase.ManageMcpServersUseCase
 import github.ponyhuang.asssistantai.domain.mcp.usecase.ObserveMcpServersUseCase
@@ -12,15 +15,18 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 @HiltViewModel
 class McpSettingsViewModel @Inject constructor(
     observeServers: ObserveMcpServersUseCase,
     private val manageServers: ManageMcpServersUseCase,
+    private val runWhenAgentIdle: RunWhenAgentIdleUseCase,
 ) : ViewModel() {
     private val localState = MutableStateFlow(LocalState())
 
-    val uiState = combine(observeServers(), localState) { servers, local ->
+    val uiState = combine(observeServers(), localState, runWhenAgentIdle.state) {
+            servers, local, runtimeState ->
         McpSettingsUiState(
             servers = servers,
             importJson = local.importJson,
@@ -28,6 +34,8 @@ class McpSettingsViewModel @Inject constructor(
             editor = local.editor,
             isTransportMenuExpanded = local.isTransportMenuExpanded,
             shouldClose = local.shouldClose,
+            isMutationBlocked = runtimeState.isBusy,
+            notice = local.notice,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -38,7 +46,7 @@ class McpSettingsViewModel @Inject constructor(
     fun onAction(action: McpSettingsAction) {
         when (action) {
             is McpSettingsAction.ToggleServer ->
-                manageServers.save(action.server.copy(isEnabled = action.enabled))
+                mutate { manageServers.save(action.server.copy(isEnabled = action.enabled)) }
             is McpSettingsAction.ImportJsonChanged -> localState.update {
                 it.copy(importJson = action.value, importResult = null)
             }
@@ -63,12 +71,14 @@ class McpSettingsViewModel @Inject constructor(
     }
 
     private fun importServers() {
-        val result = manageServers.importJson(localState.value.importJson)
-        localState.update {
-            it.copy(
-                importResult = result.message,
-                shouldClose = result.error == null && result.imported > 0,
-            )
+        mutate {
+            val result = manageServers.importJson(localState.value.importJson)
+            localState.update {
+                it.copy(
+                    importResult = result.message,
+                    shouldClose = result.error == null && result.imported > 0,
+                )
+            }
         }
     }
 
@@ -87,14 +97,29 @@ class McpSettingsViewModel @Inject constructor(
     private fun saveEditor() {
         val draft = localState.value.editor ?: return
         if (draft.name.isBlank() || draft.endpointUrl.isBlank()) return
-        manageServers.save(draft.toServer())
-        localState.update { it.copy(shouldClose = true) }
+        mutate {
+            manageServers.save(draft.toServer())
+            localState.update { it.copy(shouldClose = true) }
+        }
     }
 
     private fun deleteEditor() {
         val draft = localState.value.editor?.takeUnless { it.isNew } ?: return
-        manageServers.delete(draft.id)
-        localState.update { it.copy(shouldClose = true) }
+        mutate {
+            manageServers.delete(draft.id)
+            localState.update { it.copy(shouldClose = true) }
+        }
+    }
+
+    private fun mutate(block: () -> Unit) {
+        viewModelScope.launch {
+            when (runWhenAgentIdle { block() }) {
+                is AgentMutationResult.Applied -> localState.update { it.copy(notice = null) }
+                AgentMutationResult.BlockedByActiveAgent -> localState.update {
+                    it.copy(notice = BLOCKED_MESSAGE)
+                }
+            }
+        }
     }
 
     private data class LocalState(
@@ -103,5 +128,10 @@ class McpSettingsViewModel @Inject constructor(
         val editor: McpEditorDraft? = null,
         val isTransportMenuExpanded: Boolean = false,
         val shouldClose: Boolean = false,
+        val notice: String? = null,
     )
+
+    private companion object {
+        const val BLOCKED_MESSAGE = "Agent 任务进行中，请先停止任务后再修改。"
+    }
 }

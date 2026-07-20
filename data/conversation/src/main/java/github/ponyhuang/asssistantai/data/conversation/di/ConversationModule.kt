@@ -15,15 +15,23 @@ import github.ponyhuang.asssistantai.data.ChatDisplayPreferences
 import github.ponyhuang.asssistantai.data.conversation.attachment.AndroidChatAttachmentRepository
 import github.ponyhuang.asssistantai.data.conversation.repository.AdkChatAgentRepository
 import github.ponyhuang.asssistantai.data.conversation.repository.AdkConversationRepository
+import github.ponyhuang.asssistantai.data.conversation.runtime.InMemoryAgentRuntimeGate
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatDisplayRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentRuntimeGate
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 object ConversationModule {
+
+    @Provides
+    @Singleton
+    fun provideAgentRuntimeGate(
+        implementation: InMemoryAgentRuntimeGate,
+    ): AgentRuntimeGate = implementation
 
     @Provides
     @Singleton

@@ -18,6 +18,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -56,6 +57,13 @@ fun McpServerEditorScreen(
                 .padding(vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            if (state.isMutationBlocked || state.notice != null) {
+                Text(
+                    text = state.notice ?: "Agent 任务进行中，请先停止任务后再修改。",
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                )
+            }
             SettingsSectionTitle(text = "基本信息")
             SettingsCard(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Column(
@@ -68,6 +76,7 @@ fun McpServerEditorScreen(
                             onAction(McpSettingsAction.EditorChanged(draft.copy(name = it)))
                         },
                         label = { Text("名称 *") },
+                        enabled = !state.isMutationBlocked,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
@@ -76,18 +85,22 @@ fun McpServerEditorScreen(
                             onAction(McpSettingsAction.EditorChanged(draft.copy(description = it)))
                         },
                         label = { Text("描述") },
+                        enabled = !state.isMutationBlocked,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     ExposedDropdownMenuBox(
                         expanded = state.isTransportMenuExpanded,
                         onExpandedChange = {
-                            onAction(McpSettingsAction.TransportMenuChanged(it))
+                            if (!state.isMutationBlocked) {
+                                onAction(McpSettingsAction.TransportMenuChanged(it))
+                            }
                         },
                     ) {
                         OutlinedTextField(
                             value = draft.transport.label,
                             onValueChange = {},
                             readOnly = true,
+                            enabled = !state.isMutationBlocked,
                             label = { Text("类型 *") },
                             trailingIcon = {
                                 ExposedDropdownMenuDefaults.TrailingIcon(
@@ -120,6 +133,7 @@ fun McpServerEditorScreen(
                             onAction(McpSettingsAction.EditorChanged(draft.copy(endpointUrl = it)))
                         },
                         label = { Text("服务器端点 *") },
+                        enabled = !state.isMutationBlocked,
                         placeholder = { Text("https://example.com/mcp") },
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -129,6 +143,7 @@ fun McpServerEditorScreen(
                             onAction(McpSettingsAction.EditorChanged(draft.copy(bearerToken = it)))
                         },
                         label = { Text("Bearer Token（可选）") },
+                        enabled = !state.isMutationBlocked,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
@@ -137,6 +152,7 @@ fun McpServerEditorScreen(
                             onAction(McpSettingsAction.EditorChanged(draft.copy(headers = it)))
                         },
                         label = { Text("请求头参数（可选）") },
+                        enabled = !state.isMutationBlocked,
                         placeholder = { Text("X-Api-Key=your-key\nX-Client=assistant") },
                         supportingText = { Text("每行一个，格式：Header-Name=value") },
                         minLines = 3,
@@ -147,6 +163,7 @@ fun McpServerEditorScreen(
                         trailingContent = {
                             Switch(
                                 checked = draft.isEnabled,
+                                enabled = !state.isMutationBlocked,
                                 onCheckedChange = {
                                     onAction(
                                         McpSettingsAction.EditorChanged(
@@ -169,7 +186,8 @@ fun McpServerEditorScreen(
                 ) {
                     Button(
                         onClick = { onAction(McpSettingsAction.SaveEditor) },
-                        enabled = draft.name.isNotBlank() && draft.endpointUrl.isNotBlank(),
+                        enabled = !state.isMutationBlocked &&
+                            draft.name.isNotBlank() && draft.endpointUrl.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text("保存")
@@ -177,6 +195,7 @@ fun McpServerEditorScreen(
                     if (!draft.isNew) {
                         TextButton(
                             onClick = { onAction(McpSettingsAction.DeleteEditor) },
+                            enabled = !state.isMutationBlocked,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = null)

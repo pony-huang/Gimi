@@ -23,6 +23,7 @@ import github.ponyhuang.asssistantai.domain.speech.repository.SpeechPlaybackRepo
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechRecognitionRepository
 import github.ponyhuang.asssistantai.domain.toolauthorization.model.ToolDescriptor
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.ToolAuthorizationRepository
+import github.ponyhuang.asssistantai.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -161,6 +162,8 @@ class ChatViewModelCharacterizationTest {
         return Fixture(
             viewModel = ChatViewModel(
                 runner = agent,
+                agentRuntimeGate = TestAgentRuntimeGate(),
+                runWhenAgentIdle = RunWhenAgentIdleUseCase(TestAgentRuntimeGate()),
                 repository = conversations,
                 modelServices = catalog,
                 chatDisplayPreferences = display,

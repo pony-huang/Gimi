@@ -4,6 +4,9 @@ import com.google.adk.kt.events.Event
 import com.google.adk.kt.types.FunctionCall
 import github.ponyhuang.asssistantai.agent.AgentChatRunner
 import github.ponyhuang.asssistantai.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentRuntimeGate
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentTaskPhase
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentTaskSource
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
@@ -30,6 +33,7 @@ class VoiceAgentTaskExecutor @Inject constructor(
     private val repository: ConversationRepository,
     private val modelServices: ModelCatalogRepository,
     private val preferences: BluetoothVoicePreferences,
+    private val agentRuntimeGate: AgentRuntimeGate,
 ) {
     private val mutex = Mutex()
 
@@ -37,50 +41,57 @@ class VoiceAgentTaskExecutor @Inject constructor(
         command: String,
         confirmTool: suspend (VoiceToolConfirmation) -> Boolean,
     ): VoiceAgentResult = mutex.withLock {
-        modelServices.awaitReady()
-        val selection = defaultSelection()
-            ?: error("请先配置可用的默认助手模型")
-        val encodedSelection = ModelSelectionCodec.encode(selection)
-        val sessionId = ensureVoiceSession(encodedSelection)
-        repository.setConversationModel(sessionId, encodedSelection)
-        runner.recreate()
+        val lease = agentRuntimeGate.acquire(AgentTaskSource.BLUETOOTH_VOICE)
+        try {
+            modelServices.awaitReady()
+            val selection = defaultSelection()
+                ?: error("请先配置可用的默认助手模型")
+            val encodedSelection = ModelSelectionCodec.encode(selection)
+            val sessionId = ensureVoiceSession(encodedSelection)
+            repository.setConversationModel(sessionId, encodedSelection)
+            runner.recreate()
 
-        val accumulator = VoiceResponseAccumulator()
-        val pendingConfirmations = ArrayDeque<VoiceToolConfirmation>()
-        val seenConfirmationIds = mutableSetOf<String>()
-        val approvedTools = mutableSetOf<String>()
-        runner.send(
-            userId = USER_ID,
-            sessionId = sessionId,
-            text = command,
-        ).collect { event ->
-            accumulator.accept(event)
-            event.enqueueConfirmations(pendingConfirmations, seenConfirmationIds)
-        }
-        while (pendingConfirmations.isNotEmpty()) {
-            val request = pendingConfirmations.removeFirst()
-            val confirmed = request.toolName in approvedTools || confirmTool(request)
-            if (confirmed) {
-                approvedTools += request.toolName
-            } else {
-                approvedTools.clear()
-            }
-            runner.respondToToolConfirmation(
+            val accumulator = VoiceResponseAccumulator()
+            val pendingConfirmations = ArrayDeque<VoiceToolConfirmation>()
+            val seenConfirmationIds = mutableSetOf<String>()
+            val approvedTools = mutableSetOf<String>()
+            runner.send(
                 userId = USER_ID,
                 sessionId = sessionId,
-                confirmationCallId = request.callId,
-                confirmed = confirmed,
+                text = command,
             ).collect { event ->
                 accumulator.accept(event)
                 event.enqueueConfirmations(pendingConfirmations, seenConfirmationIds)
             }
+            while (pendingConfirmations.isNotEmpty()) {
+                lease.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
+                val request = pendingConfirmations.removeFirst()
+                val confirmed = request.toolName in approvedTools || confirmTool(request)
+                if (confirmed) {
+                    approvedTools += request.toolName
+                } else {
+                    approvedTools.clear()
+                }
+                lease.updatePhase(AgentTaskPhase.GENERATING)
+                runner.respondToToolConfirmation(
+                    userId = USER_ID,
+                    sessionId = sessionId,
+                    confirmationCallId = request.callId,
+                    confirmed = confirmed,
+                ).collect { event ->
+                    accumulator.accept(event)
+                    event.enqueueConfirmations(pendingConfirmations, seenConfirmationIds)
+                }
+            }
+            repository.refreshConversation(sessionId)
+            repository.notifyConversationContentChanged(sessionId)
+            VoiceAgentResult(
+                sessionId = sessionId,
+                responseText = accumulator.result().ifBlank { "任务已完成" },
+            )
+        } finally {
+            lease.release()
         }
-        repository.refreshConversation(sessionId)
-        repository.notifyConversationContentChanged(sessionId)
-        VoiceAgentResult(
-            sessionId = sessionId,
-            responseText = accumulator.result().ifBlank { "任务已完成" },
-        )
     }
 
     private suspend fun ensureVoiceSession(initialModel: String): String {

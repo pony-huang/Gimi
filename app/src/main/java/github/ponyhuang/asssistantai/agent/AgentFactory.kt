@@ -36,7 +36,9 @@ class AgentFactory @Inject constructor(
         return LlmAgent(
             name = "DefaultAssistant",
             model = model,
-            instruction = Instruction(AgentPrompts.DEFAULT_ASSISTANT_INSTRUCTION),
+            instruction = Instruction(
+                AgentPrompts.defaultAssistantInstruction(tools.mapTo(linkedSetOf(), BaseTool::name)),
+            ),
             tools = tools,
             beforeModelCallbacks = listOf(titleCallbacks.beforeModel()),
             afterModelCallbacks = listOf(titleCallbacks.afterModel()),

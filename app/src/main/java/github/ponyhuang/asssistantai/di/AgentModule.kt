@@ -17,6 +17,7 @@ import github.ponyhuang.asssistantai.agent.LocalToolCatalog
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.LocalToolDefinitionSource
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.ToolAuthorizationRepository
+import github.ponyhuang.asssistantai.domain.mcp.repository.McpRepository
 import github.ponyhuang.asssistantai.voice.VoiceAgentRunner
 import java.io.File
 import javax.inject.Singleton
@@ -65,6 +66,7 @@ object AgentModule {
         agentFactory: AgentFactory,
         modelServices: ModelServiceRepository,
         toolAuthorization: ToolAuthorizationRepository,
+        mcpRepository: McpRepository,
     ): AgentChatRunner = AgentChatRunner(
         factory = {
             modelServices.awaitReady()
@@ -72,7 +74,9 @@ object AgentModule {
         },
         sessionService = sessionService,
         artifactService = artifactService,
-        configurationRevision = { toolAuthorization.revision.value },
+        configurationRevision = {
+            toolAuthorization.revision.value to mcpRepository.revision.value
+        },
     )
 
     @Provides
@@ -84,6 +88,7 @@ object AgentModule {
         agentFactory: AgentFactory,
         modelServices: ModelServiceRepository,
         toolAuthorization: ToolAuthorizationRepository,
+        mcpRepository: McpRepository,
     ): AgentChatRunner = AgentChatRunner(
         factory = {
             modelServices.awaitReady()
@@ -91,7 +96,9 @@ object AgentModule {
         },
         sessionService = sessionService,
         artifactService = artifactService,
-        configurationRevision = { toolAuthorization.revision.value },
+        configurationRevision = {
+            toolAuthorization.revision.value to mcpRepository.revision.value
+        },
     )
 
     /**

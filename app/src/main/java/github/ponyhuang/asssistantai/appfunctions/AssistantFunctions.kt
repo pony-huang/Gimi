@@ -12,6 +12,10 @@ import dagger.Lazy
 import github.ponyhuang.asssistantai.agent.AgentChatRunner
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
 import github.ponyhuang.asssistantai.data.LLMModelSelection
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentMutationResult
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentRuntimeGate
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentTaskSource
+import github.ponyhuang.asssistantai.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import java.util.UUID
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
@@ -47,6 +51,8 @@ class AssistantFunctions
         // 提前构造网络运行器。
         private val agentChatRunnerLazy: Lazy<AgentChatRunner>,
         private val modelServices: ModelServiceRepository,
+        private val agentRuntimeGate: AgentRuntimeGate,
+        private val runWhenAgentIdle: RunWhenAgentIdleUseCase,
     ) {
 
         /**
@@ -118,14 +124,21 @@ class AssistantFunctions
 
             // 仅在 service / group / model 三元组全部命中后才落盘 + 重建 runner；
             // 出错时 recreate 不应触发，保持 store 的单 state-of-truth 假设。
-            modelServices.setCurrentSelection(
-                LLMModelSelection(
-                    serviceId = provider.serviceId,
-                    groupId = group.groupId,
-                    modelId = model.modelId,
-                ),
-            )
-            agentChatRunnerLazy.get().recreate()
+            when (runWhenAgentIdle {
+                modelServices.setCurrentSelection(
+                    LLMModelSelection(
+                        serviceId = provider.serviceId,
+                        groupId = group.groupId,
+                        modelId = model.modelId,
+                    ),
+                )
+                agentChatRunnerLazy.get().recreate()
+            }) {
+                is AgentMutationResult.Applied -> Unit
+                AgentMutationResult.BlockedByActiveAgent -> throw AppFunctionAppUnknownException(
+                    "Agent task is running; stop it before changing the model",
+                )
+            }
         }
 
         /**
@@ -162,6 +175,7 @@ class AssistantFunctions
 
             // 每次 AppFunction 调用都开新会话 — 避免 session 长尾污染与"上次调用遗留状态"风险。
             val sessionId = UUID.randomUUID().toString()
+            val lease = agentRuntimeGate.acquire(AgentTaskSource.APP_FUNCTION)
 
             val collectedEvents: List<Event>? = try {
                 withTimeoutOrNull(TIMEOUT_SECONDS.seconds) {
@@ -185,6 +199,8 @@ class AssistantFunctions
                 throw AppFunctionAppUnknownException(
                     "Failed to send message: ${t.message ?: t::class.java.simpleName}",
                 )
+            } finally {
+                lease.release()
             }
 
             if (collectedEvents == null) {

@@ -7,6 +7,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.ui.settings.SettingsCard
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
@@ -20,6 +23,9 @@ fun ModelServiceDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     val service = state.service ?: return
+    val dispatch: (ModelServiceDetailAction) -> Unit = { action ->
+        if (!state.isMutationBlocked || !action.changesAgentConfiguration()) onAction(action)
+    }
 
     SettingsPageContainer(modifier = modifier) {
         Column(
@@ -28,11 +34,21 @@ fun ModelServiceDetailScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(vertical = 12.dp),
         ) {
-            SettingsCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+            if (state.isMutationBlocked) {
+                Text(
+                    text = "Agent 任务进行中，请先停止任务后再修改。",
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                )
+            }
+            SettingsCard(
+                modifier = Modifier.padding(horizontal = 16.dp)
+                    .alpha(if (state.isMutationBlocked) 0.6f else 1f),
+            ) {
                 HeaderSection(
                     service = service,
                     onToggleEnabled = {
-                        onAction(ModelServiceDetailAction.EnabledChanged(it))
+                        dispatch(ModelServiceDetailAction.EnabledChanged(it))
                     },
                     onOpenHomepage = {
                         onOpenUrl(service.homepageUrl, "未配置主页链接")
@@ -47,12 +63,12 @@ fun ModelServiceDetailScreen(
                     isVisible = state.isApiKeyVisible,
                     isTesting = state.isTestingKey,
                     onApiKeyChange = {
-                        onAction(ModelServiceDetailAction.ApiKeyChanged(it))
+                        dispatch(ModelServiceDetailAction.ApiKeyChanged(it))
                     },
                     onToggleVisibility = {
-                        onAction(ModelServiceDetailAction.ToggleApiKeyVisibility)
+                        dispatch(ModelServiceDetailAction.ToggleApiKeyVisibility)
                     },
-                    onTest = { onAction(ModelServiceDetailAction.TestConnection) },
+                    onTest = { dispatch(ModelServiceDetailAction.TestConnection) },
                     onOpenKeyHelp = {
                         onOpenUrl(service.keyHelpUrl, "未配置密钥获取链接")
                     },
@@ -64,13 +80,13 @@ fun ModelServiceDetailScreen(
                 ApiBaseUrlSection(
                     service = service,
                     isMenuExpanded = state.isProtocolMenuExpanded,
-                    onToggleMenu = { onAction(ModelServiceDetailAction.ToggleProtocolMenu) },
-                    onDismissMenu = { onAction(ModelServiceDetailAction.DismissProtocolMenu) },
+                    onToggleMenu = { dispatch(ModelServiceDetailAction.ToggleProtocolMenu) },
+                    onDismissMenu = { dispatch(ModelServiceDetailAction.DismissProtocolMenu) },
                     onProtocolChange = {
-                        onAction(ModelServiceDetailAction.ApiProtocolChanged(it))
+                        dispatch(ModelServiceDetailAction.ApiProtocolChanged(it))
                     },
                     onBaseUrlChange = {
-                        onAction(ModelServiceDetailAction.ApiBaseUrlChanged(it))
+                        dispatch(ModelServiceDetailAction.ApiBaseUrlChanged(it))
                     },
                 )
             }
@@ -84,7 +100,7 @@ fun ModelServiceDetailScreen(
                     isAddDialogVisible = state.isAddDialogVisible,
                     newModelId = state.newModelId,
                     newModelKind = state.newModelKind,
-                    onAction = onAction,
+                    onAction = dispatch,
                 )
             }
             SettingsCard(
@@ -97,4 +113,18 @@ fun ModelServiceDetailScreen(
             }
         }
     }
+}
+
+private fun ModelServiceDetailAction.changesAgentConfiguration(): Boolean = when (this) {
+    is ModelServiceDetailAction.ApiKeyChanged,
+    is ModelServiceDetailAction.ApiBaseUrlChanged,
+    is ModelServiceDetailAction.ApiProtocolChanged,
+    is ModelServiceDetailAction.EnabledChanged,
+    is ModelServiceDetailAction.RemoveModel,
+    is ModelServiceDetailAction.NewModelIdChanged,
+    is ModelServiceDetailAction.NewModelKindChanged,
+    ModelServiceDetailAction.ShowAddDialog,
+    ModelServiceDetailAction.ConfirmAddModel,
+    ModelServiceDetailAction.RefreshModels -> true
+    else -> false
 }

@@ -9,12 +9,15 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalog
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.ObserveModelCatalogLoadStateUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.ObserveModelServicesUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.UpdateModelServiceUseCase
+import github.ponyhuang.asssistantai.domain.conversation.usecase.RunWhenAgentIdleUseCase
+import github.ponyhuang.asssistantai.feature.modelsettings.TestAgentRuntimeGate
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.advanceUntilIdle
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -49,11 +52,12 @@ class ModelServiceListViewModelCharacterizationTest {
     }
 
     @Test
-    fun toggleDelegatesToRepository() {
+    fun toggleDelegatesToRepository() = runTest {
         val repository = repository()
         val viewModel = viewModel(repository)
 
         viewModel.onAction(ModelServiceListAction.EnabledChanged("deepseek", true))
+        advanceUntilIdle()
 
         verify { repository.updateEnabled("deepseek", true) }
     }
@@ -62,6 +66,7 @@ class ModelServiceListViewModelCharacterizationTest {
         observeServices = ObserveModelServicesUseCase(repository),
         observeLoadState = ObserveModelCatalogLoadStateUseCase(repository),
         updateModelService = UpdateModelServiceUseCase(repository),
+        runWhenAgentIdle = RunWhenAgentIdleUseCase(TestAgentRuntimeGate()),
     )
 
     private fun repository(): ModelCatalogRepository = mockk(relaxed = true) {

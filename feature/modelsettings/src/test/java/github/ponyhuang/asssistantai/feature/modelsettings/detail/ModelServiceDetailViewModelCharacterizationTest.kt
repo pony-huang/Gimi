@@ -13,6 +13,8 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.ObserveModelSer
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.RefreshModelCatalogUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.TestModelServiceConnectionUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.UpdateModelServiceUseCase
+import github.ponyhuang.asssistantai.domain.conversation.usecase.RunWhenAgentIdleUseCase
+import github.ponyhuang.asssistantai.feature.modelsettings.TestAgentRuntimeGate
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -99,6 +101,7 @@ class ModelServiceDetailViewModelCharacterizationTest {
         advanceUntilIdle()
 
         fixture.viewModel.onAction(ModelServiceDetailAction.ApiKeyChanged("new"))
+        advanceUntilIdle()
 
         assertEquals("new", fixture.viewModel.uiState.value.service?.apiKey)
         io.mockk.verify { fixture.repository.updateApiKey(provider.id, "new") }
@@ -121,6 +124,7 @@ class ModelServiceDetailViewModelCharacterizationTest {
             updateModelService = UpdateModelServiceUseCase(repository),
             testConnection = TestModelServiceConnectionUseCase(remote),
             refreshCatalog = RefreshModelCatalogUseCase(repository, remote),
+            runWhenAgentIdle = RunWhenAgentIdleUseCase(TestAgentRuntimeGate()),
         )
         return Fixture(viewModel, repository, remote)
     }

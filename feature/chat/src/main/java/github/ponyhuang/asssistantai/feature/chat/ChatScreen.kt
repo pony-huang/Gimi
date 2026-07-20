@@ -52,6 +52,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.conversation.model.Message
 import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
@@ -364,38 +367,30 @@ private fun ChatTopBar(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
-                    onClick = onOpenSettings,
+                    onClick = onNewConversation,
+                    enabled = !isAgentRunning,
                     modifier = Modifier.size(48.dp),
                 ) {
-                    Box(modifier = Modifier.size(28.dp)) {
-                        Icon(
-                            imageVector = Icons.Default.Psychology,
-                            contentDescription = "设置",
-                            modifier = Modifier.size(24.dp),
-                        )
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(12.dp)
-                                .align(Alignment.BottomEnd),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                        contentDescription = "新建对话",
+                    )
                 }
                 VerticalDivider(
                     modifier = Modifier.height(24.dp),
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
                 )
                 IconButton(
-                    onClick = onNewConversation,
-                    enabled = !isAgentRunning,
+                    onClick = onOpenSettings,
                     modifier = Modifier.size(48.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "新建对话",
-                    )
+                    Box(modifier = Modifier.size(28.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "设置",
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
                 }
             }
         }

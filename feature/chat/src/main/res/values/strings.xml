@@ -1,0 +1,13 @@
+<resources>
+    <string name="stream_ai_compose_speech_to_text_idle_button">Voice input</string>
+    <string name="stream_ai_compose_speech_to_text_recording_button">Recording…</string>
+    <string name="stream_ai_compose_composer_mic_permission_message">Microphone permission is required to record audio</string>
+    <string name="stream_ai_compose_composer_mic_permission_action">Settings</string>
+    <string name="stream_ai_compose_composer_input_placeholder">Ask Assistant</string>
+    <string name="stream_ai_compose_composer_stop_button">Stop</string>
+    <string name="stream_ai_compose_composer_send_button">Send</string>
+    <string name="stream_ai_compose_composer_add_attachments_button">Add context</string>
+    <string name="stream_ai_compose_composer_take_photo">Take photo</string>
+    <string name="stream_ai_compose_composer_choose_photos">Choose from photos</string>
+    <string name="stream_ai_compose_composer_camera_error">Unable to open the camera</string>
+</resources>

@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
-import github.ponyhuang.asssistantai.data.ModelServiceRepository
+import github.ponyhuang.asssistantai.domain.speech.repository.VoiceWakeRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -21,8 +21,7 @@ class BluetoothVoiceController @Inject constructor(
     @ApplicationContext private val context: Context,
     private val preferences: BluetoothVoicePreferences,
     private val modelRepository: WakeModelRepository,
-    private val modelServices: ModelServiceRepository,
-) {
+) : VoiceWakeRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val _state = MutableStateFlow(
         BluetoothVoiceUiState(
@@ -31,7 +30,7 @@ class BluetoothVoiceController @Inject constructor(
             voiceSessionId = preferences.voiceSessionId.value,
         ),
     )
-    val state: StateFlow<BluetoothVoiceUiState> = _state.asStateFlow()
+    override val state: StateFlow<BluetoothVoiceUiState> = _state.asStateFlow()
 
     init {
         scope.launch { preferences.keyword.collect { keyword -> _state.update { it.copy(keyword = keyword) } } }
@@ -43,21 +42,14 @@ class BluetoothVoiceController @Inject constructor(
         }
     }
 
-    fun setKeyword(keyword: String): Result<Unit> = runCatching { preferences.setKeyword(keyword) }
+    override fun setKeyword(keyword: String): Result<Unit> =
+        runCatching { preferences.setKeyword(keyword) }
 
-    fun installModel() = modelRepository.install()
+    override fun installModel() = modelRepository.install()
 
-    fun start() {
+    override fun start() {
         if (modelRepository.modelPath() == null) {
             setStatus(BluetoothVoiceStatus.Error, message = "请先下载唤醒模型")
-            return
-        }
-        if (modelServices.defaultSelection() == null) {
-            setStatus(BluetoothVoiceStatus.Error, message = "请先配置可用的默认助手模型")
-            return
-        }
-        if (modelServices.resolveSpeechSelection(modelServices.defaultSpeechSelection.value) == null) {
-            setStatus(BluetoothVoiceStatus.Error, message = "请先选择可用的默认语音识别模型")
             return
         }
         setStatus(BluetoothVoiceStatus.Starting, message = "正在启动蓝牙语音监听")
@@ -67,7 +59,7 @@ class BluetoothVoiceController @Inject constructor(
         )
     }
 
-    fun stop() {
+    override fun stop() {
         context.startService(
             Intent(context, BluetoothVoiceService::class.java).setAction(BluetoothVoiceService.ACTION_STOP),
         )

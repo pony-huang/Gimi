@@ -1,0 +1,100 @@
+package github.ponyhuang.asssistantai.data.conversation.repository
+
+import com.google.adk.kt.events.Event
+import com.google.adk.kt.types.FunctionCall
+import github.ponyhuang.asssistantai.agent.AgentChatRunner
+import github.ponyhuang.asssistantai.domain.conversation.model.ChatFunctionCall
+import github.ponyhuang.asssistantai.domain.conversation.model.ChatFunctionResponse
+import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunEvent
+import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunPart
+import github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment
+import github.ponyhuang.asssistantai.domain.conversation.model.ToolConfirmationRequest
+import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+@Singleton
+class AdkChatAgentRepository @Inject constructor(
+    private val runner: AgentChatRunner,
+    private val modelServices: ModelCatalogRepository,
+) : ChatAgentRepository {
+    override suspend fun activateModel(selection: ModelSelection?): Result<Unit> = runCatching {
+        modelServices.setRuntimeSelection(selection)
+        if (selection == null) runner.invalidate() else runner.recreate()
+    }
+
+    override suspend fun recreate(): Result<Unit> = runCatching { runner.recreate() }
+
+    override suspend fun send(
+        sessionId: String,
+        text: String,
+        imageAttachments: List<ImageAttachment>,
+    ): Flow<ChatRunEvent> = runner.send(
+        userId = USER_ID,
+        sessionId = sessionId,
+        text = text,
+        imageAttachments = imageAttachments,
+    ).map { it.toDomain() }
+
+    override suspend fun respondToToolConfirmation(
+        sessionId: String,
+        confirmationCallId: String,
+        confirmed: Boolean,
+    ): Flow<ChatRunEvent> = runner.respondToToolConfirmation(
+        userId = USER_ID,
+        sessionId = sessionId,
+        confirmationCallId = confirmationCallId,
+        confirmed = confirmed,
+    ).map { it.toDomain() }
+
+    private fun Event.toDomain() = ChatRunEvent(
+        id = id,
+        invocationId = invocationId,
+        author = author,
+        parts = content?.parts.orEmpty().map { part ->
+            ChatRunPart(
+                text = part.text,
+                thought = part.thought == true,
+                image = part.inlineData?.let { blob ->
+                    val mimeType = blob.mimeType ?: return@let null
+                    val data = blob.data ?: return@let null
+                    ImageAttachment(mimeType, data)
+                },
+            )
+        },
+        functionCalls = functionCalls().map { it.toDomain() },
+        functionResponses = functionResponses().map {
+            ChatFunctionResponse(id = it.id, name = it.name)
+        },
+        partial = partial,
+        turnComplete = turnComplete,
+        errorCode = errorCode,
+        errorMessage = errorMessage,
+        timestamp = timestamp,
+    )
+
+    private fun FunctionCall.toDomain(): ChatFunctionCall {
+        val rawArgs = args.mapKeys { it.key.toString() }
+        val confirmation = takeIf {
+            name == FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME
+        }?.let {
+            val original = args[FunctionCall.ORIGINAL_FUNCTION_CALL_KEY] as? Map<*, *>
+            val toolName = original?.get("name") as? String
+            if (toolName == null) null else ToolConfirmationRequest(
+                toolName = toolName,
+                args = (original["args"] as? Map<*, *>)
+                    .orEmpty()
+                    .mapKeys { entry -> entry.key.toString() },
+            )
+        }
+        return ChatFunctionCall(id, name, rawArgs, confirmation)
+    }
+
+    private companion object {
+        const val USER_ID = "user-default"
+    }
+}

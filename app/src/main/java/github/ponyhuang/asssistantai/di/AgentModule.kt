@@ -2,7 +2,6 @@ package github.ponyhuang.asssistantai.di
 
 import android.content.Context
 import android.util.Log
-import androidx.room.Room
 import com.google.adk.kt.artifacts.ArtifactService
 import com.google.adk.kt.artifacts.FileArtifactService
 import com.google.adk.kt.sessions.SessionService
@@ -14,14 +13,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.asssistantai.agent.AgentChatRunner
 import github.ponyhuang.asssistantai.agent.AgentFactory
-import github.ponyhuang.asssistantai.data.ConversationRepository
-import github.ponyhuang.asssistantai.data.ConversationMetadataDatabase
-import github.ponyhuang.asssistantai.data.ModelServiceDatabase
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
-import github.ponyhuang.asssistantai.speech.OpenAiCompatibleSpeechRecognitionClient
-import github.ponyhuang.asssistantai.speech.MiMoSpeechSynthesisClient
-import github.ponyhuang.asssistantai.speech.SpeechRecognitionClient
-import github.ponyhuang.asssistantai.speech.SpeechSynthesisClient
 import github.ponyhuang.asssistantai.voice.VoiceAgentRunner
 import java.io.File
 import javax.inject.Singleton
@@ -39,16 +31,6 @@ import javax.inject.Singleton
 object AgentModule {
 
     private const val TAG: String = "AgentModule"
-
-    @Provides
-    @Singleton
-    fun provideSpeechRecognitionClient(): SpeechRecognitionClient =
-        OpenAiCompatibleSpeechRecognitionClient()
-
-    @Provides
-    @Singleton
-    fun provideSpeechSynthesisClient(): SpeechSynthesisClient =
-        MiMoSpeechSynthesisClient()
 
     @Provides
     @Singleton
@@ -82,23 +64,6 @@ object AgentModule {
         artifactService = artifactService,
     )
 
-    /**
-     * ADK SessionService 之上的 UI 友好仓库 — 提供 [Conversation] 列表与会话 CRUD。
-     *
-     * 进程级单例 — [ChatViewModel] 与后续潜在的其他 ViewModel 共享同一份会话缓存。
-     */
-    @Provides
-    @Singleton
-    fun provideConversationRepository(
-        sessionService: SessionService,
-        metadataDatabase: ConversationMetadataDatabase,
-    ): ConversationRepository = ConversationRepository(
-        appName = AgentChatRunner.APP_NAME,
-        userId = USER_ID,
-        sessionService = sessionService,
-        metadataDao = metadataDatabase.conversationMetadataDao(),
-    )
-
     @Provides
     @Singleton
     @VoiceAgentRunner
@@ -115,26 +80,6 @@ object AgentModule {
         sessionService = sessionService,
         artifactService = artifactService,
     )
-
-    @Provides
-    @Singleton
-    fun provideConversationMetadataDatabase(
-        @ApplicationContext context: Context,
-    ): ConversationMetadataDatabase = Room.databaseBuilder(
-        context,
-        ConversationMetadataDatabase::class.java,
-        "conversation-metadata.db",
-    ).build()
-
-    @Provides
-    @Singleton
-    fun provideModelServiceDatabase(
-        @ApplicationContext context: Context,
-    ): ModelServiceDatabase = Room.databaseBuilder(
-        context,
-        ModelServiceDatabase::class.java,
-        "model-services.db",
-    ).build()
 
     /**
      * 选 artifact 根目录：优先外置存储，失败时退到内部 files dir。

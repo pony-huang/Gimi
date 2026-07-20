@@ -100,6 +100,30 @@ android {
 }
 
 dependencies {
+    implementation(project(":domain:modelcatalog"))
+    implementation(project(":domain:conversation"))
+    implementation(project(":domain:speech"))
+    implementation(project(":domain:mcp"))
+    implementation(project(":domain:workfiles"))
+    implementation(project(":domain:permissions"))
+    implementation(project(":core:common"))
+    implementation(project(":data:modelcatalog"))
+    implementation(project(":core:network"))
+    implementation(project(":core:database"))
+    implementation(project(":data:speech"))
+    implementation(project(":data:conversation"))
+    implementation(project(":data:mcp"))
+    implementation(project(":data:workfiles"))
+    implementation(project(":data:permissions"))
+    implementation(project(":core:designsystem"))
+    implementation(project(":feature:modelsettings"))
+    implementation(project(":feature:mcp"))
+    implementation(project(":feature:workfiles"))
+    implementation(project(":feature:permissions"))
+    implementation(project(":feature:voicewake"))
+    implementation(project(":feature:settings"))
+    implementation(project(":feature:chat"))
+    testImplementation(project(":core:testing"))
     // Drop kxml2 from the release runtime configurations only. Android's
     // framework already provides android.content.res.XmlResourceParser which
     // implements the same org.xmlpull.v1.XmlPullParser interface, so keeping
@@ -151,6 +175,10 @@ dependencies {
     testImplementation(libs.google.adk.kotlin.webserver)
     testImplementation(libs.androidx.room.testing)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockk)
+    testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.turbine)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)

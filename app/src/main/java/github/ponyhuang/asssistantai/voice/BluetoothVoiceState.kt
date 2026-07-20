@@ -1,38 +1,9 @@
 package github.ponyhuang.asssistantai.voice
 
-enum class BluetoothVoiceStatus {
-    Stopped,
-    Starting,
-    WaitingForBluetooth,
-    Listening,
-    CapturingCommand,
-    Transcribing,
-    RunningAgent,
-    Speaking,
-    Paused,
-    Error,
-}
-
-enum class WakeModelStatus { Missing, Downloading, Extracting, Ready, Error }
-
-data class WakeModelState(
-    val status: WakeModelStatus = WakeModelStatus.Missing,
-    val progress: Float = 0f,
-    val message: String? = null,
-)
-
-data class BluetoothVoiceUiState(
-    val status: BluetoothVoiceStatus = BluetoothVoiceStatus.Stopped,
-    val keyword: String = DEFAULT_WAKE_KEYWORD,
-    val model: WakeModelState = WakeModelState(),
-    val deviceName: String? = null,
-    val lastCommand: String? = null,
-    val message: String? = null,
-    val voiceSessionId: String? = null,
-) {
-    val isRunning: Boolean
-        get() = status != BluetoothVoiceStatus.Stopped && status != BluetoothVoiceStatus.Error
-}
+typealias BluetoothVoiceStatus = github.ponyhuang.asssistantai.domain.speech.model.VoiceWakeStatus
+typealias WakeModelStatus = github.ponyhuang.asssistantai.domain.speech.model.WakeModelStatus
+typealias WakeModelState = github.ponyhuang.asssistantai.domain.speech.model.WakeModelState
+typealias BluetoothVoiceUiState = github.ponyhuang.asssistantai.domain.speech.model.VoiceWakeState
 
 internal fun normalizeWakeText(text: String): String = buildString {
     text.trim().lowercase().forEach { character ->
@@ -61,4 +32,4 @@ internal fun stripWakeKeyword(transcript: String, keyword: String): String {
     return trimmed
 }
 
-const val DEFAULT_WAKE_KEYWORD = "你好助手"
+const val DEFAULT_WAKE_KEYWORD = github.ponyhuang.asssistantai.domain.speech.model.DEFAULT_WAKE_KEYWORD

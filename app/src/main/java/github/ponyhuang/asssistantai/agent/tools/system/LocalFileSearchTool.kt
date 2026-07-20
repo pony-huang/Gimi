@@ -10,7 +10,7 @@ import android.provider.MediaStore
 import com.google.adk.kt.annotations.Param
 import com.google.adk.kt.annotations.Tool
 import dagger.hilt.android.qualifiers.ApplicationContext
-import github.ponyhuang.asssistantai.data.DocumentDirectoryRepository
+import github.ponyhuang.asssistantai.domain.workfiles.repository.WorkDirectoryRepository
 import github.ponyhuang.asssistantai.permission.MediaPermissionActivity
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -20,7 +20,7 @@ import javax.inject.Singleton
 class LocalFileSearchTool @Inject constructor(
     @ApplicationContext private val context: Context,
     private val queue: IntentActionQueue,
-    private val documentDirectories: DocumentDirectoryRepository,
+    private val documentDirectories: WorkDirectoryRepository,
 ) {
     @Tool(
         name = "request_media_file_permissions",
@@ -72,7 +72,7 @@ class LocalFileSearchTool @Inject constructor(
     fun searchDocuments(@Param("A non-blank file-name query.") query: String): Map<String, Any> {
         val value = query.trim()
         if (value.isEmpty()) return error("query must not be blank.")
-        val trees = documentDirectories.directories.value
+        val trees = documentDirectories.currentDirectories().map { Uri.parse(it.uri) }
         if (trees.isEmpty()) return error(
             "No document search directory is configured. Ask the user to add one in Settings > Document search directories.",
         )
@@ -198,7 +198,7 @@ class LocalFileSearchTool @Inject constructor(
         context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 
     private fun isAllowedUri(uri: Uri): Boolean =
-        uri.authority == MediaStore.AUTHORITY || documentDirectories.contains(uri)
+        uri.authority == MediaStore.AUTHORITY || documentDirectories.contains(uri.toString())
 
     private fun error(message: String): Map<String, Any> = mapOf("success" to false, "error" to message)
 

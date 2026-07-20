@@ -4,9 +4,9 @@ import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Schema
-import github.ponyhuang.asssistantai.data.McpServerConfig
-import github.ponyhuang.asssistantai.data.McpServerRepository
-import github.ponyhuang.asssistantai.data.McpTransport
+import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
+import github.ponyhuang.asssistantai.domain.mcp.model.McpTransport
+import github.ponyhuang.asssistantai.domain.mcp.repository.McpRepository
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.sse.SSE
@@ -26,13 +26,13 @@ import kotlinx.serialization.json.JsonPrimitive
 /** Discovers remote MCP tools and exposes them as regular ADK tools. */
 @Singleton
 class McpToolRegistry @Inject constructor(
-    private val servers: McpServerRepository,
+    private val servers: McpRepository,
 ) {
-    suspend fun tools(): List<BaseTool> = servers.servers.value
+    suspend fun tools(): List<BaseTool> = servers.currentServers()
         .filter { it.isEnabled && it.endpointUrl.isNotBlank() }
         .flatMap { server -> runCatching { discover(server) }.getOrElse { emptyList() } }
 
-    private suspend fun discover(server: McpServerConfig): List<BaseTool> {
+    private suspend fun discover(server: McpServer): List<BaseTool> {
         val connection = connect(server)
         return try {
             connection.client.listTools().tools.map { tool -> McpRemoteTool(server, tool) }
@@ -41,7 +41,7 @@ class McpToolRegistry @Inject constructor(
         }
     }
 
-    private suspend fun connect(server: McpServerConfig): McpConnection {
+    private suspend fun connect(server: McpServer): McpConnection {
         val httpClient = HttpClient(OkHttp) { install(SSE) }
         val client = Client(Implementation(name = "asssistantai", version = "1.0"))
         val requestHeaders: HttpRequestBuilder.() -> Unit = { addAuthentication(server) }
@@ -61,7 +61,7 @@ class McpToolRegistry @Inject constructor(
         return McpConnection(client, httpClient, server)
     }
 
-    private fun HttpRequestBuilder.addAuthentication(server: McpServerConfig) {
+    private fun HttpRequestBuilder.addAuthentication(server: McpServer) {
         server.bearerToken.takeIf { it.isNotBlank() }?.let { header("Authorization", "Bearer $it") }
         server.headers.lineSequence()
             .map { it.trim() }
@@ -75,7 +75,7 @@ class McpToolRegistry @Inject constructor(
     private class McpConnection(
         val client: Client,
         private val httpClient: HttpClient,
-        private val server: McpServerConfig,
+        private val server: McpServer,
     ) : AutoCloseable {
         override fun close() = httpClient.close()
 
@@ -93,7 +93,7 @@ class McpToolRegistry @Inject constructor(
     }
 
     private inner class McpRemoteTool(
-        private val server: McpServerConfig,
+        private val server: McpServer,
         private val remote: Tool,
     ) : BaseTool(
         name = "mcp_${server.id.take(8)}_${remote.name}".replace(Regex("[^A-Za-z0-9_-]"), "_"),

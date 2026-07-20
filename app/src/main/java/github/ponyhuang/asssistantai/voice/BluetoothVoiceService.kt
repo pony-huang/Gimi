@@ -19,8 +19,8 @@ import androidx.core.content.ContextCompat
 import dagger.hilt.android.AndroidEntryPoint
 import github.ponyhuang.asssistantai.MainActivity
 import github.ponyhuang.asssistantai.R
-import github.ponyhuang.asssistantai.speech.SpeechRecognitionRepository
-import github.ponyhuang.asssistantai.speech.markdownToSpeechText
+import github.ponyhuang.asssistantai.domain.speech.repository.SpeechRecognitionRepository
+import github.ponyhuang.asssistantai.domain.speech.usecase.markdownToSpeechText
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope

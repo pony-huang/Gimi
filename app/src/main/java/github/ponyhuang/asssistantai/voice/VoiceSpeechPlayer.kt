@@ -7,7 +7,7 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import dagger.hilt.android.qualifiers.ApplicationContext
-import github.ponyhuang.asssistantai.speech.SpeechSynthesisRepository
+import github.ponyhuang.asssistantai.domain.speech.repository.SpeechSynthesisRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers

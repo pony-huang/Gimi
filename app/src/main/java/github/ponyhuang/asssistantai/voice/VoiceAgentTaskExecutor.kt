@@ -3,9 +3,11 @@ package github.ponyhuang.asssistantai.voice
 import com.google.adk.kt.events.Event
 import com.google.adk.kt.types.FunctionCall
 import github.ponyhuang.asssistantai.agent.AgentChatRunner
-import github.ponyhuang.asssistantai.data.ConversationRepository
-import github.ponyhuang.asssistantai.data.LLMModelSelectionCodec
-import github.ponyhuang.asssistantai.data.ModelServiceRepository
+import github.ponyhuang.asssistantai.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelectionCodec
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.collect
@@ -21,16 +23,16 @@ data class VoiceAgentResult(
 class VoiceAgentTaskExecutor @Inject constructor(
     @VoiceAgentRunner private val runner: AgentChatRunner,
     private val repository: ConversationRepository,
-    private val modelServices: ModelServiceRepository,
+    private val modelServices: ModelCatalogRepository,
     private val preferences: BluetoothVoicePreferences,
 ) {
     private val mutex = Mutex()
 
     suspend fun execute(command: String): VoiceAgentResult = mutex.withLock {
         modelServices.awaitReady()
-        val selection = modelServices.defaultSelection()
+        val selection = defaultSelection()
             ?: error("请先配置可用的默认助手模型")
-        val encodedSelection = LLMModelSelectionCodec.encode(selection)
+        val encodedSelection = ModelSelectionCodec.encode(selection)
         val sessionId = ensureVoiceSession(encodedSelection)
         repository.setConversationModel(sessionId, encodedSelection)
         runner.recreate()
@@ -76,6 +78,20 @@ class VoiceAgentTaskExecutor @Inject constructor(
         return created
     }
 
+    private fun defaultSelection(): ModelSelection? {
+        val services = modelServices.currentServices()
+        val saved = modelServices.currentAssistantSelection()
+        if (saved != null && services.isUsable(saved)) return saved
+        return services.asSequence()
+            .filter { it.isEnabled && it.apiKey.isNotBlank() }
+            .flatMap { service -> service.groups.asSequence().flatMap { group ->
+                group.models.asSequence()
+                    .filter { !it.isStt && !it.isTts }
+                    .map { ModelSelection(service.id, group.id, it.id) }
+            } }
+            .firstOrNull()
+    }
+
     private fun Event.confirmationId(): String? = functionCalls().firstOrNull {
         it.name == FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME
     }?.id
@@ -83,6 +99,14 @@ class VoiceAgentTaskExecutor @Inject constructor(
     private companion object {
         const val USER_ID = "user-default"
     }
+}
+
+private fun List<ModelService>.isUsable(selection: ModelSelection): Boolean {
+    val service = firstOrNull { it.id == selection.serviceId } ?: return false
+    if (!service.isEnabled || service.apiKey.isBlank()) return false
+    val group = service.groups.firstOrNull { it.id == selection.groupId } ?: return false
+    val model = group.models.firstOrNull { it.id == selection.modelId } ?: return false
+    return !model.isStt && !model.isTts
 }
 
 internal class VoiceResponseAccumulator {

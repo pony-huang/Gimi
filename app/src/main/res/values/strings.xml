@@ -7,18 +7,6 @@
          verbose operational guidance lives in app_metadata.xml. -->
     <string name="app_function_app_description">本地 AI 助手 — 让系统 agent 可以列出已配置的 LLM 服务、切换当前模型、或在不开 app 的前提下向当前激活模型发送文本消息并获得回答。</string>
     <string name="app_function_app_display_description">asssistantai 本地助手</string>
-    <string name="stream_ai_compose_speech_to_text_idle_button">Voice input</string>
-    <string name="stream_ai_compose_speech_to_text_recording_button">Recording…</string>
-    <string name="stream_ai_compose_composer_mic_permission_message">Microphone permission is required to record audio</string>
-    <string name="stream_ai_compose_composer_mic_permission_action">Settings</string>
-    <string name="stream_ai_compose_composer_input_placeholder">Ask Assistant</string>
-    <string name="stream_ai_compose_composer_stop_button">Stop</string>
-    <string name="stream_ai_compose_composer_send_button">Send</string>
-    <string name="stream_ai_compose_composer_add_attachments_button">Add context</string>
-    <string name="stream_ai_compose_composer_take_photo">Take photo</string>
-    <string name="stream_ai_compose_composer_choose_photos">Choose from photos</string>
-    <string name="stream_ai_compose_composer_camera_error">Unable to open the camera</string>
-
     <!-- Display name shown in Settings → Notifications → Device & app notifications
          for MediaSessionManagerTool's notification listener service. -->
     <string name="media_notification_listener_label">asssistantai media control</string>

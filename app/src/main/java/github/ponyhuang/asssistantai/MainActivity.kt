@@ -7,7 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableStateOf
 import dagger.hilt.android.AndroidEntryPoint
-import github.ponyhuang.asssistantai.ui.chat.MainScreen
+import github.ponyhuang.asssistantai.app.navigation.MainScreen
 import github.ponyhuang.asssistantai.ui.theme.AsssistantaiTheme
 import github.ponyhuang.asssistantai.voice.BluetoothVoiceService
 

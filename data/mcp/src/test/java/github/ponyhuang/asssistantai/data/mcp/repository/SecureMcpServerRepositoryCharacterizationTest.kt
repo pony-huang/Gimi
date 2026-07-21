@@ -43,6 +43,31 @@ class SecureMcpServerRepositoryCharacterizationTest {
     }
 
     @Test
+    fun importPortableJsonDefaultsToHttpWhenTypeIsMissing() {
+        val storage = FakeStorage()
+        val repository = SecureMcpServerRepository(storage)
+
+        val result = repository.importJson(
+            """
+            {
+              "mcpServers": {
+                "amap-maps-streamableHTTP": {
+                  "url": "https://mcp.amap.com/mcp?key=xxx"
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(1, result.imported)
+        assertEquals(0, result.skipped)
+        assertEquals(1, repository.currentServers().size)
+        assertEquals(McpTransport.STREAMABLE_HTTP, repository.currentServers()[0].transport)
+        assertEquals("amap-maps-streamableHTTP", repository.currentServers()[0].name)
+        assertEquals("https://mcp.amap.com/mcp?key=xxx", repository.currentServers()[0].endpointUrl)
+    }
+
+    @Test
     fun invalidJsonReturnsLocalizedErrorWithoutChangingServers() {
         val repository = SecureMcpServerRepository(FakeStorage())
 

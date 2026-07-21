@@ -49,13 +49,18 @@ class SecureMcpServerRepository @Inject constructor(
         source.entrySet().forEach { (name, element) ->
             val config = element.takeIf { it.isJsonObject }?.asJsonObject
                 ?: run { skipped++; return@forEach }
+            val url = config.string("url")
+            if (url.isNullOrBlank()) {
+                skipped++
+                return@forEach
+            }
             val transport = when (config.string("type")?.lowercase()) {
                 "http", "streamablehttp", "streamable_http" -> McpTransport.STREAMABLE_HTTP
                 "sse" -> McpTransport.SSE
+                null -> McpTransport.STREAMABLE_HTTP
                 else -> null
             }
-            val url = config.string("url")
-            if (transport == null || url.isNullOrBlank()) {
+            if (transport == null) {
                 skipped++
                 return@forEach
             }

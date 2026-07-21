@@ -43,6 +43,7 @@ import github.ponyhuang.asssistantai.feature.modelsettings.R as ModelsettingsR
 import github.ponyhuang.asssistantai.feature.permissions.PermissionSettingsRoute
 import github.ponyhuang.asssistantai.feature.permissions.R as PermissionsR
 import github.ponyhuang.asssistantai.feature.settings.R as SettingsR
+import github.ponyhuang.asssistantai.feature.toolauthorization.ToolAuthorizationConfigurationRoute
 import github.ponyhuang.asssistantai.feature.toolauthorization.ToolAuthorizationRoute
 import github.ponyhuang.asssistantai.feature.toolauthorization.R as ToolauthR
 import github.ponyhuang.asssistantai.feature.voicewake.VoiceWakeSettingsRoute
@@ -200,7 +201,19 @@ fun MainScreen(
                             stringResource(ToolauthR.string.toolauth_screen_title),
                             goBack,
                         ) {
-                            ToolAuthorizationRoute(modifier = it)
+                            ToolAuthorizationRoute(
+                                onNavigateToConfiguration = {
+                                    backStack.add(AppRoute.ToolAuthorizationConfiguration)
+                                },
+                                modifier = it,
+                            )
+                        }
+
+                        AppRoute.ToolAuthorizationConfiguration -> SettingsScaffold(
+                            stringResource(ToolauthR.string.toolauth_configuration_title),
+                            goBack,
+                        ) {
+                            ToolAuthorizationConfigurationRoute(modifier = it)
                         }
 
                         AppRoute.McpServerList -> SettingsScaffold(

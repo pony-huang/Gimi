@@ -17,6 +17,7 @@ class ToolAuthorizationPreferencesTest {
         val repository = repository(FakePreferences(), "one", "two")
 
         assertEquals(setOf("one", "two"), repository.enabledToolIds())
+        assertFalse(repository.isCustomizationEnabled.value)
     }
 
     @Test
@@ -24,11 +25,13 @@ class ToolAuthorizationPreferencesTest {
         val preferences = FakePreferences()
         val repository = repository(preferences, "one", "two")
 
+        repository.setCustomizationEnabled(true)
         repository.setEnabled("one", false)
         assertEquals(setOf("two"), repository.enabledToolIds())
-        assertEquals(1L, repository.revision.value)
+        assertEquals(2L, repository.revision.value)
 
         val restored = repository(preferences, "one", "two")
+        assertTrue(restored.isCustomizationEnabled.value)
         assertEquals(setOf("two"), restored.enabledToolIds())
 
         restored.setAllEnabled(false)
@@ -38,14 +41,60 @@ class ToolAuthorizationPreferencesTest {
     }
 
     @Test
-    fun toolsAddedAfterInitializationDefaultToDisabled() {
+    fun toolsAddedAfterInitializationDefaultToDisabledWhenCustomizationEnabled() {
         val preferences = FakePreferences()
-        repository(preferences, "one", "two")
+        val repository = repository(preferences, "one", "two")
+        repository.setCustomizationEnabled(true)
 
         val upgraded = repository(preferences, "one", "two", "new-tool")
 
         assertEquals(setOf("one", "two"), upgraded.enabledToolIds())
         assertFalse(upgraded.tools.value.single { it.id == "new-tool" }.isEnabled)
+    }
+
+    @Test
+    fun customizationDisabledDefaultsAllToolsEnabledAndPreservesStoredChoices() {
+        val preferences = FakePreferences()
+        val repository = repository(preferences, "one", "two")
+        repository.setCustomizationEnabled(true)
+        repository.setEnabled("one", false)
+        assertEquals(setOf("two"), repository.enabledToolIds())
+
+        repository.setCustomizationEnabled(false)
+        assertEquals(setOf("one", "two"), repository.enabledToolIds())
+        assertTrue(repository.tools.value.all { it.isEnabled })
+
+        repository.setCustomizationEnabled(true)
+        assertEquals(setOf("two"), repository.enabledToolIds())
+    }
+
+    @Test
+    fun togglingCustomizationIncrementsRevision() {
+        val repository = repository(FakePreferences(), "one", "two")
+        val initialRevision = repository.revision.value
+
+        repository.setCustomizationEnabled(true)
+        assertEquals(initialRevision + 1, repository.revision.value)
+
+        repository.setCustomizationEnabled(false)
+        assertEquals(initialRevision + 2, repository.revision.value)
+    }
+
+    @Test
+    fun customizationDisabledDoesNotClearStoredEnabledIds() {
+        val preferences = FakePreferences()
+        val repository = repository(preferences, "one", "two")
+        repository.setCustomizationEnabled(true)
+        repository.setEnabled("one", false)
+
+        repository.setCustomizationEnabled(false)
+        val restored = repository(preferences, "one", "two")
+
+        assertFalse(restored.isCustomizationEnabled.value)
+        assertEquals(setOf("one", "two"), restored.enabledToolIds())
+
+        restored.setCustomizationEnabled(true)
+        assertEquals(setOf("two"), restored.enabledToolIds())
     }
 
     private fun repository(preferences: FakePreferences, vararg ids: String): ToolAuthorizationPreferences {

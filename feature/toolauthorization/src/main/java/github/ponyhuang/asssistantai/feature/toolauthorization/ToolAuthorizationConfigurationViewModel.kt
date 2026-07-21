@@ -15,20 +15,24 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @HiltViewModel
-class ToolAuthorizationViewModel @Inject constructor(
+class ToolAuthorizationConfigurationViewModel @Inject constructor(
     private val repository: ToolAuthorizationRepository,
     private val runWhenAgentIdle: RunWhenAgentIdleUseCase,
 ) : ViewModel() {
+    private val query = MutableStateFlow("")
+    private val filter = MutableStateFlow(ToolAuthorizationFilter.ALL)
     private val notice = MutableStateFlow<String?>(null)
 
     val uiState = combine(
-        repository.isCustomizationEnabled,
         repository.tools,
+        query,
+        filter,
         runWhenAgentIdle.state,
         notice,
-    ) { customizationEnabled, tools, runtimeState, currentNotice ->
-        ToolAuthorizationUiState(
-            isCustomizationEnabled = customizationEnabled,
+    ) { tools, currentQuery, currentFilter, runtimeState, currentNotice ->
+        ToolAuthorizationConfigurationUiState(
+            query = currentQuery,
+            filter = currentFilter,
             tools = tools,
             isMutationBlocked = runtimeState.isBusy,
             notice = currentNotice,
@@ -36,16 +40,17 @@ class ToolAuthorizationViewModel @Inject constructor(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = ToolAuthorizationUiState(
-            isCustomizationEnabled = repository.isCustomizationEnabled.value,
+        initialValue = ToolAuthorizationConfigurationUiState(
             tools = repository.tools.value,
         ),
     )
 
-    fun onAction(action: ToolAuthorizationAction) {
+    fun onAction(action: ToolAuthorizationConfigurationAction) {
         when (action) {
-            is ToolAuthorizationAction.SetCustomizationEnabled -> mutate {
-                repository.setCustomizationEnabled(action.enabled)
+            is ToolAuthorizationConfigurationAction.Search -> query.value = action.query
+            is ToolAuthorizationConfigurationAction.SetFilter -> filter.value = action.filter
+            is ToolAuthorizationConfigurationAction.SetEnabled -> mutate {
+                repository.setEnabled(action.toolId, action.enabled)
             }
         }
     }

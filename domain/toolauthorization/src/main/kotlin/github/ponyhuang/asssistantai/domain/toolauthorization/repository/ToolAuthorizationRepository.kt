@@ -11,8 +11,10 @@ interface LocalToolDefinitionSource {
 interface ToolAuthorizationRepository {
     val tools: StateFlow<List<ToolDescriptor>>
     val revision: StateFlow<Long>
+    val isCustomizationEnabled: StateFlow<Boolean>
 
     fun enabledToolIds(): Set<String>
     fun setEnabled(toolId: String, enabled: Boolean)
     fun setAllEnabled(enabled: Boolean)
+    fun setCustomizationEnabled(enabled: Boolean)
 }

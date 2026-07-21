@@ -23,44 +23,62 @@ class ToolAuthorizationPreferences @Inject constructor(
     private val currentIds = definitions.mapTo(linkedSetOf(), ToolDefinition::id)
     private val _tools: MutableStateFlow<List<ToolDescriptor>>
     private val _revision = MutableStateFlow(0L)
+    private val _isCustomizationEnabled: MutableStateFlow<Boolean>
+    private var storedEnabledIds: Set<String>
 
     init {
         val initialized = preferences.getBoolean(INITIALIZED_KEY, false)
         val knownIds = preferences.getStringSet(KNOWN_IDS_KEY, mutableSetOf()).orEmpty()
-        val enabledIds = if (!initialized) {
+        val customizeEnabled = preferences.getBoolean(CUSTOMIZE_ENABLED_KEY, false)
+        storedEnabledIds = if (!initialized) {
             currentIds
         } else {
             preferences.getStringSet(ENABLED_IDS_KEY, mutableSetOf()).orEmpty().intersect(currentIds)
         }
-        persist(enabledIds, knownIds = currentIds)
-        _tools = MutableStateFlow(descriptors(enabledIds))
+        persist(storedEnabledIds, knownIds = currentIds, customizeEnabled = customizeEnabled)
+        _isCustomizationEnabled = MutableStateFlow(customizeEnabled)
+        _tools = MutableStateFlow(descriptors(effectiveEnabledIds()))
     }
 
     override val tools: StateFlow<List<ToolDescriptor>> = _tools.asStateFlow()
     override val revision: StateFlow<Long> = _revision.asStateFlow()
+    override val isCustomizationEnabled: StateFlow<Boolean> = _isCustomizationEnabled.asStateFlow()
 
-    override fun enabledToolIds(): Set<String> = _tools.value
-        .asSequence()
-        .filter(ToolDescriptor::isEnabled)
-        .mapTo(linkedSetOf(), ToolDescriptor::id)
+    override fun enabledToolIds(): Set<String> = effectiveEnabledIds()
 
     override fun setEnabled(toolId: String, enabled: Boolean) {
         if (toolId !in currentIds) return
-        updateEnabledIds { current ->
+        updateStoredEnabledIds { current ->
             if (enabled) current + toolId else current - toolId
         }
     }
 
     override fun setAllEnabled(enabled: Boolean) {
-        updateEnabledIds { if (enabled) currentIds else emptySet() }
+        updateStoredEnabledIds { if (enabled) currentIds else emptySet() }
     }
 
-    private fun updateEnabledIds(transform: (Set<String>) -> Set<String>) {
-        val current = enabledToolIds()
-        val updated = transform(current).intersect(currentIds)
-        if (updated == current) return
-        persist(updated, knownIds = currentIds)
-        _tools.value = descriptors(updated)
+    override fun setCustomizationEnabled(enabled: Boolean) {
+        if (_isCustomizationEnabled.value == enabled) return
+        preferences.edit {
+            putBoolean(CUSTOMIZE_ENABLED_KEY, enabled)
+        }
+        _isCustomizationEnabled.value = enabled
+        _tools.value = descriptors(effectiveEnabledIds())
+        _revision.value += 1
+    }
+
+    private fun effectiveEnabledIds(): Set<String> = if (_isCustomizationEnabled.value) {
+        storedEnabledIds
+    } else {
+        currentIds
+    }
+
+    private fun updateStoredEnabledIds(transform: (Set<String>) -> Set<String>) {
+        val updated = transform(storedEnabledIds).intersect(currentIds)
+        if (updated == storedEnabledIds) return
+        storedEnabledIds = updated
+        persist(storedEnabledIds, knownIds = currentIds, customizeEnabled = _isCustomizationEnabled.value)
+        _tools.value = descriptors(effectiveEnabledIds())
         _revision.value += 1
     }
 
@@ -73,9 +91,10 @@ class ToolAuthorizationPreferences @Inject constructor(
         )
     }
 
-    private fun persist(enabledIds: Set<String>, knownIds: Set<String>) {
+    private fun persist(enabledIds: Set<String>, knownIds: Set<String>, customizeEnabled: Boolean) {
         preferences.edit {
             putBoolean(INITIALIZED_KEY, true)
+            putBoolean(CUSTOMIZE_ENABLED_KEY, customizeEnabled)
             putStringSet(ENABLED_IDS_KEY, enabledIds.toMutableSet())
             putStringSet(KNOWN_IDS_KEY, knownIds.toMutableSet())
         }
@@ -91,5 +110,6 @@ class ToolAuthorizationPreferences @Inject constructor(
         const val INITIALIZED_KEY = "initialized_v1"
         const val KNOWN_IDS_KEY = "known_ids_v1"
         const val ENABLED_IDS_KEY = "enabled_ids_v1"
+        const val CUSTOMIZE_ENABLED_KEY = "customize_enabled_v1"
     }
 }

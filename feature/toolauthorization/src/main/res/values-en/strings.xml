@@ -1,7 +1,16 @@
 <resources>
     <string name="toolauth_count_label">Enabled %1$d / %2$d</string>
-    <string name="toolauth_enable_all">Enable all</string>
-    <string name="toolauth_disable_all">Disable all</string>
+    <string name="toolauth_customize_label">Customize tools</string>
+    <string name="toolauth_customize_description">All tools are enabled by default when off</string>
+    <string name="toolauth_configure_tools">Configure tools</string>
+    <string name="toolauth_configure_subtitle">Choose which tools to enable</string>
+    <string name="toolauth_configure_disabled_subtitle">Enable customize tools to configure</string>
+    <string name="toolauth_configuration_title">Tool configuration</string>
+    <string name="toolauth_filter_label">Filter</string>
+    <string name="toolauth_filter_content_description">Filter, current: %1$s</string>
+    <string name="toolauth_filter_all">All</string>
+    <string name="toolauth_filter_enabled">Enabled</string>
+    <string name="toolauth_filter_disabled">Disabled</string>
     <string name="toolauth_search_label">Search tools</string>
     <string name="toolauth_empty_state">No configurable local tools</string>
     <string name="toolauth_no_match">No matching tools</string>

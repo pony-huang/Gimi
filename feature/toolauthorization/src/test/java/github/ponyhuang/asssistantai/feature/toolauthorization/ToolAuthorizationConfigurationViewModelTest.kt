@@ -24,15 +24,36 @@ import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class ToolAuthorizationViewModelTest {
+class ToolAuthorizationConfigurationViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
     @Test
-    fun activeAgentBlocksCustomizationToggleAndPublishesNotice() = runTest {
+    fun searchAndFilterCombineInVisibleTools() = runTest {
         val repository = repository()
-        val gate = FakeGate(busy = true)
-        val viewModel = ToolAuthorizationViewModel(
+        val viewModel = ToolAuthorizationConfigurationViewModel(
+            repository,
+            RunWhenAgentIdleUseCase(FakeConfigurationGate(busy = false)),
+        )
+
+        viewModel.uiState.test {
+            awaitItem()
+            viewModel.onAction(ToolAuthorizationConfigurationAction.Search("location"))
+            viewModel.onAction(ToolAuthorizationConfigurationAction.SetFilter(ToolAuthorizationFilter.DISABLED))
+            var state = awaitItem()
+            while (state.visibleTools.size != 1) {
+                state = awaitItem()
+            }
+
+            assertEquals(listOf("get_location"), state.visibleTools.map { it.id })
+        }
+    }
+
+    @Test
+    fun activeAgentBlocksToolToggleAndPublishesNotice() = runTest {
+        val repository = repository()
+        val gate = FakeConfigurationGate(busy = true)
+        val viewModel = ToolAuthorizationConfigurationViewModel(
             repository,
             RunWhenAgentIdleUseCase(gate),
         )
@@ -40,12 +61,12 @@ class ToolAuthorizationViewModelTest {
         viewModel.uiState.test {
             var state = awaitItem()
             while (!state.isMutationBlocked) state = awaitItem()
-            viewModel.onAction(ToolAuthorizationAction.SetCustomizationEnabled(true))
+            viewModel.onAction(ToolAuthorizationConfigurationAction.SetEnabled("clock", false))
             do {
                 state = awaitItem()
             } while (state.notice == null)
 
-            verify(exactly = 0) { repository.setCustomizationEnabled(any()) }
+            verify(exactly = 0) { repository.setEnabled(any(), any()) }
             assertTrue(state.isMutationBlocked)
             assertEquals("", state.notice)
             cancelAndIgnoreRemainingEvents()
@@ -53,29 +74,32 @@ class ToolAuthorizationViewModelTest {
     }
 
     @Test
-    fun idleAgentAllowsCustomizationToggle() = runTest {
+    fun idleAgentAllowsToolToggle() = runTest {
         val repository = repository()
-        val viewModel = ToolAuthorizationViewModel(
+        val viewModel = ToolAuthorizationConfigurationViewModel(
             repository,
-            RunWhenAgentIdleUseCase(FakeGate(busy = false)),
+            RunWhenAgentIdleUseCase(FakeConfigurationGate(busy = false)),
         )
 
-        viewModel.onAction(ToolAuthorizationAction.SetCustomizationEnabled(true))
+        viewModel.onAction(ToolAuthorizationConfigurationAction.SetEnabled("clock", false))
         advanceUntilIdle()
 
-        verify { repository.setCustomizationEnabled(true) }
+        verify { repository.setEnabled("clock", false) }
     }
 
     private fun repository(): ToolAuthorizationRepository = mockk(relaxed = true) {
         io.mockk.every { tools } returns MutableStateFlow(
-            listOf(ToolDescriptor("clock", "clock", "Clock", true)),
+            listOf(
+                ToolDescriptor("clock", "clock", "Clock", true),
+                ToolDescriptor("get_location", "get_location", "Location", false),
+            ),
         )
         io.mockk.every { revision } returns MutableStateFlow(0L)
-        io.mockk.every { isCustomizationEnabled } returns MutableStateFlow(false)
+        io.mockk.every { isCustomizationEnabled } returns MutableStateFlow(true)
     }
 }
 
-private class FakeGate(busy: Boolean) : AgentRuntimeGate {
+private class FakeConfigurationGate(busy: Boolean) : AgentRuntimeGate {
     override val state = MutableStateFlow<AgentRuntimeState>(
         if (busy) {
             AgentRuntimeState.Busy(

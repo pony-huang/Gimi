@@ -283,4 +283,8 @@ private fun List<ModelService>.firstConfiguredChatSelection(): ModelSelection? {
 private fun ModelService.isConfiguredForChat(): Boolean =
     isEnabled && apiKey.isNotBlank() && groups.any { group -> group.models.any(Model::isChatModel) }
 
-private fun Model.isChatModel(): Boolean = !isStt && !isTts
+// 远端拉取的模型不会带 isTts 标记（OpenAiCompatibleModelServiceGateway 只取 id），
+// 这里额外按 id/name 中的 "tts" 关键字兜底过滤，避免语音合成模型混入聊天候选。
+private fun Model.isChatModel(): Boolean =
+    !isStt && !isTts && !id.contains("tts", ignoreCase = true) &&
+        !name.contains("tts", ignoreCase = true)

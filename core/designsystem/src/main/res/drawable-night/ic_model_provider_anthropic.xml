@@ -1,0 +1,23 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- lobe-icons: anthropic.svg（无 color 版，深色模式用浅蓝渐变单色；渐变可规避部分 ROM 深色滤镜将纯色图标压黑的问题） -->
+    <path
+        android:fillType="evenOdd"
+        android:pathData="M13.827,3.52h3.603L24,20h-3.603l-6.57,-16.48zM6.569,3.52h3.767L16.906,20h-3.674l-1.343,-3.461H5.017l-1.344,3.46H0L6.57,3.522zM10.701,13.479L8.453,7.687L6.205,13.48H10.7z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="24"
+                android:endY="24"
+                android:type="linear">
+                <item android:color="#E3E8FF" android:offset="0" />
+                <item android:color="#AEBBFF" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

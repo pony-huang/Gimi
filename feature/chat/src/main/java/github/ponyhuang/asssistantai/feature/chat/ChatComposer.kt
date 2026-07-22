@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +34,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -54,6 +57,7 @@ import androidx.core.net.toUri
 import github.ponyhuang.asssistantai.feature.chat.R
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -71,11 +75,10 @@ import kotlinx.coroutines.launch
  *
  * @param onSendClick Callback invoked when the send button is clicked with the composed message data.
  * @param onStopClick Callback invoked when the stop button is clicked (during AI generation).
- * @param onVoiceInputStart Callback invoked when the user starts voice input. The caller owns
- * audio capture and speech-to-text processing.
- * @param onVoiceInputStop Callback invoked when the user stops voice input.
+ * @param onVoiceInputStart Callback invoked after microphone capture starts.
+ * @param onVoiceInputStop Callback invoked after an active capture stops or is cancelled.
  * @param onVoiceAudioChunk Callback receiving 16 kHz, mono, signed 16-bit PCM chunks on a
- * background thread. The caller owns speech-to-text processing.
+ * background thread for optional observation.
  * @param onVoiceInputError Callback invoked when microphone capture cannot start or fails.
  * @param isGenerating Whether the AI is currently generating a response.
  * @param modifier The modifier to be applied to the composer.
@@ -101,9 +104,10 @@ public fun ChatComposer(
     var showAttachmentOptions by rememberSaveable { mutableStateOf(false) }
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCameraPath by rememberSaveable { mutableStateOf<String?>(null) }
-    var isTranscribing by remember { mutableStateOf(false) }
+    var voiceInputState: VoiceInputUiState by remember { mutableStateOf(VoiceInputUiState.Idle) }
     var voiceErrorMessage by remember { mutableStateOf<String?>(null) }
     val voiceAudio = remember { VoicePcmBuffer() }
+    val voiceRecorder = remember { VoiceAudioRecorder() }
     val coroutineScope = rememberCoroutineScope()
 
     val context = LocalContext.current
@@ -111,6 +115,112 @@ public fun ChatComposer(
     val voiceNoAudioMessage = stringResource(R.string.chat_voice_no_audio_captured)
     val voiceTranscriptionFailedMessage = stringResource(R.string.chat_voice_transcription_failed)
     val voiceRecordingFailedMessage = stringResource(R.string.chat_voice_recording_failed)
+
+    fun startVoiceInput() {
+        if (
+            voiceInputState != VoiceInputUiState.Idle ||
+            !isVoiceInputAvailable ||
+            isGenerating
+        ) {
+            return
+        }
+        voiceAudio.reset()
+        voiceInputState = VoiceInputUiState.Recording()
+        val started = voiceRecorder.start(
+            onAudioChunk = { chunk ->
+                voiceAudio.append(chunk)
+                onVoiceAudioChunk(chunk)
+            },
+            onAudioLevel = { level ->
+                coroutineScope.launch {
+                    val recording = voiceInputState as? VoiceInputUiState.Recording
+                        ?: return@launch
+                    voiceInputState = recording.copy(
+                        levels = (recording.levels + level).takeLast(MAX_WAVEFORM_SAMPLES),
+                    )
+                }
+            },
+            onError = { error ->
+                coroutineScope.launch {
+                    if (voiceInputState !is VoiceInputUiState.Recording) return@launch
+                    voiceRecorder.stop()
+                    voiceAudio.reset()
+                    voiceInputState = VoiceInputUiState.Idle
+                    onVoiceInputStop()
+                    voiceErrorMessage = error.message ?: voiceRecordingFailedMessage
+                    onVoiceInputError(error)
+                }
+            },
+        )
+        if (started) {
+            onVoiceInputStart()
+        } else {
+            voiceInputState = VoiceInputUiState.Idle
+        }
+    }
+
+    fun cancelVoiceInput() {
+        if (voiceInputState !is VoiceInputUiState.Recording) return
+        voiceRecorder.stop()
+        voiceAudio.reset()
+        voiceInputState = VoiceInputUiState.Idle
+        onVoiceInputStop()
+    }
+
+    fun finishVoiceInput() {
+        if (voiceInputState !is VoiceInputUiState.Recording) return
+        voiceRecorder.stop()
+        onVoiceInputStop()
+        val pcm = voiceAudio.drain()
+        if (pcm.isEmpty()) {
+            voiceInputState = VoiceInputUiState.Idle
+            voiceErrorMessage = voiceNoAudioMessage
+            return
+        }
+        voiceInputState = VoiceInputUiState.Transcribing
+        coroutineScope.launch {
+            try {
+                val transcript = onTranscribeVoice(pcm)
+                messageData = messageData.copy(
+                    text = appendTranscript(messageData.text, transcript),
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                voiceErrorMessage = error.message ?: voiceTranscriptionFailedMessage
+                onVoiceInputError(error)
+            } finally {
+                voiceInputState = VoiceInputUiState.Idle
+            }
+        }
+    }
+
+    LaunchedEffect(isGenerating) {
+        if (isGenerating && voiceInputState is VoiceInputUiState.Recording) {
+            cancelVoiceInput()
+        }
+    }
+
+    LaunchedEffect(voiceInputState is VoiceInputUiState.Recording) {
+        while (voiceInputState is VoiceInputUiState.Recording) {
+            delay(1_000)
+            val recording = voiceInputState as? VoiceInputUiState.Recording
+                ?: break
+            val remainingSeconds = (recording.remainingSeconds - 1).coerceAtLeast(0)
+            voiceInputState = recording.copy(remainingSeconds = remainingSeconds)
+            if (remainingSeconds == 0) {
+                finishVoiceInput()
+                break
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            voiceRecorder.release()
+            voiceAudio.reset()
+        }
+    }
 
     val handleSendClick = {
         keyboardController?.hide()
@@ -171,75 +281,61 @@ public fun ChatComposer(
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 2.dp,
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                with(componentFactory) {
-                    ComposerLeadingContent(
-                        ComposerLeadingContentParams(
-                            isGenerating = isGenerating || isTranscribing,
-                            onAttachmentsClick = { showAttachmentOptions = true },
-                        ),
-                    )
+            AnimatedContent(targetState = voiceInputState is VoiceInputUiState.Recording) { recording ->
+                if (recording) {
+                    val state = voiceInputState as? VoiceInputUiState.Recording
+                        ?: VoiceInputUiState.Recording()
+                    with(componentFactory) {
+                        VoiceRecordingContent(
+                            VoiceRecordingContentParams(
+                                levels = state.levels,
+                                remainingSeconds = state.remainingSeconds,
+                                onCancel = ::cancelVoiceInput,
+                                onFinish = ::finishVoiceInput,
+                            ),
+                        )
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.Bottom,
+                    ) {
+                        with(componentFactory) {
+                            ComposerLeadingContent(
+                                ComposerLeadingContentParams(
+                                    isGenerating = isGenerating ||
+                                        voiceInputState == VoiceInputUiState.Transcribing,
+                                    onAttachmentsClick = { showAttachmentOptions = true },
+                                ),
+                            )
 
-                    ComposerInputContent(
-                        ComposerInputContentParams(
-                            messageData = messageData,
-                            isGenerating = isGenerating,
-                            isTranscribing = isTranscribing,
-                            isVoiceInputAvailable = isVoiceInputAvailable,
-                            voiceErrorMessage = voiceErrorMessage,
-                            onVoiceErrorShown = { voiceErrorMessage = null },
-                            onTextChange = { messageData = messageData.copy(text = it) },
-                            onRemoveAttachment = { uri ->
-                                messageData = messageData.copy(attachments = messageData.attachments - uri)
-                                deleteCameraAttachment(context, uri)
-                            },
-                            onSendClick = handleSendClick,
-                            onStopClick = onStopClick,
-                            onVoiceInputStart = {
-                                voiceAudio.reset()
-                                onVoiceInputStart()
-                            },
-                            onVoiceInputStop = {
-                                onVoiceInputStop()
-                                val pcm = voiceAudio.drain()
-                                if (pcm.isEmpty()) {
-                                    voiceErrorMessage = voiceNoAudioMessage
-                                } else if (!isTranscribing) {
-                                    coroutineScope.launch {
-                                        isTranscribing = true
-                                        try {
-                                            val transcript = onTranscribeVoice(pcm)
-                                            messageData = messageData.copy(
-                                                text = appendTranscript(messageData.text, transcript),
-                                            )
-                                        } catch (error: CancellationException) {
-                                            throw error
-                                        } catch (error: Throwable) {
-                                            voiceErrorMessage = error.message ?: voiceTranscriptionFailedMessage
-                                            onVoiceInputError(error)
-                                        } finally {
-                                            isTranscribing = false
-                                        }
-                                    }
-                                }
-                            },
-                            onVoiceAudioChunk = { chunk ->
-                                voiceAudio.append(chunk)
-                                onVoiceAudioChunk(chunk)
-                            },
-                            onVoiceInputError = { error ->
-                                voiceAudio.reset()
-                                voiceErrorMessage = error.message ?: voiceRecordingFailedMessage
-                                onVoiceInputError(error)
-                            },
-                        ),
-                    )
+                            ComposerInputContent(
+                                ComposerInputContentParams(
+                                    messageData = messageData,
+                                    isGenerating = isGenerating,
+                                    voiceInputState = voiceInputState,
+                                    isVoiceInputAvailable = isVoiceInputAvailable,
+                                    voiceErrorMessage = voiceErrorMessage,
+                                    onVoiceErrorShown = { voiceErrorMessage = null },
+                                    onTextChange = { messageData = messageData.copy(text = it) },
+                                    onRemoveAttachment = { uri ->
+                                        messageData = messageData.copy(
+                                            attachments = messageData.attachments - uri,
+                                        )
+                                        deleteCameraAttachment(context, uri)
+                                    },
+                                    onSendClick = handleSendClick,
+                                    onStopClick = onStopClick,
+                                    onVoiceInputStart = ::startVoiceInput,
+                                ),
+                            )
 
-                    ComposerTrailingContent(ComposerTrailingContentParams(isGenerating = isGenerating))
+                            ComposerTrailingContent(
+                                ComposerTrailingContentParams(isGenerating = isGenerating),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -281,6 +377,8 @@ internal fun appendTranscript(draft: String, transcript: String): String {
     if (draft.isBlank()) return recognized
     return "${draft.trimEnd()} $recognized"
 }
+
+private const val MAX_WAVEFORM_SAMPLES = 96
 
 internal class VoicePcmBuffer {
     private val output = ByteArrayOutputStream()

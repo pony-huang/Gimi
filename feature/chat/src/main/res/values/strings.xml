@@ -34,6 +34,11 @@
     <string name="chat_voice_no_audio_captured">没有录制到语音，请重试</string>
     <string name="chat_voice_transcription_failed">语音识别失败，请重试</string>
     <string name="chat_voice_recording_failed">录音失败，请重试</string>
+    <string name="chat_voice_cancel_recording">取消录音</string>
+    <string name="chat_voice_finish_recording">停止并识别</string>
+    <string name="chat_voice_transcribing">正在识别…</string>
+    <string name="chat_voice_recording_remaining">录音中，剩余 %1$d 秒</string>
+    <string name="chat_voice_waveform">实时语音波形</string>
 
     <!-- SpeechToTextButton 提示 -->
     <string name="chat_stt_configure_default_first">请先在设置中配置默认语音模型</string>

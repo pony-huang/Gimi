@@ -42,6 +42,14 @@ public interface ChatAiComponentFactory {
     }
 
     /**
+     * Full-width voice recording controls shown in place of the normal composer row.
+     */
+    @Composable
+    public fun VoiceRecordingContent(params: VoiceRecordingContentParams) {
+        DefaultVoiceRecordingContent(params)
+    }
+
+    /**
      * The content rendered to the right of the input field in [ChatComposer].
      *
      * Empty by default. Override to add custom trailing controls.

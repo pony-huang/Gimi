@@ -30,6 +30,11 @@
     <string name="chat_voice_no_audio_captured">No audio captured. Please try again.</string>
     <string name="chat_voice_transcription_failed">Speech recognition failed. Please try again.</string>
     <string name="chat_voice_recording_failed">Recording failed. Please try again.</string>
+    <string name="chat_voice_cancel_recording">Cancel recording</string>
+    <string name="chat_voice_finish_recording">Stop and transcribe</string>
+    <string name="chat_voice_transcribing">Transcribing…</string>
+    <string name="chat_voice_recording_remaining">Recording, %1$d seconds remaining</string>
+    <string name="chat_voice_waveform">Live voice waveform</string>
 
     <string name="chat_stt_configure_default_first">Please configure the default voice model in Settings first</string>
 

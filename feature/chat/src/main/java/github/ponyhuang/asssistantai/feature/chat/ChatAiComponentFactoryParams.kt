@@ -19,19 +19,18 @@ public data class ComposerLeadingContentParams(
  *
  * @param messageData The message currently being composed.
  * @param isGenerating Whether the AI is currently generating a response.
+ * @param voiceInputState Current controlled voice-input presentation state.
  * @param onTextChange Called when the input text changes.
  * @param onRemoveAttachment Called when the user removes an attachment.
  * @param onSendClick Called when the user sends the message.
  * @param onStopClick Called when the user stops AI generation.
  * @param onVoiceInputStart Called when the user starts voice input.
- * @param onVoiceInputStop Called when the user stops voice input.
- * @param onVoiceAudioChunk Receives 16 kHz, mono, signed 16-bit PCM data on a background thread.
- * @param onVoiceInputError Called when microphone capture cannot start or fails.
+ * @param onVoiceInputStart Called when microphone permission has been granted and capture should begin.
  */
 public data class ComposerInputContentParams(
     val messageData: MessageData,
     val isGenerating: Boolean,
-    val isTranscribing: Boolean,
+    val voiceInputState: VoiceInputUiState,
     val isVoiceInputAvailable: Boolean,
     val voiceErrorMessage: String?,
     val onVoiceErrorShown: () -> Unit,
@@ -40,9 +39,26 @@ public data class ComposerInputContentParams(
     val onSendClick: () -> Unit,
     val onStopClick: () -> Unit,
     val onVoiceInputStart: () -> Unit,
-    val onVoiceInputStop: () -> Unit,
-    val onVoiceAudioChunk: (ByteArray) -> Unit,
-    val onVoiceInputError: (Throwable) -> Unit,
+)
+
+/** Immutable presentation state for the composer's voice-input session. */
+public sealed interface VoiceInputUiState {
+    public data object Idle : VoiceInputUiState
+
+    public data class Recording(
+        val levels: List<Float> = emptyList(),
+        val remainingSeconds: Int = 60,
+    ) : VoiceInputUiState
+
+    public data object Transcribing : VoiceInputUiState
+}
+
+/** Parameters for the full-width recording control rendered by [ChatComposer]. */
+public data class VoiceRecordingContentParams(
+    val levels: List<Float>,
+    val remainingSeconds: Int,
+    val onCancel: () -> Unit,
+    val onFinish: () -> Unit,
 )
 
 /**

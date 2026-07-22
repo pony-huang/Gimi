@@ -6,7 +6,6 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -28,29 +26,22 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -58,7 +49,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.feature.chat.R
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 
 /**
  * Default implementation of the leading content of the chat composer.
@@ -92,13 +82,13 @@ internal fun DefaultComposerInputContent(
     params: ComposerInputContentParams,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
-    val isRecording = remember { mutableStateOf(false) }
+    val isTranscribing = params.voiceInputState == VoiceInputUiState.Transcribing
 
     val trailingButton = when {
         params.isGenerating -> ComposerTrailingButton.Stop
-        params.isTranscribing -> null
-        (params.messageData.text.isNotBlank() || params.messageData.attachments.isNotEmpty()) &&
-            !isRecording.value -> ComposerTrailingButton.Send
+        isTranscribing -> null
+        params.messageData.text.isNotBlank() || params.messageData.attachments.isNotEmpty() ->
+            ComposerTrailingButton.Send
         else -> null
     }
 
@@ -113,54 +103,77 @@ internal fun DefaultComposerInputContent(
     Column(modifier = modifier) {
         SnackbarHost(hostState = snackbarHostState)
 
-        BasicTextField(
-            modifier = Modifier
-                .fillMaxWidth()
-                .defaultMinSize(minHeight = LocalMinimumInteractiveComponentSize.current),
-            value = params.messageData.text,
-            onValueChange = params.onTextChange,
-            enabled = !params.isGenerating && !params.isTranscribing && !isRecording.value,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = KeyboardActions(onSend = { params.onSendClick() }),
-            textStyle = resolveTextFieldStyle(interactionSource, disabled = params.isGenerating),
-            cursorBrush = SolidColor(OutlinedTextFieldDefaults.colors().cursorColor),
-            interactionSource = interactionSource,
-            maxLines = 6,
-            minLines = 1,
-            decorationBox = { innerTextField ->
-                Column {
-                    AttachmentList(
-                        attachments = params.messageData.attachments,
-                        onRemoveAttachment = params.onRemoveAttachment,
-                    )
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        TextInput(
-                            modifier = Modifier.weight(1f),
-                            text = params.messageData.text,
-                            innerTextField = innerTextField,
-                        )
-                        VoiceButton(
-                            isGenerating = params.isGenerating,
-                            isTranscribing = params.isTranscribing,
-                            isVoiceInputAvailable = params.isVoiceInputAvailable,
-                            isRecording = isRecording,
-                            snackbarHostState = snackbarHostState,
-                            onVoiceInputStart = params.onVoiceInputStart,
-                            onVoiceInputStop = params.onVoiceInputStop,
-                            onVoiceAudioChunk = params.onVoiceAudioChunk,
-                            onVoiceInputError = params.onVoiceInputError,
-                        )
-                        TrailingButton(
-                            button = trailingButton,
-                            onSendClick = params.onSendClick,
-                            onStopClick = params.onStopClick,
-                        )
-                    }
-                }
-            },
+        AnimatedContent(targetState = isTranscribing) { transcribing ->
+            if (transcribing) {
+                TranscribingContent()
+            } else {
+                BasicTextField(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = LocalMinimumInteractiveComponentSize.current),
+                    value = params.messageData.text,
+                    onValueChange = params.onTextChange,
+                    enabled = !params.isGenerating,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { params.onSendClick() }),
+                    textStyle = resolveTextFieldStyle(interactionSource, disabled = params.isGenerating),
+                    cursorBrush = SolidColor(OutlinedTextFieldDefaults.colors().cursorColor),
+                    interactionSource = interactionSource,
+                    maxLines = 6,
+                    minLines = 1,
+                    decorationBox = { innerTextField ->
+                        Column {
+                            AttachmentList(
+                                attachments = params.messageData.attachments,
+                                onRemoveAttachment = params.onRemoveAttachment,
+                            )
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                TextInput(
+                                    modifier = Modifier.weight(1f),
+                                    text = params.messageData.text,
+                                    innerTextField = innerTextField,
+                                )
+                                VoiceButton(
+                                    isGenerating = params.isGenerating,
+                                    isVoiceInputAvailable = params.isVoiceInputAvailable,
+                                    snackbarHostState = snackbarHostState,
+                                    onVoiceInputStart = params.onVoiceInputStart,
+                                )
+                                TrailingButton(
+                                    button = trailingButton,
+                                    onSendClick = params.onSendClick,
+                                    onStopClick = params.onStopClick,
+                                )
+                            }
+                        }
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TranscribingContent() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = LocalMinimumInteractiveComponentSize.current)
+            .padding(horizontal = 16.dp)
+            .testTag(VOICE_TRANSCRIBING_TEST_TAG),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+        Text(
+            text = stringResource(R.string.chat_voice_transcribing),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium,
         )
     }
 }
+
+internal const val VOICE_TRANSCRIBING_TEST_TAG = "voice_transcribing"
 
 @Composable
 private fun resolveTextFieldStyle(
@@ -226,145 +239,53 @@ private fun TextInput(
 @Composable
 private fun VoiceButton(
     isGenerating: Boolean,
-    isTranscribing: Boolean,
     isVoiceInputAvailable: Boolean,
-    isRecording: MutableState<Boolean>,
     snackbarHostState: SnackbarHostState,
     onVoiceInputStart: () -> Unit,
-    onVoiceInputStop: () -> Unit,
-    onVoiceAudioChunk: (ByteArray) -> Unit,
-    onVoiceInputError: (Throwable) -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
-    val recorder = remember { VoiceAudioRecorder() }
-    var remainingSeconds by remember { mutableIntStateOf(MAX_RECORDING_SECONDS) }
-    val currentOnVoiceInputStart by rememberUpdatedState(onVoiceInputStart)
-    val currentOnVoiceInputStop by rememberUpdatedState(onVoiceInputStop)
-    val currentOnVoiceAudioChunk by rememberUpdatedState(onVoiceAudioChunk)
-    val currentOnVoiceInputError by rememberUpdatedState(onVoiceInputError)
+    if (isGenerating) return
 
-    fun stopRecording(submitForRecognition: Boolean = true) {
-        if (isRecording.value) {
-            recorder.stop()
-            isRecording.value = false
-            if (submitForRecognition) currentOnVoiceInputStop()
-        }
-    }
-
-    fun startRecording() {
-        if (!isRecording.value && isVoiceInputAvailable && !isTranscribing) {
-            remainingSeconds = MAX_RECORDING_SECONDS
-            val started = recorder.start(
-                onAudioChunk = { currentOnVoiceAudioChunk(it) },
-                onError = { error ->
-                    coroutineScope.launch {
-                        if (isRecording.value) {
-                            stopRecording(submitForRecognition = false)
-                        }
-                        currentOnVoiceInputError(error)
-                    }
-                },
-            )
-            if (started) {
-                isRecording.value = true
-                currentOnVoiceInputStart()
-            }
-        }
-    }
-
-    LaunchedEffect(isGenerating) {
-        if (isGenerating) {
-            stopRecording(submitForRecognition = false)
-        }
-    }
-
-    LaunchedEffect(isRecording.value) {
-        while (isRecording.value && remainingSeconds > 0) {
-            delay(1_000)
-            if (isRecording.value) remainingSeconds--
-        }
-        if (isRecording.value && remainingSeconds == 0) stopRecording()
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            stopRecording(submitForRecognition = false)
-            recorder.release()
-        }
-    }
-
-    AnimatedContent(targetState = isTranscribing) { transcribing ->
-        if (transcribing) {
-            Box(
-                modifier = Modifier.size(48.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-            }
-            return@AnimatedContent
-        }
-        val showVoiceButton = !isGenerating
-        if (showVoiceButton) {
-            val snackbarMessage = stringResource(R.string.stream_ai_compose_composer_mic_permission_message)
-            val actionLabel = stringResource(R.string.stream_ai_compose_composer_mic_permission_action)
-            val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-                contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-            ) { isGranted ->
-                if (isGranted) {
-                    startRecording()
-                } else {
-                    coroutineScope.launch {
-                        val result = snackbarHostState.showSnackbar(
-                            message = snackbarMessage,
-                            actionLabel = actionLabel,
-                            withDismissAction = true,
-                        )
-                        if (result == SnackbarResult.ActionPerformed) {
-                            context.openSettings()
-                        }
-                    }
-                }
-            }
-            val onClick = {
-                if (isRecording.value) {
-                    stopRecording()
-                } else if (!isVoiceInputAvailable) {
-                    Unit
-                } else if (
-                    androidx.core.content.ContextCompat.checkSelfPermission(
-                        context,
-                        android.Manifest.permission.RECORD_AUDIO,
-                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                ) {
-                    startRecording()
-                } else {
-                    permissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
-                }
-            }
-            with(LocalChatAiComponentFactory.current) {
-                if (isRecording.value) {
-                    SpeechToTextButtonRecordingContent(
-                        SpeechToTextButtonRecordingContentParams(
-                            onClick = onClick,
-                            rmsdB = 0f,
-                            remainingSeconds = remainingSeconds,
-                        ),
-                    )
-                } else {
-                    SpeechToTextButtonIdleContent(
-                        SpeechToTextButtonIdleContentParams(
-                            onClick = onClick,
-                            enabled = isVoiceInputAvailable,
-                        ),
-                    )
+    val snackbarMessage = stringResource(R.string.stream_ai_compose_composer_mic_permission_message)
+    val actionLabel = stringResource(R.string.stream_ai_compose_composer_mic_permission_action)
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { isGranted ->
+        if (isGranted) {
+            onVoiceInputStart()
+        } else {
+            coroutineScope.launch {
+                val result = snackbarHostState.showSnackbar(
+                    message = snackbarMessage,
+                    actionLabel = actionLabel,
+                    withDismissAction = true,
+                )
+                if (result == SnackbarResult.ActionPerformed) {
+                    context.openSettings()
                 }
             }
         }
+    }
+    val onClick = {
+        when {
+            !isVoiceInputAvailable -> Unit
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.RECORD_AUDIO,
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED -> onVoiceInputStart()
+            else -> permissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+        }
+    }
+    with(LocalChatAiComponentFactory.current) {
+        SpeechToTextButtonIdleContent(
+            SpeechToTextButtonIdleContentParams(
+                onClick = onClick,
+                enabled = isVoiceInputAvailable,
+            ),
+        )
     }
 }
-
-private const val MAX_RECORDING_SECONDS = 60
 
 private enum class ComposerTrailingButton { Send, Stop }
 

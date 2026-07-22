@@ -145,6 +145,9 @@ class ModelServiceDetailViewModel @Inject constructor(
 
     private fun changeProtocol(protocol: ApiProtocol) {
         val id = serviceId ?: return
+        // 单协议厂商（OpenAI / Anthropic）不允许切换到不支持的接口标准。
+        val supported = _uiState.value.service?.supportedProtocols ?: return
+        if (protocol !in supported) return
         mutate {
             updateModelService.protocol(id, protocol)
             _uiState.update { state ->

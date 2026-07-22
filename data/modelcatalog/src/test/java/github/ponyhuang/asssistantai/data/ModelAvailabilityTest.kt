@@ -1,5 +1,6 @@
 package github.ponyhuang.asssistantai.data
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -12,6 +13,26 @@ class ModelAvailabilityTest {
 
         assertFalse(providers.getValue("deepseek").isEnabled)
         assertFalse(providers.getValue("minimax").isEnabled)
+    }
+
+    @Test
+    fun builtInOpenAiAnthropicAndKimiExistWithProtocolConstraints() {
+        val providers = DefaultModelServices.services.associateBy { it.serviceId }
+
+        val openAi = providers.getValue("openai")
+        assertFalse(openAi.isEnabled)
+        assertEquals(listOf(ApiBaseType.Standard), openAi.supportedBaseTypes)
+        assertEquals(ApiBaseType.Standard, openAi.baseType)
+
+        val anthropic = providers.getValue("anthropic")
+        assertFalse(anthropic.isEnabled)
+        assertEquals(listOf(ApiBaseType.Anthropic), anthropic.supportedBaseTypes)
+        assertEquals(ApiBaseType.Anthropic, anthropic.baseType)
+
+        val kimi = providers.getValue("kimi")
+        assertFalse(kimi.isEnabled)
+        assertTrue(ApiBaseType.Standard in kimi.supportedBaseTypes)
+        assertTrue(ApiBaseType.Anthropic in kimi.supportedBaseTypes)
     }
 
     @Test

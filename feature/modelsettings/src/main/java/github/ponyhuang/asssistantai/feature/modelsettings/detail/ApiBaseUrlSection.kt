@@ -29,38 +29,54 @@ fun ApiBaseUrlSection(
     onBaseUrlChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val options = listOf(
+    val allOptions = listOf(
         ApiProtocol.Standard to stringResource(R.string.modelsettings_api_protocol_standard),
         ApiProtocol.Anthropic to stringResource(R.string.modelsettings_api_protocol_anthropic),
     )
+    // 单协议厂商（OpenAI 仅 Standard、Anthropic 仅 Anthropic）只展示其支持的接口标准。
+    val options = allOptions.filter { it.first in service.supportedProtocols }
+    val currentLabel = options.firstOrNull { it.first == service.apiProtocol }?.second
+        ?: options.first().second
 
     Column(
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        ExposedDropdownMenuBox(
-            expanded = isMenuExpanded,
-            onExpandedChange = { onToggleMenu() },
-        ) {
+        if (options.size == 1) {
+            // 协议被厂商约束锁定时，用禁用的只读输入框展示当前唯一可用协议。
             OutlinedTextField(
-                value = options.first { it.first == service.apiProtocol }.second,
+                value = currentLabel,
                 onValueChange = {},
                 readOnly = true,
+                enabled = false,
                 label = { Text(stringResource(R.string.modelsettings_api_url_label)) },
-                trailingIcon = {
-                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = isMenuExpanded)
-                },
-                modifier = Modifier.fillMaxWidth().menuAnchor(),
+                modifier = Modifier.fillMaxWidth(),
             )
-            ExposedDropdownMenu(
+        } else {
+            ExposedDropdownMenuBox(
                 expanded = isMenuExpanded,
-                onDismissRequest = onDismissMenu,
+                onExpandedChange = { onToggleMenu() },
             ) {
-                options.forEach { (protocol, label) ->
-                    DropdownMenuItem(
-                        text = { Text(label) },
-                        onClick = { onProtocolChange(protocol) },
-                    )
+                OutlinedTextField(
+                    value = currentLabel,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text(stringResource(R.string.modelsettings_api_url_label)) },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = isMenuExpanded)
+                    },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                )
+                ExposedDropdownMenu(
+                    expanded = isMenuExpanded,
+                    onDismissRequest = onDismissMenu,
+                ) {
+                    options.forEach { (protocol, label) ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = { onProtocolChange(protocol) },
+                        )
+                    }
                 }
             }
         }

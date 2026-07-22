@@ -18,6 +18,7 @@ fun LLMModelProvider.toDomain(): ModelService = ModelService(
     apiKey = apiKey,
     apiBaseUrl = apiBaseUrl,
     apiProtocol = baseType.toDomain(),
+    supportedProtocols = supportedBaseTypes.map { it.toDomain() },
     anthropicBaseUrl = anthropicBaseUrl,
     groups = LLMModelGroups.map(LLMModelGroup::toDomain),
     iconRes = iconRes,

@@ -8,6 +8,9 @@ package github.ponyhuang.asssistantai.data
  * @property isEnabled 总开关；false 时列表页不显示 ON 胶囊，且 Agent 不应路由到此服务。
  * @property apiKey API 密钥；可填多个，逗号分隔（UI HelperText 已说明）。
  * @property baseType 接口标准类型，决定预览拼接路径。
+ * @property supportedBaseTypes 该厂商允许的接口标准集合。OpenAI 仅支持 Standard，
+ *                  Anthropic 仅支持 Anthropic，其余厂商两种皆可。UI 协议下拉按此过滤，
+ *                  持久化的非法取值会在加载时回退到集合首项。
  * @property LLMModelGroups 该服务下的模型组列表。
  * @property iconRes 品牌图标 drawable 资源 ID；null 时回退到默认机器人图标。
  *                  新增厂商时只需在 [DefaultModelServices] 中赋值即可，无需改 UI 调用点。
@@ -23,6 +26,7 @@ data class LLMModelProvider(
     val apiKey: String,
     val apiBaseUrl: String,
     val baseType: ApiBaseType = ApiBaseType.Standard,
+    val supportedBaseTypes: List<ApiBaseType> = ApiBaseType.entries,
     val anthropicBaseUrl: String = apiBaseUrl,
     val LLMModelGroups: List<LLMModelGroup> = emptyList(),
     val iconRes: Int? = null,
@@ -208,6 +212,109 @@ object DefaultModelServices {
             docsUrl = "https://mimo.mi.com/docs",
             modelsUrl = "https://mimo.mi.com/docs/zh-CN/quick-start/summary/model",
         ),
+        LLMModelProvider(
+            serviceId = "openai",
+            serviceName = "OpenAI",
+            isEnabled = false,
+            apiKey = "",
+            apiBaseUrl = "https://api.openai.com/v1",
+            baseType = ApiBaseType.Standard,
+            // OpenAI 官方仅提供标准 OpenAI 格式，协议下拉锁定为 Standard。
+            supportedBaseTypes = listOf(ApiBaseType.Standard),
+            LLMModelGroups = listOf(
+                LLMModelGroup(
+                    groupId = "gpt-5",
+                    groupName = "GPT-5",
+                    isExpanded = true,
+                    models = listOf(
+                        LLMModelItem(
+                            modelId = "gpt-5",
+                            modelName = "gpt-5",
+                        ),
+                        LLMModelItem(
+                            modelId = "gpt-5-mini",
+                            modelName = "gpt-5-mini",
+                        ),
+                    ),
+                ),
+            ),
+            homepageUrl = "https://openai.com/",
+            keyHelpUrl = "https://platform.openai.com/api-keys",
+            docsUrl = "https://platform.openai.com/docs",
+            modelsUrl = "https://platform.openai.com/docs/models",
+        ),
+        LLMModelProvider(
+            serviceId = "anthropic",
+            serviceName = "Anthropic",
+            isEnabled = false,
+            apiKey = "",
+            apiBaseUrl = "https://api.anthropic.com",
+            baseType = ApiBaseType.Anthropic,
+            // Anthropic 官方仅提供 Anthropic 格式，协议下拉锁定为 Anthropic。
+            supportedBaseTypes = listOf(ApiBaseType.Anthropic),
+            anthropicBaseUrl = "https://api.anthropic.com",
+            LLMModelGroups = listOf(
+                LLMModelGroup(
+                    groupId = "claude",
+                    groupName = "Claude",
+                    isExpanded = true,
+                    models = listOf(
+                        LLMModelItem(
+                            modelId = "claude-fable-5",
+                            modelName = "claude-fable-5",
+                        ),
+                        LLMModelItem(
+                            modelId = "claude-opus-4-8",
+                            modelName = "claude-opus-4-8",
+                        ),
+                        LLMModelItem(
+                            modelId = "claude-sonnet-5",
+                            modelName = "claude-sonnet-5",
+                        ),
+                        LLMModelItem(
+                            modelId = "claude-haiku-4-5-20251001",
+                            modelName = "claude-haiku-4-5-20251001",
+                        ),
+                    ),
+                ),
+            ),
+            homepageUrl = "https://www.anthropic.com/",
+            keyHelpUrl = "https://console.anthropic.com/settings/keys",
+            docsUrl = "https://docs.anthropic.com/",
+            modelsUrl = "https://docs.anthropic.com/en/docs/about-claude/models",
+        ),
+        LLMModelProvider(
+            serviceId = "kimi",
+            serviceName = "Kimi（月之暗面）",
+            isEnabled = false,
+            apiKey = "",
+            // 官方文档：https://platform.kimi.com/docs/api/overview — 兼容 OpenAI 格式，
+            // 同时提供 Anthropic 兼容端点，与 DeepSeek 一样两种协议皆可选。
+            apiBaseUrl = "https://api.moonshot.cn/v1",
+            baseType = ApiBaseType.Standard,
+            anthropicBaseUrl = "https://api.moonshot.cn/anthropic",
+            LLMModelGroups = listOf(
+                LLMModelGroup(
+                    groupId = "kimi",
+                    groupName = "Kimi",
+                    isExpanded = true,
+                    models = listOf(
+                        LLMModelItem(
+                            modelId = "kimi-k3",
+                            modelName = "kimi-k3",
+                        ),
+                        LLMModelItem(
+                            modelId = "kimi-k2.7-code",
+                            modelName = "kimi-k2.7-code",
+                        ),
+                    ),
+                ),
+            ),
+            homepageUrl = "https://www.kimi.com/",
+            keyHelpUrl = "https://platform.kimi.com/console/api-keys",
+            docsUrl = "https://platform.kimi.com/docs",
+            modelsUrl = "https://platform.kimi.com/docs/api/models-overview",
+        ),
     )
 
     /**
@@ -217,4 +324,12 @@ object DefaultModelServices {
      */
     fun iconFor(serviceId: String): Int? =
         services.firstOrNull { it.serviceId == serviceId }?.iconRes
+
+    /**
+     * 按 [serviceId] 查找厂商允许的接口标准集合（静态元数据，与 [iconFor] 一样
+     * 不随用户设置变化）。未声明的自定义服务回退为两种协议皆可。
+     */
+    fun supportedBaseTypesFor(serviceId: String): List<ApiBaseType> =
+        services.firstOrNull { it.serviceId == serviceId }?.supportedBaseTypes
+            ?: ApiBaseType.entries
 }

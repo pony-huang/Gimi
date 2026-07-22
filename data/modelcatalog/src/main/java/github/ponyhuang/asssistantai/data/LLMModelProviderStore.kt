@@ -192,7 +192,11 @@ class ModelServiceRepository @Inject constructor(
         setEnabled(serviceId, enabled)
 
     override fun updateApiProtocol(serviceId: String, protocol: ApiProtocol) {
-        updateService(serviceId) { it.copy(baseType = protocol.toData()) }
+        updateService(serviceId) { provider ->
+            val target = protocol.toData()
+            // 单协议厂商（OpenAI / Anthropic）拒绝切换到不支持的接口标准。
+            if (target in provider.supportedBaseTypes) provider.copy(baseType = target) else provider
+        }
     }
 
     override fun updateBaseUrl(serviceId: String, value: String) {
@@ -398,13 +402,19 @@ class ModelServiceRepository @Inject constructor(
         val providerSettings = settings.value[entity.serviceId]
             ?: defaultSettings[entity.serviceId]
             ?: ModelServiceSettings(false, "", "", ApiBaseType.Standard, "")
+        // 接口标准白名单是静态元数据，按 serviceId 从默认清单回填；
+        // 持久化的协议若不在白名单内（例如厂商后来收紧了格式约束），回退到首个允许值。
+        val supportedBaseTypes = DefaultModelServices.supportedBaseTypesFor(entity.serviceId)
+        val baseType = providerSettings.baseType.takeIf { it in supportedBaseTypes }
+            ?: supportedBaseTypes.first()
         return LLMModelProvider(
             serviceId = entity.serviceId,
             serviceName = entity.serviceName,
             isEnabled = providerSettings.isEnabled,
             apiKey = providerSettings.apiKey,
             apiBaseUrl = providerSettings.apiBaseUrl,
-            baseType = providerSettings.baseType,
+            baseType = baseType,
+            supportedBaseTypes = supportedBaseTypes,
             anthropicBaseUrl = providerSettings.anthropicBaseUrl,
             LLMModelGroups = decodeGroups(entity.modelGroupsJson).map { group ->
                 LLMModelGroup(

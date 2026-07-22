@@ -38,6 +38,7 @@
 
     <string name="chat_stt_configure_default_first">Please configure the default voice model in Settings first</string>
 
+    <string name="chat_drawer_history_title">Chat History</string>
     <string name="chat_drawer_empty_history">No history yet</string>
     <string name="chat_drawer_current_session_protected">The current session cannot be deleted</string>
     <string name="chat_drawer_switch_first">Please switch to another session first</string>

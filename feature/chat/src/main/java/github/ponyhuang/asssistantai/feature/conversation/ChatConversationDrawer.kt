@@ -131,7 +131,7 @@ private fun HistoryDrawerContent(
             .statusBarsPadding(),
     ) {
         Text(
-            text = "AsssistantAI",
+            text = stringResource(R.string.chat_drawer_history_title),
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Medium,
             modifier = Modifier.padding(start = 24.dp, top = 20.dp, bottom = 24.dp),

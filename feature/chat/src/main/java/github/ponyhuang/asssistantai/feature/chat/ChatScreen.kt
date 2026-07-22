@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -20,7 +21,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -160,19 +163,39 @@ fun ChatScaffold(
             }
     }
 
+    val statusBarProtectionColor = MaterialTheme.colorScheme.surface
+    val statusBarProtectionBrush = remember(statusBarProtectionColor) {
+        Brush.verticalGradient(
+            colors = listOf(
+                statusBarProtectionColor.copy(alpha = 0.72f),
+                statusBarProtectionColor.copy(alpha = 0.36f),
+                Color.Transparent,
+            ),
+        )
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            ChatTopBar(
-                state = state,
-                isAgentRunning = isAgentRunning,
-                onOpenDrawer = onOpenDrawer,
-                onOpenSettings = onOpenSettings,
-                onConfigureModels = onConfigureModels,
-                onNewConversation = onNewConversation,
-                onSelectModel = onSelectModel,
-                onModelSwitchBlocked = onModelSwitchBlocked,
-            )
+            Box {
+                ChatTopBar(
+                    state = state,
+                    isAgentRunning = isAgentRunning,
+                    onOpenDrawer = onOpenDrawer,
+                    onOpenSettings = onOpenSettings,
+                    onConfigureModels = onConfigureModels,
+                    onNewConversation = onNewConversation,
+                    onSelectModel = onSelectModel,
+                    onModelSwitchBlocked = onModelSwitchBlocked,
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .windowInsetsTopHeight(WindowInsets.statusBars)
+                        .background(statusBarProtectionBrush),
+                )
+            }
         },
         bottomBar = {
             val background = MaterialTheme.colorScheme.background

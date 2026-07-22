@@ -64,6 +64,7 @@ object ConversationModule {
     @Provides
     @Singleton
     fun provideConversationRepository(
+        @ApplicationContext context: Context,
         sessionService: SessionService,
         database: ConversationMetadataDatabase,
     ): ConversationRepository = AdkConversationRepository(
@@ -71,6 +72,7 @@ object ConversationModule {
         userId = USER_ID,
         sessionService = sessionService,
         metadataDao = database.conversationMetadataDao(),
+        context = context,
     )
 
     private const val USER_ID = "user-default"

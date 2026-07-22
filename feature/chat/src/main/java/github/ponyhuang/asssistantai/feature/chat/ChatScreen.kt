@@ -8,9 +8,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -55,6 +59,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.conversation.model.Message
@@ -213,12 +218,23 @@ fun ChatScaffold(
             }
         },
     ) { innerPadding ->
+        val layoutDirection = LocalLayoutDirection.current
+        val listContentPadding = PaddingValues(
+            start = innerPadding.calculateStartPadding(layoutDirection) + 12.dp,
+            top = innerPadding.calculateTopPadding() + 8.dp,
+            end = innerPadding.calculateEndPadding(layoutDirection) + 12.dp,
+            bottom = innerPadding.calculateBottomPadding() + 8.dp,
+        )
+
         AnimatedContent(
             targetState = state.isInitializing,
         ) { isInitializing ->
             if (isInitializing) {
                 Box(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .consumeWindowInsets(innerPadding),
                     contentAlignment = Alignment.Center,
                 ) {
                     CircularProgressIndicator()
@@ -230,8 +246,8 @@ fun ChatScaffold(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(innerPadding)
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .consumeWindowInsets(innerPadding),
+                    contentPadding = listContentPadding,
                 ) {
                     items(
                         items = visibleMessages,

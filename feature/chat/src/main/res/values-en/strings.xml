@@ -38,7 +38,12 @@
 
     <string name="chat_stt_configure_default_first">Please configure the default voice model in Settings first</string>
 
-    <string name="chat_drawer_history_title">Chat History</string>
+        <string name="chat_time_just_now">Just now</string>
+    <string name="chat_time_minutes_ago">%1$d min ago</string>
+    <string name="chat_time_hours_ago">%1$d hr ago</string>
+    <string name="chat_time_days_ago">%1$d d ago</string>
+    <string name="chat_time_date">%1$d/%2$d</string>
+<string name="chat_drawer_history_title">Chat History</string>
     <string name="chat_drawer_empty_history">No history yet</string>
     <string name="chat_drawer_current_session_protected">The current session cannot be deleted</string>
     <string name="chat_drawer_switch_first">Please switch to another session first</string>

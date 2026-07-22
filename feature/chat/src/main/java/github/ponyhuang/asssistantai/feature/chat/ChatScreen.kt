@@ -178,7 +178,27 @@ fun ChatScaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
+            // 与底部 composer 的 fadeBrush 对称：消息滚到悬浮顶栏后方时渐隐，
+            // 避免文字从透明按钮之间透出（只保护状态栏不够，按钮行本身也是透明的）。
+            val topBarBackground = MaterialTheme.colorScheme.background
+            val topFadeBrush = remember(topBarBackground) {
+                Brush.verticalGradient(
+                    // 顶栏按钮行占区域上半部，需要接近不透明才能压住后方文字；
+                    // 只在底部边缘渐隐到透明，保持"悬浮"观感。
+                    colorStops = arrayOf(
+                        0.0f to topBarBackground,
+                        0.55f to topBarBackground.copy(alpha = 0.95f),
+                        0.8f to topBarBackground.copy(alpha = 0.5f),
+                        1.0f to Color.Transparent,
+                    ),
+                )
+            }
             Box {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(topFadeBrush),
+                )
                 ChatTopBar(
                     state = state,
                     isAgentRunning = isAgentRunning,

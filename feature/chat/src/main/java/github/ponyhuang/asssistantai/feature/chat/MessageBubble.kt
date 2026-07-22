@@ -9,15 +9,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
@@ -37,6 +43,7 @@ import github.ponyhuang.asssistantai.ui.theme.AsssistantaiTheme
 import github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackState
 import github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackStatus
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 
@@ -187,19 +194,30 @@ private fun AssistantMessageActions(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val copiedMessage = stringResource(R.string.chat_message_copied)
+        // 复制成功后的短暂 ✓ 反馈：动作有始有终，不只依赖 Toast（部分 ROM 会吞掉）。
+        var justCopied by remember { mutableStateOf(false) }
         IconButton(
             onClick = {
                 scope.launch {
                     clipboard.setClipEntry(
                         ClipEntry(ClipData.newPlainText("assistant response", text)),
                     )
+                    justCopied = true
                     Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                    delay(1_600)
+                    justCopied = false
                 }
             },
         ) {
             Icon(
-                imageVector = Icons.Default.ContentCopy,
+                imageVector = if (justCopied) Icons.Default.Check else Icons.Default.ContentCopy,
                 contentDescription = stringResource(R.string.chat_message_copy),
+                tint = if (justCopied) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.size(18.dp),
             )
         }
         val isCurrent = speechPlaybackState.messageId == messageId
@@ -207,12 +225,14 @@ private fun AssistantMessageActions(
         IconButton(onClick = { onToggleSpeechPlayback(messageId, text) }) {
             when (status) {
                 SpeechPlaybackStatus.Loading -> CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(18.dp),
                     strokeWidth = 2.dp,
                 )
                 SpeechPlaybackStatus.Playing -> Icon(
                     imageVector = Icons.Default.Pause,
                     contentDescription = stringResource(R.string.chat_message_pause_playback),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
                 )
                 SpeechPlaybackStatus.Paused,
                 SpeechPlaybackStatus.Idle,
@@ -222,6 +242,12 @@ private fun AssistantMessageActions(
                         if (status == SpeechPlaybackStatus.Paused) R.string.chat_message_resume_playback
                         else R.string.chat_message_play_reply,
                     ),
+                    tint = if (status == SpeechPlaybackStatus.Paused) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.size(18.dp),
                 )
             }
         }

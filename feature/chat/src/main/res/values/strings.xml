@@ -44,6 +44,11 @@
     <string name="chat_stt_configure_default_first">请先在设置中配置默认语音模型</string>
 
     <!-- ChatConversationDrawer -->
+    <string name="chat_time_just_now">刚刚</string>
+    <string name="chat_time_minutes_ago">%1$d 分钟前</string>
+    <string name="chat_time_hours_ago">%1$d 小时前</string>
+    <string name="chat_time_days_ago">%1$d 天前</string>
+    <string name="chat_time_date">%1$d 月 %2$d 日</string>
     <string name="chat_drawer_history_title">历史会话</string>
     <string name="chat_drawer_empty_history">暂无历史对话</string>
     <string name="chat_drawer_current_session_protected">当前会话不可删除</string>

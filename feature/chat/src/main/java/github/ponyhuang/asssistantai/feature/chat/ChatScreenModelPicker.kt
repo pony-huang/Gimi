@@ -235,7 +235,17 @@ fun ModelTitleAndPicker(
             key = { row -> "${row.service.id}/${row.group.id}/${row.model.id}" },
             title = stringResource(R.string.chat_model_picker_title),
             optionTitle = { it.model.name },
-            optionSubtitle = { "${it.service.name} · ${it.group.name}" },
+            // 副标题只在有区分度时带上组名：服务只有一个聊天模型组时，
+            optionSubtitle = { row ->
+                val chatGroupCount = row.service.groups.count { group ->
+                    group.models.any(Model::isChatModel)
+                }
+                if (chatGroupCount > 1) {
+                    "${row.service.name} · ${row.group.name}"
+                } else {
+                    row.service.name
+                }
+            },
             emptyText = stringResource(R.string.chat_model_empty_enable_first),
             onPick = { row ->
                 onSelectModel(

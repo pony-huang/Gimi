@@ -71,7 +71,7 @@ fun VoiceWakeSettingsScreen(
                         onValueChange = {
                             onAction(VoiceWakeSettingsAction.KeywordChanged(it))
                         },
-                        label = { Text(stringResource(R.string.voicewake_keyword_label)) },
+                        // 组标题已是「唤醒词」，不再重复 label；规则说明交给 supportingText。
                         supportingText = {
                             val errorText = state.keywordError
                             Text(

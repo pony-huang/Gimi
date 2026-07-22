@@ -15,10 +15,13 @@ import github.ponyhuang.asssistantai.domain.conversation.model.FunctionResponseV
 import github.ponyhuang.asssistantai.ui.theme.AsssistantaiTheme
 
 /**
- * 工具调用 chip — 在气泡上方展示一行 `name(args)` 风格的小标签。
- *
- * 设计参考：adk-web 的 `<app-hover-info-button>` chip 行（`event-content.component.html:28-162`）。
+ * 工具名展示：MCP 工具注册名带 `mcp_<服务器id前8位>_` 前缀（见 McpToolRegistry），
+ * 哈希前缀对用户无意义，展示时剥掉，只留远端工具本身的可读名。
  */
+private val McpNamePrefix = Regex("^mcp_[A-Za-z0-9_-]{8}_")
+
+internal fun toolDisplayName(rawName: String): String = rawName.replace(McpNamePrefix, "")
+
 @Composable
 fun ToolCallChip(
     call: FunctionCallView,
@@ -31,7 +34,7 @@ fun ToolCallChip(
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
     ) {
         Text(
-            text = "${call.name}${call.argsSummary}",
+            text = "${toolDisplayName(call.name)}${call.argsSummary}",
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
         )
@@ -54,7 +57,7 @@ fun ToolResponseChip(
     ) {
         Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)) {
             Text(
-                text = "${response.name} ✓",
+                text = "${toolDisplayName(response.name)} ✓",
                 style = MaterialTheme.typography.labelSmall,
             )
         }

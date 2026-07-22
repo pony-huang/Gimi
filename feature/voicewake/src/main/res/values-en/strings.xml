@@ -4,7 +4,6 @@
     <string name="voicewake_listening_subtitle">After connecting a Bluetooth headset, use the wake word to run tasks in the background</string>
 
     <string name="voicewake_section_keyword">Wake word</string>
-    <string name="voicewake_keyword_label">Wake word</string>
     <string name="voicewake_keyword_hint">2–20 characters, e.g. hello assistant</string>
     <string name="voicewake_save_keyword">Save wake word</string>
 

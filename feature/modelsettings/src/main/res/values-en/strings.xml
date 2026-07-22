@@ -36,7 +36,9 @@
     <string name="modelsettings_list_section_configured">Configured services</string>
     <string name="modelsettings_list_load_failed">Failed to load the model catalog</string>
 
-    <string name="modelsettings_defaults_assistant_title">Default assistant model</string>
+        <string name="modelsettings_defaults_section_chat">Chat</string>
+    <string name="modelsettings_defaults_section_voice">Voice</string>
+<string name="modelsettings_defaults_assistant_title">Default assistant model</string>
     <string name="modelsettings_defaults_assistant_subtitle">Model used when creating a new assistant</string>
     <string name="modelsettings_defaults_quick_title">Quick model</string>
     <string name="modelsettings_defaults_quick_subtitle">Used for assistant features that need fast responses</string>

@@ -227,8 +227,10 @@ private fun ConversationListItem(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val containerColor = if (isCurrent) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface
-    val contentColor = if (isCurrent) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
+    // 选中态用品牌 primaryContainer：深/浅主题下都与抽屉 surface 拉开明度差，
+    // secondaryContainer 在深色模式 (#383838 on #2F2F2F) 几乎看不出哪条是当前会话。
+    val containerColor = if (isCurrent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+    val contentColor = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
     val taskContentDescription = when (taskStatus) {
         is ConversationTaskStatus.Running -> stringResource(R.string.chat_task_running)
         is ConversationTaskStatus.WaitingForConfirmation -> stringResource(
@@ -250,18 +252,31 @@ private fun ConversationListItem(
                 onClick = onClick,
                 onLongClick = onLongClick,
             )
-            .padding(horizontal = 16.dp, vertical = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = conversation.title,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            color = if (enabled) contentColor else contentColor.copy(alpha = 0.45f),
+        Column(
             modifier = Modifier.weight(1f),
-        )
+        ) {
+            Text(
+                text = conversation.title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = if (enabled) contentColor else contentColor.copy(alpha = 0.45f),
+            )
+            // 副标题是辨识度的来源：标题可能都是"新对话"，时间 + 末条消息才能区分开。
+            Text(
+                text = conversation.subtitle(),
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = (if (enabled) contentColor else contentColor.copy(alpha = 0.45f))
+                    .copy(alpha = 0.6f),
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
         when (taskStatus) {
             is ConversationTaskStatus.Running -> CircularProgressIndicator(
                 modifier = Modifier
@@ -290,6 +305,38 @@ private fun ConversationListItem(
                 modifier = Modifier.size(20.dp),
             )
             null -> Unit
+        }
+    }
+}
+
+// ── 副标题：相对时间 + 末条消息 ─────────────────────────────────
+
+/** 列表副标题：`2 小时前 · 末条消息…`；无消息时只有时间。 */
+@Composable
+private fun Conversation.subtitle(): String {
+    val time = formatRelativeTime(timestamp)
+    val snippet = lastMessage.lineSequence().firstOrNull()?.trim().orEmpty()
+    return if (snippet.isEmpty()) time else "$time · $snippet"
+}
+
+@Composable
+private fun formatRelativeTime(timestamp: Long): String {
+    val diff = (System.currentTimeMillis() - timestamp).coerceAtLeast(0L)
+    val minutes = diff / 60_000L
+    val hours = diff / 3_600_000L
+    val days = diff / 86_400_000L
+    return when {
+        minutes < 1L -> stringResource(R.string.chat_time_just_now)
+        minutes < 60L -> stringResource(R.string.chat_time_minutes_ago, minutes)
+        hours < 24L -> stringResource(R.string.chat_time_hours_ago, hours)
+        days < 7L -> stringResource(R.string.chat_time_days_ago, days)
+        else -> {
+            val calendar = java.util.Calendar.getInstance().apply { timeInMillis = timestamp }
+            stringResource(
+                R.string.chat_time_date,
+                calendar.get(java.util.Calendar.MONTH) + 1,
+                calendar.get(java.util.Calendar.DAY_OF_MONTH),
+            )
         }
     }
 }

@@ -203,11 +203,12 @@ private fun McpServerCard(
                 server.name,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Medium,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                "${server.transport.displayName()} · ${server.endpointUrl}",
+                // 完整 URL 截断后毫无信息量，只保留 host；完整地址在编辑页可见。
+                "${server.transport.displayName()} · ${server.endpointHost()}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -227,3 +228,10 @@ internal fun McpTransport.displayName(): String = when (this) {
     McpTransport.SSE -> stringResource(R.string.mcp_transport_sse)
     McpTransport.STREAMABLE_HTTP -> stringResource(R.string.mcp_transport_streamable_http)
 }
+
+/** 从 endpoint URL 提取 host 用于列表副标题；解析失败时回退到原始 URL。 */
+private fun McpServer.endpointHost(): String =
+    runCatching { java.net.URI(endpointUrl).host }
+        .getOrNull()
+        ?.takeUnless { it.isNullOrBlank() }
+        ?: endpointUrl

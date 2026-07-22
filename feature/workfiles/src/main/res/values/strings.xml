@@ -1,8 +1,8 @@
 <resources>
     <!-- WorkFilesSettingsScreen -->
     <string name="workfiles_screen_title">工作文件</string>
-    <string name="workfiles_title">工作文件夹</string>
-    <string name="workfiles_subtitle">添加允许助手搜索的本机文件夹</string>
+    <string name="workfiles_title">添加工作文件夹</string>
+    <string name="workfiles_subtitle">允许助手搜索的本机文件夹</string>
     <string name="workfiles_auth_count">已授权 %1$d 个文件夹</string>
     <string name="workfiles_add_action">添加工作文件夹</string>
     <string name="workfiles_section_authorized">已授权文件夹</string>

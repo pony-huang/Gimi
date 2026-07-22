@@ -43,7 +43,9 @@
     <string name="modelsettings_list_load_failed">模型目录加载失败</string>
 
     <!-- DefaultModelSettingsScreen -->
-    <string name="modelsettings_defaults_assistant_title">默认助手模型</string>
+        <string name="modelsettings_defaults_section_chat">聊天</string>
+    <string name="modelsettings_defaults_section_voice">语音</string>
+<string name="modelsettings_defaults_assistant_title">默认助手模型</string>
     <string name="modelsettings_defaults_assistant_subtitle">创建新助手时使用的模型</string>
     <string name="modelsettings_defaults_quick_title">快速模型</string>
     <string name="modelsettings_defaults_quick_subtitle">用于需要快速响应的助手功能</string>

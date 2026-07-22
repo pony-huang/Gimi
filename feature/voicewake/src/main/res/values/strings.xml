@@ -6,7 +6,6 @@
     <string name="voicewake_listening_subtitle">连接蓝牙耳机后，可通过唤醒词在后台执行任务</string>
 
     <string name="voicewake_section_keyword">唤醒词</string>
-    <string name="voicewake_keyword_label">唤醒词</string>
     <string name="voicewake_keyword_hint">2–20 个字符，例如：你好助手</string>
     <string name="voicewake_save_keyword">保存唤醒词</string>
 

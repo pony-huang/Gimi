@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,6 +24,7 @@ import github.ponyhuang.asssistantai.feature.modelsettings.R
 import github.ponyhuang.asssistantai.ui.common.PickerSingleChoiceDialog
 import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
+import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
 
 @Composable
 fun DefaultModelSettingsScreen(
@@ -45,6 +47,7 @@ fun DefaultModelSettingsScreen(
                     )
                 }
             }
+            item { SettingsSectionTitle(stringResource(R.string.modelsettings_defaults_section_chat)) }
             item {
                 DefaultModelOption(
                     icon = Icons.AutoMirrored.Filled.Chat,
@@ -69,6 +72,7 @@ fun DefaultModelSettingsScreen(
                     },
                 )
             }
+            item { SettingsSectionTitle(stringResource(R.string.modelsettings_defaults_section_voice)) }
             item {
                 DefaultModelOption(
                     icon = Icons.Default.Mic,
@@ -97,7 +101,7 @@ fun DefaultModelSettingsScreen(
                 val voice = MiMoTtsVoices.all.firstOrNull { it.id == state.ttsVoiceId }
                 val enabled = state.ttsModels.any { it.selection() == state.ttsSelection }
                 SettingsListItem(
-                    icon = Icons.AutoMirrored.Filled.VolumeUp,
+                    icon = Icons.Default.GraphicEq,
                     title = stringResource(R.string.modelsettings_defaults_voice_title),
                     subtitle = voice?.name ?: state.ttsVoiceId,
                     onClick = if (enabled && !state.isMutationBlocked) {
@@ -191,7 +195,19 @@ private fun ModelChoiceDialog(
         key = { "${it.service.id}/${it.group.id}/${it.model.id}" },
         title = title,
         optionTitle = { it.model.name },
-        optionSubtitle = { "${it.service.name} · ${it.group.name}" },
+        // 与聊天页模型弹窗同一规则：服务内只有一个候选组时，组名对每行都相同，只显示服务名。
+        optionSubtitle = { row ->
+            val groupCount = rows.asSequence()
+                .filter { it.service.id == row.service.id }
+                .map { it.group.id }
+                .distinct()
+                .count()
+            if (groupCount > 1) {
+                "${row.service.name} · ${row.group.name}"
+            } else {
+                row.service.name
+            }
+        },
         emptyText = stringResource(R.string.modelsettings_dialog_no_models),
         onPick = {
             onAction(DefaultModelSettingsAction.SelectModel(target, it.selection()))

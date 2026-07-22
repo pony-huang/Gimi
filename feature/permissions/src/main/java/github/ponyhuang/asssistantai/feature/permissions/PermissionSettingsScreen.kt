@@ -145,13 +145,14 @@ private fun PermissionStatusText(
         stringResource(R.string.permissions_status_not_granted)
     },
 ) {
+    // 已授权是静止状态，用弱化色降噪；未授权需要用户行动，才用强调色吸引点击。
     Text(
         text = text,
         style = MaterialTheme.typography.labelLarge,
         color = if (granted) {
-            MaterialTheme.colorScheme.primary
-        } else {
             MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.primary
         },
     )
 }

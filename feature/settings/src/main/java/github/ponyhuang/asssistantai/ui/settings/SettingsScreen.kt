@@ -5,10 +5,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.BluetoothAudio
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
@@ -88,6 +89,7 @@ private fun SettingsHomeContent(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
+            item { SettingsSectionTitle(stringResource(R.string.settings_group_model)) }
             item {
                 SettingsNavigationCard(
                     icon = Icons.Default.Tune,
@@ -104,22 +106,41 @@ private fun SettingsHomeContent(
                     onClick = onNavigateToDefaultModels,
                 )
             }
+            item { SettingsSectionTitle(stringResource(R.string.settings_group_voice)) }
             item {
                 SettingsNavigationCard(
-                    icon = Icons.Default.BluetoothAudio,
+                    icon = Icons.Default.Mic,
                     title = stringResource(R.string.settings_voice_wake_title),
                     subtitle = stringResource(R.string.settings_voice_wake_subtitle),
                     onClick = onNavigateToVoiceWake,
                 )
             }
+            item { SettingsSectionTitle(stringResource(R.string.settings_group_tools)) }
             item {
                 SettingsNavigationCard(
-                    icon = Icons.Default.Build,
+                    icon = Icons.Default.Extension,
                     title = stringResource(R.string.settings_mcp_title),
                     subtitle = stringResource(R.string.settings_mcp_subtitle),
                     onClick = onNavigateToMcpServers,
                 )
             }
+            item {
+                SettingsNavigationCard(
+                    icon = Icons.Default.Build,
+                    title = stringResource(R.string.settings_tool_authorization_title),
+                    subtitle = stringResource(R.string.settings_tool_authorization_subtitle),
+                    onClick = onNavigateToToolAuthorization,
+                )
+            }
+            item {
+                SettingsNavigationCard(
+                    icon = Icons.Default.Folder,
+                    title = stringResource(R.string.settings_work_files_title),
+                    subtitle = stringResource(R.string.settings_work_files_subtitle),
+                    onClick = onNavigateToWorkFiles,
+                )
+            }
+            item { SettingsSectionTitle(stringResource(R.string.settings_group_general)) }
             item {
                 SettingsListItem(
                     icon = Icons.Default.Visibility,
@@ -132,22 +153,6 @@ private fun SettingsHomeContent(
                             onCheckedChange = onToggleToolActivity,
                         )
                     },
-                )
-            }
-            item {
-                SettingsNavigationCard(
-                    icon = Icons.Default.Folder,
-                    title = stringResource(R.string.settings_work_files_title),
-                    subtitle = stringResource(R.string.settings_work_files_subtitle),
-                    onClick = onNavigateToWorkFiles,
-                )
-            }
-            item {
-                SettingsNavigationCard(
-                    icon = Icons.Default.Build,
-                    title = stringResource(R.string.settings_tool_authorization_title),
-                    subtitle = stringResource(R.string.settings_tool_authorization_subtitle),
-                    onClick = onNavigateToToolAuthorization,
                 )
             }
             item {

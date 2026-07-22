@@ -107,6 +107,44 @@ class ModelServiceDetailViewModelCharacterizationTest {
         io.mockk.verify { fixture.repository.updateApiKey(provider.id, "new") }
     }
 
+    @Test
+    fun protocolChangeToUnsupportedProtocolIsRejected() = runTest {
+        val provider = service(apiKey = "key").copy(
+            supportedProtocols = listOf(ApiProtocol.Standard),
+        )
+        val fixture = fixture(provider)
+        fixture.viewModel.onAction(ModelServiceDetailAction.Load(provider.id))
+        advanceUntilIdle()
+
+        fixture.viewModel.onAction(
+            ModelServiceDetailAction.ApiProtocolChanged(ApiProtocol.Anthropic),
+        )
+        advanceUntilIdle()
+
+        assertEquals(ApiProtocol.Standard, fixture.viewModel.uiState.value.service?.apiProtocol)
+        io.mockk.verify(exactly = 0) {
+            fixture.repository.updateApiProtocol(any(), ApiProtocol.Anthropic)
+        }
+    }
+
+    @Test
+    fun protocolChangeToSupportedProtocolUpdatesStateAndRepository() = runTest {
+        val provider = service(apiKey = "key")
+        val fixture = fixture(provider)
+        fixture.viewModel.onAction(ModelServiceDetailAction.Load(provider.id))
+        advanceUntilIdle()
+
+        fixture.viewModel.onAction(
+            ModelServiceDetailAction.ApiProtocolChanged(ApiProtocol.Anthropic),
+        )
+        advanceUntilIdle()
+
+        assertEquals(ApiProtocol.Anthropic, fixture.viewModel.uiState.value.service?.apiProtocol)
+        io.mockk.verify {
+            fixture.repository.updateApiProtocol(provider.id, ApiProtocol.Anthropic)
+        }
+    }
+
     private fun fixture(service: ModelService?): Fixture {
         val services = MutableStateFlow(service)
         val repository = mockk<ModelCatalogRepository>(relaxed = true) {

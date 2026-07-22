@@ -7,6 +7,8 @@ data class ModelService(
     val apiKey: String,
     val apiBaseUrl: String,
     val apiProtocol: ApiProtocol,
+    /** 厂商允许的接口协议集合；单协议厂商（OpenAI / Anthropic）在 UI 上锁定协议切换。 */
+    val supportedProtocols: List<ApiProtocol> = ApiProtocol.entries,
     val anthropicBaseUrl: String,
     val groups: List<ModelGroup>,
     val iconRes: Int? = null,

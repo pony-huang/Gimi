@@ -9,7 +9,7 @@ import androidx.core.net.toUri
 
 @Singleton
 class BrowserTool @Inject constructor(private val queue: IntentActionQueue) {
-    @Tool(name = "open_url", description = "Opens an HTTP or HTTPS URL in an installed browser.") fun openUrl(@Param("HTTP or HTTPS URL to open.") url: String): Map<String, Any> {
+    @Tool(name = "open_url", description = "Opens an HTTP or HTTPS URL in the user's browser.") fun openUrl(@Param("HTTP or HTTPS URL to open.") url: String): Map<String, Any> {
         val uri = url.trim().toUri()
         if (uri.scheme !in setOf("http", "https") || uri.host.isNullOrBlank()) return mapOf("success" to false, "error" to "Use a complete http or https URL.")
         return queue.request("Open browser", "Open ${uri.host} in a browser.", Intent(Intent.ACTION_VIEW, uri))

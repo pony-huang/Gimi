@@ -9,7 +9,7 @@ import javax.inject.Singleton
 
 @Singleton
 class SettingsNavigationTool @Inject constructor(private val queue: IntentActionQueue) {
-    @Tool(name = "open_settings", description = "Opens the requested Android system settings page.") fun openSettings(@Param("Settings page: general, wireless, airplane, wifi, bluetooth, date, locale, input, display, security, location, storage.") page: String): Map<String, Any> {
+    @Tool(name = "open_settings", description = "Opens the requested system settings page.") fun openSettings(@Param("Settings page: general, wireless, airplane, wifi, bluetooth, date, locale, input, display, security, location, storage.") page: String): Map<String, Any> {
         val normalized = page.trim().lowercase()
         val action = when (normalized) {
             "general" -> Settings.ACTION_SETTINGS; "wireless" -> Settings.ACTION_WIRELESS_SETTINGS; "airplane" -> Settings.ACTION_AIRPLANE_MODE_SETTINGS

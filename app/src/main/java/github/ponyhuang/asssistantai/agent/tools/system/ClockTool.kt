@@ -15,7 +15,7 @@ import javax.inject.Singleton
 class ClockTool @Inject constructor(
     private val queue: IntentActionQueue,
 ) {
-    @Tool(name = "set_alarm", description = "Creates an alarm in the system clock for the requested time without showing a confirmation screen.", requireConfirmation = true)
+    @Tool(name = "set_alarm", description = "Creates an alarm in the system clock for the requested time.", requireConfirmation = true)
     fun setAlarm(
         @Param("Alarm hour in 24-hour time, from 0 to 23.") hour: Int,
         @Param("Alarm minute, from 0 to 59.") minute: Int,
@@ -35,7 +35,7 @@ class ClockTool @Inject constructor(
         )
     }
 
-    @Tool(name = "set_timer", description = "Starts a countdown timer in the system clock app for the requested duration without showing a confirmation screen.", requireConfirmation = true)
+    @Tool(name = "set_timer", description = "Starts a countdown timer in the system clock for the requested duration.", requireConfirmation = true)
     fun setTimer(
         @Param("Timer duration in seconds. Must be at least one second.") durationSeconds: Int,
         @Param("Optional label shown by the system timer app.") label: String? = null,

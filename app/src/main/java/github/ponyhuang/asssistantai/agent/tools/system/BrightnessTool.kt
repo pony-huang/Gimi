@@ -11,23 +11,23 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import androidx.core.net.toUri
 
-/** Controls the device's system screen brightness and automatic-brightness setting. */
+/** Controls screen brightness and auto-brightness. */
 @Singleton
 class BrightnessTool @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
     private val resolver = context.contentResolver
 
-    @Tool(name = "get_screen_brightness", description = "Gets the current screen brightness level, automatic-brightness setting, and whether the WRITE_SETTINGS permission is granted.")
+    @Tool(name = "get_screen_brightness", description = "Returns the current brightness level, auto-brightness setting, and whether permission to change brightness is granted.")
     fun getScreenBrightness(): Map<String, Any> = brightnessState()
 
     @Tool(
         name = "set_screen_brightness",
-        description = "Sets the screen brightness to an absolute level from 1 (darkest) to 255 (brightest). Disables automatic brightness. Requires the WRITE_SETTINGS permission; otherwise the request fails with a hint to grant it first.",
+        description = "Sets brightness to an absolute level and disables auto-brightness. Requires permission to change system settings.",
         requireConfirmation = true,
     )
     fun setScreenBrightness(
-        @Param("Target screen brightness from 1 (darkest) to 255 (brightest). This disables automatic brightness.")
+        @Param("Target brightness level from 0 to 255 (darkest to brightest).")
         level: Int,
     ): Map<String, Any> = writeBrightnessSetting {
         val appliedLevel = level.coerceIn(MINIMUM_BRIGHTNESS, MAXIMUM_BRIGHTNESS)
@@ -45,7 +45,7 @@ class BrightnessTool @Inject constructor(
 
     @Tool(
         name = "set_automatic_brightness",
-        description = "Enables or disables automatic screen brightness. Requires the WRITE_SETTINGS permission; otherwise the request fails with a hint to grant it first.",
+        description = "Enables or disables auto-brightness. Requires permission to change system settings.",
         requireConfirmation = true,
     )
     fun setAutomaticBrightness(
@@ -63,7 +63,7 @@ class BrightnessTool @Inject constructor(
 
     @Tool(
         name = "open_brightness_permission_settings",
-        description = "Opens the system screen that lets the user grant the WRITE_SETTINGS permission required to change screen brightness. Returns the current permission state.",
+        description = "Opens system settings so the user can grant permission to change brightness.",
     )
     fun openBrightnessPermissionSettings(): Map<String, Any> {
         if (Settings.System.canWrite(context)) {

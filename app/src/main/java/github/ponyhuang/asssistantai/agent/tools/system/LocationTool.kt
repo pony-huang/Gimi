@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Reads the device's geographic location from the system LocationManager. */
+/** Reads the device's geographic location. */
 @Singleton
 class LocationTool @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -30,10 +30,10 @@ class LocationTool @Inject constructor(
 
     @Tool(
         name = "get_current_location",
-        description = "Returns the device's current geographic location (latitude, longitude, accuracy, and other available fields) from enabled system providers. Requires the location permission and that location services are turned on.",
+        description = "Returns the device's current geographic location, including latitude, longitude, and accuracy. Requires location permission and that location services are turned on.",
     )
     fun getCurrentLocation(
-        @Param("If true, request a fresh fix from the highest-accuracy enabled provider and fall back to the cached fix on timeout. If false, return the cached fix without requesting an update. Defaults to true.")
+        @Param("If true, requests a fresh location update; otherwise returns the cached value. Defaults to true.")
         preferFreshFix: Boolean? = true,
     ): Map<String, Any> {
         if (!hasLocationPermission()) return locationPermissionError()
@@ -68,7 +68,7 @@ class LocationTool @Inject constructor(
 
     @Tool(
         name = "is_location_enabled",
-        description = "Returns whether any system location provider (fused, GPS, network) is currently enabled.",
+        description = "Returns whether any location service is currently enabled.",
     )
     fun isLocationEnabled(): Map<String, Any> {
         val manager = locationManager ?: return mapOf(

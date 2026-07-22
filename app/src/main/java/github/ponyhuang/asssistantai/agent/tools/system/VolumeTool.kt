@@ -8,7 +8,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Controls the device media-volume stream. */
+/** Controls the device media volume. */
 @Singleton
 class VolumeTool @Inject constructor(
     @ApplicationContext context: Context,
@@ -20,11 +20,11 @@ class VolumeTool @Inject constructor(
 
     @Tool(
         name = "set_media_volume",
-        description = "Sets the device media volume to an absolute level, ramping gradually so the change feels smooth. The applied level is clamped to the device's minimum and maximum.",
+        description = "Sets the device media volume to an absolute level. The applied level is clamped to the device's minimum and maximum.",
         requireConfirmation = true,
     )
     fun setMediaVolume(
-        @Param("Target media volume level. The volume changes gradually. Use get_media_volume first to learn the device's minimum and maximum levels.")
+        @Param("Target media volume level.")
         level: Int,
     ): Map<String, Int> {
         val minimum = audioManager.getStreamMinVolume(AudioManager.STREAM_MUSIC)
@@ -39,7 +39,7 @@ class VolumeTool @Inject constructor(
 
     @Tool(
         name = "adjust_media_volume",
-        description = "Adjusts the device media volume relative to its current level by a signed number of steps, ramping gradually so the change feels smooth.",
+        description = "Adjusts the device media volume relative to its current level by a signed number of steps.",
         requireConfirmation = true,
     )
     fun adjustMediaVolume(

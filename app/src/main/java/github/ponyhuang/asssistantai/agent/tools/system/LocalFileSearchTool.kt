@@ -24,7 +24,7 @@ class LocalFileSearchTool @Inject constructor(
 ) {
     @Tool(
         name = "request_media_file_permissions",
-        description = "Launches Android's runtime prompt for permission to search shared images, videos, and audio files.",
+        description = "Asks the user to grant permission to search shared images, videos, and audio files.",
         requireConfirmation = true,
     )
     fun requestMediaFilePermissions(): Map<String, Any> = queue.request(
@@ -35,7 +35,7 @@ class LocalFileSearchTool @Inject constructor(
 
     @Tool(
         name = "search_media_files",
-        description = "Searches shared image, video, and audio file names on this device. Returns up to 50 newest matching files and their content URIs. Requires the matching Android media permission.",
+        description = "Searches shared images, videos, and audio files by name on this device. Returns up to 50 newest matches. Requires permission to access the requested media type.",
         requireConfirmation = true,
     )
     fun searchMediaFiles(
@@ -93,10 +93,10 @@ class LocalFileSearchTool @Inject constructor(
 
     @Tool(
         name = "open_local_file",
-        description = "Opens a local media-search result or a document-search result in a compatible app for preview. The URI must have been returned by a local search tool.",
+        description = "Opens a file found by a local search in a compatible app for preview. The identifier must come from search_media_files or search_documents.",
         requireConfirmation = true,
     )
-    fun openLocalFile(@Param("The contentUri returned by search_media_files or search_documents.") contentUri: String): Map<String, Any> {
+    fun openLocalFile(@Param("The file identifier returned by search_media_files or search_documents.") contentUri: String): Map<String, Any> {
         val uri = runCatching { Uri.parse(contentUri) }.getOrNull() ?: return error("contentUri is invalid.")
         if (uri.scheme != "content" || !isAllowedUri(uri)) return error(
             "contentUri is not an accessible media result or a file from an authorized document directory.",

@@ -9,7 +9,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Provides access to installed apps that expose a launcher activity. */
+/** Provides access to installed apps on the device. */
 @Singleton
 class PackageManagerTool @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -20,16 +20,16 @@ class PackageManagerTool @Inject constructor(
 
     @Tool(
         name = "list_installed_apps",
-        description = "Lists currently installed, launchable apps. Each result contains only its display name and package name.",
+        description = "Lists apps currently installed on the device, returning each app's display name and ID.",
     )
     fun listInstalledApps(): Map<String, Any> = appListResult(launchableApps())
 
     @Tool(
         name = "search_installed_apps",
-        description = "Searches currently installed, launchable apps by display name or package name. Each result contains only its display name and package name.",
+        description = "Searches installed apps by display name or ID.",
     )
     fun searchInstalledApps(
-        @Param("A full or partial app display name or package name to search for.")
+        @Param("A full or partial app display name or ID to search for.")
         query: String,
     ): Map<String, Any> {
         val normalizedQuery = query.trim()
@@ -43,10 +43,10 @@ class PackageManagerTool @Inject constructor(
 
     @Tool(
         name = "is_app_installed",
-        description = "Returns whether a currently installed, launchable app with the supplied package name is available.",
+        description = "Returns whether an installed app with the supplied ID is available.",
     )
     fun isAppInstalled(
-        @Param("The Android package name to check, for example com.example.app.")
+        @Param("The app ID to check, for example com.example.app.")
         packageName: String,
     ): Map<String, Any> {
         val normalizedPackageName = packageName.trim()
@@ -61,10 +61,10 @@ class PackageManagerTool @Inject constructor(
 
     @Tool(
         name = "open_app",
-        description = "Opens the launch activity for an installed app. Supply its exact Android package name, obtained from list_installed_apps or search_installed_apps.",
+        description = "Opens an installed app. Supply its exact ID, obtained from list_installed_apps or search_installed_apps.",
     )
     fun openApp(
-        @Param("The exact Android package name of the app to open.")
+        @Param("The exact app ID of the app to open.")
         packageName: String,
     ): Map<String, Any> {
         val normalizedPackageName = packageName.trim()

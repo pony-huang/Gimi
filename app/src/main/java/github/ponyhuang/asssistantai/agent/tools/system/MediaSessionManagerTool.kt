@@ -16,13 +16,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Controls another app's currently playing media (next / previous / play / pause).
- *
- * Relies on Android's [MediaSessionManager] cross-app transport API, which requires
- * the calling app to be a registered notification listener **and** for the user to
- * have granted it notification access via Settings → Notifications → Device & app
- * notifications. When that permission is missing, the transport calls return a
- * clear error pointing the model at [requestNotificationAccess].
+ * Controls playback in another app's currently active media session. All media
+ * control tools require notification access, granted through
+ * request_notification_access.
  */
 @Singleton
 class MediaSessionManagerTool @Inject constructor(
@@ -34,8 +30,7 @@ class MediaSessionManagerTool @Inject constructor(
 
     @Tool(
         name = "has_notification_access",
-        description = "Reports whether this app currently has notification listener access. " +
-            "Required before any other media_session tool can control another app's playback.",
+        description = "Returns whether the app has permission to control other apps' media playback.",
     )
     fun hasNotificationAccess(): Map<String, Any> = mapOf(
         "success" to true,
@@ -44,8 +39,7 @@ class MediaSessionManagerTool @Inject constructor(
 
     @Tool(
         name = "request_notification_access",
-        description = "Opens the system notification access settings page so the user can grant " +
-            "this app the ability to read and control other apps' media sessions.",
+        description = "Opens system settings so the user can grant permission to control other apps' media playback.",
     )
     fun requestNotificationAccess(): Map<String, Any> {
         if (isNotificationAccessGranted()) {
@@ -65,8 +59,7 @@ class MediaSessionManagerTool @Inject constructor(
 
     @Tool(
         name = "list_active_media_sessions",
-        description = "Lists media sessions that are currently active on the device. " +
-            "Requires notification access.",
+        description = "Lists media sessions that are currently active on the device.",
     )
     fun listActiveMediaSessions(): Map<String, Any> {
         if (!isNotificationAccessGranted()) return notificationAccessRequired()
@@ -93,42 +86,42 @@ class MediaSessionManagerTool @Inject constructor(
 
     @Tool(
         name = "skip_to_next_track",
-        description = "Sends skip-to-next to the most recent active media session. Requires notification access.",
+        description = "Sends skip-to-next to the most recent active media session.",
         requireConfirmation = true,
     )
     fun skipToNextTrack(): Map<String, Any> = sendTransportCommand(MediaAction.NEXT)
 
     @Tool(
         name = "skip_to_previous_track",
-        description = "Sends skip-to-previous to the most recent active media session. Requires notification access.",
+        description = "Sends skip-to-previous to the most recent active media session.",
         requireConfirmation = true,
     )
     fun skipToPreviousTrack(): Map<String, Any> = sendTransportCommand(MediaAction.PREVIOUS)
 
     @Tool(
         name = "play_media_session",
-        description = "Resumes playback on the most recent active media session. Requires notification access.",
+        description = "Resumes playback on the most recent active media session.",
         requireConfirmation = true,
     )
     fun playMediaSession(): Map<String, Any> = sendTransportCommand(MediaAction.PLAY)
 
     @Tool(
         name = "pause_media_session",
-        description = "Pauses playback on the most recent active media session. Requires notification access.",
+        description = "Pauses playback on the most recent active media session.",
         requireConfirmation = true,
     )
     fun pauseMediaSession(): Map<String, Any> = sendTransportCommand(MediaAction.PAUSE)
 
     @Tool(
         name = "stop_media_session",
-        description = "Stops playback on the most recent active media session. Requires notification access.",
+        description = "Stops playback on the most recent active media session.",
         requireConfirmation = true,
     )
     fun stopMediaSession(): Map<String, Any> = sendTransportCommand(MediaAction.STOP)
 
     @Tool(
         name = "toggle_play_pause_media_session",
-        description = "Toggles play / pause on the most recent active media session: pauses when playing, plays otherwise. Requires notification access.",
+        description = "Toggles play / pause on the most recent active media session: pauses when playing, plays otherwise.",
         requireConfirmation = true,
     )
     fun togglePlayPauseMediaSession(): Map<String, Any> {
@@ -152,7 +145,7 @@ class MediaSessionManagerTool @Inject constructor(
     @Tool(
         name = "media_control",
         description = "Dispatches a transport command to the most recent active media session. " +
-            "Action must be one of: next, previous, play, pause, stop. Requires notification access.",
+            "Action must be one of: next, previous, play, pause, stop.",
         requireConfirmation = true,
     )
     fun mediaControl(

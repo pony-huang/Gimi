@@ -19,17 +19,17 @@ class ScreenTimeoutTool @Inject constructor(
 
     @Tool(
         name = "get_screen_timeout",
-        description = "Gets the current screen timeout in seconds, the supported minimum/maximum range, and whether the WRITE_SETTINGS permission is granted.",
+        description = "Returns the current screen timeout in seconds, the supported range, and whether permission to change it is granted.",
     )
     fun getScreenTimeout(): Map<String, Any> = screenTimeoutState()
 
     @Tool(
         name = "set_screen_timeout",
-        description = "Sets the screen timeout in seconds. The value is clamped to the supported range. Requires the WRITE_SETTINGS permission; otherwise the request fails with a hint to grant it first.",
+        description = "Sets the screen timeout in seconds. Requires permission to change system settings.",
         requireConfirmation = true,
     )
     fun setScreenTimeout(
-        @Param("Target screen timeout in seconds. Will be clamped to the supported range; use get_screen_timeout to inspect it.")
+        @Param("Target screen timeout in seconds.")
         seconds: Int,
     ): Map<String, Any> = writeScreenTimeoutSetting {
         val appliedSeconds = seconds.coerceIn(MINIMUM_TIMEOUT_SECONDS, MAXIMUM_TIMEOUT_SECONDS)
@@ -46,7 +46,7 @@ class ScreenTimeoutTool @Inject constructor(
 
     @Tool(
         name = "open_screen_timeout_permission_settings",
-        description = "Opens the system screen that lets the user grant the WRITE_SETTINGS permission required to change the screen timeout. Returns the current permission state.",
+        description = "Opens system settings so the user can grant permission to change the screen timeout.",
     )
     fun openScreenTimeoutPermissionSettings(): Map<String, Any> {
         if (Settings.System.canWrite(context)) {

@@ -18,7 +18,7 @@ import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Reads and creates events in the device calendar provider. */
+/** Reads and creates events in the device calendar. */
 @Singleton
 class CalendarTool @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -89,7 +89,7 @@ class CalendarTool @Inject constructor(
 
     @Tool(name = "create_calendar_event", description = "Creates a calendar event in a selected device calendar. Requires calendar write permission.", requireConfirmation = true)
     fun createCalendarEvent(
-        @Param("Calendar ID returned by listCalendars, represented as a decimal string.") calendarId: String,
+        @Param("Calendar ID returned by list_calendars.") calendarId: String,
         @Param("Event title.") title: String,
         @Param("Event start time in yyyymmddhhmmss format, interpreted in the device's local timezone.") startTimeMillis: String,
         @Param("Event end time in yyyymmddhhmmss format, interpreted in the device's local timezone. It must be later than the start time.") endTimeMillis: String,

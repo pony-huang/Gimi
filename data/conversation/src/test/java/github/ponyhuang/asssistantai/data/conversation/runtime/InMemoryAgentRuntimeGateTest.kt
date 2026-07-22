@@ -15,7 +15,7 @@ class InMemoryAgentRuntimeGateTest {
     @Test
     fun activeTasksBlockMutationsUntilEveryLeaseIsReleased() = runTest {
         val gate = InMemoryAgentRuntimeGate()
-        val chat = gate.acquire(AgentTaskSource.CHAT)
+        val chat = gate.acquire(AgentTaskSource.CHAT, sessionId = "session-a")
         val voice = gate.acquire(AgentTaskSource.BLUETOOTH_VOICE)
 
         assertSame(
@@ -23,6 +23,10 @@ class InMemoryAgentRuntimeGateTest {
             gate.runMutation { error("must not run") },
         )
         assertEquals(2, (gate.state.value as AgentRuntimeState.Busy).tasks.size)
+        assertEquals(
+            "session-a",
+            (gate.state.value as AgentRuntimeState.Busy).tasks.first().sessionId,
+        )
 
         chat.release()
         assertSame(

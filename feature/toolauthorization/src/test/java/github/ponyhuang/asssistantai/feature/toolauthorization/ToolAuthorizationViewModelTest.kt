@@ -79,7 +79,12 @@ private class FakeGate(busy: Boolean) : AgentRuntimeGate {
     override val state = MutableStateFlow<AgentRuntimeState>(
         if (busy) {
             AgentRuntimeState.Busy(
-                listOf(ActiveAgentTask(AgentTaskSource.CHAT, AgentTaskPhase.GENERATING)),
+                listOf(
+                    ActiveAgentTask(
+                        source = AgentTaskSource.CHAT,
+                        phase = AgentTaskPhase.GENERATING,
+                    ),
+                ),
             )
         } else {
             AgentRuntimeState.Idle
@@ -88,6 +93,7 @@ private class FakeGate(busy: Boolean) : AgentRuntimeGate {
 
     override suspend fun acquire(
         source: AgentTaskSource,
+        sessionId: String?,
         phase: AgentTaskPhase,
     ): AgentRunLease = error("not used")
 

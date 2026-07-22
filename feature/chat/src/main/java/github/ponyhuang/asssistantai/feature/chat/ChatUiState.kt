@@ -7,6 +7,7 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
 import github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackState
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentTaskPhase
 
 /**
  * The current UI state of the chat conversation.
@@ -42,9 +43,9 @@ data class ChatUiState(
     val messages: List<Message> = emptyList(),
     val sessionId: String = "",
     val isAgentRunning: Boolean = false,
-    val isAgentMutationBlocked: Boolean = false,
     val turnComplete: Boolean = false,
     val conversations: List<Conversation> = emptyList(),
+    val conversationTaskStatuses: Map<String, ConversationTaskStatus> = emptyMap(),
     val isInitializing: Boolean = false,
     val availableModelServices: List<ModelService> = emptyList(),
     val modelCatalogLoadState: CatalogLoadState = CatalogLoadState.Loading,
@@ -62,7 +63,16 @@ val ChatUiState.pendingToolConfirmation: PendingToolConfirmation?
 sealed interface ChatNotice {
     data object ConfigureChatModel : ChatNotice
     data object ModelSwitchBlocked : ChatNotice
+    data object ParallelTaskLimitReached : ChatNotice
+    data object ActiveConversationDeleteBlocked : ChatNotice
     data class Message(val text: String) : ChatNotice
+}
+
+sealed interface ConversationTaskStatus {
+    data class Running(val phase: AgentTaskPhase) : ConversationTaskStatus
+    data class WaitingForConfirmation(val count: Int) : ConversationTaskStatus
+    data object Completed : ConversationTaskStatus
+    data object Failed : ConversationTaskStatus
 }
 
 fun ChatUiState.getCurrentUserMessage(): Message? =

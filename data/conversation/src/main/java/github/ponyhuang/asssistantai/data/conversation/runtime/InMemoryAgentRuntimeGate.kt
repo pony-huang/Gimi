@@ -25,11 +25,16 @@ class InMemoryAgentRuntimeGate @Inject constructor() : AgentRuntimeGate {
 
     override suspend fun acquire(
         source: AgentTaskSource,
+        sessionId: String?,
         phase: AgentTaskPhase,
     ): AgentRunLease = mutationMutex.withLock {
         synchronized(tasks) {
             val token = Any()
-            tasks[token] = ActiveAgentTask(source = source, phase = phase)
+            tasks[token] = ActiveAgentTask(
+                source = source,
+                sessionId = sessionId,
+                phase = phase,
+            )
             publishState()
             Lease(token)
         }

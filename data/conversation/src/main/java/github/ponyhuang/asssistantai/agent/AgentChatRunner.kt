@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 
 /**
  * Agent 聊天运行器 — 把 ADK `InMemoryRunner.runAsync(...)` 封装为一个简洁的 `Flow<Event>`。
@@ -38,22 +39,20 @@ import github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment
  * 线程模型：所有调用都通过协程 `Flow` 完成，框架本身不持有任何额外线程。
  */
 class AgentChatRunner(
-    private val factory: suspend () -> BaseAgent,
+    private val factory: suspend (ModelSelection?) -> BaseAgent,
     private val sessionService: SessionService,
     private val artifactService: ArtifactService?,
     private val configurationRevision: () -> Any = { Unit },
 ) {
 
-    /**
-     * 当前生效的 runner；[recreate] 会整体替换为新工厂产出的 agent 上跑出来的实例。
-     *
-     * 声明 `@Volatile` 是因为 [recreate] 由主线程触发（顶栏"新建对话"按钮），
-     * [send] 在 `Dispatchers.IO` 上消费 `runAsync` 返回的 Flow——需要 happens-before。
-     */
-    @Volatile
-    private var runner: InMemoryRunner? = null
-    @Volatile
-    private var runnerRevision: Any? = null
+    /** 每个会话持有独立 Runner；模型选择或配置版本变化时按会话重建。 */
+    private data class RunnerEntry(
+        val selection: ModelSelection?,
+        val revision: Any,
+        val runner: InMemoryRunner,
+    )
+
+    private val runners = mutableMapOf<String, RunnerEntry>()
     private val runnerMutex = Mutex()
 
     @OptIn(ExperimentalResumabilityFeature::class)
@@ -75,8 +74,7 @@ class AgentChatRunner(
      */
     suspend fun recreate() {
         runnerMutex.withLock {
-            runner = buildRunner(factory())
-            runnerRevision = configurationRevision()
+            runners.clear()
         }
     }
 
@@ -88,9 +86,12 @@ class AgentChatRunner(
      */
     suspend fun invalidate() {
         runnerMutex.withLock {
-            runner = null
-            runnerRevision = null
+            runners.clear()
         }
+    }
+
+    suspend fun releaseSession(sessionId: String) {
+        runnerMutex.withLock { runners.remove(sessionId) }
     }
 
     /**
@@ -105,11 +106,12 @@ class AgentChatRunner(
     suspend fun send(
         userId: String,
         sessionId: String,
+        selection: ModelSelection? = null,
         text: String,
         imageAttachments: List<ImageAttachment> = emptyList(),
     ): Flow<Event> {
         // 快照当前 runner；中途 recreate() 不会改本次 send 的行为。
-        val activeRunner = currentRunnerForNewTurn()
+        val activeRunner = currentRunnerForNewTurn(sessionId, selection)
         val parts = buildList {
             text.takeIf(String::isNotBlank)?.let { add(Part(text = it)) }
             imageAttachments.forEach { image ->
@@ -137,7 +139,7 @@ class AgentChatRunner(
         confirmationCallId: String,
         confirmed: Boolean,
     ): Flow<Event> {
-        val activeRunner = currentRunnerForResume()
+        val activeRunner = currentRunnerForResume(sessionId)
         val confirmationResponse = Content(
             role = Role.USER,
             parts = listOf(
@@ -160,23 +162,26 @@ class AgentChatRunner(
         ).flowOn(Dispatchers.IO)
     }
 
-    private suspend fun currentRunnerForNewTurn(): InMemoryRunner {
+    private suspend fun currentRunnerForNewTurn(
+        sessionId: String,
+        selection: ModelSelection?,
+    ): InMemoryRunner {
         val expectedRevision = configurationRevision()
-        runner?.takeIf { runnerRevision == expectedRevision }?.let { return it }
         return runnerMutex.withLock {
-            runner?.takeIf { runnerRevision == expectedRevision } ?: buildRunner(factory()).also {
-                runner = it
-                runnerRevision = expectedRevision
-            }
+            runners[sessionId]
+                ?.takeIf { it.selection == selection && it.revision == expectedRevision }
+                ?.runner
+                ?: buildRunner(factory(selection)).also { newRunner ->
+                    runners[sessionId] = RunnerEntry(selection, expectedRevision, newRunner)
+                }
         }
     }
 
-    private suspend fun currentRunnerForResume(): InMemoryRunner = runner ?: runnerMutex.withLock {
-        runner ?: buildRunner(factory()).also {
-            runner = it
-            runnerRevision = configurationRevision()
+    private suspend fun currentRunnerForResume(sessionId: String): InMemoryRunner =
+        runnerMutex.withLock {
+            runners[sessionId]?.runner
+                ?: error("No active runner is available for session $sessionId.")
         }
-    }
 
     companion object {
         const val APP_NAME: String = "AsssistantaiApp"

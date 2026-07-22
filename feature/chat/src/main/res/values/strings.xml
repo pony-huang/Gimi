@@ -48,6 +48,11 @@
     <string name="chat_drawer_current_session_protected">当前会话不可删除</string>
     <string name="chat_drawer_switch_first">请先切换到其他会话</string>
     <string name="chat_drawer_delete_conversation">删除对话</string>
+    <string name="chat_drawer_active_session_protected">任务运行或等待确认时不可删除</string>
+    <string name="chat_task_running">任务运行中</string>
+    <string name="chat_task_waiting_confirmation">等待确认，%1$d 项</string>
+    <string name="chat_task_completed">任务已完成</string>
+    <string name="chat_task_failed">任务失败</string>
 
     <!-- MessageBubble 助手回复操作 -->
     <string name="chat_message_copied">已复制</string>
@@ -62,6 +67,8 @@
     <!-- ChatNotice 文案（由 :app 的 LaunchedEffect 解析为 Toast/通知） -->
     <string name="chat_notice_configure_chat_model">请先在模型服务中配置并启用聊天模型</string>
     <string name="chat_notice_model_switch_blocked">正在生成回复，完成后再切换模型</string>
+    <string name="chat_notice_parallel_limit">最多同时运行 3 个会话任务</string>
+    <string name="chat_notice_active_delete_blocked">任务运行或等待确认时不可删除该会话</string>
 
     <!-- 工具确认卡片：未在本地目录中找到的工具 -->
     <string name="chat_tool_unknown_description">远程工具请求执行操作</string>

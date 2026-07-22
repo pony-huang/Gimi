@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,11 +19,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -41,12 +45,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.conversation.model.Conversation
 import github.ponyhuang.asssistantai.feature.chat.R
+import github.ponyhuang.asssistantai.feature.chat.ConversationTaskStatus
 import github.ponyhuang.asssistantai.ui.theme.AsssistantaiTheme
 
 /**
@@ -71,6 +78,7 @@ fun ChatDrawer(
     drawerState: DrawerState,
     conversations: List<Conversation>,
     currentSessionId: String,
+    conversationTaskStatuses: Map<String, ConversationTaskStatus> = emptyMap(),
     isConversationSwitchEnabled: Boolean = true,
     onConversationClick: (Conversation) -> Unit,
     onDeleteClick: (Conversation) -> Unit,
@@ -88,6 +96,7 @@ fun ChatDrawer(
                 HistoryDrawerContent(
                     conversations = conversations,
                     currentSessionId = currentSessionId,
+                    conversationTaskStatuses = conversationTaskStatuses,
                     isConversationSwitchEnabled = isConversationSwitchEnabled,
                     onConversationClick = onConversationClick,
                     onDeleteClick = onDeleteClick,
@@ -108,6 +117,7 @@ fun ChatDrawer(
 private fun HistoryDrawerContent(
     conversations: List<Conversation>,
     currentSessionId: String,
+    conversationTaskStatuses: Map<String, ConversationTaskStatus>,
     isConversationSwitchEnabled: Boolean,
     onConversationClick: (Conversation) -> Unit,
     onDeleteClick: (Conversation) -> Unit,
@@ -148,6 +158,7 @@ private fun HistoryDrawerContent(
                 ConversationListItem(
                     conversation = conversation,
                     isCurrent = conversation.id == currentSessionId,
+                    taskStatus = conversationTaskStatuses[conversation.id],
                     enabled = isConversationSwitchEnabled,
                     onClick = { onConversationClick(conversation) },
                     onLongClick = { menuConversation = conversation },
@@ -187,6 +198,8 @@ private fun HistoryDrawerContent(
         menuConversation?.let { conversation ->
             ConversationActionSheet(
                 isCurrent = conversation.id == currentSessionId,
+                isActive = conversationTaskStatuses[conversation.id] is ConversationTaskStatus.Running ||
+                    conversationTaskStatuses[conversation.id] is ConversationTaskStatus.WaitingForConfirmation,
                 onDismiss = { menuConversation = null },
                 onDeleteClick = {
                     onDeleteClick(conversation)
@@ -208,6 +221,7 @@ private fun HistoryDrawerContent(
 private fun ConversationListItem(
     conversation: Conversation,
     isCurrent: Boolean,
+    taskStatus: ConversationTaskStatus?,
     enabled: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
@@ -215,6 +229,16 @@ private fun ConversationListItem(
 ) {
     val containerColor = if (isCurrent) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface
     val contentColor = if (isCurrent) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
+    val taskContentDescription = when (taskStatus) {
+        is ConversationTaskStatus.Running -> stringResource(R.string.chat_task_running)
+        is ConversationTaskStatus.WaitingForConfirmation -> stringResource(
+            R.string.chat_task_waiting_confirmation,
+            taskStatus.count,
+        )
+        ConversationTaskStatus.Completed -> stringResource(R.string.chat_task_completed)
+        ConversationTaskStatus.Failed -> stringResource(R.string.chat_task_failed)
+        null -> ""
+    }
 
     Row(
         modifier = modifier
@@ -236,7 +260,37 @@ private fun ConversationListItem(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             color = if (enabled) contentColor else contentColor.copy(alpha = 0.45f),
+            modifier = Modifier.weight(1f),
         )
+        when (taskStatus) {
+            is ConversationTaskStatus.Running -> CircularProgressIndicator(
+                modifier = Modifier
+                    .size(20.dp)
+                    .semantics { contentDescription = taskContentDescription },
+                strokeWidth = 2.dp,
+            )
+            is ConversationTaskStatus.WaitingForConfirmation -> Text(
+                text = taskStatus.count.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .padding(start = 12.dp)
+                    .semantics { contentDescription = taskContentDescription },
+            )
+            ConversationTaskStatus.Completed -> Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = stringResource(R.string.chat_task_completed),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
+            ConversationTaskStatus.Failed -> Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = stringResource(R.string.chat_task_failed),
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(20.dp),
+            )
+            null -> Unit
+        }
     }
 }
 
@@ -244,6 +298,7 @@ private fun ConversationListItem(
 @Composable
 private fun ConversationActionSheet(
     isCurrent: Boolean,
+    isActive: Boolean,
     onDismiss: () -> Unit,
     onDeleteClick: () -> Unit,
 ) {
@@ -252,8 +307,11 @@ private fun ConversationActionSheet(
             headlineContent = {
                 Text(
                     stringResource(
-                        if (isCurrent) R.string.chat_drawer_current_session_protected
-                        else R.string.chat_drawer_delete_conversation,
+                        when {
+                            isCurrent -> R.string.chat_drawer_current_session_protected
+                            isActive -> R.string.chat_drawer_active_session_protected
+                            else -> R.string.chat_drawer_delete_conversation
+                        },
                     ),
                 )
             },
@@ -267,7 +325,7 @@ private fun ConversationActionSheet(
                 )
             },
             modifier = Modifier.combinedClickable(
-                enabled = !isCurrent,
+                enabled = !isCurrent && !isActive,
                 onClick = onDeleteClick,
             ),
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),

@@ -15,6 +15,7 @@ import github.ponyhuang.asssistantai.agent.AgentChatRunner
 import github.ponyhuang.asssistantai.agent.AgentFactory
 import github.ponyhuang.asssistantai.agent.LocalToolCatalog
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
+import github.ponyhuang.asssistantai.data.modelcatalog.toData
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.LocalToolDefinitionSource
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.ToolAuthorizationRepository
 import github.ponyhuang.asssistantai.domain.mcp.repository.McpRepository
@@ -68,9 +69,9 @@ object AgentModule {
         toolAuthorization: ToolAuthorizationRepository,
         mcpRepository: McpRepository,
     ): AgentChatRunner = AgentChatRunner(
-        factory = {
+        factory = { selection ->
             modelServices.awaitReady()
-            agentFactory.create()
+            agentFactory.create(selection?.toData())
         },
         sessionService = sessionService,
         artifactService = artifactService,
@@ -90,7 +91,7 @@ object AgentModule {
         toolAuthorization: ToolAuthorizationRepository,
         mcpRepository: McpRepository,
     ): AgentChatRunner = AgentChatRunner(
-        factory = {
+        factory = { _ ->
             modelServices.awaitReady()
             agentFactory.create(modelServices.defaultSelection())
         },

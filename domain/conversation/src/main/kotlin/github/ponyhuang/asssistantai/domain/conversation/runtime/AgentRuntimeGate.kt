@@ -16,6 +16,7 @@ enum class AgentTaskPhase {
 
 data class ActiveAgentTask(
     val source: AgentTaskSource,
+    val sessionId: String? = null,
     val phase: AgentTaskPhase,
 )
 
@@ -45,6 +46,7 @@ interface AgentRuntimeGate {
 
     suspend fun acquire(
         source: AgentTaskSource,
+        sessionId: String? = null,
         phase: AgentTaskPhase = AgentTaskPhase.GENERATING,
     ): AgentRunLease
 

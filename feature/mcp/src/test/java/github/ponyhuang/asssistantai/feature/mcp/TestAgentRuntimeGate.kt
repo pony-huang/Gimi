@@ -10,7 +10,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 internal class TestAgentRuntimeGate : AgentRuntimeGate {
     override val state = MutableStateFlow<AgentRuntimeState>(AgentRuntimeState.Idle)
-    override suspend fun acquire(source: AgentTaskSource, phase: AgentTaskPhase): AgentRunLease =
+    override suspend fun acquire(
+        source: AgentTaskSource,
+        sessionId: String?,
+        phase: AgentTaskPhase,
+    ): AgentRunLease =
         error("not used")
     override suspend fun <T> runMutation(block: suspend () -> T): AgentMutationResult<T> =
         AgentMutationResult.Applied(block())

@@ -11,7 +11,6 @@ import github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment
 import github.ponyhuang.asssistantai.domain.conversation.model.ToolConfirmationRequest
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
@@ -20,25 +19,23 @@ import kotlinx.coroutines.flow.map
 @Singleton
 class AdkChatAgentRepository @Inject constructor(
     private val runner: AgentChatRunner,
-    private val modelServices: ModelCatalogRepository,
 ) : ChatAgentRepository {
-    override suspend fun activateModel(selection: ModelSelection?): Result<Unit> = runCatching {
-        modelServices.setRuntimeSelection(selection)
-        if (selection == null) runner.invalidate() else runner.recreate()
-    }
-
-    override suspend fun recreate(): Result<Unit> = runCatching { runner.recreate() }
-
     override suspend fun send(
         sessionId: String,
+        selection: ModelSelection,
         text: String,
         imageAttachments: List<ImageAttachment>,
     ): Flow<ChatRunEvent> = runner.send(
         userId = USER_ID,
         sessionId = sessionId,
+        selection = selection,
         text = text,
         imageAttachments = imageAttachments,
     ).map { it.toDomain() }
+
+    override suspend fun releaseSession(sessionId: String) {
+        runner.releaseSession(sessionId)
+    }
 
     override suspend fun respondToToolConfirmation(
         sessionId: String,

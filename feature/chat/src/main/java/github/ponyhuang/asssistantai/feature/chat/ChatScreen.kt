@@ -122,7 +122,6 @@ fun ChatScaffold(
         messages.filter { message -> message.isVisibleInChat(showToolActivity) }
     }
     val isAgentRunning = state.isAgentRunning
-    val isAgentMutationBlocked = state.isAgentMutationBlocked
     val speechPlaybackState = state.speechPlaybackState
     val pendingToolConfirmation = state.pendingToolConfirmation
     // 只要用户仍停留在底部，就让流式内容增长持续跟随；用户向上浏览历史时则停止抢占滚动。
@@ -166,7 +165,7 @@ fun ChatScaffold(
         topBar = {
             ChatTopBar(
                 state = state,
-                isAgentRunning = isAgentMutationBlocked,
+                isAgentRunning = isAgentRunning,
                 onOpenDrawer = onOpenDrawer,
                 onOpenSettings = onOpenSettings,
                 onConfigureModels = onConfigureModels,
@@ -393,7 +392,6 @@ private fun ChatTopBar(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
                     onClick = onNewConversation,
-                    enabled = !isAgentRunning,
                     modifier = Modifier.size(48.dp),
                 ) {
                     Icon(

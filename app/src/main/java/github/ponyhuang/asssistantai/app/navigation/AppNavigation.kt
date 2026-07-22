@@ -72,6 +72,8 @@ fun MainScreen(
     val context = LocalContext.current
     val chatNoticeConfigureChatModel = stringResource(ChatR.string.chat_notice_configure_chat_model)
     val chatNoticeModelSwitchBlocked = stringResource(ChatR.string.chat_notice_model_switch_blocked)
+    val chatNoticeParallelLimit = stringResource(ChatR.string.chat_notice_parallel_limit)
+    val chatNoticeActiveDeleteBlocked = stringResource(ChatR.string.chat_notice_active_delete_blocked)
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val backStack = rememberNavBackStack(AppRoute.Chat)
@@ -94,6 +96,8 @@ fun MainScreen(
         val message = when (val notice = uiState.notice) {
             ChatNotice.ConfigureChatModel -> chatNoticeConfigureChatModel
             ChatNotice.ModelSwitchBlocked -> chatNoticeModelSwitchBlocked
+            ChatNotice.ParallelTaskLimitReached -> chatNoticeParallelLimit
+            ChatNotice.ActiveConversationDeleteBlocked -> chatNoticeActiveDeleteBlocked
             is ChatNotice.Message -> notice.text
             null -> return@LaunchedEffect
         }
@@ -105,7 +109,8 @@ fun MainScreen(
         drawerState = drawerState,
         conversations = uiState.conversations,
         currentSessionId = currentSessionId,
-        isConversationSwitchEnabled = !uiState.isAgentMutationBlocked,
+        conversationTaskStatuses = uiState.conversationTaskStatuses,
+        isConversationSwitchEnabled = true,
         onConversationClick = { conversation ->
             viewModel.switchSession(conversation.id)
             returnToChat()

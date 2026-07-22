@@ -6,12 +6,9 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import kotlinx.coroutines.flow.Flow
 
 interface ChatAgentRepository {
-    suspend fun activateModel(selection: ModelSelection?): Result<Unit>
-
-    suspend fun recreate(): Result<Unit>
-
     suspend fun send(
         sessionId: String,
+        selection: ModelSelection,
         text: String,
         imageAttachments: List<ImageAttachment>,
     ): Flow<ChatRunEvent>
@@ -21,6 +18,8 @@ interface ChatAgentRepository {
         confirmationCallId: String,
         confirmed: Boolean,
     ): Flow<ChatRunEvent>
+
+    suspend fun releaseSession(sessionId: String)
 }
 
 interface ChatAttachmentRepository {

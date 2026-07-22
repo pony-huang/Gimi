@@ -42,6 +42,11 @@
     <string name="chat_drawer_current_session_protected">The current session cannot be deleted</string>
     <string name="chat_drawer_switch_first">Please switch to another session first</string>
     <string name="chat_drawer_delete_conversation">Delete conversation</string>
+    <string name="chat_drawer_active_session_protected">A running task or pending confirmation must finish first</string>
+    <string name="chat_task_running">Task running</string>
+    <string name="chat_task_waiting_confirmation">Waiting for %1$d confirmation(s)</string>
+    <string name="chat_task_completed">Task completed</string>
+    <string name="chat_task_failed">Task failed</string>
 
     <string name="chat_message_copied">Copied</string>
     <string name="chat_message_copy">Copy reply</string>
@@ -54,6 +59,8 @@
     <!-- ChatNotice text (consumed by :app LaunchedEffect -> Toast/notification) -->
     <string name="chat_notice_configure_chat_model">Please configure and enable a chat model in Model services first</string>
     <string name="chat_notice_model_switch_blocked">The assistant is still generating a reply. Please wait before switching models.</string>
+    <string name="chat_notice_parallel_limit">Up to 3 conversation tasks can run at once</string>
+    <string name="chat_notice_active_delete_blocked">A running task or pending confirmation prevents deleting this conversation</string>
 
     <string name="chat_tool_unknown_description">A remote tool is requesting to perform an action</string>
 </resources>

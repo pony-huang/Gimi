@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -92,9 +93,8 @@ fun ChatBubbleText(
  * 消息气泡 — 把 [Message] 渲染到 [ChatBubble] 的 content slot 里。
  *
  * 渲染顺序：
- * 1. 工具调用 chip 行（`Message.functionCalls`）
- * 2. 工具响应 chip 行（`Message.functionResponses`）
- * 3. 每个 [TextPart]：
+ * 1. 工具活动 chip 行（call/response 按 id 配对为单 chip，确认协议信令已过滤）
+ * 2. 每个 [TextPart]：
  *    - `thought == true` → 走 [ThoughtBubble]（同样支持流式渲染）
  *    - 否则 → 流式 Markdown（经由 [TextContent] 收口）
  *
@@ -107,6 +107,9 @@ fun MessageBubble(
     message: Message,
     partChannelProvider: (partId: String) -> ReceiveChannel<String>?,
     showToolActivity: Boolean = true,
+    isAgentRunning: Boolean = false,
+    rejectedToolNames: Set<String> = emptySet(),
+    awaitingConfirmationToolNames: Set<String> = emptySet(),
     speechPlaybackState: SpeechPlaybackState = SpeechPlaybackState(),
     onToggleSpeechPlayback: (messageId: String, text: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
@@ -115,20 +118,42 @@ fun MessageBubble(
     val fillsBubbleWidth = role != MessageRole.User
     ChatBubble(role = role, modifier = modifier) {
         Column(modifier = if (fillsBubbleWidth) Modifier.fillMaxWidth() else Modifier) {
-            // 1. 工具调用 chip 行
-            if (showToolActivity && message.functionCalls.isNotEmpty()) {
-                ChipRow(fillAvailableWidth = fillsBubbleWidth) {
-                    message.functionCalls.forEach { call ->
-                        ToolCallChip(call = call)
-                    }
-                }
-            }
-
-            // 2. 工具响应 chip 行
-            if (showToolActivity && message.functionResponses.isNotEmpty()) {
-                ChipRow(fillAvailableWidth = fillsBubbleWidth) {
-                    message.functionResponses.forEach { response ->
-                        ToolResponseChip(response = response)
+            // 工具活动 chip 行：call/response 按 id 配对成单个状态 chip（见 ToolCallChip），
+            // 确认协议信令（adk_request_confirmation）在 visibleFunction* 里已过滤。
+            if (showToolActivity) {
+                val calls = message.visibleFunctionCalls()
+                val responses = message.visibleFunctionResponses()
+                if (calls.isNotEmpty() || responses.isNotEmpty()) {
+                    val respondedIds = responses.mapTo(HashSet()) { it.id }
+                    val calledIds = calls.mapTo(HashSet()) { it.id }
+                    ChipRow(fillAvailableWidth = fillsBubbleWidth) {
+                        calls.forEach { call ->
+                            // id 为空时无法可靠配对，保守按"未完成"处理，避免误标 ✓。
+                            val completed = call.id.isNotEmpty() && call.id in respondedIds
+                            // 显式拒绝（内存态）优先；任务已结束（非流式、未在跑）而响应
+                            // 始终未到的，视为未执行/被中断，同样给 ✗ 而不是永远悬着。
+                            val rejected = !completed &&
+                                (call.name in rejectedToolNames ||
+                                    (!message.partial && !isAgentRunning))
+                            val awaitingConfirmation = !completed && !rejected &&
+                                call.name in awaitingConfirmationToolNames
+                            ToolCallChip(
+                                call = call,
+                                completed = completed,
+                                inProgress = !completed && !rejected && !awaitingConfirmation,
+                                rejected = rejected,
+                                awaitingConfirmation = awaitingConfirmation,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                        }
+                        responses.forEach { response ->
+                            if (response.id.isEmpty() || response.id !in calledIds) {
+                                ToolResponseChip(
+                                    response = response,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -257,7 +282,7 @@ private fun AssistantMessageActions(
 @Composable
 private fun ChipRow(
     fillAvailableWidth: Boolean,
-    content: @Composable () -> Unit,
+    content: @Composable RowScope.() -> Unit,
 ) {
     Row(
         modifier = (if (fillAvailableWidth) Modifier.fillMaxWidth() else Modifier)

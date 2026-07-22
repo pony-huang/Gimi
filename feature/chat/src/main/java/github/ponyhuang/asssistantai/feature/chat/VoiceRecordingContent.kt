@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -21,7 +22,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -87,8 +87,9 @@ internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
             onClick = params.onFinish,
             modifier = Modifier.testTag(VOICE_FINISH_TEST_TAG),
         ) {
+            // 语义是"完成录音并转写"，用对勾而非停止方块——方块容易被理解为"中断丢弃"。
             Icon(
-                painter = painterResource(R.drawable.stream_ai_compose_ic_stop),
+                imageVector = Icons.Default.Check,
                 contentDescription = stringResource(R.string.chat_voice_finish_recording),
             )
         }
@@ -99,7 +100,7 @@ internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
 private fun VoiceWaveform(
     levels: List<Float>,
     modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    color: Color = MaterialTheme.colorScheme.primary,
 ) {
     Canvas(modifier = modifier) {
         val barWidth = 3.dp.toPx()

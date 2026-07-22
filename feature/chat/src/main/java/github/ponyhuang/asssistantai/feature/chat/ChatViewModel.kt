@@ -100,6 +100,7 @@ class ChatViewModel @Inject constructor(
             runtime.approvedToolsThisTurn += request.toolName
         } else {
             runtime.approvedToolsThisTurn.clear()
+            runtime.rejectedToolNames += request.toolName
         }
         runtime.pendingToolConfirmations = runtime.pendingToolConfirmations.filterNot {
             it.confirmationCallId == request.confirmationCallId
@@ -200,6 +201,7 @@ class ChatViewModel @Inject constructor(
                     turnComplete = runtime.turnComplete,
                     currentModelSelection = runtime.modelSelection,
                     pendingToolConfirmations = runtime.pendingToolConfirmations,
+                    rejectedToolNames = runtime.rejectedToolNames.toSet(),
                     conversationTaskStatuses = statuses,
                 )
             } else {
@@ -218,6 +220,7 @@ class ChatViewModel @Inject constructor(
                 turnComplete = runtime.turnComplete,
                 currentModelSelection = runtime.modelSelection,
                 pendingToolConfirmations = runtime.pendingToolConfirmations,
+                rejectedToolNames = runtime.rejectedToolNames.toSet(),
                 isInitializing = isInitializing,
             )
         }

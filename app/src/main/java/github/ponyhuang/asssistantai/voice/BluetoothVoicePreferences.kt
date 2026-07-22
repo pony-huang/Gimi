@@ -3,6 +3,7 @@ package github.ponyhuang.asssistantai.voice
 import android.content.Context
 import androidx.core.content.edit
 import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.asssistantai.domain.speech.model.isPresetWakeKeyword
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,7 +16,7 @@ class BluetoothVoicePreferences @Inject constructor(
 ) {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val _keyword = MutableStateFlow(
-        preferences.getString(KEYWORD_KEY, null)?.takeIf(String::isNotBlank) ?: DEFAULT_WAKE_KEYWORD,
+        preferences.getString(KEYWORD_KEY, null)?.takeIf(::isPresetWakeKeyword) ?: DEFAULT_WAKE_KEYWORD,
     )
     private val _voiceSessionId = MutableStateFlow(preferences.getString(SESSION_ID_KEY, null))
 
@@ -24,8 +25,7 @@ class BluetoothVoicePreferences @Inject constructor(
 
     fun setKeyword(value: String) {
         val normalized = value.trim()
-        require(normalized.length in KEYWORD_LENGTH_RANGE) { "唤醒词需要包含 2–20 个字符" }
-        require(normalized.none(Char::isISOControl)) { "唤醒词不能包含控制字符" }
+        require(isPresetWakeKeyword(normalized)) { "仅支持预置唤醒词" }
         _keyword.value = normalized
         preferences.edit { putString(KEYWORD_KEY, normalized) }
     }
@@ -41,6 +41,5 @@ class BluetoothVoicePreferences @Inject constructor(
         const val PREFERENCES_NAME = "bluetooth_voice_preferences"
         const val KEYWORD_KEY = "wake_keyword"
         const val SESSION_ID_KEY = "voice_session_id"
-        val KEYWORD_LENGTH_RANGE = 2..20
     }
 }

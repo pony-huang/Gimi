@@ -4,8 +4,7 @@
     <string name="voicewake_listening_subtitle">After connecting a Bluetooth headset, use the wake word to run tasks in the background</string>
 
     <string name="voicewake_section_keyword">Wake word</string>
-    <string name="voicewake_keyword_hint">2–20 characters, e.g. hello assistant</string>
-    <string name="voicewake_save_keyword">Save wake word</string>
+    <string name="voicewake_keyword_hint">The offline model can only recognize the preset wake words above</string>
 
     <string name="voicewake_offline_model">Offline model</string>
     <string name="voicewake_offline_setup_required">Configure a default assistant model and a speech recognition model before enabling.</string>
@@ -19,6 +18,4 @@
     <string name="voicewake_action_install">Install</string>
     <!-- Voice wake screen title (consumed by :app SettingsScaffold) -->
     <string name="voicewake_screen_title">Voice wake</string>
-
-    <string name="voicewake_keyword_error">Wake word must contain 2–20 characters</string>
 </resources>

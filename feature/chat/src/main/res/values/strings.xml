@@ -78,4 +78,10 @@
 
     <!-- 工具确认卡片：未在本地目录中找到的工具 -->
     <string name="chat_tool_unknown_description">远程工具请求执行操作</string>
+
+    <!-- 图片附件 -->
+    <string name="chat_attachment_remove">移除附件</string>
+    <string name="chat_attachment_sent_image">已发送的图片</string>
+    <string name="chat_attachment_sent_image_preview">已发送图片预览</string>
+    <string name="chat_attachment_close_preview">关闭图片预览</string>
 </resources>

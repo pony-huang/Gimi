@@ -25,8 +25,6 @@ class VoiceWakeSettingsViewModel @Inject constructor(
         VoiceWakeSettingsUiState(
             voiceState = settings.voiceState,
             configurationReady = settings.configurationReady,
-            keywordDraft = local.keywordDraft ?: settings.voiceState.keyword,
-            keywordError = local.keywordError,
             permissionRequestId = local.permissionRequestId,
         )
     }.stateIn(
@@ -37,10 +35,8 @@ class VoiceWakeSettingsViewModel @Inject constructor(
 
     fun onAction(action: VoiceWakeSettingsAction) {
         when (action) {
-            is VoiceWakeSettingsAction.KeywordChanged -> localState.update {
-                it.copy(keywordDraft = action.value, keywordError = null)
-            }
-            VoiceWakeSettingsAction.SaveKeyword -> saveKeyword()
+            is VoiceWakeSettingsAction.KeywordSelected ->
+                manageVoiceWake.setKeyword(action.keyword)
             is VoiceWakeSettingsAction.ToggleListening -> toggleListening(action.enabled)
             VoiceWakeSettingsAction.InstallModel -> manageVoiceWake.installModel()
             is VoiceWakeSettingsAction.PermissionsResult -> {
@@ -63,19 +59,6 @@ class VoiceWakeSettingsViewModel @Inject constructor(
         }
     }
 
-    private fun saveKeyword() {
-        val draft = uiState.value.keywordDraft
-        manageVoiceWake.setKeyword(draft)
-            .onSuccess {
-                localState.update {
-                    it.copy(keywordDraft = draft.trim(), keywordError = null)
-                }
-            }
-            .onFailure { error ->
-                localState.update { it.copy(keywordError = error.message) }
-            }
-    }
-
     private fun toggleListening(enabled: Boolean) {
         if (!enabled) {
             manageVoiceWake.stop()
@@ -94,8 +77,6 @@ class VoiceWakeSettingsViewModel @Inject constructor(
     }
 
     private data class LocalState(
-        val keywordDraft: String? = null,
-        val keywordError: String? = null,
         val permissionRequestId: Int? = null,
     )
 }

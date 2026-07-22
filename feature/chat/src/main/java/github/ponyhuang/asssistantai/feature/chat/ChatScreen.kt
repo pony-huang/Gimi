@@ -61,9 +61,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.conversation.model.Message
 import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
@@ -123,10 +127,14 @@ fun ChatScaffold(
     val isSpeechRecognitionAvailable = state.isSpeechRecognitionAvailable
     val visibleMessages = remember(messages, showToolActivity) {
         messages.filter { message -> message.isVisibleInChat(showToolActivity) }
+            .foldToolResponses()
     }
     val isAgentRunning = state.isAgentRunning
     val speechPlaybackState = state.speechPlaybackState
     val pendingToolConfirmation = state.pendingToolConfirmation
+    val awaitingConfirmationToolNames = remember(state.pendingToolConfirmations) {
+        state.pendingToolConfirmations.mapTo(HashSet()) { it.toolName }
+    }
     // 只要用户仍停留在底部，就让流式内容增长持续跟随；用户向上浏览历史时则停止抢占滚动。
     var shouldFollowLatest by remember { mutableStateOf(true) }
     val latestItemIndex by rememberUpdatedState(visibleMessages.size)
@@ -307,6 +315,9 @@ fun ChatScaffold(
                             message = msg,
                             partChannelProvider = partChannelProvider,
                             showToolActivity = showToolActivity,
+                            isAgentRunning = isAgentRunning,
+                            rejectedToolNames = state.rejectedToolNames,
+                            awaitingConfirmationToolNames = awaitingConfirmationToolNames,
                             speechPlaybackState = speechPlaybackState,
                             onToggleSpeechPlayback = onToggleSpeechPlayback,
                         )
@@ -353,8 +364,26 @@ private fun ToolConfirmationCard(
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(stringResource(R.string.chat_tool_confirmation_title), style = MaterialTheme.typography.titleMedium)
-            Text(request.toolName, style = MaterialTheme.typography.labelLarge)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Build,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(
+                    stringResource(R.string.chat_tool_confirmation_title),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+            Text(
+                toolDisplayName(request.toolName),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
             Text(
                 if (request.description.isBlank()) {
                     stringResource(R.string.chat_tool_unknown_description)
@@ -364,18 +393,31 @@ private fun ToolConfirmationCard(
                 style = MaterialTheme.typography.bodyMedium,
             )
             if (request.arguments.isNotBlank()) {
-                Text(
-                    request.arguments,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f),
-                )
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                ) {
+                    Text(
+                        request.arguments,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                }
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onReject) { Text(stringResource(R.string.chat_action_reject)) }
-                TextButton(onClick = onConfirm) { Text(stringResource(R.string.chat_action_allow)) }
+                // 拒绝是次要动作：弱化颜色，把视觉重量让给主操作「允许」。
+                TextButton(
+                    onClick = onReject,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                ) { Text(stringResource(R.string.chat_action_reject)) }
+                Button(onClick = onConfirm) { Text(stringResource(R.string.chat_action_allow)) }
             }
         }
     }
@@ -475,6 +517,9 @@ private fun MessageRow(
     message: Message,
     partChannelProvider: (partId: String) -> ReceiveChannel<String>?,
     showToolActivity: Boolean,
+    isAgentRunning: Boolean,
+    rejectedToolNames: Set<String>,
+    awaitingConfirmationToolNames: Set<String>,
     speechPlaybackState: github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackState,
     onToggleSpeechPlayback: (messageId: String, text: String) -> Unit,
     modifier: Modifier = Modifier
@@ -486,6 +531,9 @@ private fun MessageRow(
             message = message,
             partChannelProvider = partChannelProvider,
             showToolActivity = showToolActivity,
+            isAgentRunning = isAgentRunning,
+            rejectedToolNames = rejectedToolNames,
+            awaitingConfirmationToolNames = awaitingConfirmationToolNames,
             speechPlaybackState = speechPlaybackState,
             onToggleSpeechPlayback = onToggleSpeechPlayback,
             modifier = modifier

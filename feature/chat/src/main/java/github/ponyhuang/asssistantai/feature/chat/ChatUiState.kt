@@ -53,6 +53,8 @@ data class ChatUiState(
     val showToolActivity: Boolean = true,
     val isSpeechRecognitionAvailable: Boolean = false,
     val pendingToolConfirmations: List<PendingToolConfirmation> = emptyList(),
+    /** 被用户拒绝确认的工具名（内存展示态）；工具 chip 据此显示 ✗ 而非永远悬在"未完成"。 */
+    val rejectedToolNames: Set<String> = emptySet(),
     val speechPlaybackState: SpeechPlaybackState = SpeechPlaybackState(),
     val notice: ChatNotice? = null,
 )

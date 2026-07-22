@@ -75,27 +75,13 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
     }
 
     @Test
-    fun invalidKeywordSurfacesControllerValidationMessage() = runTest {
+    fun selectingPresetKeywordPersistsThroughRepository() = runTest {
         val voiceRepository = voiceRepository(ready = true)
-        every { voiceRepository.setKeyword("x") } returns
-            Result.failure(IllegalArgumentException("唤醒词需要包含 2–20 个字符"))
         val viewModel = viewModel(modelRepository(), voiceRepository)
 
-        viewModel.uiState.test {
-            awaitItem()
-            viewModel.onAction(VoiceWakeSettingsAction.KeywordChanged("x"))
-            var state = awaitItem()
-            while (state.keywordDraft != "x") state = awaitItem()
+        viewModel.onAction(VoiceWakeSettingsAction.KeywordSelected("小助手"))
 
-            viewModel.onAction(VoiceWakeSettingsAction.SaveKeyword)
-            do {
-                state = awaitItem()
-            } while (state.keywordError == null)
-
-            assertEquals("唤醒词需要包含 2–20 个字符", state.keywordError)
-            verify(exactly = 1) { voiceRepository.setKeyword("x") }
-            cancelAndIgnoreRemainingEvents()
-        }
+        verify(exactly = 1) { voiceRepository.setKeyword("小助手") }
     }
 
     @Test

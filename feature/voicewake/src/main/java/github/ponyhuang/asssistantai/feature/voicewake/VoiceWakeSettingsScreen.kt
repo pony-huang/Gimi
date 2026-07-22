@@ -1,21 +1,22 @@
 package github.ponyhuang.asssistantai.feature.voicewake
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BluetoothAudio
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.speech.model.VoiceWakeState
+import github.ponyhuang.asssistantai.domain.speech.model.WAKE_KEYWORDS
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelStatus
 import github.ponyhuang.asssistantai.feature.voicewake.R
 import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
@@ -64,37 +66,30 @@ fun VoiceWakeSettingsScreen(
             }
 
             item { SettingsSectionTitle(text = stringResource(R.string.voicewake_section_keyword)) }
+            items(WAKE_KEYWORDS, key = { it.display }) { option ->
+                ListItem(
+                    headlineContent = { Text(option.display) },
+                    trailingContent = {
+                        RadioButton(
+                            selected = state.voiceState.keyword == option.display,
+                            onClick = null,
+                        )
+                    },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp)
+                        .clickable {
+                            onAction(VoiceWakeSettingsAction.KeywordSelected(option.display))
+                        },
+                )
+            }
             item {
-                Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)) {
-                    OutlinedTextField(
-                        value = state.keywordDraft,
-                        onValueChange = {
-                            onAction(VoiceWakeSettingsAction.KeywordChanged(it))
-                        },
-                        // 组标题已是「唤醒词」，不再重复 label；规则说明交给 supportingText。
-                        supportingText = {
-                            val errorText = state.keywordError
-                            Text(
-                                if (errorText != null) {
-                                    stringResource(R.string.voicewake_keyword_error)
-                                } else {
-                                    stringResource(R.string.voicewake_keyword_hint)
-                                },
-                            )
-                        },
-                        isError = state.keywordError != null,
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Button(
-                        onClick = { onAction(VoiceWakeSettingsAction.SaveKeyword) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 12.dp),
-                    ) {
-                        Text(stringResource(R.string.voicewake_save_keyword))
-                    }
-                }
+                Text(
+                    text = stringResource(R.string.voicewake_keyword_hint),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                )
             }
 
             item {

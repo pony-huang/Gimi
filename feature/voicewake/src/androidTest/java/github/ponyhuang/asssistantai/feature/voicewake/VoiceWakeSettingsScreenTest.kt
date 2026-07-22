@@ -13,7 +13,7 @@ class VoiceWakeSettingsScreenTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun clickingSaveRaisesSynchronousAction() {
+    fun clickingPresetKeywordRaisesSynchronousAction() {
         var action: VoiceWakeSettingsAction? = null
         composeRule.setContent {
             AsssistantaiTheme {
@@ -24,8 +24,8 @@ class VoiceWakeSettingsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("保存唤醒词").performClick()
+        composeRule.onNodeWithText("小助手").performClick()
 
-        assertEquals(VoiceWakeSettingsAction.SaveKeyword, action)
+        assertEquals(VoiceWakeSettingsAction.KeywordSelected("小助手"), action)
     }
 }

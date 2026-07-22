@@ -6,8 +6,7 @@
     <string name="voicewake_listening_subtitle">连接蓝牙耳机后，可通过唤醒词在后台执行任务</string>
 
     <string name="voicewake_section_keyword">唤醒词</string>
-    <string name="voicewake_keyword_hint">2–20 个字符，例如：你好助手</string>
-    <string name="voicewake_save_keyword">保存唤醒词</string>
+    <string name="voicewake_keyword_hint">离线模型仅可识别以上预置唤醒词</string>
 
     <string name="voicewake_offline_model">离线模型</string>
     <string name="voicewake_offline_setup_required">启用前请配置可用的默认助手模型和语音识别模型。</string>
@@ -19,7 +18,4 @@
     <string name="voicewake_model_install_failed">安装失败</string>
     <string name="voicewake_action_retry">重试</string>
     <string name="voicewake_action_install">安装</string>
-
-    <!-- 校验错误：唤醒词需要包含 2–20 个字符 -->
-    <string name="voicewake_keyword_error">唤醒词需要包含 2–20 个字符</string>
 </resources>

@@ -69,4 +69,10 @@
     <string name="chat_notice_active_delete_blocked">A running task or pending confirmation prevents deleting this conversation</string>
 
     <string name="chat_tool_unknown_description">A remote tool is requesting to perform an action</string>
+
+    <!-- Image attachments -->
+    <string name="chat_attachment_remove">Remove attachment</string>
+    <string name="chat_attachment_sent_image">Sent image</string>
+    <string name="chat_attachment_sent_image_preview">Sent image preview</string>
+    <string name="chat_attachment_close_preview">Close image preview</string>
 </resources>

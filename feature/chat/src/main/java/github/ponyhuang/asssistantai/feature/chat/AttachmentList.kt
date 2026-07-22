@@ -40,6 +40,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
@@ -139,7 +140,7 @@ private fun ImagePreviewDialog(
             bitmap?.let { currentBitmap ->
                 Image(
                     bitmap = currentBitmap.asImageBitmap(),
-                    contentDescription = "Sent image preview",
+                    contentDescription = stringResource(R.string.chat_attachment_sent_image_preview),
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit,
                 )
@@ -157,7 +158,7 @@ private fun ImagePreviewDialog(
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "Close image preview",
+                    contentDescription = stringResource(R.string.chat_attachment_close_preview),
                 )
             }
         }
@@ -183,7 +184,7 @@ private fun InlineImage(
         if (currentBitmap != null) {
             Image(
                 bitmap = currentBitmap.asImageBitmap(),
-                contentDescription = "Sent image",
+                contentDescription = stringResource(R.string.chat_attachment_sent_image),
                 modifier = Modifier.matchParentSize(),
                 contentScale = ContentScale.Crop,
             )
@@ -237,7 +238,7 @@ private fun SelectedAttachment(
         RemoveButton(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(8.dp),
+                .padding(6.dp),
             onClick = onRemove,
         )
     }
@@ -330,7 +331,7 @@ private fun RemoveButton(
     onClick: () -> Unit,
 ) {
     FilledIconButton(
-        modifier = modifier.size(22.dp),
+        modifier = modifier.size(18.dp),
         onClick = onClick,
         colors = IconButtonDefaults.filledIconButtonColors(
             containerColor = MaterialTheme.colorScheme.inverseSurface,
@@ -339,7 +340,8 @@ private fun RemoveButton(
         Icon(
             painter = painterResource(R.drawable.stream_ai_compose_ic_cancel),
             tint = MaterialTheme.colorScheme.inverseOnSurface,
-            contentDescription = "Remove attachment",
+            contentDescription = stringResource(R.string.chat_attachment_remove),
+            modifier = Modifier.size(12.dp),
         )
     }
 }

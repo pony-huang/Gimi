@@ -109,6 +109,8 @@ dependencies {
     implementation(project(":domain:toolauthorization"))
     implementation(project(":domain:skills"))
     implementation(project(":core:audio"))
+    implementation(project(":data:assistant"))
+    implementation(project(":domain:assistant"))
     implementation(project(":core:common"))
     implementation(project(":data:modelcatalog"))
     implementation(project(":core:network"))

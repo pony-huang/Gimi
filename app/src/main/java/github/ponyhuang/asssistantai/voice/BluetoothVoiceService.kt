@@ -421,6 +421,7 @@ class BluetoothVoiceService : Service() {
     private fun pauseListening() {
         pausedByUser = true
         recoveryJob?.cancel()
+        agentTasks.stop()
         processingJob?.cancel()
         processingJob = null
         stopAudioCapture(releaseRoute = true)
@@ -445,6 +446,7 @@ class BluetoothVoiceService : Service() {
     private fun stopCompletely() {
         pausedByUser = true
         recoveryJob?.cancel()
+        agentTasks.stop()
         processingJob?.cancel()
         processingJob = null
         stopAudioCapture(releaseRoute = true)

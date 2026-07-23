@@ -7,10 +7,9 @@ import org.vosk.Model
 import org.vosk.Recognizer
 
 class VoskWakeWordDetector(
-    modelPath: String,
+    private val model: Model,
     keyword: String,
 ) : Closeable {
-    private val model = Model(modelPath)
     private var keyword = keyword
     private var recognizer = createRecognizer(keyword)
 
@@ -47,8 +46,8 @@ class VoskWakeWordDetector(
         return Recognizer(model, BluetoothPcmRecorder.SAMPLE_RATE_HZ.toFloat(), "[\"$escaped\", \"[unk]\"]")
     }
 
+    /** 只关闭 Recognizer；Model 由 [WakeModelProvider] 统一缓存与释放。 */
     override fun close() {
         recognizer.close()
-        model.close()
     }
 }

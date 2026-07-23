@@ -34,6 +34,7 @@ internal class VoiceCommandCapture(
     private val output = ByteArrayOutputStream().apply { write(preRoll) }
     private var speechDetected = false
     private var lastSpeechAtMs = startedAtMs
+    private var noiseFloor = 0.0
 
     fun append(chunk: ByteArray, nowMs: Long): CaptureDecision {
         output.write(chunk)
@@ -65,7 +66,15 @@ internal class VoiceCommandCapture(
             samples++
             index += 2
         }
-        return samples > 0 && sum / samples >= SPEECH_AMPLITUDE_THRESHOLD
+        if (samples == 0) return false
+        val average = sum / samples
+        // 不同蓝牙耳机增益差异大，固定阈值不可靠：以近期噪声底自适应抬升，
+        // 阈值 = 噪声底 × 3，并钳制在 [MIN, MAX] 内。噪声底取历史最大值随时间衰减。
+        val threshold = (noiseFloor * NOISE_SPEECH_FACTOR)
+            .coerceIn(SPEECH_AMPLITUDE_THRESHOLD.toDouble(), MAX_SPEECH_AMPLITUDE.toDouble())
+        if (average >= threshold) return true
+        noiseFloor = maxOf(average.toDouble(), noiseFloor * NOISE_FLOOR_DECAY)
+        return false
     }
 
     companion object {
@@ -73,6 +82,9 @@ internal class VoiceCommandCapture(
         const val SILENCE_TO_FINISH_MS = 1_200L
         const val MAX_CAPTURE_MS = 30_000L
         const val SPEECH_AMPLITUDE_THRESHOLD = 700L
+        const val MAX_SPEECH_AMPLITUDE = 3_000L
+        const val NOISE_SPEECH_FACTOR = 3.0
+        const val NOISE_FLOOR_DECAY = 0.98
     }
 }
 

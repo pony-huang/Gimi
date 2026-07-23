@@ -43,6 +43,7 @@ class BluetoothVoiceService : Service() {
     @Inject lateinit var speechRecognition: SpeechRecognitionRepository
     @Inject lateinit var agentTasks: VoiceAgentTaskExecutor
     @Inject lateinit var speechPlayer: VoiceSpeechPlayer
+    @Inject lateinit var wakeModels: WakeModelProvider
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val audioLock = Any()
@@ -52,12 +53,31 @@ class BluetoothVoiceService : Service() {
     private var preRoll = PcmPreRollBuffer()
     private var capture: VoiceCommandCapture? = null
     private var processingJob: Job? = null
+    private var recoveryJob: Job? = null
+    private var recoveryAttempts = 0
     private var pausedByUser = false
+    private var pausedByCall = false
     private var lastWakeAtMs = 0L
+    private var cueActiveUntilMs = 0L
+    private val audioManager by lazy { getSystemService(AudioManager::class.java) }
+    private val callModeListener = AudioManager.OnModeChangedListener { mode ->
+        val callActive = mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_RINGTONE
+        scope.launch {
+            if (callActive && !pausedByCall && (recorder != null || capture != null)) {
+                pausedByCall = true
+                stopAudioCapture(releaseRoute = true)
+                setStatus(BluetoothVoiceStatus.Paused, "通话中，语音唤醒已暂停")
+            } else if (!callActive && pausedByCall) {
+                pausedByCall = false
+                if (!pausedByUser) reconcileBluetoothRoute()
+            }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        audioManager.addOnModeChangedListener(ContextCompat.getMainExecutor(this), callModeListener)
         audioRouter.observe { scope.launch { reconcileBluetoothRoute() } }
         scope.launch {
             preferences.keyword.collect { keyword ->
@@ -76,7 +96,7 @@ class BluetoothVoiceService : Service() {
             }
             ACTION_START -> startForegroundAndListen()
         }
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -92,6 +112,8 @@ class BluetoothVoiceService : Service() {
             setStatus(BluetoothVoiceStatus.Error, "缺少麦克风或蓝牙权限")
             return
         }
+        recoveryJob?.cancel()
+        recoveryAttempts = 0
         pausedByUser = false
         scope.launch { reconcileBluetoothRoute() }
     }
@@ -131,7 +153,7 @@ class BluetoothVoiceService : Service() {
         route = newRoute
         val wakeDetector = runCatching {
             withContext(Dispatchers.IO) {
-                VoskWakeWordDetector(modelPath, preferences.keyword.value)
+                VoskWakeWordDetector(wakeModels.acquire(modelPath), preferences.keyword.value)
             }
         }.getOrElse { error ->
             audioRouter.release()
@@ -158,6 +180,7 @@ class BluetoothVoiceService : Service() {
             setStatus(BluetoothVoiceStatus.Error, "蓝牙麦克风启动失败")
             return
         }
+        recoveryAttempts = 0
         setStatus(
             BluetoothVoiceStatus.Listening,
             "正在监听“${preferences.keyword.value}”",
@@ -171,6 +194,8 @@ class BluetoothVoiceService : Service() {
             preRoll.append(chunk)
             val activeCapture = capture
             if (activeCapture != null) {
+                // 提示音播放窗口内的采样不写入指令音频，避免“滴”声串入云端识别。
+                if (now < cueActiveUntilMs) return
                 when (val decision = activeCapture.append(chunk, now)) {
                     CaptureDecision.Continue -> Unit
                     CaptureDecision.Cancel -> {
@@ -198,6 +223,7 @@ class BluetoothVoiceService : Service() {
             }
             if (detected) {
                 lastWakeAtMs = now
+                cueActiveUntilMs = now + WAKE_CUE_GUARD_MS
                 capture = VoiceCommandCapture(preRoll.snapshot(), now)
                 scope.launch { playWakeCue() }
                 scope.launch {
@@ -320,13 +346,28 @@ class BluetoothVoiceService : Service() {
         return isVoiceConfirmationApproved(transcript)
     }
 
-    private suspend fun recoverFromAudioError(error: Throwable) {
+    private fun recoverFromAudioError(error: Throwable) {
         stopAudioCapture(releaseRoute = true)
-        setStatus(BluetoothVoiceStatus.Error, error.message ?: "蓝牙录音失败")
+        if (pausedByUser || pausedByCall) return
+        if (recoveryAttempts >= MAX_RECOVERY_ATTEMPTS) {
+            setStatus(BluetoothVoiceStatus.Error, error.message ?: "蓝牙录音失败")
+            return
+        }
+        recoveryAttempts += 1
+        val delayMs = RECOVERY_BASE_DELAY_MS shl (recoveryAttempts - 1)
+        setStatus(
+            BluetoothVoiceStatus.Starting,
+            "录音失败，${delayMs / 1000} 秒后重试（$recoveryAttempts/$MAX_RECOVERY_ATTEMPTS）",
+        )
+        recoveryJob = scope.launch {
+            delay(delayMs)
+            reconcileBluetoothRoute()
+        }
     }
 
     private fun pauseListening() {
         pausedByUser = true
+        recoveryJob?.cancel()
         processingJob?.cancel()
         processingJob = null
         stopAudioCapture(releaseRoute = true)
@@ -350,9 +391,11 @@ class BluetoothVoiceService : Service() {
 
     private fun stopCompletely() {
         pausedByUser = true
+        recoveryJob?.cancel()
         processingJob?.cancel()
         processingJob = null
         stopAudioCapture(releaseRoute = true)
+        wakeModels.release()
         controller.setStatus(BluetoothVoiceStatus.Stopped, deviceName = null, message = null)
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -422,8 +465,11 @@ class BluetoothVoiceService : Service() {
     ).all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
 
     override fun onDestroy() {
+        recoveryJob?.cancel()
         processingJob?.cancel()
         stopAudioCapture(releaseRoute = true)
+        wakeModels.release()
+        audioManager.removeOnModeChangedListener(callModeListener)
         audioRouter.stopObserving()
         if (controller.state.value.status != BluetoothVoiceStatus.Stopped) {
             controller.setStatus(BluetoothVoiceStatus.Stopped, deviceName = null, message = null)
@@ -441,6 +487,9 @@ class BluetoothVoiceService : Service() {
         private const val NOTIFICATION_CHANNEL_ID = "bluetooth_voice_wake"
         private const val NOTIFICATION_ID = 4107
         private const val WAKE_COOLDOWN_MS = 2_000L
+        private const val WAKE_CUE_GUARD_MS = 400L
+        private const val MAX_RECOVERY_ATTEMPTS = 3
+        private const val RECOVERY_BASE_DELAY_MS = 2_000L
         private const val CONFIRMATION_TIMEOUT_MS = 15_000L
         private const val NOTIFICATION_PREVIEW_LENGTH = 120
     }

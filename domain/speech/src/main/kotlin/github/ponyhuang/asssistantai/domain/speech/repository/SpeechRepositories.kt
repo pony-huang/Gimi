@@ -27,5 +27,11 @@ interface SpeechPlaybackRepository {
 
     fun toggle(messageId: String, text: String)
 
+    /** 显式开始播报指定内容（中断当前播报），供助理浮层自动播报使用。 */
+    fun play(messageId: String, text: String)
+
+    /** 显式停止当前播报。 */
+    fun stop()
+
     fun clearSession()
 }

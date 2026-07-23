@@ -459,7 +459,7 @@ class ChatViewModel @Inject constructor(
                 return@launch
             }
             val userMessage = Messages.fromUser(text = text, imageAttachments = images)
-            runtime.messages = runtime.messages + userMessage
+            runtime.messages += userMessage
             runtime.isLoaded = true
             publishRuntime(runtime)
             try {
@@ -469,7 +469,6 @@ class ChatViewModel @Inject constructor(
                     text = text,
                     imageAttachments = images,
                 ).collect { event ->
-                    Log.i("chat", "event: $event")
                     applyEvent(sessionId, event)
                 }
             } catch (ce: CancellationException) {

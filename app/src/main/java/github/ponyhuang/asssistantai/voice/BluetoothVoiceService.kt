@@ -18,6 +18,9 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.AndroidEntryPoint
 import github.ponyhuang.asssistantai.MainActivity
+import github.ponyhuang.asssistantai.core.audio.CaptureDecision
+import github.ponyhuang.asssistantai.core.audio.PcmPreRollBuffer
+import github.ponyhuang.asssistantai.core.audio.VoiceCommandCapture
 import github.ponyhuang.asssistantai.R
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelInfo
@@ -418,6 +421,7 @@ class BluetoothVoiceService : Service() {
     private fun pauseListening() {
         pausedByUser = true
         recoveryJob?.cancel()
+        agentTasks.stop()
         processingJob?.cancel()
         processingJob = null
         stopAudioCapture(releaseRoute = true)
@@ -442,6 +446,7 @@ class BluetoothVoiceService : Service() {
     private fun stopCompletely() {
         pausedByUser = true
         recoveryJob?.cancel()
+        agentTasks.stop()
         processingJob?.cancel()
         processingJob = null
         stopAudioCapture(releaseRoute = true)

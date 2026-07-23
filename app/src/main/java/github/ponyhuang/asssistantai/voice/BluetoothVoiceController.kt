@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.asssistantai.R
+import github.ponyhuang.asssistantai.data.assistant.VoiceSessionIdStore
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.asssistantai.domain.speech.repository.VoiceWakeRepository
 import javax.inject.Inject
@@ -23,6 +24,7 @@ class BluetoothVoiceController @Inject constructor(
     @ApplicationContext private val context: Context,
     private val preferences: BluetoothVoicePreferences,
     private val modelRepository: WakeModelRepository,
+    private val voiceSessionStore: VoiceSessionIdStore,
 ) : VoiceWakeRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val _state = MutableStateFlow(
@@ -31,7 +33,7 @@ class BluetoothVoiceController @Inject constructor(
             availableModels = WakeModelCatalog.models,
             activeModelId = preferences.activeModelId.value,
             modelStates = modelRepository.states.value,
-            voiceSessionId = preferences.voiceSessionId.value,
+            voiceSessionId = voiceSessionStore.voiceSessionId.value,
         ),
     )
     override val state: StateFlow<BluetoothVoiceUiState> = _state.asStateFlow()
@@ -45,7 +47,7 @@ class BluetoothVoiceController @Inject constructor(
             modelRepository.states.collect { states -> _state.update { it.copy(modelStates = states) } }
         }
         scope.launch {
-            preferences.voiceSessionId.collect { sessionId ->
+            voiceSessionStore.voiceSessionId.collect { sessionId ->
                 _state.update { it.copy(voiceSessionId = sessionId) }
             }
         }

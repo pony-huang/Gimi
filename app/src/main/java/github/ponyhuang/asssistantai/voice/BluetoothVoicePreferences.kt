@@ -23,14 +23,11 @@ class BluetoothVoicePreferences @Inject constructor(
             ?: WakeModelCatalog.default.id,
     )
     private val _keyword = MutableStateFlow(loadKeyword(_activeModelId.value))
-    private val _voiceSessionId = MutableStateFlow(preferences.getString(SESSION_ID_KEY, null))
-
     /** 激活的唤醒模型 id。 */
     val activeModelId: StateFlow<String> = _activeModelId.asStateFlow()
 
     /** 激活模型语言下的唤醒词（切换模型时恢复该语言已保存的词或默认词）。 */
     val keyword: StateFlow<String> = _keyword.asStateFlow()
-    val voiceSessionId: StateFlow<String?> = _voiceSessionId.asStateFlow()
 
     fun setActiveModel(modelId: String) {
         val info = requireNotNull(WakeModelCatalog.byId(modelId)) { "Unknown wake model: $modelId" }
@@ -48,13 +45,6 @@ class BluetoothVoicePreferences @Inject constructor(
         preferences.edit { putString(keywordKey(info.languageTag), normalized) }
     }
 
-    fun setVoiceSessionId(value: String?) {
-        _voiceSessionId.value = value
-        preferences.edit {
-            if (value.isNullOrBlank()) remove(SESSION_ID_KEY) else putString(SESSION_ID_KEY, value)
-        }
-    }
-
     private fun loadKeyword(modelId: String): String {
         val info = WakeModelCatalog.byId(modelId) ?: WakeModelCatalog.default
         return preferences.getString(keywordKey(info.languageTag), null)
@@ -66,7 +56,6 @@ class BluetoothVoicePreferences @Inject constructor(
         const val PREFERENCES_NAME = "bluetooth_voice_preferences"
         const val ACTIVE_MODEL_KEY = "active_model_id"
         const val KEYWORD_KEY_PREFIX = "wake_keyword."
-        const val SESSION_ID_KEY = "voice_session_id"
 
         fun keywordKey(languageTag: String) = "$KEYWORD_KEY_PREFIX$languageTag"
     }

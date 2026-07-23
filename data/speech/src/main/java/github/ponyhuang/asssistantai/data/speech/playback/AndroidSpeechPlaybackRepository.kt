@@ -72,6 +72,11 @@ class AndroidSpeechPlaybackRepository @Inject constructor(
         }
     }
 
+    override fun play(messageId: String, text: String) {
+        stop()
+        start(messageId, text)
+    }
+
     override fun clearSession() {
         stop()
         synchronized(cache) {
@@ -80,7 +85,7 @@ class AndroidSpeechPlaybackRepository @Inject constructor(
         }
     }
 
-    fun stop() {
+    override fun stop() {
         generation++
         playbackJob?.cancel()
         playbackJob = null

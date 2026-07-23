@@ -19,7 +19,6 @@ import github.ponyhuang.asssistantai.data.modelcatalog.toData
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.LocalToolDefinitionSource
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.ToolAuthorizationRepository
 import github.ponyhuang.asssistantai.domain.mcp.repository.McpRepository
-import github.ponyhuang.asssistantai.voice.VoiceAgentRunner
 import java.io.File
 import javax.inject.Singleton
 
@@ -72,28 +71,6 @@ object AgentModule {
         factory = { selection ->
             modelServices.awaitReady()
             agentFactory.create(selection?.toData())
-        },
-        sessionService = sessionService,
-        artifactService = artifactService,
-        configurationRevision = {
-            toolAuthorization.revision.value to mcpRepository.revision.value
-        },
-    )
-
-    @Provides
-    @Singleton
-    @VoiceAgentRunner
-    fun provideVoiceAgentChatRunner(
-        sessionService: SessionService,
-        artifactService: ArtifactService,
-        agentFactory: AgentFactory,
-        modelServices: ModelServiceRepository,
-        toolAuthorization: ToolAuthorizationRepository,
-        mcpRepository: McpRepository,
-    ): AgentChatRunner = AgentChatRunner(
-        factory = { _ ->
-            modelServices.awaitReady()
-            agentFactory.create(modelServices.defaultSelection())
         },
         sessionService = sessionService,
         artifactService = artifactService,

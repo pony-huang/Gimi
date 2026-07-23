@@ -33,6 +33,8 @@ interface AssistantSessionCoordinator {
      * 提交一条用户指令到共享语音会话并挂起直到任务结束（完成/失败/被取消）。
      * 同一语音会话的请求按提交顺序串行执行。
      *
+     * 等待方协程被取消（如浮层销毁）不会取消任务本身；取消任务必须调用 [stop]。
+     *
      * @param confirmationHandler 敏感工具确认通道；为 null 时通过状态流暴露确认请求，
      * 由调用方使用 [respondToConfirmation] 答复（15 秒超时自动拒绝）。
      */

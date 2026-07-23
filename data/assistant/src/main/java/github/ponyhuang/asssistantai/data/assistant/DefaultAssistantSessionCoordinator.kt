@@ -242,7 +242,6 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                     deadlineEpochMs = 0L,
                 )
             }
-            event.errorMessage?.let { message -> run.lastError = message }
         }
     }
 
@@ -308,7 +307,6 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
         val pendingConfirmations = ArrayDeque<PendingAssistantConfirmation>()
         val seenConfirmationIds = mutableSetOf<String>()
         val approvedTools = mutableSetOf<String>()
-        var lastError: String? = null
     }
 
     private companion object {

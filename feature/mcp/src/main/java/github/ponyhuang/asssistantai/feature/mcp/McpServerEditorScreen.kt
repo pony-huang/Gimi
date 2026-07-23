@@ -10,27 +10,39 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.mcp.model.McpTransport
 import github.ponyhuang.asssistantai.feature.mcp.R
 import github.ponyhuang.asssistantai.ui.settings.SettingsCard
+import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
 import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
 
@@ -67,6 +79,35 @@ fun McpServerEditorScreen(
                     modifier = Modifier.padding(horizontal = 24.dp),
                 )
             }
+            // 启用开关是状态控制而非表单字段，置顶作主开关；
+            // 样式与语音唤醒等设置页的 SettingsListItem + 尾部 Switch 保持一致。
+            SettingsListItem(
+                icon = Icons.Default.Extension,
+                title = stringResource(R.string.mcp_field_enable_server),
+                subtitle = stringResource(R.string.mcp_field_enable_subtitle),
+                onClick = {
+                    if (!state.isMutationBlocked) {
+                        onAction(
+                            McpSettingsAction.EditorChanged(
+                                draft.copy(isEnabled = !draft.isEnabled),
+                            ),
+                        )
+                    }
+                },
+                trailingContent = {
+                    Switch(
+                        checked = draft.isEnabled,
+                        enabled = !state.isMutationBlocked,
+                        onCheckedChange = {
+                            onAction(
+                                McpSettingsAction.EditorChanged(
+                                    draft.copy(isEnabled = it),
+                                ),
+                            )
+                        },
+                    )
+                },
+            )
             SettingsSectionTitle(text = stringResource(R.string.mcp_section_basic_info))
             SettingsCard(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Column(
@@ -79,6 +120,7 @@ fun McpServerEditorScreen(
                             onAction(McpSettingsAction.EditorChanged(draft.copy(name = it)))
                         },
                         label = { Text(stringResource(R.string.mcp_field_name_required)) },
+                        placeholder = { Text(stringResource(R.string.mcp_field_name_placeholder)) },
                         enabled = !state.isMutationBlocked,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -140,6 +182,7 @@ fun McpServerEditorScreen(
                         placeholder = { Text("https://example.com/mcp") },
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    var tokenVisible by remember { mutableStateOf(false) }
                     OutlinedTextField(
                         value = draft.bearerToken,
                         onValueChange = {
@@ -147,6 +190,26 @@ fun McpServerEditorScreen(
                         },
                         label = { Text(stringResource(R.string.mcp_field_bearer_token_optional)) },
                         enabled = !state.isMutationBlocked,
+                        visualTransformation = if (tokenVisible) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { tokenVisible = !tokenVisible }) {
+                                Icon(
+                                    imageVector = if (tokenVisible) {
+                                        Icons.Default.VisibilityOff
+                                    } else {
+                                        Icons.Default.Visibility
+                                    },
+                                    contentDescription = stringResource(
+                                        if (tokenVisible) R.string.mcp_token_hide
+                                        else R.string.mcp_token_show,
+                                    ),
+                                )
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
                     )
                     OutlinedTextField(
@@ -161,24 +224,10 @@ fun McpServerEditorScreen(
                         minLines = 3,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.mcp_field_enable_server)) },
-                        trailingContent = {
-                            Switch(
-                                checked = draft.isEnabled,
-                                enabled = !state.isMutationBlocked,
-                                onCheckedChange = {
-                                    onAction(
-                                        McpSettingsAction.EditorChanged(
-                                            draft.copy(isEnabled = it),
-                                        ),
-                                    )
-                                },
-                            )
-                        },
-                    )
                     Text(
                         stringResource(R.string.mcp_sse_help),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -196,13 +245,49 @@ fun McpServerEditorScreen(
                         Text(stringResource(R.string.mcp_save))
                     }
                     if (!draft.isNew) {
+                        var showDeleteDialog by remember { mutableStateOf(false) }
                         TextButton(
-                            onClick = { onAction(McpSettingsAction.DeleteEditor) },
+                            onClick = { showDeleteDialog = true },
                             enabled = !state.isMutationBlocked,
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error,
+                            ),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = null)
                             Text(stringResource(R.string.mcp_delete_server))
+                        }
+                        if (showDeleteDialog) {
+                            AlertDialog(
+                                onDismissRequest = { showDeleteDialog = false },
+                                title = { Text(stringResource(R.string.mcp_delete_confirm_title)) },
+                                text = {
+                                    Text(
+                                        stringResource(
+                                            R.string.mcp_delete_confirm_message,
+                                            draft.name,
+                                        ),
+                                    )
+                                },
+                                confirmButton = {
+                                    TextButton(
+                                        onClick = {
+                                            showDeleteDialog = false
+                                            onAction(McpSettingsAction.DeleteEditor)
+                                        },
+                                        colors = ButtonDefaults.textButtonColors(
+                                            contentColor = MaterialTheme.colorScheme.error,
+                                        ),
+                                    ) {
+                                        Text(stringResource(R.string.mcp_delete_confirm_action))
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = { showDeleteDialog = false }) {
+                                        Text(stringResource(R.string.mcp_cancel))
+                                    }
+                                },
+                            )
                         }
                     }
                 }

@@ -9,7 +9,8 @@ enum class McpTransport {
 
 data class McpServer(
     val id: String = UUID.randomUUID().toString(),
-    val name: String = "MCP 服务器",
+    // 新建时留空，由编辑器 placeholder 引导用户命名；避免所有服务器同叫一个默认名。
+    val name: String = "",
     val description: String = "",
     val endpointUrl: String = "",
     val transport: McpTransport = McpTransport.STREAMABLE_HTTP,

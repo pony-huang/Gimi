@@ -10,6 +10,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun McpServerListRoute(
     onNavigateToEditor: (String?) -> Unit,
+    onCreateServer: () -> Unit,
+    onImportServers: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: McpSettingsViewModel = hiltViewModel(),
 ) {
@@ -18,6 +20,8 @@ fun McpServerListRoute(
         state = state,
         onAction = viewModel::onAction,
         onNavigateToEditor = onNavigateToEditor,
+        onCreateServer = onCreateServer,
+        onImportServers = onImportServers,
         modifier = modifier,
     )
 }
@@ -33,7 +37,6 @@ fun McpServerImportRoute(
     McpServerImportScreen(
         state = state,
         onAction = viewModel::onAction,
-        onCancel = onBack,
         modifier = modifier,
     )
 }

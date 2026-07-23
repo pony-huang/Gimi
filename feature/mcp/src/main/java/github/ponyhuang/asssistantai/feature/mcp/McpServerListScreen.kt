@@ -27,8 +27,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
@@ -44,14 +46,12 @@ fun McpServerListScreen(
     state: McpSettingsUiState,
     onAction: (McpSettingsAction) -> Unit,
     onNavigateToEditor: (String?) -> Unit,
+    onCreateServer: () -> Unit,
+    onImportServers: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     SettingsPageContainer(modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
-            SettingsSectionTitle(
-                text = stringResource(R.string.mcp_section_servers),
-                modifier = Modifier.padding(top = 12.dp),
-            )
             if (state.isMutationBlocked || !state.notice.isNullOrBlank()) {
                 Text(
                     text = state.notice?.takeUnless { it.isBlank() }
@@ -60,30 +60,84 @@ fun McpServerListScreen(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 )
             }
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 24.dp),
-            ) {
-                if (state.servers.isEmpty()) {
-                    item {
-                        Text(
-                            stringResource(R.string.mcp_no_servers),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 18.dp),
+            if (state.servers.isEmpty()) {
+                McpEmptyState(
+                    onCreateServer = onCreateServer,
+                    onImportServers = onImportServers,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+                ) {
+                    items(state.servers, key = McpServer::id) { server ->
+                        McpServerCard(
+                            server = server,
+                            mutationEnabled = !state.isMutationBlocked,
+                            onClick = { onNavigateToEditor(server.id) },
+                            onToggleEnabled = {
+                                onAction(McpSettingsAction.ToggleServer(server, it))
+                            },
                         )
                     }
                 }
-                items(state.servers, key = McpServer::id) { server ->
-                    McpServerCard(
-                        server = server,
-                        mutationEnabled = !state.isMutationBlocked,
-                        onClick = { onNavigateToEditor(server.id) },
-                        onToggleEnabled = {
-                            onAction(McpSettingsAction.ToggleServer(server, it))
-                        },
-                    )
-                }
             }
+        }
+    }
+}
+
+/**
+ * 空态是首次用户的入口：直接给出两条路径（新建 / 导入），
+ * 让首次配置跳过「添加方式」中转页。
+ */
+@Composable
+private fun McpEmptyState(
+    onCreateServer: () -> Unit,
+    onImportServers: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.padding(horizontal = 32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            Icons.Default.Extension,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            modifier = Modifier.size(56.dp),
+        )
+        Text(
+            stringResource(R.string.mcp_empty_title),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.padding(top = 20.dp),
+        )
+        Text(
+            stringResource(R.string.mcp_empty_subtitle),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        Button(
+            onClick = onCreateServer,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 28.dp),
+        ) {
+            Text(stringResource(R.string.mcp_empty_action_new))
+        }
+        OutlinedButton(
+            onClick = onImportServers,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp),
+        ) {
+            Text(stringResource(R.string.mcp_empty_action_import))
         }
     }
 }
@@ -124,9 +178,9 @@ fun McpServerAddOptionsScreen(
 fun McpServerImportScreen(
     state: McpSettingsUiState,
     onAction: (McpSettingsAction) -> Unit,
-    onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val clipboard = LocalClipboardManager.current
     SettingsPageContainer(modifier) {
         Column(
             modifier = Modifier
@@ -145,7 +199,7 @@ fun McpServerImportScreen(
                     OutlinedTextField(
                         value = state.importJson,
                         onValueChange = { onAction(McpSettingsAction.ImportJsonChanged(it)) },
-                        label = { Text("MCP JSON") },
+                        label = { Text(stringResource(R.string.mcp_field_json_label)) },
                         placeholder = { Text("{\n  \"mcpServers\": { ... }\n}") },
                         minLines = 10,
                         modifier = Modifier.fillMaxWidth(),
@@ -153,26 +207,43 @@ fun McpServerImportScreen(
                     state.importResult?.let {
                         Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Button(
-                        onClick = { onAction(McpSettingsAction.ImportServers) },
-                        enabled = state.importJson.isNotBlank() && !state.isMutationBlocked,
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Text(stringResource(R.string.mcp_import_action))
+                        OutlinedButton(
+                            onClick = {
+                                clipboard.getText()?.text?.let {
+                                    onAction(McpSettingsAction.ImportJsonChanged(it))
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(
+                                Icons.Default.ContentPaste,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Text(
+                                stringResource(R.string.mcp_paste),
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+                        Button(
+                            onClick = { onAction(McpSettingsAction.ImportServers) },
+                            enabled = state.importJson.isNotBlank() && !state.isMutationBlocked,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(stringResource(R.string.mcp_import_action))
+                        }
                     }
-                    OutlinedButton(
-                        onClick = onCancel,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.mcp_cancel))
-                    }
+                    Text(
+                        stringResource(R.string.mcp_stdio_skip_notice),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
-            Text(
-                stringResource(R.string.mcp_stdio_skip_notice),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 24.dp),
-            )
         }
     }
 }
@@ -207,8 +278,8 @@ private fun McpServerCard(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                // 完整 URL 截断后毫无信息量，只保留 host；完整地址在编辑页可见。
-                "${server.transport.displayName()} · ${server.endpointHost()}",
+                // host 是最有辨识度的信息，放前面；空间不足时截断的是传输方式而非 host。
+                "${server.endpointHost()} · ${server.transport.displayName()}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

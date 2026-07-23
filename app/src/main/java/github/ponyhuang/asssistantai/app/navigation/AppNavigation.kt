@@ -235,6 +235,8 @@ fun MainScreen(
                         ) { modifier ->
                             McpServerListRoute(
                                 onNavigateToEditor = { backStack.add(AppRoute.McpServerEditor(it)) },
+                                onCreateServer = { backStack.add(AppRoute.McpServerEditor()) },
+                                onImportServers = { backStack.add(AppRoute.McpServerImport) },
                                 modifier = modifier,
                             )
                         }
@@ -243,9 +245,16 @@ fun MainScreen(
                             stringResource(McpR.string.mcp_add_options_title),
                             goBack,
                         ) {
+                            // replace 而非 add：保存/导入完成后直接回到列表，不经过中转页。
                             McpServerAddOptionsScreen(
-                                onCreate = { backStack.add(AppRoute.McpServerEditor()) },
-                                onImport = { backStack.add(AppRoute.McpServerImport) },
+                                onCreate = {
+                                    backStack.removeLastOrNull()
+                                    backStack.add(AppRoute.McpServerEditor())
+                                },
+                                onImport = {
+                                    backStack.removeLastOrNull()
+                                    backStack.add(AppRoute.McpServerImport)
+                                },
                                 modifier = it,
                             )
                         }

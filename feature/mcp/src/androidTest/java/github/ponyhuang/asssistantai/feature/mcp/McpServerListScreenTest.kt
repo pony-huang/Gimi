@@ -24,6 +24,8 @@ class McpServerListScreenTest {
                     ),
                     onAction = {},
                     onNavigateToEditor = { editedId = it },
+                    onCreateServer = {},
+                    onImportServers = {},
                 )
             }
         }

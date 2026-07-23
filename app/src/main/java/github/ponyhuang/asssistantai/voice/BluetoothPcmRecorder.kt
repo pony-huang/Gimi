@@ -35,7 +35,7 @@ class BluetoothPcmRecorder {
             AudioFormat.ENCODING_PCM_16BIT,
         )
         if (minBuffer <= 0) {
-            onError(IllegalStateException("无法确定蓝牙录音缓冲区大小"))
+            onError(BluetoothRecorderException(BluetoothRecorderException.Reason.BufferSizeUnavailable))
             return false
         }
         val audioRecord = runCatching {
@@ -56,13 +56,13 @@ class BluetoothPcmRecorder {
         }
         if (audioRecord.state != AudioRecord.STATE_INITIALIZED || !audioRecord.setPreferredDevice(route.input)) {
             audioRecord.release()
-            onError(IllegalStateException("无法将麦克风路由到蓝牙耳机"))
+            onError(BluetoothRecorderException(BluetoothRecorderException.Reason.MicrophoneRouteFailed))
             return false
         }
         return runCatching {
             audioRecord.startRecording()
-            check(audioRecord.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
-                "蓝牙麦克风没有开始录音"
+            if (audioRecord.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                throw BluetoothRecorderException(BluetoothRecorderException.Reason.NotRecording)
             }
             recorder = audioRecord
             readJob = scope.launch {
@@ -72,7 +72,12 @@ class BluetoothPcmRecorder {
                     when {
                         count > 0 -> onChunk(buffer.copyOf(count))
                         count < 0 && !stopping.get() -> {
-                            onError(IllegalStateException("蓝牙麦克风读取失败：$count"))
+                            onError(
+                                BluetoothRecorderException(
+                                    BluetoothRecorderException.Reason.ReadFailed,
+                                    errorCode = count,
+                                ),
+                            )
                             break
                         }
                     }
@@ -107,4 +112,12 @@ class BluetoothPcmRecorder {
         const val SAMPLE_RATE_HZ = 16_000
         private const val FRAME_BYTES = 3_200
     }
+}
+
+/** 录音失败原因类型化，文案由服务层按 locale 映射到字符串资源。 */
+internal class BluetoothRecorderException(
+    val reason: Reason,
+    val errorCode: Int? = null,
+) : IllegalStateException(reason.name) {
+    enum class Reason { BufferSizeUnavailable, MicrophoneRouteFailed, NotRecording, ReadFailed }
 }

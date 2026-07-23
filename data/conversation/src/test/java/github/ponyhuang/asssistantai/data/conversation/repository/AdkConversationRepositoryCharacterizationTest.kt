@@ -1,9 +1,11 @@
 package github.ponyhuang.asssistantai.data.conversation.repository
 
+import android.content.Context
 import app.cash.turbine.test
 import com.google.adk.kt.sessions.SessionService
 import github.ponyhuang.asssistantai.data.conversation.local.ConversationMetadataDao
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -13,6 +15,9 @@ class AdkConversationRepositoryCharacterizationTest {
 
     private val sessionService = mockk<SessionService>()
     private val metadataDao = mockk<ConversationMetadataDao>(relaxed = true)
+    private val context = mockk<Context> {
+        every { getString(any()) } returns "新对话"
+    }
 
     @Test
     fun contentUpdate_ignoresBlankId_andPublishesCompletedSessionId() = runTest {
@@ -39,5 +44,6 @@ class AdkConversationRepositoryCharacterizationTest {
         userId = "test-user",
         sessionService = sessionService,
         metadataDao = metadataDao,
+        context = context,
     )
 }

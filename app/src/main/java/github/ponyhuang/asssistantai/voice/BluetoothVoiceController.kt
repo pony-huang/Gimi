@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.asssistantai.R
+import github.ponyhuang.asssistantai.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.asssistantai.domain.speech.repository.VoiceWakeRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -26,15 +28,22 @@ class BluetoothVoiceController @Inject constructor(
     private val _state = MutableStateFlow(
         BluetoothVoiceUiState(
             keyword = preferences.keyword.value,
-            model = modelRepository.state.value,
+            availableModels = WakeModelCatalog.models,
+            activeModelId = preferences.activeModelId.value,
+            modelStates = modelRepository.states.value,
             voiceSessionId = preferences.voiceSessionId.value,
         ),
     )
     override val state: StateFlow<BluetoothVoiceUiState> = _state.asStateFlow()
 
     init {
+        scope.launch {
+            preferences.activeModelId.collect { modelId -> _state.update { it.copy(activeModelId = modelId) } }
+        }
         scope.launch { preferences.keyword.collect { keyword -> _state.update { it.copy(keyword = keyword) } } }
-        scope.launch { modelRepository.state.collect { model -> _state.update { it.copy(model = model) } } }
+        scope.launch {
+            modelRepository.states.collect { states -> _state.update { it.copy(modelStates = states) } }
+        }
         scope.launch {
             preferences.voiceSessionId.collect { sessionId ->
                 _state.update { it.copy(voiceSessionId = sessionId) }
@@ -45,14 +54,28 @@ class BluetoothVoiceController @Inject constructor(
     override fun setKeyword(keyword: String): Result<Unit> =
         runCatching { preferences.setKeyword(keyword) }
 
-    override fun installModel() = modelRepository.install()
+    override fun selectModel(modelId: String) {
+        runCatching { preferences.setActiveModel(modelId) }.onFailure { return }
+        if (_state.value.isRunning) {
+            stop()
+            start()
+        }
+    }
+
+    override fun installModel(modelId: String) = modelRepository.install(modelId)
 
     override fun start() {
-        if (modelRepository.modelPath() == null) {
-            setStatus(BluetoothVoiceStatus.Error, message = "请先下载唤醒模型")
+        if (modelPath() == null) {
+            setStatus(
+                BluetoothVoiceStatus.Error,
+                message = context.getString(R.string.bluetooth_voice_model_required),
+            )
             return
         }
-        setStatus(BluetoothVoiceStatus.Starting, message = "正在启动蓝牙语音监听")
+        setStatus(
+            BluetoothVoiceStatus.Starting,
+            message = context.getString(R.string.bluetooth_voice_starting_listener),
+        )
         ContextCompat.startForegroundService(
             context,
             Intent(context, BluetoothVoiceService::class.java).setAction(BluetoothVoiceService.ACTION_START),
@@ -74,7 +97,7 @@ class BluetoothVoiceController @Inject constructor(
         context.startService(Intent(context, BluetoothVoiceService::class.java).setAction(action))
     }
 
-    internal fun modelPath(): String? = modelRepository.modelPath()
+    internal fun modelPath(): String? = modelRepository.modelPath(preferences.activeModelId.value)
 
     internal fun setStatus(
         status: BluetoothVoiceStatus,

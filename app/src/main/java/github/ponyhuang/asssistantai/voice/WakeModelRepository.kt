@@ -2,6 +2,10 @@ package github.ponyhuang.asssistantai.voice
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.asssistantai.R
+import github.ponyhuang.asssistantai.domain.speech.model.WakeModelCatalog
+import github.ponyhuang.asssistantai.domain.speech.model.WakeModelInfo
+import github.ponyhuang.asssistantai.domain.speech.model.WakeModelSource
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
@@ -17,86 +21,141 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
-import okhttp3.Request
 
 @Singleton
 class WakeModelRepository @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val httpClient: OkHttpClient,
+    okHttpClient: OkHttpClient,
 ) {
+    private val downloader = WakeModelDownloader(okHttpClient)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val rootDir = File(context.filesDir, "voice/wake-model")
-    private val installedDir = File(rootDir, MODEL_NAME)
-    private val _state = MutableStateFlow(
-        if (isValidModel(installedDir)) WakeModelState(WakeModelStatus.Ready, 1f)
-        else WakeModelState(),
-    )
-    private var installJob: Job? = null
+    private val _states = MutableStateFlow(initialStates())
+    private val installJobs = mutableMapOf<String, Job>()
 
-    val state: StateFlow<WakeModelState> = _state.asStateFlow()
+    val states: StateFlow<Map<String, WakeModelState>> = _states.asStateFlow()
 
-    fun modelPath(): String? = installedDir.takeIf(::isValidModel)?.absolutePath
+    fun modelPath(modelId: String): String? =
+        installedDir(modelId).takeIf(::isValidModel)?.absolutePath
 
-    fun install() {
-        if (_state.value.status == WakeModelStatus.Ready || installJob?.isActive == true) return
-        installJob = scope.launch {
-            val archive = File(context.cacheDir, "$MODEL_NAME.download")
-            val extracting = File(rootDir, "$MODEL_NAME.extracting")
-            runCatching {
-                rootDir.mkdirs()
-                archive.delete()
-                extracting.deleteRecursively()
-                download(archive)
-                _state.value = WakeModelState(WakeModelStatus.Extracting, 1f, "正在安装唤醒模型")
-                unzipSafely(archive, extracting)
-                val extractedModel = findModelRoot(extracting)
-                    ?: error("下载包不包含有效的 Vosk 中文模型")
-                installedDir.deleteRecursively()
-                if (!extractedModel.renameTo(installedDir)) {
-                    extractedModel.copyRecursively(installedDir, overwrite = true)
-                }
-                check(isValidModel(installedDir)) { "唤醒模型文件不完整" }
-                _state.value = WakeModelState(WakeModelStatus.Ready, 1f)
-            }.onFailure { error ->
-                _state.value = WakeModelState(
-                    WakeModelStatus.Error,
-                    message = error.message ?: "唤醒模型下载失败",
-                )
-            }
+    fun install(modelId: String) {
+        val info = WakeModelCatalog.byId(modelId) ?: return
+        if (_states.value[modelId]?.status == WakeModelStatus.Ready) return
+        if (installJobs[modelId]?.isActive == true) return
+        installJobs[modelId] = scope.launch { installInternal(info) }
+    }
+
+    private fun installInternal(info: WakeModelInfo) {
+        val archive = File(context.cacheDir, "${info.id}.archive")
+        val extracting = File(rootDir, "${info.id}.extracting")
+        runCatching {
+            rootDir.mkdirs()
             archive.delete()
             extracting.deleteRecursively()
+            when (val source = info.source) {
+                is WakeModelSource.Bundled -> copyBundledAsset(info, source, archive)
+                is WakeModelSource.Downloadable -> downloadArchive(info, source, archive)
+            }
+            updateState(info.id, WakeModelState(WakeModelStatus.Extracting, 1f, getString(R.string.wake_model_installing)))
+            unzipSafely(archive, extracting)
+            val extractedModel = findModelRoot(extracting)
+                ?: error(getString(R.string.wake_model_package_invalid))
+            val target = installedDir(info.id)
+            target.deleteRecursively()
+            if (!extractedModel.renameTo(target)) {
+                extractedModel.copyRecursively(target, overwrite = true)
+            }
+            check(isValidModel(target)) { getString(R.string.wake_model_files_incomplete) }
+            updateState(info.id, WakeModelState(WakeModelStatus.Ready, 1f))
+        }.onFailure { error ->
+            updateState(
+                info.id,
+                WakeModelState(
+                    WakeModelStatus.Error,
+                    message = error.message ?: getString(R.string.wake_model_install_failed),
+                ),
+            )
+        }
+        archive.delete()
+        extracting.deleteRecursively()
+    }
+
+    private fun copyBundledAsset(info: WakeModelInfo, source: WakeModelSource.Bundled, archive: File) {
+        val message = getString(R.string.wake_model_reading_bundled)
+        updateState(info.id, WakeModelState(WakeModelStatus.Downloading, 0f, message))
+        val digest = MessageDigest.getInstance("SHA-256")
+        context.assets.open(source.assetPath).use { input ->
+            val total = input.available().toLong()
+            FileOutputStream(archive).use { output ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                var copied = 0L
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    digest.update(buffer, 0, read)
+                    output.write(buffer, 0, read)
+                    copied += read
+                    val progress = if (total > 0) copied.toFloat() / total else 0f
+                    updateState(
+                        info.id,
+                        WakeModelState(WakeModelStatus.Downloading, progress.coerceIn(0f, 1f), message),
+                    )
+                }
+            }
+        }
+        verifyChecksum(info, digest)
+    }
+
+    private fun downloadArchive(info: WakeModelInfo, source: WakeModelSource.Downloadable, archive: File) {
+        val message = getString(R.string.wake_model_downloading)
+        try {
+            downloader.download(source.url, source.sizeBytes, info.sha256, archive) { progress ->
+                updateState(info.id, WakeModelState(WakeModelStatus.Downloading, progress, message))
+            }
+        } catch (error: WakeModelDownloadException) {
+            val messageRes = when (error.reason) {
+                WakeModelDownloadException.Reason.ChecksumMismatch -> R.string.wake_model_checksum_failed
+                WakeModelDownloadException.Reason.Network -> R.string.wake_model_download_failed
+            }
+            error(getString(messageRes))
         }
     }
 
-    private fun download(archive: File) {
-        val digest = MessageDigest.getInstance("SHA-256")
-        _state.value = WakeModelState(WakeModelStatus.Downloading, 0f, "正在下载中文唤醒模型")
-        httpClient.newCall(Request.Builder().url(MODEL_URL).build()).execute().use { response ->
-            check(response.isSuccessful) { "唤醒模型下载失败：HTTP ${response.code}" }
-            val body = checkNotNull(response.body) { "唤醒模型下载失败：空响应体" }
-            val total = body.contentLength()
-            body.byteStream().use { input ->
-                FileOutputStream(archive).use { output ->
-                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                    var copied = 0L
-                    while (true) {
-                        val read = input.read(buffer)
-                        if (read < 0) break
-                        digest.update(buffer, 0, read)
-                        output.write(buffer, 0, read)
-                        copied += read
-                        val progress = if (total > 0) copied.toFloat() / total else 0f
-                        _state.value = WakeModelState(
-                            WakeModelStatus.Downloading,
-                            progress.coerceIn(0f, 1f),
-                            "正在下载中文唤醒模型",
-                        )
-                    }
-                }
+    private fun verifyChecksum(info: WakeModelInfo, digest: MessageDigest) {
+        val sha256 = digest.digest().joinToString("") { "%02x".format(it) }
+        check(sha256 == info.sha256) { getString(R.string.wake_model_checksum_failed) }
+    }
+
+    private fun updateState(modelId: String, state: WakeModelState) {
+        _states.value = _states.value + (modelId to state)
+    }
+
+    private fun getString(resId: Int): String = context.getString(resId)
+
+    private fun installedDir(modelId: String): File = File(rootDir, modelId)
+
+    private fun initialStates(): Map<String, WakeModelState> {
+        migrateLegacyChineseModel()
+        return WakeModelCatalog.models.associate { info ->
+            val state = if (isValidModel(installedDir(info.id))) {
+                WakeModelState(WakeModelStatus.Ready, 1f)
+            } else {
+                WakeModelState()
+            }
+            info.id to state
+        }
+    }
+
+    /** 旧版本中文模型目录按模型文件命名，迁移到按模型 id 命名的目录。 */
+    private fun migrateLegacyChineseModel() {
+        val legacy = File(rootDir, LEGACY_CHINESE_MODEL_DIR)
+        val target = installedDir(WakeModelCatalog.Chinese.id)
+        if (legacy.isDirectory && !target.exists()) {
+            if (!legacy.renameTo(target)) {
+                legacy.copyRecursively(target, overwrite = true)
+                legacy.deleteRecursively()
             }
         }
-        val sha256 = digest.digest().joinToString("") { "%02x".format(it) }
-        check(sha256 == MODEL_SHA256) { "唤醒模型校验失败" }
     }
 
     private fun unzipSafely(archive: File, destination: File) {
@@ -106,7 +165,9 @@ class WakeModelRepository @Inject constructor(
             while (true) {
                 val entry = zip.nextEntry ?: break
                 val output = File(destination, entry.name)
-                require(output.canonicalPath.startsWith(destinationPath)) { "模型压缩包路径无效" }
+                require(output.canonicalPath.startsWith(destinationPath)) {
+                    getString(R.string.wake_model_package_invalid)
+                }
                 if (entry.isDirectory) {
                     output.mkdirs()
                 } else {
@@ -128,8 +189,6 @@ class WakeModelRepository @Inject constructor(
             File(directory, "graph/phones/word_boundary.int").isFile
 
     private companion object {
-        const val MODEL_NAME = "vosk-model-small-cn-0.22"
-        const val MODEL_URL = "https://alphacephei.com/vosk/models/$MODEL_NAME.zip"
-        const val MODEL_SHA256 = "3af8b0e7e0f835ae9d414ce5df580237a3cfb08d586c9fbbb0f7ff29ad5b14ba"
+        const val LEGACY_CHINESE_MODEL_DIR = "vosk-model-small-cn-0.22"
     }
 }

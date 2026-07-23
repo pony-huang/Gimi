@@ -7,6 +7,7 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.asssistantai.R
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechSynthesisRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -17,7 +18,7 @@ import kotlinx.coroutines.withContext
 
 @Singleton
 class VoiceSpeechPlayer @Inject constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
     private val synthesis: SpeechSynthesisRepository,
 ) {
     private val audioManager = context.getSystemService(AudioManager::class.java)
@@ -62,7 +63,9 @@ class VoiceSpeechPlayer @Inject constructor(
                 var offset = 0
                 while (offset < bytes.size) {
                     val written = track.write(bytes, offset, bytes.size - offset, AudioTrack.WRITE_BLOCKING)
-                    check(written >= 0) { "蓝牙语音播放失败：$written" }
+                    check(written >= 0) {
+                        context.getString(R.string.bluetooth_voice_playback_failed, written)
+                    }
                     offset += written
                     frames += written / 2
                 }

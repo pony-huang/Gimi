@@ -10,6 +10,9 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.asssistantai.domain.speech.model.VoiceWakeState
+import github.ponyhuang.asssistantai.domain.speech.model.WakeKeywordError
+import github.ponyhuang.asssistantai.domain.speech.model.WakeKeywordException
+import github.ponyhuang.asssistantai.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelState
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelStatus
 import github.ponyhuang.asssistantai.domain.speech.repository.VoiceWakeRepository
@@ -22,6 +25,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -67,7 +71,7 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
 
             viewModel.onAction(VoiceWakeSettingsAction.ToggleListening(enabled = true))
 
-            verify(exactly = 1) { voiceRepository.installModel() }
+            verify(exactly = 1) { voiceRepository.installModel(WakeModelCatalog.Chinese.id) }
             assertEquals(null, viewModel.uiState.value.permissionRequestId)
             verify(exactly = 0) { voiceRepository.start() }
             cancelAndIgnoreRemainingEvents()
@@ -75,13 +79,71 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
     }
 
     @Test
-    fun selectingPresetKeywordPersistsThroughRepository() = runTest {
+    fun invalidKeywordSurfacesTypedValidationError() = runTest {
+        val voiceRepository = voiceRepository(ready = true)
+        every { voiceRepository.setKeyword("x") } returns
+            Result.failure(WakeKeywordException(WakeKeywordError.InvalidLength))
+        val viewModel = viewModel(modelRepository(), voiceRepository)
+
+        viewModel.uiState.test {
+            awaitItem()
+            viewModel.onAction(VoiceWakeSettingsAction.KeywordChanged("x"))
+            var state = awaitItem()
+            while (state.keywordDraft != "x") state = awaitItem()
+
+            viewModel.onAction(VoiceWakeSettingsAction.SaveKeyword)
+            do {
+                state = awaitItem()
+            } while (state.keywordError == null)
+
+            assertEquals(WakeKeywordError.InvalidLength, state.keywordError)
+            verify(exactly = 1) { voiceRepository.setKeyword("x") }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun selectingModelRestoresThatModelsSavedKeywordAndAutoInstalls() = runTest {
         val voiceRepository = voiceRepository(ready = true)
         val viewModel = viewModel(modelRepository(), voiceRepository)
 
-        viewModel.onAction(VoiceWakeSettingsAction.KeywordSelected("小助手"))
+        viewModel.uiState.test {
+            var state = awaitItem()
+            while (!state.configurationReady) state = awaitItem()
 
-        verify(exactly = 1) { voiceRepository.setKeyword("小助手") }
+            viewModel.onAction(VoiceWakeSettingsAction.KeywordChanged("自定义唤醒词"))
+            state = awaitItem()
+            while (state.keywordDraft != "自定义唤醒词") state = awaitItem()
+
+            viewModel.onAction(VoiceWakeSettingsAction.SelectModel(WakeModelCatalog.English.id))
+            do {
+                state = awaitItem()
+            } while (state.voiceState.activeModelId != WakeModelCatalog.English.id)
+
+            // 草稿丢弃，输入框回落为英语模型已保存（默认）的唤醒词。
+            assertEquals(WakeModelCatalog.English.defaultKeyword, state.keywordDraft)
+            assertNull(state.keywordError)
+            // 英语模型未安装，选中后自动触发安装。
+            verify(exactly = 1) { voiceRepository.installModel(WakeModelCatalog.English.id) }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun selectingInstalledModelDoesNotReinstall() = runTest {
+        val voiceRepository = voiceRepository(ready = true)
+        val viewModel = viewModel(modelRepository(), voiceRepository)
+
+        viewModel.uiState.test {
+            var state = awaitItem()
+            while (!state.configurationReady) state = awaitItem()
+
+            // 中文模型已安装且已激活，重复选中不触发安装（状态不变，不会有新发射）。
+            viewModel.onAction(VoiceWakeSettingsAction.SelectModel(WakeModelCatalog.Chinese.id))
+
+            verify(exactly = 0) { voiceRepository.installModel(any()) }
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test
@@ -112,15 +174,27 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
         )
     }
 
-    private fun voiceRepository(ready: Boolean): VoiceWakeRepository = mockk(relaxed = true) {
-        every { state } returns MutableStateFlow(
+    private fun voiceRepository(ready: Boolean): VoiceWakeRepository {
+        val flow = MutableStateFlow(
             VoiceWakeState(
-                model = WakeModelState(
-                    status = if (ready) WakeModelStatus.Ready else WakeModelStatus.Missing,
+                availableModels = WakeModelCatalog.models,
+                activeModelId = WakeModelCatalog.Chinese.id,
+                modelStates = mapOf(
+                    WakeModelCatalog.Chinese.id to WakeModelState(
+                        status = if (ready) WakeModelStatus.Ready else WakeModelStatus.Missing,
+                    ),
+                    WakeModelCatalog.English.id to WakeModelState(WakeModelStatus.Missing),
                 ),
             ),
         )
-        every { setKeyword(any()) } returns Result.success(Unit)
+        return mockk(relaxed = true) {
+            every { state } returns flow
+            every { setKeyword(any()) } returns Result.success(Unit)
+            every { selectModel(any()) } answers {
+                val info = WakeModelCatalog.byId(firstArg()) ?: return@answers Unit
+                flow.value = flow.value.copy(activeModelId = info.id, keyword = info.defaultKeyword)
+            }
+        }
     }
 
     private fun modelRepository(

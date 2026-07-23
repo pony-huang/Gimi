@@ -19,6 +19,8 @@ import androidx.core.content.ContextCompat
 import dagger.hilt.android.AndroidEntryPoint
 import github.ponyhuang.asssistantai.MainActivity
 import github.ponyhuang.asssistantai.R
+import github.ponyhuang.asssistantai.domain.speech.model.WakeModelCatalog
+import github.ponyhuang.asssistantai.domain.speech.model.WakeModelInfo
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechRecognitionRepository
 import github.ponyhuang.asssistantai.domain.speech.usecase.markdownToSpeechText
 import javax.inject.Inject
@@ -105,11 +107,11 @@ class BluetoothVoiceService : Service() {
         ServiceCompat.startForeground(
             this,
             NOTIFICATION_ID,
-            buildNotification(BluetoothVoiceStatus.Starting, "正在启动监听"),
+            buildNotification(BluetoothVoiceStatus.Starting, getString(R.string.bluetooth_voice_status_starting)),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
         )
         if (!hasRequiredPermissions()) {
-            setStatus(BluetoothVoiceStatus.Error, "缺少麦克风或蓝牙权限")
+            setStatus(BluetoothVoiceStatus.Error, getString(R.string.bluetooth_voice_status_permission_missing))
             return
         }
         recoveryJob?.cancel()
@@ -121,13 +123,16 @@ class BluetoothVoiceService : Service() {
     private suspend fun reconcileBluetoothRoute() {
         if (pausedByUser || processingJob?.isActive == true) return
         if (!hasRequiredPermissions()) {
-            setStatus(BluetoothVoiceStatus.Error, "缺少麦克风或蓝牙权限")
+            setStatus(BluetoothVoiceStatus.Error, getString(R.string.bluetooth_voice_status_permission_missing))
             return
         }
         val available = runCatching { audioRouter.findRoute() }.getOrNull()
         if (available == null) {
             stopAudioCapture(releaseRoute = true)
-            setStatus(BluetoothVoiceStatus.WaitingForBluetooth, "请连接支持通话麦克风的蓝牙耳机")
+            setStatus(
+                BluetoothVoiceStatus.WaitingForBluetooth,
+                getString(R.string.bluetooth_voice_status_waiting_bluetooth),
+            )
             return
         }
         val current = route
@@ -141,13 +146,16 @@ class BluetoothVoiceService : Service() {
         stopAudioCapture(releaseRoute = false)
         val modelPath = controller.modelPath()
         if (modelPath == null) {
-            setStatus(BluetoothVoiceStatus.Error, "唤醒模型尚未安装")
+            setStatus(BluetoothVoiceStatus.Error, getString(R.string.bluetooth_voice_status_model_missing))
             return
         }
         val activated = runCatching { audioRouter.activate(newRoute) }.getOrDefault(false)
         if (!activated) {
             audioRouter.release()
-            setStatus(BluetoothVoiceStatus.WaitingForBluetooth, "无法启用蓝牙通话音频")
+            setStatus(
+                BluetoothVoiceStatus.WaitingForBluetooth,
+                getString(R.string.bluetooth_voice_status_bluetooth_audio_unavailable),
+            )
             return
         }
         route = newRoute
@@ -158,7 +166,10 @@ class BluetoothVoiceService : Service() {
         }.getOrElse { error ->
             audioRouter.release()
             route = null
-            setStatus(BluetoothVoiceStatus.Error, error.message ?: "无法加载唤醒模型")
+            setStatus(
+                BluetoothVoiceStatus.Error,
+                error.message ?: getString(R.string.bluetooth_voice_status_model_load_failed),
+            )
             return
         }
         detector = wakeDetector
@@ -177,13 +188,13 @@ class BluetoothVoiceService : Service() {
             detector = null
             audioRouter.release()
             route = null
-            setStatus(BluetoothVoiceStatus.Error, "蓝牙麦克风启动失败")
+            setStatus(BluetoothVoiceStatus.Error, getString(R.string.bluetooth_voice_status_mic_start_failed))
             return
         }
         recoveryAttempts = 0
         setStatus(
             BluetoothVoiceStatus.Listening,
-            "正在监听“${preferences.keyword.value}”",
+            getString(R.string.bluetooth_voice_status_listening, preferences.keyword.value),
             deviceName = newRoute.name,
         )
     }
@@ -202,7 +213,10 @@ class BluetoothVoiceService : Service() {
                         capture = null
                         detector?.reset()
                         scope.launch {
-                            setStatus(BluetoothVoiceStatus.Listening, "未听到任务，继续监听")
+                            setStatus(
+                                BluetoothVoiceStatus.Listening,
+                                getString(R.string.bluetooth_voice_status_no_command),
+                            )
                         }
                     }
                     is CaptureDecision.Complete -> {
@@ -227,7 +241,10 @@ class BluetoothVoiceService : Service() {
                 capture = VoiceCommandCapture(preRoll.snapshot(), now)
                 scope.launch { playWakeCue() }
                 scope.launch {
-                    setStatus(BluetoothVoiceStatus.CapturingCommand, "请说出任务")
+                    setStatus(
+                        BluetoothVoiceStatus.CapturingCommand,
+                        getString(R.string.bluetooth_voice_status_say_command),
+                    )
                 }
             }
         }
@@ -247,13 +264,16 @@ class BluetoothVoiceService : Service() {
         processingJob?.cancel()
         processingJob = scope.launch {
             try {
-                setStatus(BluetoothVoiceStatus.Transcribing, "正在识别任务")
+                setStatus(BluetoothVoiceStatus.Transcribing, getString(R.string.bluetooth_voice_status_transcribing))
                 val transcript = speechRecognition.transcribe(pcm16)
                 val command = stripWakeKeyword(transcript, preferences.keyword.value)
-                check(command.isNotBlank()) { "没有识别到唤醒词后的任务内容" }
+                check(command.isNotBlank()) { getString(R.string.bluetooth_voice_status_no_task_content) }
                 setStatus(
                     BluetoothVoiceStatus.RunningAgent,
-                    "正在执行：${command.take(NOTIFICATION_PREVIEW_LENGTH)}",
+                    getString(
+                        R.string.bluetooth_voice_status_running_agent,
+                        command.take(NOTIFICATION_PREVIEW_LENGTH),
+                    ),
                     lastCommand = command,
                 )
                 val result = agentTasks.execute(command, ::confirmVoiceTool)
@@ -261,7 +281,7 @@ class BluetoothVoiceService : Service() {
                 if (activeRoute != null && speechPlayer.isAvailable()) {
                     setStatus(
                         BluetoothVoiceStatus.Speaking,
-                        "正在播报任务结果",
+                        getString(R.string.bluetooth_voice_status_speaking),
                         deviceName = activeRoute.name,
                         lastCommand = command,
                     )
@@ -278,7 +298,7 @@ class BluetoothVoiceService : Service() {
             } catch (error: Throwable) {
                 setStatus(
                     BluetoothVoiceStatus.Error,
-                    error.message ?: "语音任务执行失败",
+                    error.message ?: getString(R.string.bluetooth_voice_status_task_failed),
                     lastCommand = controller.state.value.lastCommand,
                 )
                 delay(3_000)
@@ -292,20 +312,24 @@ class BluetoothVoiceService : Service() {
     private suspend fun confirmVoiceTool(request: VoiceToolConfirmation): Boolean {
         val activeRoute = runCatching { audioRouter.findRoute() }.getOrNull() ?: return false
         if (!speechPlayer.isAvailable()) return false
+        val wakeModel = activeWakeModel()
         setStatus(
             BluetoothVoiceStatus.Speaking,
-            "等待确认：${request.toolName}",
+            getString(R.string.bluetooth_voice_status_confirm_wait, request.toolName),
             deviceName = activeRoute.name,
         )
         val promptPlayed = speechPlayer.play(
-            "需要执行工具 ${request.toolName}。请说确认、允许或执行；如需取消，请说取消、拒绝或不要。",
+            wakeModel.confirmationPromptTemplate.format(request.toolName),
             activeRoute,
         )
         if (!promptPlayed) return false
 
         setStatus(
             BluetoothVoiceStatus.CapturingCommand,
-            "请在 15 秒内确认或拒绝",
+            getString(
+                R.string.bluetooth_voice_status_confirm_window,
+                CONFIRMATION_TIMEOUT_MS / 1000,
+            ),
             deviceName = activeRoute.name,
         )
         val audio = CompletableDeferred<ByteArray?>()
@@ -341,27 +365,53 @@ class BluetoothVoiceService : Service() {
             confirmationRecorder.release()
         } ?: return false
 
-        setStatus(BluetoothVoiceStatus.Transcribing, "正在识别确认口令")
+        setStatus(
+            BluetoothVoiceStatus.Transcribing,
+            getString(R.string.bluetooth_voice_status_transcribing_confirmation),
+        )
         val transcript = runCatching { speechRecognition.transcribe(pcm16) }.getOrNull() ?: return false
-        return isVoiceConfirmationApproved(transcript)
+        return isVoiceConfirmationApproved(transcript, wakeModel.confirmWords, wakeModel.rejectWords)
     }
+
+    private fun activeWakeModel(): WakeModelInfo =
+        WakeModelCatalog.byId(preferences.activeModelId.value) ?: WakeModelCatalog.default
 
     private fun recoverFromAudioError(error: Throwable) {
         stopAudioCapture(releaseRoute = true)
         if (pausedByUser || pausedByCall) return
         if (recoveryAttempts >= MAX_RECOVERY_ATTEMPTS) {
-            setStatus(BluetoothVoiceStatus.Error, error.message ?: "蓝牙录音失败")
+            setStatus(BluetoothVoiceStatus.Error, recorderErrorMessage(error))
             return
         }
         recoveryAttempts += 1
         val delayMs = RECOVERY_BASE_DELAY_MS shl (recoveryAttempts - 1)
         setStatus(
             BluetoothVoiceStatus.Starting,
-            "录音失败，${delayMs / 1000} 秒后重试（$recoveryAttempts/$MAX_RECOVERY_ATTEMPTS）",
+            getString(
+                R.string.bluetooth_voice_status_retrying,
+                delayMs / 1000,
+                recoveryAttempts,
+                MAX_RECOVERY_ATTEMPTS,
+            ),
         )
         recoveryJob = scope.launch {
             delay(delayMs)
             reconcileBluetoothRoute()
+        }
+    }
+
+    private fun recorderErrorMessage(error: Throwable): String {
+        val recorderError = error as? BluetoothRecorderException
+            ?: return error.message ?: getString(R.string.bluetooth_voice_status_recorder_failed)
+        return when (recorderError.reason) {
+            BluetoothRecorderException.Reason.BufferSizeUnavailable ->
+                getString(R.string.bluetooth_voice_error_buffer_size)
+            BluetoothRecorderException.Reason.MicrophoneRouteFailed ->
+                getString(R.string.bluetooth_voice_error_route_failed)
+            BluetoothRecorderException.Reason.NotRecording ->
+                getString(R.string.bluetooth_voice_error_not_recording)
+            BluetoothRecorderException.Reason.ReadFailed ->
+                getString(R.string.bluetooth_voice_error_read_failed, recorderError.errorCode ?: 0)
         }
     }
 
@@ -371,7 +421,7 @@ class BluetoothVoiceService : Service() {
         processingJob?.cancel()
         processingJob = null
         stopAudioCapture(releaseRoute = true)
-        setStatus(BluetoothVoiceStatus.Paused, "监听已暂停")
+        setStatus(BluetoothVoiceStatus.Paused, getString(R.string.bluetooth_voice_status_paused))
     }
 
     private fun stopAudioCapture(releaseRoute: Boolean) {
@@ -426,7 +476,13 @@ class BluetoothVoiceService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val pauseAction = if (status == BluetoothVoiceStatus.Paused) ACTION_RESUME else ACTION_PAUSE
-        val pauseLabel = if (status == BluetoothVoiceStatus.Paused) "继续" else "暂停"
+        val pauseLabel = getString(
+            if (status == BluetoothVoiceStatus.Paused) {
+                R.string.bluetooth_voice_action_resume
+            } else {
+                R.string.bluetooth_voice_action_pause
+            },
+        )
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(getString(R.string.bluetooth_voice_notification_title))
@@ -438,7 +494,11 @@ class BluetoothVoiceService : Service() {
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .addAction(0, pauseLabel, servicePendingIntent(pauseAction, 2))
-            .addAction(0, "停止", servicePendingIntent(ACTION_STOP, 3))
+            .addAction(
+                0,
+                getString(R.string.bluetooth_voice_action_stop),
+                servicePendingIntent(ACTION_STOP, 3),
+            )
             .build()
     }
 
@@ -495,9 +555,17 @@ class BluetoothVoiceService : Service() {
     }
 }
 
-internal fun isVoiceConfirmationApproved(transcript: String): Boolean {
+/**
+ * 判断语音确认口令。确认/取消词表由调用方按激活唤醒模型的语言传入
+ * （用户对设备说的是模型语言，而非界面语言）。
+ */
+internal fun isVoiceConfirmationApproved(
+    transcript: String,
+    confirmWords: List<String>,
+    rejectWords: List<String>,
+): Boolean {
     val normalized = transcript.trim().lowercase()
-    val rejected = listOf("取消", "拒绝", "不要").any(normalized::contains)
+    val rejected = rejectWords.any(normalized::contains)
     if (rejected) return false
-    return listOf("确认", "允许", "执行").any(normalized::contains)
+    return confirmWords.any(normalized::contains)
 }

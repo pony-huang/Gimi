@@ -1,9 +1,11 @@
 package github.ponyhuang.asssistantai.data.conversation.repository
 
+import android.content.Context
 import android.util.Log
 import com.google.adk.kt.sessions.Session
 import com.google.adk.kt.sessions.SessionKey
 import com.google.adk.kt.sessions.SessionService
+import github.ponyhuang.asssistantai.data.conversation.R
 import github.ponyhuang.asssistantai.data.conversation.local.ConversationMetadataDao
 import github.ponyhuang.asssistantai.data.conversation.local.ConversationMetadataEntity
 import github.ponyhuang.asssistantai.data.conversation.mapper.EventMapper
@@ -33,6 +35,7 @@ class AdkConversationRepository(
     private val userId: String,
     private val sessionService: SessionService,
     private val metadataDao: ConversationMetadataDao,
+    private val context: Context,
 ) : ConversationRepository {
 
     private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
@@ -256,7 +259,8 @@ class AdkConversationRepository(
             if (titleSource.length > TITLE_MAX_LENGTH) "$it…" else it
         } ?: events.firstOrNull { event ->
             event.author == "user" && event.content?.parts.orEmpty().any { it.inlineData?.mimeType?.startsWith("image/") == true }
-        }?.let { "图片消息" } ?: "新对话"
+        }?.let { context.getString(R.string.conversation_image_message_title) }
+            ?: context.getString(R.string.conversation_default_title)
         val title = persistedTitle?.takeIf(String::isNotBlank) ?: fallbackTitle
 
         val lastMessage: String = events.lastOrNull { e ->

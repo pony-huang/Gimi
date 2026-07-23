@@ -27,7 +27,9 @@ class ManageVoiceWakeUseCase @Inject constructor(
 ) {
     fun setKeyword(keyword: String) = repository.setKeyword(keyword)
 
-    fun installModel() = repository.installModel()
+    fun selectModel(modelId: String) = repository.selectModel(modelId)
+
+    fun installModel(modelId: String) = repository.installModel(modelId)
 
     fun start() = repository.start()
 

@@ -1,7 +1,10 @@
 package github.ponyhuang.asssistantai.voice
 
+import android.content.Context
 import com.google.adk.kt.events.Event
 import com.google.adk.kt.types.FunctionCall
+import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.asssistantai.R
 import github.ponyhuang.asssistantai.agent.AgentChatRunner
 import github.ponyhuang.asssistantai.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentRuntimeGate
@@ -29,6 +32,7 @@ data class VoiceToolConfirmation(
 
 @Singleton
 class VoiceAgentTaskExecutor @Inject constructor(
+    @ApplicationContext private val context: Context,
     @VoiceAgentRunner private val runner: AgentChatRunner,
     private val repository: ConversationRepository,
     private val modelServices: ModelCatalogRepository,
@@ -45,7 +49,7 @@ class VoiceAgentTaskExecutor @Inject constructor(
         try {
             modelServices.awaitReady()
             val selection = defaultSelection()
-                ?: error("请先配置可用的默认助手模型")
+                ?: error(context.getString(R.string.bluetooth_voice_no_agent_model))
             val encodedSelection = ModelSelectionCodec.encode(selection)
             val sessionId = ensureVoiceSession(encodedSelection)
             repository.setConversationModel(sessionId, encodedSelection)
@@ -87,7 +91,9 @@ class VoiceAgentTaskExecutor @Inject constructor(
             repository.notifyConversationContentChanged(sessionId)
             VoiceAgentResult(
                 sessionId = sessionId,
-                responseText = accumulator.result().ifBlank { "任务已完成" },
+                responseText = accumulator.result().ifBlank {
+                    context.getString(R.string.bluetooth_voice_task_completed)
+                },
             )
         } finally {
             lease.release()
@@ -99,7 +105,7 @@ class VoiceAgentTaskExecutor @Inject constructor(
             if (repository.loadMessages(saved) != null) return saved
         }
         val created = repository.createConversation(initialModel = initialModel, activate = false)
-        check(created.isNotBlank()) { "无法创建蓝牙语音会话" }
+        check(created.isNotBlank()) { context.getString(R.string.bluetooth_voice_session_create_failed) }
         preferences.setVoiceSessionId(created)
         return created
     }

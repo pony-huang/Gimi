@@ -8,6 +8,7 @@ import com.google.adk.kt.annotations.ExperimentalResumabilityFeature
 import com.google.adk.kt.apps.App
 import com.google.adk.kt.artifacts.ArtifactService
 import com.google.adk.kt.events.Event
+import com.google.adk.kt.plugins.LoggingPlugin
 import com.google.adk.kt.runners.InMemoryRunner
 import com.google.adk.kt.sessions.SessionService
 import com.google.adk.kt.types.Content
@@ -59,6 +60,7 @@ class AgentChatRunner(
     private fun buildRunner(agent: BaseAgent): InMemoryRunner = InMemoryRunner(
         app = App(
             appName = APP_NAME,
+            plugins = mutableListOf(LoggingPlugin()),
             rootAgent = agent,
             resumabilityConfig = ResumabilityConfig(isResumable = true),
         ),

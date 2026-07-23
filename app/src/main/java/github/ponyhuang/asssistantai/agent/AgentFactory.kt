@@ -5,7 +5,9 @@ import com.google.adk.kt.agents.BaseAgent
 import com.google.adk.kt.agents.Instruction
 import com.google.adk.kt.agents.LlmAgent
 import com.google.adk.kt.models.Model
+import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.BaseTool
+import com.google.adk.kt.tools.SkillToolset
 import com.openai.client.okhttp.OpenAIOkHttpClient
 import github.ponyhuang.asssistantai.data.ApiBaseType
 import github.ponyhuang.asssistantai.data.LLMModelSelection
@@ -21,6 +23,7 @@ class AgentFactory @Inject constructor(
     private val localToolCatalog: LocalToolCatalog,
     private val toolAuthorization: ToolAuthorizationRepository,
     private val mcpToolRegistry: McpToolRegistry,
+    private val skillSource: SkillSource,
 ) {
     suspend fun create(selection: LLMModelSelection? = null): BaseAgent {
         val cfg = selectModelConfig(selection)
@@ -40,6 +43,7 @@ class AgentFactory @Inject constructor(
                 AgentPrompts.defaultAssistantInstruction(tools.mapTo(linkedSetOf(), BaseTool::name)),
             ),
             tools = tools,
+            toolsets = listOf(SkillToolset(skillSource)),
             beforeModelCallbacks = listOf(titleCallbacks.beforeModel()),
             afterModelCallbacks = listOf(titleCallbacks.afterModel()),
             afterAgentCallbacks = listOf(titleCallbacks.afterAgent()),

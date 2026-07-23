@@ -4,7 +4,6 @@ import com.google.adk.kt.agents.BaseAgent
 import com.google.adk.kt.agents.ResumabilityConfig
 import com.google.adk.kt.agents.RunConfig
 import com.google.adk.kt.agents.StreamingMode
-import com.google.adk.kt.annotations.ExperimentalResumabilityFeature
 import com.google.adk.kt.apps.App
 import com.google.adk.kt.artifacts.ArtifactService
 import com.google.adk.kt.events.Event
@@ -57,7 +56,6 @@ class AgentChatRunner(
     private val runners = mutableMapOf<String, RunnerEntry>()
     private val runnerMutex = Mutex()
 
-    @OptIn(ExperimentalResumabilityFeature::class)
     private fun buildRunner(agent: BaseAgent): InMemoryRunner = InMemoryRunner(
         app = App(
             appName = APP_NAME,

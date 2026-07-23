@@ -47,6 +47,7 @@ fun SettingsScreen(
     onNavigateToDefaultModels: () -> Unit,
     onNavigateToVoiceWake: () -> Unit,
     onNavigateToMcpServers: () -> Unit,
+    onNavigateToSkills: () -> Unit,
     onNavigateToWorkFiles: () -> Unit,
     onNavigateToPermissions: () -> Unit,
     onNavigateToToolAuthorization: () -> Unit,
@@ -62,6 +63,7 @@ fun SettingsScreen(
         onNavigateToDefaultModels = onNavigateToDefaultModels,
         onNavigateToVoiceWake = onNavigateToVoiceWake,
         onNavigateToMcpServers = onNavigateToMcpServers,
+        onNavigateToSkills = onNavigateToSkills,
         onNavigateToWorkFiles = onNavigateToWorkFiles,
         onNavigateToPermissions = onNavigateToPermissions,
         onNavigateToToolAuthorization = onNavigateToToolAuthorization,
@@ -78,6 +80,7 @@ private fun SettingsHomeContent(
     onNavigateToDefaultModels: () -> Unit,
     onNavigateToVoiceWake: () -> Unit,
     onNavigateToMcpServers: () -> Unit,
+    onNavigateToSkills: () -> Unit,
     onNavigateToWorkFiles: () -> Unit,
     onNavigateToPermissions: () -> Unit,
     onNavigateToToolAuthorization: () -> Unit,
@@ -130,6 +133,14 @@ private fun SettingsHomeContent(
                     title = stringResource(R.string.settings_tool_authorization_title),
                     subtitle = stringResource(R.string.settings_tool_authorization_subtitle),
                     onClick = onNavigateToToolAuthorization,
+                )
+            }
+            item {
+                SettingsNavigationCard(
+                    icon = Icons.Default.Extension,
+                    title = stringResource(R.string.settings_skills_title),
+                    subtitle = stringResource(R.string.settings_skills_subtitle),
+                    onClick = onNavigateToSkills,
                 )
             }
             item {
@@ -191,6 +202,7 @@ private fun SettingsHomePreview() {
                 onNavigateToDefaultModels = {},
                 onNavigateToVoiceWake = {},
                 onNavigateToMcpServers = {},
+                onNavigateToSkills = {},
                 onNavigateToWorkFiles = {},
                 onNavigateToPermissions = {},
                 onNavigateToToolAuthorization = {},

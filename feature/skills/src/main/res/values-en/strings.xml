@@ -1,0 +1,36 @@
+<resources>
+    <string name="skills_screen_title">Skills</string>
+    <string name="skills_import_section">Install a skill</string>
+    <string name="skills_import_url">Install from URL</string>
+    <string name="skills_import_url_subtitle">Download a public HTTPS ZIP archive</string>
+    <string name="skills_import_local">Choose local ZIP</string>
+    <string name="skills_import_local_subtitle">Select a skill archive from this device</string>
+    <string name="skills_importing">Validating and installing…</string>
+    <string name="skills_installed_section">Installed</string>
+    <string name="skills_empty">No skills installed</string>
+    <string name="skills_remove">Delete %1$s</string>
+
+    <string name="skills_url_dialog_title">Install from URL</string>
+    <string name="skills_url_label">HTTPS ZIP URL</string>
+    <string name="skills_install">Install</string>
+    <string name="skills_cancel">Cancel</string>
+
+    <string name="skills_replace_title">Replace existing skill?</string>
+    <string name="skills_replace_message">%1$s is already installed. Confirm to replace its current contents.</string>
+    <string name="skills_replace_action">Replace</string>
+
+    <string name="skills_delete_title">Delete skill?</string>
+    <string name="skills_delete_message">%1$s will be removed from this device. Other skills are not affected.</string>
+    <string name="skills_delete_action">Delete</string>
+
+    <string name="skills_notice_installed">Installed %1$s</string>
+    <string name="skills_notice_removed">Deleted %1$s</string>
+    <string name="skills_error_invalid_source">Choose a valid ZIP or enter an HTTPS URL</string>
+    <string name="skills_error_download">Could not download the skill</string>
+    <string name="skills_error_too_large">The skill archive or extracted content is too large</string>
+    <string name="skills_error_too_many_entries">The skill archive contains too many files</string>
+    <string name="skills_error_invalid_structure">The ZIP must contain one top-level skill directory</string>
+    <string name="skills_error_unsafe_archive">The ZIP contains an unsafe file path</string>
+    <string name="skills_error_invalid_manifest">SKILL.md is missing or invalid</string>
+    <string name="skills_error_storage">The skill file operation could not be completed</string>
+</resources>

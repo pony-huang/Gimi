@@ -1,0 +1,36 @@
+<resources>
+    <string name="skills_screen_title">Skills</string>
+    <string name="skills_import_section">安装 Skill</string>
+    <string name="skills_import_url">从 URL 安装</string>
+    <string name="skills_import_url_subtitle">下载公开的 HTTPS ZIP 压缩包</string>
+    <string name="skills_import_local">选择本地 ZIP</string>
+    <string name="skills_import_local_subtitle">从设备文件中选择 Skill 压缩包</string>
+    <string name="skills_importing">正在校验并安装…</string>
+    <string name="skills_installed_section">已安装</string>
+    <string name="skills_empty">尚未安装 Skill</string>
+    <string name="skills_remove">删除 %1$s</string>
+
+    <string name="skills_url_dialog_title">从 URL 安装</string>
+    <string name="skills_url_label">HTTPS ZIP 地址</string>
+    <string name="skills_install">安装</string>
+    <string name="skills_cancel">取消</string>
+
+    <string name="skills_replace_title">替换已有 Skill？</string>
+    <string name="skills_replace_message">%1$s 已安装。确认后将使用新压缩包替换现有内容。</string>
+    <string name="skills_replace_action">替换</string>
+
+    <string name="skills_delete_title">删除 Skill？</string>
+    <string name="skills_delete_message">将从本机删除 %1$s。此操作不会影响其他 Skill。</string>
+    <string name="skills_delete_action">删除</string>
+
+    <string name="skills_notice_installed">已安装 %1$s</string>
+    <string name="skills_notice_removed">已删除 %1$s</string>
+    <string name="skills_error_invalid_source">请选择有效的 ZIP，或输入 HTTPS 地址</string>
+    <string name="skills_error_download">下载 Skill 失败</string>
+    <string name="skills_error_too_large">Skill 压缩包或解压内容超过大小限制</string>
+    <string name="skills_error_too_many_entries">Skill 压缩包包含过多文件</string>
+    <string name="skills_error_invalid_structure">ZIP 必须只包含一个顶层 Skill 目录</string>
+    <string name="skills_error_unsafe_archive">ZIP 包含不安全的文件路径</string>
+    <string name="skills_error_invalid_manifest">SKILL.md 缺失或格式无效</string>
+    <string name="skills_error_storage">无法完成 Skill 文件操作</string>
+</resources>

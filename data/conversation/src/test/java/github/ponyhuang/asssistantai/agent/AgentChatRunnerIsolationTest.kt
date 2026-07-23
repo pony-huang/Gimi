@@ -1,6 +1,6 @@
 package github.ponyhuang.asssistantai.agent
 
-import com.google.adk.kt.agents.BaseAgent
+import com.google.adk.kt.agents.LlmAgent
 import com.google.adk.kt.sessions.SessionService
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import io.mockk.mockk
@@ -15,7 +15,7 @@ class AgentChatRunnerIsolationTest {
         val runner = AgentChatRunner(
             factory = { selection ->
                 createdSelections += selection
-                mockk<BaseAgent>(relaxed = true)
+                mockk<LlmAgent>(relaxed = true)
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
@@ -43,7 +43,7 @@ class AgentChatRunnerIsolationTest {
         val runner = AgentChatRunner(
             factory = {
                 creations += 1
-                mockk<BaseAgent>(relaxed = true)
+                mockk<LlmAgent>(relaxed = true)
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,

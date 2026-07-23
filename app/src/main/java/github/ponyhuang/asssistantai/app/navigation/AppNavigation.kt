@@ -43,6 +43,8 @@ import github.ponyhuang.asssistantai.feature.modelsettings.R as ModelsettingsR
 import github.ponyhuang.asssistantai.feature.permissions.PermissionSettingsRoute
 import github.ponyhuang.asssistantai.feature.permissions.R as PermissionsR
 import github.ponyhuang.asssistantai.feature.settings.R as SettingsR
+import github.ponyhuang.asssistantai.feature.skills.SkillsSettingsRoute
+import github.ponyhuang.asssistantai.feature.skills.R as SkillsR
 import github.ponyhuang.asssistantai.feature.toolauthorization.ToolAuthorizationConfigurationRoute
 import github.ponyhuang.asssistantai.feature.toolauthorization.ToolAuthorizationRoute
 import github.ponyhuang.asssistantai.feature.toolauthorization.R as ToolauthR
@@ -165,6 +167,7 @@ fun MainScreen(
                                 onNavigateToDefaultModels = { backStack.add(AppRoute.DefaultModelSettings) },
                                 onNavigateToVoiceWake = { backStack.add(AppRoute.VoiceWakeSettings) },
                                 onNavigateToMcpServers = { backStack.add(AppRoute.McpServerList) },
+                                onNavigateToSkills = { backStack.add(AppRoute.SkillsSettings) },
                                 onNavigateToWorkFiles = { backStack.add(AppRoute.WorkFilesSettings) },
                                 onNavigateToPermissions = { backStack.add(AppRoute.PermissionSettings) },
                                 onNavigateToToolAuthorization = {
@@ -219,6 +222,13 @@ fun MainScreen(
                             goBack,
                         ) {
                             ToolAuthorizationConfigurationRoute(modifier = it)
+                        }
+
+                        AppRoute.SkillsSettings -> SettingsScaffold(
+                            stringResource(SkillsR.string.skills_screen_title),
+                            goBack,
+                        ) {
+                            SkillsSettingsRoute(modifier = it)
                         }
 
                         AppRoute.McpServerList -> SettingsScaffold(

@@ -18,6 +18,9 @@
     <string name="settings_mcp_title">MCP 服务器</string>
     <string name="settings_mcp_subtitle">远程工具服务 · 连接与授权</string>
 
+    <string name="settings_skills_title">Skills</string>
+    <string name="settings_skills_subtitle">安装可复用的说明与资源</string>
+
     <string name="settings_chat_display_title">聊天显示</string>
     <string name="settings_chat_display_subtitle">显示工具调用和返回结果</string>
 

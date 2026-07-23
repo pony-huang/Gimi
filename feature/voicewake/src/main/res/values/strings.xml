@@ -5,17 +5,28 @@
     <string name="voicewake_listening_title">后台监听</string>
     <string name="voicewake_listening_subtitle">连接蓝牙耳机后，可通过唤醒词在后台执行任务</string>
 
-    <string name="voicewake_section_keyword">唤醒词</string>
-    <string name="voicewake_keyword_hint">离线模型仅可识别以上预置唤醒词</string>
-
-    <string name="voicewake_offline_model">离线模型</string>
-    <string name="voicewake_offline_setup_required">启用前请配置可用的默认助手模型和语音识别模型。</string>
-    <string name="voicewake_offline_model_name">离线中文唤醒模型</string>
-    <string name="voicewake_model_status_bundled">首次启用时需联网下载，约 42MB</string>
-    <string name="voicewake_model_extracting_progress">正在下载模型 %1$d%%</string>
+    <string name="voicewake_section_models">唤醒模型</string>
+    <string name="voicewake_model_cn_name">中文唤醒模型</string>
+    <string name="voicewake_model_en_name">英语唤醒模型</string>
+    <string name="voicewake_model_status_bundled">已内置 APK，选中后自动安装</string>
+    <string name="voicewake_model_status_download_required">需下载约 %1$d MB，识别仅在本机进行</string>
+    <string name="voicewake_model_downloading_progress">正在下载 %1$d%%</string>
     <string name="voicewake_model_installing">正在安装模型</string>
     <string name="voicewake_model_ready">已安装，仅在本机识别唤醒词</string>
     <string name="voicewake_model_install_failed">安装失败</string>
     <string name="voicewake_action_retry">重试</string>
     <string name="voicewake_action_install">安装</string>
+
+    <string name="voicewake_section_keyword_with_language">唤醒词 · %1$s</string>
+    <string name="voicewake_language_zh">中文</string>
+    <string name="voicewake_language_en">English</string>
+    <string name="voicewake_keyword_hint_zh">2–20 个字符，例如：你好助手</string>
+    <string name="voicewake_keyword_hint_en">2–4 个小写英文单词，空格分隔，例如：hey assistant</string>
+    <string name="voicewake_keyword_error_length_zh">唤醒词需要包含 2–20 个字符</string>
+    <string name="voicewake_keyword_error_length_en">唤醒词总长需要不超过 40 个字符</string>
+    <string name="voicewake_keyword_error_characters">唤醒词不能包含特殊字符</string>
+    <string name="voicewake_keyword_error_format_en">请输入 2–4 个小写英文单词，用空格分隔</string>
+    <string name="voicewake_save_keyword">保存唤醒词</string>
+
+    <string name="voicewake_offline_setup_required">启用前请配置可用的默认助手模型和语音识别模型。</string>
 </resources>

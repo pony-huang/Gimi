@@ -7,6 +7,7 @@ import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import androidx.annotation.RequiresPermission
 import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.asssistantai.R
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,7 +19,7 @@ data class BluetoothAudioRoute(
 
 @Singleton
 class BluetoothAudioRouter @Inject constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
 ) {
     private val audioManager = context.getSystemService(AudioManager::class.java)
     private var previousMode: Int? = null
@@ -32,7 +33,8 @@ class BluetoothAudioRouter @Inject constructor(
         val communication = audioManager.availableCommunicationDevices
             .firstOrNull { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
             ?: return null
-        val name = input.productName?.toString()?.takeIf(String::isNotBlank) ?: "蓝牙耳机"
+        val name = input.productName?.toString()?.takeIf(String::isNotBlank)
+            ?: context.getString(R.string.bluetooth_voice_default_device_name)
         return BluetoothAudioRoute(input, communication, name)
     }
 

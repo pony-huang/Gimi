@@ -32,4 +32,4 @@ internal fun stripWakeKeyword(transcript: String, keyword: String): String {
     return trimmed
 }
 
-const val DEFAULT_WAKE_KEYWORD = github.ponyhuang.asssistantai.domain.speech.model.DEFAULT_WAKE_KEYWORD
+val DEFAULT_WAKE_KEYWORD = github.ponyhuang.asssistantai.domain.speech.model.DEFAULT_WAKE_KEYWORD

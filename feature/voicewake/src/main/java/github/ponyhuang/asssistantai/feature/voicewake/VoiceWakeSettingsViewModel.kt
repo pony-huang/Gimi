@@ -3,6 +3,8 @@ package github.ponyhuang.asssistantai.feature.voicewake
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import github.ponyhuang.asssistantai.domain.speech.model.WakeKeywordError
+import github.ponyhuang.asssistantai.domain.speech.model.WakeKeywordException
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelStatus
 import github.ponyhuang.asssistantai.domain.speech.usecase.ManageVoiceWakeUseCase
 import github.ponyhuang.asssistantai.domain.speech.usecase.ObserveVoiceWakeSettingsUseCase
@@ -22,9 +24,14 @@ class VoiceWakeSettingsViewModel @Inject constructor(
     private var nextPermissionRequestId = 0
 
     val uiState = combine(observeSettings(), localState) { settings, local ->
+        val activeModelId = settings.voiceState.activeModelId
+        // 草稿绑定输入时的模型；切换模型后回落为该模型语言已保存的唤醒词。
+        val draftForActiveModel = local.keywordDraft.takeIf { local.keywordDraftModelId == activeModelId }
         VoiceWakeSettingsUiState(
             voiceState = settings.voiceState,
             configurationReady = settings.configurationReady,
+            keywordDraft = draftForActiveModel ?: settings.voiceState.keyword,
+            keywordError = local.keywordError.takeIf { draftForActiveModel != null },
             permissionRequestId = local.permissionRequestId,
         )
     }.stateIn(
@@ -35,10 +42,17 @@ class VoiceWakeSettingsViewModel @Inject constructor(
 
     fun onAction(action: VoiceWakeSettingsAction) {
         when (action) {
-            is VoiceWakeSettingsAction.KeywordSelected ->
-                manageVoiceWake.setKeyword(action.keyword)
+            is VoiceWakeSettingsAction.KeywordChanged -> localState.update {
+                it.copy(
+                    keywordDraft = action.value,
+                    keywordDraftModelId = uiState.value.voiceState.activeModelId,
+                    keywordError = null,
+                )
+            }
+            VoiceWakeSettingsAction.SaveKeyword -> saveKeyword()
             is VoiceWakeSettingsAction.ToggleListening -> toggleListening(action.enabled)
-            VoiceWakeSettingsAction.InstallModel -> manageVoiceWake.installModel()
+            is VoiceWakeSettingsAction.SelectModel -> selectModel(action.modelId)
+            is VoiceWakeSettingsAction.InstallModel -> manageVoiceWake.installModel(action.modelId)
             is VoiceWakeSettingsAction.PermissionsResult -> {
                 val state = uiState.value
                 if (
@@ -59,6 +73,33 @@ class VoiceWakeSettingsViewModel @Inject constructor(
         }
     }
 
+    private fun selectModel(modelId: String) {
+        manageVoiceWake.selectModel(modelId)
+        localState.update {
+            it.copy(keywordDraft = null, keywordDraftModelId = null, keywordError = null)
+        }
+        // 一次点击做显而易见的事：选中未安装的模型时自动开始安装。
+        val status = uiState.value.voiceState.modelStates[modelId]?.status
+        if (status == null || status == WakeModelStatus.Missing || status == WakeModelStatus.Error) {
+            manageVoiceWake.installModel(modelId)
+        }
+    }
+
+    private fun saveKeyword() {
+        val draft = uiState.value.keywordDraft
+        manageVoiceWake.setKeyword(draft)
+            .onSuccess {
+                localState.update {
+                    it.copy(keywordDraft = draft.trim(), keywordError = null)
+                }
+            }
+            .onFailure { error ->
+                val keywordError = (error as? WakeKeywordException)?.error
+                    ?: WakeKeywordError.InvalidCharacters
+                localState.update { it.copy(keywordError = keywordError) }
+            }
+    }
+
     private fun toggleListening(enabled: Boolean) {
         if (!enabled) {
             manageVoiceWake.stop()
@@ -68,7 +109,7 @@ class VoiceWakeSettingsViewModel @Inject constructor(
         val state = uiState.value
         when {
             state.voiceState.model.status != WakeModelStatus.Ready ->
-                manageVoiceWake.installModel()
+                manageVoiceWake.installModel(state.voiceState.activeModelId)
             !state.configurationReady -> Unit
             else -> localState.update {
                 it.copy(permissionRequestId = ++nextPermissionRequestId)
@@ -77,6 +118,9 @@ class VoiceWakeSettingsViewModel @Inject constructor(
     }
 
     private data class LocalState(
+        val keywordDraft: String? = null,
+        val keywordDraftModelId: String? = null,
+        val keywordError: WakeKeywordError? = null,
         val permissionRequestId: Int? = null,
     )
 }

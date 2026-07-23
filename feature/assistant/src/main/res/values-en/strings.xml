@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="assistant_overlay_title">Voice Assistant</string>
+    <string name="assistant_close">Close</string>
+    <string name="assistant_stop_task">Stop</string>
+    <string name="assistant_stop_speaking">Stop speaking</string>
+    <string name="assistant_listening">Listening…</string>
+    <string name="assistant_transcribing">Transcribing…</string>
+    <string name="assistant_preparing">Preparing…</string>
+    <string name="assistant_generating">Generating answer…</string>
+    <string name="assistant_executing_tool">Running tool: %1$s</string>
+    <string name="assistant_speaking">Speaking…</string>
+    <string name="assistant_follow_up_hint">Ask a follow-up, or the overlay closes after 30s idle</string>
+    <string name="assistant_waveform_cd">Recording volume waveform</string>
+    <string name="assistant_no_speech">No speech detected. Tap the mic to retry</string>
+    <string name="assistant_transcribe_failed">Nothing recognized, please retry</string>
+    <string name="assistant_mic_permission">Microphone permission is required for voice input</string>
+    <string name="assistant_tts_notice">Voice playback unavailable; answered in text</string>
+    <string name="assistant_missing_model">No default assistant model. Pick one in “Default models” first</string>
+    <string name="assistant_missing_stt">No speech recognition model. Pick one in “Default models” first</string>
+    <string name="assistant_error_retry">Retry</string>
+    <string name="assistant_confirm_title">Sensitive action</string>
+    <string name="assistant_confirm_message">About to run \"%1$s\". Allow?</string>
+    <string name="assistant_confirm_countdown">Auto-deny in %1$d s</string>
+    <string name="assistant_confirm_approve">Allow</string>
+    <string name="assistant_confirm_reject">Deny</string>
+    <string name="assistant_input_hint">Type a question</string>
+    <string name="assistant_send">Send</string>
+    <string name="assistant_mic_cd">Voice input</string>
+    <string name="assistant_open_in_chat">View in chat</string>
+
+    <string name="assistant_settings_title">System voice assistant</string>
+    <string name="assistant_settings_role_section">Default digital assistant</string>
+    <string name="assistant_role_status_default">Set as default assistant</string>
+    <string name="assistant_role_status_not_default">Not the default assistant</string>
+    <string name="assistant_role_unavailable">This ROM does not offer the assistant role, so system gestures are unavailable. You can still use the Quick Settings tile</string>
+    <string name="assistant_role_note">Whether system gestures or the power key route to the default assistant is decided by the ROM</string>
+    <string name="assistant_role_request">Set as default assistant</string>
+    <string name="assistant_settings_mic_section">Microphone permission</string>
+    <string name="assistant_mic_granted">Microphone permission granted</string>
+    <string name="assistant_mic_missing">Microphone permission not granted</string>
+    <string name="assistant_mic_request">Grant microphone permission</string>
+    <string name="assistant_settings_tile_section">Quick Settings tile</string>
+    <string name="assistant_tile_hint">Add the “Voice Assistant” tile to Quick Settings and pull down anytime to invoke</string>
+    <string name="assistant_tile_add">Add tile</string>
+    <string name="assistant_tile_added">Tile add request sent</string>
+</resources>

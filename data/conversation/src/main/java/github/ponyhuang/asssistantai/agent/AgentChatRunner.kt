@@ -11,6 +11,7 @@ import com.google.adk.kt.events.Event
 import com.google.adk.kt.plugins.LoggingPlugin
 import com.google.adk.kt.runners.InMemoryRunner
 import com.google.adk.kt.sessions.SessionService
+import com.google.adk.kt.summarizer.EventsCompactionConfig
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.Blob
 import com.google.adk.kt.types.FunctionCall
@@ -63,6 +64,8 @@ class AgentChatRunner(
             plugins = mutableListOf(LoggingPlugin()),
             rootAgent = agent,
             resumabilityConfig = ResumabilityConfig(isResumable = true),
+            // 对话摘要压缩
+            eventsCompactionConfig = EventsCompactionConfig()
         ),
         sessionService = sessionService,
         artifactService = artifactService,

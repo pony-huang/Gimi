@@ -2,7 +2,6 @@ package github.ponyhuang.asssistantai.feature.assistant
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,17 +63,8 @@ fun AssistantOverlayScreen(
     onOpenInChat: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val darkTheme = isSystemInDarkTheme()
-    val panelColor = if (darkTheme) {
-        MaterialTheme.colorScheme.surface
-    } else {
-        MaterialTheme.colorScheme.inverseSurface
-    }
-    val panelContentColor = if (darkTheme) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.inverseOnSurface
-    }
+    val panelColor = MaterialTheme.colorScheme.surface
+    val panelContentColor = MaterialTheme.colorScheme.onSurface
 
     Column(
         modifier = modifier

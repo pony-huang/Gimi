@@ -1,11 +1,19 @@
 package github.ponyhuang.asssistantai.feature.assistant
 
+import android.content.res.Configuration
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -66,6 +74,38 @@ class AssistantOverlayScreenTest {
 
         composeRule.onNodeWithTag("assistant_search_bar").assertIsDisplayed()
         composeRule.onAllNodesWithTag("assistant_expanded_content").assertCountEquals(0)
+    }
+
+    @Test
+    fun lightThemeSearchBarUsesAppSurfaceColor() {
+        val surfaceColor = Color(0xFFFF00FF)
+        composeRule.setContent {
+            val lightConfiguration = Configuration(LocalConfiguration.current).apply {
+                uiMode = uiMode and Configuration.UI_MODE_NIGHT_MASK.inv() or
+                    Configuration.UI_MODE_NIGHT_NO
+            }
+            CompositionLocalProvider(LocalConfiguration provides lightConfiguration) {
+                MaterialTheme(
+                    colorScheme = lightColorScheme(
+                        surface = surfaceColor,
+                        inverseSurface = Color.Yellow,
+                    ),
+                ) {
+                    AssistantOverlayScreen(
+                        state = AssistantOverlayUiState(),
+                        onAction = {},
+                        onOpenInChat = {},
+                    )
+                }
+            }
+        }
+
+        val image = composeRule
+            .onNodeWithTag("assistant_search_bar")
+            .captureToImage()
+        val pixels = image.toPixelMap()
+
+        assertEquals(surfaceColor, pixels[image.width / 2, image.height / 2])
     }
 
     @Test

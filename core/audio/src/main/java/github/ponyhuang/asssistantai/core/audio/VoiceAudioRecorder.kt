@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.feature.chat
+package github.ponyhuang.asssistantai.core.audio
 
 import android.Manifest
 import android.media.AudioFormat
@@ -17,7 +17,7 @@ import kotlin.math.log10
 import kotlin.math.sqrt
 
 /** Captures microphone input as 16 kHz, mono, signed 16-bit PCM chunks. */
-internal class VoiceAudioRecorder {
+class VoiceAudioRecorder {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var audioRecord: AudioRecord? = null
     private var readJob: Job? = null
@@ -124,7 +124,7 @@ internal class VoiceAudioRecorder {
 }
 
 /** Converts little-endian signed PCM16 audio into a perceptual 0..1 RMS level. */
-internal fun calculatePcm16Level(bytes: ByteArray): Float {
+fun calculatePcm16Level(bytes: ByteArray): Float {
     val sampleCount = bytes.size / Short.SIZE_BYTES
     if (sampleCount == 0) return 0f
 

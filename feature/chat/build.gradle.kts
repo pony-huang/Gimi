@@ -21,6 +21,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:audio"))
     implementation(project(":core:designsystem"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:modelcatalog"))

@@ -1,11 +1,13 @@
-package github.ponyhuang.asssistantai.voice
+package github.ponyhuang.asssistantai.core.audio
 
 import java.io.ByteArrayOutputStream
 import java.util.ArrayDeque
 import kotlin.math.abs
 
-internal class PcmPreRollBuffer(
-    private val maxBytes: Int = BluetoothPcmRecorder.SAMPLE_RATE_HZ * 2 * 5 / 2,
+private const val PRE_ROLL_MAX_BYTES = 16_000 * 2 * 5 / 2
+
+class PcmPreRollBuffer(
+    private val maxBytes: Int = PRE_ROLL_MAX_BYTES,
 ) {
     private val chunks = ArrayDeque<ByteArray>()
     private var size = 0
@@ -25,7 +27,7 @@ internal class PcmPreRollBuffer(
     }.toByteArray()
 }
 
-internal class VoiceCommandCapture(
+class VoiceCommandCapture(
     preRoll: ByteArray,
     private val startedAtMs: Long,
     private val speechStartTimeoutMs: Long = SPEECH_START_TIMEOUT_MS,
@@ -78,6 +80,7 @@ internal class VoiceCommandCapture(
     }
 
     companion object {
+        const val SAMPLE_RATE_HZ = 16_000
         const val SPEECH_START_TIMEOUT_MS = 5_000L
         const val SILENCE_TO_FINISH_MS = 1_200L
         const val MAX_CAPTURE_MS = 30_000L
@@ -88,7 +91,7 @@ internal class VoiceCommandCapture(
     }
 }
 
-internal sealed interface CaptureDecision {
+sealed interface CaptureDecision {
     data object Continue : CaptureDecision
     data object Cancel : CaptureDecision
     data class Complete(val pcm16: ByteArray) : CaptureDecision

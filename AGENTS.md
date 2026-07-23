@@ -1,22 +1,30 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
+## Structure, Ownership, and Architecture
 
-This is a multi-module Android application organized by feature and clean architecture boundaries. The current module graph declared in `settings.gradle.kts` is the source of truth:
+`settings.gradle.kts` is the source of truth for this multi-module Android app:
 
-- `:app` is the composition root. It owns application startup, top-level navigation, Android services/app functions, and Hilt wiring that composes multiple capabilities. It must not become a catch-all UI, domain, or data module.
-- `:core:common`, `:core:network`, `:core:database`, and `:core:testing` provide narrow shared infrastructure.
-- `:core:designsystem` owns theme tokens and stateless, business-agnostic Compose components.
-- `:domain:<capability>` owns domain models, repository interfaces, and use cases for one capability. Current capabilities are `modelcatalog`, `conversation`, `speech`, `mcp`, `workfiles`, and `permissions`.
-- `:data:<capability>` owns the corresponding repository implementations, Room/Preferences/Keystore storage, Android gateways, network clients, and third-party SDK adapters.
-- `:feature:<capability>` owns feature UI, routes, contracts, ViewModels, and feature-specific components. Current features are `modelsettings`, `settings`, `mcp`, `workfiles`, `permissions`, `voicewake`, and `chat`.
-- `gradle/libs.versions.toml` is the dependency/version catalog. Notes live in `doc/`.
+- `:app`: composition root for startup, top-level navigation, Android services/app functions, and cross-capability Hilt wiring; never a catch-all for UI, domain, data, or provider logic.
+- `:core:common`, `:core:network`, `:core:database`, `:core:testing`: narrow shared infrastructure.
+- `:core:designsystem`: theme tokens and stateless, business-agnostic Compose components.
+- `:domain:<capability>`: domain models, repository interfaces, and use cases.
+- `:data:<capability>`: repository implementations, Room/Preferences/Keystore storage, Android gateways, network clients, and third-party SDK adapters.
+- `:feature:<capability>`: feature UI, routes, contracts, ViewModels, and feature-specific components.
+- `gradle/libs.versions.toml`: dependency/version catalog; project notes live in `doc/`.
 
-Module ownership is more important than a legacy package name. New feature code should use a package matching its owning feature; do not recreate the old `app/ui`, `app/data`, `app/model`, or similar catch-all package trees.
+Current domain capabilities are `modelcatalog`, `conversation`, `speech`, `mcp`, `workfiles`, and `permissions`; current features are `modelsettings`, `settings`, `mcp`, `workfiles`, `permissions`, `voicewake`, and `chat`.
 
-## Architecture Preservation Rules
+Module ownership overrides legacy package names. Use packages matching the owning capability; never recreate catch-all trees such as `app/ui`, `app/data`, or `app/model`. Place new work as follows:
 
-The required runtime direction is:
+1. Feature-only presentation or interaction state -> `:feature:<capability>`.
+2. Business model, rule, repository contract, or reusable workflow -> `:domain:<capability>`.
+3. Persistence, network, Android API, secure storage, or SDK adapter -> `:data:<capability>`.
+4. Stable, business-agnostic shared infrastructure or UI with at least two real consumers -> the narrowest `:core:*`.
+5. Startup, navigation graph, service registration, or cross-capability composition -> `:app`.
+
+If no capability owns the change, create a focused domain/data/feature slice; do not use a nearby unrelated module or create empty placeholder modules.
+
+Required runtime and dependency directions:
 
 ```text
 Route -> Stateless Screen
@@ -29,11 +37,7 @@ UseCase / Domain Repository Interface
   ^
   |
 Data Repository Implementation -> Room / Secure Settings / Remote Gateway
-```
 
-Keep module dependencies consistent with these rules:
-
-```text
 :app -> :feature:* + :data:* + required domain/core modules
 :feature:* -> :domain:* + :core:designsystem
 :data:* -> :domain:* + required core infrastructure
@@ -42,117 +46,81 @@ feature A -X-> feature B
 domain/data/core -X-> feature or app
 ```
 
-These rules are mandatory for new work:
+Mandatory boundaries:
 
-- A feature module must never import or depend on another feature module. Move shared business contracts to the appropriate domain module; move genuinely business-agnostic UI to `:core:designsystem`.
-- Domain code must not depend on Android, Compose, Hilt, Room, OkHttp, provider SDKs, or data-layer models. Domain repository types are interfaces.
-- Third-party SDK, HTTP, database, Keystore, Preferences, and Android framework details belong behind gateways or repository implementations in data/core infrastructure.
-- ViewModels may depend on use cases and domain repository interfaces, never concrete repositories, DAOs, Context, Toast, navigation controllers, OkHttp, Room, or provider SDK objects.
-- New branching business rules, cross-repository operations, or reusable workflows require a use case. Do not create pass-through use cases for trivial access unless they establish a needed contract boundary.
-- `:app` may compose implementations but must not host feature screens, reusable business logic, or provider-specific client behavior.
-- Prefer constructor injection and Hilt. Bind domain interfaces to data implementations in the owning data module; keep cross-capability runtime composition in `:app`.
-- Do not introduce generic `Manager`, `Helper`, `Utils`, or `BaseViewModel` dumping grounds. Name types after one concrete responsibility and place them in the narrowest owning module.
-- Do not move code into `core` merely because two files look similar. Promote code only when it is business-agnostic, has a stable contract, and has at least two real consumers.
+- Feature modules never depend on one another. Move shared business contracts to domain and genuinely business-agnostic UI to `:core:designsystem`.
+- Domain code never depends on Android, Compose, Hilt, Room, OkHttp, provider SDKs, or data models; domain repositories are interfaces.
+- Keep SDK, HTTP, database, Keystore, Preferences, and Android framework details behind data/core gateways or repository implementations.
+- ViewModels depend on use cases or domain repository interfaces, never concrete repositories, DAOs, Context, Toast, navigation controllers, OkHttp, Room, or provider SDK objects.
+- Use a use case for branching business rules, cross-repository operations, or reusable workflows; avoid trivial pass-through use cases unless they establish a necessary contract boundary.
+- Prefer constructor injection and Hilt. Bind domain interfaces in the owning data module; compose capabilities in `:app`.
+- Avoid generic `Manager`, `Helper`, `Utils`, or `BaseViewModel` dumping grounds. Name one responsibility and use the narrowest owner.
+- Do not promote code to `core` merely because two files look alike.
+- Resolve graph conflicts through contracts/interfaces, not shortcut dependencies. Document any temporary exception with its owner and removal condition.
 
-When a requested implementation appears to violate the graph, change the contract or introduce an interface/use case instead of adding a shortcut dependency. Any temporary exception must be documented in the change description with an owner and removal condition; undocumented architecture exceptions are not allowed.
+## Compose, UI, i18n, and Style
 
-## Compose State and Side-Effect Rules
+- Each screen exposes one immutable `*UiState`; user intent enters through a `*Action`/`*UiAction` contract or explicit synchronous callbacks.
+- Route composables collect state lifecycle-aware and own navigation, Toast/Snackbar delivery, activity results, permissions, URL opening, and other Android/UI side effects.
+- Screens and business components are stateless: state enters as parameters and events leave as callbacks. They do not fetch ViewModels, repositories, or Context, or launch business coroutines.
+- Keep loading, testing, refreshing, notices, and other ephemeral business-operation state in the ViewModel.
+- `:core:designsystem` components reference no ViewModels, repositories, domain models, navigation, Toast, network calls, or business coroutines; keep them independently previewable and Compose-testable.
+- Preserve existing theme tokens, dimensions, copy, accessibility semantics, and insets unless explicitly changing them. Use Material 3/design-system tokens instead of hard-coded UI colors.
+- Edge-to-edge UI must keep controls and primary content clear of status bars, cutouts, navigation bars, and gesture areas using appropriate insets such as `statusBarsPadding`, `navigationBarsPadding`, or `safeDrawingPadding`; verify visually.
+- Default locale is Chinese (`values/`); English is in `values-en/`. Each module owns both `strings.xml` files; shared business-agnostic copy belongs in `:core:designsystem`.
+- All user-facing `Text`, content descriptions, dialog/field copy, and surfaced Toasts must use `stringResource(R.string.xxx)`. Doc comments and `@Preview` fixtures are exempt.
+- Use idiomatic Kotlin, four-space indentation, nearby trailing-comma style, PascalCase for types/composables/type files, and camelCase for functions/properties/locals. Match nearby formatting and keep imports organized; no formatter or linter is configured.
 
-- Each screen exposes one immutable `*UiState` and receives user intent through a `*Action`/`*UiAction` contract or explicit synchronous callbacks.
-- Route composables collect lifecycle-aware state and own Android/UI side effects such as navigation, Toast/Snackbar delivery, activity results, permissions, and opening URLs.
-- Screen and business components must be stateless: state enters through parameters and events leave through callbacks. They must not fetch a ViewModel, repository, or Context internally or launch business coroutines.
-- Keep ephemeral business operation state such as loading, testing, refreshing, and notices in the ViewModel state, not in reusable UI components.
-- `:core:designsystem` components must not reference ViewModels, repositories, domain models, navigation, Toast, network calls, or business coroutines. They must be independently previewable and Compose-testable.
-- Preserve existing theme tokens, dimensions, copy, accessibility semantics, and safety insets unless the task explicitly changes the UI.
+## Build and Verification
 
-## Change Placement Checklist
+Run from the repository root with `gradlew.bat` on Windows:
 
-Before adding a file or dependency, decide its owner in this order:
+- `.\gradlew.bat app:compileDebugKotlin`: compile the complete debug graph.
+- `.\gradlew.bat :feature:<name>:testDebugUnitTest`: run affected feature JVM tests; use the equivalent domain/data task as needed.
+- `.\gradlew.bat app:testDebugUnitTest`: run app JVM tests.
+- `.\gradlew.bat app:assembleDebug`: build debug APKs.
+- `.\gradlew.bat connectedDebugAndroidTest`: run configured instrumentation tests.
+- `.\gradlew.bat check`: run configured verification lifecycle tasks.
+- `.\gradlew.bat clean`: remove generated build output.
 
-1. Feature-only presentation or interaction state -> `:feature:<capability>`.
-2. Business model, rule, repository contract, or reusable workflow -> `:domain:<capability>`.
-3. Persistence, network, Android API, secure storage, or SDK adapter -> `:data:<capability>`.
-4. Business-agnostic shared infrastructure/UI with multiple consumers -> the narrowest `:core:*` module.
-5. Application startup, navigation graph, service registration, or cross-capability composition -> `:app`.
+Android Studio may run the `app` debug configuration on a device or emulator.
 
-If no current capability owns the change, create a focused domain/data/feature slice rather than placing it in a nearby unrelated module. New Gradle modules require a clear owner and dependency direction; do not create empty placeholder modules.
+Testing rules:
 
-## Build, Test, and Development Commands
+- Use JUnit 4 in the owning module's `src/test`; use behavior-based `*Test.kt` names. Put Android/Compose interaction coverage in `src/androidTest`.
+- Add characterization tests before behavior-preserving refactors of ViewModel transitions or externally visible repository behavior.
+- Changed business rules require domain/use-case or ViewModel tests. Gateways/repositories require applicable success, failure, exception, and mapping coverage.
+- Meaningfully interactive or conditional stateless Compose components require UI coverage when practical. Pure visual-only changes may use compilation plus screenshot/device verification when behavior is unchanged.
+- Tests use fakes, MockWebServer, or mocked gateways, never live model APIs or real credentials.
+- At minimum, compile the affected module and `app:compileDebugKotlin`, run affected JVM tests, and run `git diff --check`. Also run `app:assembleDebug` for wiring, resource, manifest, or packaging changes.
+- Every module declares and verifies its own dependencies; compilation through an undeclared `:app` transitive dependency is not completion.
+- After repeated runner/device/infrastructure failures following a successful compile, stop retrying, hand off to manual verification, and record the successful compile, repeated failure, and any manual checks.
 
-Run commands from the repository root (use `gradlew.bat` on Windows):
+## Refactoring, Git, and Security
 
-- `.\gradlew.bat app:compileDebugKotlin` compiles the complete debug dependency graph.
-- `.\gradlew.bat :feature:<name>:testDebugUnitTest` runs an affected feature's JVM tests; use the equivalent domain/data task for those modules.
-- `.\gradlew.bat app:testDebugUnitTest` runs app JVM tests.
-- `.\gradlew.bat app:assembleDebug` builds the debug APKs.
-- `.\gradlew.bat connectedDebugAndroidTest` runs configured instrumentation tests on a connected emulator or device.
-- `.\gradlew.bat check` runs the configured verification lifecycle tasks.
-- `.\gradlew.bat clean` removes generated build output.
+- Refactor one closed capability at a time; preserve behavior and keep logical commits independently compilable and revertible.
+- Use IDE Refactor Move or `git mv`. Move-only commits change only paths, packages, imports, and necessary visibility. Inspect `git diff --find-renames --summary`, compile affected modules, and remove empty legacy package directories.
+- Do not leave forwarding wrappers, duplicate implementations, or legacy adapters unless compatibility is required. Local data may be destructively recreated; do not add historical migrations without a requirement.
+- Avoid drive-by package moves or broad unrelated cleanup.
+- Never commit build outputs, caches, generated reports, IDE state, API keys, tokens, or credentials. Store local secrets in ignored `local.properties` or environment variables and revoke exposed credentials.
+- Treat untracked `app/release/` APKs as local artifacts; include or delete them only when explicitly requested.
+- Before committing, inspect staged paths, run `git diff --cached --check`, exclude generated/local artifacts, and confirm architecture boundaries.
+- Keep commits focused with imperative subjects under 72 characters. Pull requests describe user-visible changes, tests, relevant issue/OpenSpec change, and Compose screenshots.
 
-Open the project in Android Studio to run the `app` debug configuration on an emulator or device.
+## Android Tooling and Physical Device Verification
 
-## Coding Style & Naming Conventions
+- Prefer the `android` CLI for project, deployment, launch, screenshot, layout, and emulator workflows; consult `android help <command>` first.
+- Use `android run` for deployment/launch, `android layout` for primary UI inspection, `android layout --diff` for focused changes, and `android screen capture` for secondary visual checks. Always inspect captured PNGs visually.
+- Do not use `adb` by habit. Fall back only when the installed CLI is unavailable/fails or lacks the operation, such as connection diagnostics, wake, raw input, or a narrow shell command. Record the reason, limit ADB to that operation, then return to the CLI.
+- Prefer a connected physical Android device for installation, UI, permissions, system insets, and hardware behavior. Never hard-code a manufacturer, model, or serial; resolve the current physical device dynamically. Use an emulator only when no suitable device exists or the task requires one, and report the fallback.
 
-Write idiomatic Kotlin with four-space indentation and trailing commas where surrounding code uses them. Use PascalCase for classes, composables, and primary-type files (`ChatViewModel.kt`); use camelCase for functions, properties, and local values. Keep Compose state in `*UiState` types and screen logic in `*ViewModel` classes. Prefer constructor injection and Hilt modules. Use Material 3 tokens from `:core:designsystem` instead of hard-coded UI colors.
-
-No formatter or linter is currently configured; match nearby code and keep imports organized by the IDE.
-
-## Compose UI Safety Insets
-
-When designing or changing Compose UI, always account for system safety insets. Edge-to-edge screens must keep interactive controls and primary content clear of status bars, display cutouts, navigation bars, and gesture areas by applying the appropriate inset padding (for example, `statusBarsPadding`, `navigationBarsPadding`, or `safeDrawingPadding`). Visually review screenshot/device output to ensure back buttons, app bars, and bottom controls are not crowded by system UI.
-
-## Internationalization (i18n)
-
-Default locale is Chinese (`values/`); English lives in `values-en/`. Each module owns its own `res/values/strings.xml` + `res/values-en/strings.xml`; shared business-agnostic copy lives in `:core:designsystem`.
-
-All user-facing text (`Text`, `contentDescription`, dialog titles, field labels/supporting text, surfaced toasts) MUST come from `stringResource(R.string.xxx)`. Doc comments and `@Preview` fixtures are exempt.
-
-## Testing Guidelines
-
-Use JUnit 4 for JVM unit tests in the owning module's `src/test` source set. Name files `*Test.kt` and methods after the behavior checked, for example `fun restoresLastSession()`. Put Android-dependent and Compose interaction coverage in the owning module's `src/androidTest` source set.
-
-- Before behavior-preserving refactoring, add characterization tests for current ViewModel state transitions and externally visible repository behavior.
-- New or changed business rules require domain/use-case or ViewModel unit tests. New gateways and repository implementations require success, failure, exception, and mapping coverage as applicable.
-- Stateless Compose components with meaningful interaction or conditional rendering require Compose UI coverage when practical.
-- Pure visual-only changes may use compilation plus screenshot/device verification, provided interaction behavior is unchanged.
-- Tests must use fakes, MockWebServer, or mocked gateways; never depend on live model-provider APIs or real credentials.
-- At minimum, compile the affected module and `app:compileDebugKotlin`, run affected JVM tests, then run `git diff --check`. Use `app:assembleDebug` for changes affecting wiring, resources, manifests, or packaging.
-- A feature is not complete if it compiles only because `:app` supplies an undeclared transitive dependency. Each module must declare and verify its own dependencies.
-
-If compilation succeeds but the same automated test repeatedly fails because of the test runner, device environment, or infrastructure rather than a reproducible code failure, stop retrying and hand the case off for manual verification. Record the successful compile command, the repeated test failure, and any manual verification already completed.
-
-## Refactoring, File Moves, and Repository Hygiene
-
-- Refactor one closed capability at a time. Preserve observable behavior and keep each logical commit independently compilable and revertible.
-- Use IDE Refactor Move or `git mv` for source moves. A move-only commit should change paths, packages, imports, and required visibility only; do not mix unrelated business changes into it.
-- After moves, inspect `git diff --find-renames --summary`, compile affected modules, and remove empty legacy package directories.
-- Never commit Gradle build outputs, local caches, generated test reports, IDE state, API keys, or provider credentials. Module-level `build/` directories are ignored by the root `.gitignore`.
-- Treat untracked `app/release/` APKs as local artifacts. Include or delete release APKs only when the user explicitly requests that exact action.
-- Do not leave forwarding wrappers, duplicate implementations, or legacy adapters unless compatibility is an explicit requirement. This prototype currently permits destructive local-data recreation; do not add historical data migrations without a requirement.
-- Do not perform drive-by package moves or broad cleanup in an unrelated feature change.
-
-## Meizu Device UI Verification
-
-The shared Meizu 20 Pro can be reached through wireless ADB when it appears in `adb devices -l`. Use the displayed serial dynamically rather than hard-coding it, then build and install the debug APK:
+If CLI device resolution fails, `adb devices -l` is permitted only for discovery. Build and run on the selected physical device with:
 
 ```powershell
-$deviceLine = adb devices -l | Select-String ' device ' | Select-Object -First 1
-$serial = $deviceLine.ToString() -replace '\s+device\s+product:.*$',''
 .\gradlew.bat app:assembleDebug
-adb -s "$serial" install -r app\build\outputs\apk\debug\app-arm64-v8a-debug.apk
-adb -s "$serial" shell monkey -p github.ponyhuang.asssistantai -c android.intent.category.LAUNCHER 1
+android run --debug --device "$serial" --apks=app\build\outputs\apk\debug\app-arm64-v8a-debug.apk
 ```
 
-For visual Compose checks, use `adb -s "$serial" shell input tap <x> <y>` to navigate, capture the screen with `adb -s "$serial" exec-out screencap -p > build\device-screen.png`, and inspect the PNG visually. Pair this with `adb -s "$serial" shell uiautomator dump /sdcard/window.xml` when confirming text, click targets, and bounds. Check that interactive elements clear the status bar and gesture-navigation area.
+Use `android layout --device "$serial" --pretty` for hierarchy/text/bounds and `android screen capture -o build\device-screen.png` for visuals. Use narrowly scoped `adb -s "$serial" shell input ...` only when CLI lacks required input.
 
-The device may be asleep. If an initial screenshot or UI dump shows the keyguard or the app is not foregrounded, first wake it with `adb -s "$serial" shell input keyevent KEYCODE_WAKEUP`, then re-check the UI before reporting a test blocker. The shared test device normally has no authentication lock, so waking it is sufficient; do not attempt to bypass a password, pattern, or biometric lock if one is actually present. Keep any intentional model-selection test change visible in the final report, because it persists in the app's settings.
-
-## Commit & Pull Request Guidelines
-
-Existing history uses short imperative subjects (for example, `Refactor settings module`); keep subjects under 72 characters and commits focused. Pull requests should explain user-visible changes, note tests run, link the relevant issue or OpenSpec change, and include screenshots for Compose UI changes.
-
-Before committing, confirm that the staged diff contains no generated files or local artifacts, `git diff --cached --check` passes, and architecture boundaries above are still satisfied.
-
-## Security & Configuration
-
-Never commit API keys, provider tokens, or credentials. Store local secrets in ignored `local.properties` or environment variables, and revoke credentials that enter source control.
+If the device is asleep or not foregrounded and CLI has no wake command, use only `adb -s "$serial" shell input keyevent KEYCODE_WAKEUP`, then re-check with `android layout` or `android screen capture`. Never bypass device security. Report persistent test changes such as model selection.

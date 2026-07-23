@@ -128,6 +128,7 @@ dependencies {
     implementation(project(":feature:workfiles"))
     implementation(project(":feature:permissions"))
     implementation(project(":feature:toolauthorization"))
+    implementation(project(":feature:assistant"))
     implementation(project(":feature:voicewake"))
     implementation(project(":feature:settings"))
     implementation(project(":feature:skills"))

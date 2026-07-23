@@ -16,6 +16,9 @@ import github.ponyhuang.asssistantai.domain.assistant.model.AssistantInvocationS
 
 /**
  * 助理浮层路由：持有 Android 副作用（权限申请、关闭回调），界面保持无状态。
+ *
+ * @param approveConfirmation 批准敏感操作的拦截器（宿主注入锁屏解锁流程）；
+ * 默认直接放行。
  */
 @Composable
 fun AssistantOverlayRoute(
@@ -23,6 +26,7 @@ fun AssistantOverlayRoute(
     onClose: () -> Unit,
     onOpenInChat: (sessionId: String?) -> Unit,
     modifier: Modifier = Modifier,
+    approveConfirmation: (proceed: () -> Unit) -> Unit = { it() },
     viewModel: AssistantOverlayViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -52,7 +56,13 @@ fun AssistantOverlayRoute(
 
     AssistantOverlayScreen(
         state = state,
-        onAction = viewModel::onAction,
+        onAction = { action ->
+            if (action is AssistantOverlayAction.ApproveConfirmation) {
+                approveConfirmation { viewModel.onAction(action) }
+            } else {
+                viewModel.onAction(action)
+            }
+        },
         onOpenInChat = { onOpenInChat(state.voiceSessionId) },
         modifier = modifier,
     )

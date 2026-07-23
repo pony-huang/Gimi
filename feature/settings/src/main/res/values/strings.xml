@@ -35,4 +35,6 @@
 
     <string name="settings_about_title">关于</string>
     <string name="settings_about_subtitle">Assistant AI %1$s</string>
+    <string name="settings_assistant_title">系统语音助手</string>
+    <string name="settings_assistant_subtitle">默认助理 · 快捷磁贴 · 浮层</string>
 </resources>

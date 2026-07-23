@@ -18,6 +18,9 @@ sealed interface AppRoute : NavKey {
     data object VoiceWakeSettings : AppRoute
 
     @Serializable
+    data object AssistantSettings : AppRoute
+
+    @Serializable
     data object WorkFilesSettings : AppRoute
 
     @Serializable

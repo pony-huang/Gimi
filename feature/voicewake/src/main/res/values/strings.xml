@@ -11,8 +11,8 @@
     <string name="voicewake_offline_model">离线模型</string>
     <string name="voicewake_offline_setup_required">启用前请配置可用的默认助手模型和语音识别模型。</string>
     <string name="voicewake_offline_model_name">离线中文唤醒模型</string>
-    <string name="voicewake_model_status_bundled">已内置 APK，首次启用时安装</string>
-    <string name="voicewake_model_extracting_progress">正在读取内置模型 %1$d%%</string>
+    <string name="voicewake_model_status_bundled">首次启用时需联网下载，约 42MB</string>
+    <string name="voicewake_model_extracting_progress">正在下载模型 %1$d%%</string>
     <string name="voicewake_model_installing">正在安装模型</string>
     <string name="voicewake_model_ready">已安装，仅在本机识别唤醒词</string>
     <string name="voicewake_model_install_failed">安装失败</string>

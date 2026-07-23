@@ -9,8 +9,8 @@
     <string name="voicewake_offline_model">Offline model</string>
     <string name="voicewake_offline_setup_required">Configure a default assistant model and a speech recognition model before enabling.</string>
     <string name="voicewake_offline_model_name">Offline Chinese wake-word model</string>
-    <string name="voicewake_model_status_bundled">Bundled in the APK. Installed on first enable.</string>
-    <string name="voicewake_model_extracting_progress">Reading bundled model %1$d%%</string>
+    <string name="voicewake_model_status_bundled">Downloaded online on first use, about 42MB.</string>
+    <string name="voicewake_model_extracting_progress">Downloading model %1$d%%</string>
     <string name="voicewake_model_installing">Installing model</string>
     <string name="voicewake_model_ready">Installed. Wake word is recognized on this device only.</string>
     <string name="voicewake_model_install_failed">Installation failed</string>

@@ -13,6 +13,7 @@
     <string name="assistant_follow_up_hint">可以继续提问，30 秒无操作后自动关闭</string>
     <string name="assistant_waveform_cd">录音音量波形</string>
     <string name="assistant_no_speech">没有听到声音，点击麦克风重试</string>
+    <string name="assistant_preparation_failed">麦克风没有准备好，点击麦克风重试</string>
     <string name="assistant_transcribe_failed">没有识别到内容，请重试</string>
     <string name="assistant_mic_permission">需要麦克风权限才能语音提问</string>
     <string name="assistant_tts_notice">语音播报不可用，已以文字回答</string>
@@ -24,7 +25,7 @@
     <string name="assistant_confirm_countdown">%1$d 秒后自动拒绝</string>
     <string name="assistant_confirm_approve">允许</string>
     <string name="assistant_confirm_reject">拒绝</string>
-    <string name="assistant_input_hint">输入问题</string>
+    <string name="assistant_input_hint">想要我怎么帮你？</string>
     <string name="assistant_send">发送</string>
     <string name="assistant_mic_cd">语音输入</string>
     <string name="assistant_open_in_chat">在聊天中查看</string>

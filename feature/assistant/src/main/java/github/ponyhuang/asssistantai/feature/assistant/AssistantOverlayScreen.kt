@@ -1,20 +1,29 @@
 package github.ponyhuang.asssistantai.feature.assistant
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -23,8 +32,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,7 +45,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.assistant.model.AssistantConfigIssue
 import github.ponyhuang.asssistantai.domain.assistant.model.AssistantSessionPhase
@@ -55,84 +64,87 @@ fun AssistantOverlayScreen(
     onOpenInChat: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val darkTheme = isSystemInDarkTheme()
+    val panelColor = if (darkTheme) {
+        MaterialTheme.colorScheme.surface
+    } else {
+        MaterialTheme.colorScheme.inverseSurface
+    }
+    val panelContentColor = if (darkTheme) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.inverseOnSurface
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
             .widthIn(max = OverlayMaxWidth)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Surface(
-            shape = MaterialTheme.shapes.extraLarge,
-            tonalElevation = 3.dp,
-            shadowElevation = 8.dp,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(
+        if (state.shouldShowExpandedContent()) {
+            Surface(
+                shape = RoundedCornerShape(28.dp),
+                color = panelColor,
+                contentColor = panelContentColor,
+                shadowElevation = 10.dp,
                 modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .verticalScroll(rememberScrollState()),
+                    .fillMaxWidth()
+                    .testTag("assistant_expanded_content"),
             ) {
-                OverlayHeader(state, onAction)
-                Spacer(Modifier.height(8.dp))
-                when (state.phase) {
-                    AssistantSessionPhase.MISSING_CONFIG -> MissingConfigContent(state, onAction)
-                    AssistantSessionPhase.ERROR -> ErrorContent(state, onAction)
-                    else -> SessionContent(state, onAction)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                        .heightIn(max = 360.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    when (state.phase) {
+                        AssistantSessionPhase.MISSING_CONFIG -> MissingConfigContent(state, onAction)
+                        AssistantSessionPhase.ERROR -> ErrorContent(state, onAction)
+                        else -> SessionContent(state, onAction)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Spacer(Modifier.weight(1f))
+                        TextButton(
+                            onClick = onOpenInChat,
+                            modifier = Modifier.testTag("assistant_open_in_chat"),
+                        ) {
+                            Text(stringResource(R.string.assistant_open_in_chat))
+                        }
+                    }
                 }
-                Spacer(Modifier.height(8.dp))
-                OverlayFooter(state, onAction, onOpenInChat)
             }
+            Spacer(Modifier.height(8.dp))
         }
+        AssistantSearchBar(
+            state = state,
+            onAction = onAction,
+            containerColor = panelColor,
+            contentColor = panelContentColor,
+        )
     }
 }
 
-@Composable
-private fun OverlayHeader(
-    state: AssistantOverlayUiState,
-    onAction: (AssistantOverlayAction) -> Unit,
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = stringResource(R.string.assistant_overlay_title),
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Spacer(Modifier.weight(1f))
-        if (state.phase == AssistantSessionPhase.GENERATING ||
-            state.phase == AssistantSessionPhase.EXECUTING_TOOL ||
-            state.phase == AssistantSessionPhase.AWAITING_CONFIRMATION
-        ) {
-            TextButton(
-                onClick = { onAction(AssistantOverlayAction.StopTask) },
-                modifier = Modifier.testTag("assistant_stop_task"),
-            ) {
-                Text(stringResource(R.string.assistant_stop_task))
-            }
-        }
-        IconButton(
-            onClick = { onAction(AssistantOverlayAction.CloseOverlay) },
-            modifier = Modifier.testTag("assistant_close"),
-        ) {
-            Icon(
-                Icons.Default.Close,
-                contentDescription = stringResource(R.string.assistant_close),
-            )
-        }
-    }
-}
+private fun AssistantOverlayUiState.shouldShowExpandedContent(): Boolean =
+    phase == AssistantSessionPhase.MISSING_CONFIG ||
+        phase == AssistantSessionPhase.ERROR ||
+        pendingConfirmation != null ||
+        userText.isNotBlank() ||
+        responseText.isNotBlank() ||
+        toolNames.isNotEmpty() ||
+        ttsNotice ||
+        canRetryListening
 
 @Composable
 private fun SessionContent(
     state: AssistantOverlayUiState,
     onAction: (AssistantOverlayAction) -> Unit,
 ) {
-    when (state.phase) {
-        AssistantSessionPhase.PREPARING -> StatusRow(stringResource(R.string.assistant_preparing), true)
-        AssistantSessionPhase.LISTENING -> ListeningContent(state, onAction)
-        AssistantSessionPhase.TRANSCRIBING -> StatusRow(stringResource(R.string.assistant_transcribing), true)
-        else -> Unit
-    }
-
     if (state.userText.isNotBlank()) {
         Text(
             text = state.userText,
@@ -193,53 +205,28 @@ private fun SessionContent(
         Text(
             text = stringResource(R.string.assistant_tts_notice),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = LocalContentColor.current.copy(alpha = 0.66f),
         )
     }
     if (state.canRetryListening && state.phase != AssistantSessionPhase.LISTENING) {
         Text(
-            text = stringResource(R.string.assistant_no_speech),
+            text = stringResource(
+                if (state.preparationFailed) {
+                    R.string.assistant_preparation_failed
+                } else {
+                    R.string.assistant_no_speech
+                },
+            ),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = LocalContentColor.current.copy(alpha = 0.66f),
         )
     }
-    if (state.phase == AssistantSessionPhase.FOLLOW_UP_IDLE) {
+    if (state.phase == AssistantSessionPhase.FOLLOW_UP_IDLE && !state.canRetryListening) {
         Text(
             text = stringResource(R.string.assistant_follow_up_hint),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = LocalContentColor.current.copy(alpha = 0.66f),
         )
-    }
-}
-
-@Composable
-private fun ListeningContent(
-    state: AssistantOverlayUiState,
-    onAction: (AssistantOverlayAction) -> Unit,
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        VoiceWaveform(
-            levels = state.recordingLevels,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-                .testTag("assistant_waveform"),
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = stringResource(R.string.assistant_listening),
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
-        )
-        TextButton(
-            onClick = { onAction(AssistantOverlayAction.StopListening) },
-            modifier = Modifier.testTag("assistant_stop_listening"),
-        ) {
-            Text(stringResource(R.string.assistant_stop_task))
-        }
     }
 }
 
@@ -270,7 +257,8 @@ private fun ErrorContent(
 ) {
     Column {
         Text(
-            text = state.errorMessage.orEmpty(),
+            text = state.errorMessage
+                ?: stringResource(R.string.assistant_transcribe_failed),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.error,
             modifier = Modifier
@@ -340,48 +328,223 @@ private fun ConfirmationCard(
 }
 
 @Composable
-private fun OverlayFooter(
+private fun AssistantSearchBar(
     state: AssistantOverlayUiState,
     onAction: (AssistantOverlayAction) -> Unit,
-    onOpenInChat: () -> Unit,
+    containerColor: androidx.compose.ui.graphics.Color,
+    contentColor: androidx.compose.ui.graphics.Color,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        OutlinedTextField(
-            value = state.draftText,
-            onValueChange = { onAction(AssistantOverlayAction.DraftChanged(it)) },
-            placeholder = { Text(stringResource(R.string.assistant_input_hint)) },
-            enabled = state.inputEnabled,
-            singleLine = true,
+    Surface(
+        shape = RoundedCornerShape(34.dp),
+        color = containerColor,
+        contentColor = contentColor,
+        shadowElevation = 14.dp,
+        border = BorderStroke(1.dp, contentColor.copy(alpha = 0.12f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("assistant_search_bar"),
+    ) {
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .testTag("assistant_input"),
-        )
-        IconButton(
-            onClick = { onAction(AssistantOverlayAction.MicTapped) },
-            enabled = state.inputEnabled,
-            modifier = Modifier.testTag("assistant_mic"),
+                .fillMaxWidth()
+                .heightIn(min = 68.dp)
+                .padding(horizontal = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                Icons.Default.Mic,
-                contentDescription = stringResource(R.string.assistant_mic_cd),
+            IconButton(
+                onClick = { onAction(AssistantOverlayAction.CloseOverlay) },
+                modifier = Modifier
+                    .size(48.dp)
+                    .testTag("assistant_close"),
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = stringResource(R.string.assistant_close),
+                    tint = contentColor.copy(alpha = 0.72f),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 6.dp, vertical = 12.dp),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                SearchBarContent(
+                    state = state,
+                    onAction = onAction,
+                    contentColor = contentColor,
+                )
+            }
+            SearchBarAction(state, onAction, contentColor)
+        }
+    }
+}
+
+@Composable
+private fun SearchBarContent(
+    state: AssistantOverlayUiState,
+    onAction: (AssistantOverlayAction) -> Unit,
+    contentColor: androidx.compose.ui.graphics.Color,
+) {
+    when (state.phase) {
+        AssistantSessionPhase.LISTENING -> {
+            VoiceWaveform(
+                levels = state.recordingLevels,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(32.dp)
+                    .testTag("assistant_waveform"),
             )
         }
-        IconButton(
-            onClick = { onAction(AssistantOverlayAction.SubmitDraft) },
-            enabled = state.inputEnabled && state.draftText.isNotBlank(),
-            modifier = Modifier.testTag("assistant_send"),
-        ) {
-            Icon(
-                Icons.Default.Send,
-                contentDescription = stringResource(R.string.assistant_send),
+        AssistantSessionPhase.PREPARING,
+        AssistantSessionPhase.TRANSCRIBING,
+        -> {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                )
+                Text(
+                    text = stringResource(
+                        if (state.phase == AssistantSessionPhase.PREPARING) {
+                            R.string.assistant_preparing
+                        } else {
+                            R.string.assistant_transcribing
+                        },
+                    ),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = contentColor.copy(alpha = 0.72f),
+                )
+            }
+        }
+        AssistantSessionPhase.GENERATING,
+        AssistantSessionPhase.EXECUTING_TOOL,
+        AssistantSessionPhase.AWAITING_CONFIRMATION,
+        -> {
+            Text(
+                text = stringResource(
+                    if (state.phase == AssistantSessionPhase.EXECUTING_TOOL) {
+                        R.string.assistant_executing_tool
+                    } else {
+                        R.string.assistant_generating
+                    },
+                    *if (state.phase == AssistantSessionPhase.EXECUTING_TOOL) {
+                        arrayOf(state.toolNames.lastOrNull().orEmpty())
+                    } else {
+                        emptyArray()
+                    },
+                ),
+                style = MaterialTheme.typography.bodyLarge,
+                color = contentColor.copy(alpha = 0.72f),
+            )
+        }
+        else -> {
+            BasicTextField(
+                value = state.draftText,
+                onValueChange = { onAction(AssistantOverlayAction.DraftChanged(it)) },
+                enabled = state.inputEnabled,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = if (state.inputEnabled) {
+                        contentColor
+                    } else {
+                        contentColor.copy(alpha = 0.38f)
+                    },
+                ),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(
+                    onSend = {
+                        if (state.draftText.isNotBlank()) {
+                            onAction(AssistantOverlayAction.SubmitDraft)
+                        }
+                    },
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("assistant_input"),
+                decorationBox = { innerTextField ->
+                    if (state.draftText.isBlank()) {
+                        Text(
+                            text = stringResource(R.string.assistant_input_hint),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = contentColor.copy(
+                                alpha = if (state.inputEnabled) 0.62f else 0.38f,
+                            ),
+                        )
+                    }
+                    innerTextField()
+                },
             )
         }
     }
-    TextButton(
-        onClick = onOpenInChat,
-        modifier = Modifier.testTag("assistant_open_in_chat"),
-    ) {
-        Text(stringResource(R.string.assistant_open_in_chat))
+}
+
+@Composable
+private fun SearchBarAction(
+    state: AssistantOverlayUiState,
+    onAction: (AssistantOverlayAction) -> Unit,
+    contentColor: androidx.compose.ui.graphics.Color,
+) {
+    when {
+        state.phase == AssistantSessionPhase.LISTENING -> {
+            IconButton(
+                onClick = { onAction(AssistantOverlayAction.StopListening) },
+                modifier = Modifier.testTag("assistant_stop_listening"),
+            ) {
+                Icon(
+                    Icons.Default.Stop,
+                    contentDescription = stringResource(R.string.assistant_stop_task),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        state.phase == AssistantSessionPhase.GENERATING ||
+            state.phase == AssistantSessionPhase.EXECUTING_TOOL ||
+            state.phase == AssistantSessionPhase.AWAITING_CONFIRMATION -> {
+            IconButton(
+                onClick = { onAction(AssistantOverlayAction.StopTask) },
+                modifier = Modifier.testTag("assistant_stop_task"),
+            ) {
+                Icon(
+                    Icons.Default.Stop,
+                    contentDescription = stringResource(R.string.assistant_stop_task),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        state.draftText.isNotBlank() -> {
+            IconButton(
+                onClick = { onAction(AssistantOverlayAction.SubmitDraft) },
+                enabled = state.inputEnabled,
+                modifier = Modifier.testTag("assistant_send"),
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.Send,
+                    contentDescription = stringResource(R.string.assistant_send),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        else -> {
+            IconButton(
+                onClick = { onAction(AssistantOverlayAction.MicTapped) },
+                enabled = state.inputEnabled,
+                modifier = Modifier.testTag("assistant_mic"),
+            ) {
+                Icon(
+                    Icons.Default.Mic,
+                    contentDescription = stringResource(R.string.assistant_mic_cd),
+                    tint = if (state.inputEnabled) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        contentColor.copy(alpha = 0.38f)
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -395,8 +558,8 @@ private fun StatusRow(label: String, loading: Boolean) {
         if (loading) {
             CircularProgressIndicator(
                 modifier = Modifier
-                    .height(18.dp)
-                    .padding(end = 4.dp),
+                    .size(18.dp)
+                    .testTag("assistant_status_spinner"),
                 strokeWidth = 2.dp,
             )
         }

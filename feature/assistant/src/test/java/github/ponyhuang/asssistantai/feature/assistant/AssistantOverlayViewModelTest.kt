@@ -14,6 +14,7 @@ import github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackState
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechPlaybackRepository
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechRecognitionRepository
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechSynthesisRepository
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -54,7 +55,9 @@ class AssistantOverlayViewModelTest {
         speechRecognition = speechRecognition,
         speechPlayback = playback,
         speechSynthesis = synthesis,
-    )
+    ).apply {
+        recordingDispatcher = mainDispatcherRule.dispatcher
+    }
 
     @Test
     fun `invocation with active task only restores state without recording`() = runTest {
@@ -165,6 +168,49 @@ class AssistantOverlayViewModelTest {
     }
 
     @Test
+    fun `recorder startup failure leaves preparing state and enables retry`() = runTest {
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect() }
+
+        vm.onInvoked(AssistantInvocationSource.TILE, microphoneGranted = true)
+        advanceUntilIdle()
+
+        assertEquals(AssistantSessionPhase.FOLLOW_UP_IDLE, vm.uiState.value.phase)
+        assertTrue(vm.uiState.value.canRetryListening)
+    }
+
+    @Test
+    fun `configuration check failure leaves preparing state and enables retry`() = runTest {
+        coordinator.configFailure = IllegalStateException("catalog unavailable")
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect() }
+
+        vm.onInvoked(AssistantInvocationSource.TILE, microphoneGranted = true)
+        advanceUntilIdle()
+
+        assertEquals(AssistantSessionPhase.FOLLOW_UP_IDLE, vm.uiState.value.phase)
+        assertTrue(vm.uiState.value.canRetryListening)
+    }
+
+    @Test
+    fun `transcription failure is surfaced as an error`() = runTest {
+        coEvery { speechRecognition.transcribe(any()) } throws
+            IllegalStateException("speech service unavailable")
+        val vm = viewModel()
+        backgroundScope.launch { vm.uiState.collect() }
+        val transcribe = AssistantOverlayViewModel::class.java.getDeclaredMethod(
+            "transcribeAndSubmit",
+            ByteArray::class.java,
+        ).apply { isAccessible = true }
+
+        transcribe.invoke(vm, byteArrayOf(1, 2))
+        advanceUntilIdle()
+
+        assertEquals(AssistantSessionPhase.ERROR, vm.uiState.value.phase)
+        assertTrue(vm.uiState.value.canRetryListening)
+    }
+
+    @Test
     fun `stop task cancels coordinator task and playback`() = runTest {
         coordinatorState.value = AssistantSessionState(
             sessionId = "s1",
@@ -212,9 +258,13 @@ class AssistantOverlayViewModelTest {
         var stopCalled = false
         var hideCalled = false
         var configIssue: AssistantConfigIssue? = null
+        var configFailure: Throwable? = null
         override val voiceSessionId = MutableStateFlow<String?>(null)
 
-        override suspend fun configurationIssue(): AssistantConfigIssue? = configIssue
+        override suspend fun configurationIssue(): AssistantConfigIssue? {
+            configFailure?.let { throw it }
+            return configIssue
+        }
 
         override fun noteInvocation(source: AssistantInvocationSource) {
             invocations += source

@@ -52,16 +52,43 @@ class VoiceCommandCaptureTest {
     @Test
     fun captureAdaptsThresholdToLoudBackgroundNoise() {
         val capture = VoiceCommandCapture(preRoll = byteArrayOf(), startedAtMs = 0L)
-        // 背景噪声幅度 650 低于初始阈值 700 → 噪声底抬升，阈值升至约 1950
+        // 背景噪声幅度 650 低于初始阈值 700 → 噪声底开始缓慢抬升。
         assertEquals(CaptureDecision.Continue, capture.append(pcmWithAmplitude(650), 100L))
-        // 800 高于旧固定阈值 700，但低于自适应阈值，不误判为语音（噪声底随之升到 800）
+        // 800 仍低于自适应阈值，不误判为语音，也不会把噪声底瞬间抬到 800。
         assertEquals(CaptureDecision.Continue, capture.append(pcmWithAmplitude(800), 200L))
-        // 真实语音高于自适应阈值（约 2400）
+        // 明显高于背景的真实语音可以触发。
         assertEquals(CaptureDecision.Continue, capture.append(pcmWithAmplitude(2_500), 300L))
 
         val result = capture.append(
             silentPcm(),
             300L + VoiceCommandCapture.SILENCE_TO_FINISH_MS,
+        )
+
+        assertTrue(result is CaptureDecision.Complete)
+    }
+
+    @Test
+    fun captureDoesNotRaiseNoiseFloorPastSoftSpeech() {
+        val capture = VoiceCommandCapture(preRoll = byteArrayOf(), startedAtMs = 0L)
+        assertEquals(CaptureDecision.Continue, capture.append(pcmWithAmplitude(650), 100L))
+        assertEquals(CaptureDecision.Continue, capture.append(pcmWithAmplitude(1_000), 200L))
+
+        val result = capture.append(
+            silentPcm(),
+            200L + VoiceCommandCapture.SILENCE_TO_FINISH_MS,
+        )
+
+        assertTrue(result is CaptureDecision.Complete)
+    }
+
+    @Test
+    fun lowGainAudioIsTranscribedAtSpeechStartDeadline() {
+        val capture = VoiceCommandCapture(preRoll = byteArrayOf(), startedAtMs = 0L)
+        assertEquals(CaptureDecision.Continue, capture.append(pcmWithAmplitude(200), 100L))
+
+        val result = capture.append(
+            pcmWithAmplitude(200),
+            VoiceCommandCapture.SPEECH_START_TIMEOUT_MS,
         )
 
         assertTrue(result is CaptureDecision.Complete)

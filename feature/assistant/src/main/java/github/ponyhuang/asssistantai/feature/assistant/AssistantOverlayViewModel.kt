@@ -17,6 +17,8 @@ import github.ponyhuang.asssistantai.domain.speech.repository.SpeechRecognitionR
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechSynthesisRepository
 import github.ponyhuang.asssistantai.domain.speech.usecase.markdownToSpeechText
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -57,6 +59,7 @@ class AssistantOverlayViewModel @Inject constructor(
         val transcribeFailed: Boolean = false,
         val ttsNotice: Boolean = false,
         val micPermissionDenied: Boolean = false,
+        val preparationFailed: Boolean = false,
         val confirmationRemainingSeconds: Int = 0,
     )
 
@@ -71,6 +74,9 @@ class AssistantOverlayViewModel @Inject constructor(
     private var invoked = false
     private var source: AssistantInvocationSource = AssistantInvocationSource.TILE
     private var lastSpokenResponse = ""
+    /** AudioRecord initialization must never block the main/UI dispatcher. */
+    internal var recordingDispatcher: CoroutineDispatcher = Dispatchers.IO
+    private var recorderStartJob: Job? = null
 
     val uiState: StateFlow<AssistantOverlayUiState> =
         combine(coordinator.state, local, speechPlayback.state) { cs, l, playback ->
@@ -78,7 +84,11 @@ class AssistantOverlayViewModel @Inject constructor(
                 l.listening -> AssistantSessionPhase.LISTENING
                 l.transcribing -> AssistantSessionPhase.TRANSCRIBING
                 l.configIssue != null -> AssistantSessionPhase.MISSING_CONFIG
-                cs.taskActive || cs.phase != AssistantSessionPhase.FOLLOW_UP_IDLE -> cs.phase
+                l.transcribeFailed -> AssistantSessionPhase.ERROR
+                cs.taskActive -> cs.phase
+                l.preparationFailed || l.canRetryListening ||
+                    l.micPermissionDenied -> AssistantSessionPhase.FOLLOW_UP_IDLE
+                cs.phase != AssistantSessionPhase.FOLLOW_UP_IDLE -> cs.phase
                 l.speaking && playback.status != SpeechPlaybackStatus.Idle ->
                     AssistantSessionPhase.SPEAKING
                 else -> AssistantSessionPhase.FOLLOW_UP_IDLE
@@ -99,6 +109,7 @@ class AssistantOverlayViewModel @Inject constructor(
                 ttsNotice = l.ttsNotice,
                 canRetryListening = l.canRetryListening || l.transcribeFailed ||
                     l.micPermissionDenied,
+                preparationFailed = l.preparationFailed,
                 voiceSessionId = cs.sessionId,
             )
         }.stateIn(
@@ -219,7 +230,18 @@ class AssistantOverlayViewModel @Inject constructor(
 
     private fun begin() {
         viewModelScope.launch {
-            val issue = coordinator.configurationIssue()
+            local.update { it.copy(preparationFailed = false, canRetryListening = false) }
+            val issue = runCatching { coordinator.configurationIssue() }
+                .getOrElse {
+                    local.update {
+                        it.copy(
+                            preparationFailed = true,
+                            canRetryListening = true,
+                        )
+                    }
+                    scheduleIdleClose()
+                    return@launch
+                }
             if (issue != null) {
                 local.update { it.copy(configIssue = issue) }
                 return@launch
@@ -242,32 +264,57 @@ class AssistantOverlayViewModel @Inject constructor(
                 transcribeFailed = false,
                 ttsNotice = false,
                 configIssue = null,
+                preparationFailed = false,
             )
         }
         val commandCapture = VoiceCommandCapture(ByteArray(0), SystemClock.elapsedRealtime())
         capture = commandCapture
-        val started = recorder.start(
-            onAudioChunk = { chunk ->
-                when (val decision = commandCapture.append(chunk, SystemClock.elapsedRealtime())) {
-                    CaptureDecision.Continue -> Unit
-                    CaptureDecision.Cancel -> viewModelScope.launch { stopListening(retryable = true) }
-                    is CaptureDecision.Complete -> viewModelScope.launch {
-                        transcribeAndSubmit(decision.pcm16)
+        recorderStartJob?.cancel()
+        recorderStartJob = viewModelScope.launch(recordingDispatcher) {
+            val started = recorder.start(
+                onAudioChunk = { chunk ->
+                    when (val decision = commandCapture.append(chunk, SystemClock.elapsedRealtime())) {
+                        CaptureDecision.Continue -> Unit
+                        CaptureDecision.Cancel ->
+                            viewModelScope.launch { stopListening(retryable = true) }
+                        is CaptureDecision.Complete -> viewModelScope.launch {
+                            transcribeAndSubmit(decision.pcm16)
+                        }
                     }
-                }
-            },
-            onAudioLevel = { level ->
-                local.update { it.copy(recordingLevels = (it.recordingLevels + level).takeLast(MAX_WAVEFORM_LEVELS)) }
-            },
-            onError = { viewModelScope.launch { stopListening(retryable = true) } },
-        )
-        if (!started) stopListening(retryable = true)
+                },
+                onAudioLevel = { level ->
+                    local.update {
+                        it.copy(
+                            recordingLevels =
+                                (it.recordingLevels + level).takeLast(MAX_WAVEFORM_LEVELS),
+                        )
+                    }
+                },
+                onError = {
+                    viewModelScope.launch {
+                        stopListening(retryable = true, preparationFailed = true)
+                    }
+                },
+            )
+            if (!started) {
+                stopListening(retryable = true, preparationFailed = true)
+            }
+        }
     }
 
-    private fun stopListening(retryable: Boolean) {
+    private fun stopListening(
+        retryable: Boolean,
+        preparationFailed: Boolean = false,
+    ) {
         capture = null
         recorder.stop()
-        local.update { it.copy(listening = false, canRetryListening = retryable) }
+        local.update {
+            it.copy(
+                listening = false,
+                canRetryListening = retryable,
+                preparationFailed = preparationFailed,
+            )
+        }
         if (retryable && !coordinator.state.value.taskActive) scheduleIdleClose()
     }
 
@@ -348,6 +395,8 @@ class AssistantOverlayViewModel @Inject constructor(
 
     private fun close() {
         cancelIdleClose()
+        recorderStartJob?.cancel()
+        recorderStartJob = null
         capture = null
         recorder.stop()
         speechPlayback.stop()

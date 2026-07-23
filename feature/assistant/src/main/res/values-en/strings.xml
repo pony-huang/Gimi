@@ -13,6 +13,7 @@
     <string name="assistant_follow_up_hint">Ask a follow-up, or the overlay closes after 30s idle</string>
     <string name="assistant_waveform_cd">Recording volume waveform</string>
     <string name="assistant_no_speech">No speech detected. Tap the mic to retry</string>
+    <string name="assistant_preparation_failed">The microphone isn’t ready. Tap the mic to retry</string>
     <string name="assistant_transcribe_failed">Nothing recognized, please retry</string>
     <string name="assistant_mic_permission">Microphone permission is required for voice input</string>
     <string name="assistant_tts_notice">Voice playback unavailable; answered in text</string>
@@ -24,7 +25,7 @@
     <string name="assistant_confirm_countdown">Auto-deny in %1$d s</string>
     <string name="assistant_confirm_approve">Allow</string>
     <string name="assistant_confirm_reject">Deny</string>
-    <string name="assistant_input_hint">Type a question</string>
+    <string name="assistant_input_hint">How can I help?</string>
     <string name="assistant_send">Send</string>
     <string name="assistant_mic_cd">Voice input</string>
     <string name="assistant_open_in_chat">View in chat</string>

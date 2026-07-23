@@ -1,10 +1,15 @@
 package github.ponyhuang.asssistantai.feature.assistant
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -48,19 +53,55 @@ class AssistantOverlayScreenTest {
 
         composeRule.onNodeWithTag("assistant_waveform").assertIsDisplayed()
         composeRule.onNodeWithTag("assistant_stop_listening").assertIsDisplayed()
-        composeRule.onNodeWithTag("assistant_input").assertIsNotEnabled()
+        composeRule.onAllNodesWithTag("assistant_input").assertCountEquals(0)
     }
 
     @Test
-    fun followUpStateEnablesInputAndDispatchesKeyboardSubmission() {
-        val actions = mutableListOf<AssistantOverlayAction>()
+    fun preparingUsesSearchBarWithoutExpandedCard() {
+        render(
+            AssistantOverlayUiState(
+                phase = AssistantSessionPhase.PREPARING,
+            ),
+        )
+
+        composeRule.onNodeWithTag("assistant_search_bar").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("assistant_expanded_content").assertCountEquals(0)
+    }
+
+    @Test
+    fun responseExpandsAboveSearchBar() {
         render(
             AssistantOverlayUiState(
                 phase = AssistantSessionPhase.FOLLOW_UP_IDLE,
                 responseText = "回答内容",
             ),
-            onAction = actions::add,
         )
+
+        composeRule.onNodeWithTag("assistant_expanded_content").assertIsDisplayed()
+        composeRule.onNodeWithTag("assistant_search_bar").assertIsDisplayed()
+    }
+
+    @Test
+    fun followUpStateEnablesInputAndDispatchesKeyboardSubmission() {
+        val actions = mutableListOf<AssistantOverlayAction>()
+        var state by mutableStateOf(
+            AssistantOverlayUiState(
+                phase = AssistantSessionPhase.FOLLOW_UP_IDLE,
+                responseText = "回答内容",
+            ),
+        )
+        composeRule.setContent {
+            AssistantOverlayScreen(
+                state = state,
+                onAction = { action ->
+                    actions += action
+                    if (action is AssistantOverlayAction.DraftChanged) {
+                        state = state.copy(draftText = action.value)
+                    }
+                },
+                onOpenInChat = {},
+            )
+        }
 
         composeRule.onNodeWithTag("assistant_response_text").assertIsDisplayed()
         composeRule.onNodeWithTag("assistant_input").assertIsEnabled()
@@ -118,6 +159,17 @@ class AssistantOverlayScreenTest {
     }
 
     @Test
+    fun transcriptionErrorWithoutProviderMessageShowsUsefulFallback() {
+        render(
+            AssistantOverlayUiState(
+                phase = AssistantSessionPhase.ERROR,
+            ),
+        )
+
+        composeRule.onNodeWithText("没有识别到内容，请重试").assertIsDisplayed()
+    }
+
+    @Test
     fun missingConfigShowsGuidance() {
         render(
             AssistantOverlayUiState(
@@ -154,6 +206,23 @@ class AssistantOverlayScreenTest {
     }
 
     @Test
+    fun generatingStatusUsesSquareSpinner() {
+        render(
+            AssistantOverlayUiState(
+                phase = AssistantSessionPhase.GENERATING,
+                userText = "问题",
+            ),
+        )
+
+        val bounds = composeRule
+            .onNodeWithTag("assistant_status_spinner")
+            .assertIsDisplayed()
+            .fetchSemanticsNode()
+            .boundsInRoot
+        assertEquals(bounds.width, bounds.height, 0.5f)
+    }
+
+    @Test
     fun speakingStateOffersStopPlayback() {
         val actions = mutableListOf<AssistantOverlayAction>()
         render(
@@ -173,7 +242,10 @@ class AssistantOverlayScreenTest {
     fun openInChatCallbackIsInvoked() {
         var opened = false
         render(
-            AssistantOverlayUiState(phase = AssistantSessionPhase.FOLLOW_UP_IDLE),
+            AssistantOverlayUiState(
+                phase = AssistantSessionPhase.FOLLOW_UP_IDLE,
+                responseText = "回答内容",
+            ),
             onOpenInChat = { opened = true },
         )
 

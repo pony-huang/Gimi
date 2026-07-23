@@ -26,6 +26,8 @@ data class AssistantOverlayUiState(
     val ttsNotice: Boolean = false,
     /** 起声超时/转写为空/录音失败后可重试。 */
     val canRetryListening: Boolean = false,
+    /** 配置检查或录音器启动失败；用于给出区别于“未听到声音”的提示。 */
+    val preparationFailed: Boolean = false,
     val voiceSessionId: String? = null,
 ) {
     val inputEnabled: Boolean

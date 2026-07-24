@@ -41,11 +41,11 @@ class ToolAuthorizationScreenTest {
             )
         }
 
-        compose.onNodeWithText("自定义工具").assertIsDisplayed()
+        compose.onNodeWithText("逐个授权工具").assertIsDisplayed()
         compose.onNodeWithText("配置工具").assertIsDisplayed()
-        compose.onNodeWithText("开启自定义工具后可配置").assertIsDisplayed()
+        compose.onNodeWithText("开启逐个授权后可配置").assertIsDisplayed()
 
-        compose.onNodeWithText("自定义工具").performClick()
+        compose.onNodeWithText("逐个授权工具").performClick()
         compose.onNodeWithText("选择要启用的工具").assertIsDisplayed()
         compose.onNodeWithText("配置工具").performClick()
         assert(navigated)

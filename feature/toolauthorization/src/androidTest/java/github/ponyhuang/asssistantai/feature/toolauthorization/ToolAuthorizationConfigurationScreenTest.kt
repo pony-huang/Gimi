@@ -49,7 +49,8 @@ class ToolAuthorizationConfigurationScreenTest {
         compose.onNodeWithText("搜索工具").performTextInput("不存在")
         compose.onNodeWithText("没有匹配的工具").assertIsDisplayed()
 
-        compose.onNodeWithText("搜索工具").performTextClearance()
+        // 输入后占位符已消失，按当前内容定位输入框再清空。
+        compose.onNodeWithText("不存在").performTextClearance()
         compose.onNodeWithText("set_alarm").assertIsDisplayed()
         compose.onNodeWithText("get_location").assertIsDisplayed()
 

@@ -1,6 +1,8 @@
 <resources>
     <string name="toolauth_count_label">Enabled %1$d / %2$d</string>
     <string name="toolauth_customize_label">Per-tool authorization</string>
+    <string name="toolauth_state_enabled">On</string>
+    <string name="toolauth_state_disabled">Off</string>
     <string name="toolauth_customize_description">Turn on to choose which tools the assistant may use; all tools are available when off</string>
     <string name="toolauth_configure_tools">Configure tools</string>
     <string name="toolauth_configure_subtitle">Choose which tools to enable</string>

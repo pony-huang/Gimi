@@ -9,9 +9,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -21,8 +19,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import github.ponyhuang.asssistantai.ui.settings.SettingsBanner
+import github.ponyhuang.asssistantai.ui.settings.SettingsBannerTone
 import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
+import github.ponyhuang.asssistantai.ui.settings.SettingsStatusHero
 
 @Composable
 fun ToolAuthorizationRoute(
@@ -51,10 +52,19 @@ fun ToolAuthorizationScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
+            // 顶部状态锚点：主开关的当前状态一眼可见，与语音唤醒页同一语言。
             item {
-                SettingsListItem(
+                SettingsStatusHero(
                     icon = Icons.Default.Build,
                     title = stringResource(R.string.toolauth_customize_label),
+                    statusText = stringResource(
+                        if (state.isCustomizationEnabled) {
+                            R.string.toolauth_state_enabled
+                        } else {
+                            R.string.toolauth_state_disabled
+                        },
+                    ),
+                    active = state.isCustomizationEnabled,
                     subtitle = stringResource(R.string.toolauth_customize_description),
                     onClick = {
                         if (!state.isMutationBlocked) {
@@ -101,12 +111,15 @@ fun ToolAuthorizationScreen(
             }
             if (state.isMutationBlocked || !state.notice.isNullOrBlank()) {
                 item {
-                    Text(
+                    SettingsBanner(
                         text = state.notice?.takeUnless { it.isBlank() }
                             ?: stringResource(R.string.toolauth_agent_mutation_blocked),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                        tone = if (state.isMutationBlocked) {
+                            SettingsBannerTone.Error
+                        } else {
+                            SettingsBannerTone.Info
+                        },
+                        modifier = Modifier.padding(top = 4.dp),
                     )
                 }
             }

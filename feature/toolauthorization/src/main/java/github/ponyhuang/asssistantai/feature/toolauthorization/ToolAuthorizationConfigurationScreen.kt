@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.asssistantai.domain.toolauthorization.model.ToolDescriptor
+import github.ponyhuang.asssistantai.ui.settings.SettingsBanner
+import github.ponyhuang.asssistantai.ui.settings.SettingsBannerTone
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
 
 @Composable
@@ -56,54 +58,60 @@ fun ToolAuthorizationConfigurationScreen(
     modifier: Modifier = Modifier,
 ) {
     SettingsPageContainer(modifier) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    if (state.isMutationBlocked || !state.notice.isNullOrBlank()) {
+        Column(Modifier.fillMaxSize()) {
+            if (state.isMutationBlocked || !state.notice.isNullOrBlank()) {
+                SettingsBanner(
+                    text = state.notice?.takeUnless { it.isBlank() }
+                        ?: stringResource(R.string.toolauth_agent_mutation_blocked),
+                    tone = if (state.isMutationBlocked) {
+                        SettingsBannerTone.Error
+                    } else {
+                        SettingsBannerTone.Info
+                    },
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SearchAndFilterRow(state, onAction)
                         Text(
-                            text = state.notice?.takeUnless { it.isBlank() }
-                                ?: stringResource(R.string.toolauth_agent_mutation_blocked),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
+                            text = stringResource(
+                                R.string.toolauth_count_label,
+                                state.enabledCount,
+                                state.tools.size,
+                            ),
+                            style = MaterialTheme.typography.titleMedium,
                         )
                     }
-                    SearchAndFilterRow(state, onAction)
-                    Text(
-                        text = stringResource(
-                            R.string.toolauth_count_label,
-                            state.enabledCount,
-                            state.tools.size,
-                        ),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
                 }
-            }
-            if (state.visibleTools.isEmpty()) {
-                item {
-                    Text(
-                        text = if (state.query.isBlank() && state.filter == ToolAuthorizationFilter.ALL) {
-                            stringResource(R.string.toolauth_empty_state)
-                        } else {
-                            stringResource(R.string.toolauth_no_match)
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 24.dp),
-                    )
-                }
-            } else {
-                items(state.visibleTools, key = ToolDescriptor::id) { tool ->
-                    ToolAuthorizationRow(
-                        tool = tool,
-                        enabled = !state.isMutationBlocked,
-                        onEnabledChange = { enabled ->
-                            onAction(ToolAuthorizationConfigurationAction.SetEnabled(tool.id, enabled))
-                        },
-                    )
+                if (state.visibleTools.isEmpty()) {
+                    item {
+                        Text(
+                            text = if (state.query.isBlank() && state.filter == ToolAuthorizationFilter.ALL) {
+                                stringResource(R.string.toolauth_empty_state)
+                            } else {
+                                stringResource(R.string.toolauth_no_match)
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 24.dp),
+                        )
+                    }
+                } else {
+                    items(state.visibleTools, key = ToolDescriptor::id) { tool ->
+                        ToolAuthorizationRow(
+                            tool = tool,
+                            enabled = !state.isMutationBlocked,
+                            onEnabledChange = { enabled ->
+                                onAction(ToolAuthorizationConfigurationAction.SetEnabled(tool.id, enabled))
+                            },
+                        )
+                    }
                 }
             }
         }

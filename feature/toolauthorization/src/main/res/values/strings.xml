@@ -3,6 +3,8 @@
     <string name="toolauth_screen_title">工具授权</string>
     <string name="toolauth_count_label">已启用 %1$d / %2$d</string>
     <string name="toolauth_customize_label">逐个授权工具</string>
+    <string name="toolauth_state_enabled">已开启</string>
+    <string name="toolauth_state_disabled">已关闭</string>
     <string name="toolauth_customize_description">开启后可选择允许助手使用的工具；关闭则全部可用</string>
     <string name="toolauth_configure_tools">配置工具</string>
     <string name="toolauth_configure_subtitle">选择要启用的工具</string>

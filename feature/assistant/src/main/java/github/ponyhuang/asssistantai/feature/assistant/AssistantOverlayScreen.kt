@@ -23,12 +23,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -55,6 +55,9 @@ private val OverlayMaxWidth = 560.dp
 /**
  * 无状态助理浮层：状态经 [state] 进入，事件经 [onAction] 离开。
  * 遮罩、安全边距与窗口属性由宿主 Activity/主题负责。
+ *
+ * 展开内容与底部输入条合并为单个圆角容器：一层阴影、一条头发丝分割线，
+ * 避免「两张卡片叠放」的割裂感；右侧操作键始终是全页唯一的实心主按钮。
  */
 @Composable
 fun AssistantOverlayScreen(
@@ -73,50 +76,53 @@ fun AssistantOverlayScreen(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (state.shouldShowExpandedContent()) {
-            Surface(
-                shape = RoundedCornerShape(28.dp),
-                color = panelColor,
-                contentColor = panelContentColor,
-                shadowElevation = 10.dp,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("assistant_expanded_content"),
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 16.dp)
-                        .heightIn(max = 360.dp)
-                        .verticalScroll(rememberScrollState()),
-                ) {
-                    when (state.phase) {
-                        AssistantSessionPhase.MISSING_CONFIG -> MissingConfigContent(state, onAction)
-                        AssistantSessionPhase.ERROR -> ErrorContent(state, onAction)
-                        else -> SessionContent(state, onAction)
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = panelColor,
+            contentColor = panelContentColor,
+            shadowElevation = 10.dp,
+            border = BorderStroke(1.dp, panelContentColor.copy(alpha = 0.08f)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("assistant_search_bar"),
+        ) {
+            Column(Modifier.fillMaxWidth()) {
+                if (state.shouldShowExpandedContent()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 4.dp)
+                            .heightIn(max = 360.dp)
+                            .verticalScroll(rememberScrollState())
+                            .testTag("assistant_expanded_content"),
                     ) {
-                        Spacer(Modifier.weight(1f))
-                        TextButton(
-                            onClick = onOpenInChat,
-                            modifier = Modifier.testTag("assistant_open_in_chat"),
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(stringResource(R.string.assistant_open_in_chat))
+                            Spacer(Modifier.weight(1f))
+                            TextButton(
+                                onClick = onOpenInChat,
+                                modifier = Modifier.testTag("assistant_open_in_chat"),
+                            ) {
+                                Text(stringResource(R.string.assistant_open_in_chat))
+                            }
+                        }
+                        when (state.phase) {
+                            AssistantSessionPhase.MISSING_CONFIG -> MissingConfigContent(state, onAction)
+                            AssistantSessionPhase.ERROR -> ErrorContent(state, onAction)
+                            else -> SessionContent(state, onAction)
                         }
                     }
+                    HorizontalDivider(color = panelContentColor.copy(alpha = 0.08f))
                 }
+                AssistantSearchBar(
+                    state = state,
+                    onAction = onAction,
+                    contentColor = panelContentColor,
+                )
             }
-            Spacer(Modifier.height(8.dp))
         }
-        AssistantSearchBar(
-            state = state,
-            onAction = onAction,
-            containerColor = panelColor,
-            contentColor = panelContentColor,
-        )
     }
 }
 
@@ -256,7 +262,7 @@ private fun ErrorContent(
                 .padding(vertical = 8.dp)
                 .testTag("assistant_error"),
         )
-        FilledTonalButton(
+        Button(
             onClick = { onAction(AssistantOverlayAction.RetryAfterError) },
             modifier = Modifier.testTag("assistant_retry"),
         ) {
@@ -272,20 +278,30 @@ private fun ConfirmationCard(
     onApprove: () -> Unit,
     onReject: () -> Unit,
 ) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer,
-        ),
+    // 授权请求是中性的安全确认，不是错误：用 surfaceVariant 而非 errorContainer，
+    // 红色只留给真正的失败状态。
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
             .testTag("assistant_confirmation"),
     ) {
         Column(Modifier.padding(12.dp)) {
-            Text(
-                text = stringResource(R.string.assistant_confirm_title),
-                style = MaterialTheme.typography.titleSmall,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Security,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(
+                    text = stringResource(R.string.assistant_confirm_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
             Spacer(Modifier.height(4.dp))
             Text(
                 text = stringResource(R.string.assistant_confirm_message, toolName),
@@ -295,7 +311,7 @@ private fun ConfirmationCard(
             Text(
                 text = stringResource(R.string.assistant_confirm_countdown, remainingSeconds),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onErrorContainer,
+                color = LocalContentColor.current.copy(alpha = 0.66f),
                 modifier = Modifier.testTag("assistant_confirm_countdown"),
             )
             Spacer(Modifier.height(8.dp))
@@ -306,7 +322,7 @@ private fun ConfirmationCard(
                 ) {
                     Text(stringResource(R.string.assistant_confirm_approve))
                 }
-                FilledTonalButton(
+                TextButton(
                     onClick = onReject,
                     modifier = Modifier.testTag("assistant_confirm_reject"),
                 ) {
@@ -317,56 +333,45 @@ private fun ConfirmationCard(
     }
 }
 
+/** 底部输入行：容器与阴影由外层单面板提供，这里只负责排布。 */
 @Composable
 private fun AssistantSearchBar(
     state: AssistantOverlayUiState,
     onAction: (AssistantOverlayAction) -> Unit,
-    containerColor: androidx.compose.ui.graphics.Color,
     contentColor: androidx.compose.ui.graphics.Color,
 ) {
-    Surface(
-        shape = RoundedCornerShape(34.dp),
-        color = containerColor,
-        contentColor = contentColor,
-        shadowElevation = 14.dp,
-        border = BorderStroke(1.dp, contentColor.copy(alpha = 0.12f)),
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("assistant_search_bar"),
+            .heightIn(min = 68.dp)
+            .padding(horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
+        IconButton(
+            onClick = { onAction(AssistantOverlayAction.CloseOverlay) },
             modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 68.dp)
-                .padding(horizontal = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .size(48.dp)
+                .testTag("assistant_close"),
         ) {
-            IconButton(
-                onClick = { onAction(AssistantOverlayAction.CloseOverlay) },
-                modifier = Modifier
-                    .size(48.dp)
-                    .testTag("assistant_close"),
-            ) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = stringResource(R.string.assistant_close),
-                    tint = contentColor.copy(alpha = 0.72f),
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 6.dp, vertical = 12.dp),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                SearchBarContent(
-                    state = state,
-                    onAction = onAction,
-                    contentColor = contentColor,
-                )
-            }
-            SearchBarAction(state, onAction, contentColor)
+            Icon(
+                Icons.Default.Close,
+                contentDescription = stringResource(R.string.assistant_close),
+                tint = contentColor.copy(alpha = 0.72f),
+            )
         }
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 6.dp, vertical = 12.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            SearchBarContent(
+                state = state,
+                onAction = onAction,
+                contentColor = contentColor,
+            )
+        }
+        SearchBarAction(state, onAction)
     }
 }
 
@@ -376,8 +381,11 @@ private fun SearchBarContent(
     onAction: (AssistantOverlayAction) -> Unit,
     contentColor: androidx.compose.ui.graphics.Color,
 ) {
-    when (state.phase) {
-        AssistantSessionPhase.LISTENING -> {
+    // 面板展开时进行态只由面板内的 StatusRow 呈现，输入条回退为禁用输入框，
+    // 避免同一状态在面板与输入条中重复出现。
+    val expanded = state.shouldShowExpandedContent()
+    when {
+        state.phase == AssistantSessionPhase.LISTENING -> {
             VoiceWaveform(
                 levels = state.recordingLevels,
                 modifier = Modifier
@@ -386,9 +394,8 @@ private fun SearchBarContent(
                     .testTag("assistant_waveform"),
             )
         }
-        AssistantSessionPhase.PREPARING,
-        AssistantSessionPhase.TRANSCRIBING,
-        -> {
+        state.phase == AssistantSessionPhase.PREPARING ||
+            state.phase == AssistantSessionPhase.TRANSCRIBING -> {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -410,10 +417,11 @@ private fun SearchBarContent(
                 )
             }
         }
-        AssistantSessionPhase.GENERATING,
-        AssistantSessionPhase.EXECUTING_TOOL,
-        AssistantSessionPhase.AWAITING_CONFIRMATION,
-        -> {
+        !expanded && (
+            state.phase == AssistantSessionPhase.GENERATING ||
+                state.phase == AssistantSessionPhase.EXECUTING_TOOL ||
+                state.phase == AssistantSessionPhase.AWAITING_CONFIRMATION
+            ) -> {
             Text(
                 text = stringResource(
                     if (state.phase == AssistantSessionPhase.EXECUTING_TOOL) {
@@ -476,62 +484,62 @@ private fun SearchBarContent(
 private fun SearchBarAction(
     state: AssistantOverlayUiState,
     onAction: (AssistantOverlayAction) -> Unit,
-    contentColor: androidx.compose.ui.graphics.Color,
 ) {
+    // 右侧始终是全页唯一的实心主按钮：听音=停止、空闲=麦克风、有草稿=发送。
     when {
         state.phase == AssistantSessionPhase.LISTENING -> {
-            IconButton(
+            FilledIconButton(
                 onClick = { onAction(AssistantOverlayAction.StopListening) },
-                modifier = Modifier.testTag("assistant_stop_listening"),
+                modifier = Modifier
+                    .size(48.dp)
+                    .testTag("assistant_stop_listening"),
             ) {
                 Icon(
                     Icons.Default.Stop,
                     contentDescription = stringResource(R.string.assistant_stop_task),
-                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
         }
         state.phase == AssistantSessionPhase.GENERATING ||
             state.phase == AssistantSessionPhase.EXECUTING_TOOL ||
             state.phase == AssistantSessionPhase.AWAITING_CONFIRMATION -> {
-            IconButton(
+            FilledIconButton(
                 onClick = { onAction(AssistantOverlayAction.StopTask) },
-                modifier = Modifier.testTag("assistant_stop_task"),
+                modifier = Modifier
+                    .size(48.dp)
+                    .testTag("assistant_stop_task"),
             ) {
                 Icon(
                     Icons.Default.Stop,
                     contentDescription = stringResource(R.string.assistant_stop_task),
-                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
         }
         state.draftText.isNotBlank() -> {
-            IconButton(
+            FilledIconButton(
                 onClick = { onAction(AssistantOverlayAction.SubmitDraft) },
                 enabled = state.inputEnabled,
-                modifier = Modifier.testTag("assistant_send"),
+                modifier = Modifier
+                    .size(48.dp)
+                    .testTag("assistant_send"),
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.Send,
                     contentDescription = stringResource(R.string.assistant_send),
-                    tint = MaterialTheme.colorScheme.primary,
                 )
             }
         }
         else -> {
-            IconButton(
+            FilledIconButton(
                 onClick = { onAction(AssistantOverlayAction.MicTapped) },
                 enabled = state.inputEnabled,
-                modifier = Modifier.testTag("assistant_mic"),
+                modifier = Modifier
+                    .size(48.dp)
+                    .testTag("assistant_mic"),
             ) {
                 Icon(
                     Icons.Default.Mic,
                     contentDescription = stringResource(R.string.assistant_mic_cd),
-                    tint = if (state.inputEnabled) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        contentColor.copy(alpha = 0.38f)
-                    },
                 )
             }
         }

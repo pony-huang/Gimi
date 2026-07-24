@@ -104,7 +104,7 @@ class DefaultAssistantSessionCoordinatorTest {
         coEvery { conversations.loadMessages("existing-session") } returns emptyList()
         coEvery { chatAgent.send(any(), any(), any(), any()) } returns flowOf(textEvent("好"))
 
-        coordinator.submit("继续", AssistantInvocationSource.SYSTEM_GESTURE)
+        coordinator.submit("继续", AssistantInvocationSource.TILE)
         advanceUntilIdle()
 
         assertEquals("existing-session", coordinator.state.value.sessionId)
@@ -254,11 +254,11 @@ class DefaultAssistantSessionCoordinatorTest {
     }
 
     @Test
-    fun `overlay invocation source maps to system assistant lease`() = runTest {
+    fun `quick tile source maps to system assistant lease`() = runTest {
         coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
         coEvery { chatAgent.send(any(), any(), any(), any()) } returns flowOf(textEvent("好"))
 
-        coordinator.submit("你好", AssistantInvocationSource.SYSTEM_GESTURE)
+        coordinator.submit("你好", AssistantInvocationSource.TILE)
         advanceUntilIdle()
 
         assertEquals(

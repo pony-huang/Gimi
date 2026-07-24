@@ -31,12 +31,6 @@
     <string name="assistant_open_in_chat">在聊天中查看</string>
 
     <string name="assistant_settings_title">系统语音助手</string>
-    <string name="assistant_settings_role_section">默认数字助理</string>
-    <string name="assistant_role_status_default">已是默认数字助理</string>
-    <string name="assistant_role_status_not_default">未设为默认数字助理</string>
-    <string name="assistant_role_unavailable">当前系统不提供默认助理角色，系统手势不可用；仍可使用快捷设置磁贴唤起</string>
-    <string name="assistant_role_note">系统手势或电源键唤起由系统 ROM 决定是否路由给默认助理</string>
-    <string name="assistant_role_request">设为默认助理</string>
     <string name="assistant_settings_mic_section">麦克风权限</string>
     <string name="assistant_mic_granted">麦克风权限已授予</string>
     <string name="assistant_mic_missing">麦克风权限未授予</string>

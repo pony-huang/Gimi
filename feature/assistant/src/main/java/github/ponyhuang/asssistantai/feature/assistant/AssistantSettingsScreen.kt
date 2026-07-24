@@ -20,11 +20,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 
-/** 无状态助理设置页。角色/权限/磁贴的系统交互由 Route 回调承载。 */
+/** 无状态助理设置页。权限/磁贴的系统交互由 Route 回调承载。 */
 @Composable
 fun AssistantSettingsScreen(
     state: AssistantSettingsUiState,
-    onRequestRole: () -> Unit,
     onRequestMicrophone: () -> Unit,
     onAddTile: () -> Unit,
     modifier: Modifier = Modifier,
@@ -36,35 +35,6 @@ fun AssistantSettingsScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        SettingsCard(title = stringResource(R.string.assistant_settings_role_section)) {
-            Text(
-                text = stringResource(
-                    when {
-                        !state.roleAvailable -> R.string.assistant_role_unavailable
-                        state.isDefaultAssistant -> R.string.assistant_role_status_default
-                        else -> R.string.assistant_role_status_not_default
-                    },
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.testTag("assistant_role_status"),
-            )
-            if (state.roleAvailable) {
-                Text(
-                    text = stringResource(R.string.assistant_role_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (!state.isDefaultAssistant) {
-                    Button(
-                        onClick = onRequestRole,
-                        modifier = Modifier.testTag("assistant_request_role"),
-                    ) {
-                        Text(stringResource(R.string.assistant_role_request))
-                    }
-                }
-            }
-        }
-
         SettingsCard(title = stringResource(R.string.assistant_settings_mic_section)) {
             Text(
                 text = stringResource(

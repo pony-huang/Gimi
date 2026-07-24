@@ -35,9 +35,6 @@ enum class AssistantSessionPhase {
 
 /** 唤起助理的入口来源。 */
 enum class AssistantInvocationSource {
-    /** ROM 路由给默认助理的系统手势（含电源键映射，由 ROM 决定）。 */
-    SYSTEM_GESTURE,
-
     /** 快捷设置磁贴。 */
     TILE,
 

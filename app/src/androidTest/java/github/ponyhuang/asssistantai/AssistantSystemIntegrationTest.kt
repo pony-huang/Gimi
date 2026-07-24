@@ -1,6 +1,5 @@
 package github.ponyhuang.asssistantai
 
-import android.app.role.RoleManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -9,7 +8,6 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import github.ponyhuang.asssistantai.assistant.AssistantOverlayActivity
 import github.ponyhuang.asssistantai.assistant.AssistantTileService
-import github.ponyhuang.asssistantai.assistant.AssistantVoiceInteractionService
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -33,7 +31,8 @@ class AssistantSystemIntegrationTest {
         val services = packageInfo.services?.map { it.name }.orEmpty()
 
         assertTrue(activities.contains(AssistantOverlayActivity::class.java.name))
-        assertTrue(services.contains(AssistantVoiceInteractionService::class.java.name))
+        assertFalse(services.any { it.contains("VoiceInteraction") })
+        assertFalse(services.any { it.contains("StubRecognition") })
         assertTrue(services.contains(AssistantTileService::class.java.name))
     }
 
@@ -58,23 +57,8 @@ class AssistantSystemIntegrationTest {
     }
 
     @Test
-    fun assistantRoleRequestIntentResolvesWhenRoleAvailable() {
-        val roleManager = context.getSystemService(RoleManager::class.java)
-        assertNotNull(roleManager)
-        if (!roleManager.isRoleAvailable(RoleManager.ROLE_ASSISTANT)) return
-        val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_ASSISTANT)
-        assertNotNull(intent)
-        val resolved = context.packageManager.resolveActivity(intent, 0)
-        assertNotNull(resolved)
-    }
-
-    @Test
     fun tileLaunchIntentTargetsOverlayActivity() {
         val intent = Intent(context, AssistantOverlayActivity::class.java)
-            .putExtra(
-                AssistantOverlayActivity.EXTRA_INVOCATION_SOURCE,
-                AssistantOverlayActivity.SOURCE_TILE,
-            )
         val resolved = context.packageManager.resolveActivity(intent, 0)
         assertNotNull(resolved)
         assertEquals(

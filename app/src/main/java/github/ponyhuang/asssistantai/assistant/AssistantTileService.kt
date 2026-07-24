@@ -10,10 +10,6 @@ class AssistantTileService : TileService() {
     override fun onClick() {
         val intent = Intent(this, AssistantOverlayActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            .putExtra(
-                AssistantOverlayActivity.EXTRA_INVOCATION_SOURCE,
-                AssistantOverlayActivity.SOURCE_TILE,
-            )
         val pendingIntent = PendingIntent.getActivity(
             this,
             0,

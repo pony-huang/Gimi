@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -35,13 +34,10 @@ class AssistantOverlayActivity : ComponentActivity() {
 
     @Inject lateinit var coordinator: AssistantSessionCoordinator
 
-    private val source = mutableStateOf(AssistantInvocationSource.TILE)
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setShowWhenLocked(true)
         setTurnScreenOn(true)
-        source.value = parseSource(intent)
         setContent {
             AsssistantaiTheme {
                 Box(
@@ -63,7 +59,7 @@ class AssistantOverlayActivity : ComponentActivity() {
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         AssistantOverlayRoute(
-                            source = source.value,
+                            source = AssistantInvocationSource.TILE,
                             onClose = { finish() },
                             onOpenInChat = { sessionId -> openInChat(sessionId) },
                             approveConfirmation = ::approveWithKeyguard,
@@ -72,12 +68,6 @@ class AssistantOverlayActivity : ComponentActivity() {
                 }
             }
         }
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        source.value = parseSource(intent)
     }
 
     /** 批准必须先解锁；解锁取消/失败均自动拒绝。拒绝本身不需要解锁。 */
@@ -113,15 +103,4 @@ class AssistantOverlayActivity : ComponentActivity() {
         finish()
     }
 
-    private fun parseSource(intent: Intent?): AssistantInvocationSource =
-        when (intent?.getStringExtra(EXTRA_INVOCATION_SOURCE)) {
-            SOURCE_SYSTEM_GESTURE -> AssistantInvocationSource.SYSTEM_GESTURE
-            else -> AssistantInvocationSource.TILE
-        }
-
-    companion object {
-        const val EXTRA_INVOCATION_SOURCE = "assistant_invocation_source"
-        const val SOURCE_SYSTEM_GESTURE = "system_gesture"
-        const val SOURCE_TILE = "tile"
-    }
 }

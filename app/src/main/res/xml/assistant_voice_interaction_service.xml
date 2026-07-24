@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:sessionService="github.ponyhuang.asssistantai.assistant.AssistantVoiceInteractionSessionService"
-    android:recognitionService="github.ponyhuang.asssistantai.assistant.AssistantStubRecognitionService"
-    android:supportsAssist="false"
-    android:supportsLaunchVoiceAssistFromKeyguard="true" />

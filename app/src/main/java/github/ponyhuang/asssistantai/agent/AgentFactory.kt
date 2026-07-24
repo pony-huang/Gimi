@@ -9,6 +9,8 @@ import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.SkillToolset
 import com.openai.client.okhttp.OpenAIOkHttpClient
+import github.ponyhuang.asssistantai.agent.model.Claude
+import github.ponyhuang.asssistantai.agent.model.Openai
 import github.ponyhuang.asssistantai.data.ApiBaseType
 import github.ponyhuang.asssistantai.data.LLMModelSelection
 import github.ponyhuang.asssistantai.data.ModelServiceRepository

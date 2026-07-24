@@ -315,7 +315,7 @@ object DefaultModelServices {
             docsUrl = "https://platform.kimi.com/docs",
             modelsUrl = "https://platform.kimi.com/docs/api/models-overview",
         ),
-    )
+    ).sortedBy { it.serviceId }
 
     /**
      * 按 [serviceId] 查找品牌图标。供 UI 层在仅有 serviceId 时使用

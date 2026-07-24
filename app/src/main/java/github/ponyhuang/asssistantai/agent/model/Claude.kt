@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent
+package github.ponyhuang.asssistantai.agent.model
 
 import com.anthropic.client.AnthropicClient
 import com.anthropic.core.JsonValue
@@ -18,10 +18,12 @@ import com.anthropic.models.messages.ImageBlockParam
 import com.anthropic.models.messages.Message
 import com.anthropic.models.messages.MessageCreateParams
 import com.anthropic.models.messages.MessageParam
+import com.anthropic.models.messages.RawMessageStreamEvent
 import com.anthropic.models.messages.TextBlockParam
 import com.anthropic.models.messages.ThinkingBlockParam
 import com.anthropic.models.messages.ThinkingConfigDisabled
 import com.anthropic.models.messages.ThinkingConfigParam
+import com.anthropic.models.messages.Tool
 import com.anthropic.models.messages.ToolResultBlockParam
 import com.anthropic.models.messages.ToolUnion
 import com.anthropic.models.messages.ToolUseBlockParam
@@ -149,7 +151,7 @@ open class Claude(
         }
     }
 
-    private suspend fun FlowCollector<LlmResponse>.emitTextDeltaIfPresent(event: com.anthropic.models.messages.RawMessageStreamEvent) {
+    private suspend fun FlowCollector<LlmResponse>.emitTextDeltaIfPresent(event: RawMessageStreamEvent) {
         if (!event.isContentBlockDelta()) return
         val delta = event.asContentBlockDelta().delta()
         if (!delta.isText()) return
@@ -289,23 +291,23 @@ open class Claude(
         else -> MessageParam.Role.USER
     }
 
-    private fun FunctionDeclaration.toAnthropicTool(): com.anthropic.models.messages.Tool {
+    private fun FunctionDeclaration.toAnthropicTool(): Tool {
         // ADK represents a parameterless function with `parameters == null`.
         // Anthropic still requires `input_schema` to be a JSON object, so its
         // `properties` member must be an empty object rather than JSON null.
-        val properties = com.anthropic.models.messages.Tool.InputSchema.Properties.builder()
+        val properties = Tool.InputSchema.Properties.builder()
             .additionalProperties(
                 parameters?.properties.orEmpty().mapValues { (_, schema) ->
                     from(schema.toClaudeParameters())
                 }
             )
             .build()
-        val inputSchema = com.anthropic.models.messages.Tool.InputSchema.builder()
+        val inputSchema = Tool.InputSchema.builder()
             .properties(properties)
             .required(parameters?.required.orEmpty())
             .build()
 
-        return com.anthropic.models.messages.Tool.builder()
+        return Tool.builder()
             .name(name)
             .description(description)
             .inputSchema(inputSchema)
@@ -335,7 +337,7 @@ open class Claude(
 
 /**
  * Converts ADK's completed function-call arguments to the object required by an Anthropic
- * `tool_use` content block. [FunctionCall.partialArgs] represents streaming fragments and must
+ * `tool_use` content block. [partialArgs] represents streaming fragments and must
  * never be replayed as the completed tool input.
  */
 internal fun FunctionCall.toAnthropicToolUseInput(): ToolUseBlockParam.Input =

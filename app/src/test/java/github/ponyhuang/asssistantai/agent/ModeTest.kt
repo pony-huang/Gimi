@@ -2,6 +2,8 @@ package github.ponyhuang.asssistantai.agent
 
 import com.anthropic.client.okhttp.AnthropicOkHttpClient
 import com.openai.client.okhttp.OpenAIOkHttpClient
+import github.ponyhuang.asssistantai.agent.model.Claude
+import github.ponyhuang.asssistantai.agent.model.Openai
 import org.junit.Test
 
 class ModeTest {

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference
 import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.PartialArg
 import com.google.adk.kt.types.PartialArgValue
+import github.ponyhuang.asssistantai.agent.model.toAnthropicToolUseInput
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test

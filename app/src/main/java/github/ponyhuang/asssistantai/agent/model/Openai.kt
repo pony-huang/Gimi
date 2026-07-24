@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent
+package github.ponyhuang.asssistantai.agent.model
 
 import com.fasterxml.jackson.core.type.TypeReference
 import com.google.adk.kt.logging.LoggerFactory
@@ -29,6 +29,7 @@ import com.openai.models.chat.completions.ChatCompletionContentPartImage
 import com.openai.models.chat.completions.ChatCompletionContentPartText
 import com.openai.models.chat.completions.ChatCompletionCreateParams
 import com.openai.models.chat.completions.ChatCompletionFunctionTool
+import com.openai.models.chat.completions.ChatCompletionMessage
 import com.openai.models.chat.completions.ChatCompletionMessageFunctionToolCall
 import com.openai.models.chat.completions.ChatCompletionMessageParam
 import com.openai.models.chat.completions.ChatCompletionSystemMessageParam
@@ -270,7 +271,7 @@ open class Openai(
         totalTokenCount = totalTokens().toInt()
     )
 
-    private fun com.openai.models.chat.completions.ChatCompletionMessage.toParts(): List<Part> {
+    private fun ChatCompletionMessage.toParts(): List<Part> {
         val parts = mutableListOf<Part>()
         content().ifPresent { text -> parts += Part(text = text) }
         toolCalls().ifPresent { calls ->

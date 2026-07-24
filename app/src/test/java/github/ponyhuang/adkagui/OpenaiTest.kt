@@ -19,8 +19,8 @@ import com.google.adk.kt.webserver.loaders.AgentLoader
 import com.google.adk.kt.webserver.telemetry.ApiServerSpanExporter
 import com.google.gson.Gson
 import com.openai.client.okhttp.OpenAIOkHttpClient
-import github.ponyhuang.asssistantai.agent.Claude
-import github.ponyhuang.asssistantai.agent.Openai
+import github.ponyhuang.asssistantai.agent.model.Claude
+import github.ponyhuang.asssistantai.agent.model.Openai
 import org.junit.Test
 
 /**

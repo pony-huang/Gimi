@@ -5,6 +5,7 @@ import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.FunctionResponse
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
+import github.ponyhuang.asssistantai.agent.model.normalizeForAnthropic
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Test

@@ -34,6 +34,7 @@ data class LLMModelProvider(
     val keyHelpUrl: String = "",
     val docsUrl: String = "",
     val modelsUrl: String = "",
+    val officialTools: List<String> = emptyList(),
 ) {
     /** 当前 [baseType] 对应的实际请求地址。两种协议的地址分别保存，切换时互不覆盖。 */
     val activeApiBaseUrl: String
@@ -100,7 +101,7 @@ object DefaultModelServices {
     val services: List<LLMModelProvider> = listOf(
         LLMModelProvider(
             serviceId = "deepseek",
-            serviceName = "深度求索",
+            serviceName = "Deepseek",
             isEnabled = false,
             apiKey = "",
             apiBaseUrl = "https://api.deepseek.com",
@@ -219,25 +220,8 @@ object DefaultModelServices {
             apiKey = "",
             apiBaseUrl = "https://api.openai.com/v1",
             baseType = ApiBaseType.Standard,
-            // OpenAI 官方仅提供标准 OpenAI 格式，协议下拉锁定为 Standard。
             supportedBaseTypes = listOf(ApiBaseType.Standard),
-            LLMModelGroups = listOf(
-                LLMModelGroup(
-                    groupId = "gpt-5",
-                    groupName = "GPT-5",
-                    isExpanded = true,
-                    models = listOf(
-                        LLMModelItem(
-                            modelId = "gpt-5",
-                            modelName = "gpt-5",
-                        ),
-                        LLMModelItem(
-                            modelId = "gpt-5-mini",
-                            modelName = "gpt-5-mini",
-                        ),
-                    ),
-                ),
-            ),
+            LLMModelGroups = listOf(),
             homepageUrl = "https://openai.com/",
             keyHelpUrl = "https://platform.openai.com/api-keys",
             docsUrl = "https://platform.openai.com/docs",
@@ -250,34 +234,9 @@ object DefaultModelServices {
             apiKey = "",
             apiBaseUrl = "https://api.anthropic.com",
             baseType = ApiBaseType.Anthropic,
-            // Anthropic 官方仅提供 Anthropic 格式，协议下拉锁定为 Anthropic。
             supportedBaseTypes = listOf(ApiBaseType.Anthropic),
             anthropicBaseUrl = "https://api.anthropic.com",
-            LLMModelGroups = listOf(
-                LLMModelGroup(
-                    groupId = "claude",
-                    groupName = "Claude",
-                    isExpanded = true,
-                    models = listOf(
-                        LLMModelItem(
-                            modelId = "claude-fable-5",
-                            modelName = "claude-fable-5",
-                        ),
-                        LLMModelItem(
-                            modelId = "claude-opus-4-8",
-                            modelName = "claude-opus-4-8",
-                        ),
-                        LLMModelItem(
-                            modelId = "claude-sonnet-5",
-                            modelName = "claude-sonnet-5",
-                        ),
-                        LLMModelItem(
-                            modelId = "claude-haiku-4-5-20251001",
-                            modelName = "claude-haiku-4-5-20251001",
-                        ),
-                    ),
-                ),
-            ),
+            LLMModelGroups = listOf(),
             homepageUrl = "https://www.anthropic.com/",
             keyHelpUrl = "https://console.anthropic.com/settings/keys",
             docsUrl = "https://docs.anthropic.com/",
@@ -285,11 +244,9 @@ object DefaultModelServices {
         ),
         LLMModelProvider(
             serviceId = "kimi",
-            serviceName = "Kimi（月之暗面）",
+            serviceName = "Moonshot",
             isEnabled = false,
             apiKey = "",
-            // 官方文档：https://platform.kimi.com/docs/api/overview — 兼容 OpenAI 格式，
-            // 同时提供 Anthropic 兼容端点，与 DeepSeek 一样两种协议皆可选。
             apiBaseUrl = "https://api.moonshot.cn/v1",
             baseType = ApiBaseType.Standard,
             anthropicBaseUrl = "https://api.moonshot.cn/anthropic",

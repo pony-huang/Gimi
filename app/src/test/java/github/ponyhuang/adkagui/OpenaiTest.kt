@@ -1,6 +1,5 @@
 package github.ponyhuang.adkagui
 
-import com.anthropic.client.okhttp.AnthropicOkHttpClient
 import com.google.adk.kt.agents.BaseAgent
 import com.google.adk.kt.agents.Instruction
 import com.google.adk.kt.agents.LlmAgent
@@ -18,17 +17,12 @@ import com.google.adk.kt.webserver.AdkWebServer
 import com.google.adk.kt.webserver.loaders.AgentLoader
 import com.google.adk.kt.webserver.telemetry.ApiServerSpanExporter
 import com.google.gson.Gson
-import com.openai.client.okhttp.OpenAIOkHttpClient
-import github.ponyhuang.asssistantai.agent.model.Claude
-import github.ponyhuang.asssistantai.agent.model.Openai
 import org.junit.Test
 
 /**
  * github.ponyhuang.adkagui.Openai 使用样例 — 多工具 / plan 场景测试
  */
 class OpenaiTest {
-
-    // ---- 工具服务定义 -------------------------------------------
 
     /** 时间查询工具 */
     class TimeService {
@@ -225,28 +219,6 @@ class OpenaiTest {
 
     // ---- 测试方法 --------------------------------------------------
 
-    // 便捷工厂
-//    private fun syncModel() = Claude(
-////        name = "deepseek-v4-pro",
-//        name = "deepseek-v4-flash",
-//        url = "https://api.deepseek.com/v1",
-//        apiKey = "sk-b04ee4901e1a49d29464c48108a90519"
-//
-//    )
-
-    private fun claudeModel() = Claude(
-        "deepseek-v4-pro", AnthropicOkHttpClient.builder()
-            .baseUrl("https://api.deepseek.com/anthropic")
-            .apiKey("sk-b04ee4901e1a49d29464c48108a90519")
-            .build()
-    )
-
-    private fun openaiModel() = Openai(
-        "deepseek-v4-pro", OpenAIOkHttpClient.builder()
-            .baseUrl("https://api.deepseek.com")
-            .apiKey("sk-b04ee4901e1a49d29464c48108a90519")
-            .build()
-    )
 
     private fun printEvents(events: Iterator<Event>) {
         val gson = Gson().newBuilder().setPrettyPrinting().create()
@@ -262,7 +234,7 @@ class OpenaiTest {
 
     val timeAgent = LlmAgent(
         name = "TimeAgent",
-        model = claudeModel(),
+        model = PropertiesUtils.claudeModel(),
         instruction = Instruction("You help users check the time."),
         tools = TimeService().generatedTools(),
         generateContentConfig = GenerateContentConfig()
@@ -285,7 +257,7 @@ class OpenaiTest {
 
     val weatherAgent = LlmAgent(
         name = "WeatherAgent",
-        model = claudeModel(),
+        model = PropertiesUtils.claudeModel(),
         instruction = Instruction("You help users check weather."),
         tools = WeatherService().generatedTools()
     )
@@ -303,7 +275,7 @@ class OpenaiTest {
 
     val calcAgent = LlmAgent(
         name = "CalcAgent",
-        model = claudeModel(),
+        model = PropertiesUtils.claudeModel(),
         instruction = Instruction("You help users with calculations."),
         tools = CalculatorService().generatedTools()
     )
@@ -329,7 +301,7 @@ class OpenaiTest {
         val tools = TimeService().generatedTools() + WeatherService().generatedTools()
         val agent = LlmAgent(
             name = "MultiAgent",
-            model = openaiModel(),
+            model = PropertiesUtils.openaiModel(),
             instruction = Instruction("You are a helpful assistant. Use tools to answer questions."),
             tools = tools
         )
@@ -346,7 +318,7 @@ class OpenaiTest {
     fun multiTool_planManagement_sync() {
         val agent = LlmAgent(
             name = "PlannerAgent",
-            model = claudeModel(),
+            model = PropertiesUtils.claudeModel(),
             instruction = Instruction(
                 """You are a project planner. Help users create plans and manage tasks.
 First create a plan, then add tasks, and show the task list."""
@@ -370,7 +342,7 @@ First create a plan, then add tasks, and show the task list."""
         val tools = PlannerService().generatedTools() + NotificationService().generatedTools()
         val agent = LlmAgent(
             name = "PlanNotifyAgent",
-            model = claudeModel(),
+            model = PropertiesUtils.claudeModel(),
             instruction = Instruction(
                 """You help users create plans and send notifications.
 After creating tasks, send a notification to confirm."""
@@ -394,7 +366,7 @@ After creating tasks, send a notification to confirm."""
         val tools = SearchService().generatedTools() + PlannerService().generatedTools()
         val agent = LlmAgent(
             name = "ResearchAgent",
-            model = claudeModel(),
+            model = PropertiesUtils.claudeModel(),
             instruction = Instruction(
                 """You are a research assistant. Search for information,
 then organize findings into a plan."""
@@ -418,7 +390,7 @@ then organize findings into a plan."""
         val tools = WeatherService().generatedTools() + PlannerService().generatedTools()
         val agent = LlmAgent(
             name = "OutdoorPlanner",
-            model = claudeModel(),
+            model = PropertiesUtils.claudeModel(),
             instruction = Instruction(
                 """You help users plan outdoor activities. Check weather first,
 then create a plan based on conditions."""
@@ -447,7 +419,7 @@ then create a plan based on conditions."""
                 NotificationService().generatedTools()
         val agent = LlmAgent(
             name = "FullAssistant",
-            model = openaiModel(),
+            model = PropertiesUtils.openaiModel(),
             instruction = Instruction(
                 """You are a comprehensive assistant. You can:
 - Check time and weather
@@ -481,7 +453,7 @@ Use the most appropriate tools to help the user."""
         val tools = WeatherService().generatedTools() + PlannerService().generatedTools()
         val agent = LlmAgent(
             name = "ConditionalPlanner",
-            model = claudeModel(),
+            model = PropertiesUtils.claudeModel(),
             instruction = Instruction(
                 """You make conditional plans. Check weather first.
 If the weather is good (sunny/clear), create an outdoor activity plan.
@@ -503,7 +475,7 @@ If bad (rain), create an indoor activity plan instead."""
         val tools = SearchService().generatedTools() + PlannerService().generatedTools()
         val agent = LlmAgent(
             name = "ResearchTodoAgent",
-            model = claudeModel(),
+            model = PropertiesUtils.claudeModel(),
             instruction = Instruction(
                 """You research topics and create actionable todo lists.
 1. Search for relevant documents
@@ -529,7 +501,7 @@ If bad (rain), create an indoor activity plan instead."""
         val tools = CalculatorService().generatedTools() + PlannerService().generatedTools()
         val agent = LlmAgent(
             name = "BudgetPlanner",
-            model = claudeModel(),
+            model = PropertiesUtils.claudeModel(),
             instruction = Instruction(
                 """You help with budget planning. Use the calculator for numbers,
 then organize results into a plan."""
@@ -555,7 +527,7 @@ then organize results into a plan."""
             NotificationService().generatedTools()
     val fullAssistant = LlmAgent(
         name = "FullAssistant",
-        model = claudeModel(),
+        model = PropertiesUtils.claudeModel(),
         instruction = Instruction(
             """You are a comprehensive assistant. You can:
 - Check time and weather

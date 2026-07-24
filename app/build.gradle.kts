@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -7,20 +5,6 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
 }
-
-val minimaxApiKey = Properties().apply {
-    val localPropertiesFile = rootProject.file("local.properties")
-    if (localPropertiesFile.isFile) {
-        localPropertiesFile.inputStream().use { input -> load(input) }
-    }
-}.getProperty("MINIMAX_API_KEY").orEmpty()
-
-val deepseekApiKey = Properties().apply {
-    val localPropertiesFile = rootProject.file("local.properties")
-    if (localPropertiesFile.isFile) {
-        localPropertiesFile.inputStream().use { input -> load(input) }
-    }
-}.getProperty("DEEPSEEK_API_KEY").orEmpty()
 
 android {
     namespace = "github.ponyhuang.asssistantai"
@@ -39,23 +23,13 @@ android {
     }
 
     buildTypes {
-        debug {
-            buildConfigField("String", "MINIMAX_API_KEY", "\"$minimaxApiKey\"")
-            buildConfigField("String", "DEEPSEEK_API_KEY", "\"$deepseekApiKey\"")
-        }
         release {
-            buildConfigField("String", "MINIMAX_API_KEY", "\"\"")
-            buildConfigField("String", "DEEPSEEK_API_KEY", "\"\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // TODO: replace with a real upload keystore before Play Store publish.
-            // For local Meizu verification we sign with the auto-generated debug
-            // keystore so `assembleRelease` produces an installable APK without
-            // standing up a keystore just to test R8 / shrink behavior.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

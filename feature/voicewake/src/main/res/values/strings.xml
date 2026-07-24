@@ -1,8 +1,9 @@
 <resources>
     <!-- VoiceWakeSettingsScreen -->
     <string name="voicewake_screen_title">语音唤醒</string>
-    <string name="voicewake_section_listening">监听</string>
     <string name="voicewake_listening_title">后台监听</string>
+    <string name="voicewake_listening_state_on">监听中</string>
+    <string name="voicewake_listening_state_off">已关闭</string>
     <string name="voicewake_listening_subtitle">连接蓝牙耳机后，可通过唤醒词在后台执行任务</string>
 
     <string name="voicewake_section_models">唤醒模型</string>

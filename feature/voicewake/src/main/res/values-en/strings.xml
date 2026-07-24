@@ -1,8 +1,9 @@
 <resources>
     <!-- Voice wake screen title (consumed by :app SettingsScaffold) -->
     <string name="voicewake_screen_title">Voice wake</string>
-    <string name="voicewake_section_listening">Listening</string>
     <string name="voicewake_listening_title">Background listening</string>
+    <string name="voicewake_listening_state_on">Listening</string>
+    <string name="voicewake_listening_state_off">Off</string>
     <string name="voicewake_listening_subtitle">After connecting a Bluetooth headset, use the wake word to run tasks in the background</string>
 
     <string name="voicewake_section_models">Wake models</string>

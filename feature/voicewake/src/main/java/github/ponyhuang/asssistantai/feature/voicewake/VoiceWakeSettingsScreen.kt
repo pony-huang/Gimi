@@ -14,7 +14,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
@@ -35,9 +34,11 @@ import github.ponyhuang.asssistantai.domain.speech.model.WakeModelSource
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelState
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelStatus
 import github.ponyhuang.asssistantai.feature.voicewake.R
-import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
+import github.ponyhuang.asssistantai.ui.settings.SettingsBanner
+import github.ponyhuang.asssistantai.ui.settings.SettingsBannerTone
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
 import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
+import github.ponyhuang.asssistantai.ui.settings.SettingsStatusHero
 
 @Composable
 fun VoiceWakeSettingsScreen(
@@ -50,11 +51,19 @@ fun VoiceWakeSettingsScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
-            item { SettingsSectionTitle(text = stringResource(R.string.voicewake_section_listening)) }
+            // 顶部状态锚点：进入页面第一眼即可确认监听是否开启。
             item {
-                SettingsListItem(
+                SettingsStatusHero(
                     icon = Icons.Default.BluetoothAudio,
                     title = stringResource(R.string.voicewake_listening_title),
+                    statusText = stringResource(
+                        if (state.voiceState.isRunning) {
+                            R.string.voicewake_listening_state_on
+                        } else {
+                            R.string.voicewake_listening_state_off
+                        },
+                    ),
+                    active = state.voiceState.isRunning,
                     subtitle = listeningSubtitle(state.voiceState),
                     onClick = {
                         onAction(VoiceWakeSettingsAction.ToggleListening(!state.voiceState.isRunning))
@@ -71,11 +80,9 @@ fun VoiceWakeSettingsScreen(
             }
             if (!state.configurationReady) {
                 item {
-                    Text(
+                    SettingsBanner(
                         text = stringResource(R.string.voicewake_offline_setup_required),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                        tone = SettingsBannerTone.Error,
                     )
                 }
             }
@@ -158,7 +165,9 @@ private fun WakeModelRow(
                     )
                     LinearProgressIndicator(
                         progress = { modelState.progress },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp),
                     )
                 }
                 WakeModelStatus.Extracting -> Text(stringResource(R.string.voicewake_model_installing))

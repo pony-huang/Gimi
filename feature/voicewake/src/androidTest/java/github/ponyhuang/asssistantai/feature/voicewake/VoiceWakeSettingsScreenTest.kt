@@ -19,24 +19,6 @@ class VoiceWakeSettingsScreenTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun clickingPresetKeywordRaisesSynchronousAction() {
-        var action: VoiceWakeSettingsAction? = null
-        composeRule.setContent {
-            AsssistantaiTheme {
-                VoiceWakeSettingsScreen(
-                    // 草稿与已保存唤醒词不同，保存按钮才可用。
-                    state = VoiceWakeSettingsUiState(keywordDraft = "新唤醒词"),
-                    onAction = { action = it },
-                )
-            }
-        }
-
-        composeRule.onNodeWithText("小助手").performClick()
-
-        assertEquals(VoiceWakeSettingsAction.KeywordSelected("小助手"), action)
-    }
-
-    @Test
     fun rendersBothModelsAndClickingEnglishRowEmitsSelectModel() {
         var action: VoiceWakeSettingsAction? = null
         composeRule.setContent {

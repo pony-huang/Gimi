@@ -1,24 +1,36 @@
 package github.ponyhuang.adkagui
 
 import com.google.adk.kt.agents.LlmAgent
-import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.runners.InMemoryRunner
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.GenerateContentConfig
-import com.google.adk.kt.types.Tool
+import com.google.adk.kt.types.Schema
+import com.google.adk.kt.types.Type
+import com.openai.client.okhttp.OpenAIOkHttpClient
+import github.ponyhuang.asssistantai.agent.model.Openai
+import github.ponyhuang.asssistantai.agent.tools.official.kimi.KimiFormulaToolset
+import kotlinx.coroutines.runBlocking
+import okhttp3.OkHttpClient
 import org.junit.Test
+
 
 class KimiTest {
 
     @Test
-    fun kimiModel() {
+    fun kimiModel() = runBlocking {
+        val toolset = KimiFormulaToolset(
+            PropertiesUtils.get("KIMI_API_KEY"),
+            "https://api.moonshot.cn/v1",
+            OkHttpClient()
+        )
         val agent = LlmAgent(
             name = "Agent",
-            tools = listOf(WebSearchTool()),
-            model = PropertiesUtils.kimiForCodingModel(),
+            toolsets = listOf(toolset),
+            model = Kimi(),
+            maxSteps = 3,
             generateContentConfig = GenerateContentConfig()
         )
         InMemoryRunner(agent).run(
@@ -26,41 +38,18 @@ class KimiTest {
             sessionId = "sessionId123",
             Content.fromText(
                 role = "user",
-                text = "请搜索 Moonshot AI Context Caching 技术，并告诉我它是什么。"
-            )
+                text = "请搜索 \"一方感恩碑 廿载育人心\"，并告诉我它是什么。"
+            ),
+//            runConfig = RunConfig(StreamingMode.SSE)
         ).forEach {
             println(it)
         }
     }
 
-    class WebSearchTool : BaseTool(name = "$" + "web_search", description = "$" + "web_search") {
-
-        override fun declaration(): FunctionDeclaration = FunctionDeclaration(
-            name = name,
-            description = description
-        )
-
-        override suspend fun run(context: ToolContext, args: Map<String, Any>): Any {
-            throw UnsupportedOperationException("WebSearchTool does not support local execution")
-        }
-
-        override suspend fun processLlmRequest(
-            toolContext: ToolContext,
-            llmRequest: LlmRequest,
-        ): LlmRequest {
-            val config = llmRequest.config
-            val existingTools = config.tools?.toMutableList() ?: mutableListOf()
-
-            val hasSearchTool = existingTools.any { tool ->
-                tool.functionDeclarations?.any { it.name == name }
-                    ?: false
-            }
-            if (hasSearchTool) {
-                return llmRequest
-            }
-
-            existingTools.add(Tool(functionDeclarations = listOf(declaration())))
-            return llmRequest.copy(config = config.copy(tools = existingTools))
-        }
-    }
+    class Kimi : Openai(
+        "kimi-k3", OpenAIOkHttpClient.builder()
+            .baseUrl("https://api.moonshot.cn/v1")
+            .apiKey(PropertiesUtils.get("KIMI_API_KEY"))
+            .build()
+    )
 }

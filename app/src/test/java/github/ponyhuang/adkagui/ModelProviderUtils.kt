@@ -36,7 +36,7 @@ class PropertiesUtils {
                 .baseUrl("https://api.deepseek.com/anthropic")
                 .apiKey(PropertiesUtils.get("DEEPSEEK_API_KEY"))
                 .build()
-        ) {}
+        )
 
         fun openaiModel() = Openai(
             "deepseek-v4-pro", OpenAIOkHttpClient.builder()
@@ -50,7 +50,7 @@ class PropertiesUtils {
                 .baseUrl("https://api.kimi.com/coding/")
                 .apiKey(PropertiesUtils.get("KIMI_API_KEY"))
                 .build()
-        ) {}
+        )
     }
 
 

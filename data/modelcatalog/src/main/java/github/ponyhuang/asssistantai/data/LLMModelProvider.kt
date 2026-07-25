@@ -1,5 +1,6 @@
 package github.ponyhuang.asssistantai.data
 
+import github.ponyhuang.asssistantai.data.DefaultModelServices.iconFor
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 
 /**
@@ -119,23 +120,7 @@ object DefaultModelServices {
             apiBaseUrl = "https://api.deepseek.com",
             baseType = ApiBaseType.Anthropic,
             anthropicBaseUrl = "https://api.deepseek.com/anthropic",
-            LLMModelGroups = listOf(
-                LLMModelGroup(
-                    groupId = "deepseek-chat",
-                    groupName = "DeepSeek Chat",
-                    isExpanded = true,
-                    models = listOf(
-                        LLMModelItem(
-                            modelId = "deepseek-v4-pro",
-                            modelName = "deepseek-v4-pro",
-                        ),
-                        LLMModelItem(
-                            modelId = "deepseek-v4-flash",
-                            modelName = "deepseek-v4-flash",
-                        ),
-                    ),
-                ),
-            ),
+            LLMModelGroups = listOf(),
             homepageUrl = "https://www.deepseek.com/",
             keyHelpUrl = "https://platform.deepseek.com/api_keys",
             docsUrl = "https://api-docs.deepseek.com/",
@@ -149,19 +134,7 @@ object DefaultModelServices {
             apiBaseUrl = "https://api.minimaxi.com/v1",
             baseType = ApiBaseType.Standard,
             anthropicBaseUrl = "https://api.minimaxi.com/anthropic",
-            LLMModelGroups = listOf(
-                LLMModelGroup(
-                    groupId = "minimax-chat",
-                    groupName = "MiniMax Chat",
-                    isExpanded = true,
-                    models = listOf(
-                        LLMModelItem(
-                            modelId = "MiniMax-M3",
-                            modelName = "MiniMax-M3",
-                        ),
-                    ),
-                ),
-            ),
+            LLMModelGroups = listOf(),
             homepageUrl = "https://www.minimaxi.com/",
             keyHelpUrl = "https://platform.minimaxi.com/user-center/basic-information/interface-key",
             docsUrl = "https://platform.minimaxi.com/document",
@@ -178,51 +151,7 @@ object DefaultModelServices {
             apiBaseUrl = "https://api.xiaomimimo.com/v1",
             baseType = ApiBaseType.Standard,
             anthropicBaseUrl = "https://api.xiaomimimo.com/anthropic",
-            LLMModelGroups = listOf(
-                LLMModelGroup(
-                    groupId = "MiMo-V2.5",
-                    groupName = "MiMo-V2.5",
-                    isExpanded = true,
-                    models = listOf(
-                        LLMModelItem(
-                            modelId = "mimo-v2.5-pro-ultraspeed",
-                            modelName = "mimo-v2.5-pro-ultraspeed",
-                        ),
-                        LLMModelItem(
-                            modelId = "mimo-v2.5-pro",
-                            modelName = "mimo-v2.5-pro",
-                        ),
-                        LLMModelItem(
-                            modelId = "mimo-v2.5",
-                            modelName = "mimo-v2.5",
-                        ),
-                    ),
-                ),
-                LLMModelGroup(
-                    groupId = "MiMo-V2.5-ASR",
-                    groupName = "MiMo-V2.5 ASR",
-                    isExpanded = true,
-                    models = listOf(
-                        LLMModelItem(
-                            modelId = "mimo-v2.5-asr",
-                            modelName = "mimo-v2.5-asr",
-                            isStt = true,
-                        ),
-                    ),
-                ),
-                LLMModelGroup(
-                    groupId = "MiMo-V2.5-TTS",
-                    groupName = "MiMo-V2.5 TTS",
-                    isExpanded = true,
-                    models = listOf(
-                        LLMModelItem(
-                            modelId = "mimo-v2.5-tts",
-                            modelName = "mimo-v2.5-tts",
-                            isTts = true,
-                        ),
-                    ),
-                ),
-            ),
+            LLMModelGroups = listOf(),
             homepageUrl = "https://mimo.mi.com/",
             keyHelpUrl = "https://platform.xiaomimimo.com/console/api-keys",
             docsUrl = "https://mimo.mi.com/docs",
@@ -268,23 +197,7 @@ object DefaultModelServices {
             apiBaseUrl = "https://api.moonshot.cn/v1",
             baseType = ApiBaseType.Standard,
             anthropicBaseUrl = "https://api.moonshot.cn/anthropic",
-            LLMModelGroups = listOf(
-                LLMModelGroup(
-                    groupId = "kimi",
-                    groupName = "Kimi",
-                    isExpanded = true,
-                    models = listOf(
-                        LLMModelItem(
-                            modelId = "kimi-k3",
-                            modelName = "kimi-k3",
-                        ),
-                        LLMModelItem(
-                            modelId = "kimi-k2.7-code",
-                            modelName = "kimi-k2.7-code",
-                        ),
-                    ),
-                ),
-            ),
+            LLMModelGroups = listOf(),
             homepageUrl = "https://www.kimi.com/",
             keyHelpUrl = "https://platform.kimi.com/console/api-keys",
             docsUrl = "https://platform.kimi.com/docs",
@@ -297,7 +210,6 @@ object DefaultModelServices {
 
     /**
      * 按 [serviceId] 查找品牌图标。供 UI 层在仅有 serviceId 时使用
-     * （例如聊天 TopAppBar 中 [ModelServiceIcon]）。
      * 给列表里没声明 [LLMModelProvider.iconRes] 的服务提供兜底。
      */
     fun iconFor(serviceId: String): Int? =

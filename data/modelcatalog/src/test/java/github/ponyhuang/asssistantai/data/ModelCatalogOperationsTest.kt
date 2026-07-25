@@ -91,6 +91,34 @@ class ModelCatalogOperationsTest {
     }
 
     @Test
+    fun syncRemoteModelsAutomaticallyGroupsStandardAndMimoNames() {
+        val standard = syncStoredRemoteModels(emptyList(), "service", "Service", listOf(
+            LLMModelItem("deepseek-v3-chat", "deepseek-v3-chat"),
+            LLMModelItem("deepseek-v4-chat", "deepseek-v4-chat"),
+        ))
+        assertEquals(listOf("deepseek-v3", "deepseek-v4"), standard.map { it.groupId })
+        val mimo = syncStoredRemoteModels(emptyList(), "mimo", "Xiaomi MIMO", listOf(
+            LLMModelItem("mimo-v2.5-pro-ultraspeed", "mimo-v2.5-pro-ultraspeed"),
+            LLMModelItem("mimo-v2.5-asr", "mimo-v2.5-asr"),
+            LLMModelItem("mimo-v2.5-tts", "mimo-v2.5-tts"),
+        ))
+        assertEquals(listOf("mimo-v2.5-pro", "mimo-v2.5-asr", "mimo-v2.5-tts"), mimo.map { it.groupId })
+        assertTrue(mimo[1].models.single().isStt)
+        assertTrue(mimo[2].models.single().isTts)
+    }
+
+    @Test
+    fun syncRemoteModelsKeepsUserModelsInTheirExistingGroups() {
+        val groups = listOf(StoredModelGroup("custom", "Custom", models = listOf(
+            StoredModel("local-model", "Local", StoredModelSource.USER),
+        )))
+        val result = syncStoredRemoteModels(groups, "service", "Service", listOf(
+            LLMModelItem("vendor-v1-chat", "vendor-v1-chat"),
+        ))
+        assertEquals(listOf("custom", "vendor-v1"), result.map { it.groupId })
+        assertEquals(listOf("local-model"), result[0].models.map { it.modelId })
+    }
+    @Test
     fun metadataUpgradeAddsDefaultSpeechGroupWithoutReplacingUserModels() {
         val existing = listOf(
             StoredModelGroup(

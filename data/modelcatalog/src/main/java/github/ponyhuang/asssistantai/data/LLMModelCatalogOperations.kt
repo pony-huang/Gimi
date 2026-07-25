@@ -43,58 +43,72 @@ internal fun appendUserModel(
     }
 }
 
+/**
+ * 自动进行分组。目前模型名字格式：{名字}-{版本}-{版本类型}; 目前mimo格式：：{名字}-{版本}-{版本/类型}-{具体类型}
+ */
 internal fun syncStoredRemoteModels(
     existingGroups: List<StoredModelGroup>,
     serviceId: String,
     serviceName: String,
     models: List<LLMModelItem>,
 ): List<StoredModelGroup> {
-    val groups = existingGroups.ifEmpty {
-        listOf(
-            StoredModelGroup(
-                groupId = "$serviceId-default",
-                groupName = "$serviceName 默认组",
-            ),
-        )
-    }
-    val userModelIds = groups
+    val userModelIds = existingGroups
         .flatMap { it.models }
         .filter { it.source == StoredModelSource.USER }
         .mapTo(mutableSetOf()) { it.modelId }
-    val existingById = groups.flatMap { it.models }.associateBy { it.modelId }
+    val existingById = existingGroups.flatMap { it.models }.associateBy { it.modelId }
     val remoteModels = models
         .distinctBy { it.modelId }
         .filterNot { it.modelId in userModelIds }
         .map { model ->
+            val existing = existingById[model.modelId]
             StoredModel(
                 modelId = model.modelId,
                 modelName = model.modelName,
                 source = StoredModelSource.REMOTE,
-                isStt = existingById[model.modelId]?.isStt ?: model.isStt,
-                isTts = existingById[model.modelId]?.isTts ?: model.isTts,
+                isStt = existing?.isStt ?: model.isStt || model.modelId.hasModelType("asr"),
+                isTts = existing?.isTts ?: model.isTts || model.modelId.hasModelType("tts"),
             )
         }
-    val remoteById = remoteModels.associateBy { it.modelId }
-    val existingRemoteSpeechIds = groups.flatMap { group ->
-        group.models.filter { it.source == StoredModelSource.REMOTE && (it.isStt || it.isTts) }
-    }.mapTo(mutableSetOf()) { it.modelId }
-    val newRemoteSpeechModels = remoteModels.filter {
-        (it.isStt || it.isTts) && it.modelId !in existingRemoteSpeechIds
-    }
-    val remoteChatModels = remoteModels.filterNot { it.isStt || it.isTts }
-
-    return groups.mapIndexed { index, group ->
+    val userGroups = existingGroups.mapNotNull { group ->
         val userModels = group.models.filter { it.source == StoredModelSource.USER }
-        val speechModels = group.models
-            .filter { it.source == StoredModelSource.REMOTE && (it.isStt || it.isTts) }
-            .map { remoteById[it.modelId] ?: it }
-        if (index == 0) {
-            group.copy(models = remoteChatModels + speechModels + newRemoteSpeechModels + userModels)
-        } else {
-            group.copy(models = speechModels + userModels)
+        group.takeIf { userModels.isNotEmpty() }?.copy(models = userModels)
+    }
+    val remoteGroups = remoteModels
+        .groupBy { it.modelId.modelGroupId(serviceId, existingGroups.firstOrNull()?.groupId) }
+        .map { (groupId, groupedModels) ->
+            val existing =
+                existingGroups.firstOrNull { it.groupId.equals(groupId, ignoreCase = true) }
+            StoredModelGroup(
+                groupId = existing?.groupId ?: groupId,
+                groupName = existing?.groupName ?: groupId,
+                isExpanded = existing?.isExpanded ?: true,
+                models = groupedModels,
+            )
         }
+    if (remoteGroups.isEmpty() && userGroups.isEmpty()) {
+        return listOf(StoredModelGroup("$serviceId-default", "$serviceName 默认组"))
+    }
+    val remoteByGroupId = remoteGroups.associateBy { it.groupId }
+    return userGroups.map { userGroup ->
+        remoteByGroupId[userGroup.groupId]?.let { remoteGroup ->
+            remoteGroup.copy(models = remoteGroup.models + userGroup.models)
+        } ?: userGroup
+    } + remoteGroups.filterNot { it.groupId in userGroups.map(StoredModelGroup::groupId) }
+}
+
+private fun String.modelGroupId(serviceId: String, fallbackGroupId: String?): String {
+    val segments = split('-').filter(String::isNotBlank)
+    val groupSize = if (serviceId.equals("mimo", ignoreCase = true)) 3 else 2
+    return if (segments.size >= groupSize) {
+        segments.take(groupSize).joinToString("-")
+    } else {
+        fallbackGroupId ?: this
     }
 }
+
+private fun String.hasModelType(type: String): Boolean =
+    split('-').any { it.equals(type, ignoreCase = true) }
 
 internal fun mergeDefaultModelMetadata(
     existingGroups: List<StoredModelGroup>,

@@ -1,7 +1,6 @@
 package github.ponyhuang.asssistantai.agent
 
 import com.google.adk.kt.tools.BaseTool
-import github.ponyhuang.asssistantai.agent.tools.WebSearchTool
 import github.ponyhuang.asssistantai.agent.tools.system.BrightnessTool
 import github.ponyhuang.asssistantai.agent.tools.system.CalendarTool
 import github.ponyhuang.asssistantai.agent.tools.system.CameraTool
@@ -60,8 +59,6 @@ class LocalToolCatalog @Inject constructor(
         addAll(messagingTool.generatedTools())
         addAll(phoneTool.generatedTools())
         addAll(settingsNavigationTool.generatedTools())
-        // Web Search
-        add(WebSearchTool())
     }.also { tools ->
         val duplicateIds = tools.groupingBy(BaseTool::name).eachCount().filterValues { it > 1 }.keys
         require(duplicateIds.isEmpty()) { "Duplicate local tool ids: ${duplicateIds.joinToString()}" }

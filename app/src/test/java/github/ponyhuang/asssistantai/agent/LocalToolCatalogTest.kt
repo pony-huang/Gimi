@@ -14,7 +14,6 @@ import github.ponyhuang.asssistantai.agent.tools.system.MessagingTool
 import github.ponyhuang.asssistantai.agent.tools.system.PackageManagerTool
 import github.ponyhuang.asssistantai.agent.tools.system.PhoneTool
 import github.ponyhuang.asssistantai.agent.tools.system.ScreenTimeoutTool
-import github.ponyhuang.asssistantai.agent.tools.system.SearchTool
 import github.ponyhuang.asssistantai.agent.tools.system.SettingsNavigationTool
 import github.ponyhuang.asssistantai.agent.tools.system.VolumeTool
 import io.mockk.mockk
@@ -27,10 +26,17 @@ class LocalToolCatalogTest {
     fun catalogContainsExactlyRegisteredLocalToolsWithUniqueAdkIds() {
         val definitions = catalog().definitions()
 
-        assertEquals(53, definitions.size)
-        assertEquals(53, definitions.map { it.id }.distinct().size)
+        assertEquals(52, definitions.size)
+        assertEquals(52, definitions.map { it.id }.distinct().size)
         assertEquals(definitions.map { it.id }, definitions.map { it.name })
         assertFalse(definitions.any { it.id in setOf("compose_email", "create_note", "request_ride") })
+    }
+
+    @Test
+    fun catalogExcludesModelProviderOfficialTools() {
+        val toolIds = catalog().definitions().mapTo(mutableSetOf()) { it.id }
+
+        assertFalse("web_search must be contributed per model service", "web_search" in toolIds)
     }
 
     private fun catalog() = LocalToolCatalog(

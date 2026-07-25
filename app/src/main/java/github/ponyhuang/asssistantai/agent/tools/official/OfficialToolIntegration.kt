@@ -38,6 +38,11 @@ data class OfficialToolContribution(
             tools = tools + other.tools,
             toolsets = toolsets + other.toolsets,
         )
+
+    fun deduplicated(): OfficialToolContribution = OfficialToolContribution(
+        tools = tools.distinctBy(BaseTool::name),
+        toolsets = toolsets,
+    )
 }
 
 @Singleton
@@ -46,11 +51,13 @@ class OfficialToolRegistry @Inject constructor(
 ) {
     fun resolve(config: ModelConfig): OfficialToolContribution {
         val providersById = providers.groupBy(OfficialToolProvider::id)
-        return config.officialTools.fold(OfficialToolContribution()) { result, id ->
-            providersById[id].orEmpty().fold(result) { contribution, provider ->
-                contribution + provider.contribute(config)
+        return config.officialTools
+            .fold(OfficialToolContribution()) { result, id ->
+                providersById[id].orEmpty().fold(result) { contribution, provider ->
+                    contribution + provider.contribute(config)
+                }
             }
-        }
+            .deduplicated()
     }
 }
 
@@ -136,7 +143,10 @@ interface AnthropicOfficialToolAdapter {
 }
 
 class MiniMaxWebSearchToolAdapter @Inject constructor() : AnthropicOfficialToolAdapter {
-    override fun adapt(config: ModelConfig, tools: List<ToolUnion>): List<ToolUnion> {
+    override fun adapt(
+        config: ModelConfig,
+        tools: List<ToolUnion>,
+    ): List<ToolUnion> {
         if (
             config.serviceId != MINIMAX_SERVICE_ID ||
             config.baseType != ApiBaseType.Anthropic ||

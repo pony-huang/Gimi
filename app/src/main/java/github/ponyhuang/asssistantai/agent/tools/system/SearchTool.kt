@@ -8,6 +8,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
+@Deprecated("Please add some comments to explain the logic.")
 class SearchTool @Inject constructor(private val queue: IntentActionQueue) {
     @Tool(name = "search_web", description = "Opens a web search for the provided query in an installed search-capable app.") fun searchWeb(@Param("Web search query.") query: String): Map<String, Any> {
         val value = query.trim(); if (value.isEmpty()) return mapOf("success" to false, "error" to "query must not be blank.")

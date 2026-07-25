@@ -15,7 +15,6 @@ import github.ponyhuang.asssistantai.agent.tools.system.MessagingTool
 import github.ponyhuang.asssistantai.agent.tools.system.PackageManagerTool
 import github.ponyhuang.asssistantai.agent.tools.system.PhoneTool
 import github.ponyhuang.asssistantai.agent.tools.system.ScreenTimeoutTool
-import github.ponyhuang.asssistantai.agent.tools.system.SearchTool
 import github.ponyhuang.asssistantai.agent.tools.system.SettingsNavigationTool
 import github.ponyhuang.asssistantai.agent.tools.system.VolumeTool
 import github.ponyhuang.asssistantai.agent.tools.system.generatedTools
@@ -41,7 +40,6 @@ class LocalToolCatalog @Inject constructor(
     screenTimeoutTool: ScreenTimeoutTool,
     messagingTool: MessagingTool,
     phoneTool: PhoneTool,
-    searchTool: SearchTool,
     settingsNavigationTool: SettingsNavigationTool,
 ) : LocalToolDefinitionSource {
     private val localTools: List<BaseTool> = buildList {
@@ -60,7 +58,6 @@ class LocalToolCatalog @Inject constructor(
         addAll(screenTimeoutTool.generatedTools())
         addAll(messagingTool.generatedTools())
         addAll(phoneTool.generatedTools())
-        addAll(searchTool.generatedTools())
         addAll(settingsNavigationTool.generatedTools())
     }.also { tools ->
         val duplicateIds = tools.groupingBy(BaseTool::name).eachCount().filterValues { it > 1 }.keys

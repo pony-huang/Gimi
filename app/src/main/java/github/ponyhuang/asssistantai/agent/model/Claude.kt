@@ -40,6 +40,7 @@ import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Schema
+import com.google.adk.kt.types.Tool as AdkTool
 import com.google.adk.kt.types.UsageMetadata
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -63,6 +64,11 @@ open class Claude(
         private val logger = LoggerFactory.getLogger(Claude::class)
     }
 
+    protected open val defaultMaxTokens: Long = 8196L
+
+    protected open fun resolveMaxTokens(request: LlmRequest): Long =
+        request.config.maxOutputTokens?.toLong() ?: defaultMaxTokens
+
     override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {
         val params = buildMessageCreateParams(request)
 
@@ -82,7 +88,7 @@ open class Claude(
         }
     }
 
-    private fun buildMessageCreateParams(request: LlmRequest): MessageCreateParams {
+    protected open fun buildMessageCreateParams(request: LlmRequest): MessageCreateParams {
         logger.debug { "LLmRequest: $request" }
         val modelName = request.model?.name ?: name
         val systemInstruction = request.config.systemInstruction?.parts
@@ -100,7 +106,7 @@ open class Claude(
             .model(modelName)
             .system(systemInstruction)
             .messages(messages)
-            .maxTokens(request.config.maxOutputTokens?.toLong() ?: 8196)
+            .maxTokens(resolveMaxTokens(request))
 
         request.config.thinkingConfig?.let {
             if (it.includeThoughts == false) {
@@ -112,16 +118,27 @@ open class Claude(
             }
         }
 
-        request.config.tools
-            ?.flatMap { it.functionDeclarations.orEmpty() }
-            ?.map { ToolUnion.ofTool(it.toAnthropicTool()) }
-            ?.takeIf { it.isNotEmpty() }
+        toAnthropicTools(request.config.tools)
+            .takeIf { it.isNotEmpty() }
             ?.let { paramsBuilder.tools(it) }
+
+        postProcessParams(paramsBuilder, request)
 
         return paramsBuilder.build()
     }
 
-    private suspend fun FlowCollector<LlmResponse>.processStreamingResponse(params: MessageCreateParams) {
+    /**
+     * Composition hook invoked last inside [buildMessageCreateParams], just before `.build()`.
+     * Override to attach vendor-specific params (e.g. `temperature`, `top_p`, custom headers) without reimplementing the builder.
+     */
+    protected open fun postProcessParams(
+        builder: MessageCreateParams.Builder,
+        request: LlmRequest,
+    ) {
+        // Default: no-op.
+    }
+
+    protected open suspend fun FlowCollector<LlmResponse>.processStreamingResponse(params: MessageCreateParams) {
         val accumulator = MessageAccumulator.create()
 
         try {
@@ -151,7 +168,7 @@ open class Claude(
         }
     }
 
-    private suspend fun FlowCollector<LlmResponse>.emitTextDeltaIfPresent(event: RawMessageStreamEvent) {
+    protected open suspend fun FlowCollector<LlmResponse>.emitTextDeltaIfPresent(event: RawMessageStreamEvent) {
         if (!event.isContentBlockDelta()) return
         val delta = event.asContentBlockDelta().delta()
         if (!delta.isText()) return
@@ -182,7 +199,7 @@ open class Claude(
 //        )
 //    }
 
-    private fun Message.toLlmResponse(): LlmResponse = LlmResponse(
+    protected open fun Message.toLlmResponse(): LlmResponse = LlmResponse(
         content = Content(
             role = Role.MODEL,
             parts = content().asSequence()
@@ -192,13 +209,13 @@ open class Claude(
         usageMetadata = usage().toUsageMetadata()
     )
 
-    private fun Usage.toUsageMetadata() = UsageMetadata(
+    protected open fun Usage.toUsageMetadata() = UsageMetadata(
         promptTokenCount = inputTokens().toInt(),
         candidatesTokenCount = outputTokens().toInt(),
         totalTokenCount = inputTokens().toInt() + outputTokens().toInt()
     )
 
-    private fun ContentBlock.toPart(): Part? {
+    protected open fun ContentBlock.toPart(): Part? {
         return when {
             isText() -> Part(text = asText().text())
             isToolUse() -> Part(
@@ -221,7 +238,7 @@ open class Claude(
         }
     }
 
-    private fun contentToAnthropicMessageParam(content: Content) = MessageParam.builder()
+    protected open fun contentToAnthropicMessageParam(content: Content) = MessageParam.builder()
         .role(toClaudeRole(content.role.toString()))
         .contentOfBlockParams(
             content.parts.stream()
@@ -230,7 +247,7 @@ open class Claude(
         )
         .build()
 
-    private fun Part.toContentBlockParam(): ContentBlockParam {
+    protected open fun Part.toContentBlockParam(): ContentBlockParam {
         // Thinking blocks must be echoed back with their signature intact;
         // sending them as plain text triggers a 400 error from the API.
         if (thought == true) {
@@ -246,7 +263,7 @@ open class Claude(
             val mimeType =
                 image.mimeType ?: throw UnsupportedOperationException("Image MIME type is missing")
             val data = image.data ?: throw UnsupportedOperationException("Image data is missing")
-            if (!mimeType.startsWith("image/")) {
+            if (!isSupportedImageMimeType(mimeType)) {
                 throw UnsupportedOperationException("Only image inline data is supported: $mimeType")
             }
             return ofImage(
@@ -279,19 +296,26 @@ open class Claude(
                 ToolResultBlockParam.builder()
                     .toolUseId(fr.id.toString())
                     .content(result)
-                    .isError(false)
+                    .isError(defaultToolResultIsError())
                     .build()
             )
         }
         throw UnsupportedOperationException("Not supported yet. $this")
     }
 
-    private fun toClaudeRole(role: String) = when (role) {
+    protected open val defaultImageMimePrefix: String = "image/"
+
+    protected open fun isSupportedImageMimeType(mimeType: String): Boolean =
+        mimeType.startsWith(defaultImageMimePrefix)
+
+    protected open fun defaultToolResultIsError(): Boolean = false
+
+    protected open fun toClaudeRole(role: String) = when (role) {
         "model", "assistant" -> MessageParam.Role.ASSISTANT
         else -> MessageParam.Role.USER
     }
 
-    private fun FunctionDeclaration.toAnthropicTool(): Tool {
+    protected open fun FunctionDeclaration.toAnthropicTool(): Tool {
         // ADK represents a parameterless function with `parameters == null`.
         // Anthropic still requires `input_schema` to be a JSON object, so its
         // `properties` member must be an empty object rather than JSON null.
@@ -314,7 +338,12 @@ open class Claude(
             .build()
     }
 
-    private fun Schema.toClaudeParameters(): Map<String, JsonValue> {
+    protected open fun toAnthropicTools(tools: List<AdkTool>?): List<ToolUnion> =
+        tools.orEmpty()
+            .flatMap { it.functionDeclarations.orEmpty() }
+            .map { ToolUnion.ofTool(it.toAnthropicTool()) }
+
+    protected open fun Schema.toClaudeParameters(): Map<String, JsonValue> {
         val result = mutableMapOf<String, JsonValue>()
         type?.let { result["type"] = from(it.name.lowercase()) }
         description?.let { result["description"] = from(it) }
@@ -327,7 +356,7 @@ open class Claude(
         return result
     }
 
-    private fun mapToErrorResponse(e: Exception) = LlmResponse(
+    protected open fun mapToErrorResponse(e: Exception) = LlmResponse(
         finishReason = if (e is AnthropicServiceException) FinishReason.SAFETY
         else FinishReason.FINISH_REASON_UNSPECIFIED,
         errorMessage = if (e is AnthropicServiceException) "${e.statusCode()}: ${e.message}"
@@ -335,11 +364,7 @@ open class Claude(
     )
 }
 
-/**
- * Converts ADK's completed function-call arguments to the object required by an Anthropic
- * `tool_use` content block. [partialArgs] represents streaming fragments and must
- * never be replayed as the completed tool input.
- */
+
 internal fun FunctionCall.toAnthropicToolUseInput(): ToolUseBlockParam.Input =
     ToolUseBlockParam.Input.builder()
         .additionalProperties(
@@ -347,16 +372,6 @@ internal fun FunctionCall.toAnthropicToolUseInput(): ToolUseBlockParam.Input =
         )
         .build()
 
-/**
- * Normalizes ADK's event-shaped history into Anthropic's message protocol.
- *
- * ADK may retain text, function-call, and function-response events as separate adjacent
- * [Content] values with the same role. Anthropic treats a client tool exchange as exactly one
- * assistant message containing `tool_use`, immediately followed by one user message whose leading
- * blocks are the matching `tool_result` values. Explicitly merging and ordering the history keeps
- * Anthropic-compatible providers from interpreting an adjacent ADK fragment as an intervening
- * message.
- */
 internal fun List<Content>.normalizeForAnthropic(): List<Content> {
     val merged = mutableListOf<Content>()
     for (content in this) {

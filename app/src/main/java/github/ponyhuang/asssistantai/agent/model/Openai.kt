@@ -12,6 +12,7 @@ import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Schema
+import com.google.adk.kt.types.Tool as AdkTool
 import com.google.adk.kt.types.UsageMetadata
 import com.openai.client.OpenAIClient
 import com.openai.core.JsonValue
@@ -57,7 +58,6 @@ open class Openai(
     companion object {
         private val JSON_MAPPER = jsonMapper()
         private val logger = LoggerFactory.getLogger(Openai::class)
-        private const val DEFAULT_MAX_COMPLETION_TOKENS = 2048L
         private val THOUGHT_DELTA_FIELDS = setOf(
             "reasoning_content",
             "reasoning",
@@ -65,6 +65,13 @@ open class Openai(
             "thought",
         )
     }
+
+    /** Default OpenAI `max_completion_tokens` when the request omits one. Override for vendor caps. */
+    protected open val defaultMaxCompletionTokens: Long = 2048L
+
+    /** Resolve `max_completion_tokens` for [request]: prefer explicit config, fall back to [defaultMaxCompletionTokens]. */
+    protected open fun resolveMaxCompletionTokens(request: LlmRequest): Long =
+        request.config.maxOutputTokens?.toLong() ?: defaultMaxCompletionTokens
 
     override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {
         val params = buildCreateParams(request)
@@ -85,7 +92,8 @@ open class Openai(
         }
     }
 
-    private fun buildCreateParams(request: LlmRequest): ChatCompletionCreateParams {
+    /** Translate ADK [LlmRequest] into OpenAI [ChatCompletionCreateParams]. Override to add vendor-specific request fields. */
+    protected open fun buildCreateParams(request: LlmRequest): ChatCompletionCreateParams {
         val modelName = request.model?.name ?: name
 
         val messages = mutableListOf<ChatCompletionMessageParam>().apply {
@@ -102,15 +110,12 @@ open class Openai(
             }
         }
 
-        val tools = request.config.tools
-            ?.flatMap { it.functionDeclarations.orEmpty() }
-            ?.map { it.toChatCompletionTool() }
-            .orEmpty()
+        val tools = toOpenAiTools(request.config.tools)
 
         val builder = ChatCompletionCreateParams.builder()
             .model(modelName)
             .maxCompletionTokens(
-                request.config.maxOutputTokens?.toLong() ?: DEFAULT_MAX_COMPLETION_TOKENS
+                resolveMaxCompletionTokens(request)
             )
             .messages(messages)
             .also { if (tools.isNotEmpty()) it.tools(tools) }
@@ -123,7 +128,20 @@ open class Openai(
             }
         }
 
+        postProcessParams(builder, request)
+
         return builder.build()
+    }
+
+    /**
+     * Composition hook invoked last inside [buildCreateParams], just before `.build()`.
+     * Override to attach vendor-specific params (e.g. `temperature`, `top_p`, custom headers) without reimplementing the builder.
+     */
+    protected open fun postProcessParams(
+        builder: ChatCompletionCreateParams.Builder,
+        request: LlmRequest,
+    ) {
+        // Default: no-op.
     }
 
 
@@ -138,7 +156,8 @@ open class Openai(
      * `ChatCompletionAccumulator`, because compatible services may include usage data in chunks
      * that do not conform to the SDK's strict completion shape.
      */
-    private suspend fun FlowCollector<LlmResponse>.processStreamingResponse(params: ChatCompletionCreateParams) {
+    /** Drive OpenAI streaming, accumulate chunks, and emit them as [LlmResponse] parts. Override to swap streaming behavior. */
+    protected open suspend fun FlowCollector<LlmResponse>.processStreamingResponse(params: ChatCompletionCreateParams) {
         val responseAccumulator = StreamingResponseAccumulator()
         try {
             client.chat().completions().createStreaming(params).use { streamResponse ->
@@ -173,7 +192,8 @@ open class Openai(
      * OpenAI-compatible providers commonly put reasoning in an extension field such as
      * `reasoning_content`; those deltas are discarded instead of being rendered as text.
      */
-    private fun ChatCompletionChunk.Choice.textDeltaOrNull(): String? {
+    /** Extract a regular-text delta from a streaming [ChatCompletionChunk.Choice]. Override to surface vendor-specific reasoning or content fields. */
+    protected open fun ChatCompletionChunk.Choice.textDeltaOrNull(): String? {
         val delta = delta()
         // Some compatible providers include a reasoning extension (often with a null value) on
         // every chunk. A non-empty standard `content` field is always the visible answer and
@@ -189,7 +209,7 @@ open class Openai(
         return null
     }
 
-    private suspend fun FlowCollector<LlmResponse>.emitTextDelta(text: String) {
+    protected open suspend fun FlowCollector<LlmResponse>.emitTextDelta(text: String) {
         emit(
             LlmResponse(
                 content = Content(
@@ -257,7 +277,7 @@ open class Openai(
     )
 
 
-    private fun ChatCompletion.toLlmResponse(): LlmResponse = LlmResponse(
+    protected open fun ChatCompletion.toLlmResponse(): LlmResponse = LlmResponse(
         content = Content(
             role = Role.MODEL,
             parts = choices().flatMap { it.message().toParts() }
@@ -265,13 +285,13 @@ open class Openai(
         usageMetadata = usage().orElse(null)?.toUsageMetadata()
     )
 
-    private fun CompletionUsage.toUsageMetadata() = UsageMetadata(
+    protected open fun CompletionUsage.toUsageMetadata() = UsageMetadata(
         promptTokenCount = promptTokens().toInt(),
         candidatesTokenCount = completionTokens().toInt(),
         totalTokenCount = totalTokens().toInt()
     )
 
-    private fun ChatCompletionMessage.toParts(): List<Part> {
+    protected open fun ChatCompletionMessage.toParts(): List<Part> {
         val parts = mutableListOf<Part>()
         content().ifPresent { text -> parts += Part(text = text) }
         toolCalls().ifPresent { calls ->
@@ -291,14 +311,14 @@ open class Openai(
         return parts
     }
 
-    private fun List<Part>.toSystemMessage(): ChatCompletionMessageParam {
+    protected open fun List<Part>.toSystemMessage(): ChatCompletionMessageParam {
         val text = mapNotNull { it.text }.joinToString("\n")
         return ChatCompletionMessageParam.ofSystem(
             ChatCompletionSystemMessageParam.builder().content(text).build()
         )
     }
 
-    private fun Content.toUserMessages(): List<ChatCompletionMessageParam> {
+    protected open fun Content.toUserMessages(): List<ChatCompletionMessageParam> {
         val result = mutableListOf<ChatCompletionMessageParam>()
 
         val contentParts = buildList {
@@ -313,7 +333,7 @@ open class Openai(
             parts.mapNotNull { it.inlineData }.forEach { image ->
                 val mimeType = image.mimeType ?: return@forEach
                 val data = image.data ?: return@forEach
-                if (mimeType.startsWith("image/")) {
+                if (isSupportedImageMimeType(mimeType)) {
                     val dataUrl =
                         "data:$mimeType;base64," + Base64.getEncoder().encodeToString(data)
                     add(
@@ -353,7 +373,7 @@ open class Openai(
         return result
     }
 
-    private fun Content.toModelMessages(): List<ChatCompletionMessageParam> {
+    protected open fun Content.toModelMessages(): List<ChatCompletionMessageParam> {
         val result = mutableListOf<ChatCompletionMessageParam>()
 
         val text = parts
@@ -385,7 +405,7 @@ open class Openai(
         return result
     }
 
-    private fun FunctionDeclaration.toChatCompletionTool(): ChatCompletionTool {
+    protected open fun FunctionDeclaration.toChatCompletionTool(): ChatCompletionTool {
         // ADK represents parameterless functions with `parameters == null`, while OpenAI
         // requires every function's parameters schema to have an object root.
         val parameters = parameters?.toOpenAiParameters()?.toMutableMap() ?: mutableMapOf()
@@ -401,7 +421,12 @@ open class Openai(
         )
     }
 
-    private fun Schema.toOpenAiParameters(): Map<String, JsonValue> {
+    protected open fun toOpenAiTools(tools: List<AdkTool>?): List<ChatCompletionTool> =
+        tools.orEmpty()
+            .flatMap { it.functionDeclarations.orEmpty() }
+            .map { it.toChatCompletionTool() }
+
+    protected open fun Schema.toOpenAiParameters(): Map<String, JsonValue> {
         val result = mutableMapOf<String, JsonValue>()
         type?.let { result["type"] = JsonValue.from(it.name.lowercase()) }
         description?.let { result["description"] = JsonValue.from(it) }
@@ -422,7 +447,12 @@ open class Openai(
         emptyMap()
     }
 
-    private fun mapToErrorResponse(e: Exception): LlmResponse = LlmResponse(
+    protected open val defaultImageMimePrefix: String = "image/"
+
+    protected open fun isSupportedImageMimeType(mimeType: String): Boolean =
+        mimeType.startsWith(defaultImageMimePrefix)
+
+    protected open fun mapToErrorResponse(e: Exception): LlmResponse = LlmResponse(
         finishReason = if (e is BadRequestException) FinishReason.SAFETY
         else FinishReason.FINISH_REASON_UNSPECIFIED,
         errorMessage = e.message

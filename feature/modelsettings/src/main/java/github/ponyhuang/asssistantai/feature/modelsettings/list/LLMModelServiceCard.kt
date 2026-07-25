@@ -14,7 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.ui.settings.llmmodel.LLMModelServiceIcon
 
 /**
@@ -28,7 +28,7 @@ import github.ponyhuang.asssistantai.ui.settings.llmmodel.LLMModelServiceIcon
  */
 @Composable
 fun ModelServiceCard(
-    item: ModelService,
+    item: LLMModelSetting,
     onClick: (String) -> Unit,
     onToggleEnabled: (String, Boolean) -> Unit,
     mutationEnabled: Boolean = true,

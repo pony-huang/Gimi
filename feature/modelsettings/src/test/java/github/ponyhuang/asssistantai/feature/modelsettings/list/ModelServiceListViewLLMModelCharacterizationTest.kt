@@ -4,7 +4,7 @@ import app.cash.turbine.test
 import github.ponyhuang.asssistantai.core.testing.MainDispatcherRule
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.CatalogLoadState
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.ObserveModelCatalogLoadStateUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.ObserveModelServicesUseCase
@@ -23,7 +23,7 @@ import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class ModelServiceListViewModelCharacterizationTest {
+class ModelServiceListViewLLMModelCharacterizationTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
@@ -80,7 +80,7 @@ class ModelServiceListViewModelCharacterizationTest {
         every { updateEnabled(any(), any()) } returns true
     }
 
-    private fun service(id: String, name: String) = ModelService(
+    private fun service(id: String, name: String) = LLMModelSetting(
         id = id,
         name = name,
         isEnabled = true,

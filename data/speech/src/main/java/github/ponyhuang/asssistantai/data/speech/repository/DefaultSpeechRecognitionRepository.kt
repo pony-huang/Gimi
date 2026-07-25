@@ -4,7 +4,7 @@ import github.ponyhuang.asssistantai.data.speech.remote.SpeechRecognitionConfig
 import github.ponyhuang.asssistantai.data.speech.remote.SpeechRecognitionGateway
 import github.ponyhuang.asssistantai.data.speech.remote.SpeechRecognitionRequest
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechRecognitionRepository
 import javax.inject.Inject
@@ -40,7 +40,7 @@ class DefaultSpeechRecognitionRepository @Inject constructor(
     )
 
     private fun resolveConfig(
-        services: List<ModelService>,
+        services: List<LLMModelSetting>,
         selection: ModelSelection?,
     ): SpeechRecognitionConfig? {
         val resolved = services.resolve(selection, isSpeech = true) ?: return null
@@ -52,10 +52,10 @@ class DefaultSpeechRecognitionRepository @Inject constructor(
     }
 }
 
-internal fun List<ModelService>.resolve(
+internal fun List<LLMModelSetting>.resolve(
     selection: ModelSelection?,
     isSpeech: Boolean,
-): Pair<ModelService, github.ponyhuang.asssistantai.domain.modelcatalog.model.Model>? {
+): Pair<LLMModelSetting, github.ponyhuang.asssistantai.domain.modelcatalog.model.Model>? {
     if (selection == null) return null
     val service = firstOrNull { it.id == selection.serviceId } ?: return null
     if (!service.isEnabled || service.apiKey.isBlank()) return null

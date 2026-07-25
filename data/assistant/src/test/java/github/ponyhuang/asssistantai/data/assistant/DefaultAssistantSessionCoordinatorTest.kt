@@ -18,7 +18,7 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechRecognitionRepository
 import io.mockk.coEvery
@@ -28,10 +28,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -40,7 +37,6 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -281,7 +277,7 @@ class DefaultAssistantSessionCoordinatorTest {
         )
     }
 
-    private fun service(): ModelService = ModelService(
+    private fun service(): LLMModelSetting = LLMModelSetting(
         id = "svc",
         name = "Service",
         isEnabled = true,

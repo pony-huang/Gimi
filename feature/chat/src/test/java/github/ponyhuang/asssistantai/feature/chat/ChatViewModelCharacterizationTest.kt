@@ -16,7 +16,7 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelectionCodec
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackState
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechPlaybackRepository
@@ -456,7 +456,7 @@ class ChatViewModelCharacterizationTest {
         confirmationRequest = ToolConfirmationRequest(toolName = toolName, args = args),
     )
 
-    private fun service() = ModelService(
+    private fun service() = LLMModelSetting(
         id = "service",
         name = "Service",
         isEnabled = true,

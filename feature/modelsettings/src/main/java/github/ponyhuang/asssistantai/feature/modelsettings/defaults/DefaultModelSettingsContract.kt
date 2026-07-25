@@ -3,10 +3,10 @@ package github.ponyhuang.asssistantai.feature.modelsettings.defaults
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 
 data class SelectableModelRow(
-    val service: ModelService,
+    val service: LLMModelSetting,
     val group: ModelGroup,
     val model: Model,
 ) {

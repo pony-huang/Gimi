@@ -8,10 +8,10 @@ import github.ponyhuang.asssistantai.data.LLMModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelGroup
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 
-fun LLMModelProvider.toDomain(): ModelService = ModelService(
+fun LLMModelProvider.toDomain(): LLMModelSetting = LLMModelSetting(
     id = serviceId,
     name = serviceName,
     isEnabled = isEnabled,

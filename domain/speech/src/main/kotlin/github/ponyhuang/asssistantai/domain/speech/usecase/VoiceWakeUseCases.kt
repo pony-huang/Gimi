@@ -50,7 +50,7 @@ private fun DefaultModelSettings.isVoiceWakeConfigurationReady(): Boolean {
     return hasChatModel && hasSelectedSpeechModel
 }
 
-private fun List<github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService>.containsSelection(
+private fun List<github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting>.containsSelection(
     selection: ModelSelection?,
     predicate: (github.ponyhuang.asssistantai.domain.modelcatalog.model.Model) -> Boolean,
 ): Boolean {

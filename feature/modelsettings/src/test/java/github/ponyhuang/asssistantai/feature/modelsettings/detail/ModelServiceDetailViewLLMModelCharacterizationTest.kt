@@ -4,7 +4,7 @@ import app.cash.turbine.test
 import github.ponyhuang.asssistantai.core.testing.MainDispatcherRule
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelGroup
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelServiceRemoteGateway
@@ -30,7 +30,7 @@ import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class ModelServiceDetailViewModelCharacterizationTest {
+class ModelServiceDetailViewLLMModelCharacterizationTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
@@ -41,22 +41,22 @@ class ModelServiceDetailViewModelCharacterizationTest {
 
         fixture.viewModel.uiState.test {
             assertTrue(awaitItem().isLoading)
-            fixture.viewModel.onAction(ModelServiceDetailAction.Load(provider.id))
+            fixture.viewModel.onAction(LLmModelSettingDetailAction.Load(provider.id))
 
             var state = awaitItem()
             while (state.service == null) state = awaitItem()
             assertEquals(2, state.rows.size)
             assertEquals(
-                ModelServiceDetailRow.GroupHeader("chat", "Chat", isExpanded = true),
+                LLMModelSettingDetailRow.GroupHeader("chat", "Chat", isExpanded = true),
                 state.rows.first(),
             )
 
-            fixture.viewModel.onAction(ModelServiceDetailAction.ToggleGroup("chat"))
+            fixture.viewModel.onAction(LLmModelSettingDetailAction.ToggleGroup("chat"))
             do {
                 state = awaitItem()
             } while (state.rows.size != 1)
             assertEquals(
-                listOf(ModelServiceDetailRow.GroupHeader("chat", "Chat", isExpanded = false)),
+                listOf(LLMModelSettingDetailRow.GroupHeader("chat", "Chat", isExpanded = false)),
                 state.rows,
             )
             cancelAndIgnoreRemainingEvents()
@@ -67,27 +67,27 @@ class ModelServiceDetailViewModelCharacterizationTest {
     fun missingServiceRequestsCloseAndShowsExistingMessage() = runTest {
         val fixture = fixture(null)
 
-        fixture.viewModel.onAction(ModelServiceDetailAction.Load("missing"))
+        fixture.viewModel.onAction(LLmModelSettingDetailAction.Load("missing"))
         advanceUntilIdle()
 
         val state = fixture.viewModel.uiState.value
         assertFalse(state.isLoading)
         assertTrue(state.shouldClose)
-        assertEquals(ModelServiceDetailNotice.ServiceNotFound, state.notice)
+        assertEquals(LLMModelSettingDetailNotice.SettingNotFoundLLM, state.notice)
     }
 
     @Test
     fun blankApiKeyReturnsFailureWithoutRequest() = runTest {
         val provider = service(apiKey = "")
         val fixture = fixture(provider)
-        fixture.viewModel.onAction(ModelServiceDetailAction.Load(provider.id))
+        fixture.viewModel.onAction(LLmModelSettingDetailAction.Load(provider.id))
         advanceUntilIdle()
 
-        fixture.viewModel.onAction(ModelServiceDetailAction.TestConnection)
+        fixture.viewModel.onAction(LLmModelSettingDetailAction.TestConnection)
         advanceUntilIdle()
 
         assertEquals(
-            ModelServiceDetailNotice.ConnectionFailed,
+            LLMModelSettingDetailNotice.ConnectionFailed,
             fixture.viewModel.uiState.value.notice,
         )
         coVerify(exactly = 0) { fixture.remote.validateConnection(any()) }
@@ -97,10 +97,10 @@ class ModelServiceDetailViewModelCharacterizationTest {
     fun apiKeyChangeUpdatesStateAndRepository() = runTest {
         val provider = service(apiKey = "old")
         val fixture = fixture(provider)
-        fixture.viewModel.onAction(ModelServiceDetailAction.Load(provider.id))
+        fixture.viewModel.onAction(LLmModelSettingDetailAction.Load(provider.id))
         advanceUntilIdle()
 
-        fixture.viewModel.onAction(ModelServiceDetailAction.ApiKeyChanged("new"))
+        fixture.viewModel.onAction(LLmModelSettingDetailAction.ApiKeyChanged("new"))
         advanceUntilIdle()
 
         assertEquals("new", fixture.viewModel.uiState.value.service?.apiKey)
@@ -113,11 +113,11 @@ class ModelServiceDetailViewModelCharacterizationTest {
             supportedProtocols = listOf(ApiProtocol.Standard),
         )
         val fixture = fixture(provider)
-        fixture.viewModel.onAction(ModelServiceDetailAction.Load(provider.id))
+        fixture.viewModel.onAction(LLmModelSettingDetailAction.Load(provider.id))
         advanceUntilIdle()
 
         fixture.viewModel.onAction(
-            ModelServiceDetailAction.ApiProtocolChanged(ApiProtocol.Anthropic),
+            LLmModelSettingDetailAction.ApiProtocolChanged(ApiProtocol.Anthropic),
         )
         advanceUntilIdle()
 
@@ -131,11 +131,11 @@ class ModelServiceDetailViewModelCharacterizationTest {
     fun protocolChangeToSupportedProtocolUpdatesStateAndRepository() = runTest {
         val provider = service(apiKey = "key")
         val fixture = fixture(provider)
-        fixture.viewModel.onAction(ModelServiceDetailAction.Load(provider.id))
+        fixture.viewModel.onAction(LLmModelSettingDetailAction.Load(provider.id))
         advanceUntilIdle()
 
         fixture.viewModel.onAction(
-            ModelServiceDetailAction.ApiProtocolChanged(ApiProtocol.Anthropic),
+            LLmModelSettingDetailAction.ApiProtocolChanged(ApiProtocol.Anthropic),
         )
         advanceUntilIdle()
 
@@ -152,11 +152,11 @@ class ModelServiceDetailViewModelCharacterizationTest {
             enabledOfficialTools = setOf("web_search", "kimi_formulas"),
         )
         val fixture = fixture(provider)
-        fixture.viewModel.onAction(ModelServiceDetailAction.Load(provider.id))
+        fixture.viewModel.onAction(LLmModelSettingDetailAction.Load(provider.id))
         advanceUntilIdle()
 
         fixture.viewModel.onAction(
-            ModelServiceDetailAction.OfficialToolEnabledChanged("web_search", false),
+            LLmModelSettingDetailAction.OfficialToolEnabledChanged("web_search", false),
         )
         advanceUntilIdle()
 
@@ -169,7 +169,7 @@ class ModelServiceDetailViewModelCharacterizationTest {
         }
     }
 
-    private fun fixture(service: ModelService?): Fixture {
+    private fun fixture(service: LLMModelSetting?): Fixture {
         val services = MutableStateFlow(service)
         val repository = mockk<ModelCatalogRepository>(relaxed = true) {
             coEvery { awaitReady() } returns Unit
@@ -191,7 +191,7 @@ class ModelServiceDetailViewModelCharacterizationTest {
         return Fixture(viewModel, repository, remote)
     }
 
-    private fun service(apiKey: String): ModelService = ModelService(
+    private fun service(apiKey: String): LLMModelSetting = LLMModelSetting(
         id = "deepseek",
         name = "DeepSeek",
         isEnabled = true,

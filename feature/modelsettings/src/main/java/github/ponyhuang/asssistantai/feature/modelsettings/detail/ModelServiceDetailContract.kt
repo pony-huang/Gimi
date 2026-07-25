@@ -3,16 +3,16 @@ package github.ponyhuang.asssistantai.feature.modelsettings.detail
 import androidx.annotation.StringRes
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.feature.modelsettings.R
 
-data class ModelServiceDetailUiState(
+data class LLMModelSettingDetailUiState(
     val isLoading: Boolean = true,
-    val service: ModelService? = null,
-    val rows: List<ModelServiceDetailRow> = emptyList(),
+    val service: LLMModelSetting? = null,
+    val rows: List<LLMModelSettingDetailRow> = emptyList(),
     val isTestingKey: Boolean = false,
     val isRefreshing: Boolean = false,
-    val notice: ModelServiceDetailNotice? = null,
+    val notice: LLMModelSettingDetailNotice? = null,
     val shouldClose: Boolean = false,
     val isApiKeyVisible: Boolean = false,
     val isProtocolMenuExpanded: Boolean = false,
@@ -22,52 +22,52 @@ data class ModelServiceDetailUiState(
     val isMutationBlocked: Boolean = false,
 )
 
-sealed interface ModelServiceDetailAction {
-    data class Load(val serviceId: String) : ModelServiceDetailAction
-    data class ApiKeyChanged(val value: String) : ModelServiceDetailAction
-    data class ApiBaseUrlChanged(val value: String) : ModelServiceDetailAction
-    data class ApiProtocolChanged(val value: ApiProtocol) : ModelServiceDetailAction
-    data class EnabledChanged(val value: Boolean) : ModelServiceDetailAction
+sealed interface LLmModelSettingDetailAction {
+    data class Load(val serviceId: String) : LLmModelSettingDetailAction
+    data class ApiKeyChanged(val value: String) : LLmModelSettingDetailAction
+    data class ApiBaseUrlChanged(val value: String) : LLmModelSettingDetailAction
+    data class ApiProtocolChanged(val value: ApiProtocol) : LLmModelSettingDetailAction
+    data class EnabledChanged(val value: Boolean) : LLmModelSettingDetailAction
     data class OfficialToolEnabledChanged(
         val toolId: String,
         val enabled: Boolean,
-    ) : ModelServiceDetailAction
-    data class ToggleGroup(val groupId: String) : ModelServiceDetailAction
-    data class RemoveModel(val groupId: String, val modelId: String) : ModelServiceDetailAction
-    data class NewModelIdChanged(val value: String) : ModelServiceDetailAction
-    data class NewModelKindChanged(val value: NewModelKind) : ModelServiceDetailAction
-    data object ToggleApiKeyVisibility : ModelServiceDetailAction
-    data object ToggleProtocolMenu : ModelServiceDetailAction
-    data object DismissProtocolMenu : ModelServiceDetailAction
-    data object ShowAddDialog : ModelServiceDetailAction
-    data object DismissAddDialog : ModelServiceDetailAction
-    data object ConfirmAddModel : ModelServiceDetailAction
-    data object TestConnection : ModelServiceDetailAction
-    data object RefreshModels : ModelServiceDetailAction
-    data object NoticeConsumed : ModelServiceDetailAction
-    data object CloseConsumed : ModelServiceDetailAction
+    ) : LLmModelSettingDetailAction
+    data class ToggleGroup(val groupId: String) : LLmModelSettingDetailAction
+    data class RemoveLLmModel(val groupId: String, val modelId: String) : LLmModelSettingDetailAction
+    data class NewLLmModelIdChanged(val value: String) : LLmModelSettingDetailAction
+    data class NewLLmModelKindChanged(val value: NewModelKind) : LLmModelSettingDetailAction
+    data object ToggleApiKeyVisibility : LLmModelSettingDetailAction
+    data object ToggleProtocolMenu : LLmModelSettingDetailAction
+    data object DismissProtocolMenu : LLmModelSettingDetailAction
+    data object ShowAddDialog : LLmModelSettingDetailAction
+    data object DismissAddDialog : LLmModelSettingDetailAction
+    data object ConfirmAddLLmModel : LLmModelSettingDetailAction
+    data object TestConnection : LLmModelSettingDetailAction
+    data object RefreshModels : LLmModelSettingDetailAction
+    data object NoticeConsumed : LLmModelSettingDetailAction
+    data object CloseConsumed : LLmModelSettingDetailAction
 }
 
-sealed interface ModelServiceDetailNotice {
-    data object ServiceNotFound : ModelServiceDetailNotice
-    data object ConnectionSucceeded : ModelServiceDetailNotice
-    data object ConnectionFailed : ModelServiceDetailNotice
-    data class ModelsSynchronized(val count: Int) : ModelServiceDetailNotice
-    data object ModelSynchronizationFailed : ModelServiceDetailNotice
-    data object AgentMutationBlocked : ModelServiceDetailNotice
+sealed interface LLMModelSettingDetailNotice {
+    data object SettingNotFoundLLM : LLMModelSettingDetailNotice
+    data object ConnectionSucceeded : LLMModelSettingDetailNotice
+    data object ConnectionFailed : LLMModelSettingDetailNotice
+    data class ModelsSynchronized(val count: Int) : LLMModelSettingDetailNotice
+    data object LLMModelSynchronizationFailed : LLMModelSettingDetailNotice
+    data object AgentMutationBlocked : LLMModelSettingDetailNotice
 }
 
-sealed interface ModelServiceDetailRow {
+sealed interface LLMModelSettingDetailRow {
     data class GroupHeader(
         val groupId: String,
         val groupName: String,
         val isExpanded: Boolean,
-    ) : ModelServiceDetailRow
+    ) : LLMModelSettingDetailRow
 
-    data class ModelItem(
+    data class LLMModelItem(
         val groupId: String,
         val model: Model,
-    ) : ModelServiceDetailRow
+    ) : LLMModelSettingDetailRow
 }
 
 enum class NewModelKind(@StringRes val labelRes: Int) {

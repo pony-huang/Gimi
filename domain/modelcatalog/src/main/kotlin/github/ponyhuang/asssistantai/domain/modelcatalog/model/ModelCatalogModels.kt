@@ -5,7 +5,7 @@ object OfficialToolIds {
     const val KIMI_FORMULAS: String = "kimi_formulas"
 }
 
-data class ModelService(
+data class LLMModelSetting(
     val id: String,
     val name: String,
     val isEnabled: Boolean,
@@ -56,7 +56,7 @@ data class ModelSelection(
 )
 
 data class DefaultModelSettings(
-    val services: List<ModelService>,
+    val services: List<LLMModelSetting>,
     val assistantSelection: ModelSelection?,
     val fastSelection: ModelSelection?,
     val speechSelection: ModelSelection?,

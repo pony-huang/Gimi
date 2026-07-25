@@ -15,13 +15,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.feature.modelsettings.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ApiBaseUrlSection(
-    service: ModelService,
+    service: LLMModelSetting,
     isMenuExpanded: Boolean,
     onToggleMenu: () -> Unit,
     onDismissMenu: () -> Unit,

@@ -18,14 +18,14 @@ import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
 import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
 
 @Composable
-fun ModelServiceDetailScreen(
-    state: ModelServiceDetailUiState,
-    onAction: (ModelServiceDetailAction) -> Unit,
+fun LLMModelSettingDetailScreen(
+    state: LLMModelSettingDetailUiState,
+    onAction: (LLmModelSettingDetailAction) -> Unit,
     onOpenUrl: (url: String, missingMessage: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val service = state.service ?: return
-    val dispatch: (ModelServiceDetailAction) -> Unit = { action ->
+    val dispatch: (LLmModelSettingDetailAction) -> Unit = { action ->
         if (!state.isMutationBlocked || !action.changesAgentConfiguration()) onAction(action)
     }
 
@@ -54,7 +54,7 @@ fun ModelServiceDetailScreen(
                 HeaderSection(
                     service = service,
                     onToggleEnabled = {
-                        dispatch(ModelServiceDetailAction.EnabledChanged(it))
+                        dispatch(LLmModelSettingDetailAction.EnabledChanged(it))
                     },
                     onOpenHomepage = {
                         onOpenUrl(service.homepageUrl, homepageMissing)
@@ -72,12 +72,12 @@ fun ModelServiceDetailScreen(
                     isVisible = state.isApiKeyVisible,
                     isTesting = state.isTestingKey,
                     onApiKeyChange = {
-                        dispatch(ModelServiceDetailAction.ApiKeyChanged(it))
+                        dispatch(LLmModelSettingDetailAction.ApiKeyChanged(it))
                     },
                     onToggleVisibility = {
-                        dispatch(ModelServiceDetailAction.ToggleApiKeyVisibility)
+                        dispatch(LLmModelSettingDetailAction.ToggleApiKeyVisibility)
                     },
-                    onTest = { dispatch(ModelServiceDetailAction.TestConnection) },
+                    onTest = { dispatch(LLmModelSettingDetailAction.TestConnection) },
                     onOpenKeyHelp = {
                         onOpenUrl(service.keyHelpUrl, keyUrlMissing)
                     },
@@ -89,13 +89,13 @@ fun ModelServiceDetailScreen(
                 ApiBaseUrlSection(
                     service = service,
                     isMenuExpanded = state.isProtocolMenuExpanded,
-                    onToggleMenu = { dispatch(ModelServiceDetailAction.ToggleProtocolMenu) },
-                    onDismissMenu = { dispatch(ModelServiceDetailAction.DismissProtocolMenu) },
+                    onToggleMenu = { dispatch(LLmModelSettingDetailAction.ToggleProtocolMenu) },
+                    onDismissMenu = { dispatch(LLmModelSettingDetailAction.DismissProtocolMenu) },
                     onProtocolChange = {
-                        dispatch(ModelServiceDetailAction.ApiProtocolChanged(it))
+                        dispatch(LLmModelSettingDetailAction.ApiProtocolChanged(it))
                     },
                     onBaseUrlChange = {
-                        dispatch(ModelServiceDetailAction.ApiBaseUrlChanged(it))
+                        dispatch(LLmModelSettingDetailAction.ApiBaseUrlChanged(it))
                     },
                 )
             }
@@ -110,7 +110,7 @@ fun ModelServiceDetailScreen(
                         enabledTools = service.enabledOfficialTools,
                         onEnabledChange = { toolId, enabled ->
                             dispatch(
-                                ModelServiceDetailAction.OfficialToolEnabledChanged(
+                                LLmModelSettingDetailAction.OfficialToolEnabledChanged(
                                     toolId,
                                     enabled,
                                 ),
@@ -144,17 +144,17 @@ fun ModelServiceDetailScreen(
     }
 }
 
-private fun ModelServiceDetailAction.changesAgentConfiguration(): Boolean = when (this) {
-    is ModelServiceDetailAction.ApiKeyChanged,
-    is ModelServiceDetailAction.ApiBaseUrlChanged,
-    is ModelServiceDetailAction.ApiProtocolChanged,
-    is ModelServiceDetailAction.EnabledChanged,
-    is ModelServiceDetailAction.OfficialToolEnabledChanged,
-    is ModelServiceDetailAction.RemoveModel,
-    is ModelServiceDetailAction.NewModelIdChanged,
-    is ModelServiceDetailAction.NewModelKindChanged,
-    ModelServiceDetailAction.ShowAddDialog,
-    ModelServiceDetailAction.ConfirmAddModel,
-    ModelServiceDetailAction.RefreshModels -> true
+private fun LLmModelSettingDetailAction.changesAgentConfiguration(): Boolean = when (this) {
+    is LLmModelSettingDetailAction.ApiKeyChanged,
+    is LLmModelSettingDetailAction.ApiBaseUrlChanged,
+    is LLmModelSettingDetailAction.ApiProtocolChanged,
+    is LLmModelSettingDetailAction.EnabledChanged,
+    is LLmModelSettingDetailAction.OfficialToolEnabledChanged,
+    is LLmModelSettingDetailAction.RemoveLLmModel,
+    is LLmModelSettingDetailAction.NewLLmModelIdChanged,
+    is LLmModelSettingDetailAction.NewLLmModelKindChanged,
+    LLmModelSettingDetailAction.ShowAddDialog,
+    LLmModelSettingDetailAction.ConfirmAddLLmModel,
+    LLmModelSettingDetailAction.RefreshModels -> true
     else -> false
 }

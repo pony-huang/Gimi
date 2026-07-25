@@ -5,7 +5,7 @@ import github.ponyhuang.asssistantai.domain.conversation.model.Message
 import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackState
 import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentTaskPhase
 
@@ -47,7 +47,7 @@ data class ChatUiState(
     val conversations: List<Conversation> = emptyList(),
     val conversationTaskStatuses: Map<String, ConversationTaskStatus> = emptyMap(),
     val isInitializing: Boolean = false,
-    val availableModelServices: List<ModelService> = emptyList(),
+    val availableLLMModelSettings: List<LLMModelSetting> = emptyList(),
     val modelCatalogLoadState: CatalogLoadState = CatalogLoadState.Loading,
     val currentModelSelection: ModelSelection? = null,
     val showToolActivity: Boolean = true,

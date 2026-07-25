@@ -9,7 +9,7 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import io.mockk.coEvery
 import io.mockk.every
@@ -75,7 +75,7 @@ class DefaultSpeechRepositoriesTest {
     }
 
     private fun catalog(
-        service: ModelService,
+        service: LLMModelSetting,
         speechSelection: ModelSelection?,
         ttsSelection: ModelSelection?,
     ): ModelCatalogRepository = mockk(relaxed = true) {
@@ -88,7 +88,7 @@ class DefaultSpeechRepositoriesTest {
         every { currentTtsVoice() } returns "mimo_default"
     }
 
-    private fun service(apiKey: String = " secret ") = ModelService(
+    private fun service(apiKey: String = " secret ") = LLMModelSetting(
         id = "service",
         name = "Service",
         isEnabled = true,

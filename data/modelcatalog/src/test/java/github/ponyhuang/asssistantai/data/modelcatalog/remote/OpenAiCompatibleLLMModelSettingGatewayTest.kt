@@ -1,7 +1,7 @@
 package github.ponyhuang.asssistantai.data.modelcatalog.remote
 
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
@@ -14,7 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-class OpenAiCompatibleModelServiceGatewayTest {
+class OpenAiCompatibleLLMModelSettingGatewayTest {
     private lateinit var server: MockWebServer
 
     @Before
@@ -53,7 +53,7 @@ class OpenAiCompatibleModelServiceGatewayTest {
         ioDispatcher = Dispatchers.IO,
     )
 
-    private fun service() = ModelService(
+    private fun service() = LLMModelSetting(
         id = "test",
         name = "Test",
         isEnabled = true,

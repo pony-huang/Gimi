@@ -37,7 +37,7 @@ import github.ponyhuang.asssistantai.feature.mcp.McpServerImportRoute
 import github.ponyhuang.asssistantai.feature.mcp.McpServerListRoute
 import github.ponyhuang.asssistantai.feature.mcp.R as McpR
 import github.ponyhuang.asssistantai.feature.modelsettings.defaults.DefaultModelSettingsRoute
-import github.ponyhuang.asssistantai.feature.modelsettings.detail.LLMModelServiceDetailRoute
+import github.ponyhuang.asssistantai.feature.modelsettings.detail.LLMModelSettingDetailRoute
 import github.ponyhuang.asssistantai.feature.modelsettings.list.ModelServiceListRoute
 import github.ponyhuang.asssistantai.feature.modelsettings.R as ModelsettingsR
 import github.ponyhuang.asssistantai.feature.permissions.PermissionSettingsRoute
@@ -314,7 +314,7 @@ fun MainScreen(
                             stringResource(ModelsettingsR.string.modelsettings_detail_title),
                             goBack,
                         ) {
-                            LLMModelServiceDetailRoute(route.serviceId, goBack, modifier = it)
+                            LLMModelSettingDetailRoute(route.serviceId, goBack, modifier = it)
                         }
                     }
                 }

@@ -32,7 +32,7 @@ class ObserveDefaultModelSettingsUseCase @Inject constructor(
     }
 
     private data class PartialSettings(
-        val services: List<github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService>,
+        val services: List<github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting>,
         val assistant: ModelSelection?,
         val fast: ModelSelection?,
         val speech: ModelSelection?,

@@ -8,7 +8,7 @@ import github.ponyhuang.asssistantai.domain.conversation.runtime.isBusy
 import github.ponyhuang.asssistantai.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.LoadModelServiceUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.ObserveModelServiceUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.RefreshModelCatalogUseCase
@@ -30,7 +30,7 @@ class ModelServiceDetailViewModel @Inject constructor(
     private val refreshCatalog: RefreshModelCatalogUseCase,
     private val runWhenAgentIdle: RunWhenAgentIdleUseCase,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(ModelServiceDetailUiState())
+    private val _uiState = MutableStateFlow(LLMModelSettingDetailUiState())
     val uiState = _uiState.asStateFlow()
 
     private var serviceId: String? = null
@@ -45,36 +45,36 @@ class ModelServiceDetailViewModel @Inject constructor(
         }
     }
 
-    fun onAction(action: ModelServiceDetailAction) {
+    fun onAction(action: LLmModelSettingDetailAction) {
         when (action) {
-            is ModelServiceDetailAction.Load -> load(action.serviceId)
-            is ModelServiceDetailAction.ApiKeyChanged -> changeApiKey(action.value)
-            is ModelServiceDetailAction.ApiBaseUrlChanged -> changeBaseUrl(action.value)
-            is ModelServiceDetailAction.ApiProtocolChanged -> changeProtocol(action.value)
-            is ModelServiceDetailAction.EnabledChanged -> changeEnabled(action.value)
-            is ModelServiceDetailAction.OfficialToolEnabledChanged ->
+            is LLmModelSettingDetailAction.Load -> load(action.serviceId)
+            is LLmModelSettingDetailAction.ApiKeyChanged -> changeApiKey(action.value)
+            is LLmModelSettingDetailAction.ApiBaseUrlChanged -> changeBaseUrl(action.value)
+            is LLmModelSettingDetailAction.ApiProtocolChanged -> changeProtocol(action.value)
+            is LLmModelSettingDetailAction.EnabledChanged -> changeEnabled(action.value)
+            is LLmModelSettingDetailAction.OfficialToolEnabledChanged ->
                 changeOfficialTool(action.toolId, action.enabled)
-            is ModelServiceDetailAction.ToggleGroup -> toggleGroup(action.groupId)
-            is ModelServiceDetailAction.RemoveModel -> removeModel(action.groupId, action.modelId)
-            is ModelServiceDetailAction.NewModelIdChanged ->
+            is LLmModelSettingDetailAction.ToggleGroup -> toggleGroup(action.groupId)
+            is LLmModelSettingDetailAction.RemoveLLmModel -> removeModel(action.groupId, action.modelId)
+            is LLmModelSettingDetailAction.NewLLmModelIdChanged ->
                 _uiState.update { it.copy(newModelId = action.value) }
-            is ModelServiceDetailAction.NewModelKindChanged ->
+            is LLmModelSettingDetailAction.NewLLmModelKindChanged ->
                 _uiState.update { it.copy(newModelKind = action.value) }
-            ModelServiceDetailAction.ToggleApiKeyVisibility ->
+            LLmModelSettingDetailAction.ToggleApiKeyVisibility ->
                 _uiState.update { it.copy(isApiKeyVisible = !it.isApiKeyVisible) }
-            ModelServiceDetailAction.ToggleProtocolMenu ->
+            LLmModelSettingDetailAction.ToggleProtocolMenu ->
                 _uiState.update { it.copy(isProtocolMenuExpanded = !it.isProtocolMenuExpanded) }
-            ModelServiceDetailAction.DismissProtocolMenu ->
+            LLmModelSettingDetailAction.DismissProtocolMenu ->
                 _uiState.update { it.copy(isProtocolMenuExpanded = false) }
-            ModelServiceDetailAction.ShowAddDialog ->
+            LLmModelSettingDetailAction.ShowAddDialog ->
                 _uiState.update { it.copy(isAddDialogVisible = true) }
-            ModelServiceDetailAction.DismissAddDialog -> resetAddDialog()
-            ModelServiceDetailAction.ConfirmAddModel -> addModel()
-            ModelServiceDetailAction.TestConnection -> testCurrentConnection()
-            ModelServiceDetailAction.RefreshModels -> refreshModels()
-            ModelServiceDetailAction.NoticeConsumed ->
+            LLmModelSettingDetailAction.DismissAddDialog -> resetAddDialog()
+            LLmModelSettingDetailAction.ConfirmAddLLmModel -> addModel()
+            LLmModelSettingDetailAction.TestConnection -> testCurrentConnection()
+            LLmModelSettingDetailAction.RefreshModels -> refreshModels()
+            LLmModelSettingDetailAction.NoticeConsumed ->
                 _uiState.update { it.copy(notice = null) }
-            ModelServiceDetailAction.CloseConsumed ->
+            LLmModelSettingDetailAction.CloseConsumed ->
                 _uiState.update { it.copy(shouldClose = false) }
         }
     }
@@ -83,7 +83,7 @@ class ModelServiceDetailViewModel @Inject constructor(
         if (serviceId == id && observationJob?.isActive == true) return
         observationJob?.cancel()
         serviceId = id
-        _uiState.value = ModelServiceDetailUiState(
+        _uiState.value = LLMModelSettingDetailUiState(
             isLoading = true,
             isMutationBlocked = _uiState.value.isMutationBlocked,
         )
@@ -94,7 +94,7 @@ class ModelServiceDetailViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        notice = ModelServiceDetailNotice.ServiceNotFound,
+                        notice = LLMModelSettingDetailNotice.SettingNotFoundLLM,
                         shouldClose = true,
                     )
                 }
@@ -109,7 +109,7 @@ class ModelServiceDetailViewModel @Inject constructor(
         }
     }
 
-    private fun publishService(service: ModelService?) {
+    private fun publishService(service: LLMModelSetting?) {
         _uiState.update { state ->
             state.copy(
                 isLoading = false,
@@ -246,9 +246,9 @@ class ModelServiceDetailViewModel @Inject constructor(
                 it.copy(
                     isTestingKey = false,
                     notice = if (success) {
-                        ModelServiceDetailNotice.ConnectionSucceeded
+                        LLMModelSettingDetailNotice.ConnectionSucceeded
                     } else {
-                        ModelServiceDetailNotice.ConnectionFailed
+                        LLMModelSettingDetailNotice.ConnectionFailed
                     },
                 )
             }
@@ -265,8 +265,8 @@ class ModelServiceDetailViewModel @Inject constructor(
                 it.copy(
                     isRefreshing = false,
                     notice = result.fold(
-                        onSuccess = ModelServiceDetailNotice::ModelsSynchronized,
-                        onFailure = { ModelServiceDetailNotice.ModelSynchronizationFailed },
+                        onSuccess = LLMModelSettingDetailNotice::ModelsSynchronized,
+                        onFailure = { LLMModelSettingDetailNotice.LLMModelSynchronizationFailed },
                     ),
                 )
             }
@@ -278,21 +278,21 @@ class ModelServiceDetailViewModel @Inject constructor(
             when (runWhenAgentIdle(block)) {
                 is AgentMutationResult.Applied -> Unit
                 AgentMutationResult.BlockedByActiveAgent -> _uiState.update {
-                    it.copy(notice = ModelServiceDetailNotice.AgentMutationBlocked)
+                    it.copy(notice = LLMModelSettingDetailNotice.AgentMutationBlocked)
                 }
             }
         }
     }
 }
 
-private fun ModelService.toRows(expandedGroupIds: Set<String>): List<ModelServiceDetailRow> =
+private fun LLMModelSetting.toRows(expandedGroupIds: Set<String>): List<LLMModelSettingDetailRow> =
     buildList {
         groups.forEach { group ->
             val expanded = group.id in expandedGroupIds
-            add(ModelServiceDetailRow.GroupHeader(group.id, group.name, expanded))
+            add(LLMModelSettingDetailRow.GroupHeader(group.id, group.name, expanded))
             if (expanded) {
                 group.models.forEach { model ->
-                    add(ModelServiceDetailRow.ModelItem(group.id, model))
+                    add(LLMModelSettingDetailRow.LLMModelItem(group.id, model))
                 }
             }
         }

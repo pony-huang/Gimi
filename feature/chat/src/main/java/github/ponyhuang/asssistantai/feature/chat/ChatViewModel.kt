@@ -4,8 +4,6 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import github.ponyhuang.asssistantai.domain.conversation.model.ChatFunctionCall
-import github.ponyhuang.asssistantai.domain.conversation.model.ChatFunctionResponse
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAttachmentRepository
@@ -15,20 +13,16 @@ import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentRunLease
 import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentRuntimeGate
 import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentTaskSource
-import github.ponyhuang.asssistantai.domain.conversation.model.FunctionCallView
-import github.ponyhuang.asssistantai.domain.conversation.model.FunctionResponseView
 import github.ponyhuang.asssistantai.domain.conversation.model.Message
 import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
-import github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment
 import github.ponyhuang.asssistantai.domain.conversation.model.Messages
 import github.ponyhuang.asssistantai.domain.conversation.model.TextPart
 import github.ponyhuang.asssistantai.domain.conversation.usecase.ChatRunEventMapper
 import github.ponyhuang.asssistantai.domain.conversation.usecase.summarizeValue
 import github.ponyhuang.asssistantai.domain.conversation.usecase.toView
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelectionCodec
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechRecognitionRepository
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechPlaybackRepository
@@ -146,7 +140,7 @@ class ChatViewModel @Inject constructor(
         }
         viewModelScope.launch {
             modelServices.observeServices().collect { services ->
-                _uiState.update { it.copy(availableModelServices = services) }
+                _uiState.update { it.copy(availableLLMModelSettings = services) }
             }
         }
         viewModelScope.launch {
@@ -1074,7 +1068,7 @@ private fun summarizeConfirmationArgument(key: String, value: Any?): String {
     return if (sensitiveKey) "••••" else summarizeValue(value).take(120)
 }
 
-private fun List<ModelService>.isUsableChatSelection(selection: ModelSelection): Boolean {
+private fun List<LLMModelSetting>.isUsableChatSelection(selection: ModelSelection): Boolean {
     val service = firstOrNull { it.id == selection.serviceId } ?: return false
     if (!service.isEnabled || service.apiKey.isBlank()) return false
     val group = service.groups.firstOrNull { it.id == selection.groupId } ?: return false

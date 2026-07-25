@@ -5,13 +5,13 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.CatalogLoadState
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.ui.theme.AsssistantaiTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
-class ModelServiceListScreenTest {
+class LLMModelSettingListScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -36,7 +36,7 @@ class ModelServiceListScreenTest {
         assertEquals("deepseek", selectedId)
     }
 
-    private fun service() = ModelService(
+    private fun service() = LLMModelSetting(
         id = "deepseek",
         name = "深度求索",
         isEnabled = true,

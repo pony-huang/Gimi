@@ -100,7 +100,7 @@ private fun DefaultModelSettings.toUiState(
     )
 }
 
-private fun List<github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService>.rows(
+private fun List<github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting>.rows(
     predicate: (github.ponyhuang.asssistantai.domain.modelcatalog.model.Model) -> Boolean,
 ): List<SelectableModelRow> = flatMap { service ->
     service.groups.flatMap { group ->

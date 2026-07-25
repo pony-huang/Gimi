@@ -35,8 +35,7 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
-import github.ponyhuang.asssistantai.feature.chat.R
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.ui.common.PickerSingleChoiceDialog
 import github.ponyhuang.asssistantai.ui.settings.llmmodel.LLMModelServiceIcon
 
@@ -56,7 +55,7 @@ import github.ponyhuang.asssistantai.ui.settings.llmmodel.LLMModelServiceIcon
  * 一行可选项的视图模型 — 同时携带所属服务与组，供对话框展示二级文案与构造 [LLMModelSelection]。
  */
 data class EnabledModelRow(
-    val service: ModelService,
+    val service: LLMModelSetting,
     val group: ModelGroup,
     val model: Model,
 )
@@ -150,7 +149,7 @@ fun ModelStatusDisplay(
  */
 @Composable
 fun ModelTitleAndPicker(
-    services: List<ModelService>,
+    services: List<LLMModelSetting>,
     currentSelection: ModelSelection?,
     loadState: CatalogLoadState,
     isAgentRunning: Boolean,
@@ -187,7 +186,8 @@ fun ModelTitleAndPicker(
     val enabledModels: List<EnabledModelRow> = remember(services) {
         services.filter { it.isConfiguredForChat() }.flatMap { svc ->
             svc.groups.flatMap { grp ->
-                grp.models.filter { it.isChatModel() }.map { m -> EnabledModelRow(svc, grp, m) }
+                grp.models.sortedBy { it.id }.sortedBy { it.name }
+                    .filter { it.isChatModel() }.map { m -> EnabledModelRow(svc, grp, m) }
             }
         }
     }
@@ -210,13 +210,15 @@ fun ModelTitleAndPicker(
             onClick = when {
                 loadState == CatalogLoadState.Loading -> null
                 displayedModelName == null -> onConfigureModels
-                else -> {{
-                    if (isAgentRunning) {
-                        onModelSwitchBlocked()
-                    } else {
-                        showModelPicker = true
+                else -> {
+                    {
+                        if (isAgentRunning) {
+                            onModelSwitchBlocked()
+                        } else {
+                            showModelPicker = true
+                        }
                     }
-                }}
+                }
             },
         )
     }
@@ -228,8 +230,8 @@ fun ModelTitleAndPicker(
             selected = { row ->
                 effectiveSelection?.let { sel ->
                     sel.serviceId == row.service.id &&
-                        sel.groupId == row.group.id &&
-                        sel.modelId == row.model.id
+                            sel.groupId == row.group.id &&
+                            sel.modelId == row.model.id
                 } ?: false
             },
             key = { row -> "${row.service.id}/${row.group.id}/${row.model.id}" },
@@ -262,7 +264,7 @@ fun ModelTitleAndPicker(
     }
 }
 
-private fun List<ModelService>.resolveSelection(selection: ModelSelection?): EnabledModelRow? {
+private fun List<LLMModelSetting>.resolveSelection(selection: ModelSelection?): EnabledModelRow? {
     if (selection == null) return null
     val service = firstOrNull {
         it.id == selection.serviceId && it.isConfiguredForChat()
@@ -274,7 +276,7 @@ private fun List<ModelService>.resolveSelection(selection: ModelSelection?): Ena
     return EnabledModelRow(service, group, model)
 }
 
-private fun List<ModelService>.firstConfiguredChatSelection(): ModelSelection? {
+private fun List<LLMModelSetting>.firstConfiguredChatSelection(): ModelSelection? {
     return asSequence()
         .filter { it.isConfiguredForChat() }
         .mapNotNull { service ->
@@ -290,11 +292,11 @@ private fun List<ModelService>.firstConfiguredChatSelection(): ModelSelection? {
         .firstOrNull()
 }
 
-private fun ModelService.isConfiguredForChat(): Boolean =
+private fun LLMModelSetting.isConfiguredForChat(): Boolean =
     isEnabled && apiKey.isNotBlank() && groups.any { group -> group.models.any(Model::isChatModel) }
 
 // 远端拉取的模型不会带 isTts 标记（OpenAiCompatibleModelServiceGateway 只取 id），
 // 这里额外按 id/name 中的 "tts" 关键字兜底过滤，避免语音合成模型混入聊天候选。
 private fun Model.isChatModel(): Boolean =
     !isStt && !isTts && !id.contains("tts", ignoreCase = true) &&
-        !name.contains("tts", ignoreCase = true)
+            !name.contains("tts", ignoreCase = true)

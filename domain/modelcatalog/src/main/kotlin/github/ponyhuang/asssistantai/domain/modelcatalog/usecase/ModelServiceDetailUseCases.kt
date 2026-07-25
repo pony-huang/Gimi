@@ -3,7 +3,7 @@ package github.ponyhuang.asssistantai.domain.modelcatalog.usecase
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelServiceRemoteGateway
 import javax.inject.Inject
@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.Flow
 class LoadModelServiceUseCase @Inject constructor(
     private val repository: ModelCatalogRepository,
 ) {
-    suspend operator fun invoke(serviceId: String): ModelService? {
+    suspend operator fun invoke(serviceId: String): LLMModelSetting? {
         repository.awaitReady()
         return repository.currentService(serviceId)
     }
@@ -21,14 +21,14 @@ class LoadModelServiceUseCase @Inject constructor(
 class ObserveModelServiceUseCase @Inject constructor(
     private val repository: ModelCatalogRepository,
 ) {
-    operator fun invoke(serviceId: String): Flow<ModelService?> =
+    operator fun invoke(serviceId: String): Flow<LLMModelSetting?> =
         repository.observeService(serviceId)
 }
 
 class ObserveModelServicesUseCase @Inject constructor(
     private val repository: ModelCatalogRepository,
 ) {
-    operator fun invoke(): Flow<List<ModelService>> = repository.observeServices()
+    operator fun invoke(): Flow<List<LLMModelSetting>> = repository.observeServices()
 }
 
 class ObserveModelCatalogLoadStateUseCase @Inject constructor(
@@ -62,7 +62,7 @@ class UpdateModelServiceUseCase @Inject constructor(
 class TestModelServiceConnectionUseCase @Inject constructor(
     private val remoteGateway: ModelServiceRemoteGateway,
 ) {
-    suspend operator fun invoke(service: ModelService): Boolean {
+    suspend operator fun invoke(service: LLMModelSetting): Boolean {
         if (service.apiKey.isBlank()) return false
         return runCatching { remoteGateway.validateConnection(service) }.getOrDefault(false)
     }
@@ -72,7 +72,7 @@ class RefreshModelCatalogUseCase @Inject constructor(
     private val repository: ModelCatalogRepository,
     private val remoteGateway: ModelServiceRemoteGateway,
 ) {
-    suspend operator fun invoke(service: ModelService): Result<Int> = runCatching {
+    suspend operator fun invoke(service: LLMModelSetting): Result<Int> = runCatching {
         val models = remoteGateway.fetchModels(service)
         repository.replaceRemoteModels(service.id, models)
         models.size

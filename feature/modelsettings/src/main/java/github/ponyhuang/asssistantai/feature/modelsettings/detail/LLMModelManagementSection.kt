@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Construction
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
@@ -31,18 +31,18 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.feature.modelsettings.R
 
 @Composable
 fun LLMModelManagementSection(
-    service: ModelService,
-    rows: List<ModelServiceDetailRow>,
+    service: LLMModelSetting,
+    rows: List<LLMModelSettingDetailRow>,
     isRefreshing: Boolean,
     isAddDialogVisible: Boolean,
     newModelId: String,
     newModelKind: NewModelKind,
-    onAction: (ModelServiceDetailAction) -> Unit,
+    onAction: (LLmModelSettingDetailAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -60,7 +60,7 @@ fun LLMModelManagementSection(
             )
             IconButton(
                 enabled = service.apiKey.isNotBlank() && !isRefreshing,
-                onClick = { onAction(ModelServiceDetailAction.RefreshModels) },
+                onClick = { onAction(LLmModelSettingDetailAction.RefreshModels) },
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
@@ -70,7 +70,7 @@ fun LLMModelManagementSection(
                     ),
                 )
             }
-            IconButton(onClick = { onAction(ModelServiceDetailAction.ShowAddDialog) }) {
+            IconButton(onClick = { onAction(LLmModelSettingDetailAction.ShowAddDialog) }) {
                 Icon(
                     Icons.Default.Add,
                     contentDescription = stringResource(R.string.modelsettings_dialog_add_custom_model_title),
@@ -80,17 +80,17 @@ fun LLMModelManagementSection(
 
         rows.forEach { row ->
             when (row) {
-                is ModelServiceDetailRow.GroupHeader -> GroupHeaderRow(
+                is LLMModelSettingDetailRow.GroupHeader -> GroupHeaderRow(
                     row = row,
                     onToggle = {
-                        onAction(ModelServiceDetailAction.ToggleGroup(row.groupId))
+                        onAction(LLmModelSettingDetailAction.ToggleGroup(row.groupId))
                     },
                 )
-                is ModelServiceDetailRow.ModelItem -> ModelItemRow(
+                is LLMModelSettingDetailRow.LLMModelItem -> ModelItemRow(
                     row = row,
                     onRemove = {
                         onAction(
-                            ModelServiceDetailAction.RemoveModel(
+                            LLmModelSettingDetailAction.RemoveLLmModel(
                                 groupId = row.groupId,
                                 modelId = row.model.id,
                             ),
@@ -107,20 +107,20 @@ fun LLMModelManagementSection(
             input = newModelId,
             kind = newModelKind,
             onInputChange = {
-                onAction(ModelServiceDetailAction.NewModelIdChanged(it))
+                onAction(LLmModelSettingDetailAction.NewLLmModelIdChanged(it))
             },
             onKindChange = {
-                onAction(ModelServiceDetailAction.NewModelKindChanged(it))
+                onAction(LLmModelSettingDetailAction.NewLLmModelKindChanged(it))
             },
-            onConfirm = { onAction(ModelServiceDetailAction.ConfirmAddModel) },
-            onDismiss = { onAction(ModelServiceDetailAction.DismissAddDialog) },
+            onConfirm = { onAction(LLmModelSettingDetailAction.ConfirmAddLLmModel) },
+            onDismiss = { onAction(LLmModelSettingDetailAction.DismissAddDialog) },
         )
     }
 }
 
 @Composable
 private fun GroupHeaderRow(
-    row: ModelServiceDetailRow.GroupHeader,
+    row: LLMModelSettingDetailRow.GroupHeader,
     onToggle: () -> Unit,
 ) {
     val rotation by animateFloatAsState(
@@ -154,7 +154,7 @@ private fun GroupHeaderRow(
 
 @Composable
 private fun ModelItemRow(
-    row: ModelServiceDetailRow.ModelItem,
+    row: LLMModelSettingDetailRow.LLMModelItem,
     onRemove: () -> Unit,
 ) {
     Row(
@@ -162,7 +162,7 @@ private fun ModelItemRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            imageVector = Icons.Default.Construction,
+            imageVector = Icons.Default.Psychology,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(18.dp),

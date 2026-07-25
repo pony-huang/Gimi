@@ -12,12 +12,12 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.feature.modelsettings.R
 
 @Composable
 fun FooterSection(
-    service: ModelService,
+    service: LLMModelSetting,
     onOpenUrl: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {

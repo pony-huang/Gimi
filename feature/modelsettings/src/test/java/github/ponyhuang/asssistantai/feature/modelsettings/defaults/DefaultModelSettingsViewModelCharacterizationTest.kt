@@ -6,7 +6,7 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.UpdateDefaultModelSettingsUseCase
@@ -78,7 +78,7 @@ class DefaultModelSettingsViewModelCharacterizationTest {
         every { observeTtsVoice() } returns MutableStateFlow("female-shaonv")
     }
 
-    private fun service() = ModelService(
+    private fun service() = LLMModelSetting(
         id = "service",
         name = "Service",
         isEnabled = true,

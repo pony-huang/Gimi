@@ -4,15 +4,15 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import kotlinx.coroutines.flow.Flow
 
 interface ModelCatalogRepository {
     suspend fun awaitReady()
 
-    fun observeService(serviceId: String): Flow<ModelService?>
+    fun observeService(serviceId: String): Flow<LLMModelSetting?>
 
-    fun observeServices(): Flow<List<ModelService>>
+    fun observeServices(): Flow<List<LLMModelSetting>>
 
     fun observeLoadState(): Flow<CatalogLoadState>
 
@@ -26,9 +26,9 @@ interface ModelCatalogRepository {
 
     fun observeTtsVoice(): Flow<String>
 
-    fun currentService(serviceId: String): ModelService?
+    fun currentService(serviceId: String): LLMModelSetting?
 
-    fun currentServices(): List<ModelService>
+    fun currentServices(): List<LLMModelSetting>
 
     fun currentAssistantSelection(): ModelSelection?
 
@@ -69,7 +69,7 @@ interface ModelCatalogRepository {
 }
 
 interface ModelServiceRemoteGateway {
-    suspend fun validateConnection(service: ModelService): Boolean
+    suspend fun validateConnection(service: LLMModelSetting): Boolean
 
-    suspend fun fetchModels(service: ModelService): List<Model>
+    suspend fun fetchModels(service: LLMModelSetting): List<Model>
 }

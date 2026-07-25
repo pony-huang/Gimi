@@ -16,7 +16,7 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import java.nio.charset.StandardCharsets
 import java.security.KeyStore
@@ -171,9 +171,9 @@ class ModelServiceRepository @Inject constructor(
 
     override fun observeTtsVoice() = defaultTtsVoice
 
-    override fun currentService(serviceId: String): ModelService? = getService(serviceId)?.toDomain()
+    override fun currentService(serviceId: String): LLMModelSetting? = getService(serviceId)?.toDomain()
 
-    override fun currentServices(): List<ModelService> = services.value.map { it.toDomain() }
+    override fun currentServices(): List<LLMModelSetting> = services.value.map { it.toDomain() }
 
     override fun currentAssistantSelection(): ModelSelection? =
         defaultAssistantSelection.value?.toDomain()

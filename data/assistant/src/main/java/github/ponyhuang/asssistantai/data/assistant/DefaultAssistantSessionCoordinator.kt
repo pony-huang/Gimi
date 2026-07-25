@@ -16,7 +16,7 @@ import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentTaskSource
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelectionCodec
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelService
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechRecognitionRepository
 import javax.inject.Inject
@@ -314,7 +314,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     }
 }
 
-private fun List<ModelService>.isUsable(selection: ModelSelection): Boolean {
+private fun List<LLMModelSetting>.isUsable(selection: ModelSelection): Boolean {
     val service = firstOrNull { it.id == selection.serviceId } ?: return false
     if (!service.isEnabled || service.apiKey.isBlank()) return false
     val group = service.groups.firstOrNull { it.id == selection.groupId } ?: return false

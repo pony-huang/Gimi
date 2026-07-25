@@ -3,7 +3,6 @@ package github.ponyhuang.asssistantai.feature.modelsettings.detail
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -14,9 +13,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.asssistantai.feature.modelsettings.R
+import androidx.core.net.toUri
 
 @Composable
-fun LLMModelServiceDetailRoute(
+fun LLMModelSettingDetailRoute(
     serviceId: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -33,34 +33,34 @@ fun LLMModelServiceDetailRoute(
     val agentBlockedMessage = stringResource(R.string.modelsettings_agent_mutation_blocked)
 
     LaunchedEffect(serviceId) {
-        viewModel.onAction(ModelServiceDetailAction.Load(serviceId))
+        viewModel.onAction(LLmModelSettingDetailAction.Load(serviceId))
     }
 
     LaunchedEffect(state.notice) {
         val notice = state.notice ?: return@LaunchedEffect
         val message = when (notice) {
-            ModelServiceDetailNotice.ServiceNotFound -> serviceNotFoundMessage
-            ModelServiceDetailNotice.ConnectionSucceeded -> connectionSucceededMessage
-            ModelServiceDetailNotice.ConnectionFailed -> connectionFailedMessage
-            is ModelServiceDetailNotice.ModelsSynchronized -> context.getString(
+            LLMModelSettingDetailNotice.SettingNotFoundLLM -> serviceNotFoundMessage
+            LLMModelSettingDetailNotice.ConnectionSucceeded -> connectionSucceededMessage
+            LLMModelSettingDetailNotice.ConnectionFailed -> connectionFailedMessage
+            is LLMModelSettingDetailNotice.ModelsSynchronized -> context.getString(
                 R.string.modelsettings_notice_models_synchronized,
                 notice.count,
             )
-            ModelServiceDetailNotice.ModelSynchronizationFailed -> modelsSyncFailedMessage
-            ModelServiceDetailNotice.AgentMutationBlocked -> agentBlockedMessage
+            LLMModelSettingDetailNotice.LLMModelSynchronizationFailed -> modelsSyncFailedMessage
+            LLMModelSettingDetailNotice.AgentMutationBlocked -> agentBlockedMessage
         }
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        viewModel.onAction(ModelServiceDetailAction.NoticeConsumed)
+        viewModel.onAction(LLmModelSettingDetailAction.NoticeConsumed)
     }
 
     LaunchedEffect(state.shouldClose) {
         if (state.shouldClose) {
             onBack()
-            viewModel.onAction(ModelServiceDetailAction.CloseConsumed)
+            viewModel.onAction(LLmModelSettingDetailAction.CloseConsumed)
         }
     }
 
-    ModelServiceDetailScreen(
+    LLMModelSettingDetailScreen(
         state = state,
         onAction = viewModel::onAction,
         onOpenUrl = { url, missingMessage -> context.openUrl(url, missingMessage, noBrowserMessage) },
@@ -75,7 +75,7 @@ private fun Context.openUrl(url: String, missingMessage: String, noBrowserMessag
     }
     try {
         startActivity(
-            Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            Intent(Intent.ACTION_VIEW, url.toUri())
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     } catch (_: ActivityNotFoundException) {

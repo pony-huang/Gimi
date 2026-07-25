@@ -145,6 +145,30 @@ class ModelServiceDetailViewModelCharacterizationTest {
         }
     }
 
+    @Test
+    fun officialToolSelectionUpdatesStateAndRepository() = runTest {
+        val provider = service(apiKey = "key").copy(
+            supportedOfficialTools = listOf("web_search", "kimi_formulas"),
+            enabledOfficialTools = setOf("web_search", "kimi_formulas"),
+        )
+        val fixture = fixture(provider)
+        fixture.viewModel.onAction(ModelServiceDetailAction.Load(provider.id))
+        advanceUntilIdle()
+
+        fixture.viewModel.onAction(
+            ModelServiceDetailAction.OfficialToolEnabledChanged("web_search", false),
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            setOf("kimi_formulas"),
+            fixture.viewModel.uiState.value.service?.enabledOfficialTools,
+        )
+        io.mockk.verify {
+            fixture.repository.updateOfficialToolEnabled(provider.id, "web_search", false)
+        }
+    }
+
     private fun fixture(service: ModelService?): Fixture {
         val services = MutableStateFlow(service)
         val repository = mockk<ModelCatalogRepository>(relaxed = true) {

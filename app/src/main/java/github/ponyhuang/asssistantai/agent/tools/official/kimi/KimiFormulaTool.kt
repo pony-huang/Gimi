@@ -30,11 +30,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.ConcurrentHashMap
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class KimiFormulaToolset @Inject constructor(
+class KimiFormulaToolset(
     private val apiKey: String,
     private val baseUrl: String,
     private val httpClient: OkHttpClient,

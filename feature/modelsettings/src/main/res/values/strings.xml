@@ -28,6 +28,13 @@
 
     <!-- LLMModelServiceDetailScreen / Route -->
     <string name="modelsettings_section_connection">连接配置</string>
+    <string name="modelsettings_section_official_tools">官方工具</string>
+    <string name="modelsettings_official_tool_web_search">网页搜索</string>
+    <string name="modelsettings_official_tool_web_search_description">使用该模型服务提供的原生网页搜索能力</string>
+    <string name="modelsettings_official_tool_kimi_formulas">Kimi Formula 工具</string>
+    <string name="modelsettings_official_tool_kimi_formulas_description">使用 Moonshot 托管的搜索、代码与数据处理工具</string>
+    <string name="modelsettings_official_tool_unknown">官方工具：%1$s</string>
+    <string name="modelsettings_official_tool_default_description">由当前模型服务直接提供并授权</string>
     <string name="modelsettings_homepage_missing">未配置主页链接</string>
     <string name="modelsettings_key_url_missing">未配置密钥获取链接</string>
     <string name="modelsettings_no_link_configured">未配置对应链接</string>

@@ -75,7 +75,11 @@ object AgentModule {
         sessionService = sessionService,
         artifactService = artifactService,
         configurationRevision = {
-            toolAuthorization.revision.value to mcpRepository.revision.value
+            Triple(
+                toolAuthorization.revision.value,
+                mcpRepository.revision.value,
+                modelServices.configurationRevision.value,
+            )
         },
     )
 

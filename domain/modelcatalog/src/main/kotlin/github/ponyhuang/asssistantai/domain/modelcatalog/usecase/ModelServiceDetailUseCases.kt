@@ -50,6 +50,9 @@ class UpdateModelServiceUseCase @Inject constructor(
 
     fun baseUrl(serviceId: String, value: String) = repository.updateBaseUrl(serviceId, value)
 
+    fun officialTool(serviceId: String, toolId: String, enabled: Boolean) =
+        repository.updateOfficialToolEnabled(serviceId, toolId, enabled)
+
     suspend fun addModel(serviceId: String, model: Model) = repository.addModel(serviceId, model)
 
     suspend fun removeModel(serviceId: String, groupId: String, modelId: String) =

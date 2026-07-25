@@ -2,18 +2,14 @@ package github.ponyhuang.asssistantai.agent
 
 import com.anthropic.client.okhttp.AnthropicOkHttpClient
 import com.anthropic.models.messages.MessageCreateParams
-import com.anthropic.models.messages.ToolUnion
-import com.anthropic.models.messages.WebSearchTool20250305
 import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.models.Model
 import com.openai.client.okhttp.OpenAIOkHttpClient
-import com.openai.core.JsonValue
-import com.openai.models.FunctionDefinition
 import com.openai.models.chat.completions.ChatCompletionCreateParams
-import com.openai.models.chat.completions.ChatCompletionFunctionTool
-import com.openai.models.chat.completions.ChatCompletionTool
 import github.ponyhuang.asssistantai.agent.model.Claude
 import github.ponyhuang.asssistantai.agent.model.Openai
+import github.ponyhuang.asssistantai.agent.tools.official.AnthropicOfficialToolAdapter
+import github.ponyhuang.asssistantai.agent.tools.official.OpenAiOfficialToolAdapter
 import github.ponyhuang.asssistantai.data.ApiBaseType
 import github.ponyhuang.asssistantai.data.LLMModelSelection
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
@@ -21,7 +17,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 解析后的模型配置（[create] 用）。
+ * 解析后的模型配置（[AgentModelFactory.createModel] 用）。
  */
 data class ModelConfig(
     val serviceId: String,
@@ -29,25 +25,17 @@ data class ModelConfig(
     val modelId: String,
     val apiKey: String,
     val fullBaseUrl: String,
+    val officialTools: List<String> = emptyList(),
+    /** Vendor tool endpoints may stay on the standard API host even for Anthropic model traffic. */
+    val officialToolBaseUrl: String = fullBaseUrl,
 )
 
 @Singleton
 class AgentModelFactory @Inject constructor(
     private val modelServices: ModelServiceRepository,
+    private val openAiToolAdapters: Set<@JvmSuppressWildcards OpenAiOfficialToolAdapter>,
+    private val anthropicToolAdapters: Set<@JvmSuppressWildcards AnthropicOfficialToolAdapter>,
 ) {
-
-
-    fun selectDefaultModel(explicitSelection: LLMModelSelection?): Model {
-        val selectDefaultModel = selectModelConfig(explicitSelection)
-        return createModel(selectDefaultModel)
-    }
-
-    fun selectFastModel(explicitSelection: LLMModelSelection?): Model {
-        val selectFastModel = selectFastModelConfig()
-            ?: return selectDefaultModel(explicitSelection)
-        return createModel(selectFastModel)
-    }
-
     /**
      * 从 [ModelServiceRepository] 选当前模型配置。
      *
@@ -64,42 +52,21 @@ class AgentModelFactory @Inject constructor(
         // the chat screen's process-wide current selection.
         val explicit = modelServices.resolveChatSelection(explicitSelection)
         if (explicit != null) {
-            val svc = explicit.provider
-            return ModelConfig(
-                serviceId = svc.serviceId,
-                baseType = svc.baseType,
-                modelId = explicit.model.modelId,
-                apiKey = svc.apiKey,
-                fullBaseUrl = composeUrl(svc.activeApiBaseUrl),
-            )
+            return explicit.toModelConfig()
         }
         // 2. Prefer the model explicitly selected in the chat screen.
         val resolved = modelServices.resolveChatSelection(
             modelServices.currentSelection.value
         )
         if (resolved != null) {
-            val svc = resolved.provider
-            return ModelConfig(
-                serviceId = svc.serviceId,
-                baseType = svc.baseType,
-                modelId = resolved.model.modelId,
-                apiKey = svc.apiKey,
-                fullBaseUrl = composeUrl(svc.activeApiBaseUrl),
-            )
+            return resolved.toModelConfig()
         }
         // 3. Fall back to the configured default/first available chat model.
         val fallback = modelServices.defaultSelection()
             ?: error("No enabled model service with a configured model. Enable one in Settings → Model Service.")
         val resolvedFallback = modelServices.resolveChatSelection(fallback)
             ?: error("The default model selection is unavailable.")
-        val svc = resolvedFallback.provider
-        return ModelConfig(
-            serviceId = svc.serviceId,
-            baseType = svc.baseType,
-            modelId = resolvedFallback.model.modelId,
-            apiKey = svc.apiKey,
-            fullBaseUrl = composeUrl(svc.activeApiBaseUrl),
-        )
+        return resolvedFallback.toModelConfig()
     }
 
 
@@ -116,49 +83,11 @@ class AgentModelFactory @Inject constructor(
                     builder: ChatCompletionCreateParams.Builder,
                     request: LlmRequest,
                 ) {
-                    if (
-                        request.model?.name?.lowercase()?.startsWith("mimo") == true
-                    ) {
-
-                        val build = builder.build()
-                        val tools = build.tools()
-                        val webTool = tools.get().filter {
-                            it.asFunction().function().name() == "web_search"
-                        }.map {
-                            val functionDef = FunctionDefinition.builder()
-                                .name("web_search")
-                                .putAdditionalProperty("type", JsonValue.from("web_search"))
-                                .putAdditionalProperty("max_keyword", JsonValue.from(3))
-                                .putAdditionalProperty("force_search", JsonValue.from(true))
-                                .putAdditionalProperty("limit", JsonValue.from(1))
-                                .putAdditionalProperty(
-                                    "user_location", JsonValue.from(
-                                        mapOf(
-                                            "type" to "approximate",
-                                            "country" to "China",
-                                            "region" to "Hubei",
-                                            "city" to "Wuhan"
-                                        )
-                                    )
-                                )
-                                .build()
-
-                            ChatCompletionTool.ofFunction(
-                                ChatCompletionFunctionTool.builder()
-                                    .type(JsonValue.from("web_search"))
-                                    .function(functionDef).build()
-                            )
-                        }.first()
-
-                        val newTools =
-                            tools.get().filter { it.asFunction().function().name() != "web_search" }
-                                .toList()
-                                .plus(webTool)
-
-                        builder.tools(newTools)
-                    } else {
-                        // TODO remove
+                    val tools = builder.build().tools().orElse(emptyList())
+                    val adapted = openAiToolAdapters.fold(tools) { current, adapter ->
+                        adapter.adapt(cfg, current)
                     }
+                    if (adapted !== tools) builder.tools(adapted)
                 }
             }
 
@@ -173,28 +102,11 @@ class AgentModelFactory @Inject constructor(
                     builder: MessageCreateParams.Builder,
                     request: LlmRequest
                 ) {
-                    if (
-                        request.model?.name?.lowercase()?.startsWith("minimax") == true
-                    ) {
-                        val build = builder.build()
-                        val tools = build.tools()
-                        val webTool = tools.get().filter {
-                            it.asTool().name() == "web_search"
-                        }.map {
-                            ToolUnion.ofWebSearchTool20250305(
-                                WebSearchTool20250305.builder().build()
-                            )
-                        }.first()
-
-
-                        val newTools =
-                            tools.get().filter { it.asTool().name() != "web_search" }.toList()
-                                .plus(webTool)
-
-                        builder.tools(newTools)
-                    } else {
-                        // TODO remove
+                    val tools = builder.build().tools().orElse(emptyList())
+                    val adapted = anthropicToolAdapters.fold(tools) { current, adapter ->
+                        adapter.adapt(cfg, current)
                     }
+                    if (adapted !== tools) builder.tools(adapted)
                 }
             }
         }
@@ -202,17 +114,21 @@ class AgentModelFactory @Inject constructor(
     fun selectFastModelConfig(): ModelConfig? {
         val resolved = modelServices.resolveChatSelection(modelServices.fastModelSelection.value)
             ?: return null
-        val svc = resolved.provider
+        return resolved.toModelConfig()
+    }
+
+    private fun ModelServiceRepository.ResolvedModel.toModelConfig(): ModelConfig {
+        val service = provider
         return ModelConfig(
-            serviceId = svc.serviceId,
-            baseType = svc.baseType,
-            modelId = resolved.model.modelId,
-            apiKey = svc.apiKey,
-            fullBaseUrl = composeUrl(svc.activeApiBaseUrl),
+            serviceId = service.serviceId,
+            baseType = service.baseType,
+            modelId = model.modelId,
+            apiKey = service.apiKey,
+            fullBaseUrl = composeUrl(service.activeApiBaseUrl),
+            officialTools = service.enabledOfficialTools,
+            officialToolBaseUrl = composeUrl(service.apiBaseUrl),
         )
     }
 
-    fun composeUrl(apiBaseUrl: String): String = apiBaseUrl.trimEnd('/')
-
-
+    private fun composeUrl(apiBaseUrl: String): String = apiBaseUrl.trimEnd('/')
 }

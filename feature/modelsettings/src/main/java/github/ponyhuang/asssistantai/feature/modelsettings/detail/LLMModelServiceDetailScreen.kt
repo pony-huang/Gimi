@@ -99,6 +99,26 @@ fun ModelServiceDetailScreen(
                     },
                 )
             }
+            if (service.supportedOfficialTools.isNotEmpty()) {
+                SettingsSectionTitle(
+                    text = stringResource(R.string.modelsettings_section_official_tools),
+                    modifier = Modifier.padding(top = 20.dp),
+                )
+                SettingsCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    OfficialToolsSection(
+                        supportedTools = service.supportedOfficialTools,
+                        enabledTools = service.enabledOfficialTools,
+                        onEnabledChange = { toolId, enabled ->
+                            dispatch(
+                                ModelServiceDetailAction.OfficialToolEnabledChanged(
+                                    toolId,
+                                    enabled,
+                                ),
+                            )
+                        },
+                    )
+                }
+            }
             SettingsCard(
                 modifier = Modifier.padding(start = 16.dp, top = 20.dp, end = 16.dp),
             ) {
@@ -129,6 +149,7 @@ private fun ModelServiceDetailAction.changesAgentConfiguration(): Boolean = when
     is ModelServiceDetailAction.ApiBaseUrlChanged,
     is ModelServiceDetailAction.ApiProtocolChanged,
     is ModelServiceDetailAction.EnabledChanged,
+    is ModelServiceDetailAction.OfficialToolEnabledChanged,
     is ModelServiceDetailAction.RemoveModel,
     is ModelServiceDetailAction.NewModelIdChanged,
     is ModelServiceDetailAction.NewModelKindChanged,

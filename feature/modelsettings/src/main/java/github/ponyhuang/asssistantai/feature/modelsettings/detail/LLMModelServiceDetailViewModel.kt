@@ -52,6 +52,8 @@ class ModelServiceDetailViewModel @Inject constructor(
             is ModelServiceDetailAction.ApiBaseUrlChanged -> changeBaseUrl(action.value)
             is ModelServiceDetailAction.ApiProtocolChanged -> changeProtocol(action.value)
             is ModelServiceDetailAction.EnabledChanged -> changeEnabled(action.value)
+            is ModelServiceDetailAction.OfficialToolEnabledChanged ->
+                changeOfficialTool(action.toolId, action.enabled)
             is ModelServiceDetailAction.ToggleGroup -> toggleGroup(action.groupId)
             is ModelServiceDetailAction.RemoveModel -> removeModel(action.groupId, action.modelId)
             is ModelServiceDetailAction.NewModelIdChanged ->
@@ -164,6 +166,27 @@ class ModelServiceDetailViewModel @Inject constructor(
         mutate {
             if (!updateModelService.enabled(id, enabled)) return@mutate
             _uiState.update { state -> state.copy(service = state.service?.copy(isEnabled = enabled)) }
+        }
+    }
+
+    private fun changeOfficialTool(toolId: String, enabled: Boolean) {
+        val id = serviceId ?: return
+        val service = _uiState.value.service ?: return
+        if (toolId !in service.supportedOfficialTools) return
+        mutate {
+            updateModelService.officialTool(id, toolId, enabled)
+            _uiState.update { state ->
+                val current = state.service ?: return@update state
+                state.copy(
+                    service = current.copy(
+                        enabledOfficialTools = if (enabled) {
+                            current.enabledOfficialTools + toolId
+                        } else {
+                            current.enabledOfficialTools - toolId
+                        },
+                    ),
+                )
+            }
         }
     }
 

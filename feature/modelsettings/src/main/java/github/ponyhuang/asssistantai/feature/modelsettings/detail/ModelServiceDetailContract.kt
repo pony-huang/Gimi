@@ -28,6 +28,10 @@ sealed interface ModelServiceDetailAction {
     data class ApiBaseUrlChanged(val value: String) : ModelServiceDetailAction
     data class ApiProtocolChanged(val value: ApiProtocol) : ModelServiceDetailAction
     data class EnabledChanged(val value: Boolean) : ModelServiceDetailAction
+    data class OfficialToolEnabledChanged(
+        val toolId: String,
+        val enabled: Boolean,
+    ) : ModelServiceDetailAction
     data class ToggleGroup(val groupId: String) : ModelServiceDetailAction
     data class RemoveModel(val groupId: String, val modelId: String) : ModelServiceDetailAction
     data class NewModelIdChanged(val value: String) : ModelServiceDetailAction

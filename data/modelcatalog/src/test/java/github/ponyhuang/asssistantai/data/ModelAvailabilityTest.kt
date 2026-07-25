@@ -1,5 +1,6 @@
 package github.ponyhuang.asssistantai.data
 
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -33,6 +34,44 @@ class ModelAvailabilityTest {
         assertFalse(kimi.isEnabled)
         assertTrue(ApiBaseType.Standard in kimi.supportedBaseTypes)
         assertTrue(ApiBaseType.Anthropic in kimi.supportedBaseTypes)
+    }
+
+    @Test
+    fun builtInProvidersDeclareTheirOfficialToolIntegrations() {
+        val providers = DefaultModelServices.services.associateBy { it.serviceId }
+
+        val miniMax = providers.getValue("minimax")
+        assertTrue(miniMax.supportedOfficialTools.isEmpty())
+        assertEquals(
+            listOf(OfficialToolIds.WEB_SEARCH),
+            miniMax.copy(baseType = ApiBaseType.Anthropic).supportedOfficialTools,
+        )
+        assertEquals(
+            listOf(OfficialToolIds.WEB_SEARCH),
+            providers.getValue("mimo").supportedOfficialTools,
+        )
+        assertEquals(
+            listOf(OfficialToolIds.KIMI_FORMULAS),
+            providers.getValue("kimi").supportedOfficialTools,
+        )
+        assertEquals(
+            listOf(OfficialToolIds.WEB_SEARCH),
+            miniMax.copy(baseType = ApiBaseType.Anthropic).enabledOfficialTools,
+        )
+        assertEquals(
+            providers.getValue("mimo").supportedOfficialTools,
+            providers.getValue("mimo").enabledOfficialTools,
+        )
+        assertEquals(
+            providers.getValue("kimi").supportedOfficialTools,
+            providers.getValue("kimi").enabledOfficialTools,
+        )
+        assertTrue(
+            providers.getValue("mimo")
+                .copy(baseType = ApiBaseType.Anthropic)
+                .supportedOfficialTools
+                .isEmpty(),
+        )
     }
 
     @Test

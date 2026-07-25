@@ -53,6 +53,8 @@ private data class ModelServiceSettings(
     val apiBaseUrl: String,
     val baseType: ApiBaseType,
     val anthropicBaseUrl: String,
+    /** Null keeps settings written before official-tool selection backward compatible. */
+    val disabledOfficialTools: Set<String>? = null,
 )
 
 /**
@@ -85,6 +87,7 @@ class ModelServiceRepository @Inject constructor(
     private val settings = MutableStateFlow(defaultSettings)
     private val _services = MutableStateFlow<List<LLMModelProvider>>(emptyList())
     private val _loadState = MutableStateFlow<ModelCatalogLoadState>(ModelCatalogLoadState.Loading)
+    private val _configurationRevision = MutableStateFlow(0L)
     private val _currentSelection = MutableStateFlow<LLMModelSelection?>(null)
     private val _defaultAssistantSelection = MutableStateFlow(readSelection(DEFAULT_ASSISTANT_MODEL_KEY))
     private val _fastModelSelection = MutableStateFlow(readSelection(FAST_MODEL_KEY))
@@ -96,6 +99,7 @@ class ModelServiceRepository @Inject constructor(
 
     val services: StateFlow<List<LLMModelProvider>> = _services.asStateFlow()
     val loadState: StateFlow<ModelCatalogLoadState> = _loadState.asStateFlow()
+    val configurationRevision: StateFlow<Long> = _configurationRevision.asStateFlow()
     val currentSelection: StateFlow<LLMModelSelection?> = _currentSelection.asStateFlow()
     /** User-configured model used to initialize new assistant conversations. */
     val defaultAssistantSelection: StateFlow<LLMModelSelection?> = _defaultAssistantSelection.asStateFlow()
@@ -208,6 +212,23 @@ class ModelServiceRepository @Inject constructor(
         }
     }
 
+    override fun updateOfficialToolEnabled(
+        serviceId: String,
+        toolId: String,
+        enabled: Boolean,
+    ) {
+        updateService(serviceId) { provider ->
+            if (toolId !in provider.supportedOfficialTools) return@updateService provider
+            provider.copy(
+                disabledOfficialTools = if (enabled) {
+                    provider.disabledOfficialTools - toolId
+                } else {
+                    provider.disabledOfficialTools + toolId
+                },
+            )
+        }
+    }
+
     override suspend fun addModel(serviceId: String, model: Model) {
         appendModel(serviceId, model.toData())
     }
@@ -250,6 +271,7 @@ class ModelServiceRepository @Inject constructor(
         settings.value = settings.value + (serviceId to updated)
         persistSettings(settings.value)
         refreshMergedServices()
+        _configurationRevision.value += 1
     }
 
     /**
@@ -438,6 +460,8 @@ class ModelServiceRepository @Inject constructor(
             keyHelpUrl = entity.keyHelpUrl,
             docsUrl = entity.docsUrl,
             modelsUrl = entity.modelsUrl,
+            officialToolProtocols = DefaultModelServices.officialToolProtocolsFor(entity.serviceId),
+            disabledOfficialTools = providerSettings.disabledOfficialTools.orEmpty(),
         )
     }
 
@@ -450,6 +474,7 @@ class ModelServiceRepository @Inject constructor(
         apiBaseUrl = apiBaseUrl,
         baseType = baseType,
         anthropicBaseUrl = anthropicBaseUrl,
+        disabledOfficialTools = disabledOfficialTools,
     )
 
     private fun LLMModelProvider.applySettings(value: ModelServiceSettings): LLMModelProvider = copy(
@@ -458,6 +483,7 @@ class ModelServiceRepository @Inject constructor(
         apiBaseUrl = value.apiBaseUrl,
         baseType = value.baseType,
         anthropicBaseUrl = value.anthropicBaseUrl,
+        disabledOfficialTools = value.disabledOfficialTools.orEmpty(),
     )
 
     private fun readSettings(): Map<String, ModelServiceSettings>? {

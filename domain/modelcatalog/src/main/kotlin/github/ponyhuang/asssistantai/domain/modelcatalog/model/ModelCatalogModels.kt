@@ -1,5 +1,10 @@
 package github.ponyhuang.asssistantai.domain.modelcatalog.model
 
+object OfficialToolIds {
+    const val WEB_SEARCH: String = "web_search"
+    const val KIMI_FORMULAS: String = "kimi_formulas"
+}
+
 data class ModelService(
     val id: String,
     val name: String,
@@ -16,6 +21,10 @@ data class ModelService(
     val keyHelpUrl: String = "",
     val docsUrl: String = "",
     val modelsUrl: String = "",
+    /** Official tools exposed by this provider. They are enabled by default. */
+    val supportedOfficialTools: List<String> = emptyList(),
+    /** User-selected subset of [supportedOfficialTools]. */
+    val enabledOfficialTools: Set<String> = supportedOfficialTools.toSet(),
 ) {
     val activeApiBaseUrl: String
         get() = when (apiProtocol) {

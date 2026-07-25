@@ -23,6 +23,13 @@
     <string name="modelsettings_dialog_cancel">Cancel</string>
 
     <string name="modelsettings_section_connection">Connection</string>
+    <string name="modelsettings_section_official_tools">Official tools</string>
+    <string name="modelsettings_official_tool_web_search">Web search</string>
+    <string name="modelsettings_official_tool_web_search_description">Use native web search provided by this model service</string>
+    <string name="modelsettings_official_tool_kimi_formulas">Kimi Formula tools</string>
+    <string name="modelsettings_official_tool_kimi_formulas_description">Use Moonshot-hosted search, code, and data tools</string>
+    <string name="modelsettings_official_tool_unknown">Official tool: %1$s</string>
+    <string name="modelsettings_official_tool_default_description">Provided and directly authorized by this model service</string>
     <string name="modelsettings_homepage_missing">Homepage URL is not configured</string>
     <string name="modelsettings_key_url_missing">API key help URL is not configured</string>
     <string name="modelsettings_no_link_configured">The corresponding URL is not configured</string>

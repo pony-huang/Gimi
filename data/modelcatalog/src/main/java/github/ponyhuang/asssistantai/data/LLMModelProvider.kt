@@ -1,5 +1,6 @@
 package github.ponyhuang.asssistantai.data
 
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 
 /**
  * 模型服务与配置中心 — 数据契约。
@@ -34,7 +35,8 @@ data class LLMModelProvider(
     val keyHelpUrl: String = "",
     val docsUrl: String = "",
     val modelsUrl: String = "",
-    val officialTools: List<String> = emptyList(),
+    val officialToolProtocols: Map<String, List<ApiBaseType>> = emptyMap(),
+    val disabledOfficialTools: Set<String> = emptySet(),
 ) {
     /** 当前 [baseType] 对应的实际请求地址。两种协议的地址分别保存，切换时互不覆盖。 */
     val activeApiBaseUrl: String
@@ -42,6 +44,16 @@ data class LLMModelProvider(
             ApiBaseType.Standard -> apiBaseUrl
             ApiBaseType.Anthropic -> anthropicBaseUrl
         }
+
+    val supportedOfficialTools: List<String>
+        get() = officialToolProtocols
+            .filterValues { baseType in it }
+            .keys
+            .toList()
+
+    /** Official tools are directly authorized by default; settings persist only opt-outs. */
+    val enabledOfficialTools: List<String>
+        get() = supportedOfficialTools.filterNot(disabledOfficialTools::contains)
 }
 
 /**
@@ -154,6 +166,9 @@ object DefaultModelServices {
             keyHelpUrl = "https://platform.minimaxi.com/user-center/basic-information/interface-key",
             docsUrl = "https://platform.minimaxi.com/document",
             modelsUrl = "https://platform.minimaxi.com/document/Models",
+            officialToolProtocols = mapOf(
+                OfficialToolIds.WEB_SEARCH to listOf(ApiBaseType.Anthropic),
+            ),
         ),
         LLMModelProvider(
             serviceId = "mimo",
@@ -212,6 +227,9 @@ object DefaultModelServices {
             keyHelpUrl = "https://platform.xiaomimimo.com/console/api-keys",
             docsUrl = "https://mimo.mi.com/docs",
             modelsUrl = "https://mimo.mi.com/docs/zh-CN/quick-start/summary/model",
+            officialToolProtocols = mapOf(
+                OfficialToolIds.WEB_SEARCH to listOf(ApiBaseType.Standard),
+            ),
         ),
         LLMModelProvider(
             serviceId = "openai",
@@ -271,6 +289,9 @@ object DefaultModelServices {
             keyHelpUrl = "https://platform.kimi.com/console/api-keys",
             docsUrl = "https://platform.kimi.com/docs",
             modelsUrl = "https://platform.kimi.com/docs/api/models-overview",
+            officialToolProtocols = mapOf(
+                OfficialToolIds.KIMI_FORMULAS to ApiBaseType.entries,
+            ),
         ),
     ).sortedBy { it.serviceId }
 
@@ -289,4 +310,7 @@ object DefaultModelServices {
     fun supportedBaseTypesFor(serviceId: String): List<ApiBaseType> =
         services.firstOrNull { it.serviceId == serviceId }?.supportedBaseTypes
             ?: ApiBaseType.entries
+
+    fun officialToolProtocolsFor(serviceId: String): Map<String, List<ApiBaseType>> =
+        services.firstOrNull { it.serviceId == serviceId }?.officialToolProtocols.orEmpty()
 }

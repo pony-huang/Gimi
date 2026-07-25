@@ -49,7 +49,6 @@ class LocalToolCatalogTest {
         screenTimeoutTool = mockk<ScreenTimeoutTool>(relaxed = true),
         messagingTool = mockk<MessagingTool>(relaxed = true),
         phoneTool = mockk<PhoneTool>(relaxed = true),
-        searchTool = mockk<SearchTool>(relaxed = true),
         settingsNavigationTool = mockk<SettingsNavigationTool>(relaxed = true),
     )
 }

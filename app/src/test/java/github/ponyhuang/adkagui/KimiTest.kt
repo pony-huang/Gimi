@@ -38,7 +38,7 @@ class KimiTest {
             sessionId = "sessionId123",
             Content.fromText(
                 role = "user",
-                text = "请搜索 \"一方感恩碑 廿载育人心\"，并告诉我它是什么。"
+                text = "请搜索最新台风情况."
             ),
 //            runConfig = RunConfig(StreamingMode.SSE)
         ).forEach {

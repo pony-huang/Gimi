@@ -51,7 +51,7 @@ class KimiFormulaToolset(
             "moonshot/base64:latest",
             "moonshot/fetch:latest",
             "moonshot/quickjs:latest",
-            "moonshot/code_runner:latest",
+            "moonshot/code-runner:latest",
         )
     }
     private val toolCache = ConcurrentHashMap<Pair<String, String>, List<KimiFormulaTool>>()

@@ -7,6 +7,11 @@ import com.anthropic.models.messages.WebSearchTool20250305
 import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.models.Model
 import com.openai.client.okhttp.OpenAIOkHttpClient
+import com.openai.core.JsonValue
+import com.openai.models.FunctionDefinition
+import com.openai.models.chat.completions.ChatCompletionCreateParams
+import com.openai.models.chat.completions.ChatCompletionFunctionTool
+import com.openai.models.chat.completions.ChatCompletionTool
 import github.ponyhuang.asssistantai.agent.model.Claude
 import github.ponyhuang.asssistantai.agent.model.Openai
 import github.ponyhuang.asssistantai.data.ApiBaseType
@@ -107,6 +112,54 @@ class AgentModelFactory @Inject constructor(
                     .apiKey(cfg.apiKey)
                     .build(),
             ) {
+                override fun postProcessParams(
+                    builder: ChatCompletionCreateParams.Builder,
+                    request: LlmRequest,
+                ) {
+                    if (
+                        request.model?.name?.lowercase()?.startsWith("mimo") == true
+                    ) {
+
+                        val build = builder.build()
+                        val tools = build.tools()
+                        val webTool = tools.get().filter {
+                            it.asFunction().function().name() == "web_search"
+                        }.map {
+                            val functionDef = FunctionDefinition.builder()
+                                .name("web_search")
+                                .putAdditionalProperty("type", JsonValue.from("web_search"))
+                                .putAdditionalProperty("max_keyword", JsonValue.from(3))
+                                .putAdditionalProperty("force_search", JsonValue.from(true))
+                                .putAdditionalProperty("limit", JsonValue.from(1))
+                                .putAdditionalProperty(
+                                    "user_location", JsonValue.from(
+                                        mapOf(
+                                            "type" to "approximate",
+                                            "country" to "China",
+                                            "region" to "Hubei",
+                                            "city" to "Wuhan"
+                                        )
+                                    )
+                                )
+                                .build()
+
+                            ChatCompletionTool.ofFunction(
+                                ChatCompletionFunctionTool.builder()
+                                    .type(JsonValue.from("web_search"))
+                                    .function(functionDef).build()
+                            )
+                        }.first()
+
+                        val newTools =
+                            tools.get().filter { it.asFunction().function().name() != "web_search" }
+                                .toList()
+                                .plus(webTool)
+
+                        builder.tools(newTools)
+                    } else {
+                        // TODO remove
+                    }
+                }
             }
 
             ApiBaseType.Anthropic -> object : Claude(
@@ -126,7 +179,7 @@ class AgentModelFactory @Inject constructor(
                         val build = builder.build()
                         val tools = build.tools()
                         val webTool = tools.get().filter {
-                           it.asTool().name() == "web_search"
+                            it.asTool().name() == "web_search"
                         }.map {
                             ToolUnion.ofWebSearchTool20250305(
                                 WebSearchTool20250305.builder().build()

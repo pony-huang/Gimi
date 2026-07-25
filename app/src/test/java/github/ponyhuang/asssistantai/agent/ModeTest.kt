@@ -13,7 +13,7 @@ class ModeTest {
             .baseUrl("https://api.deepseek.com/anthropic")
             .apiKey("sk-b04ee4901e1a49d29464c48108a90519")
             .build()
-    )
+    ) {}
 
     private fun openaiModel() = Openai(
         "deepseek-v4-pro", OpenAIOkHttpClient.builder()

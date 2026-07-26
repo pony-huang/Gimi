@@ -59,7 +59,8 @@ class MediaSessionManagerTool @Inject constructor(
 
     @Tool(
         name = "list_active_media_sessions",
-        description = "Lists media sessions that are currently active on the device.",
+        description = "Lists media sessions currently active in other apps after user confirmation.",
+        requireConfirmation = true,
     )
     fun listActiveMediaSessions(): Map<String, Any> {
         if (!isNotificationAccessGranted()) return notificationAccessRequired()

@@ -76,6 +76,7 @@ private class SpeechRecognizerHelperViewModel(
 
     private var onPartialResult: ((String) -> Unit)? = null
     private var onFinalResult: ((String) -> Unit)? = null
+    private var onErrorResult: ((String) -> Unit)? = null
 
     private var speechRecognizer: SpeechRecognizer? = null
 
@@ -85,14 +86,16 @@ private class SpeechRecognizerHelperViewModel(
     private val _rmsdB = mutableFloatStateOf(0f)
     override val rmsdB by _rmsdB
 
-    private var speechResults = mutableListOf<String>()
+    private val resultAccumulator = SpeechRecognitionResultAccumulator()
 
     fun setCallbacks(
         onPartialResult: ((String) -> Unit)?,
         onFinalResult: ((String) -> Unit)?,
+        onError: ((String) -> Unit)?,
     ) {
         this.onPartialResult = onPartialResult
         this.onFinalResult = onFinalResult
+        this.onErrorResult = onError
     }
 
     @Suppress("TooGenericExceptionCaught")
@@ -180,11 +183,12 @@ private class SpeechRecognizerHelperViewModel(
             extractResult(partialResults)
                 ?.takeIf(String::isNotBlank)
                 ?.let { result ->
-                    onPartialResult?.invoke(speechResults.joinToString() + result)
-
-                    if (partialResults.isFinalResult()) {
-                        speechResults += result
-                    }
+                    onPartialResult?.invoke(
+                        resultAccumulator.preview(
+                            result,
+                            commit = partialResults.isFinalResult(),
+                        ),
+                    )
                 }
         }
 
@@ -197,7 +201,7 @@ private class SpeechRecognizerHelperViewModel(
         override fun onResults(results: Bundle?) {
             logger.d { "onResults: ${results?.getData()}" }
 
-            onFinalResult?.invoke(speechResults.joinToString())
+            onFinalResult?.invoke(resultAccumulator.complete(extractResult(results)))
 
             resetState()
         }
@@ -206,6 +210,7 @@ private class SpeechRecognizerHelperViewModel(
         override fun onError(error: Int) {
             val errorMessage = getErrorMessage(error)
             logger.e { "onError: $errorMessage" }
+            onErrorResult?.invoke(errorMessage)
 
             resetState()
         }
@@ -219,7 +224,7 @@ private class SpeechRecognizerHelperViewModel(
     private fun resetState() {
         _isListening.value = false
         _rmsdB.floatValue = 0f
-        speechResults.clear()
+        resultAccumulator.reset()
     }
 
     class Factory(private val context: Context) : ViewModelProvider.Factory {
@@ -240,6 +245,7 @@ private fun Bundle.getData(): String =
 @Composable
 internal fun rememberSpeechRecognizerHelper(
     onPartialResult: ((String) -> Unit)? = null,
+    onError: ((String) -> Unit)? = null,
     onFinalResult: (String) -> Unit,
 ): SpeechRecognizerHelper {
     val isPreview = LocalInspectionMode.current
@@ -260,6 +266,7 @@ internal fun rememberSpeechRecognizerHelper(
             setCallbacks(
                 onPartialResult = onPartialResult,
                 onFinalResult = onFinalResult,
+                onError = onError,
             )
         }
     }
@@ -298,6 +305,31 @@ private fun extractResult(bundle: Bundle?): String? =
 
 private fun Bundle?.isFinalResult(): Boolean =
     this?.getBoolean("final_result", false) ?: false
+
+internal class SpeechRecognitionResultAccumulator {
+    private val committed = mutableListOf<String>()
+
+    fun preview(value: String, commit: Boolean): String {
+        val normalized = value.trim()
+        if (commit && normalized.isNotEmpty() && committed.lastOrNull() != normalized) {
+            committed += normalized
+        }
+        return (committed + normalized.takeIf { !commit && it.isNotEmpty() }.orEmpty())
+            .joinToString(separator = "")
+    }
+
+    fun complete(value: String?): String {
+        val normalized = value?.trim().orEmpty()
+        if (normalized.isNotEmpty() && committed.lastOrNull() != normalized) {
+            committed += normalized
+        }
+        return committed.joinToString(separator = "")
+    }
+
+    fun reset() {
+        committed.clear()
+    }
+}
 
 private fun getErrorMessage(error: Int): String = when (error) {
     SpeechRecognizer.ERROR_AUDIO -> "Audio recording error."

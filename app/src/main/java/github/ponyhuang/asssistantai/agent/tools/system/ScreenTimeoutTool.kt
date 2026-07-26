@@ -33,15 +33,20 @@ class ScreenTimeoutTool @Inject constructor(
         seconds: Int,
     ): Map<String, Any> = writeScreenTimeoutSetting {
         val appliedSeconds = seconds.coerceIn(MINIMUM_TIMEOUT_SECONDS, MAXIMUM_TIMEOUT_SECONDS)
-        Settings.System.putInt(
+        val written = Settings.System.putInt(
             resolver,
             Settings.System.SCREEN_OFF_TIMEOUT,
             appliedSeconds * MILLIS_PER_SECOND,
         )
-        screenTimeoutState() + mapOf(
+        val result = screenTimeoutState() + mapOf(
             "requestedSeconds" to seconds,
             "appliedSeconds" to appliedSeconds,
         )
+        if (written) {
+            result
+        } else {
+            result + mapOf("success" to false, "error" to "The system rejected the timeout update.")
+        }
     }
 
     @Tool(
@@ -70,7 +75,8 @@ class ScreenTimeoutTool @Inject constructor(
                 "error" to "WRITE_SETTINGS permission is required. Call open_screen_timeout_permission_settings and enable the permission.",
             )
         }
-        return write() + mapOf("success" to true)
+        val result = write()
+        return if ("success" in result) result else result + mapOf("success" to true)
     }
 
     private fun screenTimeoutState(): Map<String, Any> = mapOf(

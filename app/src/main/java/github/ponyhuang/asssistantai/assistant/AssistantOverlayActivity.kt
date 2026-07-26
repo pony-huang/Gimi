@@ -71,7 +71,10 @@ class AssistantOverlayActivity : ComponentActivity() {
     }
 
     /** 批准必须先解锁；解锁取消/失败均自动拒绝。拒绝本身不需要解锁。 */
-    private fun approveWithKeyguard(proceed: () -> Unit) {
+    private fun approveWithKeyguard(
+        confirmationCallId: String,
+        proceed: () -> Unit,
+    ) {
         val keyguard = getSystemService(KeyguardManager::class.java)
         if (keyguard?.isKeyguardLocked != true) {
             proceed()
@@ -85,11 +88,11 @@ class AssistantOverlayActivity : ComponentActivity() {
                 }
 
                 override fun onDismissCancelled() {
-                    coordinator.respondToConfirmation(false)
+                    coordinator.respondToConfirmation(confirmationCallId, false)
                 }
 
                 override fun onDismissError() {
-                    coordinator.respondToConfirmation(false)
+                    coordinator.respondToConfirmation(confirmationCallId, false)
                 }
             },
         )

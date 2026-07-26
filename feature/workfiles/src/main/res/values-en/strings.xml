@@ -7,4 +7,7 @@
     <string name="workfiles_empty_state">No working folders added yet</string>
     <string name="workfiles_remove_action">Remove working folder</string>
     <string name="workfiles_screen_title">Working files</string>
+    <string name="workfiles_error_invalid">The selected location is not a valid working folder.</string>
+    <string name="workfiles_error_permission">Folder access could not be retained. Select it again.</string>
+    <string name="workfiles_error_persistence">The working folder could not be saved. Try again.</string>
 </resources>

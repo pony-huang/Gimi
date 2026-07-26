@@ -68,9 +68,12 @@ object AgentModule {
         toolAuthorization: ToolAuthorizationRepository,
         mcpRepository: McpRepository,
     ): AgentChatRunner = AgentChatRunner(
-        factory = { selection ->
+        factory = { selection, allowConfirmationRequiredTools ->
             modelServices.awaitReady()
-            agentFactory.create(selection?.toData())
+            agentFactory.create(
+                selection = selection?.toData(),
+                allowConfirmationRequiredTools = allowConfirmationRequiredTools,
+            )
         },
         sessionService = sessionService,
         artifactService = artifactService,

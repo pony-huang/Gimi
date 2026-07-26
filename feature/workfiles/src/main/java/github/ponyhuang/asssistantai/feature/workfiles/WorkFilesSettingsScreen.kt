@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.feature.workfiles.R
+import github.ponyhuang.asssistantai.domain.workfiles.repository.WorkDirectoryOperationResult
 import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
 import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
@@ -67,6 +68,25 @@ fun WorkFilesSettingsScreen(
                         }
                     },
                 )
+            }
+            state.operationError?.let { error ->
+                item {
+                    Text(
+                        text = stringResource(
+                            when (error) {
+                                WorkDirectoryOperationResult.Failure.InvalidDirectory ->
+                                    R.string.workfiles_error_invalid
+                                WorkDirectoryOperationResult.Failure.PermissionDenied ->
+                                    R.string.workfiles_error_permission
+                                WorkDirectoryOperationResult.Failure.PersistenceFailed ->
+                                    R.string.workfiles_error_persistence
+                            },
+                        ),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                    )
+                }
             }
             item { SettingsSectionTitle(text = stringResource(R.string.workfiles_section_authorized)) }
             if (state.directories.isEmpty()) {

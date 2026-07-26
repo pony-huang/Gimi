@@ -156,14 +156,8 @@ open class Claude(
             logger.debug { "Claude streaming complete: $message" }
             emit(message.toLlmResponse())
 
-        } catch (e: Exception) {
-            logger.error(e) {
-                "Error processing streaming response, params: ${
-                    JSON_MAPPER.writeValueAsString(
-                        params
-                    )
-                }"
-            }
+        } catch (e: AnthropicServiceException) {
+            logger.error(e) { "Error processing Claude streaming response" }
             emit(mapToErrorResponse(e))
         }
     }

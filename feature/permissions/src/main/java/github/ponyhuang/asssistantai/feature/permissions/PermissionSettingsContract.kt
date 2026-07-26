@@ -29,6 +29,7 @@ data class PermissionGroupUiModel(
 data class RuntimePermissionRequest(
     val id: Int,
     val permissions: List<AppPermission>,
+    val previouslyRequested: Set<AppPermission>,
 )
 
 enum class PermissionSettingsDestination {

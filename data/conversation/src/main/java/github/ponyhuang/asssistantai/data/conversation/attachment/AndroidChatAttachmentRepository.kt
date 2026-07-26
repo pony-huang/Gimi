@@ -11,19 +11,35 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAttachmentRepository
 import java.io.ByteArrayOutputStream
+import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 class AndroidChatAttachmentRepository @Inject constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
 ) : ChatAttachmentRepository {
     private val resolver = context.contentResolver
 
     override suspend fun read(references: List<String>): List<ImageAttachment> =
         withContext(Dispatchers.IO) {
-            references.map { reference -> prepare(resolver, Uri.parse(reference)) }
+            references.map { reference ->
+                val uri = Uri.parse(reference)
+                try {
+                    prepare(resolver, uri)
+                } finally {
+                    deleteOwnedCameraAttachment(uri)
+                }
+            }
         }
+
+    private fun deleteOwnedCameraAttachment(uri: Uri) {
+        if (uri.scheme != "content" || uri.authority != "${context.packageName}.fileprovider") {
+            return
+        }
+        val fileName = uri.lastPathSegment?.takeIf(String::isNotBlank) ?: return
+        File(File(context.cacheDir, CAMERA_DIRECTORY), fileName).delete()
+    }
 
     private fun prepare(contentResolver: ContentResolver, uri: Uri): ImageAttachment {
         var bitmap = decode(contentResolver, uri)
@@ -115,6 +131,7 @@ class AndroidChatAttachmentRepository @Inject constructor(
     }
 
     private companion object {
+        const val CAMERA_DIRECTORY = "camera"
         const val MAX_DIMENSION_PX = 1280
         const val MAX_BYTES = 512 * 1024
         const val INITIAL_JPEG_QUALITY = 85

@@ -49,12 +49,14 @@ domain/data/core -X-> feature or app
 Mandatory boundaries:
 
 - Feature modules never depend on one another. Move shared business contracts to domain and genuinely business-agnostic UI to `:core:designsystem`.
+- Feature modules never depend on `:app`; expose contracts from the owning domain or core module and perform composition in `:app`.
 - Domain code never depends on Android, Compose, Hilt, Room, OkHttp, provider SDKs, or data models; domain repositories are interfaces.
 - Keep SDK, HTTP, database, Keystore, Preferences, and Android framework details behind data/core gateways or repository implementations.
 - ViewModels depend on use cases or domain repository interfaces, never concrete repositories, DAOs, Context, Toast, navigation controllers, OkHttp, Room, or provider SDK objects.
 - Use a use case for branching business rules, cross-repository operations, or reusable workflows; avoid trivial pass-through use cases unless they establish a necessary contract boundary.
 - Prefer constructor injection and Hilt. Bind domain interfaces in the owning data module; compose capabilities in `:app`.
 - Avoid generic `Manager`, `Helper`, `Utils`, or `BaseViewModel` dumping grounds. Name one responsibility and use the narrowest owner.
+- Suspending code should let cancellation propagate naturally: avoid broad catches, catch recoverable exception types, and use the shared cancellation-aware recovery helper only at boundaries that require a fallback.
 - Do not promote code to `core` merely because two files look alike.
 - Resolve graph conflicts through contracts/interfaces, not shortcut dependencies. Document any temporary exception with its owner and removal condition.
 

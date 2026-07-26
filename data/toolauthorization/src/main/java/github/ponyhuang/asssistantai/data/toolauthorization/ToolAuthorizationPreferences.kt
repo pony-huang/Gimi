@@ -12,6 +12,7 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 @Singleton
 class ToolAuthorizationPreferences @Inject constructor(
@@ -46,6 +47,7 @@ class ToolAuthorizationPreferences @Inject constructor(
 
     override fun enabledToolIds(): Set<String> = effectiveEnabledIds()
 
+    @Synchronized
     override fun setEnabled(toolId: String, enabled: Boolean) {
         if (toolId !in currentIds) return
         updateStoredEnabledIds { current ->
@@ -53,10 +55,12 @@ class ToolAuthorizationPreferences @Inject constructor(
         }
     }
 
+    @Synchronized
     override fun setAllEnabled(enabled: Boolean) {
         updateStoredEnabledIds { if (enabled) currentIds else emptySet() }
     }
 
+    @Synchronized
     override fun setCustomizationEnabled(enabled: Boolean) {
         if (_isCustomizationEnabled.value == enabled) return
         preferences.edit {
@@ -64,7 +68,7 @@ class ToolAuthorizationPreferences @Inject constructor(
         }
         _isCustomizationEnabled.value = enabled
         _tools.value = descriptors(effectiveEnabledIds())
-        _revision.value += 1
+        _revision.update { it + 1 }
     }
 
     private fun effectiveEnabledIds(): Set<String> = if (_isCustomizationEnabled.value) {
@@ -79,7 +83,7 @@ class ToolAuthorizationPreferences @Inject constructor(
         storedEnabledIds = updated
         persist(storedEnabledIds, knownIds = currentIds, customizeEnabled = _isCustomizationEnabled.value)
         _tools.value = descriptors(effectiveEnabledIds())
-        _revision.value += 1
+        _revision.update { it + 1 }
     }
 
     private fun descriptors(enabledIds: Set<String>): List<ToolDescriptor> = definitions.map { definition ->

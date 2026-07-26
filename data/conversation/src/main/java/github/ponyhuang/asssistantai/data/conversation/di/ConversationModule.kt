@@ -10,12 +10,12 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.asssistantai.agent.AgentChatRunner
 import github.ponyhuang.asssistantai.core.database.destructiveForPrototype
-import github.ponyhuang.asssistantai.data.conversation.local.ConversationMetadataDatabase
 import github.ponyhuang.asssistantai.data.ChatDisplayPreferences
 import github.ponyhuang.asssistantai.data.conversation.attachment.AndroidChatAttachmentRepository
 import github.ponyhuang.asssistantai.data.conversation.repository.AdkChatAgentRepository
 import github.ponyhuang.asssistantai.data.conversation.repository.AdkConversationRepository
 import github.ponyhuang.asssistantai.data.conversation.runtime.InMemoryAgentRuntimeGate
+import github.ponyhuang.asssistantai.data.conversation.local.ConversationMetadataDatabase
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatDisplayRepository

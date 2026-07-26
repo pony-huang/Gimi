@@ -57,7 +57,7 @@ internal class ChatSessionRuntime(
 
     fun emitPartDelta(partId: String, delta: String) {
         if (delta.isEmpty()) return
-        partChannels.getOrPut(partId) { Channel(Channel.UNLIMITED) }.trySend(delta)
+        partChannels.getOrPut(partId) { Channel(Channel.BUFFERED) }.trySend(delta)
     }
 
     fun closePartChannels() {

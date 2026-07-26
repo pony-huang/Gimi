@@ -179,9 +179,6 @@ open class Openai(
         } catch (e: OpenAIException) {
             logger.error(e) { "Error processing OpenAI streaming response" }
             emit(mapToErrorResponse(e))
-        } catch (e: Exception) {
-            logger.error(e) { "Unexpected error processing OpenAI streaming response" }
-            emit(mapToErrorResponse(e))
         }
     }
 

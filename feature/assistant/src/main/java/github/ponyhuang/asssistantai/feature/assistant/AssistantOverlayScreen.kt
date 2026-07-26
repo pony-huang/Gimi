@@ -177,9 +177,22 @@ private fun SessionContent(
     state.pendingConfirmation?.let { pending ->
         ConfirmationCard(
             toolName = pending.toolName,
+            arguments = pending.arguments,
             remainingSeconds = state.confirmationRemainingSeconds,
-            onApprove = { onAction(AssistantOverlayAction.ApproveConfirmation) },
-            onReject = { onAction(AssistantOverlayAction.RejectConfirmation) },
+            onApprove = {
+                onAction(
+                    AssistantOverlayAction.ApproveConfirmation(
+                        pending.confirmationCallId,
+                    ),
+                )
+            },
+            onReject = {
+                onAction(
+                    AssistantOverlayAction.RejectConfirmation(
+                        pending.confirmationCallId,
+                    ),
+                )
+            },
         )
     }
     if (state.phase == AssistantSessionPhase.SPEAKING || state.isSpeaking) {
@@ -274,6 +287,7 @@ private fun ErrorContent(
 @Composable
 private fun ConfirmationCard(
     toolName: String,
+    arguments: Map<String, Any?>,
     remainingSeconds: Int,
     onApprove: () -> Unit,
     onReject: () -> Unit,
@@ -307,6 +321,15 @@ private fun ConfirmationCard(
                 text = stringResource(R.string.assistant_confirm_message, toolName),
                 style = MaterialTheme.typography.bodyMedium,
             )
+            confirmationArgumentsSummary(arguments).takeIf(String::isNotBlank)?.let { summary ->
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.assistant_confirm_arguments, summary),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LocalContentColor.current.copy(alpha = 0.78f),
+                    modifier = Modifier.testTag("assistant_confirm_arguments"),
+                )
+            }
             Spacer(Modifier.height(4.dp))
             Text(
                 text = stringResource(R.string.assistant_confirm_countdown, remainingSeconds),
@@ -332,6 +355,23 @@ private fun ConfirmationCard(
         }
     }
 }
+
+internal fun confirmationArgumentsSummary(arguments: Map<String, Any?>): String =
+    arguments.entries
+        .joinToString(separator = ", ") { (key, rawValue) ->
+            val value = rawValue?.toString().orEmpty()
+            val shown = when {
+                key.contains("phone", ignoreCase = true) ||
+                    key.contains("number", ignoreCase = true) ->
+                    value.takeLast(4).padStart(value.length.coerceAtMost(8), '•')
+                key.contains("message", ignoreCase = true) ||
+                    key.contains("text", ignoreCase = true) ->
+                    value.take(40)
+                else -> value.take(60)
+            }
+            "$key: $shown"
+        }
+        .take(160)
 
 /** 底部输入行：容器与阴影由外层单面板提供，这里只负责排布。 */
 @Composable

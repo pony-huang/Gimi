@@ -6,4 +6,5 @@ kotlin { jvmToolchain(11) }
 
 dependencies {
     implementation(libs.javax.inject)
+    testImplementation(libs.junit)
 }

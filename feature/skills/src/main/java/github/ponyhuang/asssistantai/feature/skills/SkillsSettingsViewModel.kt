@@ -3,6 +3,7 @@ package github.ponyhuang.asssistantai.feature.skills
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.asssistantai.domain.skills.model.SkillImportFailure
 import github.ponyhuang.asssistantai.domain.skills.model.SkillImportSource
 import github.ponyhuang.asssistantai.domain.skills.usecase.CommitSkillImportUseCase
@@ -91,7 +92,7 @@ class SkillsSettingsViewModel @Inject constructor(
         if (mutableState.value.isImporting) return
         mutableState.update { it.copy(isImporting = true, notice = null) }
         viewModelScope.launch {
-            runCatching { prepareImport(source) }
+            cancellationAwareRunCatching { prepareImport(source) }
                 .onSuccess { prepared ->
                     if (prepared.replacesExisting) {
                         mutableState.update {
@@ -109,7 +110,7 @@ class SkillsSettingsViewModel @Inject constructor(
     }
 
     private suspend fun install(preparedId: String, name: String, allowReplace: Boolean) {
-        runCatching { commitImport(preparedId, allowReplace) }
+        cancellationAwareRunCatching { commitImport(preparedId, allowReplace) }
             .onSuccess {
                 mutableState.update {
                     it.copy(
@@ -134,7 +135,7 @@ class SkillsSettingsViewModel @Inject constructor(
         val pending = mutableState.value.pendingReplacement ?: return
         mutableState.update { it.copy(pendingReplacement = null) }
         viewModelScope.launch {
-            runCatching { discardImport(pending.id) }
+            cancellationAwareRunCatching { discardImport(pending.id) }
                 .onFailure(::publishFailure)
         }
     }
@@ -143,7 +144,7 @@ class SkillsSettingsViewModel @Inject constructor(
         val pending = mutableState.value.pendingRemoval ?: return
         mutableState.update { it.copy(pendingRemoval = null) }
         viewModelScope.launch {
-            runCatching { removeSkill(pending.name) }
+            cancellationAwareRunCatching { removeSkill(pending.name) }
                 .onSuccess {
                     mutableState.update {
                         it.copy(notice = SkillsNotice.Removed(pending.name))

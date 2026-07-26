@@ -61,7 +61,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     private val scope by lazy { CoroutineScope(SupervisorJob() + taskDispatcher) }
     private val submitMutex = Mutex()
     private var runningJob: Job? = null
-    private var confirmationResponse: CompletableDeferred<Boolean>? = null
+    private var confirmationResponse: PendingConfirmationResponse? = null
 
     private val _state = MutableStateFlow(AssistantSessionState())
     override val state: StateFlow<AssistantSessionState> = _state.asStateFlow()
@@ -95,12 +95,18 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     }
 
     override fun stop() {
-        confirmationResponse?.complete(false)
+        confirmationResponse?.response?.complete(false)
         runningJob?.cancel()
     }
 
-    override fun respondToConfirmation(confirmed: Boolean) {
-        confirmationResponse?.complete(confirmed)
+    override fun respondToConfirmation(
+        confirmationCallId: String,
+        confirmed: Boolean,
+    ): Boolean {
+        val pending = confirmationResponse
+            ?.takeIf { it.confirmationCallId == confirmationCallId }
+            ?: return false
+        return pending.response.complete(confirmed)
     }
 
     override fun hideOverlay() {
@@ -201,7 +207,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                 )
             }
         } finally {
-            confirmationResponse?.cancel()
+            confirmationResponse?.response?.cancel()
             confirmationResponse = null
             lease.release()
         }
@@ -260,7 +266,10 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
         }
         if (handler != null) return handler.confirm(presented)
         val deferred = CompletableDeferred<Boolean>()
-        confirmationResponse = deferred
+        confirmationResponse = PendingConfirmationResponse(
+            confirmationCallId = request.confirmationCallId,
+            response = deferred,
+        )
         return withTimeoutOrNull(CONFIRMATION_TIMEOUT_MS) { deferred.await() } ?: false
     }
 
@@ -308,6 +317,11 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
         val seenConfirmationIds = mutableSetOf<String>()
         val approvedTools = mutableSetOf<String>()
     }
+
+    private data class PendingConfirmationResponse(
+        val confirmationCallId: String,
+        val response: CompletableDeferred<Boolean>,
+    )
 
     private companion object {
         const val CONFIRMATION_TIMEOUT_MS = 15_000L

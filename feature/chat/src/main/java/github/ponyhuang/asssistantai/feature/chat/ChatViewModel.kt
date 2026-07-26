@@ -28,7 +28,7 @@ import github.ponyhuang.asssistantai.domain.speech.repository.SpeechRecognitionR
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechPlaybackRepository
 import github.ponyhuang.asssistantai.domain.speech.usecase.markdownToSpeechText
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.ToolAuthorizationRepository
-import kotlinx.coroutines.CancellationException
+import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,6 +36,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 
 /**
@@ -68,6 +70,7 @@ class ChatViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
+    private val sessionCreationMutex = Mutex()
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
     suspend fun transcribeVoice(pcm16: ByteArray): String =
         speechRecognitionRepository.transcribe(pcm16)
@@ -108,19 +111,19 @@ class ChatViewModel @Inject constructor(
         publishRuntime(runtime)
         runtime.job = viewModelScope.launch {
             try {
-                ensureRunLease(runtime).updatePhase(AgentTaskPhase.GENERATING)
-                runner.respondToToolConfirmation(
-                    sessionId = sessionId,
-                    confirmationCallId = request.confirmationCallId,
-                    confirmed = confirmed,
-                ).collect { event ->
-                    Log.i("chat", "tool confirmation event: $event")
-                    applyEvent(sessionId, event)
+                cancellationAwareRunCatching {
+                    ensureRunLease(runtime).updatePhase(AgentTaskPhase.GENERATING)
+                    runner.respondToToolConfirmation(
+                        sessionId = sessionId,
+                        confirmationCallId = request.confirmationCallId,
+                        confirmed = confirmed,
+                    ).collect { event ->
+                        Log.i("chat", "tool confirmation event: $event")
+                        applyEvent(sessionId, event, runToken)
+                    }
+                }.onFailure { failure ->
+                    applyError(sessionId, failure.message ?: failure::class.simpleName ?: "Unknown error")
                 }
-            } catch (ce: CancellationException) {
-                throw ce
-            } catch (t: Throwable) {
-                applyError(sessionId, t.message ?: t::class.simpleName ?: "Unknown error")
             } finally {
                 finishRunIfOwned(sessionId, runToken)
                 repository.refreshConversation(sessionId)
@@ -445,10 +448,10 @@ class ChatViewModel @Inject constructor(
 
         runtime.job = viewModelScope.launch {
             ensureRunLease(runtime).updatePhase(AgentTaskPhase.GENERATING)
-            val images = try {
+            val images = cancellationAwareRunCatching {
                 attachments.read(attachmentReferences)
-            } catch (t: Throwable) {
-                applyError(sessionId, "Cannot read selected image: ${t.message ?: "unknown error"}")
+            }.getOrElse { failure ->
+                applyError(sessionId, "Cannot read selected image: ${failure.message ?: "unknown error"}")
                 finishRunIfOwned(sessionId, runToken)
                 return@launch
             }
@@ -457,18 +460,18 @@ class ChatViewModel @Inject constructor(
             runtime.isLoaded = true
             publishRuntime(runtime)
             try {
-                runner.send(
-                    sessionId = sessionId,
-                    selection = selection,
-                    text = text,
-                    imageAttachments = images,
-                ).collect { event ->
-                    applyEvent(sessionId, event)
+                cancellationAwareRunCatching {
+                    runner.send(
+                        sessionId = sessionId,
+                        selection = selection,
+                        text = text,
+                        imageAttachments = images,
+                    ).collect { event ->
+                        applyEvent(sessionId, event, runToken)
+                    }
+                }.onFailure { failure ->
+                    applyError(sessionId, failure.message ?: failure::class.simpleName ?: "Unknown error")
                 }
-            } catch (ce: CancellationException) {
-                throw ce
-            } catch (t: Throwable) {
-                applyError(sessionId, t.message ?: t::class.simpleName ?: "Unknown error")
             } finally {
                 finishRunIfOwned(sessionId, runToken)
                 repository.refreshConversation(sessionId)
@@ -481,9 +484,9 @@ class ChatViewModel @Inject constructor(
      *
      * 注：是 `suspend` 内部方法，调用方必须在协程里调用以确保 `_uiState.value.sessionId` 已更新后再继续。
      */
-    private suspend fun ensureSessionId(): String {
+    private suspend fun ensureSessionId(): String = sessionCreationMutex.withLock {
         modelServices.awaitReady()
-        _uiState.value.sessionId.takeIf { it.isNotBlank() }?.let { return it }
+        _uiState.value.sessionId.takeIf { it.isNotBlank() }?.let { return@withLock it }
         val newId = repository.createConversation(defaultModelPayload())
         if (newId.isNotBlank()) {
             val runtime = runtimeFor(newId)
@@ -491,7 +494,7 @@ class ChatViewModel @Inject constructor(
             runtime.isLoaded = true
             showRuntime(newId)
         }
-        return _uiState.value.sessionId
+        _uiState.value.sessionId
     }
 
     /**
@@ -801,7 +804,8 @@ class ChatViewModel @Inject constructor(
     /**
      * 顶层 reducer：partial 合并，否则当作完整事件构造新的 `Message`。
      */
-    private fun applyEvent(sessionId: String, event: ChatRunEvent) {
+    private fun applyEvent(sessionId: String, event: ChatRunEvent, runToken: Any) {
+        if (sessionRuntimes[sessionId]?.runToken !== runToken) return
         // 错误优先：errorCode / errorMessage 非空 → 错误消息。
         val errMsg = event.errorMessage
         if (event.errorCode != null || !errMsg.isNullOrBlank()) {

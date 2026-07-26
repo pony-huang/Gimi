@@ -13,12 +13,14 @@ import github.ponyhuang.asssistantai.domain.conversation.model.Conversation
 import github.ponyhuang.asssistantai.domain.conversation.model.Message
 import github.ponyhuang.asssistantai.domain.conversation.repository.ConversationRepository
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * ADK [Session] ↔ UI [Conversation] / [Message] 的映射层。
@@ -69,7 +71,7 @@ class AdkConversationRepository(
             val list = listConversationsInternal()
             _conversations.value = list
         } catch (t: Throwable) {
-            Log.w(TAG, "refresh() failed: ${t::class.simpleName}: ${t.message}")
+            recover(t, "refresh()", Unit)
         }
     }
 
@@ -80,12 +82,14 @@ class AdkConversationRepository(
         try {
             val session = sessionService.getSession(key) ?: return
             val updated = session.toConversation(metadataFor(sessionId))
-            _conversations.value = _conversations.value
-                .filterNot { it.id == sessionId }
-                .plus(updated)
-                .sortedByDescending { it.timestamp }
+            _conversations.update { conversations ->
+                conversations
+                    .filterNot { it.id == sessionId }
+                    .plus(updated)
+                    .sortedByDescending { it.timestamp }
+            }
         } catch (t: Throwable) {
-            Log.w(TAG, "refreshConversation($sessionId) failed: ${t::class.simpleName}: ${t.message}")
+            recover(t, "refreshConversation($sessionId)", Unit)
         }
     }
 
@@ -96,8 +100,7 @@ class AdkConversationRepository(
         try {
             listConversationsInternal()
         } catch (t: Throwable) {
-            Log.w(TAG, "listConversations() failed: ${t::class.simpleName}: ${t.message}")
-            emptyList()
+            recover(t, "listConversations()", emptyList())
         }
 
     /**
@@ -113,14 +116,12 @@ class AdkConversationRepository(
         val session: Session = try {
             sessionService.getSession(key) ?: return null
         } catch (t: Throwable) {
-            Log.w(TAG, "loadMessages($sessionId) failed: ${t::class.simpleName}: ${t.message}")
-            return null
+            return recover(t, "loadMessages($sessionId)", null)
         }
         return try {
             EventMapper.fromSession(session)
         } catch (t: Throwable) {
-            Log.w(TAG, "EventMapper.fromSession($sessionId) failed: ${t::class.simpleName}: ${t.message}")
-            emptyList()
+            recover(t, "EventMapper.fromSession($sessionId)", emptyList())
         }
     }
 
@@ -129,8 +130,7 @@ class AdkConversationRepository(
         try {
             metadataDao.getLast()?.sessionId
         } catch (t: Throwable) {
-            Log.w(TAG, "lastConversationId() failed: ${t::class.simpleName}: ${t.message}")
-            null
+            recover(t, "lastConversationId()", null)
         }
 
     /** Marks an existing session as current and returns its stored model selection payload. */
@@ -140,8 +140,7 @@ class AdkConversationRepository(
             refreshConversation(sessionId)
             metadata.model
         } catch (t: Throwable) {
-            Log.w(TAG, "activateConversation($sessionId) failed: ${t::class.simpleName}: ${t.message}")
-            defaultModel
+            recover(t, "activateConversation($sessionId)", defaultModel)
         }
 
     /** Persists the selected model for a conversation and refreshes its drawer row. */
@@ -151,7 +150,7 @@ class AdkConversationRepository(
             metadataDao.setModel(sessionId, model)
             refreshConversation(sessionId)
         } catch (t: Throwable) {
-            Log.w(TAG, "setConversationModel($sessionId) failed: ${t::class.simpleName}: ${t.message}")
+            recover(t, "setConversationModel($sessionId)", Unit)
         }
     }
 
@@ -161,7 +160,7 @@ class AdkConversationRepository(
         try {
             metadataDao.delete(sessionId)
         } catch (t: Throwable) {
-            Log.w(TAG, "discardConversationMetadata($sessionId) failed: ${t::class.simpleName}: ${t.message}")
+            recover(t, "discardConversationMetadata($sessionId)", Unit)
         }
     }
 
@@ -187,14 +186,13 @@ class AdkConversationRepository(
                         )
                     }
                 } catch (t: Throwable) {
-                    Log.w(TAG, "createConversation($sessionId) metadata write failed: ${t::class.simpleName}: ${t.message}")
+                    recover(t, "createConversation($sessionId) metadata write", Unit)
                 }
             }
             refresh()
             sessionId
         } catch (t: Throwable) {
-            Log.w(TAG, "createConversation() failed: ${t::class.simpleName}: ${t.message}")
-            ""
+            recover(t, "createConversation()", "")
         }
     }
 
@@ -207,7 +205,7 @@ class AdkConversationRepository(
             sessionService.deleteSession(key)
             metadataDao.delete(sessionId)
         } catch (t: Throwable) {
-            Log.w(TAG, "deleteConversation($sessionId) failed: ${t::class.simpleName}: ${t.message}")
+            recover(t, "deleteConversation($sessionId)", Unit)
         }
         refresh()
     }
@@ -230,16 +228,14 @@ class AdkConversationRepository(
         try {
             metadataDao.getAll().associateBy { it.sessionId }
         } catch (t: Throwable) {
-            Log.w(TAG, "metadataBySessionId() failed: ${t::class.simpleName}: ${t.message}")
-            emptyMap()
+            recover(t, "metadataBySessionId()", emptyMap())
         }
 
     private suspend fun metadataFor(sessionId: String): ConversationMetadataEntity? =
         try {
             metadataDao.get(sessionId)
         } catch (t: Throwable) {
-            Log.w(TAG, "metadataFor($sessionId) failed: ${t::class.simpleName}: ${t.message}")
-            null
+            recover(t, "metadataFor($sessionId)", null)
         }
 
     /**
@@ -288,4 +284,13 @@ class AdkConversationRepository(
         private const val LAST_MESSAGE_MAX_LENGTH: Int = 64
         private const val CONVERSATION_TITLE_STATE_KEY: String = "conversation.title"
     }
+}
+
+private fun <T> recover(failure: Throwable, operation: String, fallback: T): T {
+    if (failure is CancellationException) throw failure
+    Log.w(
+        "ConversationRepository",
+        "$operation failed: ${failure::class.simpleName}: ${failure.message}",
+    )
+    return fallback
 }

@@ -26,7 +26,8 @@ fun AssistantOverlayRoute(
     onClose: () -> Unit,
     onOpenInChat: (sessionId: String?) -> Unit,
     modifier: Modifier = Modifier,
-    approveConfirmation: (proceed: () -> Unit) -> Unit = { it() },
+    approveConfirmation: (confirmationCallId: String, proceed: () -> Unit) -> Unit =
+        { _, proceed -> proceed() },
     viewModel: AssistantOverlayViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -58,7 +59,7 @@ fun AssistantOverlayRoute(
         state = state,
         onAction = { action ->
             if (action is AssistantOverlayAction.ApproveConfirmation) {
-                approveConfirmation { viewModel.onAction(action) }
+                approveConfirmation(action.confirmationCallId) { viewModel.onAction(action) }
             } else {
                 viewModel.onAction(action)
             }

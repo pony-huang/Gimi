@@ -40,20 +40,32 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
  * 线程模型：所有调用都通过协程 `Flow` 完成，框架本身不持有任何额外线程。
  */
 class AgentChatRunner(
-    private val factory: suspend (ModelSelection?) -> BaseAgent,
+    private val factory: suspend (ModelSelection?, Boolean) -> BaseAgent,
     private val sessionService: SessionService,
     private val artifactService: ArtifactService?,
     private val configurationRevision: () -> Any = { Unit },
 ) {
+    constructor(
+        factory: suspend (ModelSelection?) -> BaseAgent,
+        sessionService: SessionService,
+        artifactService: ArtifactService?,
+        configurationRevision: () -> Any = { Unit },
+    ) : this(
+        factory = { selection, _ -> factory(selection) },
+        sessionService = sessionService,
+        artifactService = artifactService,
+        configurationRevision = configurationRevision,
+    )
 
     /** 每个会话持有独立 Runner；模型选择或配置版本变化时按会话重建。 */
     private data class RunnerEntry(
         val selection: ModelSelection?,
         val revision: Any,
+        val allowConfirmationRequiredTools: Boolean,
         val runner: InMemoryRunner,
     )
 
-    private val runners = mutableMapOf<String, RunnerEntry>()
+    private val runners = LinkedHashMap<String, RunnerEntry>(16, 0.75f, true)
     private val runnerMutex = Mutex()
 
     private fun buildRunner(agent: BaseAgent): InMemoryRunner = InMemoryRunner(
@@ -112,9 +124,14 @@ class AgentChatRunner(
         selection: ModelSelection? = null,
         text: String,
         imageAttachments: List<ImageAttachment> = emptyList(),
+        allowConfirmationRequiredTools: Boolean = true,
     ): Flow<Event> {
         // 快照当前 runner；中途 recreate() 不会改本次 send 的行为。
-        val activeRunner = currentRunnerForNewTurn(sessionId, selection)
+        val activeRunner = currentRunnerForNewTurn(
+            sessionId,
+            selection,
+            allowConfirmationRequiredTools,
+        )
         val parts = buildList {
             text.takeIf(String::isNotBlank)?.let { add(Part(text = it)) }
             imageAttachments.forEach { image ->
@@ -168,14 +185,27 @@ class AgentChatRunner(
     private suspend fun currentRunnerForNewTurn(
         sessionId: String,
         selection: ModelSelection?,
+        allowConfirmationRequiredTools: Boolean,
     ): InMemoryRunner {
         val expectedRevision = configurationRevision()
         return runnerMutex.withLock {
             runners[sessionId]
-                ?.takeIf { it.selection == selection && it.revision == expectedRevision }
+                ?.takeIf {
+                    it.selection == selection &&
+                        it.revision == expectedRevision &&
+                        it.allowConfirmationRequiredTools == allowConfirmationRequiredTools
+                }
                 ?.runner
-                ?: buildRunner(factory(selection)).also { newRunner ->
-                    runners[sessionId] = RunnerEntry(selection, expectedRevision, newRunner)
+                ?: buildRunner(factory(selection, allowConfirmationRequiredTools)).also { newRunner ->
+                    runners[sessionId] = RunnerEntry(
+                        selection,
+                        expectedRevision,
+                        allowConfirmationRequiredTools,
+                        newRunner,
+                    )
+                    while (runners.size > MAX_CACHED_RUNNERS) {
+                        runners.remove(runners.entries.first().key)
+                    }
                 }
         }
     }
@@ -188,5 +218,6 @@ class AgentChatRunner(
 
     companion object {
         const val APP_NAME: String = "AsssistantaiApp"
+        const val MAX_CACHED_RUNNERS: Int = 20
     }
 }

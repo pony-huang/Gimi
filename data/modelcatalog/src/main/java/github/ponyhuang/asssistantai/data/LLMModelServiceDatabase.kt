@@ -49,7 +49,7 @@ interface ModelServiceDao {
 
 @Database(
     entities = [ModelServiceEntity::class],
-    version = 2,
+    version = 1,
     exportSchema = false,
 )
 abstract class ModelServiceDatabase : RoomDatabase() {

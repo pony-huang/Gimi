@@ -1,6 +1,6 @@
 package github.ponyhuang.asssistantai.data.modelcatalog.remote
 
-import com.openai.client.okhttp.OpenAIOkHttpClient
+import com.google.gson.Gson
 import github.ponyhuang.asssistantai.core.common.coroutine.IoDispatcher
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
@@ -15,6 +15,7 @@ class OpenAiCompatibleModelServiceGateway @Inject constructor(
     private val okHttpClient: OkHttpClient,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : ModelServiceRemoteGateway {
+    private val gson = Gson()
     override suspend fun validateConnection(service: LLMModelSetting): Boolean =
         withContext(ioDispatcher) {
             val request = Request.Builder()
@@ -29,13 +30,28 @@ class OpenAiCompatibleModelServiceGateway @Inject constructor(
 
     override suspend fun fetchModels(service: LLMModelSetting): List<Model> =
         withContext(ioDispatcher) {
-            val client = OpenAIOkHttpClient.builder()
-                .baseUrl(service.openAiCompatibleBaseUrl)
-                .apiKey(service.apiKey)
+            val request = Request.Builder()
+                .url("${service.openAiCompatibleBaseUrl}/models")
+                .get()
+                .addHeader("Accept", "application/json")
+                .addHeader("Authorization", "Bearer ${service.apiKey.trim()}")
                 .build()
-
-            client.models().list().data().map { remote ->
-                Model(id = remote.id(), name = remote.id())
+            okHttpClient.newCall(request).execute().use { response ->
+                check(response.isSuccessful) {
+                    "Model list request failed with HTTP ${response.code}"
+                }
+                val body = checkNotNull(response.body).string()
+                gson.fromJson(body, OpenAiModelsResponse::class.java)
+                    .data
+                    .map { remote -> Model(id = remote.id, name = remote.id) }
             }
         }
 }
+
+private data class OpenAiModelsResponse(
+    val data: List<OpenAiModelEntry> = emptyList(),
+)
+
+private data class OpenAiModelEntry(
+    val id: String = "",
+)

@@ -10,6 +10,7 @@ import androidx.room.withTransaction
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.asssistantai.data.modelcatalog.toData
 import github.ponyhuang.asssistantai.data.modelcatalog.toDomain
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
@@ -36,6 +37,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -70,6 +72,7 @@ class ModelServiceRepository @Inject constructor(
     private val dao = database.modelServiceDao()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val catalogWriteMutex = Mutex()
+    private val settingsMutationLock = Any()
     private val ready = CompletableDeferred<Unit>()
     private val preferences = applicationContext.getSharedPreferences(
         PREFERENCES_NAME,
@@ -113,11 +116,17 @@ class ModelServiceRepository @Inject constructor(
 
     init {
         scope.launch {
-            runCatching {
+            cancellationAwareRunCatching {
                 settings.value = readInitialSettings()
                 seedCatalogIfEmpty()
                 dao.observeAll().collectLatest { entities ->
-                    _services.value = entities.map(::entityToProvider)
+                    _services.value = entities.mapNotNull { entity ->
+                        cancellationAwareRunCatching { entityToProvider(entity) }
+                            .onFailure { error ->
+                                Log.w(TAG, "Skipping corrupt model service ${entity.serviceId}.", error)
+                            }
+                            .getOrNull()
+                    }
                     if (!ready.isCompleted) {
                         _loadState.value = ModelCatalogLoadState.Ready
                         ready.complete(Unit)
@@ -266,12 +275,15 @@ class ModelServiceRepository @Inject constructor(
 
     /** Updates encrypted connection settings; public catalog fields are intentionally ignored. */
     fun updateService(serviceId: String, transform: (LLMModelProvider) -> LLMModelProvider) {
-        val current = getService(serviceId) ?: return
-        val updated = transform(current).toSettings()
-        settings.value = settings.value + (serviceId to updated)
-        persistSettings(settings.value)
-        refreshMergedServices()
-        _configurationRevision.value += 1
+        synchronized(settingsMutationLock) {
+            val current = getService(serviceId) ?: return
+            val updated = transform(current).toSettings()
+            val nextSettings = settings.value + (serviceId to updated)
+            if (!persistSettings(nextSettings)) return
+            settings.value = nextSettings
+            refreshMergedServices()
+            _configurationRevision.update { it + 1 }
+        }
     }
 
     /**
@@ -360,7 +372,7 @@ class ModelServiceRepository @Inject constructor(
     fun setDefaultTtsVoice(voiceId: String) {
         val normalized = voiceId.trim().ifEmpty { DEFAULT_TTS_VOICE }
         _defaultTtsVoice.value = normalized
-        preferences.edit(commit = true) { putString(DEFAULT_TTS_VOICE_KEY, normalized) }
+        preferences.edit { putString(DEFAULT_TTS_VOICE_KEY, normalized) }
     }
 
     fun setCurrentSelection(selection: LLMModelSelection?) {
@@ -495,23 +507,25 @@ class ModelServiceRepository @Inject constructor(
 
     private fun readInitialSettings(): Map<String, ModelServiceSettings> {
         return readSettings() ?: defaultSettings.also {
-            persistSettings(defaultSettings)
+            check(persistSettings(defaultSettings)) {
+                "Unable to persist initial model service settings."
+            }
         }
     }
 
-    private fun persistSettings(value: Map<String, ModelServiceSettings>) {
-        runCatching {
-            preferences.edit(commit = true) {
-                putString(SETTINGS_KEY, encrypt(gson.toJson(value)))
-            }
+    private fun persistSettings(value: Map<String, ModelServiceSettings>): Boolean =
+        cancellationAwareRunCatching {
+            preferences.edit()
+                .putString(SETTINGS_KEY, encrypt(gson.toJson(value)))
+                .commit()
         }.onFailure { Log.w(TAG, "Unable to persist model service settings.", it) }
-    }
+            .getOrDefault(false)
 
     private fun readSelection(key: String): LLMModelSelection? = preferences.getString(key, null)
         ?.let { encoded -> runCatching { gson.fromJson<LLMModelSelection>(encoded, selectionType) }.getOrNull() }
 
     private fun persistSelection(key: String, selection: LLMModelSelection?) {
-        preferences.edit(commit = true) {
+        preferences.edit {
             if (selection == null) remove(key) else putString(key, gson.toJson(selection))
         }
     }

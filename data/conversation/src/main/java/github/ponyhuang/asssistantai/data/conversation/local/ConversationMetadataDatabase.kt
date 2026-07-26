@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
 import androidx.room.Insert
+import androidx.room.Index
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
@@ -11,7 +12,15 @@ import androidx.room.RoomDatabase
 import androidx.room.Transaction
 
 /** Metadata owned by the app for an ADK session. Session events remain in ADK's database. */
-@Entity(tableName = "conversation_metadata")
+@Entity(
+    tableName = "conversation_metadata",
+    indices = [
+        Index(
+            value = ["isLast"],
+            name = "index_conversation_metadata_isLast",
+        ),
+    ],
+)
 data class ConversationMetadataEntity(
     @PrimaryKey
     val sessionId: String,
@@ -64,7 +73,7 @@ abstract class ConversationMetadataDao {
 
 @Database(
     entities = [ConversationMetadataEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class ConversationMetadataDatabase : RoomDatabase() {

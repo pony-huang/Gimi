@@ -1,12 +1,11 @@
 package github.ponyhuang.asssistantai.agent.tools.system
 
 import android.content.Intent
-import android.net.Uri
+import androidx.core.net.toUri
 import com.google.adk.kt.annotations.Param
 import com.google.adk.kt.annotations.Tool
 import javax.inject.Inject
 import javax.inject.Singleton
-import androidx.core.net.toUri
 
 /** Opens a music or video URL in a compatible app installed on the device. */
 @Singleton
@@ -36,10 +35,15 @@ class MediaPlaybackTool @Inject constructor(
                 "error" to "Unsupported media type. Use music or video.",
             )
         }
-        return queue.request("Play media", "Open $mediaType media in a compatible player.", Intent(Intent.ACTION_VIEW).setDataAndType(uri, mimeType))
+        val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, mimeType)
+            .addFlags(mediaIntentFlags(uri.scheme))
+        return queue.request("Play media", "Open $mediaType media in a compatible player.", intent)
     }
 
     private companion object {
         val SUPPORTED_SCHEMES = setOf("http", "https", "content")
     }
 }
+
+internal fun mediaIntentFlags(scheme: String?): Int =
+    if (scheme == "content") Intent.FLAG_GRANT_READ_URI_PERMISSION else 0

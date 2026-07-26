@@ -18,4 +18,5 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.okhttp)
     ksp(libs.hilt.android.compiler)
+    testImplementation(libs.junit)
 }

@@ -4,14 +4,17 @@ import app.cash.turbine.test
 import github.ponyhuang.asssistantai.core.testing.MainDispatcherRule
 import github.ponyhuang.asssistantai.domain.workfiles.model.WorkDirectory
 import github.ponyhuang.asssistantai.domain.workfiles.repository.WorkDirectoryRepository
+import github.ponyhuang.asssistantai.domain.workfiles.repository.WorkDirectoryOperationResult
 import github.ponyhuang.asssistantai.domain.workfiles.usecase.AddWorkDirectoryUseCase
 import github.ponyhuang.asssistantai.domain.workfiles.usecase.ObserveWorkDirectoriesUseCase
 import github.ponyhuang.asssistantai.domain.workfiles.usecase.RemoveWorkDirectoryUseCase
 import io.mockk.every
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
-import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -57,9 +60,30 @@ class WorkFilesSettingsViewModelCharacterizationTest {
             viewModel.onAction(WorkFilesSettingsAction.DirectoryPickerHandled(requestId))
             viewModel.onAction(WorkFilesSettingsAction.DirectorySelected(uri))
             viewModel.onAction(WorkFilesSettingsAction.RemoveDirectory(uri))
+            advanceUntilIdle()
 
-            verify(exactly = 1) { repository.addDirectory(uri) }
-            verify(exactly = 1) { repository.removeDirectory(uri) }
+            coVerify(exactly = 1) { repository.addDirectory(uri) }
+            coVerify(exactly = 1) { repository.removeDirectory(uri) }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun repositoryFailureIsExposedInUiState() = runTest {
+        val repository = repository()
+        coEvery { repository.addDirectory(any()) } returns
+            WorkDirectoryOperationResult.Failure.PermissionDenied
+        val viewModel = viewModel(repository)
+
+        viewModel.onAction(WorkFilesSettingsAction.DirectorySelected("content://denied"))
+
+        viewModel.uiState.test {
+            var state = awaitItem()
+            while (state.operationError == null) state = awaitItem()
+            assertEquals(
+                WorkDirectoryOperationResult.Failure.PermissionDenied,
+                state.operationError,
+            )
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -74,6 +98,7 @@ class WorkFilesSettingsViewModelCharacterizationTest {
         directories: List<WorkDirectory> = emptyList(),
     ): WorkDirectoryRepository = mockk(relaxed = true) {
         every { observeDirectories() } returns MutableStateFlow(directories)
-        every { addDirectory(any()) } returns true
+        coEvery { addDirectory(any()) } returns WorkDirectoryOperationResult.Success
+        coEvery { removeDirectory(any()) } returns WorkDirectoryOperationResult.Success
     }
 }

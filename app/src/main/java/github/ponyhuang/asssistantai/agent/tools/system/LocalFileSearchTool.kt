@@ -123,8 +123,8 @@ class LocalFileSearchTool @Inject constructor(
             context.contentResolver.query(
                 collection.uri,
                 projection,
-                "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ? COLLATE NOCASE",
-                arrayOf("%$query%"),
+                "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ? ESCAPE '\\' COLLATE NOCASE",
+                arrayOf("%${escapeLikePattern(query)}%"),
                 "${MediaStore.MediaColumns.DATE_MODIFIED} DESC",
             )?.use { cursor ->
                 buildList {
@@ -217,5 +217,12 @@ class LocalFileSearchTool @Inject constructor(
                 MediaCollection("audio", MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, Manifest.permission.READ_MEDIA_AUDIO),
             )
         }
+    }
+}
+
+internal fun escapeLikePattern(value: String): String = buildString(value.length) {
+    value.forEach { character ->
+        if (character == '\\' || character == '%' || character == '_') append('\\')
+        append(character)
     }
 }

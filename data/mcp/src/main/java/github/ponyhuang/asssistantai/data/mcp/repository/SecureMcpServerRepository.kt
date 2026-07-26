@@ -12,6 +12,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 @Singleton
 class SecureMcpServerRepository @Inject constructor(
@@ -30,6 +31,7 @@ class SecureMcpServerRepository @Inject constructor(
 
     override fun server(id: String): McpServer? = servers.value.firstOrNull { it.id == id }
 
+    @Synchronized
     override fun save(server: McpServer) {
         val updated = servers.value.toMutableList().apply {
             val index = indexOfFirst { it.id == server.id }
@@ -38,19 +40,33 @@ class SecureMcpServerRepository @Inject constructor(
         persist(updated)
     }
 
+    @Synchronized
     override fun delete(id: String) = persist(servers.value.filterNot { it.id == id })
 
+    @Synchronized
     override fun importJson(json: String): McpImportResult {
+        if (json.length > MAX_IMPORT_CHARACTERS) {
+            return McpImportResult(error = "JSON 内容过大")
+        }
         val root = runCatching { JsonParser.parseString(json).asJsonObject }
             .getOrElse { return McpImportResult(error = "JSON 格式无效") }
-        val source = root.getAsJsonObject("mcpServers") ?: root
+        val wrappedSource = root.get("mcpServers")
+        val source = when {
+            wrappedSource == null -> root
+            wrappedSource.isJsonObject -> wrappedSource.asJsonObject
+            else -> return McpImportResult(error = "mcpServers 必须是对象")
+        }
         val imported = mutableListOf<McpServer>()
         var skipped = 0
-        source.entrySet().forEach { (name, element) ->
+        source.entrySet().take(MAX_IMPORT_SERVERS).forEach { (name, element) ->
+            if (name.length > MAX_FIELD_CHARACTERS) {
+                skipped++
+                return@forEach
+            }
             val config = element.takeIf { it.isJsonObject }?.asJsonObject
                 ?: run { skipped++; return@forEach }
             val url = config.string("url")
-            if (url.isNullOrBlank()) {
+            if (url.isNullOrBlank() || url.length > MAX_FIELD_CHARACTERS) {
                 skipped++
                 return@forEach
             }
@@ -68,9 +84,14 @@ class SecureMcpServerRepository @Inject constructor(
                 name = name,
                 endpointUrl = url,
                 transport = transport,
-                headers = config.getAsJsonObject("headers")?.toHeaderLines().orEmpty(),
+                headers = config.get("headers")
+                    ?.takeIf { it.isJsonObject }
+                    ?.asJsonObject
+                    ?.toHeaderLines()
+                    .orEmpty(),
             )
         }
+        skipped += (source.size() - MAX_IMPORT_SERVERS).coerceAtLeast(0)
         if (imported.isNotEmpty()) persist(servers.value + imported)
         return McpImportResult(imported = imported.size, skipped = skipped)
     }
@@ -83,13 +104,22 @@ class SecureMcpServerRepository @Inject constructor(
         if (value == servers.value) return
         storage.write(gson.toJson(value, type))
         servers.value = value
-        _revision.value += 1
+        _revision.update { it + 1 }
+    }
+
+    private companion object {
+        const val MAX_IMPORT_CHARACTERS = 256 * 1024
+        const val MAX_IMPORT_SERVERS = 100
+        const val MAX_FIELD_CHARACTERS = 2_048
     }
 }
 
 private fun JsonObject.string(name: String): String? =
     get(name)?.takeIf { it.isJsonPrimitive }?.asString
 
-private fun JsonObject.toHeaderLines(): String = entrySet().joinToString("\n") { (name, value) ->
-    "$name=${value.asString}"
-}
+private fun JsonObject.toHeaderLines(): String = entrySet()
+    .mapNotNull { (name, value) ->
+        value.takeIf { it.isJsonPrimitive }?.asString?.let { "$name=$it" }
+    }
+    .joinToString("\n")
+    .take(8_192)

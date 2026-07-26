@@ -6,19 +6,18 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
-import android.location.LocationListener
 import android.location.LocationManager
-import android.os.Bundle
-import android.os.Looper
+import android.os.CancellationSignal
 import android.provider.Settings
 import com.google.adk.kt.annotations.Param
 import com.google.adk.kt.annotations.Tool
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.asssistantai.permission.LocationPermissionActivity
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resume
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Reads the device's geographic location. */
 @Singleton
@@ -30,9 +29,10 @@ class LocationTool @Inject constructor(
 
     @Tool(
         name = "get_current_location",
-        description = "Returns the device's current geographic location, including latitude, longitude, and accuracy. Requires location permission and that location services are turned on.",
+        description = "Returns the device's current geographic location, including latitude, longitude, and accuracy. Requires location permission, enabled location services, and user confirmation.",
+        requireConfirmation = true,
     )
-    fun getCurrentLocation(
+    suspend fun getCurrentLocation(
         @Param("If true, requests a fresh location update; otherwise returns the cached value. Defaults to true.")
         preferFreshFix: Boolean? = true,
     ): Map<String, Any> {
@@ -109,7 +109,10 @@ class LocationTool @Inject constructor(
     }
 
     @SuppressLint("MissingPermission")
-    private fun tryFreshFix(manager: LocationManager, enabledProviders: List<String>): Location? {
+    private suspend fun tryFreshFix(
+        manager: LocationManager,
+        enabledProviders: List<String>,
+    ): Location? {
         if (!hasLocationPermission()) return null
         val preferred = listOf(
             LocationManager.FUSED_PROVIDER,
@@ -124,41 +127,27 @@ class LocationTool @Inject constructor(
     }
 
     @SuppressLint("MissingPermission")
-    private fun awaitSingleLocationUpdate(manager: LocationManager, provider: String): Location? {
-        val looper = Looper.myLooper() ?: Looper.getMainLooper()
-        val latch = CountDownLatch(1)
-        val holder = arrayOfNulls<Location>(1)
-        val listener = object : LocationListener {
-            override fun onLocationChanged(location: Location) {
-                holder[0] = location
-                latch.countDown()
+    private suspend fun awaitSingleLocationUpdate(
+        manager: LocationManager,
+        provider: String,
+    ): Location? = withTimeoutOrNull(FRESH_FIX_TIMEOUT_MS) {
+        suspendCancellableCoroutine { continuation ->
+            val cancellationSignal = CancellationSignal()
+            continuation.invokeOnCancellation { cancellationSignal.cancel() }
+            try {
+                manager.getCurrentLocation(
+                    provider,
+                    cancellationSignal,
+                    context.mainExecutor,
+                ) { location ->
+                    if (continuation.isActive) continuation.resume(location)
+                }
+            } catch (_: SecurityException) {
+                continuation.resume(null)
+            } catch (_: IllegalArgumentException) {
+                continuation.resume(null)
             }
-
-            override fun onProviderEnabled(provider: String) {}
-
-            override fun onProviderDisabled(provider: String) {
-                latch.countDown()
-            }
-
-            @Suppress("OVERRIDE_DEPRECATION")
-            override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
         }
-        val acquired = try {
-            manager.requestSingleUpdate(provider, listener, looper)
-            true
-        } catch (_: SecurityException) {
-            false
-        } catch (_: IllegalArgumentException) {
-            false
-        }
-        if (!acquired) return null
-        latch.await(FRESH_FIX_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-        try {
-            manager.removeUpdates(listener)
-        } catch (_: Exception) {
-            // Listener may already be detached — ignore.
-        }
-        return holder[0]
     }
 
     private fun safelyGetLastKnownLocation(manager: LocationManager, provider: String): Location? = try {

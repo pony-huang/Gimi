@@ -61,4 +61,24 @@ class AgentChatRunnerIsolationTest {
         runner.send("user", "session-b", first, "b2")
         assertEquals(4, creations)
     }
+
+    @Test
+    fun runnerCacheEvictsLeastRecentlyUsedSession() = runTest {
+        var creations = 0
+        val runner = AgentChatRunner(
+            factory = {
+                creations += 1
+                mockk<LlmAgent>(relaxed = true)
+            },
+            sessionService = mockk<SessionService>(relaxed = true),
+            artifactService = null,
+        )
+
+        repeat(AgentChatRunner.MAX_CACHED_RUNNERS + 1) { index ->
+            runner.send("user", "session-$index", text = "message")
+        }
+        runner.send("user", "session-0", text = "again")
+
+        assertEquals(AgentChatRunner.MAX_CACHED_RUNNERS + 2, creations)
+    }
 }

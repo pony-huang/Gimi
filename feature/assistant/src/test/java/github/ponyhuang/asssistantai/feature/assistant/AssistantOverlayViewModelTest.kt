@@ -150,7 +150,7 @@ class AssistantOverlayViewModelTest {
         assertEquals("camera_open", state.pendingConfirmation?.toolName)
         assertTrue(state.confirmationRemainingSeconds in 13..15)
 
-        vm.onAction(AssistantOverlayAction.ApproveConfirmation)
+        vm.onAction(AssistantOverlayAction.ApproveConfirmation("confirm-1"))
         assertEquals(listOf(true), coordinator.confirmationResponses)
     }
 
@@ -282,8 +282,12 @@ class AssistantOverlayViewModelTest {
             stopCalled = true
         }
 
-        override fun respondToConfirmation(confirmed: Boolean) {
+        override fun respondToConfirmation(
+            confirmationCallId: String,
+            confirmed: Boolean,
+        ): Boolean {
             confirmationResponses += confirmed
+            return true
         }
 
         override fun hideOverlay() {

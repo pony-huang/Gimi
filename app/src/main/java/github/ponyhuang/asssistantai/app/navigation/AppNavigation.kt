@@ -81,7 +81,9 @@ fun MainScreen(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val backStack = rememberNavBackStack(AppRoute.Chat)
-    val goBack: () -> Unit = { backStack.removeLastOrNull() }
+    val goBack: () -> Unit = {
+        if (backStack.size > 1) backStack.removeLastOrNull()
+    }
     val returnToChat = {
         while (backStack.size > 1) backStack.removeLast()
     }

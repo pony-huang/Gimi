@@ -22,6 +22,7 @@
     <string name="assistant_error_retry">Retry</string>
     <string name="assistant_confirm_title">Sensitive action</string>
     <string name="assistant_confirm_message">About to run \"%1$s\". Allow?</string>
+    <string name="assistant_confirm_arguments">Target details: %1$s</string>
     <string name="assistant_confirm_countdown">Auto-deny in %1$d s</string>
     <string name="assistant_confirm_approve">Allow</string>
     <string name="assistant_confirm_reject">Deny</string>

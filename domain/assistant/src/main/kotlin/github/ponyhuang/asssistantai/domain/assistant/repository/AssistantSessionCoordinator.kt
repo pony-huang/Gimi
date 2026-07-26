@@ -47,8 +47,15 @@ interface AssistantSessionCoordinator {
     /** 取消当前任务并释放运行时租约。 */
     fun stop()
 
-    /** 答复等待中的敏感工具确认。 */
-    fun respondToConfirmation(confirmed: Boolean)
+    /**
+     * 答复等待中的敏感工具确认。
+     *
+     * 只有 [confirmationCallId] 与当前等待项一致时才接受，避免解锁等异步旧回调
+     * 误批准后续工具调用。
+     *
+     * @return true 表示答复已交付给当前等待项。
+     */
+    fun respondToConfirmation(confirmationCallId: String, confirmed: Boolean): Boolean
 
     /** 仅隐藏浮层：停止界面层交互，不取消已提交任务。 */
     fun hideOverlay()

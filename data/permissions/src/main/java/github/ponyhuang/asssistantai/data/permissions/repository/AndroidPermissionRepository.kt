@@ -49,6 +49,17 @@ class AndroidPermissionRepository @Inject constructor(
         )
     }
 
+    override fun wasRequested(permission: AppPermission): Boolean =
+        permission.name in preferences.getStringSet(REQUESTED_KEY, emptySet()).orEmpty()
+
+    override fun recordRequested(permissions: Set<AppPermission>) {
+        if (permissions.isEmpty()) return
+        val requested = preferences.getStringSet(REQUESTED_KEY, emptySet()).orEmpty()
+        preferences.edit {
+            putStringSet(REQUESTED_KEY, requested + permissions.map(AppPermission::name))
+        }
+    }
+
     private fun readPermanentlyDenied(): Set<AppPermission> = preferences
         .getStringSet(PERMANENTLY_DENIED_KEY, emptySet())
         .orEmpty()
@@ -81,5 +92,6 @@ class AndroidPermissionRepository @Inject constructor(
     private companion object {
         const val PREFERENCES_NAME = "permission_settings"
         const val PERMANENTLY_DENIED_KEY = "permanently_denied_v2"
+        const val REQUESTED_KEY = "requested_runtime_permissions_v1"
     }
 }

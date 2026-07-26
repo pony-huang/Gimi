@@ -1,10 +1,12 @@
 package github.ponyhuang.asssistantai.feature.workfiles
 
 import github.ponyhuang.asssistantai.domain.workfiles.model.WorkDirectory
+import github.ponyhuang.asssistantai.domain.workfiles.repository.WorkDirectoryOperationResult
 
 data class WorkFilesSettingsUiState(
     val directories: List<WorkDirectory> = emptyList(),
     val directoryPickerRequestId: Int? = null,
+    val operationError: WorkDirectoryOperationResult.Failure? = null,
 )
 
 sealed interface WorkFilesSettingsAction {

@@ -7,4 +7,8 @@ interface PermissionRepository {
     fun snapshot(): PermissionSnapshot
 
     fun recordPermanentlyDenied(permissions: Set<AppPermission>)
+
+    fun wasRequested(permission: AppPermission): Boolean
+
+    fun recordRequested(permissions: Set<AppPermission>)
 }

@@ -43,8 +43,10 @@ abstract class SpeechModule {
     companion object {
         @Provides
         @Singleton
-        fun provideSpeechRecognitionGateway(): SpeechRecognitionGateway =
-            OpenAiCompatibleSpeechRecognitionGateway()
+        fun provideSpeechRecognitionGateway(
+            okHttpClient: OkHttpClient,
+        ): SpeechRecognitionGateway =
+            OpenAiCompatibleSpeechRecognitionGateway(okHttpClient)
 
         @Provides
         @Singleton

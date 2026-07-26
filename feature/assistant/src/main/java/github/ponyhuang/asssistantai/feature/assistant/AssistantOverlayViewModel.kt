@@ -203,11 +203,12 @@ class AssistantOverlayViewModel @Inject constructor(
             AssistantOverlayAction.SubmitDraft -> submitDraft()
             AssistantOverlayAction.StopTask -> stopTask()
             AssistantOverlayAction.CloseOverlay -> close()
-            AssistantOverlayAction.ApproveConfirmation -> {
-                coordinator.respondToConfirmation(true)
+            is AssistantOverlayAction.ApproveConfirmation -> {
+                coordinator.respondToConfirmation(action.confirmationCallId, true)
                 restartIdleClose()
             }
-            AssistantOverlayAction.RejectConfirmation -> coordinator.respondToConfirmation(false)
+            is AssistantOverlayAction.RejectConfirmation ->
+                coordinator.respondToConfirmation(action.confirmationCallId, false)
             AssistantOverlayAction.StopSpeaking -> {
                 speechPlayback.stop()
                 local.update { it.copy(speaking = false) }

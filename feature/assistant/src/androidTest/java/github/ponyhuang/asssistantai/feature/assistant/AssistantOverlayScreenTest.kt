@@ -175,8 +175,8 @@ class AssistantOverlayScreenTest {
 
         assertEquals(
             listOf(
-                AssistantOverlayAction.ApproveConfirmation,
-                AssistantOverlayAction.RejectConfirmation,
+                AssistantOverlayAction.ApproveConfirmation("confirm-1"),
+                AssistantOverlayAction.RejectConfirmation("confirm-1"),
             ),
             actions,
         )

@@ -12,11 +12,11 @@ class ObserveWorkDirectoriesUseCase @Inject constructor(
 class AddWorkDirectoryUseCase @Inject constructor(
     private val repository: WorkDirectoryRepository,
 ) {
-    operator fun invoke(uri: String) = repository.addDirectory(uri)
+    suspend operator fun invoke(uri: String) = repository.addDirectory(uri)
 }
 
 class RemoveWorkDirectoryUseCase @Inject constructor(
     private val repository: WorkDirectoryRepository,
 ) {
-    operator fun invoke(uri: String) = repository.removeDirectory(uri)
+    suspend operator fun invoke(uri: String) = repository.removeDirectory(uri)
 }

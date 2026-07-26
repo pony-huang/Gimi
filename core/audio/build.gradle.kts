@@ -13,6 +13,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:common"))
     implementation(libs.androidx.annotation)
     implementation(libs.kotlinx.coroutines.core)
 

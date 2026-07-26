@@ -79,16 +79,21 @@ private fun calculateInSampleSize(
     reqWidth: Int,
     reqHeight: Int,
 ): Int {
+    val safeReqWidth = reqWidth.coerceAtLeast(1)
+    val safeReqHeight = reqHeight.coerceAtLeast(1)
     val (height: Int, width: Int) = options.outHeight to options.outWidth
     var inSampleSize = 1
 
-    if (height > reqHeight || width > reqWidth) {
+    if (height > safeReqHeight || width > safeReqWidth) {
         val halfHeight: Int = height / 2
         val halfWidth: Int = width / 2
 
         // Calculate the largest inSampleSize value that is a power of 2 and keeps both
         // height and width larger than the requested height and width.
-        while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+        while (
+            halfHeight / inSampleSize >= safeReqHeight &&
+            halfWidth / inSampleSize >= safeReqWidth
+        ) {
             inSampleSize *= 2
         }
     }

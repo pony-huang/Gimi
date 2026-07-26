@@ -55,9 +55,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
+import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.asssistantai.feature.chat.R
 import java.io.ByteArrayOutputStream
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -181,15 +181,16 @@ public fun ChatComposer(
         voiceInputState = VoiceInputUiState.Transcribing
         coroutineScope.launch {
             try {
-                val transcript = onTranscribeVoice(pcm)
-                messageData = messageData.copy(
-                    text = appendTranscript(messageData.text, transcript),
-                )
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
-                voiceErrorMessage = error.message ?: voiceTranscriptionFailedMessage
-                onVoiceInputError(error)
+                cancellationAwareRunCatching { onTranscribeVoice(pcm) }
+                    .onSuccess { transcript ->
+                        messageData = messageData.copy(
+                            text = appendTranscript(messageData.text, transcript),
+                        )
+                    }
+                    .onFailure { error ->
+                        voiceErrorMessage = error.message ?: voiceTranscriptionFailedMessage
+                        onVoiceInputError(error)
+                    }
             } finally {
                 voiceInputState = VoiceInputUiState.Idle
             }
@@ -220,6 +221,8 @@ public fun ChatComposer(
         onDispose {
             voiceRecorder.release()
             voiceAudio.reset()
+            deletePendingCameraAttachment(pendingCameraPath)
+            messageData.attachments.forEach { uri -> deleteCameraAttachment(context, uri) }
         }
     }
 

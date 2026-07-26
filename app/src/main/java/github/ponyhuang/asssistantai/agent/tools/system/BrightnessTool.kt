@@ -2,14 +2,13 @@ package github.ponyhuang.asssistantai.agent.tools.system
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.provider.Settings
+import androidx.core.net.toUri
 import com.google.adk.kt.annotations.Param
 import com.google.adk.kt.annotations.Tool
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
-import androidx.core.net.toUri
 
 /** Controls screen brightness and auto-brightness. */
 @Singleton
@@ -31,16 +30,25 @@ class BrightnessTool @Inject constructor(
         level: Int,
     ): Map<String, Any> = writeBrightnessSetting {
         val appliedLevel = level.coerceIn(MINIMUM_BRIGHTNESS, MAXIMUM_BRIGHTNESS)
-        Settings.System.putInt(
+        val modeWritten = Settings.System.putInt(
             resolver,
             Settings.System.SCREEN_BRIGHTNESS_MODE,
             Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
         )
-        Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS, appliedLevel)
-        brightnessState() + mapOf(
+        val levelWritten = Settings.System.putInt(
+            resolver,
+            Settings.System.SCREEN_BRIGHTNESS,
+            appliedLevel,
+        )
+        val result = brightnessState() + mapOf(
             "requestedLevel" to level,
             "appliedLevel" to appliedLevel,
         )
+        if (allSettingsWritten(modeWritten, levelWritten)) {
+            result
+        } else {
+            result + mapOf("success" to false, "error" to "The system rejected the brightness update.")
+        }
     }
 
     @Tool(
@@ -57,8 +65,14 @@ class BrightnessTool @Inject constructor(
         } else {
             Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
         }
-        Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, mode)
-        brightnessState()
+        if (Settings.System.putInt(resolver, Settings.System.SCREEN_BRIGHTNESS_MODE, mode)) {
+            brightnessState()
+        } else {
+            brightnessState() + mapOf(
+                "success" to false,
+                "error" to "The system rejected the automatic brightness update.",
+            )
+        }
     }
 
     @Tool(
@@ -87,7 +101,8 @@ class BrightnessTool @Inject constructor(
                 "error" to "WRITE_SETTINGS permission is required. Call openBrightnessPermissionSettings and enable the permission.",
             )
         }
-        return write() + mapOf("success" to true)
+        val result = write()
+        return if ("success" in result) result else result + mapOf("success" to true)
     }
 
     private fun brightnessState(): Map<String, Any> = mapOf(
@@ -114,3 +129,5 @@ class BrightnessTool @Inject constructor(
         const val DEFAULT_BRIGHTNESS = 128
     }
 }
+
+internal fun allSettingsWritten(vararg results: Boolean): Boolean = results.all { it }

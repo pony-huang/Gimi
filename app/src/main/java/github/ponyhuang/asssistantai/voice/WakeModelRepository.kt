@@ -9,16 +9,19 @@ import github.ponyhuang.asssistantai.domain.speech.model.WakeModelSource
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.ZipInputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 
@@ -30,19 +33,41 @@ class WakeModelRepository @Inject constructor(
     private val downloader = WakeModelDownloader(okHttpClient)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val rootDir = File(context.filesDir, "voice/wake-model")
-    private val _states = MutableStateFlow(initialStates())
-    private val installJobs = mutableMapOf<String, Job>()
+    private val _states = MutableStateFlow(
+        WakeModelCatalog.models.associate { it.id to WakeModelState() },
+    )
+    private val installJobs = ConcurrentHashMap<String, Job>()
+
+    init {
+        scope.launch {
+            _states.value = initialStates()
+        }
+    }
 
     val states: StateFlow<Map<String, WakeModelState>> = _states.asStateFlow()
 
     fun modelPath(modelId: String): String? =
-        installedDir(modelId).takeIf(::isValidModel)?.absolutePath
+        installedDir(modelId)
+            .takeIf {
+                _states.value[modelId]?.status == WakeModelStatus.Ready && isValidModel(it)
+            }
+            ?.absolutePath
 
     fun install(modelId: String) {
         val info = WakeModelCatalog.byId(modelId) ?: return
         if (_states.value[modelId]?.status == WakeModelStatus.Ready) return
-        if (installJobs[modelId]?.isActive == true) return
-        installJobs[modelId] = scope.launch { installInternal(info) }
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            try {
+                installInternal(info)
+            } finally {
+                installJobs.remove(modelId)
+            }
+        }
+        if (installJobs.putIfAbsent(modelId, job) == null) {
+            job.start()
+        } else {
+            job.cancel()
+        }
     }
 
     private fun installInternal(info: WakeModelInfo) {
@@ -61,11 +86,22 @@ class WakeModelRepository @Inject constructor(
             val extractedModel = findModelRoot(extracting)
                 ?: error(getString(R.string.wake_model_package_invalid))
             val target = installedDir(info.id)
-            target.deleteRecursively()
-            if (!extractedModel.renameTo(target)) {
-                extractedModel.copyRecursively(target, overwrite = true)
+            val backup = File(rootDir, "${info.id}.backup")
+            backup.deleteRecursively()
+            if (target.exists()) {
+                check(target.renameTo(backup)) { getString(R.string.wake_model_install_failed) }
             }
-            check(isValidModel(target)) { getString(R.string.wake_model_files_incomplete) }
+            val installed = extractedModel.renameTo(target)
+            if (!installed) {
+                backup.renameTo(target)
+                error(getString(R.string.wake_model_install_failed))
+            }
+            if (!isValidModel(target)) {
+                target.deleteRecursively()
+                backup.renameTo(target)
+                error(getString(R.string.wake_model_files_incomplete))
+            }
+            backup.deleteRecursively()
             updateState(info.id, WakeModelState(WakeModelStatus.Ready, 1f))
         }.onFailure { error ->
             updateState(
@@ -127,7 +163,7 @@ class WakeModelRepository @Inject constructor(
     }
 
     private fun updateState(modelId: String, state: WakeModelState) {
-        _states.value = _states.value + (modelId to state)
+        _states.update { it + (modelId to state) }
     }
 
     private fun getString(resId: Int): String = context.getString(resId)
@@ -135,7 +171,6 @@ class WakeModelRepository @Inject constructor(
     private fun installedDir(modelId: String): File = File(rootDir, modelId)
 
     private fun initialStates(): Map<String, WakeModelState> {
-        migrateLegacyChineseModel()
         return WakeModelCatalog.models.associate { info ->
             val state = if (isValidModel(installedDir(info.id))) {
                 WakeModelState(WakeModelStatus.Ready, 1f)
@@ -143,18 +178,6 @@ class WakeModelRepository @Inject constructor(
                 WakeModelState()
             }
             info.id to state
-        }
-    }
-
-    /** 旧版本中文模型目录按模型文件命名，迁移到按模型 id 命名的目录。 */
-    private fun migrateLegacyChineseModel() {
-        val legacy = File(rootDir, LEGACY_CHINESE_MODEL_DIR)
-        val target = installedDir(WakeModelCatalog.Chinese.id)
-        if (legacy.isDirectory && !target.exists()) {
-            if (!legacy.renameTo(target)) {
-                legacy.copyRecursively(target, overwrite = true)
-                legacy.deleteRecursively()
-            }
         }
     }
 
@@ -188,7 +211,4 @@ class WakeModelRepository @Inject constructor(
             File(directory, "conf/model.conf").isFile &&
             File(directory, "graph/phones/word_boundary.int").isFile
 
-    private companion object {
-        const val LEGACY_CHINESE_MODEL_DIR = "vosk-model-small-cn-0.22"
-    }
 }

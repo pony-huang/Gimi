@@ -54,8 +54,8 @@ sealed interface AssistantOverlayAction {
     /** 关闭浮层：不取消已提交任务。 */
     data object CloseOverlay : AssistantOverlayAction
 
-    data object ApproveConfirmation : AssistantOverlayAction
-    data object RejectConfirmation : AssistantOverlayAction
+    data class ApproveConfirmation(val confirmationCallId: String) : AssistantOverlayAction
+    data class RejectConfirmation(val confirmationCallId: String) : AssistantOverlayAction
     data object StopSpeaking : AssistantOverlayAction
     data object RetryAfterError : AssistantOverlayAction
 

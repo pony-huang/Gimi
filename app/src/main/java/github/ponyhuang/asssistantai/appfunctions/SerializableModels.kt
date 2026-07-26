@@ -12,7 +12,7 @@ import androidx.appfunctions.AppFunctionSerializable
  */
 @AppFunctionSerializable(isDescribedByKDoc = true)
 data class AssistantReply(
-    /** 本轮实际使用的会话 id：入参 sessionId 为空时是新建的 id，否则回显传入值。下一轮传回此值即可延续对话。 */
+    /** 本应用签发的受管会话句柄；下一轮原样传回可延续对话，句柄会过期且不能访问普通应用会话。 */
     val sessionId: String,
     /** LLM 本轮的最终回答文本（已屏蔽 streaming 细节，单字符串）。 */
     val reply: String,

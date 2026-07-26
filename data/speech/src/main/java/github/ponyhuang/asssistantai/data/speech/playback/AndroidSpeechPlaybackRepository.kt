@@ -7,6 +7,7 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackState
 import github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackStatus
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechPlaybackRepository
@@ -15,7 +16,6 @@ import java.io.ByteArrayOutputStream
 import java.util.LinkedHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -108,24 +108,24 @@ class AndroidSpeechPlaybackRepository @Inject constructor(
         _state.value = SpeechPlaybackState(messageId, SpeechPlaybackStatus.Loading)
         playbackJob = scope.launch {
             try {
-                val cached = synchronized(cache) { cache[cacheKey] }
-                if (cached != null) {
-                    playPcm(messageId, token) { write -> write(cached) }
-                } else {
-                    val collected = ByteArrayOutputStream()
-                    playPcm(messageId, token) { write ->
-                        synthesis.synthesize(text).collect { chunk ->
-                            collected.write(chunk)
-                            write(chunk)
+                cancellationAwareRunCatching {
+                    val cached = synchronized(cache) { cache[cacheKey] }
+                    if (cached != null) {
+                        playPcm(messageId, token) { write -> write(cached) }
+                    } else {
+                        val collected = ByteArrayOutputStream()
+                        playPcm(messageId, token) { write ->
+                            synthesis.synthesize(text).collect { chunk ->
+                                collected.write(chunk)
+                                write(chunk)
+                            }
                         }
+                        putCache(cacheKey, collected.toByteArray())
                     }
-                    putCache(cacheKey, collected.toByteArray())
-                }
-            } catch (_: CancellationException) {
-                throw CancellationException()
-            } catch (error: Throwable) {
-                if (generation == token) {
-                    _errors.tryEmit(error.message ?: "语音播放失败")
+                }.onFailure { error ->
+                    if (generation == token) {
+                        _errors.tryEmit(error.message ?: "语音播放失败")
+                    }
                 }
             } finally {
                 if (generation == token) {
@@ -164,7 +164,7 @@ class AndroidSpeechPlaybackRepository @Inject constructor(
         var totalFrames = 0L
         track.play()
         source { bytes ->
-            if (generation != token) throw CancellationException()
+            check(generation == token) { "Playback superseded" }
             if (_state.value.status == SpeechPlaybackStatus.Loading) {
                 _state.value = SpeechPlaybackState(messageId, SpeechPlaybackStatus.Playing)
             }
@@ -172,7 +172,7 @@ class AndroidSpeechPlaybackRepository @Inject constructor(
             while (offset < bytes.size) {
                 val written = track.write(bytes, offset, bytes.size - offset, AudioTrack.WRITE_BLOCKING)
                 if (written < 0) {
-                    if (generation != token) throw CancellationException()
+                    check(generation == token) { "Playback superseded" }
                     error("音频播放写入失败：$written")
                 }
                 offset += written

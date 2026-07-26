@@ -1,16 +1,20 @@
 package github.ponyhuang.asssistantai.data.speech.remote
 
 import android.util.Base64
-import com.openai.client.okhttp.OpenAIOkHttpClient
-import com.openai.core.JsonValue
-import com.openai.models.chat.completions.ChatCompletionContentPart
-import com.openai.models.chat.completions.ChatCompletionContentPartInputAudio
-import com.openai.models.chat.completions.ChatCompletionCreateParams
-import com.openai.models.chat.completions.ChatCompletionUserMessageParam
+import com.google.gson.Gson
+import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 
-class OpenAiCompatibleSpeechRecognitionGateway : SpeechRecognitionGateway {
+class OpenAiCompatibleSpeechRecognitionGateway(
+    private val okHttpClient: OkHttpClient,
+) : SpeechRecognitionGateway {
+    private val gson = Gson()
+
     override suspend fun transcribe(
         config: SpeechRecognitionConfig,
         request: SpeechRecognitionRequest,
@@ -20,38 +24,55 @@ class OpenAiCompatibleSpeechRecognitionGateway : SpeechRecognitionGateway {
             sampleRateHz = request.sampleRateHz,
             channelCount = request.channelCount,
         )
-        val inputAudio = ChatCompletionContentPartInputAudio.builder()
-            .inputAudio(
-                ChatCompletionContentPartInputAudio.InputAudio.builder()
-                    .data(Base64.encodeToString(wav, Base64.NO_WRAP))
-                    .format(ChatCompletionContentPartInputAudio.InputAudio.Format.WAV)
-                    .build(),
-            )
-            .build()
-        val message = ChatCompletionUserMessageParam.builder()
-            .content(
-                ChatCompletionUserMessageParam.Content.ofArrayOfContentParts(
-                    listOf(ChatCompletionContentPart.ofInputAudio(inputAudio)),
+        val body = gson.toJson(
+            mapOf(
+                "model" to config.modelId,
+                "messages" to listOf(
+                    mapOf(
+                        "role" to "user",
+                        "content" to listOf(
+                            mapOf(
+                                "type" to "input_audio",
+                                "input_audio" to mapOf(
+                                    "data" to Base64.encodeToString(wav, Base64.NO_WRAP),
+                                    "format" to "wav",
+                                ),
+                            ),
+                        ),
+                    ),
                 ),
-            )
+                "asr_options" to mapOf("language" to request.language),
+            ),
+        )
+        val httpRequest = Request.Builder()
+            .url("${config.baseUrl.trimEnd('/')}/chat/completions")
+            .addHeader("Authorization", "Bearer ${config.apiKey}")
+            .addHeader("Accept", "application/json")
+            .post(body.toRequestBody(JSON_MEDIA_TYPE))
             .build()
-        val params = ChatCompletionCreateParams.builder()
-            .model(config.modelId)
-            .addMessage(message)
-            .putAdditionalBodyProperty(
-                "asr_options",
-                JsonValue.from(mapOf("language" to request.language)),
-            )
-            .build()
-        val client = OpenAIOkHttpClient.builder()
-            .baseUrl(config.baseUrl)
-            .apiKey(config.apiKey)
-            .build()
-        client.chat().completions().create(params).choices()
-            .asSequence()
-            .mapNotNull { it.message().content().orElse(null) }
-            .firstOrNull { it.isNotBlank() }
-            ?: error("语音识别未返回文本")
+        okHttpClient.newCall(httpRequest).execute().use { response ->
+            check(response.isSuccessful) {
+                "语音识别请求失败：HTTP ${response.code}"
+            }
+            val responseBody = checkNotNull(response.body).string()
+            JsonParser.parseString(responseBody)
+                .asJsonObject
+                .getAsJsonArray("choices")
+                ?.asSequence()
+                ?.mapNotNull { choice ->
+                    choice.asJsonObject
+                        .getAsJsonObject("message")
+                        ?.get("content")
+                        ?.takeUnless { it.isJsonNull }
+                        ?.asString
+                }
+                ?.firstOrNull(String::isNotBlank)
+                ?: error("语音识别未返回文本")
+        }
+    }
+
+    private companion object {
+        val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }
 

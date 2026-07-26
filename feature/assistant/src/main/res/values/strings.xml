@@ -22,6 +22,7 @@
     <string name="assistant_error_retry">重试</string>
     <string name="assistant_confirm_title">敏感操作确认</string>
     <string name="assistant_confirm_message">即将执行「%1$s」，是否允许？</string>
+    <string name="assistant_confirm_arguments">目标参数：%1$s</string>
     <string name="assistant_confirm_countdown">%1$d 秒后自动拒绝</string>
     <string name="assistant_confirm_approve">允许</string>
     <string name="assistant_confirm_reject">拒绝</string>

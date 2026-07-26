@@ -26,7 +26,11 @@ class CalendarTool @Inject constructor(
 ) {
     private val resolver = context.contentResolver
 
-    @Tool(name = "list_calendars", description = "Lists calendars available on the device. Requires calendar read permission.")
+    @Tool(
+        name = "list_calendars",
+        description = "Lists calendars available on the device. Requires calendar read permission and user confirmation.",
+        requireConfirmation = true,
+    )
     fun listCalendars(): Map<String, Any> {
         if (!hasPermission(Manifest.permission.READ_CALENDAR)) return readPermissionError()
         val calendars = mutableListOf<Map<String, Any>>()
@@ -49,7 +53,11 @@ class CalendarTool @Inject constructor(
         return mapOf("success" to true, "calendars" to calendars)
     }
 
-    @Tool(name = "get_upcoming_calendar_events", description = "Lists calendar events occurring in the requested number of upcoming days. Requires calendar read permission.")
+    @Tool(
+        name = "get_upcoming_calendar_events",
+        description = "Lists calendar events occurring in the requested number of upcoming days. Requires calendar read permission and user confirmation.",
+        requireConfirmation = true,
+    )
     fun getUpcomingCalendarEvents(
         @Param("Number of upcoming days to query, from 1 to 31.") days: Int,
     ): Map<String, Any> {

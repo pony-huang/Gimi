@@ -16,3 +16,15 @@ class RecordPermanentlyDeniedPermissionsUseCase @Inject constructor(
     operator fun invoke(permissions: Set<AppPermission>) =
         repository.recordPermanentlyDenied(permissions)
 }
+
+class WasPermissionRequestedUseCase @Inject constructor(
+    private val repository: PermissionRepository,
+) {
+    operator fun invoke(permission: AppPermission) = repository.wasRequested(permission)
+}
+
+class RecordRequestedPermissionsUseCase @Inject constructor(
+    private val repository: PermissionRepository,
+) {
+    operator fun invoke(permissions: Set<AppPermission>) = repository.recordRequested(permissions)
+}

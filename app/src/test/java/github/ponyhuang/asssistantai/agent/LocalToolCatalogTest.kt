@@ -16,9 +16,11 @@ import github.ponyhuang.asssistantai.agent.tools.system.PhoneTool
 import github.ponyhuang.asssistantai.agent.tools.system.ScreenTimeoutTool
 import github.ponyhuang.asssistantai.agent.tools.system.SettingsNavigationTool
 import github.ponyhuang.asssistantai.agent.tools.system.VolumeTool
+import com.google.adk.kt.tools.FunctionTool
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalToolCatalogTest {
@@ -37,6 +39,41 @@ class LocalToolCatalogTest {
         val toolIds = catalog().definitions().mapTo(mutableSetOf()) { it.id }
 
         assertFalse("web_search must be contributed per model service", "web_search" in toolIds)
+    }
+
+    @Test
+    fun sensitiveReadToolsRequireConfirmation() {
+        val toolsByName = catalog().tools().associateBy { it.name }
+        val sensitiveNames = listOf(
+            "list_calendars",
+            "get_upcoming_calendar_events",
+            "get_current_location",
+            "list_active_media_sessions",
+        )
+
+        sensitiveNames.forEach { name ->
+            val tool = toolsByName.getValue(name) as FunctionTool
+            val getter = FunctionTool::class.java
+                .getDeclaredMethod("getRequiresConfirmation")
+                .apply { isAccessible = true }
+            @Suppress("UNCHECKED_CAST")
+            val requiresConfirmation =
+                getter.invoke(tool) as (Map<String, Any>) -> Boolean
+            assertTrue(
+                "$name must require confirmation",
+                requiresConfirmation(emptyMap()),
+            )
+        }
+    }
+
+    @Test
+    fun appFunctionToolFilteringRemovesConfirmationRequiredTools() {
+        val filteredIds = excludeConfirmationRequiredTools(catalog().tools())
+            .mapTo(mutableSetOf()) { it.name }
+
+        assertTrue("get_current_time" in filteredIds)
+        assertFalse("get_current_location" in filteredIds)
+        assertFalse("list_calendars" in filteredIds)
     }
 
     private fun catalog() = LocalToolCatalog(

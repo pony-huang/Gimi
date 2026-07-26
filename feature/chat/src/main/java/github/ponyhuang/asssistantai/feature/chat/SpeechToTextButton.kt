@@ -204,11 +204,13 @@ public class SpeechToTextButtonState internal constructor(
 @Composable
 public fun rememberSpeechToTextButtonState(
     onPartialResult: ((String) -> Unit)? = null,
+    onError: ((String) -> Unit)? = null,
     onFinalResult: (String) -> Unit,
 ): SpeechToTextButtonState {
     val helper = rememberSpeechRecognizerHelper(
         onPartialResult = onPartialResult,
         onFinalResult = onFinalResult,
+        onError = onError,
     )
     return remember(helper) {
         SpeechToTextButtonState(helper)

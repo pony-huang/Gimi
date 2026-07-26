@@ -8,9 +8,19 @@ interface WorkDirectoryRepository {
 
     fun currentDirectories(): List<WorkDirectory>
 
-    fun addDirectory(uri: String): Boolean
+    suspend fun addDirectory(uri: String): WorkDirectoryOperationResult
 
-    fun removeDirectory(uri: String)
+    suspend fun removeDirectory(uri: String): WorkDirectoryOperationResult
 
     fun contains(uri: String): Boolean
+}
+
+sealed interface WorkDirectoryOperationResult {
+    data object Success : WorkDirectoryOperationResult
+
+    sealed interface Failure : WorkDirectoryOperationResult {
+        data object InvalidDirectory : Failure
+        data object PermissionDenied : Failure
+        data object PersistenceFailed : Failure
+    }
 }

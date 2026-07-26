@@ -18,6 +18,7 @@ data class VoiceAgentResult(
 data class VoiceToolConfirmation(
     val callId: String,
     val toolName: String,
+    val arguments: Map<String, Any?>,
 )
 
 /**
@@ -34,7 +35,13 @@ class VoiceAgentTaskExecutor @Inject constructor(
         confirmTool: suspend (VoiceToolConfirmation) -> Boolean,
     ): VoiceAgentResult {
         val handler = AssistantConfirmationHandler { request ->
-            confirmTool(VoiceToolConfirmation(callId = request.confirmationCallId, toolName = request.toolName))
+            confirmTool(
+                VoiceToolConfirmation(
+                    callId = request.confirmationCallId,
+                    toolName = request.toolName,
+                    arguments = request.arguments,
+                ),
+            )
         }
         coordinator.submit(command, AssistantInvocationSource.BLUETOOTH_WAKE, handler)
         val state = coordinator.state.value

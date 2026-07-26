@@ -5,6 +5,7 @@ import com.google.adk.kt.agents.Instruction
 import com.google.adk.kt.agents.LlmAgent
 import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.BaseTool
+import com.google.adk.kt.tools.FunctionTool
 import com.google.adk.kt.tools.SkillToolset
 import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolRegistry
 import github.ponyhuang.asssistantai.data.LLMModelSelection
@@ -22,7 +23,10 @@ class AgentFactory @Inject constructor(
     private val agentModelFactory: AgentModelFactory,
     private val officialToolRegistry: OfficialToolRegistry,
 ) {
-    suspend fun create(selection: LLMModelSelection? = null): BaseAgent {
+    suspend fun create(
+        selection: LLMModelSelection? = null,
+        allowConfirmationRequiredTools: Boolean = true,
+    ): BaseAgent {
         val modelConfig = agentModelFactory.selectModelConfig(selection)
         val defaultModel = agentModelFactory.createModel(modelConfig)
         val fastModelConfig = agentModelFactory.selectFastModelConfig() ?: modelConfig
@@ -32,11 +36,16 @@ class AgentFactory @Inject constructor(
             agentModelFactory.createModel(fastModelConfig)
         }
         val officialTools = officialToolRegistry.resolve(modelConfig)
-        val tools: List<BaseTool> = buildList {
+        val configuredTools: List<BaseTool> = buildList {
             val enabledToolIds = toolAuthorization.enabledToolIds()
             addAll(localToolCatalog.tools().filter { it.name in enabledToolIds })
             addAll(mcpToolRegistry.tools())
             addAll(officialTools.tools)
+        }
+        val tools = if (allowConfirmationRequiredTools) {
+            configuredTools
+        } else {
+            excludeConfirmationRequiredTools(configuredTools)
         }
         val titleCallbacks = ConversationTitleCallbacks(fastModel)
         return LlmAgent(
@@ -59,3 +68,20 @@ class AgentFactory @Inject constructor(
     }
 
 }
+
+internal fun excludeConfirmationRequiredTools(tools: List<BaseTool>): List<BaseTool> =
+    tools.filterNot { tool ->
+        if (tool !is FunctionTool) {
+            false
+        } else {
+            runCatching {
+                val getter = FunctionTool::class.java
+                    .getDeclaredMethod("getRequiresConfirmation")
+                    .apply { isAccessible = true }
+                @Suppress("UNCHECKED_CAST")
+                val requiresConfirmation =
+                    getter.invoke(tool) as (Map<String, Any>) -> Boolean
+                requiresConfirmation(emptyMap())
+            }.getOrDefault(true)
+        }
+    }

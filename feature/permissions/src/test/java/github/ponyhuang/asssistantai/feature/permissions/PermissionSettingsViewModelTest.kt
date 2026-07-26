@@ -6,6 +6,8 @@ import github.ponyhuang.asssistantai.domain.permissions.model.RuntimeAppPermissi
 import github.ponyhuang.asssistantai.domain.permissions.repository.PermissionRepository
 import github.ponyhuang.asssistantai.domain.permissions.usecase.GetPermissionSnapshotUseCase
 import github.ponyhuang.asssistantai.domain.permissions.usecase.RecordPermanentlyDeniedPermissionsUseCase
+import github.ponyhuang.asssistantai.domain.permissions.usecase.RecordRequestedPermissionsUseCase
+import github.ponyhuang.asssistantai.domain.permissions.usecase.WasPermissionRequestedUseCase
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -72,9 +74,28 @@ class PermissionSettingsViewModelTest {
         assertTrue(!viewModel.uiState.value.allRuntimeGranted)
     }
 
+    @Test
+    fun firstRuntimeRequestIsNotMarkedAsPreviouslyRequested() {
+        val repository = repository(
+            PermissionSnapshot(
+                granted = RuntimeAppPermissions - AppPermission.RecordAudio,
+                permanentlyDenied = emptySet(),
+            ),
+        )
+        every { repository.wasRequested(AppPermission.RecordAudio) } returns false
+        val viewModel = viewModel(repository)
+
+        viewModel.onAction(PermissionSettingsAction.RequestGroup(PermissionGroupKind.Microphone))
+
+        assertTrue(viewModel.uiState.value.runtimeRequest?.previouslyRequested.orEmpty().isEmpty())
+        verify { repository.recordRequested(setOf(AppPermission.RecordAudio)) }
+    }
+
     private fun viewModel(repository: PermissionRepository) = PermissionSettingsViewModel(
         getSnapshot = GetPermissionSnapshotUseCase(repository),
         recordPermanentlyDenied = RecordPermanentlyDeniedPermissionsUseCase(repository),
+        wasPermissionRequested = WasPermissionRequestedUseCase(repository),
+        recordRequestedPermissions = RecordRequestedPermissionsUseCase(repository),
     )
 
     private fun repository(snapshot: PermissionSnapshot): PermissionRepository = mockk(relaxed = true) {

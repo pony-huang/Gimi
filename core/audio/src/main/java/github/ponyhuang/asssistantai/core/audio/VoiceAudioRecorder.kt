@@ -6,7 +6,9 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.SystemClock
 import androidx.annotation.RequiresPermission
+import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -66,32 +68,50 @@ class VoiceAudioRecorder {
         return try {
             recorder.startRecording()
             audioRecord = recorder
-            readJob = scope.launch {
-                val buffer = ByteArray(bufferSize)
-                var lastLevelDispatchMs = 0L
-                var smoothedLevel = 0f
-                while (isActive && recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
-                    val bytesRead = recorder.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
-                    when {
-                        bytesRead > 0 -> {
-                            val chunk = buffer.copyOf(bytesRead)
-                            onAudioChunk(chunk)
-                            val measuredLevel = calculatePcm16Level(chunk)
-                            smoothedLevel = (smoothedLevel * LEVEL_SMOOTHING) +
-                                (measuredLevel * (1f - LEVEL_SMOOTHING))
-                            val nowMs = SystemClock.elapsedRealtime()
-                            if (nowMs - lastLevelDispatchMs >= LEVEL_DISPATCH_INTERVAL_MS) {
-                                lastLevelDispatchMs = nowMs
-                                onAudioLevel(smoothedLevel)
+            readJob = scope.launch(start = CoroutineStart.LAZY) {
+                try {
+                    cancellationAwareRunCatching {
+                        val buffer = ByteArray(bufferSize)
+                        var lastLevelDispatchMs = 0L
+                        var smoothedLevel = 0f
+                        while (isActive && recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                            val bytesRead = recorder.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
+                            when {
+                                bytesRead > 0 -> {
+                                    val chunk = buffer.copyOf(bytesRead)
+                                    onAudioChunk(chunk)
+                                    val measuredLevel = calculatePcm16Level(chunk)
+                                    smoothedLevel = (smoothedLevel * LEVEL_SMOOTHING) +
+                                        (measuredLevel * (1f - LEVEL_SMOOTHING))
+                                    val nowMs = SystemClock.elapsedRealtime()
+                                    if (nowMs - lastLevelDispatchMs >= LEVEL_DISPATCH_INTERVAL_MS) {
+                                        lastLevelDispatchMs = nowMs
+                                        onAudioLevel(smoothedLevel)
+                                    }
+                                }
+                                bytesRead < 0 ->
+                                    throw IllegalStateException("Microphone read failed: $bytesRead")
                             }
                         }
-                        bytesRead < 0 -> {
-                            onError(IllegalStateException("Microphone read failed: $bytesRead"))
-                            break
+                    }.onFailure { error ->
+                        runCatching { onError(error) }
+                    }
+                } finally {
+                    synchronized(this@VoiceAudioRecorder) {
+                        if (audioRecord === recorder) {
+                            audioRecord = null
+                            readJob = null
+                            runCatching {
+                                if (recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                                    recorder.stop()
+                                }
+                                recorder.release()
+                            }
                         }
                     }
                 }
             }
+            readJob?.start()
             true
         } catch (error: Throwable) {
             recorder.release()

@@ -21,13 +21,13 @@ import github.ponyhuang.asssistantai.MainActivity
 import github.ponyhuang.asssistantai.core.audio.CaptureDecision
 import github.ponyhuang.asssistantai.core.audio.PcmPreRollBuffer
 import github.ponyhuang.asssistantai.core.audio.VoiceCommandCapture
+import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.asssistantai.R
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelInfo
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechRecognitionRepository
 import github.ponyhuang.asssistantai.domain.speech.usecase.markdownToSpeechText
 import javax.inject.Inject
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -267,44 +267,44 @@ class BluetoothVoiceService : Service() {
         processingJob?.cancel()
         processingJob = scope.launch {
             try {
-                setStatus(BluetoothVoiceStatus.Transcribing, getString(R.string.bluetooth_voice_status_transcribing))
-                val transcript = speechRecognition.transcribe(pcm16)
-                val command = stripWakeKeyword(transcript, preferences.keyword.value)
-                check(command.isNotBlank()) { getString(R.string.bluetooth_voice_status_no_task_content) }
-                setStatus(
-                    BluetoothVoiceStatus.RunningAgent,
-                    getString(
-                        R.string.bluetooth_voice_status_running_agent,
-                        command.take(NOTIFICATION_PREVIEW_LENGTH),
-                    ),
-                    lastCommand = command,
-                )
-                val result = agentTasks.execute(command, ::confirmVoiceTool)
-                val activeRoute = runCatching { audioRouter.findRoute() }.getOrNull()
-                if (activeRoute != null && speechPlayer.isAvailable()) {
+                cancellationAwareRunCatching {
+                    setStatus(BluetoothVoiceStatus.Transcribing, getString(R.string.bluetooth_voice_status_transcribing))
+                    val transcript = speechRecognition.transcribe(pcm16)
+                    val command = stripWakeKeyword(transcript, preferences.keyword.value)
+                    check(command.isNotBlank()) { getString(R.string.bluetooth_voice_status_no_task_content) }
                     setStatus(
-                        BluetoothVoiceStatus.Speaking,
-                        getString(R.string.bluetooth_voice_status_speaking),
-                        deviceName = activeRoute.name,
+                        BluetoothVoiceStatus.RunningAgent,
+                        getString(
+                            R.string.bluetooth_voice_status_running_agent,
+                            command.take(NOTIFICATION_PREVIEW_LENGTH),
+                        ),
                         lastCommand = command,
                     )
-                    speechPlayer.play(markdownToSpeechText(result.responseText), activeRoute)
+                    val result = agentTasks.execute(command, ::confirmVoiceTool)
+                    val activeRoute = runCatching { audioRouter.findRoute() }.getOrNull()
+                    if (activeRoute != null && speechPlayer.isAvailable()) {
+                        setStatus(
+                            BluetoothVoiceStatus.Speaking,
+                            getString(R.string.bluetooth_voice_status_speaking),
+                            deviceName = activeRoute.name,
+                            lastCommand = command,
+                        )
+                        speechPlayer.play(markdownToSpeechText(result.responseText), activeRoute)
+                    }
+                    setStatus(
+                        BluetoothVoiceStatus.Listening,
+                        result.responseText.take(NOTIFICATION_PREVIEW_LENGTH),
+                        deviceName = activeRoute?.name,
+                        lastCommand = command,
+                    )
+                }.onFailure { error ->
+                    setStatus(
+                        BluetoothVoiceStatus.Error,
+                        error.message ?: getString(R.string.bluetooth_voice_status_task_failed),
+                        lastCommand = controller.state.value.lastCommand,
+                    )
+                    delay(3_000)
                 }
-                setStatus(
-                    BluetoothVoiceStatus.Listening,
-                    result.responseText.take(NOTIFICATION_PREVIEW_LENGTH),
-                    deviceName = activeRoute?.name,
-                    lastCommand = command,
-                )
-            } catch (_: CancellationException) {
-                throw CancellationException()
-            } catch (error: Throwable) {
-                setStatus(
-                    BluetoothVoiceStatus.Error,
-                    error.message ?: getString(R.string.bluetooth_voice_status_task_failed),
-                    lastCommand = controller.state.value.lastCommand,
-                )
-                delay(3_000)
             } finally {
                 processingJob = null
                 if (!pausedByUser) reconcileBluetoothRoute()
@@ -321,8 +321,13 @@ class BluetoothVoiceService : Service() {
             getString(R.string.bluetooth_voice_status_confirm_wait, request.toolName),
             deviceName = activeRoute.name,
         )
+        val spokenTarget = voiceConfirmationTarget(request.arguments)
         val promptPlayed = speechPlayer.play(
-            wakeModel.confirmationPromptTemplate.format(request.toolName),
+            wakeModel.confirmationPromptTemplate.format(
+                listOf(request.toolName, spokenTarget)
+                    .filter(String::isNotBlank)
+                    .joinToString("，"),
+            ),
             activeRoute,
         )
         if (!promptPlayed) return false
@@ -559,6 +564,22 @@ class BluetoothVoiceService : Service() {
         private const val NOTIFICATION_PREVIEW_LENGTH = 120
     }
 }
+
+private fun voiceConfirmationTarget(arguments: Map<String, Any?>): String =
+    arguments.entries
+        .joinToString("，") { (key, rawValue) ->
+            val value = rawValue?.toString().orEmpty()
+            val spokenValue = if (
+                key.contains("phone", ignoreCase = true) ||
+                key.contains("number", ignoreCase = true)
+            ) {
+                value.takeLast(4)
+            } else {
+                value.take(40)
+            }
+            "$key $spokenValue"
+        }
+        .take(120)
 
 /**
  * 判断语音确认口令。确认/取消词表由调用方按激活唤醒模型的语言传入

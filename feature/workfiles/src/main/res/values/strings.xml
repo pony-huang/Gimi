@@ -8,4 +8,7 @@
     <string name="workfiles_section_authorized">已授权文件夹</string>
     <string name="workfiles_empty_state">尚未添加工作文件夹</string>
     <string name="workfiles_remove_action">移除工作文件夹</string>
+    <string name="workfiles_error_invalid">所选位置不是有效的工作文件夹。</string>
+    <string name="workfiles_error_permission">无法保留该文件夹的访问权限，请重新选择。</string>
+    <string name="workfiles_error_persistence">保存工作文件夹失败，请重试。</string>
 </resources>

@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -136,6 +137,10 @@ private fun ImagePreviewDialog(
                     decodeSampledBitmap(image.data, targetSize = targetSize)
                 }
             }
+            DisposableEffect(bitmap) {
+                val managedBitmap = bitmap
+                onDispose { managedBitmap?.recycle() }
+            }
 
             bitmap?.let { currentBitmap ->
                 Image(
@@ -175,6 +180,10 @@ private fun InlineImage(
         bitmap = withContext(Dispatchers.Default) {
             decodeSampledBitmap(image.data, targetSize = 240)
         }
+    }
+    DisposableEffect(bitmap) {
+        val managedBitmap = bitmap
+        onDispose { managedBitmap?.recycle() }
     }
     AttachmentTile(
         modifier = Modifier.clickable(onClick = onClick),
@@ -287,7 +296,7 @@ private fun UriImage(
     val density = LocalDensity.current
     val targetSizePx = with(density) { 100.dp.toPx().toInt() }
 
-    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var bitmap by remember(uri, targetSizePx) { mutableStateOf<Bitmap?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var hasError by remember { mutableStateOf(false) }
 
@@ -303,6 +312,10 @@ private fun UriImage(
             }
         }
         isLoading = false
+    }
+    DisposableEffect(bitmap) {
+        val managedBitmap = bitmap
+        onDispose { managedBitmap?.recycle() }
     }
 
     when {

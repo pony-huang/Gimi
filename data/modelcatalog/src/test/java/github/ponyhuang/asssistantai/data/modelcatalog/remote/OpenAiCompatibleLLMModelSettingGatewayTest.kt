@@ -13,6 +13,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
 
 class OpenAiCompatibleLLMModelSettingGatewayTest {
     private lateinit var server: MockWebServer
@@ -46,6 +47,28 @@ class OpenAiCompatibleLLMModelSettingGatewayTest {
         server.enqueue(MockResponse().setResponseCode(204))
 
         assertFalse(gateway().validateConnection(service()))
+    }
+
+    @Test
+    fun fetchModelsUsesInjectedHttpClient() = runTest {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setBody("""{"data":[{"id":"model-a"},{"id":"model-b"}]}"""),
+        )
+        val calls = AtomicInteger()
+        val client = OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                calls.incrementAndGet()
+                chain.proceed(chain.request())
+            }
+            .build()
+        val gateway = OpenAiCompatibleModelServiceGateway(client, Dispatchers.IO)
+
+        val models = gateway.fetchModels(service())
+
+        assertEquals(listOf("model-a", "model-b"), models.map { it.id })
+        assertEquals(1, calls.get())
     }
 
     private fun gateway() = OpenAiCompatibleModelServiceGateway(

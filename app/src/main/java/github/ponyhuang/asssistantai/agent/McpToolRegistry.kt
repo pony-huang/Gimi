@@ -8,6 +8,7 @@ import com.google.adk.kt.types.Schema
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
 import github.ponyhuang.asssistantai.domain.mcp.model.McpTransport
 import github.ponyhuang.asssistantai.domain.mcp.repository.McpRepository
+import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.sse.SSE
@@ -23,20 +24,40 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** Discovers remote MCP tools and exposes them as regular ADK tools. */
 @Singleton
 class McpToolRegistry @Inject constructor(
     private val servers: McpRepository,
 ) {
-    suspend fun tools(): List<BaseTool> = servers.currentServers()
-        .filter { it.isEnabled && it.endpointUrl.isNotBlank() }
-        .flatMap { server -> runCatching { discover(server) }.getOrElse { emptyList() } }
+    private val discoveryMutex = Mutex()
+    private var cachedRevision = Long.MIN_VALUE
+    private var cachedTools: List<BaseTool> = emptyList()
+
+    suspend fun tools(): List<BaseTool> = discoveryMutex.withLock {
+        val revision = servers.revision.value
+        if (revision == cachedRevision) return@withLock cachedTools
+        val discovered = servers.currentServers()
+            .filter { it.isEnabled && it.endpointUrl.isNotBlank() }
+            .flatMap { server ->
+                cancellationAwareRunCatching { discover(server) }.getOrElse { emptyList() }
+            }
+            .distinctBy(BaseTool::name)
+        cachedRevision = revision
+        cachedTools = discovered
+        discovered
+    }
 
     private suspend fun discover(server: McpServer): List<BaseTool> {
         val connection = connect(server)
         return try {
-            connection.client.listTools().tools.map { tool -> McpRemoteTool(server, tool) }
+            connection.client.listTools().tools.mapNotNull { tool ->
+                mcpToolName(server.id, tool.name)?.let { name ->
+                    McpRemoteTool(server, tool, name)
+                }
+            }
         } finally {
             connection.close()
         }
@@ -58,7 +79,12 @@ class McpToolRegistry @Inject constructor(
                 requestBuilder = requestHeaders,
             )
         }
-        client.connect(transport)
+        try {
+            client.connect(transport)
+        } catch (failure: Throwable) {
+            httpClient.close()
+            throw failure
+        }
         return McpConnection(client, httpClient, server)
     }
 
@@ -96,8 +122,9 @@ class McpToolRegistry @Inject constructor(
     private inner class McpRemoteTool(
         private val server: McpServer,
         private val remote: Tool,
+        adkName: String,
     ) : FunctionTool(
-        name = "mcp_${server.id.take(8)}_${remote.name}".replace(Regex("[^A-Za-z0-9_-]"), "_"),
+        name = adkName,
         description = "MCP (${server.name}): ${remote.description ?: remote.name}",
         requiresConfirmation = true,
     ) {
@@ -110,6 +137,13 @@ class McpToolRegistry @Inject constructor(
         override suspend fun execute(context: ToolContext, args: Map<String, Any>): Any =
             connect(server).use { it.call(remote, args) }
     }
+}
+
+internal fun mcpToolName(serverId: String, remoteName: String): String? {
+    if (!remoteName.matches(Regex("[A-Za-z0-9_.-]{1,128}"))) return null
+    val namespace = serverId.hashCode().toUInt().toString(16)
+    val safeRemoteName = remoteName.replace('.', '_').take(40)
+    return "mcp_${namespace}_$safeRemoteName".take(64)
 }
 
 private fun io.modelcontextprotocol.kotlin.sdk.types.ToolSchema.toAdkSchema(): Schema = Schema(

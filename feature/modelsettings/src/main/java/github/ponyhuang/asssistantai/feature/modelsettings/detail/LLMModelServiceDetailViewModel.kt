@@ -35,7 +35,8 @@ class ModelServiceDetailViewModel @Inject constructor(
 
     private var serviceId: String? = null
     private var expandedGroupIds: Set<String> = emptySet()
-    private var observationJob: Job? = null
+    private var loadJob: Job? = null
+    private var loadGeneration = 0L
 
     init {
         viewModelScope.launch {
@@ -80,16 +81,18 @@ class ModelServiceDetailViewModel @Inject constructor(
     }
 
     private fun load(id: String) {
-        if (serviceId == id && observationJob?.isActive == true) return
-        observationJob?.cancel()
+        if (serviceId == id && loadJob?.isActive == true) return
+        loadJob?.cancel()
+        val generation = ++loadGeneration
         serviceId = id
         _uiState.value = LLMModelSettingDetailUiState(
             isLoading = true,
             isMutationBlocked = _uiState.value.isMutationBlocked,
         )
 
-        viewModelScope.launch {
+        loadJob = viewModelScope.launch {
             val initial = loadModelService(id)
+            if (generation != loadGeneration || serviceId != id) return@launch
             if (initial == null) {
                 _uiState.update {
                     it.copy(
@@ -103,8 +106,10 @@ class ModelServiceDetailViewModel @Inject constructor(
 
             expandedGroupIds = initial.groups.map { it.id }.toSet()
             publishService(initial)
-            observationJob = launch {
-                observeModelService(id).collect(::publishService)
+            observeModelService(id).collect { service ->
+                if (generation == loadGeneration && serviceId == id) {
+                    publishService(service)
+                }
             }
         }
     }

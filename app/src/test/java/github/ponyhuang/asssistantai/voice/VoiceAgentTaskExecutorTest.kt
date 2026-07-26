@@ -97,7 +97,10 @@ class VoiceAgentTaskExecutorTest {
 
         override fun stop() = Unit
 
-        override fun respondToConfirmation(confirmed: Boolean) = Unit
+        override fun respondToConfirmation(
+            confirmationCallId: String,
+            confirmed: Boolean,
+        ): Boolean = true
 
         override fun hideOverlay() = Unit
     }

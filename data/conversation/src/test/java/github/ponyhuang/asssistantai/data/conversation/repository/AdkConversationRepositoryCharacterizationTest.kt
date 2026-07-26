@@ -7,6 +7,7 @@ import github.ponyhuang.asssistantai.data.conversation.local.ConversationMetadat
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import java.util.concurrent.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -37,6 +38,20 @@ class AdkConversationRepositoryCharacterizationTest {
         coEvery { sessionService.createSession(any()) } throws IllegalStateException("storage unavailable")
 
         assertEquals("", repository().createConversation())
+    }
+
+    @Test
+    fun refresh_propagatesCancellation() = runTest {
+        coEvery {
+            sessionService.listSessions(appName = any(), userId = any())
+        } throws CancellationException("cancelled")
+
+        try {
+            repository().refresh()
+            throw AssertionError("CancellationException was swallowed")
+        } catch (_: CancellationException) {
+            // Expected.
+        }
     }
 
     private fun repository() = AdkConversationRepository(

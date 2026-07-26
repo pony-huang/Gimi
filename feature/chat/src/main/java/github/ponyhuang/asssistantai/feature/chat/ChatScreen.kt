@@ -45,6 +45,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -233,16 +234,18 @@ fun ChatScaffold(
                     ),
                 )
             }
-            ChatComposer(
-                modifier = Modifier.background(fadeBrush),
-                onSendClick = { data ->
-                    onSend(data.text, data.attachments.map { it.toString() })
-                },
-                onStopClick = onStop,
-                isGenerating = isAgentRunning,
-                isVoiceInputAvailable = isSpeechRecognitionAvailable,
-                onTranscribeVoice = onTranscribeVoice,
-            )
+            key(state.sessionId) {
+                ChatComposer(
+                    modifier = Modifier.background(fadeBrush),
+                    onSendClick = { data ->
+                        onSend(data.text, data.attachments.map { it.toString() })
+                    },
+                    onStopClick = onStop,
+                    isGenerating = isAgentRunning,
+                    isVoiceInputAvailable = isSpeechRecognitionAvailable,
+                    onTranscribeVoice = onTranscribeVoice,
+                )
+            }
         },
         floatingActionButton = {
             AnimatedVisibility(

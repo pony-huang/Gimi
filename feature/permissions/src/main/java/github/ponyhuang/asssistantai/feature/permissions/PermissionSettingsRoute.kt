@@ -37,6 +37,9 @@ fun PermissionSettingsRoute(
     var requestedPermissions by remember {
         mutableStateOf<Map<String, AppPermission>>(emptyMap())
     }
+    var previouslyRequestedPermissions by remember {
+        mutableStateOf<Set<AppPermission>>(emptySet())
+    }
     val settingsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) {
@@ -49,10 +52,12 @@ fun PermissionSettingsRoute(
             .filterValues { granted -> !granted }
             .keys
             .mapNotNullTo(mutableSetOf()) { name ->
-                requestedPermissions[name]?.takeIf {
-                    activity == null || !ActivityCompat.shouldShowRequestPermissionRationale(
-                        activity,
-                        name,
+                requestedPermissions[name]?.takeIf { permission ->
+                    permission in previouslyRequestedPermissions && (
+                        activity == null || !ActivityCompat.shouldShowRequestPermissionRationale(
+                            activity,
+                            name,
+                        )
                     )
                 }
             }
@@ -60,6 +65,7 @@ fun PermissionSettingsRoute(
             PermissionSettingsAction.RuntimePermissionsResult(permanentlyDenied),
         )
         requestedPermissions = emptyMap()
+        previouslyRequestedPermissions = emptySet()
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -75,6 +81,7 @@ fun PermissionSettingsRoute(
     LaunchedEffect(state.runtimeRequest) {
         val request = state.runtimeRequest ?: return@LaunchedEffect
         requestedPermissions = request.permissions.associateBy(AppPermission::androidName)
+        previouslyRequestedPermissions = request.previouslyRequested
         viewModel.onAction(PermissionSettingsAction.RuntimeRequestHandled(request.id))
         permissionLauncher.launch(requestedPermissions.keys.toTypedArray())
     }

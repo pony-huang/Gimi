@@ -5,8 +5,10 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import androidx.annotation.RequiresPermission
+import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -65,24 +67,39 @@ class BluetoothPcmRecorder {
                 throw BluetoothRecorderException(BluetoothRecorderException.Reason.NotRecording)
             }
             recorder = audioRecord
-            readJob = scope.launch {
-                val buffer = ByteArray(FRAME_BYTES)
-                while (isActive && audioRecord.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
-                    val count = audioRecord.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
-                    when {
-                        count > 0 -> onChunk(buffer.copyOf(count))
-                        count < 0 && !stopping.get() -> {
-                            onError(
-                                BluetoothRecorderException(
+            readJob = scope.launch(start = CoroutineStart.LAZY) {
+                try {
+                    cancellationAwareRunCatching {
+                        val buffer = ByteArray(FRAME_BYTES)
+                        while (isActive && audioRecord.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                            val count = audioRecord.read(buffer, 0, buffer.size, AudioRecord.READ_BLOCKING)
+                            when {
+                                count > 0 -> onChunk(buffer.copyOf(count))
+                                count < 0 && !stopping.get() -> throw BluetoothRecorderException(
                                     BluetoothRecorderException.Reason.ReadFailed,
                                     errorCode = count,
-                                ),
-                            )
-                            break
+                                )
+                            }
+                        }
+                    }.onFailure { error ->
+                        runCatching { onError(error) }
+                    }
+                } finally {
+                    synchronized(this@BluetoothPcmRecorder) {
+                        if (recorder === audioRecord) {
+                            recorder = null
+                            readJob = null
+                            runCatching {
+                                if (audioRecord.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                                    audioRecord.stop()
+                                }
+                                audioRecord.release()
+                            }
                         }
                     }
                 }
             }
+            readJob?.start()
             true
         }.getOrElse {
             audioRecord.release()

@@ -8,6 +8,8 @@ import github.ponyhuang.asssistantai.domain.permissions.model.PermissionSnapshot
 import github.ponyhuang.asssistantai.domain.permissions.model.RuntimeAppPermissions
 import github.ponyhuang.asssistantai.domain.permissions.usecase.GetPermissionSnapshotUseCase
 import github.ponyhuang.asssistantai.domain.permissions.usecase.RecordPermanentlyDeniedPermissionsUseCase
+import github.ponyhuang.asssistantai.domain.permissions.usecase.RecordRequestedPermissionsUseCase
+import github.ponyhuang.asssistantai.domain.permissions.usecase.WasPermissionRequestedUseCase
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,6 +19,8 @@ import kotlinx.coroutines.flow.update
 class PermissionSettingsViewModel @Inject constructor(
     private val getSnapshot: GetPermissionSnapshotUseCase,
     private val recordPermanentlyDenied: RecordPermanentlyDeniedPermissionsUseCase,
+    private val wasPermissionRequested: WasPermissionRequestedUseCase,
+    private val recordRequestedPermissions: RecordRequestedPermissionsUseCase,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(getSnapshot().toUiState())
     val uiState = _uiState.asStateFlow()
@@ -80,14 +84,18 @@ class PermissionSettingsViewModel @Inject constructor(
 
     private fun requestRuntimePermissions(permissions: List<AppPermission>) {
         if (permissions.isEmpty()) return
+        val previouslyRequested = permissions
+            .filterTo(mutableSetOf(), wasPermissionRequested::invoke)
         _uiState.update {
             it.copy(
                 runtimeRequest = RuntimePermissionRequest(
                     id = ++nextRequestId,
                     permissions = permissions,
+                    previouslyRequested = previouslyRequested,
                 ),
             )
         }
+        recordRequestedPermissions(permissions.toSet())
     }
 
     private fun requestSettings(destination: PermissionSettingsDestination) {

@@ -37,6 +37,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -157,13 +158,40 @@ class DefaultAssistantSessionCoordinatorTest {
         assertEquals("brightness_set", awaiting.pendingConfirmation?.toolName)
         assertEquals(listOf("brightness_set"), awaiting.turn?.toolNames)
 
-        coordinator.respondToConfirmation(true)
+        coordinator.respondToConfirmation("confirm-1", true)
         submission.await()
         advanceUntilIdle()
 
         coVerify { chatAgent.respondToToolConfirmation("voice-session-1", "confirm-1", true) }
         assertEquals("已调亮。", coordinator.state.value.turn?.responseText)
         assertEquals(AssistantSessionPhase.FOLLOW_UP_IDLE, coordinator.state.value.phase)
+    }
+
+    @Test
+    fun `stale confirmation id cannot approve the current request`() = runTest {
+        coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
+        coEvery { chatAgent.send(any(), any(), any(), any()) } returns flowOf(
+            confirmationEvent("confirm-current", "brightness_set"),
+        )
+        coEvery {
+            chatAgent.respondToToolConfirmation(any(), any(), any())
+        } returns flowOf(textEvent("已调亮。"))
+
+        val submission = async { coordinator.submit("调亮屏幕", AssistantInvocationSource.TILE) }
+        runCurrent()
+
+        assertFalse(coordinator.respondToConfirmation("confirm-stale", true))
+        assertEquals(
+            "confirm-current",
+            coordinator.state.value.pendingConfirmation?.confirmationCallId,
+        )
+        assertTrue(coordinator.respondToConfirmation("confirm-current", true))
+        submission.await()
+        advanceUntilIdle()
+
+        coVerify {
+            chatAgent.respondToToolConfirmation("voice-session-1", "confirm-current", true)
+        }
     }
 
     @Test

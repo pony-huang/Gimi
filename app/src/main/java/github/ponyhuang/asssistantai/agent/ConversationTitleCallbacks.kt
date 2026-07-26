@@ -13,6 +13,7 @@ import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.ThinkingConfig
+import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
 import kotlinx.coroutines.flow.toList
 import java.util.concurrent.ConcurrentHashMap
 
@@ -27,6 +28,10 @@ class ConversationTitleCallbacks(
     private val model: Model,
 ) {
     fun beforeModel() = BeforeModelCallback { context, request ->
+        val now = System.currentTimeMillis()
+        pendingTitles.entries.removeIf { (_, pending) ->
+            now - pending.createdAtMillis > PENDING_TITLE_TTL_MILLIS
+        }
         if (isTitleFlowCompleted(context)) {
             Log.d(TAG, "Title flow already completed for ${context.invocationId}")
             return@BeforeModelCallback CallbackChoice.Continue(request)
@@ -43,7 +48,7 @@ class ConversationTitleCallbacks(
             if (title != null) {
                 val pending = PendingTitle(
                     provisionalTitle = title,
-                    userText = userText.orEmpty(),
+                    userText = userText.orEmpty().take(MAX_PROMPT_TEXT_LENGTH),
                 )
                 if (pendingTitles.putIfAbsent(context.invocationId, pending) == null) {
                     Log.i(TAG, "Provisional title prepared for ${context.invocationId}: $title")
@@ -62,7 +67,9 @@ class ConversationTitleCallbacks(
                 ?.joinToString("")
                 ?.takeIf(String::isNotBlank)
                 ?.let {
-                    pendingTitles[context.invocationId] = pending.copy(assistantText = it)
+                    pendingTitles[context.invocationId] = pending.copy(
+                        assistantText = it.take(MAX_PROMPT_TEXT_LENGTH),
+                    )
                     Log.i(TAG, "First assistant response captured for ${context.invocationId}")
                 }
         }
@@ -88,7 +95,7 @@ class ConversationTitleCallbacks(
         }
 
         Log.i(TAG, "Generating AI title for ${context.invocationId}")
-        val title = runCatching {
+        val title = cancellationAwareRunCatching {
             generateTitle(
                 userText = pending.userText,
                 assistantText = assistantText,
@@ -175,12 +182,15 @@ class ConversationTitleCallbacks(
         const val TAG = "ConversationTitle"
         const val STATE_TITLE = "conversation.title"
         const val STATE_TITLE_FLOW_COMPLETED = "conversation.title.completed"
+        const val MAX_PROMPT_TEXT_LENGTH = 2_000
+        const val PENDING_TITLE_TTL_MILLIS = 5 * 60 * 1_000L
     }
 
     private data class PendingTitle(
         val provisionalTitle: String = ConversationTitle.IMAGE_MESSAGE_TITLE,
         val userText: String = "",
         val assistantText: String? = null,
+        val createdAtMillis: Long = System.currentTimeMillis(),
     )
 
     private val pendingTitles = ConcurrentHashMap<String, PendingTitle>()

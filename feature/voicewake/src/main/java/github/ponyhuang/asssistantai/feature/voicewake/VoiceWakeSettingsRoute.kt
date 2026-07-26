@@ -2,6 +2,7 @@ package github.ponyhuang.asssistantai.feature.voicewake
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -39,6 +40,16 @@ fun VoiceWakeSettingsRoute(
         } else {
             permissionLauncher.launch(missing.toTypedArray())
         }
+    }
+
+    LaunchedEffect(state.modelDownloadPromptId) {
+        val promptId = state.modelDownloadPromptId ?: return@LaunchedEffect
+        Toast.makeText(
+            context,
+            context.getString(R.string.voicewake_model_download_prompt),
+            Toast.LENGTH_SHORT,
+        ).show()
+        viewModel.onAction(VoiceWakeSettingsAction.ModelDownloadPromptHandled(promptId))
     }
 
     VoiceWakeSettingsScreen(

@@ -25,6 +25,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -61,7 +62,7 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
     }
 
     @Test
-    fun missingWakeModelInstallsInsteadOfRequestingPermissions() = runTest {
+    fun missingWakeModelPromptsForManualInstallWithoutDownloading() = runTest {
         val voiceRepository = voiceRepository(ready = false)
         val viewModel = viewModel(modelRepository(), voiceRepository)
 
@@ -70,8 +71,12 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
             while (!state.configurationReady) state = awaitItem()
 
             viewModel.onAction(VoiceWakeSettingsAction.ToggleListening(enabled = true))
+            do {
+                state = awaitItem()
+            } while (state.modelDownloadPromptId == null)
 
-            verify(exactly = 1) { voiceRepository.installModel(WakeModelCatalog.Chinese.id) }
+            assertNotNull(state.modelDownloadPromptId)
+            verify(exactly = 0) { voiceRepository.installModel(any()) }
             assertEquals(null, viewModel.uiState.value.permissionRequestId)
             verify(exactly = 0) { voiceRepository.start() }
             cancelAndIgnoreRemainingEvents()

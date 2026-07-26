@@ -76,6 +76,7 @@ class VoiceWakeSettingsScreenTest {
         }
 
         composeRule.onNodeWithText("正在监听“你好助手” · EDIFIER W820NB").assertExists()
+        composeRule.onNodeWithText("监听中").assertDoesNotExist()
     }
 
     private fun twoModelState(

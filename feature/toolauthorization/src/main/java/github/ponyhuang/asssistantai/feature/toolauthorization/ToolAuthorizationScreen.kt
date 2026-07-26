@@ -23,7 +23,6 @@ import github.ponyhuang.asssistantai.ui.settings.SettingsBanner
 import github.ponyhuang.asssistantai.ui.settings.SettingsBannerTone
 import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
-import github.ponyhuang.asssistantai.ui.settings.SettingsStatusHero
 
 @Composable
 fun ToolAuthorizationRoute(
@@ -52,19 +51,10 @@ fun ToolAuthorizationScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
-            // 顶部状态锚点：主开关的当前状态一眼可见，与语音唤醒页同一语言。
             item {
-                SettingsStatusHero(
+                SettingsListItem(
                     icon = Icons.Default.Build,
                     title = stringResource(R.string.toolauth_customize_label),
-                    statusText = stringResource(
-                        if (state.isCustomizationEnabled) {
-                            R.string.toolauth_state_enabled
-                        } else {
-                            R.string.toolauth_state_disabled
-                        },
-                    ),
-                    active = state.isCustomizationEnabled,
                     subtitle = stringResource(R.string.toolauth_customize_description),
                     onClick = {
                         if (!state.isMutationBlocked) {

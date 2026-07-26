@@ -30,4 +30,5 @@
     <string name="voicewake_save_keyword">Save wake word</string>
 
     <string name="voicewake_offline_setup_required">Configure a default assistant model and a speech recognition model before enabling.</string>
+    <string name="voicewake_model_download_prompt">Install a wake model below first</string>
 </resources>

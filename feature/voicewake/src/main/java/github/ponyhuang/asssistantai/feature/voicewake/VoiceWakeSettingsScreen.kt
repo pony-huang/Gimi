@@ -36,9 +36,9 @@ import github.ponyhuang.asssistantai.domain.speech.model.WakeModelStatus
 import github.ponyhuang.asssistantai.feature.voicewake.R
 import github.ponyhuang.asssistantai.ui.settings.SettingsBanner
 import github.ponyhuang.asssistantai.ui.settings.SettingsBannerTone
+import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
 import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
 import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
-import github.ponyhuang.asssistantai.ui.settings.SettingsStatusHero
 
 @Composable
 fun VoiceWakeSettingsScreen(
@@ -51,19 +51,10 @@ fun VoiceWakeSettingsScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
-            // 顶部状态锚点：进入页面第一眼即可确认监听是否开启。
             item {
-                SettingsStatusHero(
+                SettingsListItem(
                     icon = Icons.Default.BluetoothAudio,
                     title = stringResource(R.string.voicewake_listening_title),
-                    statusText = stringResource(
-                        if (state.voiceState.isRunning) {
-                            R.string.voicewake_listening_state_on
-                        } else {
-                            R.string.voicewake_listening_state_off
-                        },
-                    ),
-                    active = state.voiceState.isRunning,
                     subtitle = listeningSubtitle(state.voiceState),
                     onClick = {
                         onAction(VoiceWakeSettingsAction.ToggleListening(!state.voiceState.isRunning))

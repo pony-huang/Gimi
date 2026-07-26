@@ -22,6 +22,7 @@ class VoiceWakeSettingsViewModel @Inject constructor(
 ) : ViewModel() {
     private val localState = MutableStateFlow(LocalState())
     private var nextPermissionRequestId = 0
+    private var nextModelDownloadPromptId = 0
 
     val uiState = combine(observeSettings(), localState) { settings, local ->
         val activeModelId = settings.voiceState.activeModelId
@@ -33,6 +34,7 @@ class VoiceWakeSettingsViewModel @Inject constructor(
             keywordDraft = draftForActiveModel ?: settings.voiceState.keyword,
             keywordError = local.keywordError.takeIf { draftForActiveModel != null },
             permissionRequestId = local.permissionRequestId,
+            modelDownloadPromptId = local.modelDownloadPromptId,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -66,6 +68,13 @@ class VoiceWakeSettingsViewModel @Inject constructor(
             is VoiceWakeSettingsAction.PermissionRequestHandled -> localState.update {
                 if (it.permissionRequestId == action.requestId) {
                     it.copy(permissionRequestId = null)
+                } else {
+                    it
+                }
+            }
+            is VoiceWakeSettingsAction.ModelDownloadPromptHandled -> localState.update {
+                if (it.modelDownloadPromptId == action.promptId) {
+                    it.copy(modelDownloadPromptId = null)
                 } else {
                     it
                 }
@@ -109,7 +118,9 @@ class VoiceWakeSettingsViewModel @Inject constructor(
         val state = uiState.value
         when {
             state.voiceState.model.status != WakeModelStatus.Ready ->
-                manageVoiceWake.installModel(state.voiceState.activeModelId)
+                localState.update {
+                    it.copy(modelDownloadPromptId = ++nextModelDownloadPromptId)
+                }
             !state.configurationReady -> Unit
             else -> localState.update {
                 it.copy(permissionRequestId = ++nextPermissionRequestId)
@@ -122,5 +133,6 @@ class VoiceWakeSettingsViewModel @Inject constructor(
         val keywordDraftModelId: String? = null,
         val keywordError: WakeKeywordError? = null,
         val permissionRequestId: Int? = null,
+        val modelDownloadPromptId: Int? = null,
     )
 }

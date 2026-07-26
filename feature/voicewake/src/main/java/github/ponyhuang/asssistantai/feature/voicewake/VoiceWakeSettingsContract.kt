@@ -10,6 +10,7 @@ data class VoiceWakeSettingsUiState(
     val keywordDraft: String = DEFAULT_WAKE_KEYWORD,
     val keywordError: WakeKeywordError? = null,
     val permissionRequestId: Int? = null,
+    val modelDownloadPromptId: Int? = null,
 )
 
 sealed interface VoiceWakeSettingsAction {
@@ -20,4 +21,5 @@ sealed interface VoiceWakeSettingsAction {
     data class InstallModel(val modelId: String) : VoiceWakeSettingsAction
     data class PermissionsResult(val granted: Boolean) : VoiceWakeSettingsAction
     data class PermissionRequestHandled(val requestId: Int) : VoiceWakeSettingsAction
+    data class ModelDownloadPromptHandled(val promptId: Int) : VoiceWakeSettingsAction
 }

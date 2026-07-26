@@ -42,6 +42,7 @@ class ToolAuthorizationScreenTest {
         }
 
         compose.onNodeWithText("逐个授权工具").assertIsDisplayed()
+        compose.onNodeWithText("已关闭").assertDoesNotExist()
         compose.onNodeWithText("配置工具").assertIsDisplayed()
         compose.onNodeWithText("开启逐个授权后可配置").assertIsDisplayed()
 

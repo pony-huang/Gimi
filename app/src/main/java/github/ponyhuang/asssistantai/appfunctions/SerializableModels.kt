@@ -3,21 +3,17 @@ package github.ponyhuang.asssistantai.appfunctions
 import androidx.appfunctions.AppFunctionSerializable
 
 /**
- * 给 AppFunction 返回/入参使用的轻量"模型服务摘要"数据类 — 与 UI 层的
- * [github.ponyhuang.asssistantai.data.LLMModelProvider] 完全解耦，避免把内部
- * `apiKey` / `apiBaseUrl` 等敏感字段意外暴露给 system agent。
+ * `sendMessage` 的返回结构：把本轮实际使用的会话 id 与 LLM 回答一起交给外部 agent，
+ * 使其能在后续调用中回传同一 `sessionId` 以延续对话。
  *
- * KSP 约束（参考 `~/.claude/skills/appfunctions/SKILL.md` 与 reference
- * `E:/workplace/appfunctions/ChatApp`）: `@AppFunctionSerializable` 数据类**只能**用
- * property 级 inline `/** */` 写描述，不能用 class-level `@param`/`@property` 标签 —
- * 否则 KSP 不会进 schema。
+ * KSP 约束（参考 `~/.claude/skills/appfunctions`）：`@AppFunctionSerializable` 数据类
+ * **只能**用 property 级 inline `/** */` 写描述，不能用 class-level `@param`/`@property`
+ * 标签 — 否则 KSP 不会进 schema。
  */
 @AppFunctionSerializable(isDescribedByKDoc = true)
-data class ModelServiceSummary(
-    /** 平台唯一 ID（与 `ModelProvider.serviceId` 对应，例如 `"deepseek"`）。 */
-    val serviceId: String,
-    /** 平台展示名（中文品牌名，例如 `"深度求索"`）。 */
-    val serviceName: String,
-    /** 该服务下全部 modelId 的扁平列表（跨所有 modelGroup，顺序与 store 一致）。 */
-    val availableModels: List<String>,
+data class AssistantReply(
+    /** 本轮实际使用的会话 id：入参 sessionId 为空时是新建的 id，否则回显传入值。下一轮传回此值即可延续对话。 */
+    val sessionId: String,
+    /** LLM 本轮的最终回答文本（已屏蔽 streaming 细节，单字符串）。 */
+    val reply: String,
 )

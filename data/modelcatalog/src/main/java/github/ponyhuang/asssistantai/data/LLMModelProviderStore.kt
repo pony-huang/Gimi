@@ -409,7 +409,15 @@ class ModelServiceRepository @Inject constructor(
     )
 
     private suspend fun seedCatalogIfEmpty() {
+        // Insert providers that are missing from the Room snapshot so newly built-in
+        // vendors appear on a fresh install without losing prior user data.
         seedMissingModelCatalog(database, gson)
+        // Merge newly built-in model groups / items into providers the user already
+        // has, so adding a model to an existing DefaultModelServices.services entry in
+        // an app update surfaces in the running app's settings without clearing the
+        // user's selections. Both helpers are idempotent and only write when the
+        // snapshot actually changes.
+        upgradeDefaultModelMetadata(database, gson)
     }
 
     private suspend fun mutateCatalog(

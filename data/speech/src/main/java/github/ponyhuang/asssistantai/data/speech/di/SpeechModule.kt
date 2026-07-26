@@ -1,5 +1,6 @@
 package github.ponyhuang.asssistantai.data.speech.di
 
+import com.google.gson.Gson
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -7,9 +8,9 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.asssistantai.data.speech.playback.AndroidSpeechPlaybackRepository
 import github.ponyhuang.asssistantai.data.speech.remote.MiMoSpeechSynthesisGateway
+import github.ponyhuang.asssistantai.data.speech.remote.MinimaxTtsGateway
 import github.ponyhuang.asssistantai.data.speech.remote.OpenAiCompatibleSpeechRecognitionGateway
 import github.ponyhuang.asssistantai.data.speech.remote.SpeechRecognitionGateway
-import github.ponyhuang.asssistantai.data.speech.remote.SpeechSynthesisGateway
 import github.ponyhuang.asssistantai.data.speech.repository.DefaultSpeechRecognitionRepository
 import github.ponyhuang.asssistantai.data.speech.repository.DefaultSpeechSynthesisRepository
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechPlaybackRepository
@@ -50,8 +51,14 @@ abstract class SpeechModule {
 
         @Provides
         @Singleton
-        fun provideSpeechSynthesisGateway(
+        fun provideMinimaxSpeechSynthesisGateway(
             okHttpClient: OkHttpClient,
-        ): SpeechSynthesisGateway = MiMoSpeechSynthesisGateway(okHttpClient)
+        ): MinimaxTtsGateway = MinimaxTtsGateway(okHttpClient, Gson())
+
+        @Provides
+        @Singleton
+        fun provideMiMoSpeechSynthesisGateway(
+            okHttpClient: OkHttpClient,
+        ): MiMoSpeechSynthesisGateway = MiMoSpeechSynthesisGateway(okHttpClient, Gson())
     }
 }

@@ -10,6 +10,7 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.DefaultModelSetti
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.UpdateDefaultModelSettingsUseCase
+import github.ponyhuang.asssistantai.domain.speech.model.TtsVoiceCatalog
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -91,6 +92,7 @@ private fun DefaultModelSettings.toUiState(
         speechSelection = speechSelection,
         ttsSelection = ttsSelection,
         ttsVoiceId = ttsVoiceId,
+        ttsVoiceOptions = TtsVoiceCatalog.forService(ttsSelection?.serviceId),
         chatModels = configuredServices.rows { !it.isStt && !it.isTts },
         speechModels = configuredServices.rows { it.isStt },
         ttsModels = configuredServices.rows { it.isTts },

@@ -1,7 +1,7 @@
 package github.ponyhuang.asssistantai.data.speech.repository
 
 import github.ponyhuang.asssistantai.data.speech.remote.SpeechSynthesisConfig
-import github.ponyhuang.asssistantai.data.speech.remote.SpeechSynthesisGateway
+import github.ponyhuang.asssistantai.data.speech.remote.SpeechSynthesisGatewayFactory
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechSynthesisRepository
 import javax.inject.Inject
@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 @Singleton
 class DefaultSpeechSynthesisRepository @Inject constructor(
     private val modelCatalog: ModelCatalogRepository,
-    private val gateway: SpeechSynthesisGateway,
+    private val gatewayFactory: SpeechSynthesisGatewayFactory,
 ) : SpeechSynthesisRepository {
     override val availability: Flow<Boolean> = combine(
         modelCatalog.observeServices(),
@@ -28,7 +28,7 @@ class DefaultSpeechSynthesisRepository @Inject constructor(
         val normalized = text.trim().takeIf(String::isNotEmpty)
             ?: error("没有可朗读的回复内容")
         val config = currentConfig() ?: error("请先在设置中选择可用的默认语音播放模型")
-        return gateway.synthesize(config, normalized)
+        return gatewayFactory.create(config).synthesize(config, normalized)
     }
 
     override fun cacheIdentity(): String? = currentConfig()?.let {

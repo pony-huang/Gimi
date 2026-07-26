@@ -18,7 +18,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.asssistantai.domain.speech.model.MiMoTtsVoices
 import github.ponyhuang.asssistantai.domain.speech.model.TtsVoice
 import github.ponyhuang.asssistantai.feature.modelsettings.R
 import github.ponyhuang.asssistantai.ui.common.PickerSingleChoiceDialog
@@ -98,7 +97,7 @@ fun DefaultModelSettingsScreen(
                 )
             }
             item {
-                val voice = MiMoTtsVoices.all.firstOrNull { it.id == state.ttsVoiceId }
+                val voice = state.ttsVoiceOptions.firstOrNull { it.id == state.ttsVoiceId }
                 val enabled = state.ttsModels.any { it.selection() == state.ttsSelection }
                 SettingsListItem(
                     icon = Icons.Default.GraphicEq,
@@ -149,7 +148,7 @@ fun DefaultModelSettingsScreen(
             onAction = onAction,
         )
         DefaultModelDialog.TtsVoice -> PickerSingleChoiceDialog(
-            options = MiMoTtsVoices.all,
+            options = state.ttsVoiceOptions,
             selected = { it.id == state.ttsVoiceId },
             key = TtsVoice::id,
             title = stringResource(R.string.modelsettings_dialog_pick_voice),

@@ -5,6 +5,7 @@ import github.ponyhuang.asssistantai.data.speech.remote.SpeechRecognitionGateway
 import github.ponyhuang.asssistantai.data.speech.remote.SpeechRecognitionRequest
 import github.ponyhuang.asssistantai.data.speech.remote.SpeechSynthesisConfig
 import github.ponyhuang.asssistantai.data.speech.remote.SpeechSynthesisGateway
+import github.ponyhuang.asssistantai.data.speech.remote.SpeechSynthesisGatewayFactory
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelGroup
@@ -66,7 +67,10 @@ class DefaultSpeechRepositoriesTest {
         val gateway = mockk<SpeechSynthesisGateway> {
             every { synthesize(capture(config), capture(text)) } returns flowOf(byteArrayOf(7))
         }
-        val repository = DefaultSpeechSynthesisRepository(catalog, gateway)
+        val factory = mockk<SpeechSynthesisGatewayFactory> {
+            every { create(any()) } returns gateway
+        }
+        val repository = DefaultSpeechSynthesisRepository(catalog, factory)
 
         assertEquals(listOf<Byte>(7), repository.synthesize(" 你好 ").first().toList())
         assertEquals("first", config.captured.apiKey)

@@ -134,7 +134,21 @@ object DefaultModelServices {
             apiBaseUrl = "https://api.minimaxi.com/v1",
             baseType = ApiBaseType.Standard,
             anthropicBaseUrl = "https://api.minimaxi.com/anthropic",
-            LLMModelGroups = listOf(),
+            LLMModelGroups = listOf(
+                LLMModelGroup(
+                    groupId = "minimax-tts",
+                    groupName = "Minimax 语音合成",
+                    isExpanded = true,
+                    models = listOf(
+                        LLMModelItem("speech-2.8-hd", "speech-2.8-hd    情绪渲染融合语气词，重塑自然听感", isTts = true),
+                        LLMModelItem("speech-2.8-turbo", "speech-2.8-turbo    极致生成速度，更自然逼真的音频效果", isTts = true),
+                        LLMModelItem("speech-2.6-hd", "speech-2.6-hd    超低延时，归一化升级，更高自然度", isTts = true),
+                        LLMModelItem("speech-2.6-turbo", "speech-2.6-turbo    极速版，更快更优惠，更适用于语音聊天和数字人场景", isTts = true),
+                        LLMModelItem("speech-02-hd", "speech-02-hd    拥有出色的韵律、稳定性和复刻相似度，音质表现突出", isTts = true),
+                        LLMModelItem("speech-02-turbo", "speech-02-turbo    拥有出色的韵律和稳定性，小语种能力加强，性能表现出色", isTts = true),
+                    ),
+                ),
+            ),
             homepageUrl = "https://www.minimaxi.com/",
             keyHelpUrl = "https://platform.minimaxi.com/user-center/basic-information/interface-key",
             docsUrl = "https://platform.minimaxi.com/document",

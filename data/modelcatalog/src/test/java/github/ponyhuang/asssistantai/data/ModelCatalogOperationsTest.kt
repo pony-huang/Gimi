@@ -143,4 +143,70 @@ class ModelCatalogOperationsTest {
         assertTrue(upgraded[1].models.single().isStt)
         assertEquals(upgraded, mergeDefaultModelMetadata(upgraded, defaults))
     }
+
+    /**
+     * Simulates the app-update scenario: a user already has the `minimax` provider
+     * persisted with no model groups, then an app update extends the default with a
+     * `minimax-tts` group containing six TTS models. The upgrade must add the new
+     * group without dropping the user's existing chat entries.
+     */
+    @Test
+    fun metadataUpgradeAppendsNewTtsGroupWithoutDroppingExistingEntries() {
+        val existing = listOf(
+            StoredModelGroup(
+                groupId = "minimax-chat",
+                groupName = "Minimax 对话",
+                models = listOf(
+                    StoredModel("minimax-chat-1", "Chat 1", StoredModelSource.REMOTE),
+                    StoredModel(
+                        "minimax-custom",
+                        "Custom Minimax",
+                        StoredModelSource.USER,
+                    ),
+                ),
+            ),
+        )
+        val defaults = listOf(
+            StoredModelGroup(
+                groupId = "minimax-tts",
+                groupName = "Minimax 语音合成",
+                models = listOf(
+                    StoredModel("speech-2.8-hd", "speech-2.8-hd", StoredModelSource.REMOTE, isTts = true),
+                    StoredModel("speech-2.8-turbo", "speech-2.8-turbo", StoredModelSource.REMOTE, isTts = true),
+                    StoredModel("speech-2.6-hd", "speech-2.6-hd", StoredModelSource.REMOTE, isTts = true),
+                    StoredModel("speech-2.6-turbo", "speech-2.6-turbo", StoredModelSource.REMOTE, isTts = true),
+                    StoredModel("speech-02-hd", "speech-02-hd", StoredModelSource.REMOTE, isTts = true),
+                    StoredModel("speech-02-turbo", "speech-02-turbo", StoredModelSource.REMOTE, isTts = true),
+                ),
+            ),
+        )
+
+        val upgraded = mergeDefaultModelMetadata(existing, defaults)
+
+        // 1. Existing chat group is preserved verbatim — no user models lost.
+        val chat = upgraded.first { it.groupId == "minimax-chat" }
+        assertEquals(
+            listOf("minimax-chat-1", "minimax-custom"),
+            chat.models.map { it.modelId },
+        )
+
+        // 2. New TTS group is appended at the end with all six models flagged isTts.
+        val tts = upgraded.first { it.groupId == "minimax-tts" }
+        assertEquals(
+            listOf(
+                "speech-2.8-hd",
+                "speech-2.8-turbo",
+                "speech-2.6-hd",
+                "speech-2.6-turbo",
+                "speech-02-hd",
+                "speech-02-turbo",
+            ),
+            tts.models.map { it.modelId },
+        )
+        assertTrue(tts.models.all { it.isTts })
+
+        // 3. Re-running the merge with the same defaults is a no-op (idempotency assertion
+        // covering upgradeDefaultModelMetadata's "only write when changed" guarantee).
+        assertEquals(upgraded, mergeDefaultModelMetadata(upgraded, defaults))
+    }
 }

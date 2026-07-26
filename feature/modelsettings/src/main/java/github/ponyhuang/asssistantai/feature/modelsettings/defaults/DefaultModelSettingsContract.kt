@@ -4,6 +4,7 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.asssistantai.domain.speech.model.TtsVoice
 
 data class SelectableModelRow(
     val service: LLMModelSetting,
@@ -19,6 +20,7 @@ data class DefaultModelSettingsUiState(
     val speechSelection: ModelSelection? = null,
     val ttsSelection: ModelSelection? = null,
     val ttsVoiceId: String = "",
+    val ttsVoiceOptions: List<TtsVoice> = emptyList(),
     val chatModels: List<SelectableModelRow> = emptyList(),
     val speechModels: List<SelectableModelRow> = emptyList(),
     val ttsModels: List<SelectableModelRow> = emptyList(),

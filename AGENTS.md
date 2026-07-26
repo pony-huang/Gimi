@@ -107,6 +107,12 @@ Testing rules:
 - Before committing, inspect staged paths, run `git diff --cached --check`, exclude generated/local artifacts, and confirm architecture boundaries.
 - Keep commits focused with imperative subjects under 72 characters. Pull requests describe user-visible changes, tests, relevant issue/OpenSpec change, and Compose screenshots.
 
+## Working Files and Caches
+
+- Place any temporary working files, scratch artifacts, downloaded assets, or intermediate caches in the repository-root `temp/` directory (e.g. `temp/<purpose>/...`), not in scattered locations inside modules or the repo root.
+- `temp/` is git-ignored; treat its contents as ephemeral and safe to delete at any time. Do not commit anything under `temp/`.
+- When a tool needs a default cache directory (Gradle, IDE, SDK downloads, etc.), redirect it to a subdirectory of `temp/` or keep it under an already-ignored top-level path such as `.gradle`, `.idea`, or `.kotlin`; do not introduce new top-level cache directories.
+
 ## Android Tooling and Physical Device Verification
 
 - Prefer the `android` CLI for project, deployment, launch, screenshot, layout, and emulator workflows; consult `android help <command>` first.

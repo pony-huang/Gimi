@@ -118,7 +118,8 @@ Testing rules:
 ## Android Tooling and Physical Device Verification
 
 - Prefer the `android` CLI for project, deployment, launch, screenshot, layout, and emulator workflows; consult `android help <command>` first.
-- Use `android run` for deployment/launch, `android layout` for primary UI inspection, `android layout --diff` for focused changes, and `android screen capture` for secondary visual checks. Always inspect captured PNGs visually.
+- Use plain `android run` for deployment/launch, `android layout` for primary UI inspection, `android layout --diff` for focused changes, and `android screen capture` for secondary visual checks. Always inspect captured PNGs visually.
+- Do not pass `--debug` during routine physical-device installation, launch, UI, layout, screenshot, or interaction verification. On some devices it enables “Waiting For Debugger”, preventing the Activity and Compose hierarchy from appearing. Use `android run --debug` only when the task explicitly requires attaching a debugger; otherwise launch normally before inspecting the UI.
 - Do not use `adb` by habit. Fall back only when the installed CLI is unavailable/fails or lacks the operation, such as connection diagnostics, wake, raw input, or a narrow shell command. Record the reason, limit ADB to that operation, then return to the CLI.
 - Prefer a connected physical Android device for installation, UI, permissions, system insets, and hardware behavior. Never hard-code a manufacturer, model, or serial; resolve the current physical device dynamically. Use an emulator only when no suitable device exists or the task requires one, and report the fallback.
 
@@ -126,7 +127,7 @@ If CLI device resolution fails, `adb devices -l` is permitted only for discovery
 
 ```powershell
 .\gradlew.bat app:assembleDebug
-android run --debug --device "$serial" --apks=app\build\outputs\apk\debug\app-arm64-v8a-debug.apk
+android run --device "$serial" --apks=app\build\outputs\apk\debug\app-arm64-v8a-debug.apk
 ```
 
 Use `android layout --device "$serial" --pretty` for hierarchy/text/bounds and `android screen capture -o build\device-screen.png` for visuals. Use narrowly scoped `adb -s "$serial" shell input ...` only when CLI lacks required input.

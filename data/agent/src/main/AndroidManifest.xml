@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <activity
+            android:name="github.ponyhuang.asssistantai.permission.CalendarPermissionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Asssistantai" />
+        <activity
+            android:name="github.ponyhuang.asssistantai.permission.LocationPermissionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Asssistantai" />
+        <activity
+            android:name="github.ponyhuang.asssistantai.permission.MediaPermissionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Asssistantai" />
+    </application>
+
+</manifest>

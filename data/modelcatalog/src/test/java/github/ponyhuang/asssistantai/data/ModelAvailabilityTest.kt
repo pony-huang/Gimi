@@ -10,7 +10,7 @@ class ModelAvailabilityTest {
 
     @Test
     fun builtInDeepSeekAndMiniMaxStartDisabled() {
-        val providers = DefaultModelServices.services.associateBy { it.serviceId }
+        val providers = LLMModelConfigs.services.associateBy { it.serviceId }
 
         assertFalse(providers.getValue("deepseek").isEnabled)
         assertFalse(providers.getValue("minimax").isEnabled)
@@ -18,7 +18,7 @@ class ModelAvailabilityTest {
 
     @Test
     fun builtInOpenAiAnthropicAndKimiExistWithProtocolConstraints() {
-        val providers = DefaultModelServices.services.associateBy { it.serviceId }
+        val providers = LLMModelConfigs.services.associateBy { it.serviceId }
 
         val openAi = providers.getValue("openai")
         assertFalse(openAi.isEnabled)
@@ -38,7 +38,7 @@ class ModelAvailabilityTest {
 
     @Test
     fun builtInProvidersDeclareTheirOfficialToolIntegrations() {
-        val providers = DefaultModelServices.services.associateBy { it.serviceId }
+        val providers = LLMModelConfigs.services.associateBy { it.serviceId }
 
         val miniMax = providers.getValue("minimax")
         assertTrue(miniMax.supportedOfficialTools.isEmpty())

@@ -34,7 +34,7 @@ class LLMModelSettingDatabaseTest {
     fun seedSkipsExistingServiceIds() = runBlocking {
         seedMissingModelCatalog(database)
         val seeded = database.modelServiceDao().getAll()
-        assertEquals(DefaultModelServices.services.map { it.serviceId }, seeded.map { it.serviceId })
+        assertEquals(LLMModelConfigs.services.map { it.serviceId }, seeded.map { it.serviceId })
 
         val renamed = seeded.first().copy(serviceName = "Edited")
         database.modelServiceDao().upsert(renamed)
@@ -45,7 +45,7 @@ class LLMModelSettingDatabaseTest {
 
     @Test
     fun seedInsertsProvidersMissingFromExistingCatalog() = runBlocking {
-        val first = DefaultModelServices.services.first()
+        val first = LLMModelConfigs.services.first()
         database.modelServiceDao().upsert(
             defaultModelServiceEntities().first { it.serviceId == first.serviceId },
         )
@@ -54,8 +54,8 @@ class LLMModelSettingDatabaseTest {
         seedMissingModelCatalog(database)
 
         val ids = database.modelServiceDao().getAll().map { it.serviceId }
-        assertEquals(DefaultModelServices.services.map { it.serviceId }.toSet(), ids.toSet())
-        assertEquals(DefaultModelServices.services.size, ids.size)
+        assertEquals(LLMModelConfigs.services.map { it.serviceId }.toSet(), ids.toSet())
+        assertEquals(LLMModelConfigs.services.size, ids.size)
     }
 
     @Test

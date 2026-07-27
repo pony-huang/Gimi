@@ -64,6 +64,36 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
     }
 
     @Test
+    fun newlySynchronizedGroupsAreExpanded() = runTest {
+        val provider = service(apiKey = "key")
+        val fixture = fixture(provider)
+        fixture.viewModel.onAction(LLmModelSettingDetailAction.Load(provider.id))
+        advanceUntilIdle()
+
+        fixture.services.value = provider.copy(
+            groups = listOf(
+                ModelGroup(
+                    id = "MiniMax",
+                    name = "MiniMax",
+                    models = listOf(Model("MiniMax-M2.7", "MiniMax-M2.7")),
+                ),
+            ),
+        )
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                LLMModelSettingDetailRow.GroupHeader("MiniMax", "MiniMax", isExpanded = true),
+                LLMModelSettingDetailRow.LLMModelItem(
+                    "MiniMax",
+                    Model("MiniMax-M2.7", "MiniMax-M2.7"),
+                ),
+            ),
+            fixture.viewModel.uiState.value.rows,
+        )
+    }
+
+    @Test
     fun missingServiceRequestsCloseAndShowsExistingMessage() = runTest {
         val fixture = fixture(null)
 
@@ -188,7 +218,7 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
             refreshCatalog = RefreshModelCatalogUseCase(repository, remote),
             runWhenAgentIdle = RunWhenAgentIdleUseCase(TestAgentRuntimeGate()),
         )
-        return Fixture(viewModel, repository, remote)
+        return Fixture(viewModel, repository, remote, services)
     }
 
     private fun service(apiKey: String): LLMModelSetting = LLMModelSetting(
@@ -212,5 +242,6 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
         val viewModel: ModelServiceDetailViewModel,
         val repository: ModelCatalogRepository,
         val remote: ModelServiceRemoteGateway,
+        val services: MutableStateFlow<LLMModelSetting?>,
     )
 }

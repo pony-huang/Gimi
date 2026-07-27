@@ -1,6 +1,6 @@
 package github.ponyhuang.asssistantai.data
 
-import github.ponyhuang.asssistantai.data.DefaultModelServices.iconFor
+import github.ponyhuang.asssistantai.data.LLMModelConfigs.iconFor
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 
 /**
@@ -15,7 +15,7 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
  *                  持久化的非法取值会在加载时回退到集合首项。
  * @property LLMModelGroups 该服务下的模型组列表。
  * @property iconRes 品牌图标 drawable 资源 ID；null 时回退到默认机器人图标。
- *                  新增厂商时只需在 [DefaultModelServices] 中赋值即可，无需改 UI 调用点。
+ *                  新增厂商时只需在 [LLMModelConfigs] 中赋值即可，无需改 UI 调用点。
  * @property homepageUrl 平台官方主页（Header 外链目标）。
  * @property keyHelpUrl "点击这里获取密钥" 富文本跳转目标。
  * @property docsUrl "深度求索 文档" 富文本跳转目标。
@@ -109,7 +109,7 @@ enum class ApiBaseType() {
  * 内置 / 默认模型服务清单。新增厂商时在这里追加一条 [LLMModelProvider]，
  * 同时给 [LLMModelProvider.iconRes] 赋值，品牌图标就会在所有 UI 调用点自动生效。
  */
-object DefaultModelServices {
+object LLMModelConfigs {
 
     val services: List<LLMModelProvider> = listOf(
         LLMModelProvider(
@@ -137,15 +137,15 @@ object DefaultModelServices {
             LLMModelGroups = listOf(
                 LLMModelGroup(
                     groupId = "minimax-tts",
-                    groupName = "Minimax 语音合成",
+                    groupName = "Minimax Speech",
                     isExpanded = true,
                     models = listOf(
-                        LLMModelItem("speech-2.8-hd", "speech-2.8-hd    情绪渲染融合语气词，重塑自然听感", isTts = true),
-                        LLMModelItem("speech-2.8-turbo", "speech-2.8-turbo    极致生成速度，更自然逼真的音频效果", isTts = true),
-                        LLMModelItem("speech-2.6-hd", "speech-2.6-hd    超低延时，归一化升级，更高自然度", isTts = true),
-                        LLMModelItem("speech-2.6-turbo", "speech-2.6-turbo    极速版，更快更优惠，更适用于语音聊天和数字人场景", isTts = true),
-                        LLMModelItem("speech-02-hd", "speech-02-hd    拥有出色的韵律、稳定性和复刻相似度，音质表现突出", isTts = true),
-                        LLMModelItem("speech-02-turbo", "speech-02-turbo    拥有出色的韵律和稳定性，小语种能力加强，性能表现出色", isTts = true),
+                        LLMModelItem("speech-2.8-hd", "speech-2.8-hd", isTts = true),
+                        LLMModelItem("speech-2.8-turbo", "speech-2.8-turbo", isTts = true),
+                        LLMModelItem("speech-2.6-hd", "speech-2.6-hd", isTts = true),
+                        LLMModelItem("speech-2.6-turbo", "speech-2.6-turbo", isTts = true),
+                        LLMModelItem("speech-02-hd", "speech-02-hd", isTts = true),
+                        LLMModelItem("speech-02-turbo", "speech-02-turbo", isTts = true),
                     ),
                 ),
             ),

@@ -57,7 +57,7 @@ abstract class ModelServiceDatabase : RoomDatabase() {
 }
 
 internal fun defaultModelServiceEntities(gson: Gson = Gson()): List<ModelServiceEntity> =
-    DefaultModelServices.services.mapIndexed { index, provider ->
+    LLMModelConfigs.services.mapIndexed { index, provider ->
         ModelServiceEntity(
             serviceId = provider.serviceId,
             serviceName = provider.serviceName,
@@ -88,7 +88,7 @@ internal fun defaultModelServiceEntities(gson: Gson = Gson()): List<ModelService
     }
 
 /**
- * 把 [DefaultModelServices] 里缺的 provider 增量写进 Room。判断标准是 [ModelServiceEntity.serviceId]：
+ * 把 [LLMModelConfigs] 里缺的 provider 增量写进 Room。判断标准是 [ModelServiceEntity.serviceId]：
  * serviceId 已存在就跳过该条，未存在才 upsert。这样新加的 [LLMModelProvider] 在已有用户数据上也能
  * 顺利进入设置页，同时不会覆盖用户已经修改过的服务名 / 模型组等。
  *

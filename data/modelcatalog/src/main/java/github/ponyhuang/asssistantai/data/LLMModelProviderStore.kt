@@ -81,7 +81,7 @@ class ModelServiceRepository @Inject constructor(
     private val settingsType = object : TypeToken<Map<String, ModelServiceSettings>>() {}.type
     private val groupsType = object : TypeToken<List<StoredModelGroup>>() {}.type
     private val selectionType = object : TypeToken<LLMModelSelection>() {}.type
-    private val defaultSettings = DefaultModelServices.services.associate { provider ->
+    private val defaultSettings = LLMModelConfigs.services.associate { provider ->
         provider.serviceId to provider.toSettings()
     }
     // Keep construction cheap: Android Keystore can take noticeable time to create its
@@ -446,7 +446,7 @@ class ModelServiceRepository @Inject constructor(
             ?: ModelServiceSettings(false, "", "", ApiBaseType.Standard, "")
         // 接口标准白名单是静态元数据，按 serviceId 从默认清单回填；
         // 持久化的协议若不在白名单内（例如厂商后来收紧了格式约束），回退到首个允许值。
-        val supportedBaseTypes = DefaultModelServices.supportedBaseTypesFor(entity.serviceId)
+        val supportedBaseTypes = LLMModelConfigs.supportedBaseTypesFor(entity.serviceId)
         val baseType = providerSettings.baseType.takeIf { it in supportedBaseTypes }
             ?: supportedBaseTypes.first()
         return LLMModelProvider(
@@ -475,12 +475,12 @@ class ModelServiceRepository @Inject constructor(
             },
             // 品牌图标是静态元数据，按 serviceId 从默认清单回填，
             // 新增厂商只需在 DefaultModelServices 配 iconRes，UI 自动生效。
-            iconRes = DefaultModelServices.iconFor(entity.serviceId),
+            iconRes = LLMModelConfigs.iconFor(entity.serviceId),
             homepageUrl = entity.homepageUrl,
             keyHelpUrl = entity.keyHelpUrl,
             docsUrl = entity.docsUrl,
             modelsUrl = entity.modelsUrl,
-            officialToolProtocols = DefaultModelServices.officialToolProtocolsFor(entity.serviceId),
+            officialToolProtocols = LLMModelConfigs.officialToolProtocolsFor(entity.serviceId),
             disabledOfficialTools = providerSettings.disabledOfficialTools.orEmpty(),
         )
     }

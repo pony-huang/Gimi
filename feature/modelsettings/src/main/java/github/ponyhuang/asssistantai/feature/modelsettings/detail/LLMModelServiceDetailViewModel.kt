@@ -115,6 +115,12 @@ class ModelServiceDetailViewModel @Inject constructor(
     }
 
     private fun publishService(service: LLMModelSetting?) {
+        val previousGroupIds = _uiState.value.service?.groups?.mapTo(mutableSetOf()) { it.id }
+        if (previousGroupIds != null && service != null) {
+            expandedGroupIds = expandedGroupIds + service.groups
+                .map { it.id }
+                .filterNot { it in previousGroupIds }
+        }
         _uiState.update { state ->
             state.copy(
                 isLoading = false,

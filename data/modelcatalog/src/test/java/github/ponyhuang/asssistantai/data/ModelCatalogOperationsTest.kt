@@ -108,6 +108,57 @@ class ModelCatalogOperationsTest {
     }
 
     @Test
+    fun syncRemoteModelsGroupsTwoSegmentModelIdsByFamily() {
+        val result = syncStoredRemoteModels(
+            existingGroups = emptyList(),
+            serviceId = "minimax",
+            serviceName = "MiniMax",
+            models = listOf(
+                LLMModelItem("MiniMax-M3", "MiniMax-M3"),
+                LLMModelItem("MiniMax-M2.7", "MiniMax-M2.7"),
+                LLMModelItem("MiniMax-M2", "MiniMax-M2"),
+            ),
+        )
+
+        assertEquals(listOf("MiniMax"), result.map { it.groupId })
+        assertEquals(
+            listOf("MiniMax-M3", "MiniMax-M2.7", "MiniMax-M2"),
+            result.single().models.map { it.modelId },
+        )
+    }
+
+    @Test
+    fun syncRemoteModelsPreservesExistingSpeechModelsMissingFromChatCatalog() {
+        val result = syncStoredRemoteModels(
+            existingGroups = listOf(
+                StoredModelGroup(
+                    groupId = "minimax-tts",
+                    groupName = "MiniMax 语音合成",
+                    models = listOf(
+                        StoredModel(
+                            "speech-2.8-hd",
+                            "speech-2.8-hd",
+                            StoredModelSource.REMOTE,
+                            isTts = true,
+                        ),
+                    ),
+                ),
+            ),
+            serviceId = "minimax",
+            serviceName = "MiniMax",
+            models = listOf(LLMModelItem("MiniMax-M2.7", "MiniMax-M2.7")),
+        )
+
+        val speechGroup = result.first { it.groupId == "minimax-tts" }
+        assertEquals(listOf("speech-2.8-hd"), speechGroup.models.map { it.modelId })
+        assertTrue(speechGroup.models.single().isTts)
+        assertEquals(
+            listOf("MiniMax-M2.7"),
+            result.first { it.groupId == "MiniMax" }.models.map { it.modelId },
+        )
+    }
+
+    @Test
     fun syncRemoteModelsKeepsUserModelsInTheirExistingGroups() {
         val groups = listOf(StoredModelGroup("custom", "Custom", models = listOf(
             StoredModel("local-model", "Local", StoredModelSource.USER),

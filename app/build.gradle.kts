@@ -164,6 +164,7 @@ dependencies {
     implementation(project(":core:database"))
     implementation(project(":data:speech"))
     implementation(project(":data:conversation"))
+    implementation(project(":data:agent"))
     implementation(project(":data:mcp"))
     implementation(project(":data:workfiles"))
     implementation(project(":data:permissions"))
@@ -194,21 +195,7 @@ dependencies {
 
     implementation(libs.androidx.compose.foundation.layout)
     implementation(libs.androidx.compose.foundation)
-    implementation(libs.androidx.exifinterface)
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    implementation(libs.google.adk.kotlin.core)
-    implementation(libs.anthropic.java)
-    ksp(libs.google.adk.kotlin.processor)
-    ksp(libs.androidx.room.compiler)
-    implementation(libs.openai.java)
     implementation(libs.okhttp)
-    implementation(libs.mcp.kotlin.sdk.client)
-    // ktor-client-okhttp is the OkHttp engine for the Ktor client. McpToolRegistry
-    // constructs HttpClient(OkHttp) explicitly to share the okhttp connection pool
-    // pulled in by openai-java and anthropic-java — the engine artifact is required,
-    // not redundant.
-    implementation(libs.ktor.client.okhttp)
     implementation(libs.gson)
     implementation(libs.vosk.android)
     implementation(libs.multiplatform.markdown.renderer.m3)
@@ -229,8 +216,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.androidx.navigation3.ui)
-    testImplementation(libs.google.adk.kotlin.webserver)
-    testImplementation(libs.androidx.room.testing)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
@@ -247,12 +232,4 @@ dependencies {
     // androidx.appfunctions (Android 16+, Jetpack backwards-compat layer).
     implementation(libs.androidx.appfunctions)
     implementation(libs.androidx.appfunctions.service)
-    ksp(libs.androidx.appfunctions.compiler)
-}
-
-// AppFunctions KSP option — collect every @AppFunction declared in this module
-// into a single aggregated metadata file the platform reads at runtime.
-// Reference: https://developer.android.com/ai/appfunctions
-ksp {
-    arg("appfunctions:aggregateAppFunctions", "true")
 }

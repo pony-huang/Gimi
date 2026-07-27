@@ -88,18 +88,6 @@
             </intent-filter>
         </service>
         <activity
-            android:name=".permission.CalendarPermissionActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Asssistantai" />
-        <activity
-            android:name=".permission.LocationPermissionActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Asssistantai" />
-        <activity
-            android:name=".permission.MediaPermissionActivity"
-            android:exported="false"
-            android:theme="@style/Theme.Asssistantai" />
-        <activity
             android:name=".MainActivity2"
             android:exported="false"
             android:label="@string/title_activity_main2"

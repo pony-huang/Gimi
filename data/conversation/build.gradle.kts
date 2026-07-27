@@ -17,6 +17,7 @@ android {
 
 dependencies {
     implementation(project(":core:database"))
+    implementation(project(":data:agent"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:modelcatalog"))
     implementation(libs.androidx.core.ktx)

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">asssistantai</string>
+    <string name="app_name">Gimi</string>
     <string name="media_notification_listener_label">asssistantai media control</string>
     <string name="bluetooth_voice_channel_name">Voice wake-up</string>
     <string name="bluetooth_voice_notification_title">Voice wake-up assistant</string>

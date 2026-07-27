@@ -41,7 +41,7 @@
 <string name="modelsettings_defaults_assistant_title">Default assistant model</string>
     <string name="modelsettings_defaults_assistant_subtitle">Model used when creating a new assistant</string>
     <string name="modelsettings_defaults_quick_title">Quick model</string>
-    <string name="modelsettings_defaults_quick_subtitle">Used for assistant features that need fast responses</string>
+    <string name="modelsettings_defaults_quick_subtitle">Used to generate conversation titles</string>
     <string name="modelsettings_defaults_stt_title">Default voice input model</string>
     <string name="modelsettings_defaults_stt_subtitle">Used for voice input. Only speech-to-text models are listed.</string>
     <string name="modelsettings_defaults_tts_title">Default voice playback model</string>

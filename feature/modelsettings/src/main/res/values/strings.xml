@@ -45,17 +45,17 @@
     <!-- DefaultModelSettingsScreen -->
         <string name="modelsettings_defaults_section_chat">聊天</string>
     <string name="modelsettings_defaults_section_voice">语音</string>
-<string name="modelsettings_defaults_assistant_title">默认助手模型</string>
+<string name="modelsettings_defaults_assistant_title">默认模型</string>
     <string name="modelsettings_defaults_assistant_subtitle">创建新助手时使用的模型</string>
     <string name="modelsettings_defaults_quick_title">快速模型</string>
-    <string name="modelsettings_defaults_quick_subtitle">用于需要快速响应的助手功能</string>
+    <string name="modelsettings_defaults_quick_subtitle">用于自动生成会话标题</string>
     <string name="modelsettings_defaults_stt_title">默认语音模型</string>
     <string name="modelsettings_defaults_stt_subtitle">用于语音输入，仅显示语音识别模型</string>
     <string name="modelsettings_defaults_tts_title">默认语音播放模型</string>
     <string name="modelsettings_defaults_tts_subtitle">用于朗读助手回复，仅显示语音合成模型</string>
     <string name="modelsettings_defaults_voice_title">语音播放音色</string>
 
-    <string name="modelsettings_dialog_pick_assistant">选择默认助手模型</string>
+    <string name="modelsettings_dialog_pick_assistant">选择默认模型</string>
     <string name="modelsettings_dialog_pick_quick">选择快速模型</string>
     <string name="modelsettings_dialog_pick_stt">选择默认语音模型</string>
     <string name="modelsettings_dialog_pick_tts">选择默认语音播放模型</string>

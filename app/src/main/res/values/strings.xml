@@ -36,7 +36,7 @@
     <string name="bluetooth_voice_error_route_failed">无法将麦克风路由到蓝牙耳机</string>
     <string name="bluetooth_voice_error_not_recording">蓝牙麦克风没有开始录音</string>
     <string name="bluetooth_voice_error_read_failed">蓝牙麦克风读取失败：%1$d</string>
-    <string name="bluetooth_voice_no_agent_model">请先配置可用的默认助手模型</string>
+    <string name="bluetooth_voice_no_agent_model">请先配置可用的默认模型</string>
     <string name="bluetooth_voice_task_completed">任务已完成</string>
     <string name="bluetooth_voice_session_create_failed">无法创建蓝牙语音会话</string>
 

@@ -24,7 +24,7 @@ class DefaultModelSettingsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("默认助手模型").performClick()
+        composeRule.onNodeWithText("默认模型").performClick()
 
         assertEquals(
             DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Assistant),

@@ -30,6 +30,6 @@
     <string name="voicewake_keyword_error_format_en">请输入 2–4 个小写英文单词，用空格分隔</string>
     <string name="voicewake_save_keyword">保存唤醒词</string>
 
-    <string name="voicewake_offline_setup_required">启用前请配置可用的默认助手模型和语音识别模型。</string>
+    <string name="voicewake_offline_setup_required">启用前请配置可用的默认模型和语音识别模型。</string>
     <string name="voicewake_model_download_prompt">请先在下方安装唤醒模型</string>
 </resources>

@@ -35,6 +35,4 @@
 
     <string name="settings_about_title">About</string>
     <string name="settings_about_subtitle">Assistant AI %1$s</string>
-    <string name="settings_assistant_title">System voice assistant</string>
-    <string name="settings_assistant_subtitle">Quick tile · Voice overlay</string>
 </resources>

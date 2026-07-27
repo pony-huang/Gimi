@@ -42,8 +42,6 @@ import github.ponyhuang.asssistantai.feature.modelsettings.list.ModelServiceList
 import github.ponyhuang.asssistantai.feature.modelsettings.R as ModelsettingsR
 import github.ponyhuang.asssistantai.feature.permissions.PermissionSettingsRoute
 import github.ponyhuang.asssistantai.feature.permissions.R as PermissionsR
-import github.ponyhuang.asssistantai.assistant.requestAddAssistantTile
-import github.ponyhuang.asssistantai.feature.assistant.AssistantSettingsRoute
 import github.ponyhuang.asssistantai.feature.settings.R as SettingsR
 import github.ponyhuang.asssistantai.feature.skills.SkillsSettingsRoute
 import github.ponyhuang.asssistantai.feature.skills.R as SkillsR
@@ -170,7 +168,6 @@ fun MainScreen(
                                 onNavigateToModelService = { backStack.add(AppRoute.ModelServiceList) },
                                 onNavigateToDefaultModels = { backStack.add(AppRoute.DefaultModelSettings) },
                                 onNavigateToVoiceWake = { backStack.add(AppRoute.VoiceWakeSettings) },
-                                onNavigateToAssistant = { backStack.add(AppRoute.AssistantSettings) },
                                 onNavigateToMcpServers = { backStack.add(AppRoute.McpServerList) },
                                 onNavigateToSkills = { backStack.add(AppRoute.SkillsSettings) },
                                 onNavigateToWorkFiles = { backStack.add(AppRoute.WorkFilesSettings) },
@@ -194,17 +191,6 @@ fun MainScreen(
                             goBack,
                         ) {
                             VoiceWakeSettingsRoute(modifier = it)
-                        }
-
-                        AppRoute.AssistantSettings -> SettingsScaffold(
-                            stringResource(SettingsR.string.settings_assistant_title),
-                            goBack,
-                        ) { modifier ->
-                            val context = LocalContext.current
-                            AssistantSettingsRoute(
-                                onAddTile = { requestAddAssistantTile(context) },
-                                modifier = modifier,
-                            )
                         }
 
                         AppRoute.WorkFilesSettings -> SettingsScaffold(
@@ -271,7 +257,6 @@ fun MainScreen(
                             stringResource(McpR.string.mcp_add_options_title),
                             goBack,
                         ) {
-                            // replace 而非 add：保存/导入完成后直接回到列表，不经过中转页。
                             McpServerAddOptionsScreen(
                                 onCreate = {
                                     backStack.removeLastOrNull()

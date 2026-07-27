@@ -2,12 +2,4 @@
 <resources>
 
     <style name="Theme.Asssistantai" parent="android:Theme.Material.Light.NoActionBar" />
-
-    <style name="Theme.Asssistantai.AssistantOverlay" parent="Theme.Asssistantai">
-        <item name="android:windowIsTranslucent">true</item>
-        <item name="android:windowBackground">@android:color/transparent</item>
-        <item name="android:backgroundDimEnabled">false</item>
-        <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:navigationBarColor">@android:color/transparent</item>
-    </style>
 </resources>

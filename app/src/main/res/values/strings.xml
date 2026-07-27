@@ -2,13 +2,8 @@
     <string name="app_name">asssistantai</string>
     <string name="title_activity_main2">MainActivity2</string>
 
-    <!-- AppFunctions metadata — short, agent-facing descriptions referenced by
-         AndroidManifest.xml and res/xml/app_metadata.xml. Keep them concise; the
-         verbose operational guidance lives in app_metadata.xml. -->
     <string name="app_function_app_description">本地 AI 助手 — 让外部 / 系统 agent 在不打开 app 的前提下，向本 app 的 AI 助手发送文本消息并获得回答；可指定或复用会话以进行多轮对话。</string>
     <string name="app_function_app_display_description">asssistantai 本地助手</string>
-    <!-- Display name shown in Settings → Notifications → Device & app notifications
-         for MediaSessionManagerTool's notification listener service. -->
     <string name="media_notification_listener_label">asssistantai media control</string>
     <string name="bluetooth_voice_channel_name">语音唤醒</string>
     <string name="bluetooth_voice_notification_title">语音唤醒助手</string>
@@ -24,7 +19,7 @@
     <string name="bluetooth_voice_status_bluetooth_audio_unavailable">无法启用蓝牙通话音频</string>
     <string name="bluetooth_voice_status_model_load_failed">无法加载唤醒模型</string>
     <string name="bluetooth_voice_status_mic_start_failed">蓝牙麦克风启动失败</string>
-    <string name="bluetooth_voice_status_listening">正在监听“%1$s”</string>
+    <string name="bluetooth_voice_status_listening">正在监听"%1$s"</string>
     <string name="bluetooth_voice_status_no_command">未听到任务，继续监听</string>
     <string name="bluetooth_voice_status_say_command">请说出任务</string>
     <string name="bluetooth_voice_status_transcribing">正在识别任务</string>
@@ -55,5 +50,4 @@
     <string name="wake_model_files_incomplete">唤醒模型文件不完整</string>
     <string name="wake_model_install_failed">唤醒模型安装失败</string>
     <string name="wake_model_download_failed">唤醒模型下载失败</string>
-    <string name="assistant_tile_label">语音助手</string>
 </resources>

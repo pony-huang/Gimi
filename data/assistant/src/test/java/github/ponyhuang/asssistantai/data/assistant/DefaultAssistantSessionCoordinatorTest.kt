@@ -82,7 +82,7 @@ class DefaultAssistantSessionCoordinatorTest {
             textEvent("你好。", partial = false),
         )
 
-        coordinator.submit("打招呼", AssistantInvocationSource.TILE)
+        coordinator.submit("打招呼", AssistantInvocationSource.BLUETOOTH_WAKE)
         advanceUntilIdle()
 
         val state = coordinator.state.value
@@ -101,7 +101,7 @@ class DefaultAssistantSessionCoordinatorTest {
         coEvery { conversations.loadMessages("existing-session") } returns emptyList()
         coEvery { chatAgent.send(any(), any(), any(), any()) } returns flowOf(textEvent("好"))
 
-        coordinator.submit("继续", AssistantInvocationSource.TILE)
+        coordinator.submit("继续", AssistantInvocationSource.BLUETOOTH_WAKE)
         advanceUntilIdle()
 
         assertEquals("existing-session", coordinator.state.value.sessionId)
@@ -125,9 +125,9 @@ class DefaultAssistantSessionCoordinatorTest {
             }
         }
 
-        val first = async { coordinator.submit("第一", AssistantInvocationSource.TILE) }
+        val first = async { coordinator.submit("第一", AssistantInvocationSource.BLUETOOTH_WAKE) }
         advanceUntilIdle()
-        val second = async { coordinator.submit("第二", AssistantInvocationSource.TILE) }
+        val second = async { coordinator.submit("第二", AssistantInvocationSource.BLUETOOTH_WAKE) }
         advanceUntilIdle()
 
         assertEquals(1, sendCount)
@@ -150,7 +150,7 @@ class DefaultAssistantSessionCoordinatorTest {
             chatAgent.respondToToolConfirmation(any(), any(), any())
         } returns flowOf(textEvent("已调亮。"))
 
-        val submission = async { coordinator.submit("调亮屏幕", AssistantInvocationSource.TILE) }
+        val submission = async { coordinator.submit("调亮屏幕", AssistantInvocationSource.BLUETOOTH_WAKE) }
         runCurrent()
 
         val awaiting = coordinator.state.value
@@ -177,7 +177,7 @@ class DefaultAssistantSessionCoordinatorTest {
             chatAgent.respondToToolConfirmation(any(), any(), any())
         } returns flowOf(textEvent("已调亮。"))
 
-        val submission = async { coordinator.submit("调亮屏幕", AssistantInvocationSource.TILE) }
+        val submission = async { coordinator.submit("调亮屏幕", AssistantInvocationSource.BLUETOOTH_WAKE) }
         runCurrent()
 
         assertFalse(coordinator.respondToConfirmation("confirm-stale", true))
@@ -204,7 +204,7 @@ class DefaultAssistantSessionCoordinatorTest {
             chatAgent.respondToToolConfirmation(any(), any(), any())
         } returns flowOf(textEvent("已取消。"))
 
-        val submission = async { coordinator.submit("打开相机", AssistantInvocationSource.TILE) }
+        val submission = async { coordinator.submit("打开相机", AssistantInvocationSource.BLUETOOTH_WAKE) }
         runCurrent()
         assertEquals(AssistantSessionPhase.AWAITING_CONFIRMATION, coordinator.state.value.phase)
 
@@ -224,7 +224,7 @@ class DefaultAssistantSessionCoordinatorTest {
             gate.await()
         }
 
-        val submission = async { coordinator.submit("长任务", AssistantInvocationSource.TILE) }
+        val submission = async { coordinator.submit("长任务", AssistantInvocationSource.BLUETOOTH_WAKE) }
         advanceUntilIdle()
         assertTrue(coordinator.state.value.taskActive)
 
@@ -248,7 +248,7 @@ class DefaultAssistantSessionCoordinatorTest {
 
         assertEquals(AssistantConfigIssue.MISSING_AGENT_MODEL, coordinator.configurationIssue())
 
-        coordinator.submit("你好", AssistantInvocationSource.TILE)
+        coordinator.submit("你好", AssistantInvocationSource.BLUETOOTH_WAKE)
         advanceUntilIdle()
         assertEquals(AssistantSessionPhase.MISSING_CONFIG, coordinator.state.value.phase)
         coVerify(exactly = 0) { chatAgent.send(any(), any(), any(), any()) }
@@ -268,7 +268,7 @@ class DefaultAssistantSessionCoordinatorTest {
             throw IllegalStateException("network down")
         }
 
-        coordinator.submit("你好", AssistantInvocationSource.TILE)
+        coordinator.submit("你好", AssistantInvocationSource.BLUETOOTH_WAKE)
         advanceUntilIdle()
 
         val state = coordinator.state.value
@@ -282,11 +282,11 @@ class DefaultAssistantSessionCoordinatorTest {
         coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
         coEvery { chatAgent.send(any(), any(), any(), any()) } returns flowOf(textEvent("好"))
 
-        coordinator.submit("你好", AssistantInvocationSource.TILE)
+        coordinator.submit("你好", AssistantInvocationSource.BLUETOOTH_WAKE)
         advanceUntilIdle()
 
         assertEquals(
-            AgentTaskSource.SYSTEM_ASSISTANT to "voice-session-1",
+            AgentTaskSource.BLUETOOTH_VOICE to "voice-session-1",
             gate.acquisitions.single(),
         )
     }

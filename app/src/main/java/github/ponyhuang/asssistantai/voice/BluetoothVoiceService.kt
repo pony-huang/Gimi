@@ -22,6 +22,19 @@ import github.ponyhuang.asssistantai.core.audio.CaptureDecision
 import github.ponyhuang.asssistantai.core.audio.PcmPreRollBuffer
 import github.ponyhuang.asssistantai.core.audio.VoiceCommandCapture
 import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
+import github.ponyhuang.asssistantai.data.voicewake.BluetoothAudioRoute
+import github.ponyhuang.asssistantai.data.voicewake.BluetoothAudioRouter
+import github.ponyhuang.asssistantai.data.voicewake.BluetoothPcmRecorder
+import github.ponyhuang.asssistantai.data.voicewake.BluetoothRecorderException
+import github.ponyhuang.asssistantai.data.voicewake.BluetoothVoiceController
+import github.ponyhuang.asssistantai.data.voicewake.BluetoothVoicePreferences
+import github.ponyhuang.asssistantai.data.voicewake.BluetoothVoiceStatus
+import github.ponyhuang.asssistantai.data.voicewake.VoskWakeWordDetector
+import github.ponyhuang.asssistantai.data.voicewake.VoiceSpeechPlayer
+import github.ponyhuang.asssistantai.data.voicewake.WakeModelProvider
+import github.ponyhuang.asssistantai.data.voicewake.isVoiceConfirmationApproved
+import github.ponyhuang.asssistantai.data.voicewake.stripWakeKeyword
+import github.ponyhuang.asssistantai.data.voicewake.voiceConfirmationTarget
 import github.ponyhuang.asssistantai.R
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelInfo
@@ -92,14 +105,14 @@ class BluetoothVoiceService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action ?: ACTION_START) {
-            ACTION_STOP -> stopCompletely()
-            ACTION_PAUSE -> pauseListening()
-            ACTION_RESUME -> {
+        when (intent?.action ?: BluetoothVoiceController.BLUETOOTH_VOICE_ACTION_START) {
+            BluetoothVoiceController.BLUETOOTH_VOICE_ACTION_STOP -> stopCompletely()
+            BluetoothVoiceController.BLUETOOTH_VOICE_ACTION_PAUSE -> pauseListening()
+            BluetoothVoiceController.BLUETOOTH_VOICE_ACTION_RESUME -> {
                 pausedByUser = false
                 scope.launch { reconcileBluetoothRoute() }
             }
-            ACTION_START -> startForegroundAndListen()
+            BluetoothVoiceController.BLUETOOTH_VOICE_ACTION_START -> startForegroundAndListen()
         }
         return START_STICKY
     }
@@ -477,7 +490,7 @@ class BluetoothVoiceService : Service() {
     private fun buildNotification(status: BluetoothVoiceStatus, message: String): Notification {
         val openIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            controller.state.value.voiceSessionId?.let { putExtra(EXTRA_VOICE_SESSION_ID, it) }
+            controller.state.value.voiceSessionId?.let { putExtra(BluetoothVoiceController.BLUETOOTH_VOICE_EXTRA_SESSION_ID, it) }
         }
         val contentIntent = PendingIntent.getActivity(
             this,
@@ -485,7 +498,11 @@ class BluetoothVoiceService : Service() {
             openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val pauseAction = if (status == BluetoothVoiceStatus.Paused) ACTION_RESUME else ACTION_PAUSE
+        val pauseAction = if (status == BluetoothVoiceStatus.Paused) {
+            BluetoothVoiceController.BLUETOOTH_VOICE_ACTION_RESUME
+        } else {
+            BluetoothVoiceController.BLUETOOTH_VOICE_ACTION_PAUSE
+        }
         val pauseLabel = getString(
             if (status == BluetoothVoiceStatus.Paused) {
                 R.string.bluetooth_voice_action_resume
@@ -507,7 +524,7 @@ class BluetoothVoiceService : Service() {
             .addAction(
                 0,
                 getString(R.string.bluetooth_voice_action_stop),
-                servicePendingIntent(ACTION_STOP, 3),
+                servicePendingIntent(BluetoothVoiceController.BLUETOOTH_VOICE_ACTION_STOP, 3),
             )
             .build()
     }
@@ -549,11 +566,7 @@ class BluetoothVoiceService : Service() {
     }
 
     companion object {
-        const val ACTION_START = "github.ponyhuang.asssistantai.voice.START"
-        const val ACTION_STOP = "github.ponyhuang.asssistantai.voice.STOP"
-        const val ACTION_PAUSE = "github.ponyhuang.asssistantai.voice.PAUSE"
-        const val ACTION_RESUME = "github.ponyhuang.asssistantai.voice.RESUME"
-        const val EXTRA_VOICE_SESSION_ID = "voice_session_id"
+        const val EXTRA_VOICE_SESSION_ID = BluetoothVoiceController.BLUETOOTH_VOICE_EXTRA_SESSION_ID
         private const val NOTIFICATION_CHANNEL_ID = "bluetooth_voice_wake"
         private const val NOTIFICATION_ID = 4107
         private const val WAKE_COOLDOWN_MS = 2_000L
@@ -563,35 +576,4 @@ class BluetoothVoiceService : Service() {
         private const val CONFIRMATION_TIMEOUT_MS = 15_000L
         private const val NOTIFICATION_PREVIEW_LENGTH = 120
     }
-}
-
-private fun voiceConfirmationTarget(arguments: Map<String, Any?>): String =
-    arguments.entries
-        .joinToString("，") { (key, rawValue) ->
-            val value = rawValue?.toString().orEmpty()
-            val spokenValue = if (
-                key.contains("phone", ignoreCase = true) ||
-                key.contains("number", ignoreCase = true)
-            ) {
-                value.takeLast(4)
-            } else {
-                value.take(40)
-            }
-            "$key $spokenValue"
-        }
-        .take(120)
-
-/**
- * 判断语音确认口令。确认/取消词表由调用方按激活唤醒模型的语言传入
- * （用户对设备说的是模型语言，而非界面语言）。
- */
-internal fun isVoiceConfirmationApproved(
-    transcript: String,
-    confirmWords: List<String>,
-    rejectWords: List<String>,
-): Boolean {
-    val normalized = transcript.trim().lowercase()
-    val rejected = rejectWords.any(normalized::contains)
-    if (rejected) return false
-    return confirmWords.any(normalized::contains)
 }

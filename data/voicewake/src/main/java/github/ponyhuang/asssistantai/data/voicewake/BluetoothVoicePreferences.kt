@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.voice
+package github.ponyhuang.asssistantai.data.voicewake
 
 import android.content.Context
 import androidx.core.content.edit
@@ -23,10 +23,7 @@ class BluetoothVoicePreferences @Inject constructor(
             ?: WakeModelCatalog.default.id,
     )
     private val _keyword = MutableStateFlow(loadKeyword(_activeModelId.value))
-    /** 激活的唤醒模型 id。 */
     val activeModelId: StateFlow<String> = _activeModelId.asStateFlow()
-
-    /** 激活模型语言下的唤醒词（切换模型时恢复该语言已保存的词或默认词）。 */
     val keyword: StateFlow<String> = _keyword.asStateFlow()
 
     fun setActiveModel(modelId: String) {
@@ -36,7 +33,6 @@ class BluetoothVoicePreferences @Inject constructor(
         _keyword.value = loadKeyword(info.id)
     }
 
-    /** 设置激活模型语言的唤醒词，校验失败抛 [WakeKeywordException]。 */
     fun setKeyword(value: String) {
         val info = WakeModelCatalog.byId(_activeModelId.value) ?: WakeModelCatalog.default
         val normalized = value.trim()

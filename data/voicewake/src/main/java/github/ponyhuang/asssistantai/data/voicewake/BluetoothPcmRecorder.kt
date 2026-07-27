@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.voice
+package github.ponyhuang.asssistantai.data.voicewake
 
 import android.Manifest
 import android.media.AudioFormat
@@ -131,8 +131,7 @@ class BluetoothPcmRecorder {
     }
 }
 
-/** 录音失败原因类型化，文案由服务层按 locale 映射到字符串资源。 */
-internal class BluetoothRecorderException(
+class BluetoothRecorderException(
     val reason: Reason,
     val errorCode: Int? = null,
 ) : IllegalStateException(reason.name) {

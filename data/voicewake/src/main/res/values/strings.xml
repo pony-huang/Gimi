@@ -1,0 +1,14 @@
+<resources>
+    <string name="bluetooth_voice_model_required">请先下载唤醒模型</string>
+    <string name="bluetooth_voice_starting_listener">正在启动蓝牙语音监听</string>
+    <string name="bluetooth_voice_default_device_name">蓝牙耳机</string>
+    <string name="bluetooth_voice_playback_failed">蓝牙语音播放失败：%1$d</string>
+    <string name="wake_model_reading_bundled">正在读取内置唤醒模型</string>
+    <string name="wake_model_downloading">正在下载唤醒模型</string>
+    <string name="wake_model_checksum_failed">唤醒模型校验失败</string>
+    <string name="wake_model_installing">正在安装唤醒模型</string>
+    <string name="wake_model_package_invalid">下载包不包含有效的唤醒模型</string>
+    <string name="wake_model_files_incomplete">唤醒模型文件不完整</string>
+    <string name="wake_model_install_failed">唤醒模型安装失败</string>
+    <string name="wake_model_download_failed">唤醒模型下载失败</string>
+</resources>

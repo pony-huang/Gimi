@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.voice
+package github.ponyhuang.asssistantai.data.voicewake
 
 import android.content.Context
 import android.media.AudioAttributes
@@ -7,7 +7,7 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import dagger.hilt.android.qualifiers.ApplicationContext
-import github.ponyhuang.asssistantai.R
+import github.ponyhuang.asssistantai.data.voicewake.R
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechSynthesisRepository
 import javax.inject.Inject
 import javax.inject.Singleton

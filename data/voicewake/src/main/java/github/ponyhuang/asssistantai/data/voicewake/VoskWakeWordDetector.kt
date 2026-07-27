@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.voice
+package github.ponyhuang.asssistantai.data.voicewake
 
 import com.google.gson.JsonParser
 import github.ponyhuang.asssistantai.domain.speech.model.wakeKeywordGrammar
@@ -46,7 +46,6 @@ class VoskWakeWordDetector(
         return Recognizer(model, BluetoothPcmRecorder.SAMPLE_RATE_HZ.toFloat(), "[\"$escaped\", \"[unk]\"]")
     }
 
-    /** 只关闭 Recognizer；Model 由 [WakeModelProvider] 统一缓存与释放。 */
     override fun close() {
         recognizer.close()
     }

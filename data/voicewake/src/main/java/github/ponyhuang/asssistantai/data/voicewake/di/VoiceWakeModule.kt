@@ -1,11 +1,11 @@
-package github.ponyhuang.asssistantai.app.di
+package github.ponyhuang.asssistantai.data.voicewake.di
 
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import github.ponyhuang.asssistantai.data.voicewake.BluetoothVoiceController
 import github.ponyhuang.asssistantai.domain.speech.repository.VoiceWakeRepository
-import github.ponyhuang.asssistantai.voice.BluetoothVoiceController
 import javax.inject.Singleton
 
 @Module

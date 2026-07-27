@@ -163,6 +163,7 @@ dependencies {
     implementation(project(":core:network"))
     implementation(project(":core:database"))
     implementation(project(":data:speech"))
+    implementation(project(":data:voicewake"))
     implementation(project(":data:conversation"))
     implementation(project(":data:agent"))
     implementation(project(":data:mcp"))

@@ -1,10 +1,10 @@
-package github.ponyhuang.asssistantai.voice
+package github.ponyhuang.asssistantai.data.voicewake
 
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
-import github.ponyhuang.asssistantai.R
+import github.ponyhuang.asssistantai.data.voicewake.R
 import github.ponyhuang.asssistantai.data.assistant.VoiceSessionIdStore
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.asssistantai.domain.speech.repository.VoiceWakeRepository
@@ -82,28 +82,28 @@ class BluetoothVoiceController @Inject constructor(
         )
         ContextCompat.startForegroundService(
             context,
-            Intent(context, BluetoothVoiceService::class.java).setAction(BluetoothVoiceService.ACTION_START),
+            Intent(BLUETOOTH_VOICE_ACTION_START).setClassName(context, BLUETOOTH_VOICE_SERVICE_CLASS),
         )
     }
 
     override fun stop() {
         context.startService(
-            Intent(context, BluetoothVoiceService::class.java).setAction(BluetoothVoiceService.ACTION_STOP),
+            Intent(BLUETOOTH_VOICE_ACTION_STOP).setClassName(context, BLUETOOTH_VOICE_SERVICE_CLASS),
         )
     }
 
     fun pauseOrResume() {
         val action = if (_state.value.status == BluetoothVoiceStatus.Paused) {
-            BluetoothVoiceService.ACTION_RESUME
+            BLUETOOTH_VOICE_ACTION_RESUME
         } else {
-            BluetoothVoiceService.ACTION_PAUSE
+            BLUETOOTH_VOICE_ACTION_PAUSE
         }
-        context.startService(Intent(context, BluetoothVoiceService::class.java).setAction(action))
+        context.startService(Intent(action).setClassName(context, BLUETOOTH_VOICE_SERVICE_CLASS))
     }
 
-    internal fun modelPath(): String? = modelRepository.modelPath(preferences.activeModelId.value)
+    fun modelPath(): String? = modelRepository.modelPath(preferences.activeModelId.value)
 
-    internal fun setStatus(
+    fun setStatus(
         status: BluetoothVoiceStatus,
         deviceName: String? = _state.value.deviceName,
         lastCommand: String? = _state.value.lastCommand,
@@ -117,5 +117,14 @@ class BluetoothVoiceController @Inject constructor(
                 message = message,
             )
         }
+    }
+
+    companion object {
+        const val BLUETOOTH_VOICE_ACTION_START = "github.ponyhuang.asssistantai.voice.START"
+        const val BLUETOOTH_VOICE_ACTION_STOP = "github.ponyhuang.asssistantai.voice.STOP"
+        const val BLUETOOTH_VOICE_ACTION_PAUSE = "github.ponyhuang.asssistantai.voice.PAUSE"
+        const val BLUETOOTH_VOICE_ACTION_RESUME = "github.ponyhuang.asssistantai.voice.RESUME"
+        const val BLUETOOTH_VOICE_EXTRA_SESSION_ID = "voice_session_id"
+        private const val BLUETOOTH_VOICE_SERVICE_CLASS = "github.ponyhuang.asssistantai.voice.BluetoothVoiceService"
     }
 }

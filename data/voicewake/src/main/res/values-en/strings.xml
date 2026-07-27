@@ -1,0 +1,14 @@
+<resources>
+    <string name="bluetooth_voice_model_required">Install a wake model first</string>
+    <string name="bluetooth_voice_starting_listener">Starting Bluetooth voice listener</string>
+    <string name="bluetooth_voice_default_device_name">Bluetooth headset</string>
+    <string name="bluetooth_voice_playback_failed">Bluetooth playback failed: %1$d</string>
+    <string name="wake_model_reading_bundled">Reading bundled wake model</string>
+    <string name="wake_model_downloading">Downloading wake model</string>
+    <string name="wake_model_checksum_failed">Wake model checksum failed</string>
+    <string name="wake_model_installing">Installing wake model</string>
+    <string name="wake_model_package_invalid">Package does not contain a valid wake model</string>
+    <string name="wake_model_files_incomplete">Wake model files are incomplete</string>
+    <string name="wake_model_install_failed">Wake model installation failed</string>
+    <string name="wake_model_download_failed">Wake model download failed</string>
+</resources>

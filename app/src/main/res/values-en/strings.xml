@@ -3,8 +3,6 @@
     <string name="media_notification_listener_label">asssistantai media control</string>
     <string name="bluetooth_voice_channel_name">Voice wake-up</string>
     <string name="bluetooth_voice_notification_title">Voice wake-up assistant</string>
-    <string name="bluetooth_voice_model_required">Install a wake model first</string>
-    <string name="bluetooth_voice_starting_listener">Starting Bluetooth voice listener</string>
     <string name="bluetooth_voice_action_pause">Pause</string>
     <string name="bluetooth_voice_action_resume">Resume</string>
     <string name="bluetooth_voice_action_stop">Stop</string>
@@ -29,7 +27,7 @@
     <string name="bluetooth_voice_status_confirm_wait">Waiting for confirmation: %1$s</string>
     <string name="bluetooth_voice_status_confirm_window">Confirm or decline within %1$d seconds</string>
     <string name="bluetooth_voice_status_transcribing_confirmation">Recognizing confirmation</string>
-    <string name="bluetooth_voice_default_device_name">Bluetooth headset</string>
+
     <string name="bluetooth_voice_error_buffer_size">Could not determine Bluetooth recording buffer size</string>
     <string name="bluetooth_voice_error_route_failed">Could not route the microphone to the Bluetooth headset</string>
     <string name="bluetooth_voice_error_not_recording">Bluetooth microphone did not start recording</string>
@@ -37,13 +35,5 @@
     <string name="bluetooth_voice_no_agent_model">Configure a default assistant model first</string>
     <string name="bluetooth_voice_task_completed">Task completed</string>
     <string name="bluetooth_voice_session_create_failed">Could not create a voice session</string>
-    <string name="bluetooth_voice_playback_failed">Bluetooth playback failed: %1$d</string>
-    <string name="wake_model_reading_bundled">Reading bundled wake model</string>
-    <string name="wake_model_downloading">Downloading wake model</string>
-    <string name="wake_model_checksum_failed">Wake model checksum failed</string>
-    <string name="wake_model_installing">Installing wake model</string>
-    <string name="wake_model_package_invalid">Package does not contain a valid wake model</string>
-    <string name="wake_model_files_incomplete">Wake model files are incomplete</string>
-    <string name="wake_model_install_failed">Wake model installation failed</string>
-    <string name="wake_model_download_failed">Wake model download failed</string>
+
 </resources>

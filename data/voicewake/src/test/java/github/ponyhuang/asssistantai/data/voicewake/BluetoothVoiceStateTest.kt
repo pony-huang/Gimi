@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.voice
+package github.ponyhuang.asssistantai.data.voicewake
 
 import github.ponyhuang.asssistantai.domain.speech.model.isPresetWakeKeyword
 import github.ponyhuang.asssistantai.domain.speech.model.wakeKeywordGrammar

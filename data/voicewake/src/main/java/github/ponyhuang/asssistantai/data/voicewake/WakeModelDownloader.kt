@@ -1,21 +1,16 @@
-package github.ponyhuang.asssistantai.voice
+package github.ponyhuang.asssistantai.data.voicewake
 
-import github.ponyhuang.asssistantai.voice.WakeModelDownloadException.Reason
+import github.ponyhuang.asssistantai.data.voicewake.WakeModelDownloadException.Reason
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-/** 下载失败原因，由调用方映射为用户可读的本地化文案。 */
 internal class WakeModelDownloadException(val reason: Reason) : Exception(reason.name) {
     enum class Reason { Network, ChecksumMismatch }
 }
 
-/**
- * 唤醒模型下载器：流式写入磁盘，边下边算 SHA-256，完成后与期望值比对。
- * 独立于 Android Context，便于 JVM 单测（MockWebServer）。
- */
 internal class WakeModelDownloader(
     private val okHttpClient: OkHttpClient,
 ) {

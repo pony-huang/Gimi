@@ -1,8 +1,8 @@
-package github.ponyhuang.asssistantai.voice
+package github.ponyhuang.asssistantai.data.voicewake
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
-import github.ponyhuang.asssistantai.R
+import github.ponyhuang.asssistantai.data.voicewake.R
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelInfo
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelSource

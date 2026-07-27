@@ -136,10 +136,10 @@ class VoiceAudioRecorder {
         scope.cancel()
     }
 
-    private companion object {
+    companion object {
         const val SAMPLE_RATE_HZ = 16_000
-        const val LEVEL_DISPATCH_INTERVAL_MS = 50L
-        const val LEVEL_SMOOTHING = 0.65f
+        private const val LEVEL_DISPATCH_INTERVAL_MS = 50L
+        private const val LEVEL_SMOOTHING = 0.65f
     }
 }
 

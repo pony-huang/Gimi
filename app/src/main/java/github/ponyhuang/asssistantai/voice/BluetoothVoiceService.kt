@@ -32,9 +32,9 @@ import github.ponyhuang.asssistantai.data.voicewake.BluetoothVoiceStatus
 import github.ponyhuang.asssistantai.data.voicewake.VoskWakeWordDetector
 import github.ponyhuang.asssistantai.data.voicewake.VoiceSpeechPlayer
 import github.ponyhuang.asssistantai.data.voicewake.WakeModelProvider
-import github.ponyhuang.asssistantai.data.voicewake.isVoiceConfirmationApproved
-import github.ponyhuang.asssistantai.data.voicewake.stripWakeKeyword
-import github.ponyhuang.asssistantai.data.voicewake.voiceConfirmationTarget
+import github.ponyhuang.asssistantai.domain.speech.model.isVoiceConfirmationApproved
+import github.ponyhuang.asssistantai.domain.speech.model.stripWakeKeyword
+import github.ponyhuang.asssistantai.domain.speech.model.voiceConfirmationTarget
 import github.ponyhuang.asssistantai.R
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelInfo
@@ -51,6 +51,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 
 @AndroidEntryPoint
@@ -78,6 +79,7 @@ class BluetoothVoiceService : Service() {
     private var lastWakeAtMs = 0L
     private var cueActiveUntilMs = 0L
     private val audioManager by lazy { getSystemService(AudioManager::class.java) }
+    private var cueToneGenerator: ToneGenerator? = null
     private val callModeListener = AudioManager.OnModeChangedListener { mode ->
         val callActive = mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_RINGTONE
         scope.launch {
@@ -95,6 +97,7 @@ class BluetoothVoiceService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        cueToneGenerator = runCatching { ToneGenerator(AudioManager.STREAM_VOICE_CALL, TONE_VOLUME_PERCENT) }.getOrNull()
         audioManager.addOnModeChangedListener(ContextCompat.getMainExecutor(this), callModeListener)
         audioRouter.observe { scope.launch { reconcileBluetoothRoute() } }
         scope.launch {
@@ -114,7 +117,7 @@ class BluetoothVoiceService : Service() {
             }
             BluetoothVoiceController.BLUETOOTH_VOICE_ACTION_START -> startForegroundAndListen()
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -177,7 +180,10 @@ class BluetoothVoiceService : Service() {
         route = newRoute
         val wakeDetector = runCatching {
             withContext(Dispatchers.IO) {
-                VoskWakeWordDetector(wakeModels.acquire(modelPath), preferences.keyword.value)
+                val model = withTimeout(ACQUIRE_MODEL_TIMEOUT_MS) {
+                    wakeModels.acquire(modelPath)
+                }
+                VoskWakeWordDetector(model, preferences.keyword.value)
             }
         }.getOrElse { error ->
             audioRouter.release()
@@ -267,12 +273,12 @@ class BluetoothVoiceService : Service() {
     }
 
     private suspend fun playWakeCue() {
-        val tone = ToneGenerator(AudioManager.STREAM_VOICE_CALL, 55)
+        val tone = cueToneGenerator ?: return
         try {
-            tone.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
-            delay(200)
-        } finally {
-            tone.release()
+            tone.startTone(ToneGenerator.TONE_PROP_BEEP, TONE_DURATION_MS)
+            delay(TONE_DELAY_MS)
+        } catch (_: RuntimeException) {
+            cueToneGenerator = null
         }
     }
 
@@ -358,7 +364,7 @@ class BluetoothVoiceService : Service() {
         val confirmationCapture = VoiceCommandCapture(
             preRoll = ByteArray(0),
             startedAtMs = startedAt,
-            speechStartTimeoutMs = CONFIRMATION_TIMEOUT_MS,
+            speechStartTimeoutMs = CONFIRMATION_SPEECH_START_TIMEOUT_MS,
             maxCaptureMs = CONFIRMATION_TIMEOUT_MS,
         )
         val confirmationRecorder = BluetoothPcmRecorder()
@@ -556,6 +562,8 @@ class BluetoothVoiceService : Service() {
         processingJob?.cancel()
         stopAudioCapture(releaseRoute = true)
         wakeModels.release()
+        cueToneGenerator?.release()
+        cueToneGenerator = null
         audioManager.removeOnModeChangedListener(callModeListener)
         audioRouter.stopObserving()
         if (controller.state.value.status != BluetoothVoiceStatus.Stopped) {
@@ -574,6 +582,11 @@ class BluetoothVoiceService : Service() {
         private const val MAX_RECOVERY_ATTEMPTS = 3
         private const val RECOVERY_BASE_DELAY_MS = 2_000L
         private const val CONFIRMATION_TIMEOUT_MS = 15_000L
+        private const val CONFIRMATION_SPEECH_START_TIMEOUT_MS = 5_000L
+        private const val ACQUIRE_MODEL_TIMEOUT_MS = 30_000L
         private const val NOTIFICATION_PREVIEW_LENGTH = 120
+        private const val TONE_VOLUME_PERCENT = 55
+        private const val TONE_DURATION_MS = 150
+        private const val TONE_DELAY_MS = 200L
     }
 }

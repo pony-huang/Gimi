@@ -5,6 +5,7 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import androidx.annotation.RequiresPermission
+import github.ponyhuang.asssistantai.core.audio.VoiceAudioRecorder
 import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
@@ -32,7 +33,7 @@ class BluetoothPcmRecorder {
         if (recorder != null) return false
         stopping.set(false)
         val minBuffer = AudioRecord.getMinBufferSize(
-            SAMPLE_RATE_HZ,
+            VoiceAudioRecorder.SAMPLE_RATE_HZ,
             AudioFormat.CHANNEL_IN_MONO,
             AudioFormat.ENCODING_PCM_16BIT,
         )
@@ -45,7 +46,7 @@ class BluetoothPcmRecorder {
                 .setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
                 .setAudioFormat(
                     AudioFormat.Builder()
-                        .setSampleRate(SAMPLE_RATE_HZ)
+                        .setSampleRate(VoiceAudioRecorder.SAMPLE_RATE_HZ)
                         .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
                         .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
                         .build(),
@@ -125,9 +126,8 @@ class BluetoothPcmRecorder {
         scope.cancel()
     }
 
-    companion object {
-        const val SAMPLE_RATE_HZ = 16_000
-        private const val FRAME_BYTES = 3_200
+    private companion object {
+        const val FRAME_BYTES = 3_200
     }
 }
 

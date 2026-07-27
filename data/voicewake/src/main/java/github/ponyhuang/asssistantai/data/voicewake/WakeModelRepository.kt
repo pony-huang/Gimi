@@ -33,16 +33,8 @@ class WakeModelRepository @Inject constructor(
     private val downloader = WakeModelDownloader(okHttpClient)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val rootDir = File(context.filesDir, "voice/wake-model")
-    private val _states = MutableStateFlow(
-        WakeModelCatalog.models.associate { it.id to WakeModelState() },
-    )
+    private val _states = MutableStateFlow(initialStates())
     private val installJobs = ConcurrentHashMap<String, Job>()
-
-    init {
-        scope.launch {
-            _states.value = initialStates()
-        }
-    }
 
     val states: StateFlow<Map<String, WakeModelState>> = _states.asStateFlow()
 
@@ -56,17 +48,17 @@ class WakeModelRepository @Inject constructor(
     fun install(modelId: String) {
         val info = WakeModelCatalog.byId(modelId) ?: return
         if (_states.value[modelId]?.status == WakeModelStatus.Ready) return
-        val job = scope.launch(start = CoroutineStart.LAZY) {
-            try {
-                installInternal(info)
-            } finally {
-                installJobs.remove(modelId)
+        installJobs.compute(modelId) { _, existing ->
+            existing?.also { it.cancel() }
+            val job = scope.launch(start = CoroutineStart.LAZY) {
+                try {
+                    installInternal(info)
+                } finally {
+                    installJobs.remove(modelId)
+                }
             }
-        }
-        if (installJobs.putIfAbsent(modelId, job) == null) {
             job.start()
-        } else {
-            job.cancel()
+            job
         }
     }
 

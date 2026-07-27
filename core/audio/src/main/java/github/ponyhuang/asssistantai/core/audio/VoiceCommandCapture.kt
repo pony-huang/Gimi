@@ -4,7 +4,7 @@ import java.io.ByteArrayOutputStream
 import java.util.ArrayDeque
 import kotlin.math.abs
 
-private const val PRE_ROLL_MAX_BYTES = 16_000 * 2 * 5 / 2
+private const val PRE_ROLL_MAX_BYTES = VoiceAudioRecorder.SAMPLE_RATE_HZ * 2 * 5 / 2
 
 class PcmPreRollBuffer(
     private val maxBytes: Int = PRE_ROLL_MAX_BYTES,
@@ -91,7 +91,6 @@ class VoiceCommandCapture(
     }
 
     companion object {
-        const val SAMPLE_RATE_HZ = 16_000
         const val SPEECH_START_TIMEOUT_MS = 5_000L
         const val SILENCE_TO_FINISH_MS = 1_200L
         const val MAX_CAPTURE_MS = 30_000L

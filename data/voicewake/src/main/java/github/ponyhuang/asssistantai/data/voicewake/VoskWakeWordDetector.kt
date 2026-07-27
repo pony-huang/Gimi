@@ -1,6 +1,8 @@
 package github.ponyhuang.asssistantai.data.voicewake
 
 import com.google.gson.JsonParser
+import github.ponyhuang.asssistantai.core.audio.VoiceAudioRecorder
+import github.ponyhuang.asssistantai.domain.speech.model.normalizeWakeText
 import github.ponyhuang.asssistantai.domain.speech.model.wakeKeywordGrammar
 import java.io.Closeable
 import org.vosk.Model
@@ -43,7 +45,7 @@ class VoskWakeWordDetector(
 
     private fun createRecognizer(value: String): Recognizer {
         val escaped = wakeKeywordGrammar(value).replace("\\", "\\\\").replace("\"", "\\\"")
-        return Recognizer(model, BluetoothPcmRecorder.SAMPLE_RATE_HZ.toFloat(), "[\"$escaped\", \"[unk]\"]")
+        return Recognizer(model, VoiceAudioRecorder.SAMPLE_RATE_HZ.toFloat(), "[\"$escaped\", \"[unk]\"]")
     }
 
     override fun close() {

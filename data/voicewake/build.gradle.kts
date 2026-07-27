@@ -15,6 +15,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:audio"))
     implementation(project(":core:common"))
     implementation(project(":domain:speech"))
     implementation(project(":data:assistant"))

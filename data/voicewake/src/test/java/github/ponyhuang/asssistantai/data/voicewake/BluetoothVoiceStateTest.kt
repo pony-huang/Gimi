@@ -1,6 +1,8 @@
 package github.ponyhuang.asssistantai.data.voicewake
 
 import github.ponyhuang.asssistantai.domain.speech.model.isPresetWakeKeyword
+import github.ponyhuang.asssistantai.domain.speech.model.normalizeWakeText
+import github.ponyhuang.asssistantai.domain.speech.model.stripWakeKeyword
 import github.ponyhuang.asssistantai.domain.speech.model.wakeKeywordGrammar
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

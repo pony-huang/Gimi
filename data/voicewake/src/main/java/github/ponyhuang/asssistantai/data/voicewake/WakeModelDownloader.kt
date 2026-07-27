@@ -4,6 +4,7 @@ import github.ponyhuang.asssistantai.data.voicewake.WakeModelDownloadException.R
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
+import java.util.concurrent.CancellationException
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
@@ -49,6 +50,9 @@ internal class WakeModelDownloader(
         } catch (error: WakeModelDownloadException) {
             archive.delete()
             throw error
+        } catch (cancelled: CancellationException) {
+            archive.delete()
+            throw cancelled
         } catch (error: Exception) {
             archive.delete()
             throw WakeModelDownloadException(Reason.Network)

@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.data.voicewake
 
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelCatalog
+import github.ponyhuang.asssistantai.domain.speech.model.isVoiceConfirmationApproved
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

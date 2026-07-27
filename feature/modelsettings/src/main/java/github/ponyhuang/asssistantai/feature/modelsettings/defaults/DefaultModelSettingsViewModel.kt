@@ -70,7 +70,17 @@ class DefaultModelSettingsViewModel @Inject constructor(
             DefaultModelDialog.Assistant -> updateSettings.assistant(selection)
             DefaultModelDialog.Fast -> updateSettings.fast(selection)
             DefaultModelDialog.Speech -> updateSettings.speech(selection)
-            DefaultModelDialog.Tts -> updateSettings.tts(selection)
+            DefaultModelDialog.Tts -> {
+                val currentServiceId = uiState.value.ttsSelection?.serviceId
+                updateSettings.tts(selection)
+                if (selection.serviceId != currentServiceId) {
+                    val defaultVoice = TtsVoiceCatalog.forService(selection.serviceId)
+                        .firstOrNull()
+                        ?.id
+                        .orEmpty()
+                    updateSettings.voice(defaultVoice)
+                }
+            }
             DefaultModelDialog.TtsVoice -> Unit
         }
     }

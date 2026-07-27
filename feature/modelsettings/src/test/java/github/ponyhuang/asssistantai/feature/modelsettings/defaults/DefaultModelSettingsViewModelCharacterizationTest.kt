@@ -63,18 +63,64 @@ class DefaultModelSettingsViewModelCharacterizationTest {
         assertEquals(null, viewModel.uiState.value.dialog)
     }
 
+    @Test
+    fun ttsVoiceResetsToDefaultWhenTtsServiceChanges() = runTest {
+        val repository = repository(
+            ttsSelection = ModelSelection("service", "group", "tts"),
+        )
+        val viewModel = viewModel(repository)
+        viewModel.awaitUiStateReady()
+        val newSelection = ModelSelection("mimo", "group", "tts")
+
+        viewModel.onAction(
+            DefaultModelSettingsAction.SelectModel(DefaultModelDialog.Tts, newSelection),
+        )
+        advanceUntilIdle()
+
+        verify { repository.selectTtsModel(newSelection) }
+        verify { repository.selectTtsVoice("mimo_default") }
+    }
+
+    @Test
+    fun ttsVoiceStaysUnchangedWhenTtsServiceStaysSame() = runTest {
+        val repository = repository(
+            ttsSelection = ModelSelection("service", "group", "tts"),
+        )
+        val viewModel = viewModel(repository)
+        viewModel.awaitUiStateReady()
+        val newSelection = ModelSelection("service", "group2", "tts2")
+
+        viewModel.onAction(
+            DefaultModelSettingsAction.SelectModel(DefaultModelDialog.Tts, newSelection),
+        )
+        advanceUntilIdle()
+
+        verify { repository.selectTtsModel(newSelection) }
+        verify(exactly = 0) { repository.selectTtsVoice(any()) }
+    }
+
     private fun viewModel(repository: ModelCatalogRepository) = DefaultModelSettingsViewModel(
         observeSettings = ObserveDefaultModelSettingsUseCase(repository),
         updateSettings = UpdateDefaultModelSettingsUseCase(repository),
         runWhenAgentIdle = RunWhenAgentIdleUseCase(TestAgentRuntimeGate()),
     )
 
-    private fun repository(): ModelCatalogRepository = mockk(relaxed = true) {
+    private suspend fun DefaultModelSettingsViewModel.awaitUiStateReady() {
+        uiState.test {
+            awaitItem() // initial empty state
+            awaitItem() // state populated from repository
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    private fun repository(
+        ttsSelection: ModelSelection? = null,
+    ): ModelCatalogRepository = mockk(relaxed = true) {
         every { observeServices() } returns MutableStateFlow(listOf(service()))
         every { observeAssistantSelection() } returns MutableStateFlow(null)
         every { observeFastSelection() } returns MutableStateFlow(null)
         every { observeSpeechSelection() } returns MutableStateFlow(null)
-        every { observeTtsSelection() } returns MutableStateFlow(null)
+        every { observeTtsSelection() } returns MutableStateFlow(ttsSelection)
         every { observeTtsVoice() } returns MutableStateFlow("female-shaonv")
     }
 

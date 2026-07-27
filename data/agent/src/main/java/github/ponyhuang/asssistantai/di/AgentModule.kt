@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.google.adk.kt.artifacts.ArtifactService
 import com.google.adk.kt.artifacts.FileArtifactService
+import com.google.adk.kt.plugins.Plugin
 import com.google.adk.kt.sessions.SessionService
 import com.google.adk.kt.sessions.room.RoomSessionService
 import dagger.Module
@@ -13,7 +14,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.asssistantai.agent.AgentChatRunner
 import github.ponyhuang.asssistantai.agent.AgentFactory
+import github.ponyhuang.asssistantai.agent.AgentModelFactory
 import github.ponyhuang.asssistantai.agent.LocalToolCatalog
+import github.ponyhuang.asssistantai.agent.plugins.ConversationPlugin
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
 import github.ponyhuang.asssistantai.data.modelcatalog.toData
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.LocalToolDefinitionSource
@@ -23,12 +26,17 @@ import java.io.File
 import javax.inject.Singleton
 
 /**
- * Agent 运行所需的进程级单例 — SessionService / ArtifactService / AgentChatRunner。
+ * Agent 运行所需的进程级单例。
  *
- * 设计要点：
- * - 三个绑定都标 `@Singleton`，与原先 `AsssistantaiApp` 字段的"进程级单例"语义一致。
- * - 文件 artifact 根目录沿用原先 `pickArtifactsRoot` 的策略：优先 `<externalFilesDir>/adk/artifacts`，
- *   外置存储不可用时退到 `<filesDir>/adk/artifacts`。
+ * 提供的绑定：
+ * - [SessionService] — 基于 Room 的会话持久化（[RoomSessionService]）
+ * - [ArtifactService] — 基于文件的 artifact 存储（[FileArtifactService]）
+ * - [LocalToolDefinitionSource] — 本地工具定义（委托给 [LocalToolCatalog]）
+ * - [List]<[Plugin]> — 业务插件（[ConversationPlugin] 等）
+ * - [AgentChatRunner] — 聊天运行器，组合上述所有服务
+ *
+ * 文件 artifact 根目录：优先 `<externalFilesDir>/adk/artifacts`，
+ * 外置存储不可用时退到 `<filesDir>/adk/artifacts`。
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -60,6 +68,16 @@ object AgentModule {
 
     @Provides
     @Singleton
+    fun providePlugins(
+        agentModelFactory: AgentModelFactory
+    ): List<@JvmSuppressWildcards Plugin> {
+        return listOf(
+            ConversationPlugin(agentModelFactory)
+        )
+    }
+
+    @Provides
+    @Singleton
     fun provideAgentChatRunner(
         sessionService: SessionService,
         artifactService: ArtifactService,
@@ -67,6 +85,7 @@ object AgentModule {
         modelServices: ModelServiceRepository,
         toolAuthorization: ToolAuthorizationRepository,
         mcpRepository: McpRepository,
+        plugins: List<@JvmSuppressWildcards Plugin>,
     ): AgentChatRunner = AgentChatRunner(
         factory = { selection, allowConfirmationRequiredTools, toolConfiguration ->
             modelServices.awaitReady()
@@ -85,6 +104,7 @@ object AgentModule {
                 modelServices.configurationRevision.value,
             )
         },
+        plugins = plugins,
     )
 
     /**
@@ -99,9 +119,4 @@ object AgentModule {
             File(context.filesDir, FileArtifactService.DEFAULT_ARTIFACTS_SUBDIR).path
         }
     }
-
-    /**
-     * 进程级稳定的 userId — 派生自进程启动时刻，让 Room 里的所有会话都归属于同一 user。
-     */
-    private const val USER_ID: String = "user-default"
 }

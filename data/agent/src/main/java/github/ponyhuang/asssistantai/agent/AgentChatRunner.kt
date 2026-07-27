@@ -8,37 +8,42 @@ import com.google.adk.kt.apps.App
 import com.google.adk.kt.artifacts.ArtifactService
 import com.google.adk.kt.events.Event
 import com.google.adk.kt.plugins.LoggingPlugin
+import com.google.adk.kt.plugins.Plugin
 import com.google.adk.kt.runners.InMemoryRunner
 import com.google.adk.kt.sessions.SessionService
 import com.google.adk.kt.summarizer.EventsCompactionConfig
-import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.Blob
+import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.FunctionResponse
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
+import github.ponyhuang.asssistantai.agent.AgentChatRunner.Companion.MAX_CACHED_RUNNERS
+import github.ponyhuang.asssistantai.di.AgentModule
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment
-import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
+
 
 /**
- * Agent 聊天运行器 — 把 ADK `InMemoryRunner.runAsync(...)` 封装为一个简洁的 `Flow<Event>`。
+ * Agent 聊天运行器 — 把 ADK `InMemoryRunner.runAsync(...)` 封装为 `Flow<Event>`。
  *
  * 设计要点：
- * - 内部持有一个 `InMemoryRunner`，构造期注入 [sessionService]（持久化的 `RoomSessionService`）与 [artifactService]（持久化的 `FileArtifactService`）。
- * - 不再持有任何 in-memory 默认实现；持久化层由 [AsssistantaiApp] 注入。
- * - Agent **不是一次性构建**：`factory` 在每次 [recreate] 时重新调用，让用户切换
- *   `ModelServiceStore` 中的启用服务后，下一次"新建对话"能看到新模型。当前正在进行的
- *   会话不受影响（`send` 时已快照 runner 引用）。
+ * - 按会话缓存 `InMemoryRunner`（LRU 上限 [MAX_CACHED_RUNNERS]），每个会话持有独立 runner。
+ *   当模型选择、配置版本或工具配置变化时，下一轮对话自动重建 runner。
+ * - 构造期由 [AgentModule] 通过 Hilt 注入 [sessionService]、[artifactService]、[plugins]
+ *   及 [configurationRevision]；不持有 in-memory 默认实现。
+ * - [factory] 在每次 [send] 按需调用，保证模型/工具切换立即生效。当前正在
+ *   `runAsync` 中的会话不受影响（[send] 入口处已快照 runner 引用）。
  * - 不对 `Event` 做任何加工；Event → UI 渲染的合并工作由 `ChatViewModel` 的 reducer 完成。
  * - `runConfig` 默认开启 SSE 流式，便于 UI 端做打字机效果。
  *
- * 线程模型：所有调用都通过协程 `Flow` 完成，框架本身不持有任何额外线程。
+ * 线程模型：runner 缓存由 [runnerMutex] 保护，所有调用都通过协程 `Flow` 完成。
  */
 class AgentChatRunner(
     private val factory: suspend (
@@ -49,6 +54,7 @@ class AgentChatRunner(
     private val sessionService: SessionService,
     private val artifactService: ArtifactService?,
     private val configurationRevision: () -> Any = { Unit },
+    private val plugins: List<Plugin> = emptyList()
 ) {
     constructor(
         factory: suspend (ModelSelection?) -> BaseAgent,
@@ -91,7 +97,7 @@ class AgentChatRunner(
     private fun buildRunner(agent: BaseAgent): InMemoryRunner = InMemoryRunner(
         app = App(
             appName = APP_NAME,
-            plugins = mutableListOf(LoggingPlugin()),
+            plugins = mutableListOf(LoggingPlugin()) + plugins,
             rootAgent = agent,
             resumabilityConfig = ResumabilityConfig(isResumable = true),
             // 对话摘要压缩
@@ -102,10 +108,10 @@ class AgentChatRunner(
     )
 
     /**
-     * 用工厂产出的最新 agent 重建底层 runner。
+     * 清空所有缓存的 runner。
      *
-     * 调用时机："新建对话"按钮——保证下一条消息从新 agent 出发。当前正在 `runAsync` 中的
-     * 会话不受影响（快照在 [send] 入口处已取好）。
+     * 下次 [send] 时 [factory] 会被重新调用以使用最新的模型/工具配置构建 agent。
+     * 当前正在 `runAsync` 中的会话不受影响。
      */
     suspend fun recreate() {
         runnerMutex.withLock {
@@ -114,10 +120,9 @@ class AgentChatRunner(
     }
 
     /**
-     * Drops the current runner without creating a replacement.
+     * 清空所有缓存的 runner，不创建替代。
      *
-     * Used when no model is currently available, so a runner built from a model that has since
-     * been disabled or removed cannot continue serving later requests.
+     * 当没有可用模型时调用，确保已禁用或删除的模型不会被后续请求使用。
      */
     suspend fun invalidate() {
         runnerMutex.withLock {
@@ -125,18 +130,26 @@ class AgentChatRunner(
         }
     }
 
+    /**
+     * 释放指定会话的 runner 缓存。
+     *
+     * @param sessionId 要释放的会话 ID
+     */
     suspend fun releaseSession(sessionId: String) {
         runnerMutex.withLock { runners.remove(sessionId) }
     }
 
     /**
-     * 把用户文本发送给 Agent，返回一个 Event 流。
+     * 把用户输入发送给 Agent，返回 Event 流。
      *
-     * @param userId 用户 id（用于会话归属）
-     * @param sessionId 会话 id（同会话的历史会一并送入 LLM）
-     * @param text 用户输入文本（可为空，只要包含图片）
-     * @param imageAttachments 用户选中的图片，作为 ADK inline data 传给模型适配器
-     * @param runConfig 可选运行配置；默认开启 SSE 流式
+     * @param userId 用户 ID（用于会话归属）
+     * @param sessionId 会话 ID（同会话的历史会一并送入 LLM）
+     * @param selection 模型选择；为 null 时使用默认模型
+     * @param text 用户输入文本（可为空，仅当包含图片时）
+     * @param imageAttachments 图片附件，作为 ADK inline data 传给模型
+     * @param allowConfirmationRequiredTools 是否允许需要用户确认的工具调用
+     * @param toolConfiguration 会话工具配置（启用的工具/MCP 服务器列表）
+     * @return Event 流，通过 SSE 流式输出
      */
     suspend fun send(
         userId: String,
@@ -174,7 +187,15 @@ class AgentChatRunner(
         ).flowOn(Dispatchers.IO)
     }
 
-    /** Resumes a paused ADK tool-confirmation request with the user's decision. */
+    /**
+     * 恢复暂停的 ADK 工具确认请求。
+     *
+     * @param userId 用户 ID
+     * @param sessionId 会话 ID
+     * @param confirmationCallId 工具确认的调用 ID
+     * @param confirmed 用户是否确认
+     * @return Event 流
+     */
     suspend fun respondToToolConfirmation(
         userId: String,
         sessionId: String,
@@ -215,9 +236,9 @@ class AgentChatRunner(
             runners[sessionId]
                 ?.takeIf {
                     it.selection == selection &&
-                        it.revision == expectedRevision &&
-                        it.allowConfirmationRequiredTools == allowConfirmationRequiredTools &&
-                        it.toolConfiguration == toolConfiguration
+                            it.revision == expectedRevision &&
+                            it.allowConfirmationRequiredTools == allowConfirmationRequiredTools &&
+                            it.toolConfiguration == toolConfiguration
                 }
                 ?.runner
                 ?: buildRunner(
@@ -244,7 +265,7 @@ class AgentChatRunner(
         }
 
     companion object {
-        const val APP_NAME: String = "AsssistantaiApp"
-        const val MAX_CACHED_RUNNERS: Int = 20
+        const val APP_NAME: String = "Gimi"
+        const val MAX_CACHED_RUNNERS: Int = 10
     }
 }

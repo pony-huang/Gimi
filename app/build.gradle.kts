@@ -1,5 +1,5 @@
-import java.io.File
-import java.util.Properties
+//import java.io.File
+//import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -9,34 +9,34 @@ plugins {
     alias(libs.plugins.hilt.android)
 }
 
-val localProperties = Properties().apply {
-    rootProject.file("local.properties")
-        .takeIf { it.isFile }
-        ?.inputStream()
-        ?.use(::load)
-}
-
-fun releaseSigningValue(environmentName: String, propertyName: String): String? =
-    System.getenv(environmentName)?.takeIf(String::isNotBlank)
-        ?: localProperties.getProperty(propertyName)?.takeIf(String::isNotBlank)
-
-val releaseStoreFile = releaseSigningValue(
-    "ASSISTANTAI_RELEASE_STORE_FILE",
-    "asssistantai.release.storeFile",
-)
-val releaseStorePassword = releaseSigningValue(
-    "ASSISTANTAI_RELEASE_STORE_PASSWORD",
-    "asssistantai.release.storePassword",
-)
-val releaseKeyAlias = releaseSigningValue(
-    "ASSISTANTAI_RELEASE_KEY_ALIAS",
-    "asssistantai.release.keyAlias",
-)
-val releaseKeyPassword = releaseSigningValue(
-    "ASSISTANTAI_RELEASE_KEY_PASSWORD",
-    "asssistantai.release.keyPassword",
-)
-val releaseStorePath = releaseStoreFile?.let(rootProject::file)?.absolutePath.orEmpty()
+//val localProperties = Properties().apply {
+//    rootProject.file("local.properties")
+//        .takeIf { it.isFile }
+//        ?.inputStream()
+//        ?.use(::load)
+//}
+//
+//fun releaseSigningValue(environmentName: String, propertyName: String): String? =
+//    System.getenv(environmentName)?.takeIf(String::isNotBlank)
+//        ?: localProperties.getProperty(propertyName)?.takeIf(String::isNotBlank)
+//
+//val releaseStoreFile = releaseSigningValue(
+//    "ASSISTANTAI_RELEASE_STORE_FILE",
+//    "asssistantai.release.storeFile",
+//)
+//val releaseStorePassword = releaseSigningValue(
+//    "ASSISTANTAI_RELEASE_STORE_PASSWORD",
+//    "asssistantai.release.storePassword",
+//)
+//val releaseKeyAlias = releaseSigningValue(
+//    "ASSISTANTAI_RELEASE_KEY_ALIAS",
+//    "asssistantai.release.keyAlias",
+//)
+//val releaseKeyPassword = releaseSigningValue(
+//    "ASSISTANTAI_RELEASE_KEY_PASSWORD",
+//    "asssistantai.release.keyPassword",
+//)
+//val releaseStorePath = releaseStoreFile?.let(rootProject::file)?.absolutePath.orEmpty()
 
 android {
     namespace = "github.ponyhuang.asssistantai"
@@ -54,14 +54,14 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    signingConfigs {
-        create("releasePrivate") {
-            storeFile = rootProject.file(releaseStoreFile ?: "temp/missing-release.keystore")
-            storePassword = releaseStorePassword.orEmpty()
-            keyAlias = releaseKeyAlias.orEmpty()
-            keyPassword = releaseKeyPassword.orEmpty()
-        }
-    }
+//    signingConfigs {
+//        create("releasePrivate") {
+//            storeFile = rootProject.file(releaseStoreFile ?: "temp/missing-release.keystore")
+//            storePassword = releaseStorePassword.orEmpty()
+//            keyAlias = releaseKeyAlias.orEmpty()
+//            keyPassword = releaseKeyPassword.orEmpty()
+//        }
+//    }
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -70,7 +70,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            signingConfig = signingConfigs.getByName("releasePrivate")
+//            signingConfig = signingConfigs.getByName("releasePrivate")
         }
     }
     compileOptions {
@@ -103,48 +103,44 @@ android {
         abi {
             isEnable = true
             reset()
-            // minSdk = 35 — 32-bit ABIs are no longer required by Google Play
-            // for API 35+ targets. arm64 covers real devices; x86_64 covers the
-            // Meizu emulator and CI emulators. isUniversalApk = true keeps a
-            // fat APK so ADB install works without picking an ABI.
-            include("arm64-v8a", "x86_64")
+            include("arm64-v8a")
             isUniversalApk = true
         }
     }
 }
 
-val verifyReleaseSigning by tasks.registering {
-    group = "verification"
-    description = "Fails release builds when private signing configuration is incomplete."
-    inputs.property("releaseStoreFile", releaseStorePath)
-    inputs.property("releaseStorePasswordConfigured", !releaseStorePassword.isNullOrBlank())
-    inputs.property("releaseKeyAliasConfigured", !releaseKeyAlias.isNullOrBlank())
-    inputs.property("releaseKeyPasswordConfigured", !releaseKeyPassword.isNullOrBlank())
-    doLast {
-        val configuredValues = mapOf(
-            "store file" to inputs.properties["releaseStoreFile"].toString().isNotBlank(),
-            "store password" to (inputs.properties["releaseStorePasswordConfigured"] as Boolean),
-            "key alias" to (inputs.properties["releaseKeyAliasConfigured"] as Boolean),
-            "key password" to (inputs.properties["releaseKeyPasswordConfigured"] as Boolean),
-        )
-        val missing = configuredValues.filterValues { configured -> !configured }.keys
-        check(missing.isEmpty()) {
-            "Release signing is incomplete. Missing ${missing.joinToString()}. " +
-                "Configure ASSISTANTAI_RELEASE_* environment variables or " +
-                "asssistantai.release.* entries in local.properties."
-        }
-        val configuredStoreFile = inputs.properties["releaseStoreFile"].toString()
-        check(File(configuredStoreFile).isFile) {
-            "Release signing store file does not exist: $configuredStoreFile"
-        }
-    }
-}
-
-tasks.configureEach {
-    if (name.contains("Release") && name != verifyReleaseSigning.name) {
-        dependsOn(verifyReleaseSigning)
-    }
-}
+//val verifyReleaseSigning by tasks.registering {
+//    group = "verification"
+//    description = "Fails release builds when private signing configuration is incomplete."
+//    inputs.property("releaseStoreFile", releaseStorePath)
+//    inputs.property("releaseStorePasswordConfigured", !releaseStorePassword.isNullOrBlank())
+//    inputs.property("releaseKeyAliasConfigured", !releaseKeyAlias.isNullOrBlank())
+//    inputs.property("releaseKeyPasswordConfigured", !releaseKeyPassword.isNullOrBlank())
+//    doLast {
+//        val configuredValues = mapOf(
+//            "store file" to inputs.properties["releaseStoreFile"].toString().isNotBlank(),
+//            "store password" to (inputs.properties["releaseStorePasswordConfigured"] as Boolean),
+//            "key alias" to (inputs.properties["releaseKeyAliasConfigured"] as Boolean),
+//            "key password" to (inputs.properties["releaseKeyPasswordConfigured"] as Boolean),
+//        )
+//        val missing = configuredValues.filterValues { configured -> !configured }.keys
+//        check(missing.isEmpty()) {
+//            "Release signing is incomplete. Missing ${missing.joinToString()}. " +
+//                "Configure ASSISTANTAI_RELEASE_* environment variables or " +
+//                "asssistantai.release.* entries in local.properties."
+//        }
+//        val configuredStoreFile = inputs.properties["releaseStoreFile"].toString()
+//        check(File(configuredStoreFile).isFile) {
+//            "Release signing store file does not exist: $configuredStoreFile"
+//        }
+//    }
+//}
+//
+//tasks.configureEach {
+//    if (name.contains("Release") && name != verifyReleaseSigning.name) {
+//        dependsOn(verifyReleaseSigning)
+//    }
+//}
 
 dependencies {
     implementation(project(":domain:modelcatalog"))

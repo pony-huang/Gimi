@@ -15,6 +15,16 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 
+/**
+ * Agent 工厂 — 根据模型选择和工具配置构建 [BaseAgent]。
+ *
+ * 负责：
+ * - 通过 [AgentModelFactory] 解析模型配置
+ * - 组合本地工具（[LocalToolCatalog]）、MCP 工具（[McpToolRegistry]）、
+ *   官方工具（[OfficialToolRegistry]）和技能工具集（[SkillSource]）
+ * - 按 [ToolAuthorizationRepository] 和 [ConversationToolConfiguration] 过滤启用的工具
+ * - 根据 [allowConfirmationRequiredTools] 决定是否排除需要用户确认的工具
+ */
 @Singleton
 class AgentFactory @Inject constructor(
     private val localToolCatalog: LocalToolCatalog,
@@ -24,6 +34,13 @@ class AgentFactory @Inject constructor(
     private val agentModelFactory: AgentModelFactory,
     private val officialToolRegistry: OfficialToolRegistry,
 ) {
+    /**
+     * 构建 [BaseAgent]。
+     *
+     * @param selection 模型选择；为 null 时使用默认模型
+     * @param allowConfirmationRequiredTools 是否允许需要用户确认的工具
+     * @param toolConfiguration 会话工具配置，为 null 时按全局授权决定启用哪些工具
+     */
     suspend fun create(
         selection: LLMModelSelection? = null,
         allowConfirmationRequiredTools: Boolean = true,
@@ -32,13 +49,7 @@ class AgentFactory @Inject constructor(
         val selectedModelConfig = agentModelFactory.selectModelConfig(selection)
         val modelConfig = toolConfiguration?.let(selectedModelConfig::forConversation)
             ?: selectedModelConfig
-        val defaultModel = agentModelFactory.createModel(modelConfig)
-        val fastModelConfig = agentModelFactory.selectFastModelConfig() ?: modelConfig
-        val fastModel = if (fastModelConfig == modelConfig) {
-            defaultModel
-        } else {
-            agentModelFactory.createModel(fastModelConfig)
-        }
+        val model = agentModelFactory.createModel(modelConfig)
         val officialTools = officialToolRegistry.resolve(modelConfig)
         val configuredTools: List<BaseTool> = buildList {
             val enabledToolIds = toolConfiguration?.enabledLocalToolIds
@@ -52,10 +63,9 @@ class AgentFactory @Inject constructor(
         } else {
             excludeConfirmationRequiredTools(configuredTools)
         }
-        val titleCallbacks = ConversationTitleCallbacks(fastModel)
         return LlmAgent(
             name = "Assistant",
-            model = defaultModel,
+            model = model,
             instruction = Instruction(
                 AgentPrompts.defaultAssistantInstruction(
                     tools.mapTo(
@@ -66,14 +76,12 @@ class AgentFactory @Inject constructor(
             ),
             tools = tools,
             toolsets = officialTools.toolsets + SkillToolset(skillSource),
-            beforeModelCallbacks = listOf(titleCallbacks.beforeModel()),
-            afterModelCallbacks = listOf(titleCallbacks.afterModel()),
-            afterAgentCallbacks = listOf(titleCallbacks.afterAgent()),
         )
     }
 
 }
 
+/** 从工具列表中排除需要用户确认的 [FunctionTool]。 */
 internal fun excludeConfirmationRequiredTools(tools: List<BaseTool>): List<BaseTool> =
     tools.filterNot { tool ->
         if (tool !is FunctionTool) {

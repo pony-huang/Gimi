@@ -55,6 +55,7 @@ import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.asssistantai.feature.chat.R
+import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -98,6 +99,11 @@ public fun ChatComposer(
     isVoiceInputAvailable: Boolean = false,
     onTranscribeVoice: suspend (ByteArray) -> String = { error("transcription not configured") },
     modelSelectorContent: @Composable () -> Unit = { },
+    addToChatState: ChatAddToChatState = ChatAddToChatState(),
+    onLocalToolEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
+    onMcpServerEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
+    onOfficialToolEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
+    onToolAccessModeChange: (ToolAccessMode) -> Unit = {},
 ) {
     var messageData by rememberSaveable(stateSaver = MessageData.Saver) {
         mutableStateOf(messageData)
@@ -339,7 +345,8 @@ public fun ChatComposer(
     }
 
     if (showAttachmentOptions) {
-        AttachmentSourceSheet(
+        ChatAddToChatSheet(
+            state = addToChatState,
             onDismiss = { showAttachmentOptions = false },
             onTakePhoto = {
                 showAttachmentOptions = false
@@ -354,6 +361,10 @@ public fun ChatComposer(
                     ),
                 )
             },
+            onLocalToolEnabledChange = onLocalToolEnabledChange,
+            onMcpServerEnabledChange = onMcpServerEnabledChange,
+            onOfficialToolEnabledChange = onOfficialToolEnabledChange,
+            onToolAccessModeChange = onToolAccessModeChange,
         )
     }
 }
@@ -382,46 +393,6 @@ internal class VoicePcmBuffer {
 
     @Synchronized
     fun drain(): ByteArray = output.toByteArray().also { output.reset() }
-}
-
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-private fun AttachmentSourceSheet(
-    onDismiss: () -> Unit,
-    onTakePhoto: () -> Unit,
-    onChoosePhotos: () -> Unit,
-) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.stream_ai_compose_composer_take_photo)) },
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Default.CameraAlt,
-                        contentDescription = null,
-                    )
-                },
-                modifier = Modifier.clickable(onClick = onTakePhoto),
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            )
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.stream_ai_compose_composer_choose_photos)) },
-                leadingContent = {
-                    Icon(
-                        imageVector = Icons.Default.PhotoLibrary,
-                        contentDescription = null,
-                    )
-                },
-                modifier = Modifier.clickable(onClick = onChoosePhotos),
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            )
-            Spacer(
-                modifier = Modifier
-                    .navigationBarsPadding()
-                    .windowInsetsPadding(WindowInsets.safeDrawing),
-            )
-        }
-    }
 }
 
 /**

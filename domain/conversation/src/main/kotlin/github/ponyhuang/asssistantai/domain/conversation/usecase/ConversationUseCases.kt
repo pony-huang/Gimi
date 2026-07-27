@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.domain.conversation.usecase
 
 import github.ponyhuang.asssistantai.domain.conversation.model.Conversation
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.conversation.repository.ConversationRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.StateFlow
@@ -17,7 +18,8 @@ class CreateConversationUseCase @Inject constructor(
     suspend operator fun invoke(
         initialModel: String = "",
         activate: Boolean = true,
-    ): String = repository.createConversation(initialModel, activate)
+        initialToolConfiguration: ConversationToolConfiguration? = null,
+    ): String = repository.createConversation(initialModel, activate, initialToolConfiguration)
 }
 
 class DeleteConversationUseCase @Inject constructor(

@@ -12,6 +12,42 @@
     <string name="stream_ai_compose_composer_choose_photos">从相册中选择</string>
     <string name="stream_ai_compose_composer_camera_error">无法打开相机</string>
 
+    <!-- 添加到聊天 / 当前会话工具配置 -->
+    <string name="chat_add_to_chat_title">添加到聊天</string>
+    <string name="chat_add_to_chat_close">关闭</string>
+    <string name="chat_add_to_chat_back">返回</string>
+    <string name="chat_add_to_chat_photos">照片</string>
+    <string name="chat_session_tools_title">工具</string>
+    <string name="chat_session_mcp_title">MCP</string>
+    <string name="chat_tool_access_title">权限模式</string>
+    <string name="chat_session_only_notice">仅影响当前会话</string>
+    <string name="chat_session_tools_running_notice">会话运行中，暂时无法修改工具</string>
+    <string name="chat_session_tools_enabled_count">已启用 %1$d 项</string>
+    <string name="chat_session_mcp_enabled_count">已启用 %1$d 个连接</string>
+    <string name="chat_session_none_enabled">未启用</string>
+    <string name="chat_session_mcp_not_configured">尚未配置 MCP</string>
+    <string name="chat_session_tool_save_failed">无法保存当前会话的工具设置</string>
+    <string name="chat_mcp_transport_sse">SSE</string>
+    <string name="chat_mcp_transport_streamable_http">Streamable HTTP</string>
+    <string name="chat_session_tools_search">搜索工具</string>
+    <string name="chat_session_tools_filter_all">全部</string>
+    <string name="chat_session_tools_filter_enabled">已启用</string>
+    <string name="chat_session_tools_filter_disabled">已关闭</string>
+    <string name="chat_session_mcp_empty_title">尚未配置 MCP</string>
+    <string name="chat_session_mcp_empty_description">请先前往设置中的 MCP 页面添加服务器。</string>
+    <string name="chat_tool_access_auto">自动</string>
+    <string name="chat_tool_access_auto_description">由助手根据上下文选择工具</string>
+    <string name="chat_tool_access_on_demand">按需</string>
+    <string name="chat_tool_access_on_demand_description">需要时加载，可能增加消息轮次</string>
+    <string name="chat_tool_access_always">始终可用</string>
+    <string name="chat_tool_access_always_description">从会话开始即准备全部已选工具</string>
+    <string name="chat_tool_access_todo_notice">当前版本仅保存此设置，暂不会改变工具加载和授权行为。</string>
+    <string name="chat_official_tool_web_search">网页搜索</string>
+    <string name="chat_official_tool_web_search_description">搜索最新的互联网信息</string>
+    <string name="chat_official_tool_kimi_formulas">Kimi 公式</string>
+    <string name="chat_official_tool_kimi_formulas_description">使用 Kimi 的公式计算能力</string>
+    <string name="chat_official_tool_default_description">模型服务提供的官方工具</string>
+
     <!-- ChatScreen / ChatTopBar / ToolConfirmationCard -->
     <string name="chat_fab_back_to_latest">回到最新</string>
     <string name="chat_open_drawer">打开历史对话抽屉</string>

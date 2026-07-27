@@ -10,4 +10,6 @@ dependencies {
     implementation(project(":domain:modelcatalog"))
     implementation(libs.javax.inject)
     implementation(libs.kotlinx.coroutines.core)
+
+    testImplementation(libs.junit)
 }

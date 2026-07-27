@@ -23,8 +23,6 @@ data class LLMModelSetting(
     val modelsUrl: String = "",
     /** Official tools exposed by this provider. They are enabled by default. */
     val supportedOfficialTools: List<String> = emptyList(),
-    /** User-selected subset of [supportedOfficialTools]. */
-    val enabledOfficialTools: Set<String> = supportedOfficialTools.toSet(),
 ) {
     val activeApiBaseUrl: String
         get() = when (apiProtocol) {

@@ -49,8 +49,6 @@ interface ModelCatalogRepository {
 
     fun updateBaseUrl(serviceId: String, value: String)
 
-    fun updateOfficialToolEnabled(serviceId: String, toolId: String, enabled: Boolean)
-
     suspend fun addModel(serviceId: String, model: Model)
 
     suspend fun removeCatalogModel(serviceId: String, groupId: String, modelId: String)

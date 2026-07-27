@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.feature.chat
 
 import github.ponyhuang.asssistantai.domain.conversation.model.Message
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentRunLease
 import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
@@ -20,6 +21,7 @@ internal class ChatSessionRuntime(
 ) {
     var messages: List<Message> = emptyList()
     var modelSelection: ModelSelection? = null
+    var toolConfiguration: ConversationToolConfiguration? = null
     var isLoaded: Boolean = false
     var isAgentRunning: Boolean = false
     var turnComplete: Boolean = false

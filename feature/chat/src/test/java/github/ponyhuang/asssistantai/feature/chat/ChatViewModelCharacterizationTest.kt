@@ -4,6 +4,7 @@ import github.ponyhuang.asssistantai.core.testing.MainDispatcherRule
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunPart
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatFunctionCall
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
 import github.ponyhuang.asssistantai.domain.conversation.model.ToolConfirmationRequest
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
@@ -18,6 +19,8 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
+import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
+import github.ponyhuang.asssistantai.domain.mcp.repository.McpRepository
 import github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackState
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechPlaybackRepository
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechRecognitionRepository
@@ -87,6 +90,44 @@ class ChatViewModelCharacterizationTest {
         fixture.viewModel.consumeNotice()
 
         assertEquals(null, fixture.viewModel.uiState.value.notice)
+    }
+
+    @Test
+    fun newConversationSnapshotsGlobalToolAndMcpDefaults() = runTest {
+        val fixture = fixture(configured = true)
+
+        fixture.viewModel.reset()
+        advanceUntilIdle()
+
+        coVerify {
+            fixture.conversations.createConversation(
+                any(),
+                any(),
+                match { configuration ->
+                    configuration?.enabledLocalToolIds == setOf("compose_message") &&
+                        configuration.enabledMcpServerIds == setOf("enabled-mcp") &&
+                        configuration.enabledOfficialToolIds("service") == setOf("web_search")
+                },
+            )
+        }
+    }
+
+    @Test
+    fun changingSessionToolPersistsAndReleasesOnlyCurrentRunner() = runTest {
+        val fixture = fixture(configured = true)
+        fixture.viewModel.reset()
+        advanceUntilIdle()
+
+        fixture.viewModel.setLocalToolEnabled("compose_message", enabled = false)
+        advanceUntilIdle()
+
+        coVerify {
+            fixture.conversations.setConversationToolConfiguration(
+                "session-1",
+                match { "compose_message" !in it.enabledLocalToolIds },
+            )
+        }
+        coVerify { fixture.agent.releaseSession("session-1") }
     }
 
     @Test
@@ -328,6 +369,7 @@ class ChatViewModelCharacterizationTest {
             selection: ModelSelection,
             text: String,
             imageAttachments: List<github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment>,
+            toolConfiguration: ConversationToolConfiguration?,
         ): Flow<ChatRunEvent> = events(sessionId).receiveAsFlow()
 
         override suspend fun respondToToolConfirmation(
@@ -367,12 +409,14 @@ class ChatViewModelCharacterizationTest {
         val conversations = mockk<ConversationRepository>(relaxed = true) {
             every { this@mockk.conversations } returns MutableStateFlow(emptyList())
             every { conversationContentUpdates } returns MutableSharedFlow()
-            coEvery { createConversation(any(), any()) } returnsMany sessionIds
+            coEvery { createConversation(any(), any(), any()) } returnsMany sessionIds
             coEvery { activateConversation(any(), any()) } returns ModelSelectionCodec.encode(selection)
             coEvery { loadMessages(any()) } returns emptyList()
+            coEvery { conversationToolConfiguration(any()) } returns null
+            coEvery { setConversationToolConfiguration(any(), any()) } returns true
         }
         val agent = agentOverride ?: mockk<ChatAgentRepository>(relaxed = true) {
-            coEvery { send(any(), any(), any(), any()) } returns flowOf(*events.toTypedArray())
+            coEvery { send(any(), any(), any(), any(), any()) } returns flowOf(*events.toTypedArray())
         }
         val display = mockk<ChatDisplayRepository> {
             every { showToolActivity } returns MutableStateFlow(true)
@@ -398,6 +442,19 @@ class ChatViewModelCharacterizationTest {
                     ),
                 ),
             )
+            every { enabledToolIds() } returns setOf("compose_message")
+        }
+        val mcpRepository = mockk<McpRepository>(relaxed = true) {
+            every { observeServers() } returns MutableStateFlow(
+                listOf(
+                    McpServer(id = "enabled-mcp", name = "Enabled", isEnabled = true),
+                    McpServer(id = "disabled-mcp", name = "Disabled", isEnabled = false),
+                ),
+            )
+            every { currentServers() } returns listOf(
+                McpServer(id = "enabled-mcp", name = "Enabled", isEnabled = true),
+                McpServer(id = "disabled-mcp", name = "Disabled", isEnabled = false),
+            )
         }
         return Fixture(
             viewModel = ChatViewModel(
@@ -410,6 +467,7 @@ class ChatViewModelCharacterizationTest {
                 speechPlaybackController = playback,
                 attachments = attachments,
                 toolAuthorization = toolAuthorization,
+                mcpRepository = mcpRepository,
             ),
             conversations = conversations,
             agent = agent,
@@ -471,6 +529,7 @@ class ChatViewModelCharacterizationTest {
                 models = listOf(Model(id = "model", name = "Model")),
             ),
         ),
+        supportedOfficialTools = listOf("web_search"),
     )
 
     private data class Fixture(

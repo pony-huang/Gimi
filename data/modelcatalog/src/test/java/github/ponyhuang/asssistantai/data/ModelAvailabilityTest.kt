@@ -54,18 +54,6 @@ class ModelAvailabilityTest {
             listOf(OfficialToolIds.KIMI_FORMULAS),
             providers.getValue("kimi").supportedOfficialTools,
         )
-        assertEquals(
-            listOf(OfficialToolIds.WEB_SEARCH),
-            miniMax.copy(baseType = ApiBaseType.Anthropic).enabledOfficialTools,
-        )
-        assertEquals(
-            providers.getValue("mimo").supportedOfficialTools,
-            providers.getValue("mimo").enabledOfficialTools,
-        )
-        assertEquals(
-            providers.getValue("kimi").supportedOfficialTools,
-            providers.getValue("kimi").enabledOfficialTools,
-        )
         assertTrue(
             providers.getValue("mimo")
                 .copy(baseType = ApiBaseType.Anthropic)

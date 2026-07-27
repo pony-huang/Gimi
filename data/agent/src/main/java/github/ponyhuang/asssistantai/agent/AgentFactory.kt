@@ -9,6 +9,7 @@ import com.google.adk.kt.tools.FunctionTool
 import com.google.adk.kt.tools.SkillToolset
 import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolRegistry
 import github.ponyhuang.asssistantai.data.LLMModelSelection
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.ToolAuthorizationRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -26,8 +27,11 @@ class AgentFactory @Inject constructor(
     suspend fun create(
         selection: LLMModelSelection? = null,
         allowConfirmationRequiredTools: Boolean = true,
+        toolConfiguration: ConversationToolConfiguration? = null,
     ): BaseAgent {
-        val modelConfig = agentModelFactory.selectModelConfig(selection)
+        val selectedModelConfig = agentModelFactory.selectModelConfig(selection)
+        val modelConfig = toolConfiguration?.let(selectedModelConfig::forConversation)
+            ?: selectedModelConfig
         val defaultModel = agentModelFactory.createModel(modelConfig)
         val fastModelConfig = agentModelFactory.selectFastModelConfig() ?: modelConfig
         val fastModel = if (fastModelConfig == modelConfig) {
@@ -37,9 +41,10 @@ class AgentFactory @Inject constructor(
         }
         val officialTools = officialToolRegistry.resolve(modelConfig)
         val configuredTools: List<BaseTool> = buildList {
-            val enabledToolIds = toolAuthorization.enabledToolIds()
+            val enabledToolIds = toolConfiguration?.enabledLocalToolIds
+                ?: toolAuthorization.enabledToolIds()
             addAll(localToolCatalog.tools().filter { it.name in enabledToolIds })
-            addAll(mcpToolRegistry.tools())
+            addAll(mcpToolRegistry.tools(toolConfiguration?.enabledMcpServerIds))
             addAll(officialTools.tools)
         }
         val tools = if (allowConfirmationRequiredTools) {

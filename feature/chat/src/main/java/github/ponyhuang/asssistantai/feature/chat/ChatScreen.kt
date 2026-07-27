@@ -69,6 +69,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.conversation.model.Message
 import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
+import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -117,6 +118,10 @@ fun ChatScaffold(
     onOpenSettings: () -> Unit,
     onConfigureModels: () -> Unit,
     onNewConversation: () -> Unit,
+    onLocalToolEnabledChange: (String, Boolean) -> Unit,
+    onMcpServerEnabledChange: (String, Boolean) -> Unit,
+    onOfficialToolEnabledChange: (String, Boolean) -> Unit,
+    onToolAccessModeChange: (ToolAccessMode) -> Unit,
 ) {
 
     val listState = rememberLazyListState()
@@ -241,6 +246,23 @@ fun ChatScaffold(
                     isGenerating = isAgentRunning,
                     isVoiceInputAvailable = isSpeechRecognitionAvailable,
                     onTranscribeVoice = onTranscribeVoice,
+                    addToChatState = ChatAddToChatState(
+                        serviceId = state.currentModelSelection?.serviceId,
+                        configuration = state.toolConfiguration,
+                        localTools = state.availableLocalTools,
+                        mcpServers = state.availableMcpServers,
+                        supportedOfficialToolIds = state.supportedOfficialToolIds,
+                        isMutationBlocked = state.isAgentRunning,
+                        errorMessage = if (state.hasToolConfigurationError) {
+                            stringResource(R.string.chat_session_tool_save_failed)
+                        } else {
+                            null
+                        },
+                    ),
+                    onLocalToolEnabledChange = onLocalToolEnabledChange,
+                    onMcpServerEnabledChange = onMcpServerEnabledChange,
+                    onOfficialToolEnabledChange = onOfficialToolEnabledChange,
+                    onToolAccessModeChange = onToolAccessModeChange,
                     modelSelectorContent = {
                         ModelTitleAndPicker(
                             services = state.availableLLMModelSettings,

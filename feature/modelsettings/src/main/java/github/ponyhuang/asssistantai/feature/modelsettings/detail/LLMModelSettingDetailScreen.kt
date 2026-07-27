@@ -99,26 +99,6 @@ fun LLMModelSettingDetailScreen(
                     },
                 )
             }
-            if (service.supportedOfficialTools.isNotEmpty()) {
-                SettingsSectionTitle(
-                    text = stringResource(R.string.modelsettings_section_official_tools),
-                    modifier = Modifier.padding(top = 20.dp),
-                )
-                SettingsCard(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    OfficialToolsSection(
-                        supportedTools = service.supportedOfficialTools,
-                        enabledTools = service.enabledOfficialTools,
-                        onEnabledChange = { toolId, enabled ->
-                            dispatch(
-                                LLmModelSettingDetailAction.OfficialToolEnabledChanged(
-                                    toolId,
-                                    enabled,
-                                ),
-                            )
-                        },
-                    )
-                }
-            }
             SettingsCard(
                 modifier = Modifier.padding(start = 16.dp, top = 20.dp, end = 16.dp),
             ) {
@@ -149,7 +129,6 @@ private fun LLmModelSettingDetailAction.changesAgentConfiguration(): Boolean = w
     is LLmModelSettingDetailAction.ApiBaseUrlChanged,
     is LLmModelSettingDetailAction.ApiProtocolChanged,
     is LLmModelSettingDetailAction.EnabledChanged,
-    is LLmModelSettingDetailAction.OfficialToolEnabledChanged,
     is LLmModelSettingDetailAction.RemoveLLmModel,
     is LLmModelSettingDetailAction.NewLLmModelIdChanged,
     is LLmModelSettingDetailAction.NewLLmModelKindChanged,

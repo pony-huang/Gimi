@@ -26,6 +26,7 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:modelcatalog"))
+    implementation(project(":domain:mcp"))
     implementation(project(":domain:speech"))
     implementation(project(":domain:toolauthorization"))
     implementation(platform(libs.androidx.compose.bom))

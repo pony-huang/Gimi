@@ -156,6 +156,10 @@ fun MainScreen(
                                 onNewConversation = {
                                     viewModel.reset()
                                 },
+                                onLocalToolEnabledChange = viewModel::setLocalToolEnabled,
+                                onMcpServerEnabledChange = viewModel::setMcpServerEnabled,
+                                onOfficialToolEnabledChange = viewModel::setOfficialToolEnabled,
+                                onToolAccessModeChange = viewModel::setToolAccessMode,
                             )
                         }
 

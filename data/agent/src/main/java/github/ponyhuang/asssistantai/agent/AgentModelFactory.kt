@@ -13,6 +13,7 @@ import github.ponyhuang.asssistantai.agent.tools.official.OpenAiOfficialToolAdap
 import github.ponyhuang.asssistantai.data.ApiBaseType
 import github.ponyhuang.asssistantai.data.LLMModelSelection
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,9 +26,18 @@ data class ModelConfig(
     val modelId: String,
     val apiKey: String,
     val fullBaseUrl: String,
+    val supportedOfficialTools: List<String> = emptyList(),
     val officialTools: List<String> = emptyList(),
     /** Vendor tool endpoints may stay on the standard API host even for Anthropic model traffic. */
     val officialToolBaseUrl: String = fullBaseUrl,
+)
+
+internal fun ModelConfig.forConversation(
+    configuration: ConversationToolConfiguration,
+): ModelConfig = copy(
+    officialTools = supportedOfficialTools.filter {
+        it in configuration.enabledOfficialToolIds(serviceId)
+    },
 )
 
 @Singleton
@@ -125,7 +135,8 @@ class AgentModelFactory @Inject constructor(
             modelId = model.modelId,
             apiKey = service.apiKey,
             fullBaseUrl = composeUrl(service.activeApiBaseUrl),
-            officialTools = service.enabledOfficialTools,
+            supportedOfficialTools = service.supportedOfficialTools,
+            officialTools = service.supportedOfficialTools,
             officialToolBaseUrl = composeUrl(service.apiBaseUrl),
         )
     }

@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.domain.conversation.repository
 
 import github.ponyhuang.asssistantai.domain.conversation.model.Conversation
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.conversation.model.Message
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,10 +24,16 @@ interface ConversationRepository {
     suspend fun lastConversationId(): String?
     suspend fun activateConversation(sessionId: String, defaultModel: String): String
     suspend fun setConversationModel(sessionId: String, model: String)
+    suspend fun conversationToolConfiguration(sessionId: String): ConversationToolConfiguration?
+    suspend fun setConversationToolConfiguration(
+        sessionId: String,
+        configuration: ConversationToolConfiguration,
+    ): Boolean
     suspend fun discardConversationMetadata(sessionId: String)
     suspend fun createConversation(
         initialModel: String = "",
         activate: Boolean = true,
+        initialToolConfiguration: ConversationToolConfiguration? = null,
     ): String
     suspend fun deleteConversation(sessionId: String)
 

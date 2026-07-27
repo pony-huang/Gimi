@@ -52,9 +52,6 @@ data class LLMModelProvider(
             .keys
             .toList()
 
-    /** Official tools are directly authorized by default; settings persist only opt-outs. */
-    val enabledOfficialTools: List<String>
-        get() = supportedOfficialTools.filterNot(disabledOfficialTools::contains)
 }
 
 /**

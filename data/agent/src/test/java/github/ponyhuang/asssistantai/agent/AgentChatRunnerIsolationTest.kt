@@ -2,6 +2,7 @@ package github.ponyhuang.asssistantai.agent
 
 import com.google.adk.kt.agents.LlmAgent
 import com.google.adk.kt.sessions.SessionService
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -80,5 +81,29 @@ class AgentChatRunnerIsolationTest {
         runner.send("user", "session-0", text = "again")
 
         assertEquals(AgentChatRunner.MAX_CACHED_RUNNERS + 2, creations)
+    }
+
+    @Test
+    fun conversationToolConfigurationChangeRebuildsOnlyThatSession() = runTest {
+        var creations = 0
+        val runner = AgentChatRunner(
+            factory = { _, _, _ ->
+                creations += 1
+                mockk<LlmAgent>(relaxed = true)
+            },
+            sessionService = mockk<SessionService>(relaxed = true),
+            artifactService = null,
+        )
+        val selection = ModelSelection("service", "group", "model")
+        val clockOnly = ConversationToolConfiguration(enabledLocalToolIds = setOf("clock"))
+        val clockAndLocation = ConversationToolConfiguration(
+            enabledLocalToolIds = setOf("clock", "location"),
+        )
+
+        runner.send("user", "session-a", selection, "a", toolConfiguration = clockOnly)
+        runner.send("user", "session-b", selection, "b", toolConfiguration = clockOnly)
+        runner.send("user", "session-a", selection, "a2", toolConfiguration = clockAndLocation)
+
+        assertEquals(3, creations)
     }
 }

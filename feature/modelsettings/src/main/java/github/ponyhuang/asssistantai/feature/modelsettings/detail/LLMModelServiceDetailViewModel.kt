@@ -53,8 +53,6 @@ class ModelServiceDetailViewModel @Inject constructor(
             is LLmModelSettingDetailAction.ApiBaseUrlChanged -> changeBaseUrl(action.value)
             is LLmModelSettingDetailAction.ApiProtocolChanged -> changeProtocol(action.value)
             is LLmModelSettingDetailAction.EnabledChanged -> changeEnabled(action.value)
-            is LLmModelSettingDetailAction.OfficialToolEnabledChanged ->
-                changeOfficialTool(action.toolId, action.enabled)
             is LLmModelSettingDetailAction.ToggleGroup -> toggleGroup(action.groupId)
             is LLmModelSettingDetailAction.RemoveLLmModel -> removeModel(action.groupId, action.modelId)
             is LLmModelSettingDetailAction.NewLLmModelIdChanged ->
@@ -177,27 +175,6 @@ class ModelServiceDetailViewModel @Inject constructor(
         mutate {
             if (!updateModelService.enabled(id, enabled)) return@mutate
             _uiState.update { state -> state.copy(service = state.service?.copy(isEnabled = enabled)) }
-        }
-    }
-
-    private fun changeOfficialTool(toolId: String, enabled: Boolean) {
-        val id = serviceId ?: return
-        val service = _uiState.value.service ?: return
-        if (toolId !in service.supportedOfficialTools) return
-        mutate {
-            updateModelService.officialTool(id, toolId, enabled)
-            _uiState.update { state ->
-                val current = state.service ?: return@update state
-                state.copy(
-                    service = current.copy(
-                        enabledOfficialTools = if (enabled) {
-                            current.enabledOfficialTools + toolId
-                        } else {
-                            current.enabledOfficialTools - toolId
-                        },
-                    ),
-                )
-            }
         }
     }
 

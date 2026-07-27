@@ -8,6 +8,7 @@ import github.ponyhuang.asssistantai.domain.conversation.model.ChatFunctionRespo
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunPart
 import github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.conversation.model.ToolConfirmationRequest
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
@@ -25,12 +26,14 @@ class AdkChatAgentRepository @Inject constructor(
         selection: ModelSelection,
         text: String,
         imageAttachments: List<ImageAttachment>,
+        toolConfiguration: ConversationToolConfiguration?,
     ): Flow<ChatRunEvent> = runner.send(
         userId = USER_ID,
         sessionId = sessionId,
         selection = selection,
         text = text,
         imageAttachments = imageAttachments,
+        toolConfiguration = toolConfiguration,
     ).map { it.toDomain() }
 
     override suspend fun releaseSession(sessionId: String) {

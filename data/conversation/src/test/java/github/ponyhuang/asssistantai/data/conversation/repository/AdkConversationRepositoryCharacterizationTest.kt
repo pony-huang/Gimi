@@ -4,7 +4,12 @@ import android.content.Context
 import app.cash.turbine.test
 import com.google.adk.kt.sessions.SessionService
 import github.ponyhuang.asssistantai.data.conversation.local.ConversationMetadataDao
+import github.ponyhuang.asssistantai.data.conversation.local.ConversationMetadataEntity
+import github.ponyhuang.asssistantai.data.conversation.local.ConversationToolConfigurationCodec
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import java.util.concurrent.CancellationException
@@ -51,6 +56,39 @@ class AdkConversationRepositoryCharacterizationTest {
             throw AssertionError("CancellationException was swallowed")
         } catch (_: CancellationException) {
             // Expected.
+        }
+    }
+
+    @Test
+    fun conversationToolConfiguration_readsPersistedSnapshot() = runTest {
+        val expected = ConversationToolConfiguration(
+            enabledLocalToolIds = setOf("clock"),
+            enabledMcpServerIds = setOf("mcp-1"),
+            toolAccessMode = ToolAccessMode.ON_DEMAND,
+        )
+        coEvery { metadataDao.get("session-1") } returns ConversationMetadataEntity(
+            sessionId = "session-1",
+            toolConfigurationJson = ConversationToolConfigurationCodec.encode(expected),
+        )
+
+        assertEquals(expected, repository().conversationToolConfiguration("session-1"))
+    }
+
+    @Test
+    fun setConversationToolConfiguration_persistsSnapshotWithoutReplacingOtherMetadata() = runTest {
+        val configuration = ConversationToolConfiguration(
+            enabledLocalToolIds = setOf("clock", "location"),
+        )
+
+        repository().setConversationToolConfiguration("session-1", configuration)
+
+        coVerify {
+            metadataDao.setToolConfiguration(
+                "session-1",
+                match { payload ->
+                    ConversationToolConfigurationCodec.decode(payload) == configuration
+                },
+            )
         }
     }
 

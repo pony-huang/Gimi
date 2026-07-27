@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunEvent
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatDisplayRepository
@@ -24,6 +26,7 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
+import github.ponyhuang.asssistantai.domain.mcp.repository.McpRepository
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechRecognitionRepository
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechPlaybackRepository
 import github.ponyhuang.asssistantai.domain.speech.usecase.markdownToSpeechText
@@ -64,6 +67,7 @@ class ChatViewModel @Inject constructor(
     private val modelServices: ModelCatalogRepository,
     private val chatDisplayPreferences: ChatDisplayRepository,
     private val toolAuthorization: ToolAuthorizationRepository,
+    private val mcpRepository: McpRepository,
     private val speechRecognitionRepository: SpeechRecognitionRepository,
     private val speechPlaybackController: SpeechPlaybackRepository,
     private val attachments: ChatAttachmentRepository,
@@ -147,6 +151,16 @@ class ChatViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            toolAuthorization.tools.collect { tools ->
+                _uiState.update { it.copy(availableLocalTools = tools) }
+            }
+        }
+        viewModelScope.launch {
+            mcpRepository.observeServers().collect { servers ->
+                _uiState.update { it.copy(availableMcpServers = servers) }
+            }
+        }
+        viewModelScope.launch {
             modelServices.observeLoadState().collect { state ->
                 _uiState.update { it.copy(modelCatalogLoadState = state) }
             }
@@ -197,6 +211,8 @@ class ChatViewModel @Inject constructor(
                     isAgentRunning = runtime.isAgentRunning,
                     turnComplete = runtime.turnComplete,
                     currentModelSelection = runtime.modelSelection,
+                    toolConfiguration = runtime.toolConfiguration,
+                    supportedOfficialToolIds = supportedOfficialTools(runtime.modelSelection),
                     pendingToolConfirmations = runtime.pendingToolConfirmations,
                     rejectedToolNames = runtime.rejectedToolNames.toSet(),
                     conversationTaskStatuses = statuses,
@@ -216,6 +232,8 @@ class ChatViewModel @Inject constructor(
                 isAgentRunning = runtime.isAgentRunning,
                 turnComplete = runtime.turnComplete,
                 currentModelSelection = runtime.modelSelection,
+                toolConfiguration = runtime.toolConfiguration,
+                supportedOfficialToolIds = supportedOfficialTools(runtime.modelSelection),
                 pendingToolConfirmations = runtime.pendingToolConfirmations,
                 rejectedToolNames = runtime.rejectedToolNames.toSet(),
                 isInitializing = isInitializing,
@@ -466,6 +484,7 @@ class ChatViewModel @Inject constructor(
                         selection = selection,
                         text = text,
                         imageAttachments = images,
+                        toolConfiguration = runtime.toolConfiguration,
                     ).collect { event ->
                         applyEvent(sessionId, event, runToken)
                     }
@@ -487,7 +506,7 @@ class ChatViewModel @Inject constructor(
     private suspend fun ensureSessionId(): String = sessionCreationMutex.withLock {
         modelServices.awaitReady()
         _uiState.value.sessionId.takeIf { it.isNotBlank() }?.let { return@withLock it }
-        val newId = repository.createConversation(defaultModelPayload())
+        val newId = createConversationWithDefaults()
         if (newId.isNotBlank()) {
             val runtime = runtimeFor(newId)
             runtime.modelSelection = activateConversationSettings(newId)
@@ -542,7 +561,7 @@ class ChatViewModel @Inject constructor(
             }
 
             // 3. 兜底：数据库里一个 session 都没有，建一个空会话（首次安装 / 全删场景）。
-            val newId = repository.createConversation(defaultModelPayload())
+            val newId = createConversationWithDefaults()
             if (newId.isNotBlank()) {
                 val runtime = runtimeFor(newId)
                 runtime.modelSelection = activateConversationSettings(newId)
@@ -566,7 +585,7 @@ class ChatViewModel @Inject constructor(
     fun reset() {
         viewModelScope.launch {
             modelServices.awaitReady()
-            val newId = repository.createConversation(defaultModelPayload())
+            val newId = createConversationWithDefaults()
             if (newId.isNotBlank()) {
                 switchSessionUnchecked(newId)
             } else {
@@ -613,7 +632,7 @@ class ChatViewModel @Inject constructor(
                     messages == null -> {
                         Log.i(TAG, "switchSession($sessionId): session missing; creating a fresh one.")
                         repository.discardConversationMetadata(sessionId)
-                        val newId = repository.createConversation(defaultModelPayload())
+                        val newId = createConversationWithDefaults()
                         if (activeSessionLoadToken !== loadToken) return@launch
                         if (newId.isNotBlank()) {
                             val newRuntime = runtimeFor(newId)
@@ -701,6 +720,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             repository.setConversationModel(sessionId, ModelSelectionCodec.encode(selection))
             runtime.modelSelection = selection
+            initializeOfficialToolsForSelection(sessionId, runtime, selection)
             runner.releaseSession(sessionId)
             publishRuntime(runtime)
         }
@@ -730,8 +750,153 @@ class ChatViewModel @Inject constructor(
             runner.releaseSession(sessionId)
             Log.w(TAG, "activateConversationSettings($sessionId): no available model.")
         }
+        loadOrInitializeToolConfiguration(sessionId, selection)
         return selection
     }
+
+    private suspend fun createConversationWithDefaults(): String {
+        val selection = defaultSelection()
+        return repository.createConversation(
+            initialModel = selection?.let(ModelSelectionCodec::encode).orEmpty(),
+            initialToolConfiguration = defaultToolConfiguration(selection),
+        )
+    }
+
+    private fun defaultToolConfiguration(
+        selection: ModelSelection?,
+    ): ConversationToolConfiguration {
+        val officialSelections = selection?.let { current ->
+            mapOf(current.serviceId to supportedOfficialTools(current))
+        }.orEmpty()
+        return ConversationToolConfiguration(
+            enabledLocalToolIds = toolAuthorization.enabledToolIds(),
+            enabledMcpServerIds = mcpRepository.currentServers()
+                .filter { it.isEnabled }
+                .mapTo(linkedSetOf()) { it.id },
+            enabledOfficialToolIdsByService = officialSelections,
+        )
+    }
+
+    private suspend fun loadOrInitializeToolConfiguration(
+        sessionId: String,
+        selection: ModelSelection?,
+    ) {
+        val runtime = runtimeFor(sessionId)
+        val stored = repository.conversationToolConfiguration(sessionId)
+        val initial = stored ?: defaultToolConfiguration(selection)
+        val availableLocalIds = toolAuthorization.tools.value.mapTo(hashSetOf()) { it.id }
+        val availableMcpIds = mcpRepository.currentServers().mapTo(hashSetOf()) { it.id }
+        val sanitized = initial.sanitize(availableLocalIds, availableMcpIds)
+        val initialized = selection?.let { current ->
+            sanitized.initializeOfficialTools(
+                current.serviceId,
+                supportedOfficialTools(current),
+            )
+        } ?: sanitized
+        runtime.toolConfiguration = initialized
+        if (stored != initialized) {
+            val saved = repository.setConversationToolConfiguration(sessionId, initialized)
+            if (!saved) {
+                _uiState.update {
+                    it.copy(hasToolConfigurationError = true)
+                }
+            }
+        }
+    }
+
+    private suspend fun initializeOfficialToolsForSelection(
+        sessionId: String,
+        runtime: ChatSessionRuntime,
+        selection: ModelSelection,
+    ) {
+        val current = runtime.toolConfiguration ?: defaultToolConfiguration(selection)
+        val initialized = current.initializeOfficialTools(
+            selection.serviceId,
+            supportedOfficialTools(selection),
+        )
+        if (initialized != current) {
+            if (repository.setConversationToolConfiguration(sessionId, initialized)) {
+                runtime.toolConfiguration = initialized
+            } else {
+                _uiState.update {
+                    it.copy(hasToolConfigurationError = true)
+                }
+            }
+        } else {
+            runtime.toolConfiguration = current
+        }
+    }
+
+    fun setLocalToolEnabled(toolId: String, enabled: Boolean) {
+        updateToolConfiguration { configuration ->
+            configuration.copy(
+                enabledLocalToolIds = if (enabled) {
+                    configuration.enabledLocalToolIds + toolId
+                } else {
+                    configuration.enabledLocalToolIds - toolId
+                },
+            )
+        }
+    }
+
+    fun setMcpServerEnabled(serverId: String, enabled: Boolean) {
+        updateToolConfiguration { configuration ->
+            configuration.copy(
+                enabledMcpServerIds = if (enabled) {
+                    configuration.enabledMcpServerIds + serverId
+                } else {
+                    configuration.enabledMcpServerIds - serverId
+                },
+            )
+        }
+    }
+
+    fun setOfficialToolEnabled(toolId: String, enabled: Boolean) {
+        val selection = _uiState.value.currentModelSelection ?: return
+        updateToolConfiguration { configuration ->
+            configuration.setOfficialToolEnabled(selection.serviceId, toolId, enabled)
+        }
+    }
+
+    fun setToolAccessMode(mode: ToolAccessMode) {
+        updateToolConfiguration { it.copy(toolAccessMode = mode) }
+    }
+
+    fun clearToolConfigurationError() {
+        _uiState.update { it.copy(hasToolConfigurationError = false) }
+    }
+
+    private fun updateToolConfiguration(
+        transform: (ConversationToolConfiguration) -> ConversationToolConfiguration,
+    ) {
+        val sessionId = _uiState.value.sessionId
+        if (sessionId.isBlank()) return
+        val runtime = runtimeFor(sessionId)
+        if (runtime.isActive) return
+        val current = runtime.toolConfiguration ?: defaultToolConfiguration(runtime.modelSelection)
+        val updated = transform(current)
+        if (updated == current) return
+        viewModelScope.launch {
+            if (repository.setConversationToolConfiguration(sessionId, updated)) {
+                runtime.toolConfiguration = updated
+                runner.releaseSession(sessionId)
+                _uiState.update { it.copy(hasToolConfigurationError = false) }
+                publishRuntime(runtime)
+            } else {
+                _uiState.update {
+                    it.copy(hasToolConfigurationError = true)
+                }
+            }
+        }
+    }
+
+    private fun supportedOfficialTools(selection: ModelSelection?): Set<String> =
+        selection?.let { current ->
+            modelServices.currentServices()
+                .firstOrNull { it.id == current.serviceId }
+                ?.supportedOfficialTools
+                ?.toSet()
+        }.orEmpty()
 
     /** New conversations use the saved default assistant model, with a first-available fallback. */
     private fun defaultModelPayload(): String = defaultSelection()

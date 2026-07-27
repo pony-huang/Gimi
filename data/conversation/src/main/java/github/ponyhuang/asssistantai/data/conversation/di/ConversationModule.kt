@@ -59,7 +59,9 @@ object ConversationModule {
         context,
         ConversationMetadataDatabase::class.java,
         "conversation-metadata.db",
-    ).destructiveForPrototype().build()
+    ).addMigrations(ConversationMetadataDatabase.MIGRATION_3_4)
+        .destructiveForPrototype()
+        .build()
 
     @Provides
     @Singleton

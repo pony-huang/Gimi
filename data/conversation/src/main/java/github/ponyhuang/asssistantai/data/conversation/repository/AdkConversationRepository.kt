@@ -8,8 +8,10 @@ import com.google.adk.kt.sessions.SessionService
 import github.ponyhuang.asssistantai.data.conversation.R
 import github.ponyhuang.asssistantai.data.conversation.local.ConversationMetadataDao
 import github.ponyhuang.asssistantai.data.conversation.local.ConversationMetadataEntity
+import github.ponyhuang.asssistantai.data.conversation.local.ConversationToolConfigurationCodec
 import github.ponyhuang.asssistantai.data.conversation.mapper.EventMapper
 import github.ponyhuang.asssistantai.domain.conversation.model.Conversation
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.conversation.model.Message
 import github.ponyhuang.asssistantai.domain.conversation.repository.ConversationRepository
 import kotlinx.coroutines.channels.BufferOverflow
@@ -154,6 +156,33 @@ class AdkConversationRepository(
         }
     }
 
+    override suspend fun conversationToolConfiguration(
+        sessionId: String,
+    ): ConversationToolConfiguration? {
+        if (sessionId.isBlank()) return null
+        return try {
+            ConversationToolConfigurationCodec.decode(metadataDao.get(sessionId)?.toolConfigurationJson)
+        } catch (t: Throwable) {
+            recover(t, "conversationToolConfiguration($sessionId)", null)
+        }
+    }
+
+    override suspend fun setConversationToolConfiguration(
+        sessionId: String,
+        configuration: ConversationToolConfiguration,
+    ): Boolean {
+        if (sessionId.isBlank()) return false
+        return try {
+            metadataDao.setToolConfiguration(
+                sessionId,
+                ConversationToolConfigurationCodec.encode(configuration),
+            )
+            true
+        } catch (t: Throwable) {
+            recover(t, "setConversationToolConfiguration($sessionId)", false)
+        }
+    }
+
     /** Removes stale metadata after an ADK session can no longer be found. */
     override suspend fun discardConversationMetadata(sessionId: String) {
         if (sessionId.isBlank()) return
@@ -167,7 +196,11 @@ class AdkConversationRepository(
     /**
      * 创建一个新会话，返回生成的 sessionId。
      */
-    override suspend fun createConversation(initialModel: String, activate: Boolean): String {
+    override suspend fun createConversation(
+        initialModel: String,
+        activate: Boolean,
+        initialToolConfiguration: ConversationToolConfiguration?,
+    ): String {
         val key = SessionKey(appName = appName, userId = userId, id = null)
         return try {
             val created = sessionService.createSession(key)
@@ -175,13 +208,26 @@ class AdkConversationRepository(
             if (sessionId.isNotBlank()) {
                 try {
                     if (activate) {
-                        metadataDao.activate(sessionId, initialModel)
+                        val metadata = metadataDao.activate(sessionId, initialModel)
+                        if (initialToolConfiguration != null) {
+                            metadataDao.upsert(
+                                metadata.copy(
+                                    toolConfigurationJson =
+                                        ConversationToolConfigurationCodec.encode(
+                                            initialToolConfiguration,
+                                        ),
+                                ),
+                            )
+                        }
                     } else {
                         metadataDao.upsert(
                             ConversationMetadataEntity(
                                 sessionId = sessionId,
                                 model = initialModel,
                                 isLast = false,
+                                toolConfigurationJson = initialToolConfiguration?.let(
+                                    ConversationToolConfigurationCodec::encode,
+                                ),
                             ),
                         )
                     }

@@ -10,6 +10,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /** Metadata owned by the app for an ADK session. Session events remain in ADK's database. */
 @Entity(
@@ -26,6 +28,7 @@ data class ConversationMetadataEntity(
     val sessionId: String,
     val model: String = "",
     val isLast: Boolean = false,
+    val toolConfigurationJson: String? = null,
 )
 
 @Dao
@@ -47,6 +50,13 @@ abstract class ConversationMetadataDao {
 
     @Query("DELETE FROM conversation_metadata WHERE sessionId = :sessionId")
     abstract suspend fun delete(sessionId: String)
+
+    @Query(
+        "UPDATE conversation_metadata " +
+            "SET toolConfigurationJson = :configurationJson " +
+            "WHERE sessionId = :sessionId",
+    )
+    abstract suspend fun setToolConfiguration(sessionId: String, configurationJson: String)
 
     /** Atomically makes [sessionId] the sole current conversation. */
     @Transaction
@@ -73,9 +83,20 @@ abstract class ConversationMetadataDao {
 
 @Database(
     entities = [ConversationMetadataEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class ConversationMetadataDatabase : RoomDatabase() {
     abstract fun conversationMetadataDao(): ConversationMetadataDao
+
+    companion object {
+        val MIGRATION_3_4: Migration = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE conversation_metadata " +
+                        "ADD COLUMN toolConfigurationJson TEXT DEFAULT NULL",
+                )
+            }
+        }
+    }
 }

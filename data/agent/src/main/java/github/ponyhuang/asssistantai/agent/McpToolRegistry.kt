@@ -33,22 +33,28 @@ class McpToolRegistry @Inject constructor(
     private val servers: McpRepository,
 ) {
     private val discoveryMutex = Mutex()
-    private var cachedRevision = Long.MIN_VALUE
+    private var cachedKey: CacheKey? = null
     private var cachedTools: List<BaseTool> = emptyList()
 
-    suspend fun tools(): List<BaseTool> = discoveryMutex.withLock {
-        val revision = servers.revision.value
-        if (revision == cachedRevision) return@withLock cachedTools
-        val discovered = servers.currentServers()
-            .filter { it.isEnabled && it.endpointUrl.isNotBlank() }
+    suspend fun tools(selectedServerIds: Set<String>? = null): List<BaseTool> =
+        discoveryMutex.withLock {
+        val key = CacheKey(servers.revision.value, selectedServerIds)
+        if (key == cachedKey) return@withLock cachedTools
+        val discovered = selectMcpServers(servers.currentServers(), selectedServerIds)
+            .filter { it.endpointUrl.isNotBlank() }
             .flatMap { server ->
                 cancellationAwareRunCatching { discover(server) }.getOrElse { emptyList() }
             }
             .distinctBy(BaseTool::name)
-        cachedRevision = revision
+        cachedKey = key
         cachedTools = discovered
         discovered
     }
+
+    private data class CacheKey(
+        val revision: Long,
+        val selectedServerIds: Set<String>?,
+    )
 
     private suspend fun discover(server: McpServer): List<BaseTool> {
         val connection = connect(server)
@@ -137,6 +143,15 @@ class McpToolRegistry @Inject constructor(
         override suspend fun execute(context: ToolContext, args: Map<String, Any>): Any =
             connect(server).use { it.call(remote, args) }
     }
+}
+
+internal fun selectMcpServers(
+    servers: List<McpServer>,
+    selectedServerIds: Set<String>?,
+): List<McpServer> = if (selectedServerIds == null) {
+    servers.filter(McpServer::isEnabled)
+} else {
+    servers.filter { it.id in selectedServerIds }
 }
 
 internal fun mcpToolName(serverId: String, remoteName: String): String? {

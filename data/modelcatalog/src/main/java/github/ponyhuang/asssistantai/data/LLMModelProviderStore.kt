@@ -221,23 +221,6 @@ class ModelServiceRepository @Inject constructor(
         }
     }
 
-    override fun updateOfficialToolEnabled(
-        serviceId: String,
-        toolId: String,
-        enabled: Boolean,
-    ) {
-        updateService(serviceId) { provider ->
-            if (toolId !in provider.supportedOfficialTools) return@updateService provider
-            provider.copy(
-                disabledOfficialTools = if (enabled) {
-                    provider.disabledOfficialTools - toolId
-                } else {
-                    provider.disabledOfficialTools + toolId
-                },
-            )
-        }
-    }
-
     override suspend fun addModel(serviceId: String, model: Model) {
         appendModel(serviceId, model.toData())
     }

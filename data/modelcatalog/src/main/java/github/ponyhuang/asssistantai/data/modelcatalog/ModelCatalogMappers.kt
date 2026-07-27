@@ -27,7 +27,6 @@ fun LLMModelProvider.toDomain(): LLMModelSetting = LLMModelSetting(
     docsUrl = docsUrl,
     modelsUrl = modelsUrl,
     supportedOfficialTools = supportedOfficialTools,
-    enabledOfficialTools = enabledOfficialTools.toSet(),
 )
 
 fun Model.toData(): LLMModelItem = LLMModelItem(

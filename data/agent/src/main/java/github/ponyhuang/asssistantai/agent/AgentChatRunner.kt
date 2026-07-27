@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 
 /**
@@ -40,7 +41,11 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
  * 线程模型：所有调用都通过协程 `Flow` 完成，框架本身不持有任何额外线程。
  */
 class AgentChatRunner(
-    private val factory: suspend (ModelSelection?, Boolean) -> BaseAgent,
+    private val factory: suspend (
+        ModelSelection?,
+        Boolean,
+        ConversationToolConfiguration?,
+    ) -> BaseAgent,
     private val sessionService: SessionService,
     private val artifactService: ArtifactService?,
     private val configurationRevision: () -> Any = { Unit },
@@ -51,7 +56,21 @@ class AgentChatRunner(
         artifactService: ArtifactService?,
         configurationRevision: () -> Any = { Unit },
     ) : this(
-        factory = { selection, _ -> factory(selection) },
+        factory = { selection, _, _ -> factory(selection) },
+        sessionService = sessionService,
+        artifactService = artifactService,
+        configurationRevision = configurationRevision,
+    )
+
+    constructor(
+        factory: suspend (ModelSelection?, Boolean) -> BaseAgent,
+        sessionService: SessionService,
+        artifactService: ArtifactService?,
+        configurationRevision: () -> Any = { Unit },
+    ) : this(
+        factory = { selection, allowConfirmationRequiredTools, _ ->
+            factory(selection, allowConfirmationRequiredTools)
+        },
         sessionService = sessionService,
         artifactService = artifactService,
         configurationRevision = configurationRevision,
@@ -62,6 +81,7 @@ class AgentChatRunner(
         val selection: ModelSelection?,
         val revision: Any,
         val allowConfirmationRequiredTools: Boolean,
+        val toolConfiguration: ConversationToolConfiguration?,
         val runner: InMemoryRunner,
     )
 
@@ -125,12 +145,14 @@ class AgentChatRunner(
         text: String,
         imageAttachments: List<ImageAttachment> = emptyList(),
         allowConfirmationRequiredTools: Boolean = true,
+        toolConfiguration: ConversationToolConfiguration? = null,
     ): Flow<Event> {
         // 快照当前 runner；中途 recreate() 不会改本次 send 的行为。
         val activeRunner = currentRunnerForNewTurn(
             sessionId,
             selection,
             allowConfirmationRequiredTools,
+            toolConfiguration,
         )
         val parts = buildList {
             text.takeIf(String::isNotBlank)?.let { add(Part(text = it)) }
@@ -186,6 +208,7 @@ class AgentChatRunner(
         sessionId: String,
         selection: ModelSelection?,
         allowConfirmationRequiredTools: Boolean,
+        toolConfiguration: ConversationToolConfiguration?,
     ): InMemoryRunner {
         val expectedRevision = configurationRevision()
         return runnerMutex.withLock {
@@ -193,14 +216,18 @@ class AgentChatRunner(
                 ?.takeIf {
                     it.selection == selection &&
                         it.revision == expectedRevision &&
-                        it.allowConfirmationRequiredTools == allowConfirmationRequiredTools
+                        it.allowConfirmationRequiredTools == allowConfirmationRequiredTools &&
+                        it.toolConfiguration == toolConfiguration
                 }
                 ?.runner
-                ?: buildRunner(factory(selection, allowConfirmationRequiredTools)).also { newRunner ->
+                ?: buildRunner(
+                    factory(selection, allowConfirmationRequiredTools, toolConfiguration),
+                ).also { newRunner ->
                     runners[sessionId] = RunnerEntry(
                         selection,
                         expectedRevision,
                         allowConfirmationRequiredTools,
+                        toolConfiguration,
                         newRunner,
                     )
                     while (runners.size > MAX_CACHED_RUNNERS) {

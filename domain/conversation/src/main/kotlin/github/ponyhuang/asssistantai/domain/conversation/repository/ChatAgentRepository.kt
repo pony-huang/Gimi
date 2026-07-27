@@ -2,6 +2,7 @@ package github.ponyhuang.asssistantai.domain.conversation.repository
 
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import kotlinx.coroutines.flow.Flow
 
@@ -11,6 +12,7 @@ interface ChatAgentRepository {
         selection: ModelSelection,
         text: String,
         imageAttachments: List<ImageAttachment>,
+        toolConfiguration: ConversationToolConfiguration? = null,
     ): Flow<ChatRunEvent>
 
     suspend fun respondToToolConfirmation(

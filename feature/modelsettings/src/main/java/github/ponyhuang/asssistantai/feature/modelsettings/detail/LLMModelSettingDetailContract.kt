@@ -28,10 +28,6 @@ sealed interface LLmModelSettingDetailAction {
     data class ApiBaseUrlChanged(val value: String) : LLmModelSettingDetailAction
     data class ApiProtocolChanged(val value: ApiProtocol) : LLmModelSettingDetailAction
     data class EnabledChanged(val value: Boolean) : LLmModelSettingDetailAction
-    data class OfficialToolEnabledChanged(
-        val toolId: String,
-        val enabled: Boolean,
-    ) : LLmModelSettingDetailAction
     data class ToggleGroup(val groupId: String) : LLmModelSettingDetailAction
     data class RemoveLLmModel(val groupId: String, val modelId: String) : LLmModelSettingDetailAction
     data class NewLLmModelIdChanged(val value: String) : LLmModelSettingDetailAction

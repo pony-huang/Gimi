@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.feature.chat
 
 import github.ponyhuang.asssistantai.domain.conversation.model.Conversation
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.conversation.model.Message
 import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.CatalogLoadState
@@ -8,6 +9,8 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackState
 import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentTaskPhase
+import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
+import github.ponyhuang.asssistantai.domain.toolauthorization.model.ToolDescriptor
 
 /**
  * The current UI state of the chat conversation.
@@ -50,6 +53,11 @@ data class ChatUiState(
     val availableLLMModelSettings: List<LLMModelSetting> = emptyList(),
     val modelCatalogLoadState: CatalogLoadState = CatalogLoadState.Loading,
     val currentModelSelection: ModelSelection? = null,
+    val toolConfiguration: ConversationToolConfiguration? = null,
+    val availableLocalTools: List<ToolDescriptor> = emptyList(),
+    val availableMcpServers: List<McpServer> = emptyList(),
+    val supportedOfficialToolIds: Set<String> = emptySet(),
+    val hasToolConfigurationError: Boolean = false,
     val showToolActivity: Boolean = true,
     val isSpeechRecognitionAvailable: Boolean = false,
     val pendingToolConfirmations: List<PendingToolConfirmation> = emptyList(),

@@ -108,7 +108,7 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
     }
 
     @Test
-    fun selectingModelRestoresThatModelsSavedKeywordAndAutoInstalls() = runTest {
+    fun selectingModelRestoresThatModelsSavedKeywordWithoutAutoInstalling() = runTest {
         val voiceRepository = voiceRepository(ready = true)
         val viewModel = viewModel(modelRepository(), voiceRepository)
 
@@ -128,8 +128,8 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
             // 草稿丢弃，输入框回落为英语模型已保存（默认）的唤醒词。
             assertEquals(WakeModelCatalog.English.defaultKeyword, state.keywordDraft)
             assertNull(state.keywordError)
-            // 英语模型未安装，选中后自动触发安装。
-            verify(exactly = 1) { voiceRepository.installModel(WakeModelCatalog.English.id) }
+            // 英语模型未安装，选中后不自动触发安装；仅点击安装按钮才下载。
+            verify(exactly = 0) { voiceRepository.installModel(any()) }
             cancelAndIgnoreRemainingEvents()
         }
     }

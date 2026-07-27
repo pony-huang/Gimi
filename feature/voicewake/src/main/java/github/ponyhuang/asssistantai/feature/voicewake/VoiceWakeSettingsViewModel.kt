@@ -55,6 +55,7 @@ class VoiceWakeSettingsViewModel @Inject constructor(
             is VoiceWakeSettingsAction.ToggleListening -> toggleListening(action.enabled)
             is VoiceWakeSettingsAction.SelectModel -> selectModel(action.modelId)
             is VoiceWakeSettingsAction.InstallModel -> manageVoiceWake.installModel(action.modelId)
+            is VoiceWakeSettingsAction.CancelInstall -> manageVoiceWake.cancelInstall(action.modelId)
             is VoiceWakeSettingsAction.PermissionsResult -> {
                 val state = uiState.value
                 if (
@@ -86,11 +87,6 @@ class VoiceWakeSettingsViewModel @Inject constructor(
         manageVoiceWake.selectModel(modelId)
         localState.update {
             it.copy(keywordDraft = null, keywordDraftModelId = null, keywordError = null)
-        }
-        // 一次点击做显而易见的事：选中未安装的模型时自动开始安装。
-        val status = uiState.value.voiceState.modelStates[modelId]?.status
-        if (status == null || status == WakeModelStatus.Missing || status == WakeModelStatus.Error) {
-            manageVoiceWake.installModel(modelId)
         }
     }
 

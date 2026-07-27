@@ -66,6 +66,8 @@ class BluetoothVoiceController @Inject constructor(
 
     override fun installModel(modelId: String) = modelRepository.install(modelId)
 
+    override fun cancelInstall(modelId: String) = modelRepository.cancelInstall(modelId)
+
     override fun start() {
         if (modelPath() == null) {
             setStatus(

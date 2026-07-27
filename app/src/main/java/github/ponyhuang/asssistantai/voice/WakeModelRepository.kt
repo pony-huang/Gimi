@@ -70,6 +70,11 @@ class WakeModelRepository @Inject constructor(
         }
     }
 
+    fun cancelInstall(modelId: String) {
+        installJobs.remove(modelId)?.cancel()
+        updateState(modelId, WakeModelState())
+    }
+
     private fun installInternal(info: WakeModelInfo) {
         val archive = File(context.cacheDir, "${info.id}.archive")
         val extracting = File(rootDir, "${info.id}.extracting")

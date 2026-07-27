@@ -17,6 +17,7 @@
     <string name="voicewake_model_install_failed">安装失败</string>
     <string name="voicewake_action_retry">重试</string>
     <string name="voicewake_action_install">安装</string>
+    <string name="voicewake_action_cancel">取消</string>
 
     <string name="voicewake_section_keyword_with_language">唤醒词 · %1$s</string>
     <string name="voicewake_language_zh">中文</string>

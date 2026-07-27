@@ -17,6 +17,7 @@
     <string name="voicewake_model_install_failed">Installation failed</string>
     <string name="voicewake_action_retry">Retry</string>
     <string name="voicewake_action_install">Install</string>
+    <string name="voicewake_action_cancel">Cancel</string>
 
     <string name="voicewake_section_keyword_with_language">Wake word · %1$s</string>
     <string name="voicewake_language_zh">Chinese</string>

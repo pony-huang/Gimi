@@ -31,6 +31,8 @@ class ManageVoiceWakeUseCase @Inject constructor(
 
     fun installModel(modelId: String) = repository.installModel(modelId)
 
+    fun cancelInstall(modelId: String) = repository.cancelInstall(modelId)
+
     fun start() = repository.start()
 
     fun stop() = repository.stop()

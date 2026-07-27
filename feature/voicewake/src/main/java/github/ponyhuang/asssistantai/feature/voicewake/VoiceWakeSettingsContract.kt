@@ -19,6 +19,7 @@ sealed interface VoiceWakeSettingsAction {
     data class ToggleListening(val enabled: Boolean) : VoiceWakeSettingsAction
     data class SelectModel(val modelId: String) : VoiceWakeSettingsAction
     data class InstallModel(val modelId: String) : VoiceWakeSettingsAction
+    data class CancelInstall(val modelId: String) : VoiceWakeSettingsAction
     data class PermissionsResult(val granted: Boolean) : VoiceWakeSettingsAction
     data class PermissionRequestHandled(val requestId: Int) : VoiceWakeSettingsAction
     data class ModelDownloadPromptHandled(val promptId: Int) : VoiceWakeSettingsAction

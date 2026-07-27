@@ -91,6 +91,7 @@ fun VoiceWakeSettingsScreen(
                     isActive = state.voiceState.activeModelId == model.id,
                     onSelect = { onAction(VoiceWakeSettingsAction.SelectModel(model.id)) },
                     onInstall = { onAction(VoiceWakeSettingsAction.InstallModel(model.id)) },
+                    onCancel = { onAction(VoiceWakeSettingsAction.CancelInstall(model.id)) },
                 )
             }
 
@@ -125,6 +126,7 @@ private fun WakeModelRow(
     isActive: Boolean,
     onSelect: () -> Unit,
     onInstall: () -> Unit,
+    onCancel: () -> Unit,
 ) {
     ListItem(
         headlineContent = {
@@ -182,6 +184,12 @@ private fun WakeModelRow(
                             else R.string.voicewake_action_install,
                         ),
                     )
+                }
+            } else if (modelState.status == WakeModelStatus.Downloading ||
+                modelState.status == WakeModelStatus.Extracting
+            ) {
+                TextButton(onClick = onCancel) {
+                    Text(stringResource(R.string.voicewake_action_cancel))
                 }
             }
         },

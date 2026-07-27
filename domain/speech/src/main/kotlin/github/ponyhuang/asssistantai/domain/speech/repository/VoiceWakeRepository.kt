@@ -15,6 +15,9 @@ interface VoiceWakeRepository {
     /** 安装（内置解包或下载）指定模型。 */
     fun installModel(modelId: String)
 
+    /** 取消正在进行的模型安装/下载。 */
+    fun cancelInstall(modelId: String)
+
     fun start()
 
     fun stop()

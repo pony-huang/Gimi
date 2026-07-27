@@ -157,7 +157,6 @@ private fun SettingsHomeContent(
                     icon = Icons.Default.Visibility,
                     title = stringResource(R.string.settings_chat_display_title),
                     subtitle = stringResource(R.string.settings_chat_display_subtitle),
-                    onClick = { onToggleToolActivity(!showToolActivity) },
                     trailingContent = {
                         Switch(
                             checked = showToolActivity,

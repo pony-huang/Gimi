@@ -7,10 +7,8 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia
 import github.ponyhuang.asssistantai.core.audio.VoiceAudioRecorder
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -84,6 +82,7 @@ import kotlinx.coroutines.launch
  * @param isGenerating Whether the AI is currently generating a response.
  * @param modifier The modifier to be applied to the composer.
  * @param messageData The initial message data to be displayed in the input field.
+ * @param modelSelectorContent Model selection control rendered beside the attachment button.
  */
 @Composable
 public fun ChatComposer(
@@ -98,6 +97,7 @@ public fun ChatComposer(
     onVoiceInputError: (Throwable) -> Unit = { },
     isVoiceInputAvailable: Boolean = false,
     onTranscribeVoice: suspend (ByteArray) -> String = { error("transcription not configured") },
+    modelSelectorContent: @Composable () -> Unit = { },
 ) {
     var messageData by rememberSaveable(stateSaver = MessageData.Saver) {
         mutableStateOf(messageData)
@@ -285,60 +285,43 @@ public fun ChatComposer(
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 2.dp,
         ) {
-            AnimatedContent(targetState = voiceInputState is VoiceInputUiState.Recording) { recording ->
-                if (recording) {
-                    val state = voiceInputState as? VoiceInputUiState.Recording
-                        ?: VoiceInputUiState.Recording()
+            val recordingState = voiceInputState as? VoiceInputUiState.Recording
+            if (recordingState != null) {
+                with(componentFactory) {
+                    VoiceRecordingContent(
+                        VoiceRecordingContentParams(
+                            levels = recordingState.levels,
+                            remainingSeconds = recordingState.remainingSeconds,
+                            onCancel = ::cancelVoiceInput,
+                            onFinish = ::finishVoiceInput,
+                        ),
+                    )
+                }
+            } else {
+                Row(modifier = Modifier.fillMaxWidth()) {
                     with(componentFactory) {
-                        VoiceRecordingContent(
-                            VoiceRecordingContentParams(
-                                levels = state.levels,
-                                remainingSeconds = state.remainingSeconds,
-                                onCancel = ::cancelVoiceInput,
-                                onFinish = ::finishVoiceInput,
+                        ComposerInputContent(
+                            ComposerInputContentParams(
+                                messageData = messageData,
+                                isGenerating = isGenerating,
+                                voiceInputState = voiceInputState,
+                                isVoiceInputAvailable = isVoiceInputAvailable,
+                                voiceErrorMessage = voiceErrorMessage,
+                                onVoiceErrorShown = { voiceErrorMessage = null },
+                                onTextChange = { messageData = messageData.copy(text = it) },
+                                onRemoveAttachment = { uri ->
+                                    messageData = messageData.copy(
+                                        attachments = messageData.attachments - uri,
+                                    )
+                                    deleteCameraAttachment(context, uri)
+                                },
+                                onSendClick = handleSendClick,
+                                onStopClick = onStopClick,
+                                onVoiceInputStart = ::startVoiceInput,
+                                onAttachmentsClick = { showAttachmentOptions = true },
+                                modelSelectorContent = modelSelectorContent,
                             ),
                         )
-                    }
-                } else {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.Bottom,
-                    ) {
-                        with(componentFactory) {
-                            ComposerLeadingContent(
-                                ComposerLeadingContentParams(
-                                    isGenerating = isGenerating ||
-                                        voiceInputState == VoiceInputUiState.Transcribing,
-                                    onAttachmentsClick = { showAttachmentOptions = true },
-                                ),
-                            )
-
-                            ComposerInputContent(
-                                ComposerInputContentParams(
-                                    messageData = messageData,
-                                    isGenerating = isGenerating,
-                                    voiceInputState = voiceInputState,
-                                    isVoiceInputAvailable = isVoiceInputAvailable,
-                                    voiceErrorMessage = voiceErrorMessage,
-                                    onVoiceErrorShown = { voiceErrorMessage = null },
-                                    onTextChange = { messageData = messageData.copy(text = it) },
-                                    onRemoveAttachment = { uri ->
-                                        messageData = messageData.copy(
-                                            attachments = messageData.attachments - uri,
-                                        )
-                                        deleteCameraAttachment(context, uri)
-                                    },
-                                    onSendClick = handleSendClick,
-                                    onStopClick = onStopClick,
-                                    onVoiceInputStart = ::startVoiceInput,
-                                ),
-                            )
-
-                            ComposerTrailingContent(
-                                ComposerTrailingContentParams(isGenerating = isGenerating),
-                            )
-                        }
                     }
                 }
             }

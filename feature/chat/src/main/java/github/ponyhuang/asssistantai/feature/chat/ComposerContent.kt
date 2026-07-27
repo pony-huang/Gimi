@@ -5,7 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.annotation.DrawableRes
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
@@ -21,7 +20,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.LocalTextStyle
@@ -57,10 +55,14 @@ import kotlinx.coroutines.launch
  */
 @Composable
 internal fun DefaultComposerLeadingContent(params: ComposerLeadingContentParams) {
-    IconButton(
+    FilledIconButton(
         enabled = !params.isGenerating,
         onClick = params.onAttachmentsClick,
-        colors = IconButtonDefaults.iconButtonColors(
+        modifier = Modifier
+            .size(48.dp)
+            .testTag("chat_composer_add"),
+        colors = IconButtonDefaults.filledIconButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
     ) {
@@ -100,53 +102,81 @@ internal fun DefaultComposerInputContent(
         params.onVoiceErrorShown()
     }
 
-    Column(modifier = modifier) {
+    Column(
+        modifier = modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
         SnackbarHost(hostState = snackbarHostState)
 
-        AnimatedContent(targetState = isTranscribing) { transcribing ->
-            if (transcribing) {
-                TranscribingContent()
-            } else {
-                BasicTextField(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .defaultMinSize(minHeight = LocalMinimumInteractiveComponentSize.current),
-                    value = params.messageData.text,
-                    onValueChange = params.onTextChange,
-                    enabled = !params.isGenerating,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { params.onSendClick() }),
-                    textStyle = resolveTextFieldStyle(interactionSource, disabled = params.isGenerating),
-                    cursorBrush = SolidColor(OutlinedTextFieldDefaults.colors().cursorColor),
-                    interactionSource = interactionSource,
-                    maxLines = 6,
-                    minLines = 1,
-                    decorationBox = { innerTextField ->
-                        Column {
-                            AttachmentList(
-                                attachments = params.messageData.attachments,
-                                onRemoveAttachment = params.onRemoveAttachment,
-                            )
-                            Row(verticalAlignment = Alignment.Bottom) {
-                                TextInput(
-                                    modifier = Modifier.weight(1f),
-                                    text = params.messageData.text,
-                                    innerTextField = innerTextField,
-                                )
-                                VoiceButton(
-                                    isGenerating = params.isGenerating,
-                                    isVoiceInputAvailable = params.isVoiceInputAvailable,
-                                    snackbarHostState = snackbarHostState,
-                                    onVoiceInputStart = params.onVoiceInputStart,
-                                )
-                                TrailingButton(
-                                    button = trailingButton,
-                                    onSendClick = params.onSendClick,
-                                    onStopClick = params.onStopClick,
-                                )
-                            }
-                        }
-                    },
+        if (isTranscribing) {
+            TranscribingContent()
+        } else {
+            AttachmentList(
+                attachments = params.messageData.attachments,
+                onRemoveAttachment = params.onRemoveAttachment,
+            )
+            BasicTextField(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .defaultMinSize(minHeight = LocalMinimumInteractiveComponentSize.current),
+                value = params.messageData.text,
+                onValueChange = params.onTextChange,
+                enabled = !params.isGenerating,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { params.onSendClick() }),
+                textStyle = resolveTextFieldStyle(interactionSource, disabled = params.isGenerating),
+                cursorBrush = SolidColor(OutlinedTextFieldDefaults.colors().cursorColor),
+                interactionSource = interactionSource,
+                maxLines = 6,
+                minLines = 1,
+                decorationBox = { innerTextField ->
+                    TextInput(
+                        modifier = Modifier.fillMaxWidth(),
+                        text = params.messageData.text,
+                        innerTextField = innerTextField,
+                    )
+                },
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            with(LocalChatAiComponentFactory.current) {
+                ComposerLeadingContent(
+                    ComposerLeadingContentParams(
+                        isGenerating = params.isGenerating || isTranscribing,
+                        onAttachmentsClick = params.onAttachmentsClick,
+                    ),
+                )
+            }
+
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                params.modelSelectorContent()
+            }
+
+            if (!isTranscribing) {
+                VoiceButton(
+                    isGenerating = params.isGenerating,
+                    isVoiceInputAvailable = params.isVoiceInputAvailable,
+                    snackbarHostState = snackbarHostState,
+                    onVoiceInputStart = params.onVoiceInputStart,
+                )
+            }
+            TrailingButton(
+                button = trailingButton,
+                onSendClick = params.onSendClick,
+                onStopClick = params.onStopClick,
+            )
+            with(LocalChatAiComponentFactory.current) {
+                ComposerTrailingContent(
+                    ComposerTrailingContentParams(isGenerating = params.isGenerating),
                 )
             }
         }
@@ -198,14 +228,12 @@ private fun AttachmentList(
     attachments: List<Uri>,
     onRemoveAttachment: (Uri) -> Unit,
 ) {
-    AnimatedContent(targetState = attachments.isNotEmpty()) { visible ->
-        if (visible) {
-            AttachmentList(
-                modifier = Modifier.fillMaxWidth(),
-                uris = attachments,
-                onRemoveAttachment = onRemoveAttachment,
-            )
-        }
+    if (attachments.isNotEmpty()) {
+        AttachmentList(
+            modifier = Modifier.fillMaxWidth(),
+            uris = attachments,
+            onRemoveAttachment = onRemoveAttachment,
+        )
     }
 }
 
@@ -222,7 +250,7 @@ private fun TextInput(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
+                .padding(horizontal = 6.dp, vertical = 10.dp),
         ) {
             if (text.isBlank()) {
                 Text(
@@ -295,22 +323,22 @@ private fun TrailingButton(
     onSendClick: () -> Unit,
     onStopClick: () -> Unit,
 ) {
-    AnimatedContent(targetState = button) { target ->
-        when (target) {
-            ComposerTrailingButton.Stop -> TrailingIconButton(
-                icon = R.drawable.stream_ai_compose_ic_stop,
-                contentDescription = stringResource(R.string.stream_ai_compose_composer_stop_button),
-                onClick = onStopClick,
-            )
+    when (button) {
+        ComposerTrailingButton.Stop -> TrailingIconButton(
+            icon = R.drawable.stream_ai_compose_ic_stop,
+            contentDescription = stringResource(R.string.stream_ai_compose_composer_stop_button),
+            testTag = "chat_composer_stop",
+            onClick = onStopClick,
+        )
 
-            ComposerTrailingButton.Send -> TrailingIconButton(
-                icon = R.drawable.stream_ai_compose_ic_send,
-                contentDescription = stringResource(R.string.stream_ai_compose_composer_send_button),
-                onClick = onSendClick,
-            )
+        ComposerTrailingButton.Send -> TrailingIconButton(
+            icon = R.drawable.stream_ai_compose_ic_send,
+            contentDescription = stringResource(R.string.stream_ai_compose_composer_send_button),
+            testTag = "chat_composer_send",
+            onClick = onSendClick,
+        )
 
-            null -> Unit
-        }
+        null -> Unit
     }
 }
 
@@ -318,9 +346,15 @@ private fun TrailingButton(
 private fun TrailingIconButton(
     @DrawableRes icon: Int,
     contentDescription: String,
+    testTag: String,
     onClick: () -> Unit,
 ) {
-    FilledIconButton(onClick = onClick) {
+    FilledIconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .size(48.dp)
+            .testTag(testTag),
+    ) {
         Icon(
             painter = painterResource(icon),
             contentDescription = contentDescription,

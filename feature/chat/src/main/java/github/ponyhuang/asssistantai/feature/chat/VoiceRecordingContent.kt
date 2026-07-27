@@ -4,17 +4,17 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,7 +27,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -46,17 +45,20 @@ internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 56.dp)
-            .padding(horizontal = 2.dp)
+            .heightIn(min = 64.dp)
+            .padding(horizontal = 8.dp)
             .semantics { stateDescription = recordingState },
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(
+        FilledIconButton(
             onClick = params.onCancel,
-            modifier = Modifier.testTag(VOICE_CANCEL_TEST_TAG),
-            colors = IconButtonDefaults.iconButtonColors(
-                contentColor = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier
+                .size(48.dp)
+                .testTag(VOICE_CANCEL_TEST_TAG),
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             ),
         ) {
             Icon(
@@ -65,18 +67,11 @@ internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
             )
         }
 
-        Text(
-            text = formatRecordingTime(params.remainingSeconds),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Medium,
-        )
-
         VoiceWaveform(
             levels = params.levels,
             modifier = Modifier
                 .weight(1f)
-                .heightIn(min = 32.dp)
+                .height(36.dp)
                 .testTag(VOICE_WAVEFORM_TEST_TAG)
                 .semantics {
                     contentDescription = waveformDescription
@@ -85,7 +80,9 @@ internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
 
         FilledIconButton(
             onClick = params.onFinish,
-            modifier = Modifier.testTag(VOICE_FINISH_TEST_TAG),
+            modifier = Modifier
+                .size(48.dp)
+                .testTag(VOICE_FINISH_TEST_TAG),
         ) {
             // 语义是"完成录音并转写"，用对勾而非停止方块——方块容易被理解为"中断丢弃"。
             Icon(
@@ -100,28 +97,28 @@ internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
 private fun VoiceWaveform(
     levels: List<Float>,
     modifier: Modifier = Modifier,
-    color: Color = MaterialTheme.colorScheme.primary,
+    color: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     Canvas(modifier = modifier) {
         val barWidth = 3.dp.toPx()
-        val spacing = 2.dp.toPx()
+        val spacing = 3.dp.toPx()
         val barCount = (size.width / (barWidth + spacing)).toInt().coerceAtLeast(1)
         val visibleLevels = levels.takeLast(barCount)
         val missingCount = barCount - visibleLevels.size
-        val minHeight = 4.dp.toPx()
-        val maxHeight = size.height * 0.82f
+        val maxHeight = size.height * 0.88f
 
         repeat(barCount) { index ->
-            val level = if (index < missingCount) {
-                BASELINE_LEVELS[index % BASELINE_LEVELS.size]
+            val level = visibleLevels.getOrNull(index - missingCount)
+            val barHeight = if (level == null) {
+                barWidth
             } else {
-                visibleLevels[index - missingCount].coerceIn(0f, 1f)
+                (barWidth + (maxHeight - barWidth) * level.coerceIn(0.04f, 1f))
+                    .coerceAtMost(maxHeight)
             }
-            val barHeight = minHeight + ((maxHeight - minHeight) * level.coerceAtLeast(0.06f))
             val x = index * (barWidth + spacing)
             val y = (size.height - barHeight) / 2f
             drawRoundRect(
-                color = color.copy(alpha = 0.78f),
+                color = color.copy(alpha = 0.9f),
                 topLeft = Offset(x, y),
                 size = Size(barWidth, barHeight),
                 cornerRadius = CornerRadius(barWidth / 2f),
@@ -134,8 +131,6 @@ internal fun formatRecordingTime(remainingSeconds: Int): String {
     val safeSeconds = remainingSeconds.coerceAtLeast(0)
     return "%d:%02d".format(safeSeconds / 60, safeSeconds % 60)
 }
-
-private val BASELINE_LEVELS = listOf(0.08f, 0.16f, 0.11f, 0.22f, 0.13f, 0.18f)
 
 @Preview(name = "Phone recording", device = Devices.PHONE, showBackground = true)
 @Preview(name = "Foldable recording", device = Devices.FOLDABLE, showBackground = true)

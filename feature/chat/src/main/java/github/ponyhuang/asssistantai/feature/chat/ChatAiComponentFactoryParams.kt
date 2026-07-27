@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.feature.chat
 
 import android.net.Uri
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 /**
@@ -39,6 +40,8 @@ public data class ComposerInputContentParams(
     val onSendClick: () -> Unit,
     val onStopClick: () -> Unit,
     val onVoiceInputStart: () -> Unit,
+    val onAttachmentsClick: () -> Unit = { },
+    val modelSelectorContent: @Composable () -> Unit = { },
 )
 
 /** Immutable presentation state for the composer's voice-input session. */

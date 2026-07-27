@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -217,7 +218,7 @@ private fun SelectedAttachment(
     onRemove: () -> Unit = {},
 ) {
     AttachmentTile(
-        modifier = modifier,
+        modifier = modifier.testTag("chat_composer_attachment"),
     ) {
         UriImage(
             uri = uri,
@@ -247,7 +248,7 @@ private fun SelectedAttachment(
         RemoveButton(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(6.dp),
+                .testTag("chat_composer_attachment_remove"),
             onClick = onRemove,
         )
     }
@@ -344,7 +345,7 @@ private fun RemoveButton(
     onClick: () -> Unit,
 ) {
     FilledIconButton(
-        modifier = modifier.size(18.dp),
+        modifier = modifier.size(48.dp),
         onClick = onClick,
         colors = IconButtonDefaults.filledIconButtonColors(
             containerColor = MaterialTheme.colorScheme.inverseSurface,
@@ -354,7 +355,7 @@ private fun RemoveButton(
             painter = painterResource(R.drawable.stream_ai_compose_ic_cancel),
             tint = MaterialTheme.colorScheme.inverseOnSurface,
             contentDescription = stringResource(R.string.chat_attachment_remove),
-            modifier = Modifier.size(12.dp),
+            modifier = Modifier.size(20.dp),
         )
     }
 }

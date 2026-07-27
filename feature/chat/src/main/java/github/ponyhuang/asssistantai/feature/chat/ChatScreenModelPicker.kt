@@ -9,7 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -94,13 +94,13 @@ fun ModelStatusDisplay(
     Surface(
         onClick = { onClick?.invoke() },
         enabled = onClick != null,
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface,
-        modifier = modifier,
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = modifier.heightIn(min = 48.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
         ) {
             if (isActive) {
                 LLMModelServiceIcon(
@@ -114,7 +114,7 @@ fun ModelStatusDisplay(
             }
             Text(
                 text = modelName ?: emptyText,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.labelLarge,
                 color = when {
                     isActive -> MaterialTheme.colorScheme.onSurface
                     isLoading -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -193,10 +193,10 @@ fun ModelTitleAndPicker(
     }
     var showModelPicker by remember { mutableStateOf(false) }
 
-    // ── 标题（与原实现一致：普通 TopAppBar + Box.fillMaxWidth 居中） ─────────
+    // 模型选择器由宿主决定可用宽度；输入框内保持左对齐并在窄屏省略长名称。
     Box(
-        modifier = modifier.fillMaxWidth(),
-        contentAlignment = Alignment.Center,
+        modifier = modifier,
+        contentAlignment = Alignment.CenterStart,
     ) {
         ModelStatusDisplay(
             modelName = displayedModelName,

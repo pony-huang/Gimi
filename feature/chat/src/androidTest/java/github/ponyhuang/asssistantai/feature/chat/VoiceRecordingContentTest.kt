@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
@@ -56,6 +57,14 @@ class VoiceRecordingContentTest {
 
         assertEquals(1, cancelCount)
         assertEquals(1, finishCount)
+    }
+
+    @Test
+    fun remainingTimeIsAvailableToSemanticsButNotRenderedAsText() {
+        setRecordingContent(width = 360)
+
+        composeRule.onNodeWithText("0:42").assertDoesNotExist()
+        composeRule.onNodeWithTag(VOICE_WAVEFORM_TEST_TAG).assertIsDisplayed()
     }
 
     @Test

@@ -63,6 +63,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
@@ -76,7 +77,8 @@ import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 聊天界面 Scaffold：
- * - TopAppBar：模型选择器（[ModelTitleAndPicker]）+ 抽屉按钮（[onOpenDrawer]）+ 新建对话（[onNewConversation]）
+ * - 顶部浮动操作：抽屉按钮（[onOpenDrawer]）+ 新建对话（[onNewConversation]）+ 设置
+ * - 底部输入卡片：文本、附件、模型选择与语音/发送操作。
  * - LazyColumn：消息流 + 流式输入自动跟随滚动 + 用户离开底部时显示「回到最新」FAB
  * - ChatInputBar：草稿由输入组件管理，发送按钮在流式期间被禁用。
  *
@@ -204,15 +206,10 @@ fun ChatScaffold(
                         .matchParentSize()
                         .background(topFadeBrush),
                 )
-                ChatTopBar(
-                    state = state,
-                    isAgentRunning = isAgentRunning,
+                ChatHeaderActions(
                     onOpenDrawer = onOpenDrawer,
-                    onOpenSettings = onOpenSettings,
-                    onConfigureModels = onConfigureModels,
                     onNewConversation = onNewConversation,
-                    onSelectModel = onSelectModel,
-                    onModelSwitchBlocked = onModelSwitchBlocked,
+                    onOpenSettings = onOpenSettings,
                 )
                 Box(
                     modifier = Modifier
@@ -244,6 +241,17 @@ fun ChatScaffold(
                     isGenerating = isAgentRunning,
                     isVoiceInputAvailable = isSpeechRecognitionAvailable,
                     onTranscribeVoice = onTranscribeVoice,
+                    modelSelectorContent = {
+                        ModelTitleAndPicker(
+                            services = state.availableLLMModelSettings,
+                            currentSelection = state.currentModelSelection,
+                            loadState = state.modelCatalogLoadState,
+                            isAgentRunning = isAgentRunning,
+                            onConfigureModels = onConfigureModels,
+                            onSelectModel = onSelectModel,
+                            onModelSwitchBlocked = onModelSwitchBlocked,
+                        )
+                    },
                 )
             }
         },
@@ -422,24 +430,19 @@ private fun ToolConfirmationCard(
     }
 }
 
-/** Floating chat header modelled after the compact ChatGPT mobile controls. */
+/** Lightweight floating chat actions that keep model and settings controls out of the header. */
 @Composable
-private fun ChatTopBar(
-    state: ChatUiState,
-    isAgentRunning: Boolean,
+internal fun ChatHeaderActions(
     onOpenDrawer: () -> Unit,
-    onOpenSettings: () -> Unit,
-    onConfigureModels: () -> Unit,
     onNewConversation: () -> Unit,
-    onSelectModel: (github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection) -> Unit,
-    onModelSwitchBlocked: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
             .padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Surface(
@@ -457,17 +460,6 @@ private fun ChatTopBar(
                 )
             }
         }
-
-        ModelTitleAndPicker(
-            services = state.availableLLMModelSettings,
-            currentSelection = state.currentModelSelection,
-            loadState = state.modelCatalogLoadState,
-            isAgentRunning = isAgentRunning,
-            onConfigureModels = onConfigureModels,
-            onSelectModel = onSelectModel,
-            onModelSwitchBlocked = onModelSwitchBlocked,
-            modifier = Modifier.weight(1f),
-        )
 
         Surface(
             shape = CircleShape,
@@ -489,15 +481,15 @@ private fun ChatTopBar(
                 )
                 IconButton(
                     onClick = onOpenSettings,
-                    modifier = Modifier.size(48.dp),
+                    modifier = Modifier
+                        .size(48.dp)
+                        .testTag("chat_header_settings"),
                 ) {
-                    Box(modifier = Modifier.size(28.dp)) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.chat_settings),
-                            modifier = Modifier.size(24.dp),
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = stringResource(R.string.chat_settings),
+                        modifier = Modifier.size(24.dp),
+                    )
                 }
             }
         }

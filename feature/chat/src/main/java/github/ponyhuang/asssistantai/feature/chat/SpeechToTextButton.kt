@@ -13,6 +13,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +25,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -124,7 +126,17 @@ public fun SpeechToTextButton(
 
 @Composable
 internal fun DefaultIdleContent(onClick: () -> Unit, enabled: Boolean = true) {
-    IconButton(onClick = onClick, enabled = enabled) {
+    FilledIconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .size(48.dp)
+            .testTag("chat_composer_microphone"),
+        colors = IconButtonDefaults.filledIconButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
+    ) {
         Icon(
             painter = painterResource(R.drawable.stream_ai_compose_ic_mic),
             contentDescription = if (enabled) {

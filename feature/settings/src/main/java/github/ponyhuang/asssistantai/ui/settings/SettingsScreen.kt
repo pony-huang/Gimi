@@ -10,7 +10,6 @@ import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
@@ -47,7 +46,6 @@ fun SettingsScreen(
     onNavigateToModelService: () -> Unit,
     onNavigateToDefaultModels: () -> Unit,
     onNavigateToVoiceWake: () -> Unit,
-    onNavigateToAssistant: () -> Unit,
     onNavigateToMcpServers: () -> Unit,
     onNavigateToSkills: () -> Unit,
     onNavigateToWorkFiles: () -> Unit,
@@ -64,7 +62,6 @@ fun SettingsScreen(
         onNavigateToModelService = onNavigateToModelService,
         onNavigateToDefaultModels = onNavigateToDefaultModels,
         onNavigateToVoiceWake = onNavigateToVoiceWake,
-        onNavigateToAssistant = onNavigateToAssistant,
         onNavigateToMcpServers = onNavigateToMcpServers,
         onNavigateToSkills = onNavigateToSkills,
         onNavigateToWorkFiles = onNavigateToWorkFiles,
@@ -82,7 +79,6 @@ private fun SettingsHomeContent(
     onNavigateToModelService: () -> Unit,
     onNavigateToDefaultModels: () -> Unit,
     onNavigateToVoiceWake: () -> Unit,
-    onNavigateToAssistant: () -> Unit,
     onNavigateToMcpServers: () -> Unit,
     onNavigateToSkills: () -> Unit,
     onNavigateToWorkFiles: () -> Unit,
@@ -120,14 +116,6 @@ private fun SettingsHomeContent(
                     title = stringResource(R.string.settings_voice_wake_title),
                     subtitle = stringResource(R.string.settings_voice_wake_subtitle),
                     onClick = onNavigateToVoiceWake,
-                )
-            }
-            item {
-                SettingsNavigationCard(
-                    icon = Icons.Default.RecordVoiceOver,
-                    title = stringResource(R.string.settings_assistant_title),
-                    subtitle = stringResource(R.string.settings_assistant_subtitle),
-                    onClick = onNavigateToAssistant,
                 )
             }
             item { SettingsSectionTitle(stringResource(R.string.settings_group_tools)) }
@@ -213,7 +201,6 @@ private fun SettingsHomePreview() {
                 onNavigateToModelService = {},
                 onNavigateToDefaultModels = {},
                 onNavigateToVoiceWake = {},
-                onNavigateToAssistant = {},
                 onNavigateToMcpServers = {},
                 onNavigateToSkills = {},
                 onNavigateToWorkFiles = {},

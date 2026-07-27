@@ -67,40 +67,12 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".assistant.AssistantOverlayActivity"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:launchMode="singleTask"
-            android:showWhenLocked="true"
-            android:taskAffinity=""
-            android:theme="@style/Theme.Asssistantai.AssistantOverlay"
-            android:turnScreenOn="true"
-            android:windowSoftInputMode="adjustResize" />
-
-        <service
-            android:name=".assistant.AssistantTileService"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher"
-            android:label="@string/assistant_tile_label"
-            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
-            <intent-filter>
-                <action android:name="android.service.quicksettings.action.QS_TILE" />
-            </intent-filter>
-        </service>
-        <activity
             android:name=".MainActivity2"
             android:exported="false"
             android:label="@string/title_activity_main2"
             android:theme="@style/Theme.Asssistantai"
             android:windowSoftInputMode="adjustResize"
             tools:ignore="MissingClass" />
-        <!--
-            Required by MediaSessionManagerTool: the system grants cross-app
-            media-session access only when this app is registered as a
-            notification listener and the user has enabled it in Settings →
-            Notifications → Device & app notifications. The service itself is
-            empty — it exists to satisfy getActiveSessions(ComponentName).
-        -->
         <service
             android:name=".agent.tools.system.MediaNotificationListenerService"
             android:exported="true"
@@ -114,11 +86,6 @@
             android:name=".voice.BluetoothVoiceService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
-        <!--
-            AppFunctions runtime uses this property to load the LLM-facing description of
-            what this app can do and when its functions should be called. Mirrors the
-            Google ChatApp sample (E:\workplace\appfunctions\ChatApp).
-        -->
         <property
             android:name="android.app.appfunctions.app_metadata"
             android:resource="@xml/app_metadata" />

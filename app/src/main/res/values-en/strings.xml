@@ -46,5 +46,4 @@
     <string name="wake_model_files_incomplete">Wake model files are incomplete</string>
     <string name="wake_model_install_failed">Wake model installation failed</string>
     <string name="wake_model_download_failed">Wake model download failed</string>
-    <string name="assistant_tile_label">Voice Assistant</string>
 </resources>

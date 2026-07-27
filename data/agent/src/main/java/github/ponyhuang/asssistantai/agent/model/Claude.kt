@@ -7,13 +7,16 @@ import com.anthropic.core.jsonMapper
 import com.anthropic.errors.AnthropicServiceException
 import com.anthropic.helpers.MessageAccumulator
 import com.anthropic.models.messages.Base64ImageSource
+import com.anthropic.models.messages.Base64PdfSource
 import com.anthropic.models.messages.ContentBlock
 import com.anthropic.models.messages.ContentBlockParam
+import com.anthropic.models.messages.ContentBlockParam.Companion.ofDocument
 import com.anthropic.models.messages.ContentBlockParam.Companion.ofImage
 import com.anthropic.models.messages.ContentBlockParam.Companion.ofText
 import com.anthropic.models.messages.ContentBlockParam.Companion.ofThinking
 import com.anthropic.models.messages.ContentBlockParam.Companion.ofToolResult
 import com.anthropic.models.messages.ContentBlockParam.Companion.ofToolUse
+import com.anthropic.models.messages.DocumentBlockParam
 import com.anthropic.models.messages.ImageBlockParam
 import com.anthropic.models.messages.Message
 import com.anthropic.models.messages.MessageCreateParams
@@ -27,6 +30,8 @@ import com.anthropic.models.messages.Tool
 import com.anthropic.models.messages.ToolResultBlockParam
 import com.anthropic.models.messages.ToolUnion
 import com.anthropic.models.messages.ToolUseBlockParam
+import com.anthropic.models.messages.UrlImageSource
+import com.anthropic.models.messages.UrlPdfSource
 import com.anthropic.models.messages.Usage
 import com.fasterxml.jackson.core.type.TypeReference
 import com.google.adk.kt.logging.LoggerFactory
@@ -40,13 +45,13 @@ import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Schema
-import com.google.adk.kt.types.Tool as AdkTool
 import com.google.adk.kt.types.UsageMetadata
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import java.util.Base64
 import java.util.stream.Collectors
+import com.google.adk.kt.types.Tool as AdkTool
 
 /**
  * Claude (Anthropic) Model — ADK [Model] bridge to the Anthropic Java SDK.
@@ -242,8 +247,6 @@ open class Claude(
         .build()
 
     protected open fun Part.toContentBlockParam(): ContentBlockParam {
-        // Thinking blocks must be echoed back with their signature intact;
-        // sending them as plain text triggers a 400 error from the API.
         if (thought == true) {
             return ofThinking(
                 ThinkingBlockParam.builder()
@@ -252,25 +255,71 @@ open class Claude(
                     .build()
             )
         }
+
         text?.let { return ofText(TextBlockParam.builder().text(it).build()) }
-        inlineData?.let { image ->
+
+        inlineData?.let { blob ->
             val mimeType =
-                image.mimeType ?: throw UnsupportedOperationException("Image MIME type is missing")
-            val data = image.data ?: throw UnsupportedOperationException("Image data is missing")
-            if (!isSupportedImageMimeType(mimeType)) {
-                throw UnsupportedOperationException("Only image inline data is supported: $mimeType")
-            }
-            return ofImage(
-                ImageBlockParam.builder()
-                    .source(
-                        Base64ImageSource.builder()
-                            .mediaType(Base64ImageSource.MediaType.of(mimeType))
-                            .data(Base64.getEncoder().encodeToString(data))
+                blob.mimeType
+                    ?: throw UnsupportedOperationException("Inline data MIME type is missing")
+            val data = blob.data ?: throw UnsupportedOperationException("Inline data is missing")
+            val base64 = Base64.getEncoder().encodeToString(data)
+            return when {
+                isSupportedImageMimeType(mimeType) ->
+                    ofImage(
+                        ImageBlockParam.builder()
+                            .source(
+                                Base64ImageSource.builder()
+                                    .mediaType(Base64ImageSource.MediaType.of(mimeType))
+                                    .data(base64)
+                                    .build()
+                            )
                             .build()
                     )
-                    .build()
-            )
+
+                isSupportedDocumentMimeType(mimeType) ->
+                    ofDocument(
+                        DocumentBlockParam.builder()
+                            .source(Base64PdfSource.builder().data(base64).build())
+                            .build()
+                    )
+
+                else -> throw UnsupportedOperationException(
+                    "Unsupported inline data MIME type: $mimeType"
+                )
+            }
         }
+
+        fileData?.let { blob ->
+            val mimeType =
+                blob.mimeType
+                    ?: throw UnsupportedOperationException("FileData MIME type is missing")
+            val uri = blob.fileUri ?: throw UnsupportedOperationException("FileData Uri is missing")
+            return when {
+                isSupportedImageMimeType(mimeType) ->
+                    ofImage(
+                        ImageBlockParam.builder()
+                            .source(
+                                UrlImageSource.builder().url(uri).build()
+                            )
+                            .build()
+                    )
+
+                isSupportedDocumentMimeType(mimeType) ->
+                    ofDocument(
+                        DocumentBlockParam.builder()
+                            .source(
+                                UrlPdfSource.builder().url(uri).build()
+                            )
+                            .build()
+                    )
+
+                else -> throw UnsupportedOperationException(
+                    "Unsupported inline data MIME type: $mimeType"
+                )
+            }
+        }
+
         functionCall?.let { fc ->
             return ofToolUse(
                 ToolUseBlockParam.builder()
@@ -281,6 +330,7 @@ open class Claude(
                     .build()
             )
         }
+
         functionResponse?.let { fr ->
             val response = fr.response
             val result = response["result"]
@@ -301,6 +351,9 @@ open class Claude(
 
     protected open fun isSupportedImageMimeType(mimeType: String): Boolean =
         mimeType.startsWith(defaultImageMimePrefix)
+
+    protected open fun isSupportedDocumentMimeType(mimeType: String): Boolean =
+        mimeType == "application/pdf"
 
     protected open fun defaultToolResultIsError(): Boolean = false
 

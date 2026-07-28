@@ -11,9 +11,26 @@ class ChatAddToChatStateTest {
 
     @Test
     fun upwardRemainderAtListEndIsConsumedBeforeItReachesSheet() {
-        assertEquals(-18f, consumeAtLowerScrollBoundary(-18f))
-        assertEquals(0f, consumeAtLowerScrollBoundary(18f))
-        assertEquals(0f, consumeAtLowerScrollBoundary(0f))
+        assertEquals(
+            -18f,
+            consumeAtLowerScrollBoundary(availableY = -18f, canScrollForward = false),
+        )
+        assertEquals(
+            0f,
+            consumeAtLowerScrollBoundary(availableY = 18f, canScrollForward = false),
+        )
+        assertEquals(
+            0f,
+            consumeAtLowerScrollBoundary(availableY = 0f, canScrollForward = false),
+        )
+    }
+
+    @Test
+    fun upwardMotionBeforeListEndRemainsAvailableToTheList() {
+        assertEquals(
+            0f,
+            consumeAtLowerScrollBoundary(availableY = -18f, canScrollForward = true),
+        )
     }
 
     @Test

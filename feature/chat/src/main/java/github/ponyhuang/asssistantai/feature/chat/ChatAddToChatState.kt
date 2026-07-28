@@ -10,8 +10,26 @@ enum class SessionToolFilter {
     DISABLED,
 }
 
-internal fun consumeAtLowerScrollBoundary(availableY: Float): Float =
-    availableY.coerceAtMost(0f)
+/**
+ * Prevents a list that has reached its lower boundary from forwarding upward motion to the
+ * surrounding [ModalBottomSheet][androidx.compose.material3.ModalBottomSheet].
+ *
+ * Nested-scroll deltas use pointer direction: negative Y means the finger is moving upward and
+ * positive Y means it is moving downward. We consume only negative motion at the lower boundary:
+ *
+ * - Before the boundary, the list must receive the motion so normal scrolling and flinging work.
+ * - At the boundary, forwarding upward motion makes the already-expanded sheet repeatedly settle
+ *   against the same anchor, which appears as bottom-edge jitter.
+ * - Positive motion must remain available so the list can scroll back and the sheet can still be
+ *   dismissed with a downward swipe.
+ *
+ * Keep this predicate boundary-aware. Replacing it with an unconditional `coerceAtMost(0f)` hides
+ * the distinction between list scrolling and sheet dragging and can reintroduce the regression.
+ */
+internal fun consumeAtLowerScrollBoundary(
+    availableY: Float,
+    canScrollForward: Boolean,
+): Float = if (canScrollForward) 0f else availableY.coerceAtMost(0f)
 
 data class ChatAddToChatState(
     val serviceId: String? = null,

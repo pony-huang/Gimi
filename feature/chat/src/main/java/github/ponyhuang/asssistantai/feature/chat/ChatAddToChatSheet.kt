@@ -26,7 +26,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -273,10 +275,12 @@ private fun AddToChatHome(
     onOpenMcp: () -> Unit,
     onOpenOfficialTools: () -> Unit,
 ) {
+    val listState = rememberLazyListState()
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .wrapContentHeight()
-            .nestedScroll(rememberLowerBoundaryNestedScrollConnection())
+            .nestedScroll(rememberLowerBoundaryNestedScrollConnection(listState))
             .testTag("add-to-chat-home"),
         contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -483,11 +487,13 @@ private fun OfficialToolsDetailPage(
             }
 
             else -> {
+                val listState = rememberLazyListState()
                 LazyColumn(
+                    state = listState,
                     contentPadding = PaddingValues(bottom = 24.dp),
                     modifier = Modifier
                         .fillMaxSize()
-                        .nestedScroll(rememberLowerBoundaryNestedScrollConnection()),
+                        .nestedScroll(rememberLowerBoundaryNestedScrollConnection(listState)),
                 ) {
                     state.officialTools.forEachIndexed { index, tool ->
                         if (state.officialTools.size > 1) {
@@ -659,6 +665,7 @@ private fun LocalToolsPage(
     val visibleTools = remember(state, query, filter) {
         state.visibleLocalTools(query, filter)
     }
+    val listState = rememberLazyListState()
 
     Column(modifier = Modifier.fillMaxSize().testTag("session-tools-page")) {
         PageStatus(state)
@@ -687,10 +694,11 @@ private fun LocalToolsPage(
             }
         }
         LazyColumn(
+            state = listState,
             contentPadding = PaddingValues(bottom = 24.dp),
             modifier = Modifier
                 .fillMaxSize()
-                .nestedScroll(rememberLowerBoundaryNestedScrollConnection()),
+                .nestedScroll(rememberLowerBoundaryNestedScrollConnection(listState)),
         ) {
             items(visibleTools, key = ToolDescriptor::id) { tool ->
                 LocalToolRow(
@@ -750,6 +758,7 @@ private fun McpServersPage(
     state: ChatAddToChatState,
     onEnabledChange: (String, Boolean) -> Unit,
 ) {
+    val listState = rememberLazyListState()
     Column(modifier = Modifier.fillMaxSize().testTag("session-mcp-page")) {
         PageStatus(state)
         if (state.mcpServers.isEmpty()) {
@@ -780,10 +789,11 @@ private fun McpServersPage(
             }
         } else {
             LazyColumn(
+                state = listState,
                 contentPadding = PaddingValues(bottom = 24.dp),
                 modifier = Modifier
                     .fillMaxSize()
-                    .nestedScroll(rememberLowerBoundaryNestedScrollConnection()),
+                    .nestedScroll(rememberLowerBoundaryNestedScrollConnection(listState)),
             ) {
                 items(state.mcpServers, key = McpServer::id) { server ->
                     McpServerRow(
@@ -850,16 +860,45 @@ private fun McpServerRow(
 }
 
 @Composable
-private fun rememberLowerBoundaryNestedScrollConnection(): NestedScrollConnection =
-    remember {
+private fun rememberLowerBoundaryNestedScrollConnection(
+    listState: LazyListState,
+): NestedScrollConnection =
+    remember(listState) {
         object : NestedScrollConnection {
+            /*
+             * Keep all three callbacks. Drag and fling travel through separate nested-scroll
+             * phases:
+             *
+             * 1. onPreFling stops an upward release at the list boundary before the sheet starts
+             *    settling. Handling only post-fling is too late and caused the original jitter.
+             * 2. onPostScroll consumes the unhandled upward drag after LazyColumn reaches its end.
+             * 3. onPostFling catches any residual velocity that survives list fling consumption.
+             *
+             * Every callback reads listState.canScrollForward at event time. Do not capture a
+             * one-time Boolean during composition: filtering tools or loading official functions
+             * can change the list boundary without recreating this connection.
+             *
+             * Positive deltas intentionally remain unconsumed. They let the list move away from
+             * its end and preserve ModalBottomSheet's downward swipe-to-dismiss behavior.
+             */
+            override suspend fun onPreFling(available: Velocity): Velocity = Velocity(
+                x = 0f,
+                y = consumeAtLowerScrollBoundary(
+                    availableY = available.y,
+                    canScrollForward = listState.canScrollForward,
+                ),
+            )
+
             override fun onPostScroll(
                 consumed: Offset,
                 available: Offset,
                 source: NestedScrollSource,
             ): Offset = Offset(
                 x = 0f,
-                y = consumeAtLowerScrollBoundary(available.y),
+                y = consumeAtLowerScrollBoundary(
+                    availableY = available.y,
+                    canScrollForward = listState.canScrollForward,
+                ),
             )
 
             override suspend fun onPostFling(
@@ -867,7 +906,10 @@ private fun rememberLowerBoundaryNestedScrollConnection(): NestedScrollConnectio
                 available: Velocity,
             ): Velocity = Velocity(
                 x = 0f,
-                y = consumeAtLowerScrollBoundary(available.y),
+                y = consumeAtLowerScrollBoundary(
+                    availableY = available.y,
+                    canScrollForward = listState.canScrollForward,
+                ),
             )
         }
     }

@@ -17,6 +17,11 @@
     <string name="chat_add_to_chat_close">关闭</string>
     <string name="chat_add_to_chat_back">返回</string>
     <string name="chat_add_to_chat_photos">照片</string>
+    <string name="chat_add_to_chat_files">文件</string>
+    <string name="chat_attachment_mixed_types">每次只能选择同一类型的文件</string>
+    <string name="chat_attachment_read_failed">无法读取所选附件</string>
+    <string name="chat_attachment_unsupported">当前模型不支持此类附件</string>
+    <string name="chat_attachment_open_failed">没有可用于打开此文档的应用</string>
     <string name="chat_session_tools_title">工具</string>
     <string name="chat_session_mcp_title">MCP</string>
     <string name="chat_tool_access_title">权限模式</string>

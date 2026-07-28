@@ -7,7 +7,8 @@ import github.ponyhuang.asssistantai.domain.conversation.model.ChatFunctionCall
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatFunctionResponse
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunPart
-import github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment
+import github.ponyhuang.asssistantai.domain.conversation.model.FileAttachment
+import java.io.File
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.conversation.model.ToolConfirmationRequest
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
@@ -25,14 +26,14 @@ class AdkChatAgentRepository @Inject constructor(
         sessionId: String,
         selection: ModelSelection,
         text: String,
-        imageAttachments: List<ImageAttachment>,
+        fileAttachments: List<FileAttachment>,
         toolConfiguration: ConversationToolConfiguration?,
     ): Flow<ChatRunEvent> = runner.send(
         userId = USER_ID,
         sessionId = sessionId,
         selection = selection,
         text = text,
-        imageAttachments = imageAttachments,
+        fileAttachments = fileAttachments,
         toolConfiguration = toolConfiguration,
     ).map { it.toDomain() }
 
@@ -59,10 +60,27 @@ class AdkChatAgentRepository @Inject constructor(
             ChatRunPart(
                 text = part.text,
                 thought = part.thought == true,
-                image = part.inlineData?.let { blob ->
+                attachment = part.inlineData?.let { blob ->
                     val mimeType = blob.mimeType ?: return@let null
                     val data = blob.data ?: return@let null
-                    ImageAttachment(mimeType, data)
+                    val displayName = blob.displayName.orEmpty()
+                    FileAttachment(
+                        mimeType = mimeType,
+                        data = data,
+                        displayName = displayName,
+                    )
+                } ?: part.fileData?.let { file ->
+                    val mimeType = file.mimeType ?: return@let null
+                    val reference = file.fileUri ?: return@let null
+                    val payload = File(reference.removePrefix("file://"))
+                    require(payload.isFile) { "Attachment payload is unavailable: $reference" }
+                    FileAttachment(
+                        mimeType = mimeType,
+                        data = payload.readBytes(),
+                        displayName = file.displayName.orEmpty(),
+                        sizeBytes = payload.length(),
+                        payloadReference = payload.absolutePath,
+                    )
                 },
             )
         },

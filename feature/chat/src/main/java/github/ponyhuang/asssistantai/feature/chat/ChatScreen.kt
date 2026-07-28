@@ -70,6 +70,8 @@ import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.conversation.model.Message
 import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
 import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
+import github.ponyhuang.asssistantai.domain.conversation.model.DraftAttachment
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.MultimodalCapabilities
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -107,10 +109,11 @@ import kotlin.time.Duration.Companion.milliseconds
 fun ChatScaffold(
     state: ChatUiState,
     partChannelProvider: (String) -> ReceiveChannel<String>?,
-    onSend: (String, List<String>) -> Unit,
+    onSend: (String, List<DraftAttachment>) -> Boolean,
     onStop: () -> Unit,
     onTranscribeVoice: suspend (ByteArray) -> String,
     onToggleSpeechPlayback: (String, String) -> Unit,
+    onOpenDocument: (github.ponyhuang.asssistantai.domain.conversation.model.FileAttachment) -> Unit,
     onToolConfirmation: (Boolean) -> Unit,
     onSelectModel: (github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection) -> Unit,
     onModelSwitchBlocked: () -> Unit,
@@ -136,6 +139,20 @@ fun ChatScaffold(
     val isAgentRunning = state.isAgentRunning
     val speechPlaybackState = state.speechPlaybackState
     val pendingToolConfirmation = state.pendingToolConfirmation
+    val attachmentCapabilities = remember(
+        state.availableLLMModelSettings,
+        state.currentModelSelection,
+    ) {
+        val selection = state.currentModelSelection
+        state.availableLLMModelSettings
+            .firstOrNull { it.id == selection?.serviceId }
+            ?.groups
+            ?.firstOrNull { it.id == selection?.groupId }
+            ?.models
+            ?.firstOrNull { it.id == selection?.modelId }
+            ?.capabilities
+            ?: MultimodalCapabilities()
+    }
     val awaitingConfirmationToolNames = remember(state.pendingToolConfirmations) {
         state.pendingToolConfirmations.mapTo(HashSet()) { it.toolName }
     }
@@ -240,7 +257,7 @@ fun ChatScaffold(
                 ChatComposer(
                     modifier = Modifier.background(fadeBrush),
                     onSendClick = { data ->
-                        onSend(data.text, data.attachments.map { it.toString() })
+                        onSend(data.text, data.attachments)
                     },
                     onStopClick = onStop,
                     isGenerating = isAgentRunning,
@@ -259,6 +276,7 @@ fun ChatScaffold(
                             null
                         },
                     ),
+                    attachmentCapabilities = attachmentCapabilities,
                     onLocalToolEnabledChange = onLocalToolEnabledChange,
                     onMcpServerEnabledChange = onMcpServerEnabledChange,
                     onOfficialToolEnabledChange = onOfficialToolEnabledChange,
@@ -348,7 +366,8 @@ fun ChatScaffold(
                             rejectedToolNames = state.rejectedToolNames,
                             awaitingConfirmationToolNames = awaitingConfirmationToolNames,
                             speechPlaybackState = speechPlaybackState,
-                            onToggleSpeechPlayback = onToggleSpeechPlayback,
+                        onToggleSpeechPlayback = onToggleSpeechPlayback,
+                        onOpenDocument = onOpenDocument,
                         )
                     }
                     pendingToolConfirmation?.let { request ->
@@ -535,6 +554,7 @@ private fun MessageRow(
     awaitingConfirmationToolNames: Set<String>,
     speechPlaybackState: github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackState,
     onToggleSpeechPlayback: (messageId: String, text: String) -> Unit,
+    onOpenDocument: (github.ponyhuang.asssistantai.domain.conversation.model.FileAttachment) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (message.error != null) {
@@ -549,6 +569,7 @@ private fun MessageRow(
             awaitingConfirmationToolNames = awaitingConfirmationToolNames,
             speechPlaybackState = speechPlaybackState,
             onToggleSpeechPlayback = onToggleSpeechPlayback,
+            onOpenDocument = onOpenDocument,
             modifier = modifier
         )
     }

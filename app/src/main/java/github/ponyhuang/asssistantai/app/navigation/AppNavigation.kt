@@ -1,5 +1,7 @@
 package github.ponyhuang.asssistantai.app.navigation
 
+import android.content.Context
+import android.content.Intent
 import android.widget.Toast
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -21,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.content.FileProvider
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
@@ -29,6 +32,7 @@ import github.ponyhuang.asssistantai.feature.chat.ChatNotice
 import github.ponyhuang.asssistantai.feature.chat.ChatScaffold
 import github.ponyhuang.asssistantai.feature.chat.ChatViewModel
 import github.ponyhuang.asssistantai.feature.chat.ViewModelStore
+import github.ponyhuang.asssistantai.domain.conversation.model.FileAttachment
 import github.ponyhuang.asssistantai.feature.chat.R as ChatR
 import github.ponyhuang.asssistantai.feature.conversation.ChatDrawer
 import github.ponyhuang.asssistantai.feature.mcp.McpServerAddOptionsScreen
@@ -56,6 +60,7 @@ import github.ponyhuang.asssistantai.ui.navigation.AppRoute
 import github.ponyhuang.asssistantai.ui.navigation.SettingsScaffold
 import github.ponyhuang.asssistantai.ui.settings.SettingsScreen
 import kotlinx.coroutines.launch
+import java.io.File
 
 /** App-level composition root. Feature modules never navigate to one another directly. */
 @OptIn(
@@ -141,6 +146,9 @@ fun MainScreen(
                                 onStop = viewModel::stopStreaming,
                                 onTranscribeVoice = viewModel::transcribeVoice,
                                 onToggleSpeechPlayback = viewModel::toggleSpeechPlayback,
+                                onOpenDocument = { attachment ->
+                                    openDocumentAttachment(context, attachment)
+                                },
                                 onToolConfirmation = viewModel::respondToToolConfirmation,
                                 onSelectModel = viewModel::selectModel,
                                 onModelSwitchBlocked = {
@@ -323,5 +331,30 @@ fun MainScreen(
                     slideOutHorizontally(targetOffsetX = { it })
             },
         )
+    }
+}
+
+private fun openDocumentAttachment(context: Context, attachment: FileAttachment) {
+    runCatching {
+        val directory = File(context.cacheDir, "message-attachments").apply { mkdirs() }
+        val safeName = attachment.displayName.replace(Regex("""[^\w.\-]"""), "_")
+        val file = File(directory, "${attachment.id}-$safeName")
+        if (!file.exists()) file.writeBytes(attachment.data)
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file,
+        )
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, attachment.mimeType)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
+        )
+    }.onFailure {
+        Toast.makeText(
+            context,
+            context.getString(ChatR.string.chat_attachment_open_failed),
+            Toast.LENGTH_SHORT,
+        ).show()
     }
 }

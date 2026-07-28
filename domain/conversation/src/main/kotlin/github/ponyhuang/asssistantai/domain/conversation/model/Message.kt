@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.domain.conversation.model
 
 import java.util.UUID
+import java.security.MessageDigest
 import kotlin.time.Clock
 
 
@@ -36,7 +37,7 @@ data class Message(
     val author: String,
     val role: MessageRole,
     val textParts: List<TextPart> = emptyList(),
-    val imageAttachments: List<ImageAttachment> = emptyList(),
+    val fileAttachments: List<FileAttachment> = emptyList(),
     val functionCalls: List<FunctionCallView> = emptyList(),
     val functionResponses: List<FunctionResponseView> = emptyList(),
     val error: String? = null,
@@ -46,16 +47,63 @@ data class Message(
 )
 
 /**
- * An image attached to a chat message.
+ * A validated image, audio, or document attached to a chat message.
  *
  * The original bytes are deliberately retained: ADK serializes inline data with the
- * session event, allowing a restored conversation to show the same image that was
- * sent to the model.
+ * session event, allowing a restored conversation to show the same attachment.
  */
-data class ImageAttachment(
+data class FileAttachment(
     val mimeType: String,
     val data: ByteArray,
-)
+    val displayName: String = "",
+    val sizeBytes: Long = data.size.toLong(),
+    val payloadReference: String? = null,
+    val category: AttachmentCategory = requireNotNull(
+        AttachmentCategory.from(mimeType, displayName),
+    ) { "Unsupported attachment type: $mimeType ($displayName)" },
+    val id: String = stableAttachmentId(mimeType, displayName, data),
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as FileAttachment
+
+        if (mimeType != other.mimeType) return false
+        if (!data.contentEquals(other.data)) return false
+        if (id != other.id) return false
+        if (displayName != other.displayName) return false
+        if (sizeBytes != other.sizeBytes) return false
+        if (payloadReference != other.payloadReference) return false
+        if (category != other.category) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = mimeType.hashCode()
+        result = 31 * result + data.contentHashCode()
+        result = 31 * result + id.hashCode()
+        result = 31 * result + displayName.hashCode()
+        result = 31 * result + sizeBytes.hashCode()
+        result = 31 * result + (payloadReference?.hashCode() ?: 0)
+        result = 31 * result + category.hashCode()
+        return result
+    }
+}
+
+private fun stableAttachmentId(
+    mimeType: String,
+    displayName: String,
+    data: ByteArray,
+): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    digest.update(mimeType.toByteArray())
+    digest.update(0)
+    digest.update(displayName.toByteArray())
+    digest.update(0)
+    return digest.digest(data).joinToString("") { byte -> "%02x".format(byte) }
+}
 
 /**
  * 文本分段 — 与 adk-web 的 `{ text, thought }` 对齐。
@@ -105,7 +153,7 @@ object Messages {
      */
     fun fromUser(
         text: String,
-        imageAttachments: List<ImageAttachment> = emptyList(),
+        fileAttachments: List<FileAttachment> = emptyList(),
         id: String = UUID.randomUUID().toString(),
         timestamp: Long = Clock.System.now().toEpochMilliseconds(),
     ): Message = Message(
@@ -115,7 +163,7 @@ object Messages {
         textParts = text.takeIf(String::isNotBlank)?.let {
             listOf(TextPart(text = it, thought = false))
         }.orEmpty(),
-        imageAttachments = imageAttachments,
+        fileAttachments = fileAttachments,
         timestamp = timestamp,
     )
 

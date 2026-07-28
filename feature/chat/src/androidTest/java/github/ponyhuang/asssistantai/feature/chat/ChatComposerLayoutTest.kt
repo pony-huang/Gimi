@@ -5,13 +5,15 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
+import github.ponyhuang.asssistantai.domain.conversation.model.AttachmentCategory
+import github.ponyhuang.asssistantai.domain.conversation.model.DraftAttachment
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
@@ -47,7 +49,15 @@ class ChatComposerLayoutTest {
     fun attachmentRendersInsideComposerWithAccessibleRemoveAction() {
         setComposer(
             messageData = MessageData(
-                attachments = listOf("content://chat-test/attachment".toUri()),
+                attachments = listOf(
+                    DraftAttachment(
+                        reference = "/chat-test/attachment.pdf",
+                        displayName = "attachment.pdf",
+                        mimeType = "application/pdf",
+                        sizeBytes = 128,
+                        category = AttachmentCategory.DOCUMENT,
+                    ),
+                ),
             ),
         )
 
@@ -55,6 +65,12 @@ class ChatComposerLayoutTest {
         composeRule.onNodeWithTag("chat_composer_attachment_remove")
             .assertIsDisplayed()
             .assertHeightIsAtLeast(48.dp)
+        composeRule.onNodeWithTag(
+            "chat_composer_attachment_remove_visual",
+            useUnmergedTree = true,
+        )
+            .assertIsDisplayed()
+            .assertWidthIsEqualTo(28.dp)
         composeRule.onNodeWithTag("chat_composer_send").assertIsDisplayed()
     }
 
@@ -139,7 +155,7 @@ class ChatComposerLayoutTest {
         composeRule.setContent {
             MaterialTheme {
                 ChatComposer(
-                    onSendClick = { },
+                    onSendClick = { true },
                     onStopClick = { },
                     isGenerating = isGenerating,
                     messageData = messageData,

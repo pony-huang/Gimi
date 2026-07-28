@@ -368,7 +368,7 @@ class ChatViewModelCharacterizationTest {
             sessionId: String,
             selection: ModelSelection,
             text: String,
-            imageAttachments: List<github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment>,
+            fileAttachments: List<github.ponyhuang.asssistantai.domain.conversation.model.FileAttachment>,
             toolConfiguration: ConversationToolConfiguration?,
         ): Flow<ChatRunEvent> = events(sessionId).receiveAsFlow()
 
@@ -429,7 +429,9 @@ class ChatViewModelCharacterizationTest {
             every { errors } returns MutableSharedFlow()
         }
         val attachments = mockk<ChatAttachmentRepository> {
-            coEvery { read(any()) } returns emptyList()
+            coEvery { read(any(), any()) } returns emptyList()
+            coEvery { deleteDrafts(any()) } returns Unit
+            coEvery { deleteSession(any()) } returns Unit
         }
         val toolAuthorization = mockk<ToolAuthorizationRepository>(relaxed = true) {
             every { tools } returns MutableStateFlow(

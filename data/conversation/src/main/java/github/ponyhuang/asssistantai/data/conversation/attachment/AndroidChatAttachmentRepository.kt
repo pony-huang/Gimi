@@ -8,51 +8,89 @@ import android.graphics.Matrix
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
 import dagger.hilt.android.qualifiers.ApplicationContext
-import github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment
+import github.ponyhuang.asssistantai.domain.conversation.model.FileAttachment
+import github.ponyhuang.asssistantai.domain.conversation.model.AttachmentCategory
+import github.ponyhuang.asssistantai.domain.conversation.model.DraftAttachment
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAttachmentRepository
 import java.io.ByteArrayOutputStream
 import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.core.graphics.scale
 
 class AndroidChatAttachmentRepository @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : ChatAttachmentRepository {
     private val resolver = context.contentResolver
 
-    override suspend fun read(references: List<String>): List<ImageAttachment> =
+    override suspend fun read(
+        sessionId: String,
+        attachments: List<DraftAttachment>,
+    ): List<FileAttachment> =
         withContext(Dispatchers.IO) {
-            references.map { reference ->
-                val uri = Uri.parse(reference)
-                try {
-                    prepare(resolver, uri)
-                } finally {
-                    deleteOwnedCameraAttachment(uri)
+            attachments.map { attachment ->
+                val prepared = when (attachment.category) {
+                    AttachmentCategory.IMAGE -> prepareImage(attachment)
+                    AttachmentCategory.AUDIO,
+                    AttachmentCategory.DOCUMENT,
+                    -> prepareOriginal(attachment)
                 }
+                persist(sessionId, prepared)
             }
         }
 
-    private fun deleteOwnedCameraAttachment(uri: Uri) {
-        if (uri.scheme != "content" || uri.authority != "${context.packageName}.fileprovider") {
-            return
+    override suspend fun deleteDrafts(attachments: List<DraftAttachment>) {
+        withContext(Dispatchers.IO) {
+            attachments.forEach { attachment ->
+                val file = File(attachment.reference)
+                val draftDirectory = File(context.cacheDir, DRAFT_DIRECTORY).canonicalFile
+                val candidate = runCatching { file.canonicalFile }.getOrNull() ?: return@forEach
+                if (candidate.parentFile == draftDirectory) candidate.delete()
+            }
         }
-        val fileName = uri.lastPathSegment?.takeIf(String::isNotBlank) ?: return
-        File(File(context.cacheDir, CAMERA_DIRECTORY), fileName).delete()
     }
 
-    private fun prepare(contentResolver: ContentResolver, uri: Uri): ImageAttachment {
-        var bitmap = decode(contentResolver, uri)
+    override suspend fun deleteSession(sessionId: String) {
+        withContext(Dispatchers.IO) {
+            val root = File(context.filesDir, ATTACHMENT_DIRECTORY).canonicalFile
+            val directory = File(root, safeSessionId(sessionId)).canonicalFile
+            if (directory.parentFile == root) directory.deleteRecursively()
+        }
+    }
+
+    private fun persist(sessionId: String, attachment: FileAttachment): FileAttachment {
+        val directory = File(
+            File(context.filesDir, ATTACHMENT_DIRECTORY),
+            safeSessionId(sessionId),
+        ).apply { mkdirs() }
+        val target = File(directory, attachment.id)
+        if (!target.exists()) target.writeBytes(attachment.data)
+        return attachment.copy(payloadReference = target.absolutePath)
+    }
+
+    private fun safeSessionId(sessionId: String): String =
+        sessionId.replace(Regex("""[^A-Za-z0-9._-]"""), "_")
+
+    private fun prepareImage(attachment: DraftAttachment): FileAttachment {
+        val file = File(attachment.reference)
+        val uri = Uri.fromFile(file)
+        var bitmap = decode(resolver, uri)
             ?: throw IllegalArgumentException("The selected image could not be decoded")
         try {
             repeat(MAX_RESIZE_ATTEMPTS) {
                 compress(bitmap)?.let { bytes ->
-                    return ImageAttachment(mimeType = "image/jpeg", data = bytes)
+                    return FileAttachment(
+                        mimeType = "image/jpeg",
+                        data = bytes,
+                        displayName = attachment.displayName.substringBeforeLast('.') + ".jpg",
+                        category = AttachmentCategory.IMAGE,
+                    )
                 }
                 val width = (bitmap.width * 3 / 4).coerceAtLeast(1)
                 val height = (bitmap.height * 3 / 4).coerceAtLeast(1)
                 if (width == bitmap.width && height == bitmap.height) return@repeat
-                val resized = Bitmap.createScaledBitmap(bitmap, width, height, true)
+                val resized = bitmap.scale(width, height)
                 if (resized != bitmap) {
                     bitmap.recycle()
                     bitmap = resized
@@ -62,6 +100,20 @@ class AndroidChatAttachmentRepository @Inject constructor(
             bitmap.recycle()
         }
         throw IllegalArgumentException("The selected image is too large after compression")
+    }
+
+    private fun prepareOriginal(attachment: DraftAttachment): FileAttachment {
+        val bytes = File(attachment.reference).readBytes()
+        check(bytes.size.toLong() == attachment.sizeBytes) {
+            "The selected attachment changed before it could be sent"
+        }
+        return FileAttachment(
+            mimeType = attachment.mimeType,
+            data = bytes,
+            displayName = attachment.displayName,
+            sizeBytes = attachment.sizeBytes,
+            category = attachment.category,
+        )
     }
 
     private fun decode(contentResolver: ContentResolver, uri: Uri): Bitmap? {
@@ -131,7 +183,8 @@ class AndroidChatAttachmentRepository @Inject constructor(
     }
 
     private companion object {
-        const val CAMERA_DIRECTORY = "camera"
+        const val DRAFT_DIRECTORY = "chat-drafts"
+        const val ATTACHMENT_DIRECTORY = "chat-attachments"
         const val MAX_DIMENSION_PX = 1280
         const val MAX_BYTES = 512 * 1024
         const val INITIAL_JPEG_QUALITY = 85

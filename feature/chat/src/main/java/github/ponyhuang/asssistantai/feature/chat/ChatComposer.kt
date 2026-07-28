@@ -56,6 +56,9 @@ import androidx.core.net.toUri
 import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.asssistantai.feature.chat.R
 import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
+import github.ponyhuang.asssistantai.domain.conversation.model.AttachmentCategory
+import github.ponyhuang.asssistantai.domain.conversation.model.DraftAttachment
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.MultimodalCapabilities
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -87,7 +90,7 @@ import kotlinx.coroutines.launch
  */
 @Composable
 public fun ChatComposer(
-    onSendClick: (data: MessageData) -> Unit,
+    onSendClick: (data: MessageData) -> Boolean,
     onStopClick: () -> Unit,
     isGenerating: Boolean,
     modifier: Modifier = Modifier,
@@ -104,6 +107,7 @@ public fun ChatComposer(
     onMcpServerEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
     onOfficialToolEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
     onToolAccessModeChange: (ToolAccessMode) -> Unit = {},
+    attachmentCapabilities: MultimodalCapabilities = MultimodalCapabilities(),
 ) {
     var messageData by rememberSaveable(stateSaver = MessageData.Saver) {
         mutableStateOf(messageData)
@@ -122,6 +126,49 @@ public fun ChatComposer(
     val voiceNoAudioMessage = stringResource(R.string.chat_voice_no_audio_captured)
     val voiceTranscriptionFailedMessage = stringResource(R.string.chat_voice_transcription_failed)
     val voiceRecordingFailedMessage = stringResource(R.string.chat_voice_recording_failed)
+    val mixedAttachmentMessage = stringResource(R.string.chat_attachment_mixed_types)
+    val attachmentReadFailedMessage = stringResource(R.string.chat_attachment_read_failed)
+    val attachmentUnsupportedMessage = stringResource(R.string.chat_attachment_unsupported)
+
+    fun acceptSelection(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        val imported = mutableListOf<DraftAttachment>()
+        val result = runCatching {
+            uris.forEach { uri ->
+                val attachment = importDraftAttachment(context, uri)
+                val supported = when (attachment.category) {
+                    AttachmentCategory.IMAGE ->
+                        attachmentCapabilities.vision?.supportedMimeTypes
+                    AttachmentCategory.AUDIO ->
+                        attachmentCapabilities.audioInput?.supportedMimeTypes
+                    AttachmentCategory.DOCUMENT ->
+                        attachmentCapabilities.documentInput?.supportedMimeTypes
+                }.orEmpty()
+                require(attachment.mimeType in supported) { attachmentUnsupportedMessage }
+                imported += attachment
+            }
+            mergeAttachmentSelection(messageData.attachments, imported)
+        }.getOrElse { failure ->
+            deleteManagedDrafts(imported)
+            Toast.makeText(
+                context,
+                failure.message ?: attachmentReadFailedMessage,
+                Toast.LENGTH_SHORT,
+            ).show()
+            return
+        }
+        when (result) {
+            is AttachmentSelectionResult.MixedTypes -> {
+                deleteManagedDrafts(imported)
+                Toast.makeText(context, mixedAttachmentMessage, Toast.LENGTH_SHORT).show()
+            }
+            is AttachmentSelectionResult.Accepted -> {
+                deleteManagedDrafts(result.replaced)
+                deleteManagedDrafts(imported.filterNot { it in result.attachments })
+                messageData = messageData.copy(attachments = result.attachments)
+            }
+        }
+    }
 
     fun startVoiceInput() {
         if (
@@ -228,20 +275,25 @@ public fun ChatComposer(
             voiceRecorder.release()
             voiceAudio.reset()
             deletePendingCameraAttachment(pendingCameraPath)
-            messageData.attachments.forEach { uri -> deleteCameraAttachment(context, uri) }
+            deleteManagedDrafts(messageData.attachments)
         }
     }
 
     val handleSendClick = {
         keyboardController?.hide()
-        onSendClick(messageData)
-        messageData = MessageData()
+        messageData = consumeDraftForSend(messageData, onSendClick)
     }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = PickMultipleVisualMedia(),
     ) { uris ->
-        messageData = messageData.copy(attachments = messageData.attachments + uris)
+        acceptSelection(uris)
+    }
+
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris ->
+        acceptSelection(uris)
     }
 
     val takePictureLauncher = rememberLauncherForActivityResult(
@@ -249,7 +301,8 @@ public fun ChatComposer(
     ) { captured ->
         val capturedUri = pendingCameraUri?.toUri()
         if (captured && capturedUri != null) {
-            messageData = messageData.copy(attachments = messageData.attachments + capturedUri)
+            acceptSelection(listOf(capturedUri))
+            deletePendingCameraAttachment(pendingCameraPath)
         } else {
             deletePendingCameraAttachment(pendingCameraPath)
         }
@@ -319,7 +372,7 @@ public fun ChatComposer(
                                     messageData = messageData.copy(
                                         attachments = messageData.attachments - uri,
                                     )
-                                    deleteCameraAttachment(context, uri)
+                                    deleteManagedDrafts(listOf(uri))
                                 },
                                 onSendClick = handleSendClick,
                                 onStopClick = onStopClick,
@@ -361,6 +414,17 @@ public fun ChatComposer(
                     ),
                 )
             },
+            onChooseFiles = {
+                showAttachmentOptions = false
+                val mimeTypes = buildList {
+                    attachmentCapabilities.audioInput?.supportedMimeTypes?.let(::addAll)
+                    attachmentCapabilities.documentInput?.supportedMimeTypes?.let(::addAll)
+                }.distinct().toTypedArray()
+                if (mimeTypes.isNotEmpty()) filePickerLauncher.launch(mimeTypes)
+            },
+            imagesEnabled = attachmentCapabilities.supportsImages,
+            filesEnabled = attachmentCapabilities.supportsAudio ||
+                attachmentCapabilities.supportsDocuments,
             onLocalToolEnabledChange = onLocalToolEnabledChange,
             onMcpServerEnabledChange = onMcpServerEnabledChange,
             onOfficialToolEnabledChange = onOfficialToolEnabledChange,
@@ -375,6 +439,11 @@ internal fun appendTranscript(draft: String, transcript: String): String {
     if (draft.isBlank()) return recognized
     return "${draft.trimEnd()} $recognized"
 }
+
+internal fun consumeDraftForSend(
+    draft: MessageData,
+    onSend: (MessageData) -> Boolean,
+): MessageData = if (onSend(draft)) MessageData() else draft
 
 private const val MAX_WAVEFORM_SAMPLES = 96
 
@@ -403,7 +472,7 @@ internal class VoicePcmBuffer {
  */
 public data class MessageData(
     val text: String = "",
-    val attachments: List<Uri> = emptyList(),
+    val attachments: List<DraftAttachment> = emptyList(),
 ) {
     public companion object {
         /**
@@ -413,12 +482,34 @@ public data class MessageData(
             save = { messageData ->
                 listOf(
                     messageData.text,
-                ) + messageData.attachments.map(Uri::toString)
+                ) + messageData.attachments.flatMap { attachment ->
+                    listOf(
+                        attachment.reference,
+                        attachment.displayName,
+                        attachment.mimeType,
+                        attachment.sizeBytes.toString(),
+                        attachment.category.name,
+                    )
+                }
             },
             restore = { saved ->
                 val text = saved.firstOrNull() as? String ?: ""
-                val attachmentStrings = saved.drop(1).mapNotNull { it as? String }
-                val attachments = attachmentStrings.map(String::toUri)
+                val attachments = saved.drop(1)
+                    .mapNotNull { it as? String }
+                    .chunked(5)
+                    .mapNotNull { values ->
+                        if (values.size != 5) return@mapNotNull null
+                        val category = runCatching {
+                            AttachmentCategory.valueOf(values[4])
+                        }.getOrNull() ?: return@mapNotNull null
+                        DraftAttachment(
+                            reference = values[0],
+                            displayName = values[1],
+                            mimeType = values[2],
+                            sizeBytes = values[3].toLongOrNull() ?: return@mapNotNull null,
+                            category = category,
+                        )
+                    }
                 MessageData(text = text, attachments = attachments)
             },
         )
@@ -428,7 +519,7 @@ public data class MessageData(
 @Composable
 internal fun ChatComposerEmpty() {
     ChatComposer(
-        onSendClick = {},
+        onSendClick = { true },
         onStopClick = {},
         isGenerating = false,
     )
@@ -438,7 +529,7 @@ internal fun ChatComposerEmpty() {
 internal fun ChatComposerFilled() {
     ChatComposer(
         messageData = MessageData(text = "What is Stream Chat?"),
-        onSendClick = {},
+        onSendClick = { true },
         onStopClick = {},
         isGenerating = false,
     )
@@ -448,7 +539,7 @@ internal fun ChatComposerFilled() {
 internal fun ChatComposerLongFilled() {
     ChatComposer(
         messageData = MessageData(text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit."),
-        onSendClick = {},
+        onSendClick = { true },
         onStopClick = {},
         isGenerating = false,
     )
@@ -459,9 +550,11 @@ internal fun ChatComposerWithAttachments() {
     ChatComposer(
         messageData = MessageData(
             text = "What is Stream Chat?",
-            attachments = listOf("1".toUri(), "2".toUri(), "3".toUri()),
+            attachments = listOf(
+                DraftAttachment("1", "one.jpg", "image/jpeg", 1, AttachmentCategory.IMAGE),
+            ),
         ),
-        onSendClick = {},
+        onSendClick = { true },
         onStopClick = {},
         isGenerating = false,
     )
@@ -470,7 +563,7 @@ internal fun ChatComposerWithAttachments() {
 @Composable
 internal fun ChatComposerGenerating() {
     ChatComposer(
-        onSendClick = {},
+        onSendClick = { true },
         onStopClick = {},
         isGenerating = true,
     )

@@ -12,7 +12,7 @@ import com.google.adk.kt.plugins.Plugin
 import com.google.adk.kt.runners.InMemoryRunner
 import com.google.adk.kt.sessions.SessionService
 import com.google.adk.kt.summarizer.EventsCompactionConfig
-import com.google.adk.kt.types.Blob
+import com.google.adk.kt.types.FileData
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.FunctionResponse
@@ -21,7 +21,7 @@ import com.google.adk.kt.types.Role
 import github.ponyhuang.asssistantai.agent.AgentChatRunner.Companion.MAX_CACHED_RUNNERS
 import github.ponyhuang.asssistantai.di.AgentModule
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
-import github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment
+import github.ponyhuang.asssistantai.domain.conversation.model.FileAttachment
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -146,7 +146,7 @@ class AgentChatRunner(
      * @param sessionId 会话 ID（同会话的历史会一并送入 LLM）
      * @param selection 模型选择；为 null 时使用默认模型
      * @param text 用户输入文本（可为空，仅当包含图片时）
-     * @param imageAttachments 图片附件，作为 ADK inline data 传给模型
+     * @param fileAttachments 文件附件，作为 ADK inline data 传给模型
      * @param allowConfirmationRequiredTools 是否允许需要用户确认的工具调用
      * @param toolConfiguration 会话工具配置（启用的工具/MCP 服务器列表）
      * @return Event 流，通过 SSE 流式输出
@@ -156,7 +156,7 @@ class AgentChatRunner(
         sessionId: String,
         selection: ModelSelection? = null,
         text: String,
-        imageAttachments: List<ImageAttachment> = emptyList(),
+        fileAttachments: List<FileAttachment> = emptyList(),
         allowConfirmationRequiredTools: Boolean = true,
         toolConfiguration: ConversationToolConfiguration? = null,
     ): Flow<Event> {
@@ -169,8 +169,18 @@ class AgentChatRunner(
         )
         val parts = buildList {
             text.takeIf(String::isNotBlank)?.let { add(Part(text = it)) }
-            imageAttachments.forEach { image ->
-                add(Part(inlineData = Blob(mimeType = image.mimeType, data = image.data)))
+            fileAttachments.forEach { attachment ->
+                add(
+                    Part(
+                        fileData = FileData(
+                            mimeType = attachment.mimeType,
+                            displayName = attachment.displayName,
+                            fileUri = requireNotNull(attachment.payloadReference) {
+                                "Managed attachment reference is missing"
+                            },
+                        ),
+                    ),
+                )
             }
         }
         val newMessage = Content(

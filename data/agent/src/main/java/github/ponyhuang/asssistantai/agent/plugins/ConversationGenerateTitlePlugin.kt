@@ -140,7 +140,9 @@ class ConversationGenerateTitlePlugin(
                 ?.mapNotNull { it.text }
                 ?.joinToString("\n")
             val title = ConversationTitle.provisional(userText)
-                ?: latestUserContent?.takeIf { it.parts.any { part -> part.inlineData != null } }
+                ?: latestUserContent?.takeIf {
+                    it.parts.any { part -> part.inlineData != null || part.fileData != null }
+                }
                     ?.let { ConversationTitle.IMAGE_MESSAGE_TITLE }
 
             if (title != null) {

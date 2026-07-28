@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Functions
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.CircularProgressIndicator
@@ -100,6 +101,9 @@ internal fun ChatAddToChatSheet(
     onDismiss: () -> Unit,
     onTakePhoto: () -> Unit,
     onChoosePhotos: () -> Unit,
+    onChooseFiles: () -> Unit,
+    imagesEnabled: Boolean,
+    filesEnabled: Boolean,
     onLocalToolEnabledChange: (String, Boolean) -> Unit,
     onMcpServerEnabledChange: (String, Boolean) -> Unit,
     onOfficialToolEnabledChange: (String, Boolean) -> Unit,
@@ -181,6 +185,9 @@ internal fun ChatAddToChatSheet(
                                 state = state,
                                 onTakePhoto = onTakePhoto,
                                 onChoosePhotos = onChoosePhotos,
+                                onChooseFiles = onChooseFiles,
+                                imagesEnabled = imagesEnabled,
+                                filesEnabled = filesEnabled,
                                 onOpenTools = { page = AddToChatPage.LOCAL_TOOLS },
                                 onOpenMcp = { page = AddToChatPage.MCP },
                                 onOpenToolAccess = { page = AddToChatPage.TOOL_ACCESS },
@@ -252,6 +259,9 @@ private fun AddToChatHome(
     state: ChatAddToChatState,
     onTakePhoto: () -> Unit,
     onChoosePhotos: () -> Unit,
+    onChooseFiles: () -> Unit,
+    imagesEnabled: Boolean,
+    filesEnabled: Boolean,
     onOpenTools: () -> Unit,
     onOpenMcp: () -> Unit,
     onOpenToolAccess: () -> Unit,
@@ -274,12 +284,21 @@ private fun AddToChatHome(
                     icon = Icons.Default.CameraAlt,
                     label = stringResource(R.string.stream_ai_compose_composer_take_photo),
                     onClick = onTakePhoto,
+                    enabled = imagesEnabled,
                     modifier = Modifier.weight(1f),
                 )
                 AttachmentShortcut(
                     icon = Icons.Default.PhotoLibrary,
                     label = stringResource(R.string.chat_add_to_chat_photos),
                     onClick = onChoosePhotos,
+                    enabled = imagesEnabled,
+                    modifier = Modifier.weight(1f),
+                )
+                AttachmentShortcut(
+                    icon = Icons.Default.Description,
+                    label = stringResource(R.string.chat_add_to_chat_files),
+                    onClick = onChooseFiles,
+                    enabled = filesEnabled,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -361,10 +380,12 @@ private fun AttachmentShortcut(
     icon: ImageVector,
     label: String,
     onClick: () -> Unit,
+    enabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Surface(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.height(108.dp),
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,

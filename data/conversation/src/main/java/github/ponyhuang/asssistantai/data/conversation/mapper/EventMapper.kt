@@ -7,11 +7,12 @@ import com.google.adk.kt.types.FunctionResponse
 import com.google.adk.kt.types.Part
 import github.ponyhuang.asssistantai.domain.conversation.model.FunctionCallView
 import github.ponyhuang.asssistantai.domain.conversation.model.FunctionResponseView
-import github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment
+import github.ponyhuang.asssistantai.domain.conversation.model.FileAttachment
 import github.ponyhuang.asssistantai.domain.conversation.model.Message
 import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
 import github.ponyhuang.asssistantai.domain.conversation.model.Messages
 import github.ponyhuang.asssistantai.domain.conversation.model.TextPart
+import java.io.File
 
 /**
  * ADK `Event` ↔ UI `Message` 的映射工具。
@@ -103,17 +104,39 @@ object EventMapper {
             author = "user",
             role = MessageRole.User,
             textParts = if (firstText.isEmpty()) emptyList() else listOf(textPartFor(event, 0, firstText, thought = false)),
-            imageAttachments = parts.mapNotNull { part ->
-                val inlineData = part.inlineData ?: return@mapNotNull null
-                val mimeType = inlineData.mimeType?.takeIf { it.startsWith("image/") }
-                    ?: return@mapNotNull null
-                val data = inlineData.data ?: return@mapNotNull null
-                ImageAttachment(mimeType = mimeType, data = data)
+            fileAttachments = parts.mapNotNull { part ->
+                part.toFileAttachment()
             },
             partial = false,
             turnComplete = true,
             timestamp = event.timestamp,
         )
+    }
+
+    private fun Part.toFileAttachment(): FileAttachment? {
+        inlineData?.let { blob ->
+            val mimeType = requireNotNull(blob.mimeType) { "Attachment MIME type is missing" }
+            val data = requireNotNull(blob.data) { "Attachment payload is missing" }
+            return FileAttachment(
+                mimeType = mimeType,
+                data = data,
+                displayName = blob.displayName.orEmpty(),
+            )
+        }
+        fileData?.let { file ->
+            val mimeType = requireNotNull(file.mimeType) { "Attachment MIME type is missing" }
+            val reference = requireNotNull(file.fileUri) { "Attachment reference is missing" }
+            val payload = File(reference.removePrefix("file://"))
+            require(payload.isFile) { "Attachment payload is unavailable: $reference" }
+            return FileAttachment(
+                mimeType = mimeType,
+                data = payload.readBytes(),
+                displayName = file.displayName.orEmpty(),
+                sizeBytes = payload.length(),
+                payloadReference = payload.absolutePath,
+            )
+        }
+        return null
     }
 
     private fun buildAssistantMessage(

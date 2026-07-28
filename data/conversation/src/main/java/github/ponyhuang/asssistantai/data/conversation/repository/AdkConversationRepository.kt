@@ -300,8 +300,10 @@ class AdkConversationRepository(
         val fallbackTitle = titleSource?.take(TITLE_MAX_LENGTH)?.let {
             if (titleSource.length > TITLE_MAX_LENGTH) "$it…" else it
         } ?: events.firstOrNull { event ->
-            event.author == "user" && event.content?.parts.orEmpty().any { it.inlineData?.mimeType?.startsWith("image/") == true }
-        }?.let { context.getString(R.string.conversation_image_message_title) }
+            event.author == "user" && event.content?.parts.orEmpty().any {
+                it.inlineData != null || it.fileData != null
+            }
+        }?.let { context.getString(R.string.conversation_attachment_message_title) }
             ?: context.getString(R.string.conversation_default_title)
         val title = persistedTitle?.takeIf(String::isNotBlank) ?: fallbackTitle
 

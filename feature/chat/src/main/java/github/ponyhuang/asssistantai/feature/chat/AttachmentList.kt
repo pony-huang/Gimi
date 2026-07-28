@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.feature.chat
 
 import android.graphics.Bitmap
+import android.media.MediaPlayer
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -17,13 +18,20 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.Composable
@@ -46,9 +54,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
-import androidx.core.net.toUri
-import github.ponyhuang.asssistantai.feature.chat.R
-import github.ponyhuang.asssistantai.domain.conversation.model.ImageAttachment
+import github.ponyhuang.asssistantai.domain.conversation.model.FileAttachment
+import github.ponyhuang.asssistantai.domain.conversation.model.AttachmentCategory
+import github.ponyhuang.asssistantai.domain.conversation.model.DraftAttachment
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -62,8 +71,8 @@ import kotlinx.coroutines.withContext
  */
 @Composable
 internal fun AttachmentList(
-    uris: List<Uri>,
-    onRemoveAttachment: (Uri) -> Unit,
+    attachments: List<DraftAttachment>,
+    onRemoveAttachment: (DraftAttachment) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyRow(
@@ -72,13 +81,13 @@ internal fun AttachmentList(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(
-            items = uris,
-            key = Uri::toString,
-        ) { uri ->
+            items = attachments,
+            key = DraftAttachment::reference,
+        ) { attachment ->
             SelectedAttachment(
                 modifier = Modifier.animateItem(),
-                uri = uri,
-                onRemove = { onRemoveAttachment(uri) },
+                attachment = attachment,
+                onRemove = { onRemoveAttachment(attachment) },
             )
         }
     }
@@ -86,12 +95,15 @@ internal fun AttachmentList(
 
 /** Renders persisted user-message images from their ADK inline-data bytes. */
 @Composable
-internal fun MessageImageAttachments(
-    images: List<ImageAttachment>,
+internal fun MessageAttachments(
+    attachments: List<FileAttachment>,
+    onOpenDocument: (FileAttachment) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (images.isEmpty()) return
-    var previewImage by remember { mutableStateOf<ImageAttachment?>(null) }
+    if (attachments.isEmpty()) return
+    val images = attachments.filter { it.category == AttachmentCategory.IMAGE }
+    val files = attachments.filterNot { it.category == AttachmentCategory.IMAGE }
+    var previewImage by remember { mutableStateOf<FileAttachment?>(null) }
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -110,12 +122,15 @@ internal fun MessageImageAttachments(
             onDismiss = { previewImage = null },
         )
     }
+    files.forEach { attachment ->
+        PersistedFileAttachment(attachment, onOpenDocument)
+    }
 }
 
 /** Displays a sent image at a screen-appropriate resolution. */
 @Composable
 private fun ImagePreviewDialog(
-    image: ImageAttachment,
+    image: FileAttachment,
     onDismiss: () -> Unit,
 ) {
     Dialog(
@@ -173,7 +188,7 @@ private fun ImagePreviewDialog(
 
 @Composable
 private fun InlineImage(
-    image: ImageAttachment,
+    image: FileAttachment,
     onClick: () -> Unit,
 ) {
     var bitmap by remember(image.data) { mutableStateOf<Bitmap?>(null) }
@@ -213,43 +228,135 @@ private fun InlineImage(
  */
 @Composable
 private fun SelectedAttachment(
-    uri: Uri,
+    attachment: DraftAttachment,
     modifier: Modifier = Modifier,
     onRemove: () -> Unit = {},
 ) {
     AttachmentTile(
         modifier = modifier.testTag("chat_composer_attachment"),
     ) {
-        UriImage(
-            uri = uri,
-            modifier = Modifier.matchParentSize(),
-            placeholder = {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(MaterialTheme.colorScheme.surfaceDim),
-                )
-            },
-            error = {
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .background(MaterialTheme.colorScheme.surfaceDim),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.stream_ai_compose_ic_image_placeholder),
-                        tint = MaterialTheme.colorScheme.surfaceVariant,
-                        contentDescription = null,
+        if (attachment.category == AttachmentCategory.IMAGE) {
+            UriImage(
+                uri = Uri.fromFile(File(attachment.reference)),
+                modifier = Modifier.matchParentSize(),
+                placeholder = {
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(MaterialTheme.colorScheme.surfaceDim),
                     )
-                }
-            },
-        )
+                },
+                error = {
+                    AttachmentPlaceholder()
+                },
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(MaterialTheme.colorScheme.surfaceDim)
+                    .padding(12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = if (attachment.category == AttachmentCategory.AUDIO) {
+                        Icons.Default.AudioFile
+                    } else {
+                        Icons.Default.Description
+                    },
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(36.dp),
+                )
+                Text(
+                    text = attachment.displayName,
+                    style = MaterialTheme.typography.labelSmall,
+                    maxLines = 2,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            }
+        }
         RemoveButton(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .testTag("chat_composer_attachment_remove"),
             onClick = onRemove,
+        )
+    }
+}
+
+@Composable
+private fun PersistedFileAttachment(
+    attachment: FileAttachment,
+    onOpenDocument: (FileAttachment) -> Unit,
+) {
+    val context = LocalContext.current
+    var isPlaying by remember(attachment.id) { mutableStateOf(false) }
+    val mediaPlayer = remember(attachment.id) {
+        if (attachment.category == AttachmentCategory.AUDIO) MediaPlayer() else null
+    }
+    DisposableEffect(mediaPlayer) {
+        onDispose { mediaPlayer?.release() }
+    }
+    Row(
+        modifier = Modifier
+            .padding(top = 8.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable {
+                if (attachment.category == AttachmentCategory.AUDIO) {
+                    val directory = File(context.cacheDir, "message-attachments").apply { mkdirs() }
+                    val safeName = attachment.displayName.replace(Regex("""[^\w.\-]"""), "_")
+                    val file = File(directory, "${attachment.id}-$safeName")
+                    if (!file.exists()) file.writeBytes(attachment.data)
+                    val player = mediaPlayer ?: return@clickable
+                    if (player.isPlaying) {
+                        player.pause()
+                        isPlaying = false
+                    } else {
+                        if (player.currentPosition == 0) {
+                            player.reset()
+                            player.setDataSource(file.absolutePath)
+                            player.prepare()
+                            player.setOnCompletionListener { isPlaying = false }
+                        }
+                        player.start()
+                        isPlaying = true
+                    }
+                } else onOpenDocument(attachment)
+            }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = when {
+                attachment.category == AttachmentCategory.AUDIO && isPlaying -> Icons.Default.Pause
+                attachment.category == AttachmentCategory.AUDIO -> Icons.Default.PlayArrow
+                else -> Icons.Default.Description
+            },
+            contentDescription = null,
+        )
+        Text(
+            text = attachment.displayName,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(start = 8.dp),
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun AttachmentPlaceholder() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surfaceDim),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.stream_ai_compose_ic_image_placeholder),
+            tint = MaterialTheme.colorScheme.surfaceVariant,
+            contentDescription = null,
         )
     }
 }
@@ -344,24 +451,46 @@ private fun RemoveButton(
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
-    FilledIconButton(
-        modifier = modifier.size(48.dp),
+    IconButton(
+        modifier = modifier.size(AttachmentRemoveButtonTokens.touchTargetSize),
         onClick = onClick,
-        colors = IconButtonDefaults.filledIconButtonColors(
-            containerColor = MaterialTheme.colorScheme.inverseSurface,
-        ),
     ) {
-        Icon(
-            painter = painterResource(R.drawable.stream_ai_compose_ic_cancel),
-            tint = MaterialTheme.colorScheme.inverseOnSurface,
-            contentDescription = stringResource(R.string.chat_attachment_remove),
-            modifier = Modifier.size(20.dp),
-        )
+        Box(
+            modifier = Modifier
+                .size(AttachmentRemoveButtonTokens.visualSize)
+                .clip(CircleShape)
+                .background(
+                    MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
+                )
+                .testTag("chat_composer_attachment_remove_visual"),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                contentDescription = stringResource(R.string.chat_attachment_remove),
+                modifier = Modifier.size(AttachmentRemoveButtonTokens.iconSize),
+            )
+        }
     }
+}
+
+internal object AttachmentRemoveButtonTokens {
+    val touchTargetSize = 48.dp
+    val visualSize = 28.dp
+    val iconSize = 16.dp
 }
 
 @Preview
 @Composable
 private fun SelectedAttachmentPreview() {
-    SelectedAttachment(uri = "1".toUri())
+    SelectedAttachment(
+        attachment = DraftAttachment(
+            reference = "1",
+            displayName = "preview.pdf",
+            mimeType = "application/pdf",
+            sizeBytes = 1,
+            category = AttachmentCategory.DOCUMENT,
+        ),
+    )
 }

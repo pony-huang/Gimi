@@ -24,7 +24,7 @@ internal fun Message.visibleFunctionResponses(): List<FunctionResponseView> =
 internal fun Message.isVisibleInChat(showToolActivity: Boolean): Boolean =
     error != null ||
         textParts.isNotEmpty() ||
-        imageAttachments.isNotEmpty() ||
+        fileAttachments.isNotEmpty() ||
         (showToolActivity && (visibleFunctionCalls().isNotEmpty() || visibleFunctionResponses().isNotEmpty()))
 
 /**
@@ -59,6 +59,6 @@ internal fun List<Message>.foldToolResponses(): List<Message> {
 private fun Message.isFunctionResponseOnly(): Boolean =
     error == null &&
         textParts.isEmpty() &&
-        imageAttachments.isEmpty() &&
+        fileAttachments.isEmpty() &&
         functionCalls.isEmpty() &&
         functionResponses.isNotEmpty()

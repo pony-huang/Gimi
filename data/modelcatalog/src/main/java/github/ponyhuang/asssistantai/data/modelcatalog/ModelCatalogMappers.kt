@@ -10,6 +10,7 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.withDefaultAttachmentCapabilities
 
 fun LLMModelProvider.toDomain(): LLMModelSetting = LLMModelSetting(
     id = serviceId,
@@ -68,7 +69,7 @@ private fun LLMModelGroup.toDomain(): ModelGroup = ModelGroup(
             name = item.modelName,
             isStt = item.isStt,
             isTts = item.isTts,
-            capabilities = item.capabilities,
+            capabilities = item.capabilities.withDefaultAttachmentCapabilities(),
         )
     },
 )

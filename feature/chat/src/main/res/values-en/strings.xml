@@ -15,6 +15,11 @@
     <string name="chat_add_to_chat_close">Close</string>
     <string name="chat_add_to_chat_back">Back</string>
     <string name="chat_add_to_chat_photos">Photos</string>
+    <string name="chat_add_to_chat_files">Files</string>
+    <string name="chat_attachment_mixed_types">Select only one file type at a time</string>
+    <string name="chat_attachment_read_failed">Could not read the selected attachment</string>
+    <string name="chat_attachment_unsupported">The current model does not support this attachment type</string>
+    <string name="chat_attachment_open_failed">No app is available to open this document</string>
     <string name="chat_session_tools_title">Tools</string>
     <string name="chat_session_mcp_title">MCP</string>
     <string name="chat_tool_access_title">Tool access</string>

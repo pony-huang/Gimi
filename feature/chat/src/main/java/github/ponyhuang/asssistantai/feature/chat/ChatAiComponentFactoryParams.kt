@@ -1,6 +1,6 @@
 package github.ponyhuang.asssistantai.feature.chat
 
-import android.net.Uri
+import github.ponyhuang.asssistantai.domain.conversation.model.DraftAttachment
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
@@ -36,7 +36,7 @@ public data class ComposerInputContentParams(
     val voiceErrorMessage: String?,
     val onVoiceErrorShown: () -> Unit,
     val onTextChange: (String) -> Unit,
-    val onRemoveAttachment: (Uri) -> Unit,
+    val onRemoveAttachment: (DraftAttachment) -> Unit,
     val onSendClick: () -> Unit,
     val onStopClick: () -> Unit,
     val onVoiceInputStart: () -> Unit,

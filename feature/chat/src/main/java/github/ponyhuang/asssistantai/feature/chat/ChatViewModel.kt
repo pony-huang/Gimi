@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.asssistantai.domain.conversation.model.AttachmentCategory
+import github.ponyhuang.asssistantai.domain.conversation.model.DraftAttachment
 import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAttachmentRepository
@@ -209,6 +211,7 @@ class ChatViewModel @Inject constructor(
                 state.copy(
                     messages = runtime.messages,
                     isAgentRunning = runtime.isAgentRunning,
+                    lastSendFailed = runtime.failed,
                     turnComplete = runtime.turnComplete,
                     currentModelSelection = runtime.modelSelection,
                     toolConfiguration = runtime.toolConfiguration,
@@ -230,6 +233,7 @@ class ChatViewModel @Inject constructor(
                 sessionId = sessionId,
                 messages = runtime.messages,
                 isAgentRunning = runtime.isAgentRunning,
+                lastSendFailed = runtime.failed,
                 turnComplete = runtime.turnComplete,
                 currentModelSelection = runtime.modelSelection,
                 toolConfiguration = runtime.toolConfiguration,
@@ -418,40 +422,44 @@ class ChatViewModel @Inject constructor(
      *   避免 ADK `createSession(SessionKey(id = ""))` 抛 "SessionKey.id must not be blank"。
      * - 启动协程调用 [AgentChatRunner.send]，把每个 `Event` 送入 [applyEvent]。
      */
-    fun send(text: String, attachmentReferences: List<String> = emptyList()) {
-        if (text.isBlank() && attachmentReferences.isEmpty()) return
-        if (_uiState.value.pendingToolConfirmation != null) return
+    fun send(text: String, draftAttachments: List<DraftAttachment> = emptyList()): Boolean {
+        if (text.isBlank() && draftAttachments.isEmpty()) return false
+        if (_uiState.value.pendingToolConfirmation != null) return false
         val usableSelection = _uiState.value.currentModelSelection
             ?.takeIf(::isUsableChatSelection)
             ?: defaultSelection()
         if (usableSelection == null) {
             _uiState.update { it.copy(notice = ChatNotice.ConfigureChatModel) }
-            return
+            return false
+        }
+        validateAttachments(usableSelection, draftAttachments)?.let { error ->
+            _uiState.update { it.copy(notice = ChatNotice.Message(error)) }
+            return false
         }
         val sessionId = _uiState.value.sessionId
         if (sessionId.isBlank()) {
             viewModelScope.launch {
                 val ensured = ensureSessionId()
                 if (ensured.isNotBlank()) {
-                    startSend(ensured, usableSelection, text, attachmentReferences)
+                    startSend(ensured, usableSelection, text, draftAttachments)
                 }
             }
-            return
+            return true
         }
-        startSend(sessionId, usableSelection, text, attachmentReferences)
+        return startSend(sessionId, usableSelection, text, draftAttachments)
     }
 
     private fun startSend(
         sessionId: String,
         selection: ModelSelection,
         text: String,
-        attachmentReferences: List<String>,
-    ) {
+        draftAttachments: List<DraftAttachment>,
+    ): Boolean {
         val runtime = runtimeFor(sessionId)
-        if (runtime.isActive) return
+        if (runtime.isActive) return false
         if (sessionRuntimes.values.count { it.isActive } >= MAX_PARALLEL_TASKS) {
             _uiState.update { it.copy(notice = ChatNotice.ParallelTaskLimitReached) }
-            return
+            return false
         }
         clearToolConfirmationState(runtime)
         val runToken = Any()
@@ -466,14 +474,14 @@ class ChatViewModel @Inject constructor(
 
         runtime.job = viewModelScope.launch {
             ensureRunLease(runtime).updatePhase(AgentTaskPhase.GENERATING)
-            val images = cancellationAwareRunCatching {
-                attachments.read(attachmentReferences)
+            val preparedAttachments = cancellationAwareRunCatching {
+                attachments.read(sessionId, draftAttachments)
             }.getOrElse { failure ->
-                applyError(sessionId, "Cannot read selected image: ${failure.message ?: "unknown error"}")
+                applyError(sessionId, "Cannot read selected attachment: ${failure.message ?: "unknown error"}",)
                 finishRunIfOwned(sessionId, runToken)
                 return@launch
             }
-            val userMessage = Messages.fromUser(text = text, imageAttachments = images)
+            val userMessage = Messages.fromUser(text = text, fileAttachments = preparedAttachments,)
             runtime.messages += userMessage
             runtime.isLoaded = true
             publishRuntime(runtime)
@@ -483,11 +491,13 @@ class ChatViewModel @Inject constructor(
                         sessionId = sessionId,
                         selection = selection,
                         text = text,
-                        imageAttachments = images,
+                        fileAttachments = preparedAttachments,
                         toolConfiguration = runtime.toolConfiguration,
                     ).collect { event ->
                         applyEvent(sessionId, event, runToken)
                     }
+                }.onSuccess {
+                    if (!runtime.failed) attachments.deleteDrafts(draftAttachments)
                 }.onFailure { failure ->
                     applyError(sessionId, failure.message ?: failure::class.simpleName ?: "Unknown error")
                 }
@@ -496,6 +506,45 @@ class ChatViewModel @Inject constructor(
                 repository.refreshConversation(sessionId)
             }
         }
+        return true
+    }
+
+    private fun validateAttachments(
+        selection: ModelSelection,
+        draftAttachments: List<DraftAttachment>,
+    ): String? {
+        if (draftAttachments.isEmpty()) return null
+        if (draftAttachments.mapTo(hashSetOf()) { it.category }.size != 1) {
+            return "每次只能发送同一类型的附件"
+        }
+        val model = _uiState.value.availableLLMModelSettings
+            .firstOrNull { it.id == selection.serviceId }
+            ?.groups?.firstOrNull { it.id == selection.groupId }
+            ?.models?.firstOrNull { it.id == selection.modelId }
+            ?: return "当前聊天模型不可用"
+        val (supportedMimeTypes, maxInlineBytes) = when (draftAttachments.first().category) {
+            AttachmentCategory.IMAGE -> model.capabilities.vision?.let {
+                it.supportedMimeTypes to it.maxInlineBytes
+            }
+            AttachmentCategory.AUDIO -> model.capabilities.audioInput?.let {
+                it.supportedMimeTypes to it.maxInlineBytes
+            }
+            AttachmentCategory.DOCUMENT -> model.capabilities.documentInput?.let {
+                it.supportedMimeTypes to it.maxInlineBytes
+            }
+        } ?: return "当前模型不支持此类附件"
+        val unsupported = draftAttachments.firstOrNull {
+            it.mimeType !in supportedMimeTypes ||
+                maxInlineBytes?.let { limit -> it.sizeBytes > limit } == true
+        }
+        if (unsupported != null) return "附件类型不受支持或文件过大：${unsupported.displayName}"
+        if (
+            draftAttachments.first().category == AttachmentCategory.DOCUMENT &&
+            draftAttachments.sumOf(DraftAttachment::sizeBytes) > MAX_DOCUMENT_REQUEST_BYTES
+        ) {
+            return "文档附件合计不能超过 50 MB"
+        }
+        return null
     }
 
     /**
@@ -705,6 +754,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             runner.releaseSession(sessionId)
             repository.deleteConversation(sessionId)
+            attachments.deleteSession(sessionId)
             sessionRuntimes.remove(sessionId)?.closePartChannels()
         }
     }
@@ -1210,6 +1260,7 @@ class ChatViewModel @Inject constructor(
     companion object {
         private const val TAG: String = "ChatViewModel"
         private const val MAX_PARALLEL_TASKS: Int = 3
+        private const val MAX_DOCUMENT_REQUEST_BYTES: Long = 50L * 1024 * 1024
     }
 }
 

@@ -46,6 +46,7 @@ data class ChatUiState(
     val messages: List<Message> = emptyList(),
     val sessionId: String = "",
     val isAgentRunning: Boolean = false,
+    val lastSendFailed: Boolean = false,
     val turnComplete: Boolean = false,
     val conversations: List<Conversation> = emptyList(),
     val conversationTaskStatuses: Map<String, ConversationTaskStatus> = emptyMap(),

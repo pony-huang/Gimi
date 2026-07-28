@@ -17,7 +17,7 @@ data class ChatRunEvent(
 data class ChatRunPart(
     val text: String? = null,
     val thought: Boolean = false,
-    val image: ImageAttachment? = null,
+    val attachment: FileAttachment? = null,
 )
 
 data class ChatFunctionCall(

@@ -1,8 +1,9 @@
 package github.ponyhuang.asssistantai.feature.chat
 
+import android.net.Uri
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
+import github.ponyhuang.asssistantai.domain.conversation.model.DraftAttachment
 import android.provider.Settings
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -225,13 +226,13 @@ private fun resolveTextFieldStyle(
 
 @Composable
 private fun AttachmentList(
-    attachments: List<Uri>,
-    onRemoveAttachment: (Uri) -> Unit,
+    attachments: List<DraftAttachment>,
+    onRemoveAttachment: (DraftAttachment) -> Unit,
 ) {
     if (attachments.isNotEmpty()) {
         AttachmentList(
             modifier = Modifier.fillMaxWidth(),
-            uris = attachments,
+            attachments = attachments,
             onRemoveAttachment = onRemoveAttachment,
         )
     }

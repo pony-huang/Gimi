@@ -24,7 +24,7 @@ object ChatRunEventMapper {
             return null
         }
         if (event.author == "user" &&
-            event.parts.all { it.text.isNullOrEmpty() && it.image == null } &&
+            event.parts.all { it.text.isNullOrEmpty() && it.attachment == null } &&
             event.functionCalls.isEmpty() &&
             event.functionResponses.isNotEmpty()
         ) {
@@ -40,7 +40,7 @@ object ChatRunEventMapper {
                 textParts = text.takeIf(String::isNotEmpty)?.let {
                     listOf(TextPart(id = "${event.id}:0", text = it))
                 }.orEmpty(),
-                imageAttachments = event.parts.mapNotNull { it.image },
+                fileAttachments = event.parts.mapNotNull { it.attachment },
                 turnComplete = true,
                 timestamp = event.timestamp,
             )

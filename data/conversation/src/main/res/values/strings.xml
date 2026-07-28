@@ -2,4 +2,5 @@
 <resources>
     <string name="conversation_default_title">新对话</string>
     <string name="conversation_image_message_title">图片消息</string>
+    <string name="conversation_attachment_message_title">附件消息</string>
 </resources>

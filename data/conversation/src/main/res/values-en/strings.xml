@@ -2,4 +2,5 @@
 <resources>
     <string name="conversation_default_title">New Chat</string>
     <string name="conversation_image_message_title">Image message</string>
+    <string name="conversation_attachment_message_title">Attachment message</string>
 </resources>

@@ -38,10 +38,12 @@ import com.openai.models.chat.completions.ChatCompletionTool
 import com.openai.models.chat.completions.ChatCompletionToolMessageParam
 import com.openai.models.chat.completions.ChatCompletionUserMessageParam
 import com.openai.models.completions.CompletionUsage
+import github.ponyhuang.asssistantai.domain.conversation.model.AttachmentCategory
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import java.util.Base64
+import java.io.File
 import com.google.adk.kt.types.Tool as AdkTool
 
 
@@ -65,14 +67,7 @@ open class Openai(
             "thinking",
             "thought",
         )
-        const val FILE_REFERENCE_MIME: String = "application/x-file-reference"
     }
-
-    data class FileReferenceMeta(
-        val fileId: String,
-        val fileName: String,
-        val fileSize: Long = 0L,
-    )
 
     /** Default OpenAI `max_completion_tokens` when the request omits one. Override for vendor caps. */
     protected open val defaultMaxCompletionTokens: Long = 2048L
@@ -338,14 +333,14 @@ open class Openai(
             parts.mapNotNull { it.inlineData }.forEach { blob ->
                 val mimeType = blob.mimeType ?: return@forEach
                 val data = blob.data ?: return@forEach
-                buildInlineContentPart(mimeType, data)?.let { add(it) }
+                buildInlineContentPart(mimeType, data, blob.displayName.orEmpty())?.let { add(it) }
             }
 
             parts.mapNotNull { it.fileData }.forEach { fileData ->
                 val mimeType = fileData.mimeType ?: return@forEach
                 val fileUri = fileData.fileUri ?: return@forEach
                 val displayName = fileData.displayName ?: return@forEach
-                buildFilePart(mimeType, fileUri, displayName)?.let { add(it) }
+                buildFilePart(mimeType, displayName, fileUri)?.let { add(it) }
             }
         }
         if (contentParts.isNotEmpty()) {
@@ -376,6 +371,10 @@ open class Openai(
         displayName: String,
         fileUri: String
     ): ChatCompletionContentPart? {
+        val localFile = File(fileUri.removePrefix("file://"))
+        if (localFile.isFile) {
+            return buildInlineContentPart(mimeType, localFile.readBytes(), displayName)
+        }
         if (isSupportedImageMimeType(mimeType)) {
             return ChatCompletionContentPart.ofImageUrl(
                 ChatCompletionContentPartImage.builder()
@@ -393,6 +392,7 @@ open class Openai(
     protected open fun buildInlineContentPart(
         mimeType: String,
         data: ByteArray,
+        displayName: String = "",
     ): ChatCompletionContentPart? {
         if (isSupportedImageMimeType(mimeType)) {
             val dataUrl = "data:$mimeType;base64," + Base64.getEncoder().encodeToString(data)
@@ -408,23 +408,33 @@ open class Openai(
         }
         if (isSupportedAudioMimeType(mimeType)) {
             val dataBase64 = Base64.getEncoder().encodeToString(data)
+            val format = when (mimeType.lowercase()) {
+                "audio/wav", "audio/x-wav" ->
+                    ChatCompletionContentPartInputAudio.InputAudio.Format.WAV
+                "audio/mpeg", "audio/mp3" ->
+                    ChatCompletionContentPartInputAudio.InputAudio.Format.MP3
+                else -> return null
+            }
             return ChatCompletionContentPart.ofInputAudio(
                 ChatCompletionContentPartInputAudio.builder()
                     .inputAudio(
                         ChatCompletionContentPartInputAudio.InputAudio.builder()
                             .data(dataBase64)
+                            .format(format)
                             .build()
                     )
                     .build()
             )
         }
-        if (mimeType == FILE_REFERENCE_MIME) {
-            val meta = parseFileReferenceMeta(data)
+        if (AttachmentCategory.from(mimeType, displayName) == AttachmentCategory.DOCUMENT) {
+            val fileData = "data:$mimeType;base64," + Base64.getEncoder().encodeToString(data)
             return ChatCompletionContentPart.ofFile(
                 ChatCompletionContentPart.File.builder()
                     .file(
-                        ChatCompletionContentPart.File.FileObject
-                            .builder().filename(meta.fileName).fileId(meta.fileId).build()
+                        ChatCompletionContentPart.File.FileObject.builder()
+                            .filename(displayName)
+                            .fileData(fileData)
+                            .build()
                     )
                     .build()
             )
@@ -513,14 +523,6 @@ open class Openai(
     protected open fun isSupportedAudioMimeType(mimeType: String): Boolean =
         mimeType.startsWith("audio/")
 
-    protected open fun parseFileReferenceMeta(data: ByteArray): FileReferenceMeta {
-        val node = JSON_MAPPER.readTree(data)
-        return FileReferenceMeta(
-            fileId = node.get("file_id")?.asText() ?: "",
-            fileName = node.get("file_name")?.asText() ?: "",
-            fileSize = node.get("file_size")?.asLong() ?: 0L,
-        )
-    }
     protected open fun mapToErrorResponse(e: Exception): LlmResponse = LlmResponse(
         finishReason = if (e is BadRequestException) FinishReason.SAFETY
         else FinishReason.FINISH_REASON_UNSPECIFIED,

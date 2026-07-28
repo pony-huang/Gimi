@@ -39,7 +39,6 @@ import github.ponyhuang.asssistantai.domain.conversation.model.Message
 import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
 import github.ponyhuang.asssistantai.domain.conversation.model.Messages
 import github.ponyhuang.asssistantai.domain.conversation.model.TextPart
-import github.ponyhuang.asssistantai.feature.chat.R
 import github.ponyhuang.asssistantai.ui.theme.AsssistantaiTheme
 import github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackState
 import github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackStatus
@@ -112,6 +111,8 @@ fun MessageBubble(
     awaitingConfirmationToolNames: Set<String> = emptySet(),
     speechPlaybackState: SpeechPlaybackState = SpeechPlaybackState(),
     onToggleSpeechPlayback: (messageId: String, text: String) -> Unit = { _, _ -> },
+    onOpenDocument: (github.ponyhuang.asssistantai.domain.conversation.model.FileAttachment) -> Unit =
+        {},
     modifier: Modifier = Modifier
 ) {
     val role = message.role
@@ -158,7 +159,10 @@ fun MessageBubble(
                 }
             }
 
-            MessageImageAttachments(images = message.imageAttachments)
+            MessageAttachments(
+                attachments = message.fileAttachments,
+                onOpenDocument = onOpenDocument,
+            )
 
             if (message.textParts.isNotEmpty() ||
                 message.functionCalls.isNotEmpty() ||

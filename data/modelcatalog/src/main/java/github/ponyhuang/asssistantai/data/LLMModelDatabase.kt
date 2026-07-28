@@ -12,9 +12,8 @@ import androidx.room.withTransaction
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.Flow
 
-/** Room-owned public catalog for one model provider. Sensitive connection settings live elsewhere. */
-@Entity(tableName = "model_services")
-data class ModelServiceEntity(
+@Entity(tableName = "model_config")
+data class LLMModelConfigEntity(
     @PrimaryKey
     val serviceId: String,
     val serviceName: String,
@@ -27,38 +26,39 @@ data class ModelServiceEntity(
 )
 
 @Dao
-interface ModelServiceDao {
-    @Query("SELECT * FROM model_services ORDER BY displayOrder, serviceId")
-    fun observeAll(): Flow<List<ModelServiceEntity>>
+interface LLMModelConfigDao {
+    @Query("SELECT * FROM model_config ORDER BY displayOrder, serviceId")
+    fun observeAll(): Flow<List<LLMModelConfigEntity>>
 
-    @Query("SELECT * FROM model_services ORDER BY displayOrder, serviceId")
-    suspend fun getAll(): List<ModelServiceEntity>
+    @Query("SELECT * FROM model_config ORDER BY displayOrder, serviceId")
+    suspend fun getAll(): List<LLMModelConfigEntity>
 
-    @Query("SELECT * FROM model_services WHERE serviceId = :serviceId")
-    suspend fun get(serviceId: String): ModelServiceEntity?
+    @Query("SELECT * FROM model_config WHERE serviceId = :serviceId")
+    suspend fun get(serviceId: String): LLMModelConfigEntity?
 
-    @Query("SELECT COUNT(*) FROM model_services")
+    @Query("SELECT COUNT(*) FROM model_config")
     suspend fun count(): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(entity: ModelServiceEntity)
+    suspend fun upsert(entity: LLMModelConfigEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertAll(entities: List<ModelServiceEntity>)
+    suspend fun upsertAll(entities: List<LLMModelConfigEntity>)
 }
 
 @Database(
-    entities = [ModelServiceEntity::class],
+    entities = [LLMModelConfigEntity::class],
     version = 1,
     exportSchema = false,
 )
-abstract class ModelServiceDatabase : RoomDatabase() {
-    abstract fun modelServiceDao(): ModelServiceDao
+
+abstract class LLMModelRoomDatabase : RoomDatabase() {
+    abstract fun lLMModelConfigDao(): LLMModelConfigDao
 }
 
-internal fun defaultModelServiceEntities(gson: Gson = Gson()): List<ModelServiceEntity> =
+internal fun lLMModelConfigEntities(gson: Gson = Gson()): List<LLMModelConfigEntity> =
     LLMModelConfigs.services.mapIndexed { index, provider ->
-        ModelServiceEntity(
+        LLMModelConfigEntity(
             serviceId = provider.serviceId,
             serviceName = provider.serviceName,
             displayOrder = index,
@@ -89,20 +89,20 @@ internal fun defaultModelServiceEntities(gson: Gson = Gson()): List<ModelService
     }
 
 /**
- * 把 [LLMModelConfigs] 里缺的 provider 增量写进 Room。判断标准是 [ModelServiceEntity.serviceId]：
+ * 把 [LLMModelConfigs] 里缺的 provider 增量写进 Room。判断标准是 [LLMModelConfigEntity.serviceId]：
  * serviceId 已存在就跳过该条，未存在才 upsert。这样新加的 [LLMModelProvider] 在已有用户数据上也能
  * 顺利进入设置页，同时不会覆盖用户已经修改过的服务名 / 模型组等。
  *
  * 调用时机：每次启动 [ModelServiceRepository] 时执行一次；幂等，安全。
  */
 internal suspend fun seedMissingModelCatalog(
-    database: ModelServiceDatabase,
+    database: LLMModelRoomDatabase,
     gson: Gson = Gson(),
 ) {
     database.withTransaction {
-        val dao = database.modelServiceDao()
+        val dao = database.lLMModelConfigDao()
         val existingIds = dao.getAll().mapTo(HashSet()) { it.serviceId }
-        val missing = defaultModelServiceEntities(gson)
+        val missing = lLMModelConfigEntities(gson)
             .filterNot { it.serviceId in existingIds }
         if (missing.isNotEmpty()) dao.upsertAll(missing)
     }
@@ -113,12 +113,12 @@ internal suspend fun seedMissingModelCatalog(
  * The caller persists a catalog version only after this transaction succeeds.
  */
 internal suspend fun upgradeDefaultModelMetadata(
-    database: ModelServiceDatabase,
+    database: LLMModelRoomDatabase,
     gson: Gson = Gson(),
 ) {
     database.withTransaction {
-        val dao = database.modelServiceDao()
-        val defaultsById = defaultModelServiceEntities(gson).associateBy { it.serviceId }
+        val dao = database.lLMModelConfigDao()
+        val defaultsById = lLMModelConfigEntities(gson).associateBy { it.serviceId }
         dao.getAll().forEach { entity ->
             val defaultEntity = defaultsById[entity.serviceId] ?: return@forEach
             val existingGroups = gson.fromJson<Array<StoredModelGroup>>(

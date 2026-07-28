@@ -14,9 +14,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.asssistantai.agent.AgentChatRunner
 import github.ponyhuang.asssistantai.agent.AgentFactory
-import github.ponyhuang.asssistantai.agent.AgentModelFactory
+import github.ponyhuang.asssistantai.agent.AgentLLMModelFactory
 import github.ponyhuang.asssistantai.agent.LocalToolCatalog
-import github.ponyhuang.asssistantai.agent.plugins.ConversationPlugin
+import github.ponyhuang.asssistantai.agent.plugins.ConversationGenerateTitlePlugin
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
 import github.ponyhuang.asssistantai.data.modelcatalog.toData
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.LocalToolDefinitionSource
@@ -32,7 +32,7 @@ import javax.inject.Singleton
  * - [SessionService] — 基于 Room 的会话持久化（[RoomSessionService]）
  * - [ArtifactService] — 基于文件的 artifact 存储（[FileArtifactService]）
  * - [LocalToolDefinitionSource] — 本地工具定义（委托给 [LocalToolCatalog]）
- * - [List]<[Plugin]> — 业务插件（[ConversationPlugin] 等）
+ * - [List]<[Plugin]> — 业务插件（[ConversationGenerateTitlePlugin] 等）
  * - [AgentChatRunner] — 聊天运行器，组合上述所有服务
  *
  * 文件 artifact 根目录：优先 `<externalFilesDir>/adk/artifacts`，
@@ -69,10 +69,10 @@ object AgentModule {
     @Provides
     @Singleton
     fun providePlugins(
-        agentModelFactory: AgentModelFactory
+        agentLLMModelFactory: AgentLLMModelFactory
     ): List<@JvmSuppressWildcards Plugin> {
         return listOf(
-            ConversationPlugin(agentModelFactory)
+            ConversationGenerateTitlePlugin(agentLLMModelFactory)
         )
     }
 

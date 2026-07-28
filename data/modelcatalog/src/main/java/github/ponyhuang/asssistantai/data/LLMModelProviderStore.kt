@@ -66,10 +66,10 @@ private data class ModelServiceSettings(
 @Singleton
 class ModelServiceRepository @Inject constructor(
     @ApplicationContext private val applicationContext: Context,
-    private val database: ModelServiceDatabase,
+    private val database: LLMModelRoomDatabase,
 ) : ModelCatalogRepository {
     private val gson = Gson()
-    private val dao = database.modelServiceDao()
+    private val dao = database.lLMModelConfigDao()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val catalogWriteMutex = Mutex()
     private val settingsMutationLock = Any()
@@ -423,7 +423,7 @@ class ModelServiceRepository @Inject constructor(
         }
     }
 
-    private fun entityToProvider(entity: ModelServiceEntity): LLMModelProvider {
+    private fun entityToProvider(entity: LLMModelConfigEntity): LLMModelProvider {
         val providerSettings = settings.value[entity.serviceId]
             ?: defaultSettings[entity.serviceId]
             ?: ModelServiceSettings(false, "", "", ApiBaseType.Standard, "")

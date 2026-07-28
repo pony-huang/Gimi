@@ -13,7 +13,7 @@ import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.ThinkingConfig
-import github.ponyhuang.asssistantai.agent.AgentModelFactory
+import github.ponyhuang.asssistantai.agent.AgentLLMModelFactory
 import github.ponyhuang.asssistantai.agent.AgentPrompts
 import github.ponyhuang.asssistantai.agent.ConversationTitle
 import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
@@ -24,8 +24,8 @@ import java.util.concurrent.ConcurrentHashMap
  * 通过 ADK 回调携带首轮标题上下文，并将最终标题保留在会话状态中
  * @author pony
  */
-class ConversationPlugin(
-    private val agentModelFactory: AgentModelFactory,
+class ConversationGenerateTitlePlugin(
+    private val agentLLMModelFactory: AgentLLMModelFactory,
     override val name: String = "conversation_plugin"
 ) : Plugin {
 
@@ -38,8 +38,8 @@ class ConversationPlugin(
         assistantText: String
     ): String? {
 
-        val model = agentModelFactory.selectFastModelConfig()?.let {
-            agentModelFactory.createModel(it)
+        val model = agentLLMModelFactory.selectFastModelConfig()?.let {
+            agentLLMModelFactory.createModel(it)
         } ?: agentModel
 
         val prompt = """

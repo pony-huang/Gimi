@@ -18,7 +18,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 解析后的模型配置（[AgentModelFactory.createModel] 用）。
+ * 解析后的模型配置（[AgentLLMModelFactory.createModel] 用）。
  */
 data class ModelConfig(
     val serviceId: String,
@@ -41,7 +41,7 @@ internal fun ModelConfig.forConversation(
 )
 
 @Singleton
-class AgentModelFactory @Inject constructor(
+class AgentLLMModelFactory @Inject constructor(
     private val modelServices: ModelServiceRepository,
     private val openAiToolAdapters: Set<@JvmSuppressWildcards IOpenAiOfficialToolAdapter>,
     private val anthropicToolAdapters: Set<@JvmSuppressWildcards IAnthropicOfficialToolAdapter>,
@@ -55,7 +55,6 @@ class AgentModelFactory @Inject constructor(
      *
      * 没有可用配置时抛 [IllegalStateException]，由 UI 层提示用户在
      * Settings → Model Service 启用至少一个服务。不再使用任何硬编码兜底配置——
-     * 模型密钥与地址必须来自 Store，由 [SeedData] 在 `AsssistantaiApp.onCreate` 注入。
      */
     fun selectModelConfig(explicitSelection: LLMModelSelection?): ModelConfig {
         // 1. Explicit callers (for example the detached Bluetooth voice runner) do not mutate

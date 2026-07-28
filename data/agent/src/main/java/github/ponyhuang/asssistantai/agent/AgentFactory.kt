@@ -19,7 +19,7 @@ import javax.inject.Singleton
  * Agent 工厂 — 根据模型选择和工具配置构建 [BaseAgent]。
  *
  * 负责：
- * - 通过 [AgentModelFactory] 解析模型配置
+ * - 通过 [AgentLLMModelFactory] 解析模型配置
  * - 组合本地工具（[LocalToolCatalog]）、MCP 工具（[McpToolRegistry]）、
  *   官方工具（[OfficialToolRegistry]）和技能工具集（[SkillSource]）
  * - 按 [ToolAuthorizationRepository] 和 [ConversationToolConfiguration] 过滤启用的工具
@@ -31,7 +31,7 @@ class AgentFactory @Inject constructor(
     private val toolAuthorization: ToolAuthorizationRepository,
     private val mcpToolRegistry: McpToolRegistry,
     private val skillSource: SkillSource,
-    private val agentModelFactory: AgentModelFactory,
+    private val agentLLMModelFactory: AgentLLMModelFactory,
     private val officialToolRegistry: OfficialToolRegistry,
 ) {
     /**
@@ -46,10 +46,10 @@ class AgentFactory @Inject constructor(
         allowConfirmationRequiredTools: Boolean = true,
         toolConfiguration: ConversationToolConfiguration? = null,
     ): BaseAgent {
-        val selectedModelConfig = agentModelFactory.selectModelConfig(selection)
+        val selectedModelConfig = agentLLMModelFactory.selectModelConfig(selection)
         val modelConfig = toolConfiguration?.let(selectedModelConfig::forConversation)
             ?: selectedModelConfig
-        val model = agentModelFactory.createModel(modelConfig)
+        val model = agentLLMModelFactory.createModel(modelConfig)
         val officialTools = officialToolRegistry.resolve(modelConfig)
         val configuredTools: List<BaseTool> = buildList {
             val enabledToolIds = toolConfiguration?.enabledLocalToolIds

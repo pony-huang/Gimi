@@ -58,9 +58,8 @@ object ConversationModule {
     ): ConversationMetadataDatabase = Room.databaseBuilder(
         context,
         ConversationMetadataDatabase::class.java,
-        "conversation-metadata.db",
-    ).addMigrations(ConversationMetadataDatabase.MIGRATION_3_4)
-        .destructiveForPrototype()
+        ConversationMetadataDatabase.DATABASE_NAME,
+    ).destructiveForPrototype()
         .build()
 
     @Provides

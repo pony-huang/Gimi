@@ -66,7 +66,7 @@ internal fun lLMModelConfigEntities(gson: Gson = Gson()): List<LLMModelConfigEnt
             serviceName = provider.serviceName,
             displayOrder = index,
             modelGroupsJson = gson.toJson(
-                provider.LLMModelGroups.map { group ->
+                provider.lLMModelGroups.map { group ->
                     StoredModelGroup(
                         groupId = group.groupId,
                         groupName = group.groupName,

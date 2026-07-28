@@ -16,7 +16,7 @@ class ModelCatalogMappersTest {
             isEnabled = true,
             apiKey = "key",
             apiBaseUrl = "https://example.com",
-            LLMModelGroups = listOf(
+            lLMModelGroups = listOf(
                 LLMModelGroup(
                     groupId = "group",
                     groupName = "Group",

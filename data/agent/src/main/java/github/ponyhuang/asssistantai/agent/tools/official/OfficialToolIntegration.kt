@@ -130,9 +130,9 @@ open class OpenAiOfficialToolAdapter @Inject constructor() : IOpenAiOfficialTool
     }
 
     override fun supports(config: ModelConfig): Boolean {
-        return !(config.serviceId != LLMModelType.OpenAI.serviceId ||
-                config.baseType != ApiBaseType.Standard ||
-                OfficialToolIds.WEB_SEARCH !in config.officialTools)
+        return config.serviceId in listOf(LLMModelType.OpenAI.serviceId, LLMModelType.Mimo.serviceId) &&
+                config.baseType == ApiBaseType.Standard &&
+                OfficialToolIds.WEB_SEARCH in config.officialTools
     }
 }
 
@@ -170,18 +170,9 @@ open class AnthropicOfficialToolAdapter @Inject constructor() : IAnthropicOffici
     }
 
     override fun supports(config: ModelConfig): Boolean {
-        return !(config.serviceId != LLMModelType.Anthropic.serviceId ||
-                config.baseType != ApiBaseType.Anthropic ||
-                OfficialToolIds.WEB_SEARCH !in config.officialTools)
-    }
-}
-
-class MiniMaxWebSearchToolAdapter @Inject constructor() : AnthropicOfficialToolAdapter() {
-
-    override fun supports(config: ModelConfig): Boolean {
-        return !(config.serviceId != LLMModelType.MiniMax.serviceId ||
-                config.baseType != ApiBaseType.Anthropic ||
-                OfficialToolIds.WEB_SEARCH !in config.officialTools)
+        return config.serviceId in listOf(LLMModelType.Anthropic.serviceId, LLMModelType.MiniMax.serviceId) &&
+                config.baseType == ApiBaseType.Anthropic &&
+                OfficialToolIds.WEB_SEARCH in config.officialTools
     }
 }
 

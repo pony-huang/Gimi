@@ -324,7 +324,7 @@ class ModelServiceRepository @Inject constructor(
     private fun firstAvailableSelection(): LLMModelSelection? = _services.value.asSequence()
         .filter { it.isConfiguredForChat }
         .mapNotNull { service ->
-            service.LLMModelGroups.asSequence().mapNotNull { group ->
+            service.lLMModelGroups.asSequence().mapNotNull { group ->
                 group.models.firstOrNull { it.isChatModel }?.let { model ->
                     LLMModelSelection(service.serviceId, group.groupId, model.modelId)
                 }
@@ -380,7 +380,7 @@ class ModelServiceRepository @Inject constructor(
         if (selection == null) return null
         val provider = getService(selection.serviceId) ?: return null
         if (!provider.isEnabled) return null
-        val group = provider.LLMModelGroups.firstOrNull { it.groupId == selection.groupId } ?: return null
+        val group = provider.lLMModelGroups.firstOrNull { it.groupId == selection.groupId } ?: return null
         val model = group.models.firstOrNull { it.modelId == selection.modelId } ?: return null
         return ResolvedModel(provider, group, model)
     }
@@ -441,7 +441,7 @@ class ModelServiceRepository @Inject constructor(
             baseType = baseType,
             supportedBaseTypes = supportedBaseTypes,
             anthropicBaseUrl = providerSettings.anthropicBaseUrl,
-            LLMModelGroups = decodeGroups(entity.modelGroupsJson).map { group ->
+            lLMModelGroups = decodeGroups(entity.modelGroupsJson).map { group ->
                 LLMModelGroup(
                     groupId = group.groupId,
                     groupName = group.groupName,

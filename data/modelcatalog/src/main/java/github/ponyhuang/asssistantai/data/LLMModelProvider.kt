@@ -13,7 +13,7 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
  * @property supportedBaseTypes 该厂商允许的接口标准集合。OpenAI 仅支持 Standard，
  *                  Anthropic 仅支持 Anthropic，其余厂商两种皆可。UI 协议下拉按此过滤，
  *                  持久化的非法取值会在加载时回退到集合首项。
- * @property LLMModelGroups 该服务下的模型组列表。
+ * @property lLMModelGroups 该服务下的模型组列表。
  * @property iconRes 品牌图标 drawable 资源 ID；null 时回退到默认机器人图标。
  *                  新增厂商时只需在 [LLMModelConfigs] 中赋值即可，无需改 UI 调用点。
  * @property homepageUrl 平台官方主页（Header 外链目标）。
@@ -30,7 +30,7 @@ data class LLMModelProvider(
     val baseType: ApiBaseType = ApiBaseType.Standard,
     val supportedBaseTypes: List<ApiBaseType> = ApiBaseType.entries,
     val anthropicBaseUrl: String = apiBaseUrl,
-    val LLMModelGroups: List<LLMModelGroup> = emptyList(),
+    val lLMModelGroups: List<LLMModelGroup> = emptyList(),
     val iconRes: Int? = null,
     val homepageUrl: String = "",
     val keyHelpUrl: String = "",
@@ -150,7 +150,7 @@ enum class LLMModelType(
     ),
     Mimo(
         serviceId = "mimo",
-        serviceName = "Xiaomi MIMO",
+        serviceName = "MIMO",
         defaultBaseUrl = "https://api.xiaomimimo.com/v1",
         defaultBaseType = ApiBaseType.Standard,
         supportedBaseTypes = ApiBaseType.entries,
@@ -221,7 +221,7 @@ enum class LLMModelType(
         baseType = defaultBaseType,
         supportedBaseTypes = supportedBaseTypes,
         anthropicBaseUrl = defaultAnthropicBaseUrl ?: defaultBaseUrl,
-        LLMModelGroups = modelGroups,
+        lLMModelGroups = modelGroups,
         homepageUrl = homepageUrl,
         keyHelpUrl = keyHelpUrl,
         docsUrl = docsUrl,

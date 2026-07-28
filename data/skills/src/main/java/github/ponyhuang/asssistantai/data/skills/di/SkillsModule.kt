@@ -19,6 +19,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import okhttp3.OkHttpClient
+import androidx.core.net.toUri
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -42,7 +43,7 @@ object SkillsModule {
         val reader = SkillArchiveReader(
             okHttpClient = okHttpClient,
             localDocumentOpener = { value ->
-                context.contentResolver.openInputStream(Uri.parse(value))
+                context.contentResolver.openInputStream(value.toUri())
             },
         )
         return FileSkillRepository(

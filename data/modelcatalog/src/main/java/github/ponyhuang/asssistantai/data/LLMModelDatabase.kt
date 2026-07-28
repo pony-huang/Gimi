@@ -51,9 +51,12 @@ interface LLMModelConfigDao {
     version = 1,
     exportSchema = false,
 )
-
 abstract class LLMModelRoomDatabase : RoomDatabase() {
     abstract fun lLMModelConfigDao(): LLMModelConfigDao
+
+    companion object {
+        const val DATABASE_NAME = "model-services.db"
+    }
 }
 
 internal fun lLMModelConfigEntities(gson: Gson = Gson()): List<LLMModelConfigEntity> =

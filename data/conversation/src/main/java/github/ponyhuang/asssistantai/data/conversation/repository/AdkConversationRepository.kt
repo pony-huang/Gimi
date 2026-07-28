@@ -225,9 +225,9 @@ class AdkConversationRepository(
                                 sessionId = sessionId,
                                 model = initialModel,
                                 isLast = false,
-                                toolConfigurationJson = initialToolConfiguration?.let(
-                                    ConversationToolConfigurationCodec::encode,
-                                ),
+                    toolConfigurationJson = initialToolConfiguration
+                        ?.let(ConversationToolConfigurationCodec::encode)
+                        .orEmpty(),
                             ),
                         )
                     }

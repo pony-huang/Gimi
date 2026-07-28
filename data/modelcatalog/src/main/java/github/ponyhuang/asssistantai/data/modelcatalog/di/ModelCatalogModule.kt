@@ -45,7 +45,7 @@ object ModelCatalogInfrastructureModule {
     ): LLMModelRoomDatabase = Room.databaseBuilder(
         context,
         LLMModelRoomDatabase::class.java,
-        "model-services.db",
+        LLMModelRoomDatabase.DATABASE_NAME,
     ).destructiveForPrototype().build()
 
     @Provides

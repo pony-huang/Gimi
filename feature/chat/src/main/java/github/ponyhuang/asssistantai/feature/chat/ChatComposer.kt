@@ -55,7 +55,6 @@ import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.asssistantai.feature.chat.R
-import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.asssistantai.domain.conversation.model.DraftAttachment
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.MultimodalCapabilities
@@ -106,7 +105,6 @@ public fun ChatComposer(
     onLocalToolEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
     onMcpServerEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
     onOfficialToolEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
-    onToolAccessModeChange: (ToolAccessMode) -> Unit = {},
     attachmentCapabilities: MultimodalCapabilities = MultimodalCapabilities(),
 ) {
     var messageData by rememberSaveable(stateSaver = MessageData.Saver) {
@@ -428,7 +426,6 @@ public fun ChatComposer(
             onLocalToolEnabledChange = onLocalToolEnabledChange,
             onMcpServerEnabledChange = onMcpServerEnabledChange,
             onOfficialToolEnabledChange = onOfficialToolEnabledChange,
-            onToolAccessModeChange = onToolAccessModeChange,
         )
     }
 }

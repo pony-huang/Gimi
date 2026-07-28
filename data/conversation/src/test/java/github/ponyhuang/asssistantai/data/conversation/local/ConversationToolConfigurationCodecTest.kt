@@ -1,8 +1,8 @@
 package github.ponyhuang.asssistantai.data.conversation.local
 
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
-import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -17,12 +17,33 @@ class ConversationToolConfigurationCodecTest {
                 "mimo" to setOf("web_search"),
                 "kimi" to setOf("kimi_formulas"),
             ),
-            toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
         )
 
         val encoded = ConversationToolConfigurationCodec.encode(configuration)
 
+        assertFalse(encoded.contains("toolAccessMode"))
         assertEquals(configuration, ConversationToolConfigurationCodec.decode(encoded))
+    }
+
+    @Test
+    fun legacyToolAccessModeIsIgnoredWhenReadingSavedConfiguration() {
+        val decoded = ConversationToolConfigurationCodec.decode(
+            """
+            {
+              "enabledLocalToolIds": ["clock"],
+              "enabledMcpServerIds": ["server-1"],
+              "toolAccessMode": "ON_DEMAND"
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(
+            ConversationToolConfiguration(
+                enabledLocalToolIds = setOf("clock"),
+                enabledMcpServerIds = setOf("server-1"),
+            ),
+            decoded,
+        )
     }
 
     @Test

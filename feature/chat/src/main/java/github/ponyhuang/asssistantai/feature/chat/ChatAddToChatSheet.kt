@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,7 +27,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,7 +36,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Functions
 import androidx.compose.material.icons.filled.Language
@@ -46,7 +43,6 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -81,7 +77,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
 import github.ponyhuang.asssistantai.domain.mcp.model.McpTransport
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
@@ -91,7 +86,6 @@ private enum class AddToChatPage {
     HOME,
     LOCAL_TOOLS,
     MCP,
-    TOOL_ACCESS,
 }
 
 @Composable
@@ -107,7 +101,6 @@ internal fun ChatAddToChatSheet(
     onLocalToolEnabledChange: (String, Boolean) -> Unit,
     onMcpServerEnabledChange: (String, Boolean) -> Unit,
     onOfficialToolEnabledChange: (String, Boolean) -> Unit,
-    onToolAccessModeChange: (ToolAccessMode) -> Unit,
 ) {
     var page by rememberSaveable { mutableStateOf(AddToChatPage.HOME) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -172,7 +165,6 @@ internal fun ChatAddToChatSheet(
                                 AddToChatPage.HOME -> stringResource(R.string.chat_add_to_chat_title)
                                 AddToChatPage.LOCAL_TOOLS -> stringResource(R.string.chat_session_tools_title)
                                 AddToChatPage.MCP -> stringResource(R.string.chat_session_mcp_title)
-                                AddToChatPage.TOOL_ACCESS -> stringResource(R.string.chat_tool_access_title)
                             },
                             isRoot = currentPage == AddToChatPage.HOME,
                             onNavigationClick = {
@@ -190,7 +182,6 @@ internal fun ChatAddToChatSheet(
                                 filesEnabled = filesEnabled,
                                 onOpenTools = { page = AddToChatPage.LOCAL_TOOLS },
                                 onOpenMcp = { page = AddToChatPage.MCP },
-                                onOpenToolAccess = { page = AddToChatPage.TOOL_ACCESS },
                                 onOfficialToolEnabledChange = onOfficialToolEnabledChange,
                             )
                             AddToChatPage.LOCAL_TOOLS -> LocalToolsPage(
@@ -200,12 +191,6 @@ internal fun ChatAddToChatSheet(
                             AddToChatPage.MCP -> McpServersPage(
                                 state = state,
                                 onEnabledChange = onMcpServerEnabledChange,
-                            )
-                            AddToChatPage.TOOL_ACCESS -> ToolAccessPage(
-                                selectedMode = state.configuration?.toolAccessMode
-                                    ?: ToolAccessMode.AUTO,
-                                enabled = !state.isMutationBlocked && state.configuration != null,
-                                onSelected = onToolAccessModeChange,
                             )
                         }
                     }
@@ -264,7 +249,6 @@ private fun AddToChatHome(
     filesEnabled: Boolean,
     onOpenTools: () -> Unit,
     onOpenMcp: () -> Unit,
-    onOpenToolAccess: () -> Unit,
     onOfficialToolEnabledChange: (String, Boolean) -> Unit,
 ) {
     LazyColumn(
@@ -331,16 +315,6 @@ private fun AddToChatHome(
                     subtitle = enabledCountText(state.enabledLocalToolCount, isMcp = false),
                     onClick = onOpenTools,
                     testTag = "session-tools-nav",
-                )
-                HorizontalDivider(modifier = Modifier.padding(start = 68.dp))
-                NavigationRow(
-                    icon = Icons.Default.Work,
-                    title = stringResource(R.string.chat_tool_access_title),
-                    subtitle = toolAccessModeLabel(
-                        state.configuration?.toolAccessMode ?: ToolAccessMode.AUTO,
-                    ),
-                    onClick = onOpenToolAccess,
-                    testTag = "tool-access-nav",
                 )
             }
         }
@@ -697,68 +671,6 @@ private fun McpServerRow(
 }
 
 @Composable
-private fun ToolAccessPage(
-    selectedMode: ToolAccessMode,
-    enabled: Boolean,
-    onSelected: (ToolAccessMode) -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .wrapContentHeight()
-            .testTag("tool-access-page")
-            .navigationBarsPadding()
-            .padding(horizontal = 20.dp),
-    ) {
-        ToolAccessMode.entries.forEach { mode ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 92.dp)
-                    .selectable(
-                        selected = selectedMode == mode,
-                        enabled = enabled,
-                        role = Role.RadioButton,
-                        onClick = { onSelected(mode) },
-                    )
-                    .testTag("tool-access-${mode.name}")
-                    .padding(vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        toolAccessModeLabel(mode),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = if (selectedMode == mode) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    )
-                    Text(
-                        toolAccessModeDescription(mode),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
-                if (selectedMode == mode) {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        InlineNotice(
-            text = stringResource(R.string.chat_tool_access_todo_notice),
-            isError = false,
-        )
-    }
-}
-
-@Composable
 private fun rememberLowerBoundaryNestedScrollConnection(): NestedScrollConnection =
     remember {
         object : NestedScrollConnection {
@@ -869,24 +781,6 @@ private fun toolFilterLabel(filter: SessionToolFilter): String = stringResource(
         SessionToolFilter.ALL -> R.string.chat_session_tools_filter_all
         SessionToolFilter.ENABLED -> R.string.chat_session_tools_filter_enabled
         SessionToolFilter.DISABLED -> R.string.chat_session_tools_filter_disabled
-    },
-)
-
-@Composable
-private fun toolAccessModeLabel(mode: ToolAccessMode): String = stringResource(
-    when (mode) {
-        ToolAccessMode.AUTO -> R.string.chat_tool_access_auto
-        ToolAccessMode.ON_DEMAND -> R.string.chat_tool_access_on_demand
-        ToolAccessMode.ALWAYS_AVAILABLE -> R.string.chat_tool_access_always
-    },
-)
-
-@Composable
-private fun toolAccessModeDescription(mode: ToolAccessMode): String = stringResource(
-    when (mode) {
-        ToolAccessMode.AUTO -> R.string.chat_tool_access_auto_description
-        ToolAccessMode.ON_DEMAND -> R.string.chat_tool_access_on_demand_description
-        ToolAccessMode.ALWAYS_AVAILABLE -> R.string.chat_tool_access_always_description
     },
 )
 

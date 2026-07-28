@@ -69,7 +69,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.conversation.model.Message
 import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
-import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.conversation.model.DraftAttachment
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.MultimodalCapabilities
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -124,7 +123,6 @@ fun ChatScaffold(
     onLocalToolEnabledChange: (String, Boolean) -> Unit,
     onMcpServerEnabledChange: (String, Boolean) -> Unit,
     onOfficialToolEnabledChange: (String, Boolean) -> Unit,
-    onToolAccessModeChange: (ToolAccessMode) -> Unit,
 ) {
 
     val listState = rememberLazyListState()
@@ -280,7 +278,6 @@ fun ChatScaffold(
                     onLocalToolEnabledChange = onLocalToolEnabledChange,
                     onMcpServerEnabledChange = onMcpServerEnabledChange,
                     onOfficialToolEnabledChange = onOfficialToolEnabledChange,
-                    onToolAccessModeChange = onToolAccessModeChange,
                     modelSelectorContent = {
                         ModelTitleAndPicker(
                             services = state.availableLLMModelSettings,

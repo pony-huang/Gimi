@@ -7,7 +7,6 @@ import github.ponyhuang.asssistantai.data.conversation.local.ConversationMetadat
 import github.ponyhuang.asssistantai.data.conversation.local.ConversationMetadataEntity
 import github.ponyhuang.asssistantai.data.conversation.local.ConversationToolConfigurationCodec
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
-import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -64,7 +63,6 @@ class AdkConversationRepositoryCharacterizationTest {
         val expected = ConversationToolConfiguration(
             enabledLocalToolIds = setOf("clock"),
             enabledMcpServerIds = setOf("mcp-1"),
-            toolAccessMode = ToolAccessMode.ON_DEMAND,
         )
         coEvery { metadataDao.get("session-1") } returns ConversationMetadataEntity(
             sessionId = "session-1",

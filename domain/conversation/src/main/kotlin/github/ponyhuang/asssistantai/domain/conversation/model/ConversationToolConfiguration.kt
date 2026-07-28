@@ -1,16 +1,9 @@
 package github.ponyhuang.asssistantai.domain.conversation.model
 
-enum class ToolAccessMode {
-    AUTO,
-    ON_DEMAND,
-    ALWAYS_AVAILABLE,
-}
-
 data class ConversationToolConfiguration(
     val enabledLocalToolIds: Set<String> = emptySet(),
     val enabledMcpServerIds: Set<String> = emptySet(),
     val enabledOfficialToolIdsByService: Map<String, Set<String>> = emptyMap(),
-    val toolAccessMode: ToolAccessMode = ToolAccessMode.AUTO,
 ) {
     fun enabledOfficialToolIds(serviceId: String): Set<String> =
         enabledOfficialToolIdsByService[serviceId].orEmpty()

@@ -6,7 +6,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertWidthIsEqualTo
-import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -15,11 +14,9 @@ import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.asssistantai.domain.conversation.model.DraftAttachment
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
-import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
 import github.ponyhuang.asssistantai.domain.toolauthorization.model.ToolDescriptor
 import org.junit.Rule
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatComposerLayoutTest {
@@ -112,25 +109,7 @@ class ChatComposerLayoutTest {
     }
 
     @Test
-    fun toolAccessSelectionIsReportedWithoutClosingTheSheet() {
-        var selected: ToolAccessMode? = null
-        setComposer(
-            addToChatState = ChatAddToChatState(
-                configuration = ConversationToolConfiguration(),
-            ),
-            onToolAccessModeChange = { selected = it },
-        )
-
-        composeRule.onNodeWithTag("chat_composer_add").performClick()
-        composeRule.onNodeWithTag("tool-access-nav").performClick()
-        composeRule.onNodeWithTag("tool-access-ON_DEMAND").performClick()
-
-        assert(selected == ToolAccessMode.ON_DEMAND)
-        composeRule.onNodeWithTag("tool-access-page").assertIsDisplayed()
-    }
-
-    @Test
-    fun toolAccessSheetWrapsItsContentInsteadOfKeepingTheLongListHeight() {
+    fun addToChatSheetDoesNotExposeUnusedToolAccessMode() {
         setComposer(
             addToChatState = ChatAddToChatState(
                 configuration = ConversationToolConfiguration(),
@@ -138,19 +117,13 @@ class ChatComposerLayoutTest {
         )
 
         composeRule.onNodeWithTag("chat_composer_add").performClick()
-        composeRule.onNodeWithTag("tool-access-nav").performClick()
-
-        val bounds = composeRule.onNodeWithTag("add-to-chat-sheet-content")
-            .getUnclippedBoundsInRoot()
-        val height = bounds.bottom - bounds.top
-        assertTrue("Tool access sheet content was $height", height <= 600.dp)
+        composeRule.onNodeWithTag("tool-access-nav").assertDoesNotExist()
     }
 
     private fun setComposer(
         messageData: MessageData = MessageData(),
         isGenerating: Boolean = false,
         addToChatState: ChatAddToChatState = ChatAddToChatState(),
-        onToolAccessModeChange: (ToolAccessMode) -> Unit = {},
     ) {
         composeRule.setContent {
             MaterialTheme {
@@ -161,7 +134,6 @@ class ChatComposerLayoutTest {
                     messageData = messageData,
                     isVoiceInputAvailable = true,
                     addToChatState = addToChatState,
-                    onToolAccessModeChange = onToolAccessModeChange,
                     modelSelectorContent = {
                         Text(
                             text = "Test model",

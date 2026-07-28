@@ -8,7 +8,6 @@ import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.asssistantai.domain.conversation.model.DraftAttachment
-import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatDisplayRepository
@@ -906,10 +905,6 @@ class ChatViewModel @Inject constructor(
         updateToolConfiguration { configuration ->
             configuration.setOfficialToolEnabled(selection.serviceId, toolId, enabled)
         }
-    }
-
-    fun setToolAccessMode(mode: ToolAccessMode) {
-        updateToolConfiguration { it.copy(toolAccessMode = mode) }
     }
 
     fun clearToolConfigurationError() {

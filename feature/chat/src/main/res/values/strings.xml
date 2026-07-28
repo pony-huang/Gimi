@@ -24,7 +24,6 @@
     <string name="chat_attachment_open_failed">没有可用于打开此文档的应用</string>
     <string name="chat_session_tools_title">工具</string>
     <string name="chat_session_mcp_title">MCP</string>
-    <string name="chat_tool_access_title">权限模式</string>
     <string name="chat_session_only_notice">仅影响当前会话</string>
     <string name="chat_session_tools_running_notice">会话运行中，暂时无法修改工具</string>
     <string name="chat_session_tools_enabled_count">已启用 %1$d 项</string>
@@ -40,13 +39,6 @@
     <string name="chat_session_tools_filter_disabled">已关闭</string>
     <string name="chat_session_mcp_empty_title">尚未配置 MCP</string>
     <string name="chat_session_mcp_empty_description">请先前往设置中的 MCP 页面添加服务器。</string>
-    <string name="chat_tool_access_auto">自动</string>
-    <string name="chat_tool_access_auto_description">由助手根据上下文选择工具</string>
-    <string name="chat_tool_access_on_demand">按需</string>
-    <string name="chat_tool_access_on_demand_description">需要时加载，可能增加消息轮次</string>
-    <string name="chat_tool_access_always">始终可用</string>
-    <string name="chat_tool_access_always_description">从会话开始即准备全部已选工具</string>
-    <string name="chat_tool_access_todo_notice">当前版本仅保存此设置，暂不会改变工具加载和授权行为。</string>
     <string name="chat_official_tool_web_search">网页搜索</string>
     <string name="chat_official_tool_web_search_description">搜索最新的互联网信息</string>
     <string name="chat_official_tool_kimi_formulas">Kimi 公式</string>

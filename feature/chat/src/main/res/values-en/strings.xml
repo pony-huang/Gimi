@@ -22,7 +22,6 @@
     <string name="chat_attachment_open_failed">No app is available to open this document</string>
     <string name="chat_session_tools_title">Tools</string>
     <string name="chat_session_mcp_title">MCP</string>
-    <string name="chat_tool_access_title">Tool access</string>
     <string name="chat_session_only_notice">Applies to this chat only</string>
     <string name="chat_session_tools_running_notice">Tools cannot be changed while this chat is running</string>
     <string name="chat_session_tools_enabled_count">%1$d enabled</string>
@@ -38,13 +37,6 @@
     <string name="chat_session_tools_filter_disabled">Disabled</string>
     <string name="chat_session_mcp_empty_title">MCP is not configured</string>
     <string name="chat_session_mcp_empty_description">Add a server from MCP in Settings first.</string>
-    <string name="chat_tool_access_auto">Auto</string>
-    <string name="chat_tool_access_auto_description">Let the assistant choose tools for the context</string>
-    <string name="chat_tool_access_on_demand">On demand</string>
-    <string name="chat_tool_access_on_demand_description">Load when needed, which may take more messages</string>
-    <string name="chat_tool_access_always">Always available</string>
-    <string name="chat_tool_access_always_description">Prepare every selected tool from the start</string>
-    <string name="chat_tool_access_todo_notice">This setting is saved, but does not change tool loading or authorization in this version.</string>
     <string name="chat_official_tool_web_search">Web search</string>
     <string name="chat_official_tool_web_search_description">Search the web for current information</string>
     <string name="chat_official_tool_kimi_formulas">Kimi formulas</string>

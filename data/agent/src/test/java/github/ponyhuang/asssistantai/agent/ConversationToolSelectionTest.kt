@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.agent
 
 import github.ponyhuang.asssistantai.data.ApiBaseType
+import github.ponyhuang.asssistantai.data.LLMModelType
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
 import org.junit.Assert.assertEquals
@@ -11,7 +12,7 @@ class ConversationToolSelectionTest {
     @Test
     fun conversationOfficialToolsAreLimitedToToolsSupportedByTheCurrentModel() {
         val model = ModelConfig(
-            serviceId = "mimo",
+            serviceId = LLMModelType.Mimo.serviceId,
             baseType = ApiBaseType.Standard,
             modelId = "model",
             apiKey = "key",
@@ -21,7 +22,7 @@ class ConversationToolSelectionTest {
         )
         val configuration = ConversationToolConfiguration(
             enabledOfficialToolIdsByService = mapOf(
-                "mimo" to setOf("web_search", "unsupported_tool"),
+                LLMModelType.Mimo.serviceId to setOf("web_search", "unsupported_tool"),
             ),
         )
 

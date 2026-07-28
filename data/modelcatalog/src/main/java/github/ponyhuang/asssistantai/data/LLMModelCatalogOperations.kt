@@ -24,6 +24,7 @@ internal fun appendUserModel(
         source = StoredModelSource.USER,
         isStt = model.isStt,
         isTts = model.isTts,
+        capabilities = model.capabilities,
     )
     if (groups.isEmpty()) {
         return listOf(
@@ -76,6 +77,7 @@ internal fun syncStoredRemoteModels(
                 source = StoredModelSource.REMOTE,
                 isStt = existing?.isStt ?: model.isStt || model.modelId.hasModelType("asr"),
                 isTts = existing?.isTts ?: model.isTts || model.modelId.hasModelType("tts"),
+                capabilities = existing?.capabilities ?: model.capabilities,
             )
         }
     val fetchedRemoteModelIds = fetchedRemoteModels.mapTo(mutableSetOf()) { it.modelId }
@@ -138,7 +140,7 @@ internal fun syncStoredRemoteModels(
 private fun String.modelGroupId(serviceId: String, fallbackGroupId: String?): String {
     val segments = split('-').filter(String::isNotBlank)
     return when {
-        serviceId.equals("mimo", ignoreCase = true) && segments.size >= 3 ->
+        LLMModelConfigs.fromServiceId(serviceId) == LLMModelType.Mimo && segments.size >= 3 ->
             segments.take(3).joinToString("-")
         segments.size > 2 -> segments.take(2).joinToString("-")
         segments.size == 2 -> segments.first()
@@ -162,7 +164,11 @@ internal fun mergeDefaultModelMetadata(
         group.copy(
             models = group.models.map { model ->
                 defaultsByModel[model.modelId]?.let { default ->
-                    model.copy(isStt = default.isStt, isTts = default.isTts)
+                    model.copy(
+                        isStt = default.isStt,
+                        isTts = default.isTts,
+                        capabilities = default.capabilities,
+                    )
                 } ?: model
             } + defaults.models.filterNot { it.modelId in existingModelIds },
         )

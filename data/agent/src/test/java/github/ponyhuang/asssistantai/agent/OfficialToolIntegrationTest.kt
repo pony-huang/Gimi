@@ -13,6 +13,7 @@ import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolRegistry
 import github.ponyhuang.asssistantai.agent.tools.official.WebSearchOfficialToolProvider
 import github.ponyhuang.asssistantai.agent.tools.official.kimi.KimiFormulaToolset
 import github.ponyhuang.asssistantai.data.ApiBaseType
+import github.ponyhuang.asssistantai.data.LLMModelType
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
@@ -29,7 +30,7 @@ class OfficialToolIntegrationTest {
 
         val adapted = MimoWebSearchToolAdapter().adapt(
             config(
-                serviceId = "mimo",
+                serviceId = LLMModelType.Mimo.serviceId,
                 baseType = ApiBaseType.Standard,
                 officialTools = listOf(OfficialToolIds.WEB_SEARCH),
             ),
@@ -52,7 +53,7 @@ class OfficialToolIntegrationTest {
 
         val adapted = MimoWebSearchToolAdapter().adapt(
             config(
-                serviceId = "mimo",
+                serviceId = LLMModelType.Mimo.serviceId,
                 baseType = ApiBaseType.Standard,
                 officialTools = listOf(OfficialToolIds.WEB_SEARCH),
             ),
@@ -69,7 +70,7 @@ class OfficialToolIntegrationTest {
 
         val adapted = MiniMaxWebSearchToolAdapter().adapt(
             config(
-                serviceId = "minimax",
+                serviceId = LLMModelType.MiniMax.serviceId,
                 baseType = ApiBaseType.Anthropic,
                 officialTools = listOf(OfficialToolIds.WEB_SEARCH),
             ),
@@ -108,14 +109,14 @@ class OfficialToolIntegrationTest {
 
         val native = registry.resolve(
             config(
-                serviceId = "mimo",
+                serviceId = LLMModelType.Mimo.serviceId,
                 baseType = ApiBaseType.Standard,
                 officialTools = listOf(OfficialToolIds.WEB_SEARCH),
             ),
         )
         val agentTool = registry.resolve(
             config(
-                serviceId = "kimi",
+                serviceId = LLMModelType.Moonshot.serviceId,
                 baseType = ApiBaseType.Standard,
                 officialTools = listOf(OfficialToolIds.KIMI_FORMULAS),
             ),

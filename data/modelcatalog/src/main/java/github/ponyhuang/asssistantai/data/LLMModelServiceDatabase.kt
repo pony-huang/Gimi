@@ -75,6 +75,7 @@ internal fun defaultModelServiceEntities(gson: Gson = Gson()): List<ModelService
                                 source = StoredModelSource.REMOTE,
                                 isStt = it.isStt,
                                 isTts = it.isTts,
+                                capabilities = it.capabilities,
                             )
                         },
                     )
@@ -155,4 +156,5 @@ internal data class StoredModel(
     val source: StoredModelSource,
     val isStt: Boolean = false,
     val isTts: Boolean = false,
+    val capabilities: github.ponyhuang.asssistantai.domain.modelcatalog.model.MultimodalCapabilities = github.ponyhuang.asssistantai.domain.modelcatalog.model.MultimodalCapabilities(),
 )

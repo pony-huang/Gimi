@@ -45,6 +45,7 @@ data class Model(
     val name: String,
     val isStt: Boolean = false,
     val isTts: Boolean = false,
+    val capabilities: MultimodalCapabilities = MultimodalCapabilities(),
 )
 
 data class ModelSelection(

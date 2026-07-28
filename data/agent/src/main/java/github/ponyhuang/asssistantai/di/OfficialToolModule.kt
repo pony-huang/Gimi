@@ -6,10 +6,12 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import github.ponyhuang.asssistantai.agent.tools.official.AnthropicOfficialToolAdapter
+import github.ponyhuang.asssistantai.agent.tools.official.IAnthropicOfficialToolAdapter
 import github.ponyhuang.asssistantai.agent.tools.official.KimiFormulaOfficialToolProvider
 import github.ponyhuang.asssistantai.agent.tools.official.MimoWebSearchToolAdapter
 import github.ponyhuang.asssistantai.agent.tools.official.MiniMaxWebSearchToolAdapter
 import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolProvider
+import github.ponyhuang.asssistantai.agent.tools.official.IOpenAiOfficialToolAdapter
 import github.ponyhuang.asssistantai.agent.tools.official.OpenAiOfficialToolAdapter
 import github.ponyhuang.asssistantai.agent.tools.official.WebSearchOfficialToolProvider
 
@@ -33,11 +35,24 @@ abstract class OfficialToolModule {
     @IntoSet
     abstract fun bindMimoWebSearchAdapter(
         adapter: MimoWebSearchToolAdapter,
-    ): OpenAiOfficialToolAdapter
+    ): IOpenAiOfficialToolAdapter
+
+    @Binds
+    @IntoSet
+    abstract fun bindOpenaiWebSearchAdapter(
+        adapter: OpenAiOfficialToolAdapter,
+    ): IOpenAiOfficialToolAdapter
 
     @Binds
     @IntoSet
     abstract fun bindMiniMaxWebSearchAdapter(
         adapter: MiniMaxWebSearchToolAdapter,
-    ): AnthropicOfficialToolAdapter
+    ): IAnthropicOfficialToolAdapter
+
+    @Binds
+    @IntoSet
+    abstract fun bindAnthropicWebSearchAdapter(
+        adapter: AnthropicOfficialToolAdapter,
+    ): IAnthropicOfficialToolAdapter
+
 }

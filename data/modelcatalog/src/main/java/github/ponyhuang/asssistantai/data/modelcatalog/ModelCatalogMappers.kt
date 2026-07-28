@@ -34,6 +34,7 @@ fun Model.toData(): LLMModelItem = LLMModelItem(
     modelName = name,
     isStt = isStt,
     isTts = isTts,
+    capabilities = capabilities,
 )
 
 fun LLMModelSelection.toDomain(): ModelSelection = ModelSelection(
@@ -67,6 +68,7 @@ private fun LLMModelGroup.toDomain(): ModelGroup = ModelGroup(
             name = item.modelName,
             isStt = item.isStt,
             isTts = item.isTts,
+            capabilities = item.capabilities,
         )
     },
 )

@@ -8,8 +8,8 @@ import com.openai.client.okhttp.OpenAIOkHttpClient
 import com.openai.models.chat.completions.ChatCompletionCreateParams
 import github.ponyhuang.asssistantai.agent.model.Claude
 import github.ponyhuang.asssistantai.agent.model.Openai
-import github.ponyhuang.asssistantai.agent.tools.official.AnthropicOfficialToolAdapter
-import github.ponyhuang.asssistantai.agent.tools.official.OpenAiOfficialToolAdapter
+import github.ponyhuang.asssistantai.agent.tools.official.IAnthropicOfficialToolAdapter
+import github.ponyhuang.asssistantai.agent.tools.official.IOpenAiOfficialToolAdapter
 import github.ponyhuang.asssistantai.data.ApiBaseType
 import github.ponyhuang.asssistantai.data.LLMModelSelection
 import github.ponyhuang.asssistantai.data.ModelServiceRepository
@@ -43,8 +43,8 @@ internal fun ModelConfig.forConversation(
 @Singleton
 class AgentModelFactory @Inject constructor(
     private val modelServices: ModelServiceRepository,
-    private val openAiToolAdapters: Set<@JvmSuppressWildcards OpenAiOfficialToolAdapter>,
-    private val anthropicToolAdapters: Set<@JvmSuppressWildcards AnthropicOfficialToolAdapter>,
+    private val openAiToolAdapters: Set<@JvmSuppressWildcards IOpenAiOfficialToolAdapter>,
+    private val anthropicToolAdapters: Set<@JvmSuppressWildcards IAnthropicOfficialToolAdapter>,
 ) {
     /**
      * 从 [ModelServiceRepository] 选当前模型配置。

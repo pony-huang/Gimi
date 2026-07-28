@@ -12,10 +12,11 @@ import github.ponyhuang.asssistantai.agent.ModelConfig
 import github.ponyhuang.asssistantai.agent.tools.WebSearchTool
 import github.ponyhuang.asssistantai.agent.tools.official.kimi.KimiFormulaToolset
 import github.ponyhuang.asssistantai.data.ApiBaseType
+import github.ponyhuang.asssistantai.data.LLMModelType
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
+import okhttp3.OkHttpClient
 import javax.inject.Inject
 import javax.inject.Singleton
-import okhttp3.OkHttpClient
 
 /**
  * One user-selectable official tool contribution.
@@ -74,7 +75,7 @@ class KimiFormulaOfficialToolProvider @Inject constructor(
     override val id: String = OfficialToolIds.KIMI_FORMULAS
 
     override fun contribute(config: ModelConfig): OfficialToolContribution {
-        if (config.serviceId != KIMI_SERVICE_ID) return OfficialToolContribution()
+        if (config.serviceId != LLMModelType.Moonshot.serviceId) return OfficialToolContribution()
         return OfficialToolContribution(
             toolsets = listOf(
                 KimiFormulaToolset(
@@ -85,31 +86,25 @@ class KimiFormulaOfficialToolProvider @Inject constructor(
             ),
         )
     }
-
-    private companion object {
-        const val KIMI_SERVICE_ID: String = "kimi"
-    }
 }
 
-interface OpenAiOfficialToolAdapter {
+interface IOpenAiOfficialToolAdapter {
     fun adapt(config: ModelConfig, tools: List<ChatCompletionTool>): List<ChatCompletionTool>
+
+    fun supports(config: ModelConfig): Boolean = false
 }
 
-class MimoWebSearchToolAdapter @Inject constructor() : OpenAiOfficialToolAdapter {
+open class OpenAiOfficialToolAdapter @Inject constructor() : IOpenAiOfficialToolAdapter {
     override fun adapt(
         config: ModelConfig,
         tools: List<ChatCompletionTool>,
     ): List<ChatCompletionTool> {
-        if (
-            config.serviceId != MIMO_SERVICE_ID ||
-            config.baseType != ApiBaseType.Standard ||
-            OfficialToolIds.WEB_SEARCH !in config.officialTools
-        ) {
+        if (!supports(config)) {
             return tools
         }
         val index = tools.indexOfFirst { tool ->
             tool.isFunction() &&
-                tool.asFunction().function().name() == OfficialToolIds.WEB_SEARCH
+                    tool.asFunction().function().name() == OfficialToolIds.WEB_SEARCH
         }
         if (index < 0) return tools
 
@@ -123,9 +118,6 @@ class MimoWebSearchToolAdapter @Inject constructor() : OpenAiOfficialToolAdapter
                             "type",
                             JsonValue.from(OfficialToolIds.WEB_SEARCH),
                         )
-                        .putAdditionalProperty("max_keyword", JsonValue.from(3))
-                        .putAdditionalProperty("force_search", JsonValue.from(true))
-                        .putAdditionalProperty("limit", JsonValue.from(1))
                         .build(),
                 )
                 .build(),
@@ -133,25 +125,33 @@ class MimoWebSearchToolAdapter @Inject constructor() : OpenAiOfficialToolAdapter
         return tools.toMutableList().apply { this[index] = nativeWebSearch }
     }
 
-    private companion object {
-        const val MIMO_SERVICE_ID: String = "mimo"
+    override fun supports(config: ModelConfig): Boolean {
+        return !(config.serviceId != LLMModelType.OpenAI.serviceId ||
+                config.baseType != ApiBaseType.Standard ||
+                OfficialToolIds.WEB_SEARCH !in config.officialTools)
     }
 }
 
-interface AnthropicOfficialToolAdapter {
-    fun adapt(config: ModelConfig, tools: List<ToolUnion>): List<ToolUnion>
+class MimoWebSearchToolAdapter @Inject constructor() : OpenAiOfficialToolAdapter() {
+    override fun supports(config: ModelConfig): Boolean {
+        return !(config.serviceId != LLMModelType.Mimo.serviceId ||
+                config.baseType != ApiBaseType.Standard ||
+                OfficialToolIds.WEB_SEARCH !in config.officialTools)
+    }
 }
 
-class MiniMaxWebSearchToolAdapter @Inject constructor() : AnthropicOfficialToolAdapter {
+interface IAnthropicOfficialToolAdapter {
+    fun adapt(config: ModelConfig, tools: List<ToolUnion>): List<ToolUnion>
+
+    fun supports(config: ModelConfig): Boolean = false
+}
+
+open class AnthropicOfficialToolAdapter @Inject constructor() : IAnthropicOfficialToolAdapter {
     override fun adapt(
         config: ModelConfig,
         tools: List<ToolUnion>,
     ): List<ToolUnion> {
-        if (
-            config.serviceId != MINIMAX_SERVICE_ID ||
-            config.baseType != ApiBaseType.Anthropic ||
-            OfficialToolIds.WEB_SEARCH !in config.officialTools
-        ) {
+        if (!supports(config)) {
             return tools
         }
         val index = tools.indexOfFirst { tool ->
@@ -165,7 +165,19 @@ class MiniMaxWebSearchToolAdapter @Inject constructor() : AnthropicOfficialToolA
         return tools.toMutableList().apply { this[index] = nativeWebSearch }
     }
 
-    private companion object {
-        const val MINIMAX_SERVICE_ID: String = "minimax"
+    override fun supports(config: ModelConfig): Boolean {
+        return !(config.serviceId != LLMModelType.Anthropic.serviceId ||
+                config.baseType != ApiBaseType.Anthropic ||
+                OfficialToolIds.WEB_SEARCH !in config.officialTools)
     }
 }
+
+class MiniMaxWebSearchToolAdapter @Inject constructor() : AnthropicOfficialToolAdapter() {
+
+    override fun supports(config: ModelConfig): Boolean {
+        return !(config.serviceId != LLMModelType.MiniMax.serviceId ||
+                config.baseType != ApiBaseType.Anthropic ||
+                OfficialToolIds.WEB_SEARCH !in config.officialTools)
+    }
+}
+

@@ -97,7 +97,7 @@ class ModelCatalogOperationsTest {
             LLMModelItem("deepseek-v4-chat", "deepseek-v4-chat"),
         ))
         assertEquals(listOf("deepseek-v3", "deepseek-v4"), standard.map { it.groupId })
-        val mimo = syncStoredRemoteModels(emptyList(), "mimo", "Xiaomi MIMO", listOf(
+        val mimo = syncStoredRemoteModels(emptyList(), LLMModelType.Mimo.serviceId, "Xiaomi MIMO", listOf(
             LLMModelItem("mimo-v2.5-pro-ultraspeed", "mimo-v2.5-pro-ultraspeed"),
             LLMModelItem("mimo-v2.5-asr", "mimo-v2.5-asr"),
             LLMModelItem("mimo-v2.5-tts", "mimo-v2.5-tts"),
@@ -111,7 +111,7 @@ class ModelCatalogOperationsTest {
     fun syncRemoteModelsGroupsTwoSegmentModelIdsByFamily() {
         val result = syncStoredRemoteModels(
             existingGroups = emptyList(),
-            serviceId = "minimax",
+            serviceId = LLMModelType.MiniMax.serviceId,
             serviceName = "MiniMax",
             models = listOf(
                 LLMModelItem("MiniMax-M3", "MiniMax-M3"),
@@ -144,7 +144,7 @@ class ModelCatalogOperationsTest {
                     ),
                 ),
             ),
-            serviceId = "minimax",
+            serviceId = LLMModelType.MiniMax.serviceId,
             serviceName = "MiniMax",
             models = listOf(LLMModelItem("MiniMax-M2.7", "MiniMax-M2.7")),
         )

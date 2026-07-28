@@ -1,6 +1,6 @@
 package github.ponyhuang.asssistantai.data
 
-import github.ponyhuang.asssistantai.data.LLMModelConfigs.iconFor
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.MultimodalCapabilities
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 
 /**
@@ -84,7 +84,12 @@ data class LLMModelItem(
     val isStt: Boolean = false,
     val isTts: Boolean = false,
     val isChildPanelExpanded: Boolean = false,
+    val capabilities: MultimodalCapabilities = MultimodalCapabilities(),
 )
+
+val LLMModelItem.supportsImages: Boolean get() = capabilities.supportsImages
+val LLMModelItem.supportsAudio: Boolean get() = capabilities.supportsAudio
+val LLMModelItem.supportsDocuments: Boolean get() = capabilities.supportsDocuments
 
 /** Whether this model can be used for ordinary assistant chat. */
 val LLMModelItem.isChatModel: Boolean
@@ -102,6 +107,135 @@ enum class ApiBaseType() {
     Anthropic,
 }
 
+enum class LLMModelType(
+    val serviceId: String,
+    val serviceName: String,
+    val defaultBaseUrl: String,
+    val defaultBaseType: ApiBaseType,
+    val supportedBaseTypes: List<ApiBaseType>,
+    val defaultAnthropicBaseUrl: String? = null,
+    val homepageUrl: String = "",
+    val keyHelpUrl: String = "",
+    val docsUrl: String = "",
+    val modelsUrl: String = "",
+    val officialToolProtocols: Map<String, List<ApiBaseType>> = emptyMap(),
+    val iconRes: Int? = null,
+) {
+    DeepSeek(
+        serviceId = "deepseek",
+        serviceName = "Deepseek",
+        defaultBaseUrl = "https://api.deepseek.com",
+        defaultBaseType = ApiBaseType.Anthropic,
+        supportedBaseTypes = ApiBaseType.entries,
+        defaultAnthropicBaseUrl = "https://api.deepseek.com/anthropic",
+        homepageUrl = "https://www.deepseek.com/",
+        keyHelpUrl = "https://platform.deepseek.com/api_keys",
+        docsUrl = "https://api-docs.deepseek.com/",
+        modelsUrl = "https://api-docs.deepseek.com/quick_start/pricing",
+    ),
+    MiniMax(
+        serviceId = "minimax",
+        serviceName = "MiniMax",
+        defaultBaseUrl = "https://api.minimaxi.com/v1",
+        defaultBaseType = ApiBaseType.Standard,
+        supportedBaseTypes = ApiBaseType.entries,
+        defaultAnthropicBaseUrl = "https://api.minimaxi.com/anthropic",
+        homepageUrl = "https://www.minimaxi.com/",
+        keyHelpUrl = "https://platform.minimaxi.com/user-center/basic-information/interface-key",
+        docsUrl = "https://platform.minimaxi.com/document",
+        modelsUrl = "https://platform.minimaxi.com/document/Models",
+        officialToolProtocols = mapOf(
+            OfficialToolIds.WEB_SEARCH to listOf(ApiBaseType.Anthropic),
+        ),
+    ),
+    Mimo(
+        serviceId = "mimo",
+        serviceName = "Xiaomi MIMO",
+        defaultBaseUrl = "https://api.xiaomimimo.com/v1",
+        defaultBaseType = ApiBaseType.Standard,
+        supportedBaseTypes = ApiBaseType.entries,
+        defaultAnthropicBaseUrl = "https://api.xiaomimimo.com/anthropic",
+        homepageUrl = "https://mimo.mi.com/",
+        keyHelpUrl = "https://platform.xiaomimimo.com/console/api-keys",
+        docsUrl = "https://mimo.mi.com/docs",
+        modelsUrl = "https://mimo.mi.com/docs/zh-CN/quick-start/summary/model",
+        officialToolProtocols = mapOf(
+            OfficialToolIds.WEB_SEARCH to listOf(ApiBaseType.Standard),
+        ),
+    ),
+    OpenAI(
+        serviceId = "openai",
+        serviceName = "OpenAI",
+        defaultBaseUrl = "https://api.openai.com/v1",
+        defaultBaseType = ApiBaseType.Standard,
+        supportedBaseTypes = listOf(ApiBaseType.Standard),
+        homepageUrl = "https://openai.com/",
+        keyHelpUrl = "https://platform.openai.com/api-keys",
+        docsUrl = "https://platform.openai.com/docs",
+        modelsUrl = "https://platform.openai.com/docs/models",
+        officialToolProtocols = mapOf(
+            OfficialToolIds.WEB_SEARCH to listOf(ApiBaseType.Standard),
+        ),
+    ),
+    Anthropic(
+        serviceId = "anthropic",
+        serviceName = "Anthropic",
+        defaultBaseUrl = "https://api.anthropic.com",
+        defaultBaseType = ApiBaseType.Anthropic,
+        supportedBaseTypes = listOf(ApiBaseType.Anthropic),
+        defaultAnthropicBaseUrl = "https://api.anthropic.com",
+        homepageUrl = "https://www.anthropic.com/",
+        keyHelpUrl = "https://console.anthropic.com/settings/keys",
+        docsUrl = "https://docs.anthropic.com/",
+        modelsUrl = "https://docs.anthropic.com/en/docs/about-claude/models",
+        officialToolProtocols = mapOf(
+            OfficialToolIds.WEB_SEARCH to listOf(ApiBaseType.Anthropic),
+        ),
+    ),
+    Moonshot(
+        serviceId = "kimi",
+        serviceName = "Moonshot",
+        defaultBaseUrl = "https://api.moonshot.cn/v1",
+        defaultBaseType = ApiBaseType.Standard,
+        supportedBaseTypes = ApiBaseType.entries,
+        defaultAnthropicBaseUrl = "https://api.moonshot.cn/anthropic",
+        homepageUrl = "https://www.kimi.com/",
+        keyHelpUrl = "https://platform.kimi.com/console/api-keys",
+        docsUrl = "https://platform.kimi.com/docs",
+        modelsUrl = "https://platform.kimi.com/docs/api/models-overview",
+        officialToolProtocols = mapOf(
+            OfficialToolIds.KIMI_FORMULAS to ApiBaseType.entries,
+        ),
+    );
+
+    fun toProvider(
+        modelGroups: List<LLMModelGroup> = emptyList(),
+        isEnabled: Boolean = false,
+        apiKey: String = "",
+    ): LLMModelProvider = LLMModelProvider(
+        serviceId = serviceId,
+        serviceName = serviceName,
+        isEnabled = isEnabled,
+        apiKey = apiKey,
+        apiBaseUrl = defaultBaseUrl,
+        baseType = defaultBaseType,
+        supportedBaseTypes = supportedBaseTypes,
+        anthropicBaseUrl = defaultAnthropicBaseUrl ?: defaultBaseUrl,
+        LLMModelGroups = modelGroups,
+        homepageUrl = homepageUrl,
+        keyHelpUrl = keyHelpUrl,
+        docsUrl = docsUrl,
+        modelsUrl = modelsUrl,
+        officialToolProtocols = officialToolProtocols,
+        iconRes = iconRes,
+    )
+
+    companion object {
+        fun fromServiceId(serviceId: String): LLMModelType? =
+            entries.firstOrNull { it.serviceId == serviceId }
+    }
+}
+
 /**
  * 内置 / 默认模型服务清单。新增厂商时在这里追加一条 [LLMModelProvider]，
  * 同时给 [LLMModelProvider.iconRes] 赋值，品牌图标就会在所有 UI 调用点自动生效。
@@ -109,29 +243,9 @@ enum class ApiBaseType() {
 object LLMModelConfigs {
 
     val services: List<LLMModelProvider> = listOf(
-        LLMModelProvider(
-            serviceId = "deepseek",
-            serviceName = "Deepseek",
-            isEnabled = false,
-            apiKey = "",
-            apiBaseUrl = "https://api.deepseek.com",
-            baseType = ApiBaseType.Anthropic,
-            anthropicBaseUrl = "https://api.deepseek.com/anthropic",
-            LLMModelGroups = listOf(),
-            homepageUrl = "https://www.deepseek.com/",
-            keyHelpUrl = "https://platform.deepseek.com/api_keys",
-            docsUrl = "https://api-docs.deepseek.com/",
-            modelsUrl = "https://api-docs.deepseek.com/quick_start/pricing",
-        ),
-        LLMModelProvider(
-            serviceId = "minimax",
-            serviceName = "MiniMax",
-            isEnabled = false,
-            apiKey = "",
-            apiBaseUrl = "https://api.minimaxi.com/v1",
-            baseType = ApiBaseType.Standard,
-            anthropicBaseUrl = "https://api.minimaxi.com/anthropic",
-            LLMModelGroups = listOf(
+        LLMModelType.DeepSeek.toProvider(),
+        LLMModelType.MiniMax.toProvider(
+            modelGroups = listOf(
                 LLMModelGroup(
                     groupId = "minimax-tts",
                     groupName = "Minimax Speech",
@@ -146,94 +260,22 @@ object LLMModelConfigs {
                     ),
                 ),
             ),
-            homepageUrl = "https://www.minimaxi.com/",
-            keyHelpUrl = "https://platform.minimaxi.com/user-center/basic-information/interface-key",
-            docsUrl = "https://platform.minimaxi.com/document",
-            modelsUrl = "https://platform.minimaxi.com/document/Models",
-            officialToolProtocols = mapOf(
-                OfficialToolIds.WEB_SEARCH to listOf(ApiBaseType.Anthropic),
-            ),
         ),
-        LLMModelProvider(
-            serviceId = "mimo",
-            serviceName = "Xiaomi MIMO",
-            isEnabled = false,
-            apiKey = "",
-            apiBaseUrl = "https://api.xiaomimimo.com/v1",
-            baseType = ApiBaseType.Standard,
-            anthropicBaseUrl = "https://api.xiaomimimo.com/anthropic",
-            LLMModelGroups = listOf(),
-            homepageUrl = "https://mimo.mi.com/",
-            keyHelpUrl = "https://platform.xiaomimimo.com/console/api-keys",
-            docsUrl = "https://mimo.mi.com/docs",
-            modelsUrl = "https://mimo.mi.com/docs/zh-CN/quick-start/summary/model",
-            officialToolProtocols = mapOf(
-                OfficialToolIds.WEB_SEARCH to listOf(ApiBaseType.Standard),
-            ),
-        ),
-        LLMModelProvider(
-            serviceId = "openai",
-            serviceName = "OpenAI",
-            isEnabled = false,
-            apiKey = "",
-            apiBaseUrl = "https://api.openai.com/v1",
-            baseType = ApiBaseType.Standard,
-            supportedBaseTypes = listOf(ApiBaseType.Standard),
-            LLMModelGroups = listOf(),
-            homepageUrl = "https://openai.com/",
-            keyHelpUrl = "https://platform.openai.com/api-keys",
-            docsUrl = "https://platform.openai.com/docs",
-            modelsUrl = "https://platform.openai.com/docs/models",
-        ),
-        LLMModelProvider(
-            serviceId = "anthropic",
-            serviceName = "Anthropic",
-            isEnabled = false,
-            apiKey = "",
-            apiBaseUrl = "https://api.anthropic.com",
-            baseType = ApiBaseType.Anthropic,
-            supportedBaseTypes = listOf(ApiBaseType.Anthropic),
-            anthropicBaseUrl = "https://api.anthropic.com",
-            LLMModelGroups = listOf(),
-            homepageUrl = "https://www.anthropic.com/",
-            keyHelpUrl = "https://console.anthropic.com/settings/keys",
-            docsUrl = "https://docs.anthropic.com/",
-            modelsUrl = "https://docs.anthropic.com/en/docs/about-claude/models",
-        ),
-        LLMModelProvider(
-            serviceId = "kimi",
-            serviceName = "Moonshot",
-            isEnabled = false,
-            apiKey = "",
-            apiBaseUrl = "https://api.moonshot.cn/v1",
-            baseType = ApiBaseType.Standard,
-            anthropicBaseUrl = "https://api.moonshot.cn/anthropic",
-            LLMModelGroups = listOf(),
-            homepageUrl = "https://www.kimi.com/",
-            keyHelpUrl = "https://platform.kimi.com/console/api-keys",
-            docsUrl = "https://platform.kimi.com/docs",
-            modelsUrl = "https://platform.kimi.com/docs/api/models-overview",
-            officialToolProtocols = mapOf(
-                OfficialToolIds.KIMI_FORMULAS to ApiBaseType.entries,
-            ),
-        ),
+        LLMModelType.Mimo.toProvider(),
+        LLMModelType.OpenAI.toProvider(),
+        LLMModelType.Anthropic.toProvider(),
+        LLMModelType.Moonshot.toProvider(),
     ).sortedBy { it.serviceId }
 
-    /**
-     * 按 [serviceId] 查找品牌图标。供 UI 层在仅有 serviceId 时使用
-     * 给列表里没声明 [LLMModelProvider.iconRes] 的服务提供兜底。
-     */
-    fun iconFor(serviceId: String): Int? =
-        services.firstOrNull { it.serviceId == serviceId }?.iconRes
+    fun fromServiceId(serviceId: String): LLMModelType? =
+        LLMModelType.fromServiceId(serviceId)
 
-    /**
-     * 按 [serviceId] 查找厂商允许的接口标准集合（静态元数据，与 [iconFor] 一样
-     * 不随用户设置变化）。未声明的自定义服务回退为两种协议皆可。
-     */
+    fun iconFor(serviceId: String): Int? =
+        fromServiceId(serviceId)?.iconRes
+
     fun supportedBaseTypesFor(serviceId: String): List<ApiBaseType> =
-        services.firstOrNull { it.serviceId == serviceId }?.supportedBaseTypes
-            ?: ApiBaseType.entries
+        fromServiceId(serviceId)?.supportedBaseTypes ?: ApiBaseType.entries
 
     fun officialToolProtocolsFor(serviceId: String): Map<String, List<ApiBaseType>> =
-        services.firstOrNull { it.serviceId == serviceId }?.officialToolProtocols.orEmpty()
+        fromServiceId(serviceId)?.officialToolProtocols.orEmpty()
 }

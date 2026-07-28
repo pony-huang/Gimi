@@ -12,25 +12,25 @@ class ModelAvailabilityTest {
     fun builtInDeepSeekAndMiniMaxStartDisabled() {
         val providers = LLMModelConfigs.services.associateBy { it.serviceId }
 
-        assertFalse(providers.getValue("deepseek").isEnabled)
-        assertFalse(providers.getValue("minimax").isEnabled)
+        assertFalse(providers.getValue(LLMModelType.DeepSeek.serviceId).isEnabled)
+        assertFalse(providers.getValue(LLMModelType.MiniMax.serviceId).isEnabled)
     }
 
     @Test
     fun builtInOpenAiAnthropicAndKimiExistWithProtocolConstraints() {
         val providers = LLMModelConfigs.services.associateBy { it.serviceId }
 
-        val openAi = providers.getValue("openai")
+        val openAi = providers.getValue(LLMModelType.OpenAI.serviceId)
         assertFalse(openAi.isEnabled)
         assertEquals(listOf(ApiBaseType.Standard), openAi.supportedBaseTypes)
         assertEquals(ApiBaseType.Standard, openAi.baseType)
 
-        val anthropic = providers.getValue("anthropic")
+        val anthropic = providers.getValue(LLMModelType.Anthropic.serviceId)
         assertFalse(anthropic.isEnabled)
         assertEquals(listOf(ApiBaseType.Anthropic), anthropic.supportedBaseTypes)
         assertEquals(ApiBaseType.Anthropic, anthropic.baseType)
 
-        val kimi = providers.getValue("kimi")
+        val kimi = providers.getValue(LLMModelType.Moonshot.serviceId)
         assertFalse(kimi.isEnabled)
         assertTrue(ApiBaseType.Standard in kimi.supportedBaseTypes)
         assertTrue(ApiBaseType.Anthropic in kimi.supportedBaseTypes)
@@ -40,7 +40,7 @@ class ModelAvailabilityTest {
     fun builtInProvidersDeclareTheirOfficialToolIntegrations() {
         val providers = LLMModelConfigs.services.associateBy { it.serviceId }
 
-        val miniMax = providers.getValue("minimax")
+        val miniMax = providers.getValue(LLMModelType.MiniMax.serviceId)
         assertTrue(miniMax.supportedOfficialTools.isEmpty())
         assertEquals(
             listOf(OfficialToolIds.WEB_SEARCH),
@@ -48,17 +48,27 @@ class ModelAvailabilityTest {
         )
         assertEquals(
             listOf(OfficialToolIds.WEB_SEARCH),
-            providers.getValue("mimo").supportedOfficialTools,
+            providers.getValue(LLMModelType.Mimo.serviceId).supportedOfficialTools,
         )
         assertEquals(
             listOf(OfficialToolIds.KIMI_FORMULAS),
-            providers.getValue("kimi").supportedOfficialTools,
+            providers.getValue(LLMModelType.Moonshot.serviceId).supportedOfficialTools,
         )
         assertTrue(
-            providers.getValue("mimo")
+            providers.getValue(LLMModelType.Mimo.serviceId)
                 .copy(baseType = ApiBaseType.Anthropic)
                 .supportedOfficialTools
                 .isEmpty(),
+        )
+        assertEquals(
+            listOf(OfficialToolIds.WEB_SEARCH),
+            providers.getValue(LLMModelType.Anthropic.serviceId).supportedOfficialTools,
+        )
+        assertFalse(
+            providers.getValue(LLMModelType.OpenAI.serviceId).supportedOfficialTools.isEmpty(),
+        )
+        assertFalse(
+            providers.getValue(LLMModelType.OpenAI.serviceId).supportedOfficialTools.isEmpty(),
         )
     }
 

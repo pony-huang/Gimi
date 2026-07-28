@@ -122,7 +122,9 @@ fun ChatScaffold(
     onNewConversation: () -> Unit,
     onLocalToolEnabledChange: (String, Boolean) -> Unit,
     onMcpServerEnabledChange: (String, Boolean) -> Unit,
-    onOfficialToolEnabledChange: (String, Boolean) -> Unit,
+    onOfficialToolOpened: (String) -> Unit,
+    onOfficialToolFunctionEnabledChange: (String, String, Boolean) -> Unit,
+    onOfficialToolFunctionsRetry: (String) -> Unit,
 ) {
 
     val listState = rememberLazyListState()
@@ -266,7 +268,7 @@ fun ChatScaffold(
                         configuration = state.toolConfiguration,
                         localTools = state.availableLocalTools,
                         mcpServers = state.availableMcpServers,
-                        supportedOfficialToolIds = state.supportedOfficialToolIds,
+                        officialTools = state.officialToolDescriptors,
                         isMutationBlocked = state.isAgentRunning,
                         errorMessage = if (state.hasToolConfigurationError) {
                             stringResource(R.string.chat_session_tool_save_failed)
@@ -277,7 +279,9 @@ fun ChatScaffold(
                     attachmentCapabilities = attachmentCapabilities,
                     onLocalToolEnabledChange = onLocalToolEnabledChange,
                     onMcpServerEnabledChange = onMcpServerEnabledChange,
-                    onOfficialToolEnabledChange = onOfficialToolEnabledChange,
+                    onOfficialToolOpened = onOfficialToolOpened,
+                    onOfficialToolFunctionEnabledChange = onOfficialToolFunctionEnabledChange,
+                    onOfficialToolFunctionsRetry = onOfficialToolFunctionsRetry,
                     modelSelectorContent = {
                         ModelTitleAndPicker(
                             services = state.availableLLMModelSettings,

@@ -5,6 +5,7 @@ import github.ponyhuang.asssistantai.data.LLMModelType
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationToolSelectionTest {
@@ -21,8 +22,8 @@ class ConversationToolSelectionTest {
             officialTools = listOf("web_search"),
         )
         val configuration = ConversationToolConfiguration(
-            enabledOfficialToolIdsByService = mapOf(
-                LLMModelType.Mimo.serviceId to setOf("web_search", "unsupported_tool"),
+            enabledOfficialFunctionIdsByService = mapOf(
+                LLMModelType.Mimo.serviceId to mapOf("web_search" to setOf("web_search")),
             ),
         )
 
@@ -56,5 +57,48 @@ class ConversationToolSelectionTest {
         )
 
         assertEquals(listOf("enabled"), selected.map(McpServer::id))
+    }
+
+    @Test
+    fun forConversationKeepsOfficialToolWithAnyFunctionSelected() {
+        val model = ModelConfig(
+            serviceId = LLMModelType.Mimo.serviceId,
+            baseType = ApiBaseType.Standard,
+            modelId = "model",
+            apiKey = "key",
+            fullBaseUrl = "https://example.com",
+            supportedOfficialTools = listOf("web_search"),
+            officialTools = listOf("web_search"),
+        )
+        val configuration = ConversationToolConfiguration(
+            enabledOfficialFunctionIdsByService = mapOf(
+                LLMModelType.Mimo.serviceId to mapOf("web_search" to setOf("web_search")),
+            ),
+        )
+
+        val resolved = model.forConversation(configuration)
+
+        assertEquals(listOf("web_search"), resolved.officialTools)
+        assertTrue(resolved.enabledOfficialFunctions.containsKey("web_search"))
+    }
+
+    @Test
+    fun forConversationDropsOfficialToolWhenNoFunctionsAreSelected() {
+        val model = ModelConfig(
+            serviceId = LLMModelType.Mimo.serviceId,
+            baseType = ApiBaseType.Standard,
+            modelId = "model",
+            apiKey = "key",
+            fullBaseUrl = "https://example.com",
+            supportedOfficialTools = listOf("web_search"),
+            officialTools = listOf("web_search"),
+        )
+        val configuration = ConversationToolConfiguration(
+            enabledOfficialFunctionIdsByService = mapOf(
+                LLMModelType.Mimo.serviceId to mapOf("web_search" to emptySet()),
+            ),
+        )
+
+        assertEquals(emptyList<String>(), model.forConversation(configuration).officialTools)
     }
 }

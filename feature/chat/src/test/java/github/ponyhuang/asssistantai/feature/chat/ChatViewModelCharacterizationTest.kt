@@ -106,7 +106,10 @@ class ChatViewModelCharacterizationTest {
                 match { configuration ->
                     configuration?.enabledLocalToolIds == setOf("compose_message") &&
                         configuration.enabledMcpServerIds == setOf("enabled-mcp") &&
-                        configuration.enabledOfficialToolIds("service") == setOf("web_search")
+                        configuration.enabledOfficialFunctionIds(
+                            "service",
+                            "web_search",
+                        ) == setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER)
                 },
             )
         }
@@ -458,6 +461,9 @@ class ChatViewModelCharacterizationTest {
                 McpServer(id = "disabled-mcp", name = "Disabled", isEnabled = false),
             )
         }
+        val officialFunctionCatalog = mockk<github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunctionCatalog>(relaxed = true) {
+            coEvery { listFunctions(any()) } returns emptyList()
+        }
         return Fixture(
             viewModel = ChatViewModel(
                 runner = agent,
@@ -470,6 +476,7 @@ class ChatViewModelCharacterizationTest {
                 attachments = attachments,
                 toolAuthorization = toolAuthorization,
                 mcpRepository = mcpRepository,
+                officialFunctionCatalog = officialFunctionCatalog,
             ),
             conversations = conversations,
             agent = agent,

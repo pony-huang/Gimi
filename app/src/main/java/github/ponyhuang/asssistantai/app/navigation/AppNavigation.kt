@@ -166,7 +166,22 @@ fun MainScreen(
                                 },
                                 onLocalToolEnabledChange = viewModel::setLocalToolEnabled,
                                 onMcpServerEnabledChange = viewModel::setMcpServerEnabled,
-                                onOfficialToolEnabledChange = viewModel::setOfficialToolEnabled,
+                                onOfficialToolOpened = viewModel::loadOfficialToolFunctions,
+                                onOfficialToolFunctionEnabledChange = { toolId, functionId, enabled ->
+                                    val descriptors = viewModel.uiState.value.officialToolDescriptors
+                                    val supportedIds = descriptors
+                                        .firstOrNull { it.id == toolId }
+                                        ?.functions
+                                        ?.mapTo(hashSetOf()) { it.id }
+                                        .orEmpty()
+                                    viewModel.setOfficialFunctionEnabled(
+                                        toolId = toolId,
+                                        functionId = functionId,
+                                        enabled = enabled,
+                                        supportedFunctionIds = supportedIds,
+                                    )
+                                },
+                                onOfficialToolFunctionsRetry = viewModel::loadOfficialToolFunctions,
                             )
                         }
 

@@ -42,6 +42,10 @@
     <string name="chat_official_tool_kimi_formulas">Kimi formulas</string>
     <string name="chat_official_tool_kimi_formulas_description">Use Kimi formula calculations</string>
     <string name="chat_official_tool_default_description">An official tool provided by the model service</string>
+    <string name="chat_official_tools_title">Official built-in tools</string>
+    <string name="chat_official_tool_functions_loading">Loading available functions…</string>
+    <string name="chat_official_tool_functions_empty">No functions available</string>
+    <string name="chat_official_tool_functions_retry">Retry</string>
 
     <string name="chat_fab_back_to_latest">Back to latest</string>
     <string name="chat_open_drawer">Open history drawer</string>

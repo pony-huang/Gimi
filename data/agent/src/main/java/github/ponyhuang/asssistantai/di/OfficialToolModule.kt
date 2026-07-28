@@ -6,6 +6,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import github.ponyhuang.asssistantai.agent.tools.official.AnthropicOfficialToolAdapter
+import github.ponyhuang.asssistantai.agent.tools.official.DefaultOfficialToolFunctionCatalog
 import github.ponyhuang.asssistantai.agent.tools.official.IAnthropicOfficialToolAdapter
 import github.ponyhuang.asssistantai.agent.tools.official.KimiFormulaOfficialToolProvider
 import github.ponyhuang.asssistantai.agent.tools.official.MimoWebSearchToolAdapter
@@ -14,10 +15,16 @@ import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolProvider
 import github.ponyhuang.asssistantai.agent.tools.official.IOpenAiOfficialToolAdapter
 import github.ponyhuang.asssistantai.agent.tools.official.OpenAiOfficialToolAdapter
 import github.ponyhuang.asssistantai.agent.tools.official.WebSearchOfficialToolProvider
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunctionCatalog
 
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class OfficialToolModule {
+
+    @Binds
+    abstract fun bindOfficialToolFunctionCatalog(
+        catalog: DefaultOfficialToolFunctionCatalog,
+    ): OfficialToolFunctionCatalog
 
     @Binds
     @IntoSet

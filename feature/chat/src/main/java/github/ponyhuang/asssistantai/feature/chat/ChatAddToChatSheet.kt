@@ -55,6 +55,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -79,6 +80,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
 import github.ponyhuang.asssistantai.domain.mcp.model.McpTransport
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.asssistantai.domain.toolauthorization.model.ToolDescriptor
 
@@ -86,6 +88,7 @@ private enum class AddToChatPage {
     HOME,
     LOCAL_TOOLS,
     MCP,
+    OFFICIAL_TOOL,
 }
 
 @Composable
@@ -100,7 +103,9 @@ internal fun ChatAddToChatSheet(
     filesEnabled: Boolean,
     onLocalToolEnabledChange: (String, Boolean) -> Unit,
     onMcpServerEnabledChange: (String, Boolean) -> Unit,
-    onOfficialToolEnabledChange: (String, Boolean) -> Unit,
+    onOfficialToolOpened: (String) -> Unit,
+    onOfficialToolFunctionEnabledChange: (String, String, Boolean) -> Unit,
+    onOfficialToolFunctionsRetry: (String) -> Unit,
 ) {
     var page by rememberSaveable { mutableStateOf(AddToChatPage.HOME) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -148,10 +153,15 @@ internal fun ChatAddToChatSheet(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.TopCenter,
                 ) {
-                    val pageHeightModifier = if (
-                        currentPage == AddToChatPage.LOCAL_TOOLS ||
-                        currentPage == AddToChatPage.MCP && state.mcpServers.isNotEmpty()
-                    ) {
+                    val isFullHeightPage = when (currentPage) {
+                        AddToChatPage.LOCAL_TOOLS -> true
+                        AddToChatPage.MCP -> state.mcpServers.isNotEmpty()
+                        AddToChatPage.OFFICIAL_TOOL -> state.officialTools.any {
+                            it.functions.isNotEmpty() || it.isLoadingFunctions
+                        }
+                        else -> false
+                    }
+                    val pageHeightModifier = if (isFullHeightPage) {
                         Modifier.height(maximumPageHeight)
                     } else {
                         Modifier.wrapContentHeight()
@@ -165,6 +175,8 @@ internal fun ChatAddToChatSheet(
                                 AddToChatPage.HOME -> stringResource(R.string.chat_add_to_chat_title)
                                 AddToChatPage.LOCAL_TOOLS -> stringResource(R.string.chat_session_tools_title)
                                 AddToChatPage.MCP -> stringResource(R.string.chat_session_mcp_title)
+                                AddToChatPage.OFFICIAL_TOOL ->
+                                    stringResource(R.string.chat_official_tools_title)
                             },
                             isRoot = currentPage == AddToChatPage.HOME,
                             onNavigationClick = {
@@ -182,7 +194,12 @@ internal fun ChatAddToChatSheet(
                                 filesEnabled = filesEnabled,
                                 onOpenTools = { page = AddToChatPage.LOCAL_TOOLS },
                                 onOpenMcp = { page = AddToChatPage.MCP },
-                                onOfficialToolEnabledChange = onOfficialToolEnabledChange,
+                                onOpenOfficialTools = {
+                                    state.officialTools.forEach { tool ->
+                                        onOfficialToolOpened(tool.id)
+                                    }
+                                    page = AddToChatPage.OFFICIAL_TOOL
+                                },
                             )
                             AddToChatPage.LOCAL_TOOLS -> LocalToolsPage(
                                 state = state,
@@ -191,6 +208,11 @@ internal fun ChatAddToChatSheet(
                             AddToChatPage.MCP -> McpServersPage(
                                 state = state,
                                 onEnabledChange = onMcpServerEnabledChange,
+                            )
+                            AddToChatPage.OFFICIAL_TOOL -> OfficialToolsDetailPage(
+                                state = state,
+                                onFunctionEnabledChange = onOfficialToolFunctionEnabledChange,
+                                onRetry = onOfficialToolFunctionsRetry,
                             )
                         }
                     }
@@ -249,7 +271,7 @@ private fun AddToChatHome(
     filesEnabled: Boolean,
     onOpenTools: () -> Unit,
     onOpenMcp: () -> Unit,
-    onOfficialToolEnabledChange: (String, Boolean) -> Unit,
+    onOpenOfficialTools: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -287,23 +309,13 @@ private fun AddToChatHome(
                 )
             }
         }
-        if (state.supportedOfficialToolIds.isNotEmpty()) {
+        if (state.officialTools.isNotEmpty()) {
             item {
                 GroupedCard {
-                    state.supportedOfficialToolIds.forEachIndexed { index, toolId ->
-                        OfficialToolRow(
-                            toolId = toolId,
-                            enabled = toolId in state.serviceId?.let { serviceId ->
-                                state.configuration?.enabledOfficialToolIds(serviceId)
-                            }.orEmpty(),
-                            mutationEnabled = !state.isMutationBlocked &&
-                                state.configuration != null,
-                            onEnabledChange = { onOfficialToolEnabledChange(toolId, it) },
-                        )
-                        if (index != state.supportedOfficialToolIds.size - 1) {
-                            HorizontalDivider(modifier = Modifier.padding(start = 68.dp))
-                        }
-                    }
+                    OfficialToolsNavigationRow(
+                        enabledCount = state.enabledOfficialFunctionTotal(),
+                        onClick = onOpenOfficialTools,
+                    )
                 }
             }
         }
@@ -424,8 +436,183 @@ private fun NavigationRow(
 }
 
 @Composable
-private fun OfficialToolRow(
-    toolId: String,
+private fun OfficialToolsNavigationRow(
+    enabledCount: Int,
+    onClick: () -> Unit,
+) {
+    NavigationRow(
+        icon = Icons.Default.Functions,
+        title = stringResource(R.string.chat_official_tools_title),
+        subtitle = enabledCountText(enabledCount, isMcp = false),
+        onClick = onClick,
+        testTag = "official-tools-nav",
+    )
+}
+
+@Composable
+private fun OfficialToolsDetailPage(
+    state: ChatAddToChatState,
+    onFunctionEnabledChange: (String, String, Boolean) -> Unit,
+    onRetry: (String) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize().testTag("official-tools-detail")) {
+        PageStatus(state)
+        val totalFunctions = state.officialTools.sumOf { it.functions.size }
+        val anyLoading = state.officialTools.any { it.isLoadingFunctions }
+        val anyError = state.officialTools.any { it.loadError != null && it.functions.isEmpty() }
+
+        when {
+            state.officialTools.isEmpty() -> {
+                EmptyCenteredMessage(stringResource(R.string.chat_official_tool_functions_empty))
+            }
+
+            totalFunctions == 0 && anyLoading -> {
+                LoadingState()
+            }
+
+            totalFunctions == 0 && anyError -> {
+                val firstError = state.officialTools.first { it.loadError != null }
+                ErrorState(
+                    message = firstError.loadError.orEmpty(),
+                    onRetry = { onRetry(firstError.id) },
+                )
+            }
+
+            totalFunctions == 0 -> {
+                EmptyCenteredMessage(stringResource(R.string.chat_official_tool_functions_empty))
+            }
+
+            else -> {
+                LazyColumn(
+                    contentPadding = PaddingValues(bottom = 24.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .nestedScroll(rememberLowerBoundaryNestedScrollConnection()),
+                ) {
+                    state.officialTools.forEachIndexed { index, tool ->
+                        if (state.officialTools.size > 1) {
+                            item(key = "header-${tool.id}") {
+                                OfficialToolGroupHeader(
+                                    title = officialToolLabel(tool.id),
+                                    subtitle = officialToolDescription(tool.id),
+                                    isFirst = index == 0,
+                                )
+                            }
+                        }
+                        if (tool.functions.isEmpty() && tool.isLoadingFunctions) {
+                            item(key = "loading-${tool.id}") {
+                                LoadingState(compact = true)
+                            }
+                        } else if (tool.functions.isEmpty() && tool.loadError != null) {
+                            item(key = "error-${tool.id}") {
+                                ErrorState(
+                                    message = tool.loadError,
+                                    onRetry = { onRetry(tool.id) },
+                                    compact = true,
+                                )
+                            }
+                        } else {
+                            items(tool.functions, key = { "${tool.id}-${it.id}" }) { function ->
+                                OfficialToolFunctionRow(
+                                    function = function,
+                                    enabled = state.isOfficialFunctionEnabled(tool.id, function.id),
+                                    mutationEnabled = !state.isMutationBlocked &&
+                                        state.configuration != null,
+                                    onEnabledChange = {
+                                        onFunctionEnabledChange(tool.id, function.id, it)
+                                    },
+                                )
+                                HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OfficialToolGroupHeader(
+    title: String,
+    subtitle: String,
+    isFirst: Boolean,
+) {
+    Column(modifier = Modifier.padding(top = if (isFirst) 4.dp else 18.dp, bottom = 4.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
+        )
+    }
+}
+
+@Composable
+private fun LoadingState(compact: Boolean = false) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 36.dp, vertical = if (compact) 24.dp else 0.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        CircularProgressIndicator(modifier = Modifier.size(28.dp))
+        Text(
+            stringResource(R.string.chat_official_tool_functions_loading),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+    }
+}
+
+@Composable
+private fun ErrorState(message: String, onRetry: () -> Unit, compact: Boolean = false) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 36.dp, vertical = if (compact) 24.dp else 0.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.error,
+        )
+        TextButton(onClick = onRetry) {
+            Text(stringResource(R.string.chat_official_tool_functions_retry))
+        }
+    }
+}
+
+@Composable
+private fun EmptyCenteredMessage(message: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 36.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text(
+            message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun OfficialToolFunctionRow(
+    function: OfficialToolFunction,
     enabled: Boolean,
     mutationEnabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
@@ -433,40 +620,32 @@ private fun OfficialToolRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 76.dp)
+            .heightIn(min = 72.dp)
             .toggleable(
                 value = enabled,
                 enabled = mutationEnabled,
                 role = Role.Switch,
                 onValueChange = onEnabledChange,
             )
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconBubble(
-            if (toolId == OfficialToolIds.WEB_SEARCH) {
-                Icons.Default.Language
-            } else {
-                Icons.Default.Functions
-            },
-        )
+        IconBubble(Icons.Default.Functions)
         Column(
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 12.dp),
         ) {
-            Text(officialToolLabel(toolId), style = MaterialTheme.typography.bodyLarge)
+            Text(function.name, style = MaterialTheme.typography.bodyLarge)
             Text(
-                officialToolDescription(toolId),
+                function.description,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        Switch(
-            checked = enabled,
-            onCheckedChange = null,
-            enabled = mutationEnabled,
-        )
+        Switch(checked = enabled, onCheckedChange = null, enabled = mutationEnabled)
     }
 }
 

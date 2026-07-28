@@ -12,7 +12,6 @@ import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Schema
-import com.google.adk.kt.types.Tool as AdkTool
 import com.google.adk.kt.types.UsageMetadata
 import com.openai.client.OpenAIClient
 import com.openai.core.JsonValue
@@ -27,6 +26,7 @@ import com.openai.models.chat.completions.ChatCompletionAssistantMessageParam
 import com.openai.models.chat.completions.ChatCompletionChunk
 import com.openai.models.chat.completions.ChatCompletionContentPart
 import com.openai.models.chat.completions.ChatCompletionContentPartImage
+import com.openai.models.chat.completions.ChatCompletionContentPartInputAudio
 import com.openai.models.chat.completions.ChatCompletionContentPartText
 import com.openai.models.chat.completions.ChatCompletionCreateParams
 import com.openai.models.chat.completions.ChatCompletionFunctionTool
@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import java.util.Base64
+import com.google.adk.kt.types.Tool as AdkTool
 
 
 /**
@@ -64,7 +65,14 @@ open class Openai(
             "thinking",
             "thought",
         )
+        const val FILE_REFERENCE_MIME: String = "application/x-file-reference"
     }
+
+    data class FileReferenceMeta(
+        val fileId: String,
+        val fileName: String,
+        val fileSize: Long = 0L,
+    )
 
     /** Default OpenAI `max_completion_tokens` when the request omits one. Override for vendor caps. */
     protected open val defaultMaxCompletionTokens: Long = 2048L
@@ -192,9 +200,6 @@ open class Openai(
     /** Extract a regular-text delta from a streaming [ChatCompletionChunk.Choice]. Override to surface vendor-specific reasoning or content fields. */
     protected open fun ChatCompletionChunk.Choice.textDeltaOrNull(): String? {
         val delta = delta()
-        // Some compatible providers include a reasoning extension (often with a null value) on
-        // every chunk. A non-empty standard `content` field is always the visible answer and
-        // must take precedence over those extension fields.
         delta.content().orElse(null)
             ?.takeIf { it.isNotBlank() }
             ?.let { return it }
@@ -246,7 +251,8 @@ open class Openai(
 
         fun toLlmResponse(): LlmResponse {
             val parts = buildList {
-                text.takeIf { it.isNotEmpty() }?.let { add(Part(text = it.toString(), thought = false)) }
+                text.takeIf { it.isNotEmpty() }
+                    ?.let { add(Part(text = it.toString(), thought = false)) }
                 toolCalls.values.forEach { toolCall ->
                     val name = toolCall.name ?: return@forEach
                     add(
@@ -254,7 +260,8 @@ open class Openai(
                             functionCall = FunctionCall(
                                 id = toolCall.id,
                                 name = name,
-                                args = parseJsonArgs(toolCall.arguments.toString().ifEmpty { "{}" }),
+                                args = parseJsonArgs(
+                                    toolCall.arguments.toString().ifEmpty { "{}" }),
                             )
                         )
                     )
@@ -327,24 +334,18 @@ open class Openai(
                         )
                     )
                 }
-            parts.mapNotNull { it.inlineData }.forEach { image ->
-                val mimeType = image.mimeType ?: return@forEach
-                val data = image.data ?: return@forEach
-                if (isSupportedImageMimeType(mimeType)) {
-                    val dataUrl =
-                        "data:$mimeType;base64," + Base64.getEncoder().encodeToString(data)
-                    add(
-                        ChatCompletionContentPart.ofImageUrl(
-                            ChatCompletionContentPartImage.builder()
-                                .imageUrl(
-                                    ChatCompletionContentPartImage.ImageUrl.builder()
-                                        .url(dataUrl)
-                                        .build()
-                                )
-                                .build()
-                        )
-                    )
-                }
+
+            parts.mapNotNull { it.inlineData }.forEach { blob ->
+                val mimeType = blob.mimeType ?: return@forEach
+                val data = blob.data ?: return@forEach
+                buildInlineContentPart(mimeType, data)?.let { add(it) }
+            }
+
+            parts.mapNotNull { it.fileData }.forEach { fileData ->
+                val mimeType = fileData.mimeType ?: return@forEach
+                val fileUri = fileData.fileUri ?: return@forEach
+                val displayName = fileData.displayName ?: return@forEach
+                buildFilePart(mimeType, fileUri, displayName)?.let { add(it) }
             }
         }
         if (contentParts.isNotEmpty()) {
@@ -370,6 +371,66 @@ open class Openai(
         return result
     }
 
+    protected open fun buildFilePart(
+        mimeType: String,
+        displayName: String,
+        fileUri: String
+    ): ChatCompletionContentPart? {
+        if (isSupportedImageMimeType(mimeType)) {
+            return ChatCompletionContentPart.ofImageUrl(
+                ChatCompletionContentPartImage.builder()
+                    .imageUrl(
+                        ChatCompletionContentPartImage.ImageUrl.builder()
+                            .url(fileUri)
+                            .build()
+                    )
+                    .build()
+            )
+        }
+        return null;
+    }
+
+    protected open fun buildInlineContentPart(
+        mimeType: String,
+        data: ByteArray,
+    ): ChatCompletionContentPart? {
+        if (isSupportedImageMimeType(mimeType)) {
+            val dataUrl = "data:$mimeType;base64," + Base64.getEncoder().encodeToString(data)
+            return ChatCompletionContentPart.ofImageUrl(
+                ChatCompletionContentPartImage.builder()
+                    .imageUrl(
+                        ChatCompletionContentPartImage.ImageUrl.builder()
+                            .url(dataUrl)
+                            .build()
+                    )
+                    .build()
+            )
+        }
+        if (isSupportedAudioMimeType(mimeType)) {
+            val dataBase64 = Base64.getEncoder().encodeToString(data)
+            return ChatCompletionContentPart.ofInputAudio(
+                ChatCompletionContentPartInputAudio.builder()
+                    .inputAudio(
+                        ChatCompletionContentPartInputAudio.InputAudio.builder()
+                            .data(dataBase64)
+                            .build()
+                    )
+                    .build()
+            )
+        }
+        if (mimeType == FILE_REFERENCE_MIME) {
+            val meta = parseFileReferenceMeta(data)
+            return ChatCompletionContentPart.ofFile(
+                ChatCompletionContentPart.File.builder()
+                    .file(
+                        ChatCompletionContentPart.File.FileObject
+                            .builder().filename(meta.fileName).fileId(meta.fileId).build()
+                    )
+                    .build()
+            )
+        }
+        return null
+    }
     protected open fun Content.toModelMessages(): List<ChatCompletionMessageParam> {
         val result = mutableListOf<ChatCompletionMessageParam>()
 
@@ -449,6 +510,17 @@ open class Openai(
     protected open fun isSupportedImageMimeType(mimeType: String): Boolean =
         mimeType.startsWith(defaultImageMimePrefix)
 
+    protected open fun isSupportedAudioMimeType(mimeType: String): Boolean =
+        mimeType.startsWith("audio/")
+
+    protected open fun parseFileReferenceMeta(data: ByteArray): FileReferenceMeta {
+        val node = JSON_MAPPER.readTree(data)
+        return FileReferenceMeta(
+            fileId = node.get("file_id")?.asText() ?: "",
+            fileName = node.get("file_name")?.asText() ?: "",
+            fileSize = node.get("file_size")?.asLong() ?: 0L,
+        )
+    }
     protected open fun mapToErrorResponse(e: Exception): LlmResponse = LlmResponse(
         finishReason = if (e is BadRequestException) FinishReason.SAFETY
         else FinishReason.FINISH_REASON_UNSPECIFIED,

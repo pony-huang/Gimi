@@ -4,6 +4,7 @@ import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolC
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationToolConfigurationCodecTest {
@@ -13,9 +14,13 @@ class ConversationToolConfigurationCodecTest {
         val configuration = ConversationToolConfiguration(
             enabledLocalToolIds = setOf("clock", "location"),
             enabledMcpServerIds = setOf("server-1"),
-            enabledOfficialToolIdsByService = mapOf(
-                "mimo" to setOf("web_search"),
-                "kimi" to setOf("kimi_formulas"),
+            enabledOfficialFunctionIdsByService = mapOf(
+                "mimo" to mapOf("web_search" to setOf("web_search")),
+                "kimi" to mapOf(
+                    "kimi_formulas" to setOf(
+                        ConversationToolConfiguration.ALL_FUNCTIONS_MARKER,
+                    ),
+                ),
             ),
         )
 
@@ -43,6 +48,35 @@ class ConversationToolConfigurationCodecTest {
                 enabledMcpServerIds = setOf("server-1"),
             ),
             decoded,
+        )
+    }
+
+    @Test
+    fun legacyEnabledOfficialToolIdsByServiceIsMigratedToAllFunctionsMarker() {
+        val decoded = ConversationToolConfigurationCodec.decode(
+            """
+            {
+              "enabledLocalToolIds": ["clock"],
+              "enabledMcpServerIds": [],
+              "enabledOfficialToolIdsByService": {
+                "kimi": ["kimi_formulas", "web_search"],
+                "mimo": ["web_search"]
+              }
+            }
+            """.trimIndent(),
+        )!!
+
+        assertTrue(
+            ConversationToolConfiguration.ALL_FUNCTIONS_MARKER in
+                decoded.enabledOfficialFunctionIds("kimi", "kimi_formulas"),
+        )
+        assertTrue(
+            ConversationToolConfiguration.ALL_FUNCTIONS_MARKER in
+                decoded.enabledOfficialFunctionIds("kimi", "web_search"),
+        )
+        assertTrue(
+            ConversationToolConfiguration.ALL_FUNCTIONS_MARKER in
+                decoded.enabledOfficialFunctionIds("mimo", "web_search"),
         )
     }
 

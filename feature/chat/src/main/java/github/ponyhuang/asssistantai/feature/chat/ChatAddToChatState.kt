@@ -18,7 +18,7 @@ data class ChatAddToChatState(
     val configuration: ConversationToolConfiguration? = null,
     val localTools: List<ToolDescriptor> = emptyList(),
     val mcpServers: List<McpServer> = emptyList(),
-    val supportedOfficialToolIds: Set<String> = emptySet(),
+    val officialTools: List<OfficialToolDescriptor> = emptyList(),
     val isMutationBlocked: Boolean = false,
     val errorMessage: String? = null,
 ) {
@@ -50,5 +50,47 @@ data class ChatAddToChatState(
             }
             matchesQuery && matchesFilter
         }
+    }
+
+    /**
+     * Number of functions the user has selected for [toolId] within the current
+     * service. Empty configuration / unknown tool returns 0. When the
+     * [ConversationToolConfiguration.ALL_FUNCTIONS_MARKER] sentinel is present
+     * the count is read from the matching [OfficialToolDescriptor] (which may
+     * not yet have its [OfficialToolDescriptor.functions] loaded — in that
+     * case the count is reported as 1 because the marker itself is one entry).
+     */
+    fun enabledOfficialFunctionCount(toolId: String): Int {
+        val serviceId = serviceId ?: return 0
+        val config = configuration ?: return 0
+        val raw = config.enabledOfficialFunctionIds(serviceId, toolId)
+        if (ConversationToolConfiguration.ALL_FUNCTIONS_MARKER in raw) {
+            val descriptor = officialTools.firstOrNull { it.id == toolId }
+            return descriptor?.functions?.size ?: 1
+        }
+        return raw.size
+    }
+
+    /**
+     * Total number of functions the user has selected across every official
+     * tool in the active service. Used for the single "官方内置工具" row on
+     * the home sheet so it can advertise an aggregate summary without
+     * exposing each provider separately at the top level.
+     */
+    fun enabledOfficialFunctionTotal(): Int =
+        officialTools.sumOf { enabledOfficialFunctionCount(it.id) }
+
+    /**
+     * Whether a specific function is currently enabled, taking the
+     * [ConversationToolConfiguration.ALL_FUNCTIONS_MARKER] sentinel into
+     * account. Returns false when no configuration is loaded or the tool /
+     * function is unknown.
+     */
+    fun isOfficialFunctionEnabled(toolId: String, functionId: String): Boolean {
+        val serviceId = serviceId ?: return false
+        val config = configuration ?: return false
+        val raw = config.enabledOfficialFunctionIds(serviceId, toolId)
+        return ConversationToolConfiguration.ALL_FUNCTIONS_MARKER in raw ||
+            functionId in raw
     }
 }

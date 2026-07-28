@@ -8,30 +8,99 @@ import org.junit.Test
 class ConversationToolConfigurationTest {
 
     @Test
-    fun officialToolsDefaultToEverySupportedToolForAnUnseenService() {
+    fun officialFunctionsDefaultToTheAllMarkerForAnUnseenService() {
         val configuration = ConversationToolConfiguration()
 
-        val initialized = configuration.initializeOfficialTools(
+        val initialized = configuration.initializeOfficialFunctions(
             serviceId = "kimi",
             supportedToolIds = setOf("web_search", "kimi_formulas"),
         )
 
         assertEquals(
-            setOf("web_search", "kimi_formulas"),
-            initialized.enabledOfficialToolIds("kimi"),
+            setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
+            initialized.enabledOfficialFunctionIds("kimi", "web_search"),
+        )
+        assertEquals(
+            setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
+            initialized.enabledOfficialFunctionIds("kimi", "kimi_formulas"),
         )
     }
 
     @Test
     fun officialToolSelectionsRemainIndependentBetweenServices() {
         val configuration = ConversationToolConfiguration()
-            .initializeOfficialTools("mimo", setOf("web_search"))
-            .setOfficialToolEnabled("mimo", "web_search", enabled = false)
-            .initializeOfficialTools("kimi", setOf("web_search", "kimi_formulas"))
+            .initializeOfficialFunctions("mimo", setOf("web_search"))
+            .setOfficialFunctionEnabled(
+                "mimo",
+                "web_search",
+                "web_search",
+                supportedFunctionIds = setOf("web_search"),
+                enabled = false,
+            )
+            .initializeOfficialFunctions("kimi", setOf("web_search", "kimi_formulas"))
 
-        assertFalse("web_search" in configuration.enabledOfficialToolIds("mimo"))
-        assertTrue("web_search" in configuration.enabledOfficialToolIds("kimi"))
-        assertTrue("kimi_formulas" in configuration.enabledOfficialToolIds("kimi"))
+        assertFalse("web_search" in configuration.enabledOfficialFunctionIds("mimo", "web_search"))
+        assertTrue(
+            ConversationToolConfiguration.ALL_FUNCTIONS_MARKER in
+                configuration.enabledOfficialFunctionIds("kimi", "web_search"),
+        )
+        assertTrue(
+            ConversationToolConfiguration.ALL_FUNCTIONS_MARKER in
+                configuration.enabledOfficialFunctionIds("kimi", "kimi_formulas"),
+        )
+    }
+
+    @Test
+    fun setOfficialFunctionEnabledExpandsMarkerBeforeApplyingChange() {
+        val configuration = ConversationToolConfiguration()
+            .initializeOfficialFunctions("kimi", setOf("kimi_formulas"))
+
+        val updated = configuration.setOfficialFunctionEnabled(
+            serviceId = "kimi",
+            toolId = "kimi_formulas",
+            functionId = "convert",
+            supportedFunctionIds = setOf("convert", "rethink"),
+            enabled = false,
+        )
+
+        val enabled = updated.enabledOfficialFunctionIds("kimi", "kimi_formulas")
+        assertFalse(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER in enabled)
+        assertTrue("convert" !in enabled)
+        assertTrue("rethink" in enabled)
+    }
+
+    @Test
+    fun expandOfficialFunctionsMarkerReplacesTheSentinelWithConcreteIds() {
+        val configuration = ConversationToolConfiguration()
+            .initializeOfficialFunctions("kimi", setOf("kimi_formulas"))
+
+        val expanded = configuration.expandOfficialFunctionsMarker(
+            serviceId = "kimi",
+            toolId = "kimi_formulas",
+            supportedFunctionIds = setOf("convert", "rethink"),
+        )
+
+        assertEquals(
+            setOf("convert", "rethink"),
+            expanded.enabledOfficialFunctionIds("kimi", "kimi_formulas"),
+        )
+    }
+
+    @Test
+    fun expandOfficialFunctionsMarkerIsANoOpWhenMarkerAbsent() {
+        val configuration = ConversationToolConfiguration(
+            enabledOfficialFunctionIdsByService = mapOf(
+                "kimi" to mapOf("kimi_formulas" to setOf("convert")),
+            ),
+        )
+
+        val expanded = configuration.expandOfficialFunctionsMarker(
+            serviceId = "kimi",
+            toolId = "kimi_formulas",
+            supportedFunctionIds = setOf("convert", "rethink"),
+        )
+
+        assertEquals(configuration, expanded)
     }
 
     @Test

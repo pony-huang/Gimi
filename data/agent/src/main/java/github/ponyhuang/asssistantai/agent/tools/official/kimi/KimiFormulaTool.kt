@@ -7,11 +7,7 @@ import com.google.adk.kt.tools.FunctionTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.tools.Toolset
 import com.google.adk.kt.types.FunctionDeclaration
-import com.google.adk.kt.types.Schema
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -20,8 +16,6 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -29,104 +23,49 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.util.concurrent.ConcurrentHashMap
 
+/**
+ * Exposes Moonshot formulas as ADK tools.
+ *
+ * @param enabledFunctionIds when non-null, only declarations whose `name` is in
+ *   this set are registered. When null, every formula returned by the manifest
+ *   is exposed (legacy / no-per-conversation-config behaviour).
+ */
 class KimiFormulaToolset(
     private val apiKey: String,
     private val baseUrl: String,
     private val httpClient: OkHttpClient,
+    private val enabledFunctionIds: Set<String>? = null,
 ) : Toolset {
 
     companion object {
         private val logger = LoggerFactory.getLogger(KimiFormulaToolset::class)
-        private val FORMULA_URIS = listOf(
-            "moonshot/convert:latest",
-            "moonshot/web-search:latest",
-            "moonshot/rethink:latest",
-            "moonshot/random-choice:latest",
-            "moonshot/mew:latest",
-            "moonshot/memory:latest",
-            "moonshot/excel:latest",
-            "moonshot/date:latest",
-            "moonshot/base64:latest",
-            "moonshot/fetch:latest",
-            "moonshot/quickjs:latest",
-            "moonshot/code-runner:latest",
-        )
     }
-    private val toolCache = ConcurrentHashMap<Pair<String, String>, List<KimiFormulaTool>>()
+
+    private val manifest = KimiFormulaManifest(apiKey = apiKey, baseUrl = baseUrl, httpClient = httpClient)
 
     override suspend fun getTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
         withContext(Dispatchers.IO) {
-            val base = baseUrl.trimEnd('/')
-            val seenNames = mutableSetOf<String>()
-            coroutineScope {
-                FORMULA_URIS.map { uri ->
-                    async {
-                        runCatching { loadTools(base, apiKey, uri) }
-                            .onFailure { logger.warn(it) { "Failed to load Kimi formula: $uri" } }
-                            .getOrDefault(emptyList())
-                    }
-                }.awaitAll()
-            }.flatten().filter { tool ->
-                seenNames.add(tool.name).also { added ->
-                    if (!added) logger.warn { "Skipping duplicate Kimi formula tool name: ${tool.name}" }
-                }
-            }
-        }
-
-    private fun loadTools(base: String, apiKey: String, uri: String): List<KimiFormulaTool> {
-        return toolCache.computeIfAbsent(base to uri) {
-            val request = Request.Builder()
-                .url("$base/formulas/$uri/tools")
-                .header("Authorization", "Bearer $apiKey")
-                .build()
-
-            httpClient.newCall(request).execute().use { response ->
-                check(response.isSuccessful) { "HTTP ${response.code} loading formula $uri" }
-                val body = response.body?.string() ?: error("Empty body loading formula $uri")
-                parseDeclarations(body).map { declaration ->
+            manifest.fetch()
+                .map { declaration ->
                     KimiFormulaTool(
-                        baseUrl = base,
+                        baseUrl = baseUrl,
                         apiKey = apiKey,
-                        formulaUri = uri,
                         declaration = declaration,
-                        httpClient = httpClient
+                        httpClient = httpClient,
                     )
                 }
-            }
+                .filter { tool ->
+                    enabledFunctionIds == null || tool.name in enabledFunctionIds
+                }
         }
-    }
-
-    private fun parseDeclarations(body: String): List<FormulaDeclaration> {
-        val json = Json.parseToJsonElement(body).jsonObject
-        val tools = json["tools"]?.jsonArray ?: return emptyList()
-
-        return tools.mapNotNull { element ->
-            val function = element.jsonObject["function"]?.jsonObject ?: return@mapNotNull null
-            val name = function["name"]?.jsonPrimitive?.content ?: return@mapNotNull null
-
-            FormulaDeclaration(
-                name = name,
-                description = function["description"]?.jsonPrimitive?.content ?: name,
-                parameters = function["parameters"]?.jsonObject?.toAdkSchema()
-            )
-        }
-    }
 }
-
-internal data class FormulaDeclaration(
-    val name: String,
-    val description: String,
-    val parameters: Schema?,
-)
 
 internal class KimiFormulaTool(
     private val baseUrl: String,
     private val apiKey: String,
-    private val formulaUri: String,
     private val declaration: FormulaDeclaration,
-    private val httpClient: OkHttpClient
+    private val httpClient: OkHttpClient,
 ) : FunctionTool(
     name = declaration.name,
     description = declaration.description,
@@ -159,14 +98,14 @@ internal class KimiFormulaTool(
         }
 
         val request = Request.Builder()
-            .url("$baseUrl/formulas/$formulaUri/fibers")
+            .url("$baseUrl/formulas/${declaration.formulaUri}/fibers")
             .header("Authorization", "Bearer $apiKey")
             .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
             .build()
 
         httpClient.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
-            check(response.isSuccessful) { "HTTP ${response.code} executing $formulaUri: $body" }
+            check(response.isSuccessful) { "HTTP ${response.code} executing ${declaration.formulaUri}: $body" }
             return parseFiberResult(body)
         }
     }
@@ -185,18 +124,6 @@ internal class KimiFormulaTool(
 
         return mapOf(RESULT_KEY to output)
     }
-}
-
-
-private fun JsonObject.toAdkSchema(): Schema {
-    return Schema(
-        description = this["description"]?.jsonPrimitive?.content,
-        properties = this["properties"]?.jsonObject?.mapValues { (_, value) ->
-            value.jsonObject.toAdkSchema()
-        },
-        items = this["items"]?.jsonObject?.toAdkSchema(),
-        required = this["required"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull },
-    )
 }
 
 private fun Any?.toJsonElement(): JsonElement = when (this) {

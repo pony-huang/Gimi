@@ -13,6 +13,7 @@ import github.ponyhuang.asssistantai.agent.tools.WebSearchTool
 import github.ponyhuang.asssistantai.agent.tools.official.kimi.KimiFormulaToolset
 import github.ponyhuang.asssistantai.data.ApiBaseType
 import github.ponyhuang.asssistantai.data.LLMModelType
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import okhttp3.OkHttpClient
 import javax.inject.Inject
@@ -76,12 +77,15 @@ class KimiFormulaOfficialToolProvider @Inject constructor(
 
     override fun contribute(config: ModelConfig): OfficialToolContribution {
         if (config.serviceId != LLMModelType.Moonshot.serviceId) return OfficialToolContribution()
+        val enabledFunctionIds = config.enabledOfficialFunctions[OfficialToolIds.KIMI_FORMULAS]
+            ?.takeIf { it.isNotEmpty() && ConversationToolConfiguration.ALL_FUNCTIONS_MARKER !in it }
         return OfficialToolContribution(
             toolsets = listOf(
                 KimiFormulaToolset(
                     apiKey = config.apiKey,
                     baseUrl = config.officialToolBaseUrl,
                     httpClient = httpClient,
+                    enabledFunctionIds = enabledFunctionIds,
                 ),
             ),
         )

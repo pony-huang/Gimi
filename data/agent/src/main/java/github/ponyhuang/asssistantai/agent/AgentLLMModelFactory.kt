@@ -28,17 +28,28 @@ data class ModelConfig(
     val fullBaseUrl: String,
     val supportedOfficialTools: List<String> = emptyList(),
     val officialTools: List<String> = emptyList(),
+    /**
+     * Per-tool set of enabled function ids for [officialTools]. Empty set means
+     * "tool enabled but no specific function"; the absence of an entry means
+     * "tool not selected for this conversation".
+     */
+    val enabledOfficialFunctions: Map<String, Set<String>> = emptyMap(),
     /** Vendor tool endpoints may stay on the standard API host even for Anthropic model traffic. */
     val officialToolBaseUrl: String = fullBaseUrl,
 )
 
 internal fun ModelConfig.forConversation(
     configuration: ConversationToolConfiguration,
-): ModelConfig = copy(
-    officialTools = supportedOfficialTools.filter {
-        it in configuration.enabledOfficialToolIds(serviceId)
-    },
-)
+): ModelConfig {
+    val functionsByTool = configuration.enabledOfficialFunctionIdsByService[serviceId].orEmpty()
+    val enabledTools = supportedOfficialTools.filter { toolId ->
+        functionsByTool[toolId].orEmpty().isNotEmpty()
+    }
+    return copy(
+        officialTools = enabledTools,
+        enabledOfficialFunctions = functionsByTool,
+    )
+}
 
 @Singleton
 class AgentLLMModelFactory @Inject constructor(

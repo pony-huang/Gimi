@@ -104,7 +104,9 @@ public fun ChatComposer(
     addToChatState: ChatAddToChatState = ChatAddToChatState(),
     onLocalToolEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
     onMcpServerEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
-    onOfficialToolEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
+    onOfficialToolOpened: (String) -> Unit = { _ -> },
+    onOfficialToolFunctionEnabledChange: (String, String, Boolean) -> Unit = { _, _, _ -> },
+    onOfficialToolFunctionsRetry: (String) -> Unit = { _ -> },
     attachmentCapabilities: MultimodalCapabilities = MultimodalCapabilities(),
 ) {
     var messageData by rememberSaveable(stateSaver = MessageData.Saver) {
@@ -425,7 +427,9 @@ public fun ChatComposer(
                 attachmentCapabilities.supportsDocuments,
             onLocalToolEnabledChange = onLocalToolEnabledChange,
             onMcpServerEnabledChange = onMcpServerEnabledChange,
-            onOfficialToolEnabledChange = onOfficialToolEnabledChange,
+            onOfficialToolOpened = onOfficialToolOpened,
+            onOfficialToolFunctionEnabledChange = onOfficialToolFunctionEnabledChange,
+            onOfficialToolFunctionsRetry = onOfficialToolFunctionsRetry,
         )
     }
 }

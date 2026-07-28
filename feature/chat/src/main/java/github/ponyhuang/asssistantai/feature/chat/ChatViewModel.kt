@@ -26,6 +26,7 @@ import github.ponyhuang.asssistantai.domain.conversation.usecase.toView
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.asssistantai.domain.mcp.repository.McpRepository
 import github.ponyhuang.asssistantai.domain.speech.repository.SpeechRecognitionRepository
@@ -72,6 +73,7 @@ class ChatViewModel @Inject constructor(
     private val speechRecognitionRepository: SpeechRecognitionRepository,
     private val speechPlaybackController: SpeechPlaybackRepository,
     private val attachments: ChatAttachmentRepository,
+    private val officialFunctionCatalog: OfficialToolFunctionCatalog,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -214,7 +216,10 @@ class ChatViewModel @Inject constructor(
                     turnComplete = runtime.turnComplete,
                     currentModelSelection = runtime.modelSelection,
                     toolConfiguration = runtime.toolConfiguration,
-                    supportedOfficialToolIds = supportedOfficialTools(runtime.modelSelection),
+                    officialToolDescriptors = buildOfficialToolDescriptors(
+                        runtime.modelSelection,
+                        state.officialToolDescriptors,
+                    ),
                     pendingToolConfirmations = runtime.pendingToolConfirmations,
                     rejectedToolNames = runtime.rejectedToolNames.toSet(),
                     conversationTaskStatuses = statuses,
@@ -223,6 +228,7 @@ class ChatViewModel @Inject constructor(
                 state.copy(conversationTaskStatuses = statuses)
             }
         }
+        scheduleMarkerExpansion()
     }
 
     private fun showRuntime(sessionId: String, isInitializing: Boolean = false) {
@@ -236,12 +242,16 @@ class ChatViewModel @Inject constructor(
                 turnComplete = runtime.turnComplete,
                 currentModelSelection = runtime.modelSelection,
                 toolConfiguration = runtime.toolConfiguration,
-                supportedOfficialToolIds = supportedOfficialTools(runtime.modelSelection),
+                officialToolDescriptors = buildOfficialToolDescriptors(
+                    runtime.modelSelection,
+                    state.officialToolDescriptors,
+                ),
                 pendingToolConfirmations = runtime.pendingToolConfirmations,
                 rejectedToolNames = runtime.rejectedToolNames.toSet(),
                 isInitializing = isInitializing,
             )
         }
+        scheduleMarkerExpansion()
         publishRuntime(runtime)
     }
 
@@ -769,7 +779,7 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             repository.setConversationModel(sessionId, ModelSelectionCodec.encode(selection))
             runtime.modelSelection = selection
-            initializeOfficialToolsForSelection(sessionId, runtime, selection)
+            initializeOfficialFunctionsForSelection(sessionId, runtime, selection)
             runner.releaseSession(sessionId)
             publishRuntime(runtime)
         }
@@ -815,14 +825,17 @@ class ChatViewModel @Inject constructor(
         selection: ModelSelection?,
     ): ConversationToolConfiguration {
         val officialSelections = selection?.let { current ->
-            mapOf(current.serviceId to supportedOfficialTools(current))
+            mapOf(
+                current.serviceId to supportedOfficialToolIds(current)
+                    .associateWith { setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER) },
+            )
         }.orEmpty()
         return ConversationToolConfiguration(
             enabledLocalToolIds = toolAuthorization.enabledToolIds(),
             enabledMcpServerIds = mcpRepository.currentServers()
                 .filter { it.isEnabled }
                 .mapTo(linkedSetOf()) { it.id },
-            enabledOfficialToolIdsByService = officialSelections,
+            enabledOfficialFunctionIdsByService = officialSelections,
         )
     }
 
@@ -837,9 +850,9 @@ class ChatViewModel @Inject constructor(
         val availableMcpIds = mcpRepository.currentServers().mapTo(hashSetOf()) { it.id }
         val sanitized = initial.sanitize(availableLocalIds, availableMcpIds)
         val initialized = selection?.let { current ->
-            sanitized.initializeOfficialTools(
+            sanitized.initializeOfficialFunctions(
                 current.serviceId,
-                supportedOfficialTools(current),
+                supportedOfficialToolIds(current),
             )
         } ?: sanitized
         runtime.toolConfiguration = initialized
@@ -853,15 +866,15 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private suspend fun initializeOfficialToolsForSelection(
+    private suspend fun initializeOfficialFunctionsForSelection(
         sessionId: String,
         runtime: ChatSessionRuntime,
         selection: ModelSelection,
     ) {
         val current = runtime.toolConfiguration ?: defaultToolConfiguration(selection)
-        val initialized = current.initializeOfficialTools(
+        val initialized = current.initializeOfficialFunctions(
             selection.serviceId,
-            supportedOfficialTools(selection),
+            supportedOfficialToolIds(selection),
         )
         if (initialized != current) {
             if (repository.setConversationToolConfiguration(sessionId, initialized)) {
@@ -900,10 +913,132 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun setOfficialToolEnabled(toolId: String, enabled: Boolean) {
+    /**
+     * Toggle a single function of an official tool. The caller passes the
+     * current catalog of ids so the marker can be expanded before the write.
+     */
+    fun setOfficialFunctionEnabled(
+        toolId: String,
+        functionId: String,
+        enabled: Boolean,
+        supportedFunctionIds: Set<String>,
+    ) {
         val selection = _uiState.value.currentModelSelection ?: return
         updateToolConfiguration { configuration ->
-            configuration.setOfficialToolEnabled(selection.serviceId, toolId, enabled)
+            configuration.setOfficialFunctionEnabled(
+                selection.serviceId,
+                toolId,
+                functionId,
+                supportedFunctionIds,
+                enabled,
+            )
+        }
+    }
+
+    /**
+     * Trigger an async load of the function list for [toolId]. Already loaded
+     * tools only re-run their marker expansion (no network call). On success,
+     * the configuration's marker entry for the tool is replaced with the real
+     * function ids so persistence stays concrete.
+     */
+    fun loadOfficialToolFunctions(toolId: String) {
+        val descriptors = _uiState.value.officialToolDescriptors
+        val target = descriptors.firstOrNull { it.id == toolId } ?: return
+        if (target.isLoadingFunctions) return
+        if (target.functions.isNotEmpty() && target.loadError == null) {
+            expandMarkerAfterLoad(target)
+            return
+        }
+        fetchAndCacheOfficialToolFunctions(toolId)
+    }
+
+    /**
+     * Walk every descriptor and, for tools whose configuration still uses the
+     * [ConversationToolConfiguration.ALL_FUNCTIONS_MARKER] sentinel, fetch the
+     * function list in the background so the marker is expanded to concrete
+     * ids without forcing the user to open each sub-page first.
+     */
+    private fun scheduleMarkerExpansion() {
+        val configuration = _uiState.value.toolConfiguration ?: return
+        val selection = _uiState.value.currentModelSelection ?: return
+        val descriptors = _uiState.value.officialToolDescriptors
+        descriptors.forEach { descriptor ->
+            val raw = configuration.enabledOfficialFunctionIds(selection.serviceId, descriptor.id)
+            val needsExpansion = ConversationToolConfiguration.ALL_FUNCTIONS_MARKER in raw
+            val alreadyLoaded = descriptor.functions.isNotEmpty()
+            if (!needsExpansion) return@forEach
+            if (alreadyLoaded) {
+                expandMarkerAfterLoad(descriptor)
+                return@forEach
+            }
+            if (descriptor.isLoadingFunctions || descriptor.loadError != null) return@forEach
+            fetchAndCacheOfficialToolFunctions(descriptor.id)
+        }
+    }
+
+    private fun fetchAndCacheOfficialToolFunctions(toolId: String) {
+        _uiState.update { state ->
+            state.copy(
+                officialToolDescriptors = state.officialToolDescriptors.map { existing ->
+                    if (existing.id == toolId) {
+                        existing.copy(isLoadingFunctions = true, loadError = null)
+                    } else {
+                        existing
+                    }
+                },
+            )
+        }
+        viewModelScope.launch {
+            val outcome = runCatching { officialFunctionCatalog.listFunctions(toolId) }
+            val functions = outcome.getOrDefault(emptyList())
+            val loadError = outcome.exceptionOrNull()?.message
+            _uiState.update { state ->
+                state.copy(
+                    officialToolDescriptors = state.officialToolDescriptors.map { existing ->
+                        if (existing.id == toolId) {
+                            existing.copy(
+                                functions = functions,
+                                isLoadingFunctions = false,
+                                loadError = loadError,
+                            )
+                        } else {
+                            existing
+                        }
+                    },
+                )
+            }
+            if (functions.isNotEmpty()) {
+                expandMarkerAfterLoad(
+                    OfficialToolDescriptor(id = toolId, functions = functions),
+                )
+            }
+        }
+    }
+
+    private fun expandMarkerAfterLoad(tool: OfficialToolDescriptor) {
+        val selection = _uiState.value.currentModelSelection ?: return
+        val configuration = _uiState.value.toolConfiguration ?: return
+        val ids = configuration.enabledOfficialFunctionIds(selection.serviceId, tool.id)
+        if (ConversationToolConfiguration.ALL_FUNCTIONS_MARKER !in ids) return
+        if (tool.functions.isEmpty()) return
+        updateToolConfiguration { configuration ->
+            configuration.expandOfficialFunctionsMarker(
+                selection.serviceId,
+                tool.id,
+                tool.functions.mapTo(hashSetOf()) { it.id },
+            )
+        }
+    }
+
+    private fun buildOfficialToolDescriptors(
+        selection: ModelSelection?,
+        existing: List<OfficialToolDescriptor>,
+    ): List<OfficialToolDescriptor> {
+        val ids = supportedOfficialToolIds(selection)
+        if (ids.isEmpty()) return emptyList()
+        val existingById = existing.associateBy { it.id }
+        return ids.map { id ->
+            existingById[id] ?: OfficialToolDescriptor(id = id)
         }
     }
 
@@ -935,7 +1070,7 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun supportedOfficialTools(selection: ModelSelection?): Set<String> =
+    private fun supportedOfficialToolIds(selection: ModelSelection?): Set<String> =
         selection?.let { current ->
             modelServices.currentServices()
                 .firstOrNull { it.id == current.serviceId }

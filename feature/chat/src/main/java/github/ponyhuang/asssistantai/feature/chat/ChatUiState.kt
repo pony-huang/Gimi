@@ -7,6 +7,7 @@ import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.asssistantai.domain.speech.model.SpeechPlaybackState
 import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
@@ -57,7 +58,7 @@ data class ChatUiState(
     val toolConfiguration: ConversationToolConfiguration? = null,
     val availableLocalTools: List<ToolDescriptor> = emptyList(),
     val availableMcpServers: List<McpServer> = emptyList(),
-    val supportedOfficialToolIds: Set<String> = emptySet(),
+    val officialToolDescriptors: List<OfficialToolDescriptor> = emptyList(),
     val hasToolConfigurationError: Boolean = false,
     val showToolActivity: Boolean = true,
     val isSpeechRecognitionAvailable: Boolean = false,
@@ -91,3 +92,15 @@ fun ChatUiState.getCurrentUserMessage(): Message? =
 
 fun ChatUiState.getCurrentAssistantMessage(): Message? =
     messages.firstOrNull()?.takeIf { message -> message.role == MessageRole.Assistant }
+
+/**
+ * A user-selectable official tool exposed by the active model service. The
+ * function list is loaded lazily by [ChatViewModel] when the user opens the
+ * sub-page; [OfficialToolDescriptor.functions] stays empty while loading.
+ */
+data class OfficialToolDescriptor(
+    val id: String,
+    val functions: List<OfficialToolFunction> = emptyList(),
+    val isLoadingFunctions: Boolean = false,
+    val loadError: String? = null,
+)

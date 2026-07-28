@@ -11,13 +11,20 @@ import com.openai.models.chat.completions.ChatCompletionTool
 import github.ponyhuang.asssistantai.agent.ModelConfig
 import github.ponyhuang.asssistantai.agent.tools.WebSearchTool
 import github.ponyhuang.asssistantai.agent.tools.official.kimi.KimiFormulaToolset
-import github.ponyhuang.asssistantai.data.ApiBaseType
-import github.ponyhuang.asssistantai.data.LLMModelType
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import okhttp3.OkHttpClient
 import javax.inject.Inject
 import javax.inject.Singleton
+
+// 与 :data:modelcatalog 的 LLMModelType.serviceId 保持一致；data 层模块不允许
+// 互相依赖，此处复制字面量。
+private const val MOONSHOT_SERVICE_ID = "kimi"
+private const val OPENAI_SERVICE_ID = "openai"
+private const val MIMO_SERVICE_ID = "mimo"
+private const val ANTHROPIC_SERVICE_ID = "anthropic"
+private const val MINIMAX_SERVICE_ID = "minimax"
 
 /**
  * One user-selectable official tool contribution.
@@ -76,7 +83,7 @@ class KimiFormulaOfficialToolProvider @Inject constructor(
     override val id: String = OfficialToolIds.KIMI_FORMULAS
 
     override fun contribute(config: ModelConfig): OfficialToolContribution {
-        if (config.serviceId != LLMModelType.Moonshot.serviceId) return OfficialToolContribution()
+        if (config.serviceId != MOONSHOT_SERVICE_ID) return OfficialToolContribution()
         val enabledFunctionIds = config.enabledOfficialFunctions[OfficialToolIds.KIMI_FORMULAS]
             ?.takeIf { it.isNotEmpty() && ConversationToolConfiguration.ALL_FUNCTIONS_MARKER !in it }
         return OfficialToolContribution(
@@ -130,16 +137,16 @@ open class OpenAiOfficialToolAdapter @Inject constructor() : IOpenAiOfficialTool
     }
 
     override fun supports(config: ModelConfig): Boolean {
-        return config.serviceId in listOf(LLMModelType.OpenAI.serviceId, LLMModelType.Mimo.serviceId) &&
-                config.baseType == ApiBaseType.Standard &&
+        return config.serviceId in listOf(OPENAI_SERVICE_ID, MIMO_SERVICE_ID) &&
+                config.baseType == ApiProtocol.Standard &&
                 OfficialToolIds.WEB_SEARCH in config.officialTools
     }
 }
 
 class MimoWebSearchToolAdapter @Inject constructor() : OpenAiOfficialToolAdapter() {
     override fun supports(config: ModelConfig): Boolean {
-        return !(config.serviceId != LLMModelType.Mimo.serviceId ||
-                config.baseType != ApiBaseType.Standard ||
+        return !(config.serviceId != MIMO_SERVICE_ID ||
+                config.baseType != ApiProtocol.Standard ||
                 OfficialToolIds.WEB_SEARCH !in config.officialTools)
     }
 }
@@ -170,8 +177,8 @@ open class AnthropicOfficialToolAdapter @Inject constructor() : IAnthropicOffici
     }
 
     override fun supports(config: ModelConfig): Boolean {
-        return config.serviceId in listOf(LLMModelType.Anthropic.serviceId, LLMModelType.MiniMax.serviceId) &&
-                config.baseType == ApiBaseType.Anthropic &&
+        return config.serviceId in listOf(ANTHROPIC_SERVICE_ID, MINIMAX_SERVICE_ID) &&
+                config.baseType == ApiProtocol.Anthropic &&
                 OfficialToolIds.WEB_SEARCH in config.officialTools
     }
 }

@@ -16,7 +16,9 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.TestModelServic
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.UpdateModelServiceUseCase
 import javax.inject.Inject
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -33,6 +35,10 @@ class ModelServiceDetailViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(LLMModelSettingDetailUiState())
     val uiState = _uiState.asStateFlow()
 
+    // 缓冲若干条一次性反馈，避免 Route 尚未开始收集时丢失。
+    private val _effects = MutableSharedFlow<LLMModelSettingDetailEffect>(extraBufferCapacity = 8)
+    val effects = _effects.asSharedFlow()
+
     private var serviceId: String? = null
     private var expandedGroupIds: Set<String> = emptySet()
     private var loadJob: Job? = null
@@ -46,35 +52,31 @@ class ModelServiceDetailViewModel @Inject constructor(
         }
     }
 
-    fun onAction(action: LLmModelSettingDetailAction) {
+    fun onAction(action: LLMModelSettingDetailAction) {
         when (action) {
-            is LLmModelSettingDetailAction.Load -> load(action.serviceId)
-            is LLmModelSettingDetailAction.ApiKeyChanged -> changeApiKey(action.value)
-            is LLmModelSettingDetailAction.ApiBaseUrlChanged -> changeBaseUrl(action.value)
-            is LLmModelSettingDetailAction.ApiProtocolChanged -> changeProtocol(action.value)
-            is LLmModelSettingDetailAction.EnabledChanged -> changeEnabled(action.value)
-            is LLmModelSettingDetailAction.ToggleGroup -> toggleGroup(action.groupId)
-            is LLmModelSettingDetailAction.RemoveLLmModel -> removeModel(action.groupId, action.modelId)
-            is LLmModelSettingDetailAction.NewLLmModelIdChanged ->
+            is LLMModelSettingDetailAction.Load -> load(action.serviceId)
+            is LLMModelSettingDetailAction.ApiKeyChanged -> changeApiKey(action.value)
+            is LLMModelSettingDetailAction.ApiBaseUrlChanged -> changeBaseUrl(action.value)
+            is LLMModelSettingDetailAction.ApiProtocolChanged -> changeProtocol(action.value)
+            is LLMModelSettingDetailAction.EnabledChanged -> changeEnabled(action.value)
+            is LLMModelSettingDetailAction.ToggleGroup -> toggleGroup(action.groupId)
+            is LLMModelSettingDetailAction.RemoveLLMModel -> removeModel(action.groupId, action.modelId)
+            is LLMModelSettingDetailAction.NewLLMModelIdChanged ->
                 _uiState.update { it.copy(newModelId = action.value) }
-            is LLmModelSettingDetailAction.NewLLmModelKindChanged ->
+            is LLMModelSettingDetailAction.NewLLMModelKindChanged ->
                 _uiState.update { it.copy(newModelKind = action.value) }
-            LLmModelSettingDetailAction.ToggleApiKeyVisibility ->
+            LLMModelSettingDetailAction.ToggleApiKeyVisibility ->
                 _uiState.update { it.copy(isApiKeyVisible = !it.isApiKeyVisible) }
-            LLmModelSettingDetailAction.ToggleProtocolMenu ->
+            LLMModelSettingDetailAction.ToggleProtocolMenu ->
                 _uiState.update { it.copy(isProtocolMenuExpanded = !it.isProtocolMenuExpanded) }
-            LLmModelSettingDetailAction.DismissProtocolMenu ->
+            LLMModelSettingDetailAction.DismissProtocolMenu ->
                 _uiState.update { it.copy(isProtocolMenuExpanded = false) }
-            LLmModelSettingDetailAction.ShowAddDialog ->
+            LLMModelSettingDetailAction.ShowAddDialog ->
                 _uiState.update { it.copy(isAddDialogVisible = true) }
-            LLmModelSettingDetailAction.DismissAddDialog -> resetAddDialog()
-            LLmModelSettingDetailAction.ConfirmAddLLmModel -> addModel()
-            LLmModelSettingDetailAction.TestConnection -> testCurrentConnection()
-            LLmModelSettingDetailAction.RefreshModels -> refreshModels()
-            LLmModelSettingDetailAction.NoticeConsumed ->
-                _uiState.update { it.copy(notice = null) }
-            LLmModelSettingDetailAction.CloseConsumed ->
-                _uiState.update { it.copy(shouldClose = false) }
+            LLMModelSettingDetailAction.DismissAddDialog -> resetAddDialog()
+            LLMModelSettingDetailAction.ConfirmAddLLMModel -> addModel()
+            LLMModelSettingDetailAction.TestConnection -> testCurrentConnection()
+            LLMModelSettingDetailAction.RefreshModels -> refreshModels()
         }
     }
 
@@ -92,13 +94,13 @@ class ModelServiceDetailViewModel @Inject constructor(
             val initial = loadModelService(id)
             if (generation != loadGeneration || serviceId != id) return@launch
             if (initial == null) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        notice = LLMModelSettingDetailNotice.SettingNotFoundLLM,
-                        shouldClose = true,
-                    )
-                }
+                _uiState.update { it.copy(isLoading = false) }
+                _effects.emit(
+                    LLMModelSettingDetailEffect.ShowToast(
+                        LLMModelSettingDetailNotice.SettingNotFoundLLM,
+                    ),
+                )
+                _effects.emit(LLMModelSettingDetailEffect.Close)
                 return@launch
             }
 
@@ -230,16 +232,16 @@ class ModelServiceDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isTestingKey = true) }
             val success = testConnection(service)
-            _uiState.update {
-                it.copy(
-                    isTestingKey = false,
-                    notice = if (success) {
+            _uiState.update { it.copy(isTestingKey = false) }
+            _effects.emit(
+                LLMModelSettingDetailEffect.ShowToast(
+                    if (success) {
                         LLMModelSettingDetailNotice.ConnectionSucceeded
                     } else {
                         LLMModelSettingDetailNotice.ConnectionFailed
                     },
-                )
-            }
+                ),
+            )
         }
     }
 
@@ -249,15 +251,15 @@ class ModelServiceDetailViewModel @Inject constructor(
         mutate {
             _uiState.update { it.copy(isRefreshing = true) }
             val result = refreshCatalog(service)
-            _uiState.update {
-                it.copy(
-                    isRefreshing = false,
-                    notice = result.fold(
+            _uiState.update { it.copy(isRefreshing = false) }
+            _effects.emit(
+                LLMModelSettingDetailEffect.ShowToast(
+                    result.fold(
                         onSuccess = LLMModelSettingDetailNotice::ModelsSynchronized,
                         onFailure = { LLMModelSettingDetailNotice.LLMModelSynchronizationFailed },
                     ),
-                )
-            }
+                ),
+            )
         }
     }
 
@@ -265,9 +267,11 @@ class ModelServiceDetailViewModel @Inject constructor(
         viewModelScope.launch {
             when (runWhenAgentIdle(block)) {
                 is AgentMutationResult.Applied -> Unit
-                AgentMutationResult.BlockedByActiveAgent -> _uiState.update {
-                    it.copy(notice = LLMModelSettingDetailNotice.AgentMutationBlocked)
-                }
+                AgentMutationResult.BlockedByActiveAgent -> _effects.emit(
+                    LLMModelSettingDetailEffect.ShowToast(
+                        LLMModelSettingDetailNotice.AgentMutationBlocked,
+                    ),
+                )
             }
         }
     }

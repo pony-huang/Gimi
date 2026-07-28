@@ -1,15 +1,9 @@
 package github.ponyhuang.asssistantai.data.modelcatalog
 
-import github.ponyhuang.asssistantai.data.ApiBaseType
-import github.ponyhuang.asssistantai.data.LLMModelGroup
-import github.ponyhuang.asssistantai.data.LLMModelItem
-import github.ponyhuang.asssistantai.data.LLMModelProvider
-import github.ponyhuang.asssistantai.data.LLMModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.withDefaultAttachmentCapabilities
 
 fun LLMModelProvider.toDomain(): LLMModelSetting = LLMModelSetting(
@@ -38,24 +32,12 @@ fun Model.toData(): LLMModelItem = LLMModelItem(
     capabilities = capabilities,
 )
 
-fun LLMModelSelection.toDomain(): ModelSelection = ModelSelection(
-    serviceId = serviceId,
-    groupId = groupId,
-    modelId = modelId,
-)
-
-fun ModelSelection.toData(): LLMModelSelection = LLMModelSelection(
-    serviceId = serviceId,
-    groupId = groupId,
-    modelId = modelId,
-)
-
 fun ApiProtocol.toData(): ApiBaseType = when (this) {
     ApiProtocol.Standard -> ApiBaseType.Standard
     ApiProtocol.Anthropic -> ApiBaseType.Anthropic
 }
 
-private fun ApiBaseType.toDomain(): ApiProtocol = when (this) {
+fun ApiBaseType.toDomain(): ApiProtocol = when (this) {
     ApiBaseType.Standard -> ApiProtocol.Standard
     ApiBaseType.Anthropic -> ApiProtocol.Anthropic
 }

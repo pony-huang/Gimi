@@ -112,6 +112,11 @@
     <string name="chat_notice_model_switch_blocked">正在生成回复，完成后再切换模型</string>
     <string name="chat_notice_parallel_limit">最多同时运行 3 个会话任务</string>
     <string name="chat_notice_active_delete_blocked">任务运行或等待确认时不可删除该会话</string>
+    <string name="chat_notice_mixed_attachment_categories">每次只能发送同一类型的附件</string>
+    <string name="chat_notice_chat_model_unavailable">当前聊天模型不可用</string>
+    <string name="chat_notice_attachment_category_unsupported">当前模型不支持此类附件</string>
+    <string name="chat_notice_attachment_unsupported_or_too_large">附件类型不受支持或文件过大：%1$s</string>
+    <string name="chat_notice_document_total_size_limit">文档附件合计不能超过 50 MB</string>
 
     <!-- 工具确认卡片：未在本地目录中找到的工具 -->
     <string name="chat_tool_unknown_description">远程工具请求执行操作</string>

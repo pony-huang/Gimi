@@ -17,10 +17,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
     buildFeatures { compose = true }
-    testOptions { unitTests.isReturnDefaultValues = true }
 }
 
 dependencies {
+    // AGENTS.md 允许 feature 依赖业务无关的窄 core 模块；skills UI 共用 core:common 的通用工具。
     implementation(project(":core:common"))
     implementation(project(":core:designsystem"))
     implementation(project(":domain:skills"))

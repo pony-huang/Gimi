@@ -26,9 +26,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.feature.permissions.R
-import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
-import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
-import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
+import github.ponyhuang.asssistantai.ui.preference.PreferenceListItem
+import github.ponyhuang.asssistantai.ui.preference.PreferencePageContainer
+import github.ponyhuang.asssistantai.ui.preference.PreferenceSectionTitle
 
 @Composable
 fun PermissionSettingsScreen(
@@ -36,12 +36,12 @@ fun PermissionSettingsScreen(
     onAction: (PermissionSettingsAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsPageContainer(modifier = modifier) {
+    PreferencePageContainer(modifier = modifier) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
-            item { SettingsSectionTitle(text = stringResource(R.string.permissions_section_regular)) }
+            item { PreferenceSectionTitle(text = stringResource(R.string.permissions_section_regular)) }
             item {
                 Column(
                     modifier = Modifier
@@ -82,7 +82,7 @@ fun PermissionSettingsScreen(
             }
             state.groups.forEach { group ->
                 item(key = group.kind) {
-                    SettingsListItem(
+                    PreferenceListItem(
                         icon = group.kind.icon,
                         title = stringResource(group.titleRes),
                         subtitle = stringResource(group.subtitleRes),
@@ -101,9 +101,9 @@ fun PermissionSettingsScreen(
                 }
             }
 
-            item { SettingsSectionTitle(text = stringResource(R.string.permissions_section_special)) }
+            item { PreferenceSectionTitle(text = stringResource(R.string.permissions_section_special)) }
             item {
-                SettingsListItem(
+                PreferenceListItem(
                     icon = Icons.Default.Tune,
                     title = stringResource(R.string.permissions_special_modify_settings_title),
                     subtitle = stringResource(R.string.permissions_special_modify_settings_subtitle),
@@ -118,7 +118,7 @@ fun PermissionSettingsScreen(
                 )
             }
             item {
-                SettingsListItem(
+                PreferenceListItem(
                     icon = Icons.Default.NotificationsActive,
                     title = stringResource(R.string.permissions_special_notification_access_title),
                     subtitle = stringResource(R.string.permissions_special_notification_access_subtitle),

@@ -34,11 +34,11 @@ import github.ponyhuang.asssistantai.domain.speech.model.WakeModelSource
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelState
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelStatus
 import github.ponyhuang.asssistantai.feature.voicewake.R
-import github.ponyhuang.asssistantai.ui.settings.SettingsBanner
-import github.ponyhuang.asssistantai.ui.settings.SettingsBannerTone
-import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
-import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
-import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
+import github.ponyhuang.asssistantai.ui.preference.PreferenceBanner
+import github.ponyhuang.asssistantai.ui.preference.PreferenceBannerTone
+import github.ponyhuang.asssistantai.ui.preference.PreferenceListItem
+import github.ponyhuang.asssistantai.ui.preference.PreferencePageContainer
+import github.ponyhuang.asssistantai.ui.preference.PreferenceSectionTitle
 
 @Composable
 fun VoiceWakeSettingsScreen(
@@ -46,13 +46,13 @@ fun VoiceWakeSettingsScreen(
     onAction: (VoiceWakeSettingsAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsPageContainer(modifier = modifier) {
+    PreferencePageContainer(modifier = modifier) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
             item {
-                SettingsListItem(
+                PreferenceListItem(
                     icon = Icons.Default.BluetoothAudio,
                     title = stringResource(R.string.voicewake_listening_title),
                     subtitle = listeningSubtitle(state.voiceState),
@@ -71,15 +71,15 @@ fun VoiceWakeSettingsScreen(
             }
             if (!state.configurationReady) {
                 item {
-                    SettingsBanner(
+                    PreferenceBanner(
                         text = stringResource(R.string.voicewake_offline_setup_required),
-                        tone = SettingsBannerTone.Error,
+                        tone = PreferenceBannerTone.Error,
                     )
                 }
             }
 
             item {
-                SettingsSectionTitle(
+                PreferenceSectionTitle(
                     text = stringResource(R.string.voicewake_section_models),
                     modifier = Modifier.padding(top = 12.dp),
                 )
@@ -96,7 +96,7 @@ fun VoiceWakeSettingsScreen(
             }
 
             item {
-                SettingsSectionTitle(
+                PreferenceSectionTitle(
                     text = stringResource(
                         R.string.voicewake_section_keyword_with_language,
                         stringResource(languageNameRes(state.voiceState.activeModel)),

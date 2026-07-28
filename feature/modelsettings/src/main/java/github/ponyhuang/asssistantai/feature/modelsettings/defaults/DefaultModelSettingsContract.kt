@@ -1,5 +1,6 @@
 package github.ponyhuang.asssistantai.feature.modelsettings.defaults
 
+import androidx.annotation.StringRes
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
@@ -26,7 +27,6 @@ data class DefaultModelSettingsUiState(
     val ttsModels: List<SelectableModelRow> = emptyList(),
     val dialog: DefaultModelDialog? = null,
     val isMutationBlocked: Boolean = false,
-    val notice: String? = null,
 )
 
 enum class DefaultModelDialog {
@@ -45,4 +45,10 @@ sealed interface DefaultModelSettingsAction {
     ) : DefaultModelSettingsAction
     data class SelectVoice(val voiceId: String) : DefaultModelSettingsAction
     data object DismissDialog : DefaultModelSettingsAction
+}
+
+/** 一次性 UI 反馈（Toast 等），由 Route 经 effects 通道消费。 */
+sealed interface DefaultModelSettingsEffect {
+    /** @param messageRes 文案的 string resource id。 */
+    data class ShowToast(@StringRes val messageRes: Int) : DefaultModelSettingsEffect
 }

@@ -4,12 +4,39 @@ import com.google.adk.kt.agents.LlmAgent
 import com.google.adk.kt.sessions.SessionService
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
+import android.util.Log
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 
 class AgentChatRunnerIsolationTest {
+
+    @Before
+    fun setUp() {
+        mockkStatic(Log::class)
+        every { Log.v(any<String>(), any<String>()) } returns 0
+        every { Log.d(any<String>(), any<String>()) } returns 0
+        every { Log.i(any<String>(), any<String>()) } returns 0
+        every { Log.w(any<String>(), any<String>()) } returns 0
+        every { Log.e(any<String>(), any<String>()) } returns 0
+        every { Log.v(any<String>(), any<String>(), any<Throwable>()) } returns 0
+        every { Log.d(any<String>(), any<String>(), any<Throwable>()) } returns 0
+        every { Log.i(any<String>(), any<String>(), any<Throwable>()) } returns 0
+        every { Log.w(any<String>(), any<String>(), any<Throwable>()) } returns 0
+        every { Log.e(any<String>(), any<String>(), any<Throwable>()) } returns 0
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic(Log::class)
+    }
+
     @Test
     fun sessionsOwnIndependentRunnersAndConfirmationReusesItsSessionRunner() = runTest {
         val createdSelections = mutableListOf<ModelSelection?>()

@@ -5,7 +5,7 @@ import android.content.Intent
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.asssistantai.data.voicewake.R
-import github.ponyhuang.asssistantai.data.assistant.VoiceSessionIdStore
+import github.ponyhuang.asssistantai.domain.assistant.repository.VoiceSessionStore
 import github.ponyhuang.asssistantai.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.asssistantai.domain.speech.repository.VoiceWakeRepository
 import javax.inject.Inject
@@ -24,7 +24,7 @@ class BluetoothVoiceController @Inject constructor(
     @ApplicationContext private val context: Context,
     private val preferences: BluetoothVoicePreferences,
     private val modelRepository: WakeModelRepository,
-    private val voiceSessionStore: VoiceSessionIdStore,
+    private val voiceSessionStore: VoiceSessionStore,
 ) : VoiceWakeRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val _state = MutableStateFlow(

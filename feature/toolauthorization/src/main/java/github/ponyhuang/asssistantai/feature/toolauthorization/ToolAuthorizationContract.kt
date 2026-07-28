@@ -6,7 +6,6 @@ data class ToolAuthorizationUiState(
     val isCustomizationEnabled: Boolean = false,
     val tools: List<ToolDescriptor> = emptyList(),
     val isMutationBlocked: Boolean = false,
-    val notice: String? = null,
 ) {
     val enabledCount: Int get() = tools.count(ToolDescriptor::isEnabled)
     val totalCount: Int get() = tools.size
@@ -16,12 +15,19 @@ sealed interface ToolAuthorizationAction {
     data class SetCustomizationEnabled(val enabled: Boolean) : ToolAuthorizationAction
 }
 
+sealed interface ToolAuthorizationMessage {
+    data object AgentBusy : ToolAuthorizationMessage
+}
+
+sealed interface ToolAuthorizationEffect {
+    data class ShowMessage(val message: ToolAuthorizationMessage) : ToolAuthorizationEffect
+}
+
 data class ToolAuthorizationConfigurationUiState(
     val query: String = "",
     val filter: ToolAuthorizationFilter = ToolAuthorizationFilter.ALL,
     val tools: List<ToolDescriptor> = emptyList(),
     val isMutationBlocked: Boolean = false,
-    val notice: String? = null,
 ) {
     val visibleTools: List<ToolDescriptor>
         get() {

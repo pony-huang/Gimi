@@ -11,8 +11,9 @@ import com.google.adk.kt.sessions.SessionService
 import com.google.adk.kt.types.Part
 import dagger.Lazy
 import github.ponyhuang.asssistantai.agent.AgentChatRunner
-import github.ponyhuang.asssistantai.data.ModelServiceRepository
 import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentRuntimeGate
+import github.ponyhuang.asssistantai.domain.modelcatalog.repository.AgentModelConfigurationSource
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentTaskSource
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.seconds
@@ -46,7 +47,7 @@ class AssistantFunctions
         // 仓库在首次注入时完成种子和缓存恢复。保留 Lazy，避免 AppFunction 配置阶段
         // 提前构造网络运行器。
         private val agentChatRunnerLazy: Lazy<AgentChatRunner>,
-        private val modelServices: ModelServiceRepository,
+        private val modelServices: AgentModelConfigurationSource,
         private val agentRuntimeGate: AgentRuntimeGate,
         private val managedSessions: ManagedSessionRegistry,
         private val sessionService: SessionService,
@@ -84,7 +85,7 @@ class AssistantFunctions
             if (message.isBlank()) {
                 throw AppFunctionInvalidArgumentException("message must not be blank")
             }
-            if (modelServices.services.value.none { it.isEnabled }) {
+            if (modelServices.currentServices().none { it.isEnabled }) {
                 throw AppFunctionAppUnknownException("No enabled model service available")
             }
 
@@ -161,9 +162,7 @@ class AssistantFunctions
         }
 
         private companion object {
-            // 与 `di/AgentModule.kt::USER_ID` 保持一致 — 此处复制一份常量以避免
-            // 把 AgentModule 的私有字段升级为 public；如未来需要修改请同步两处。
-            const val USER_ID: String = "user-default"
+            const val USER_ID: String = AgentSessionIdentity.DEFAULT_USER_ID
             const val TIMEOUT_SECONDS: Long = 60
         }
     }

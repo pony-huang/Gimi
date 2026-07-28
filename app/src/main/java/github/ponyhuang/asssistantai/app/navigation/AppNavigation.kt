@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.app.navigation
 
 import android.content.Context
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.animation.slideInHorizontally
@@ -28,6 +29,8 @@ import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import github.ponyhuang.asssistantai.BuildConfig
+import github.ponyhuang.asssistantai.feature.chat.ChatAction
+import github.ponyhuang.asssistantai.feature.chat.ChatEffect
 import github.ponyhuang.asssistantai.feature.chat.ChatNotice
 import github.ponyhuang.asssistantai.feature.chat.ChatScaffold
 import github.ponyhuang.asssistantai.feature.chat.ChatViewModel
@@ -47,6 +50,7 @@ import github.ponyhuang.asssistantai.feature.modelsettings.R as ModelsettingsR
 import github.ponyhuang.asssistantai.feature.permissions.PermissionSettingsRoute
 import github.ponyhuang.asssistantai.feature.permissions.R as PermissionsR
 import github.ponyhuang.asssistantai.feature.settings.R as SettingsR
+import github.ponyhuang.asssistantai.feature.settings.SettingsRoute
 import github.ponyhuang.asssistantai.feature.skills.SkillsSettingsRoute
 import github.ponyhuang.asssistantai.feature.skills.R as SkillsR
 import github.ponyhuang.asssistantai.feature.toolauthorization.ToolAuthorizationConfigurationRoute
@@ -57,8 +61,7 @@ import github.ponyhuang.asssistantai.feature.voicewake.R as VoicewakeR
 import github.ponyhuang.asssistantai.feature.workfiles.WorkFilesSettingsRoute
 import github.ponyhuang.asssistantai.feature.workfiles.R as WorkfilesR
 import github.ponyhuang.asssistantai.ui.navigation.AppRoute
-import github.ponyhuang.asssistantai.ui.navigation.SettingsScaffold
-import github.ponyhuang.asssistantai.ui.settings.SettingsScreen
+import github.ponyhuang.asssistantai.ui.preference.PreferenceScaffold
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -68,6 +71,9 @@ import java.io.File
     ExperimentalLayoutApi::class,
     ExperimentalFoundationApi::class,
 )
+// ChatNotice.AttachmentUnsupportedOrTooLarge 的 displayName 为运行时参数，
+// 文案只能在 effect 消费时解析，豁免该 lint。
+@SuppressLint("LocalContextGetResourceValueCall")
 @Composable
 fun MainScreen(
     viewModel: ChatViewModel = hiltViewModel(),
@@ -81,6 +87,13 @@ fun MainScreen(
     val chatNoticeModelSwitchBlocked = stringResource(ChatR.string.chat_notice_model_switch_blocked)
     val chatNoticeParallelLimit = stringResource(ChatR.string.chat_notice_parallel_limit)
     val chatNoticeActiveDeleteBlocked = stringResource(ChatR.string.chat_notice_active_delete_blocked)
+    val chatNoticeMixedAttachmentCategories =
+        stringResource(ChatR.string.chat_notice_mixed_attachment_categories)
+    val chatNoticeChatModelUnavailable = stringResource(ChatR.string.chat_notice_chat_model_unavailable)
+    val chatNoticeAttachmentCategoryUnsupported =
+        stringResource(ChatR.string.chat_notice_attachment_category_unsupported)
+    val chatNoticeDocumentTotalSizeLimit =
+        stringResource(ChatR.string.chat_notice_document_total_size_limit)
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val backStack = rememberNavBackStack(AppRoute.Chat)
@@ -92,26 +105,36 @@ fun MainScreen(
     }
 
     LaunchedEffect(requestedSessionId) {
-        viewModel.refreshConversations()
+        viewModel.onAction(ChatAction.RefreshConversations)
         if (requestedSessionId.isNullOrBlank()) {
-            viewModel.restoreOrCreateSession()
+            viewModel.onAction(ChatAction.RestoreOrCreateSession)
         } else {
-            viewModel.switchSession(requestedSessionId)
+            viewModel.onAction(ChatAction.SwitchSession(requestedSessionId))
             onRequestedSessionHandled()
         }
     }
 
-    LaunchedEffect(uiState.notice) {
-        val message = when (val notice = uiState.notice) {
-            ChatNotice.ConfigureChatModel -> chatNoticeConfigureChatModel
-            ChatNotice.ModelSwitchBlocked -> chatNoticeModelSwitchBlocked
-            ChatNotice.ParallelTaskLimitReached -> chatNoticeParallelLimit
-            ChatNotice.ActiveConversationDeleteBlocked -> chatNoticeActiveDeleteBlocked
-            is ChatNotice.Message -> notice.text
-            null -> return@LaunchedEffect
+    LaunchedEffect(Unit) {
+        viewModel.effects.collect { effect ->
+            val message = when (effect) {
+                is ChatEffect.ShowNotice -> when (val notice = effect.notice) {
+                    ChatNotice.ConfigureChatModel -> chatNoticeConfigureChatModel
+                    ChatNotice.ModelSwitchBlocked -> chatNoticeModelSwitchBlocked
+                    ChatNotice.ParallelTaskLimitReached -> chatNoticeParallelLimit
+                    ChatNotice.ActiveConversationDeleteBlocked -> chatNoticeActiveDeleteBlocked
+                    ChatNotice.MixedAttachmentCategories -> chatNoticeMixedAttachmentCategories
+                    ChatNotice.ChatModelUnavailable -> chatNoticeChatModelUnavailable
+                    ChatNotice.AttachmentCategoryUnsupported -> chatNoticeAttachmentCategoryUnsupported
+                    is ChatNotice.AttachmentUnsupportedOrTooLarge -> context.getString(
+                        ChatR.string.chat_notice_attachment_unsupported_or_too_large,
+                        notice.displayName,
+                    )
+                    ChatNotice.DocumentTotalSizeLimitExceeded -> chatNoticeDocumentTotalSizeLimit
+                    is ChatNotice.Message -> notice.text
+                }
+            }
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        viewModel.consumeNotice()
     }
 
     ChatDrawer(
@@ -121,11 +144,13 @@ fun MainScreen(
         conversationTaskStatuses = uiState.conversationTaskStatuses,
         isConversationSwitchEnabled = true,
         onConversationClick = { conversation ->
-            viewModel.switchSession(conversation.id)
+            viewModel.onAction(ChatAction.SwitchSession(conversation.id))
             returnToChat()
             scope.launch { drawerState.close() }
         },
-        onDeleteClick = { conversation -> viewModel.deleteConversation(conversation.id) },
+        onDeleteClick = { conversation ->
+            viewModel.onAction(ChatAction.DeleteConversation(conversation.id))
+        },
         onSettingsClick = {
             returnToChat()
             backStack.add(AppRoute.Settings)
@@ -143,14 +168,20 @@ fun MainScreen(
                                 state = uiState,
                                 partChannelProvider = viewModel::partChannelFor,
                                 onSend = viewModel::send,
-                                onStop = viewModel::stopStreaming,
+                                onStop = { viewModel.onAction(ChatAction.StopStreaming) },
                                 onTranscribeVoice = viewModel::transcribeVoice,
-                                onToggleSpeechPlayback = viewModel::toggleSpeechPlayback,
+                                onToggleSpeechPlayback = { messageId, markdown ->
+                                    viewModel.onAction(ChatAction.ToggleSpeechPlayback(messageId, markdown))
+                                },
                                 onOpenDocument = { attachment ->
                                     openDocumentAttachment(context, attachment)
                                 },
-                                onToolConfirmation = viewModel::respondToToolConfirmation,
-                                onSelectModel = viewModel::selectModel,
+                                onToolConfirmation = { confirmed ->
+                                    viewModel.onAction(ChatAction.RespondToToolConfirmation(confirmed))
+                                },
+                                onSelectModel = { selection ->
+                                    viewModel.onAction(ChatAction.SelectModel(selection))
+                                },
                                 onModelSwitchBlocked = {
                                     Toast.makeText(
                                         context,
@@ -162,11 +193,17 @@ fun MainScreen(
                                 onOpenSettings = { backStack.add(AppRoute.Settings) },
                                 onConfigureModels = { backStack.add(AppRoute.ModelServiceList) },
                                 onNewConversation = {
-                                    viewModel.reset()
+                                    viewModel.onAction(ChatAction.NewConversation)
                                 },
-                                onLocalToolEnabledChange = viewModel::setLocalToolEnabled,
-                                onMcpServerEnabledChange = viewModel::setMcpServerEnabled,
-                                onOfficialToolOpened = viewModel::loadOfficialToolFunctions,
+                                onLocalToolEnabledChange = { toolId, enabled ->
+                                    viewModel.onAction(ChatAction.SetLocalToolEnabled(toolId, enabled))
+                                },
+                                onMcpServerEnabledChange = { serverId, enabled ->
+                                    viewModel.onAction(ChatAction.SetMcpServerEnabled(serverId, enabled))
+                                },
+                                onOfficialToolOpened = { toolId ->
+                                    viewModel.onAction(ChatAction.LoadOfficialToolFunctions(toolId))
+                                },
                                 onOfficialToolFunctionEnabledChange = { toolId, functionId, enabled ->
                                     val descriptors = viewModel.uiState.value.officialToolDescriptors
                                     val supportedIds = descriptors
@@ -174,22 +211,26 @@ fun MainScreen(
                                         ?.functions
                                         ?.mapTo(hashSetOf()) { it.id }
                                         .orEmpty()
-                                    viewModel.setOfficialFunctionEnabled(
-                                        toolId = toolId,
-                                        functionId = functionId,
-                                        enabled = enabled,
-                                        supportedFunctionIds = supportedIds,
+                                    viewModel.onAction(
+                                        ChatAction.SetOfficialFunctionEnabled(
+                                            toolId = toolId,
+                                            functionId = functionId,
+                                            enabled = enabled,
+                                            supportedFunctionIds = supportedIds,
+                                        ),
                                     )
                                 },
-                                onOfficialToolFunctionsRetry = viewModel::loadOfficialToolFunctions,
+                                onOfficialToolFunctionsRetry = { toolId ->
+                                    viewModel.onAction(ChatAction.LoadOfficialToolFunctions(toolId))
+                                },
                             )
                         }
 
-                        AppRoute.Settings -> SettingsScaffold(
+                        AppRoute.Settings -> PreferenceScaffold(
                             stringResource(SettingsR.string.settings_title),
                             goBack,
                         ) { modifier ->
-                            SettingsScreen(
+                            SettingsRoute(
                                 appVersionName = BuildConfig.VERSION_NAME,
                                 onNavigateToModelService = { backStack.add(AppRoute.ModelServiceList) },
                                 onNavigateToDefaultModels = { backStack.add(AppRoute.DefaultModelSettings) },
@@ -205,35 +246,35 @@ fun MainScreen(
                             )
                         }
 
-                        AppRoute.DefaultModelSettings -> SettingsScaffold(
+                        AppRoute.DefaultModelSettings -> PreferenceScaffold(
                             stringResource(ModelsettingsR.string.modelsettings_defaults_screen_title),
                             goBack,
                         ) {
                             DefaultModelSettingsRoute(modifier = it)
                         }
 
-                        AppRoute.VoiceWakeSettings -> SettingsScaffold(
+                        AppRoute.VoiceWakeSettings -> PreferenceScaffold(
                             stringResource(VoicewakeR.string.voicewake_screen_title),
                             goBack,
                         ) {
                             VoiceWakeSettingsRoute(modifier = it)
                         }
 
-                        AppRoute.WorkFilesSettings -> SettingsScaffold(
+                        AppRoute.WorkFilesSettings -> PreferenceScaffold(
                             stringResource(WorkfilesR.string.workfiles_screen_title),
                             goBack,
                         ) {
                             WorkFilesSettingsRoute(modifier = it)
                         }
 
-                        AppRoute.PermissionSettings -> SettingsScaffold(
+                        AppRoute.PermissionSettings -> PreferenceScaffold(
                             stringResource(PermissionsR.string.permissions_screen_title),
                             goBack,
                         ) {
                             PermissionSettingsRoute(modifier = it)
                         }
 
-                        AppRoute.ToolAuthorizationSettings -> SettingsScaffold(
+                        AppRoute.ToolAuthorizationSettings -> PreferenceScaffold(
                             stringResource(ToolauthR.string.toolauth_screen_title),
                             goBack,
                         ) {
@@ -245,21 +286,21 @@ fun MainScreen(
                             )
                         }
 
-                        AppRoute.ToolAuthorizationConfiguration -> SettingsScaffold(
+                        AppRoute.ToolAuthorizationConfiguration -> PreferenceScaffold(
                             stringResource(ToolauthR.string.toolauth_configuration_title),
                             goBack,
                         ) {
                             ToolAuthorizationConfigurationRoute(modifier = it)
                         }
 
-                        AppRoute.SkillsSettings -> SettingsScaffold(
+                        AppRoute.SkillsSettings -> PreferenceScaffold(
                             stringResource(SkillsR.string.skills_screen_title),
                             goBack,
                         ) {
                             SkillsSettingsRoute(modifier = it)
                         }
 
-                        AppRoute.McpServerList -> SettingsScaffold(
+                        AppRoute.McpServerList -> PreferenceScaffold(
                             title = stringResource(McpR.string.mcp_list_title),
                             onBack = goBack,
                             actions = {
@@ -279,7 +320,7 @@ fun MainScreen(
                             )
                         }
 
-                        AppRoute.McpServerAddOptions -> SettingsScaffold(
+                        AppRoute.McpServerAddOptions -> PreferenceScaffold(
                             stringResource(McpR.string.mcp_add_options_title),
                             goBack,
                         ) {
@@ -296,14 +337,14 @@ fun MainScreen(
                             )
                         }
 
-                        AppRoute.McpServerImport -> SettingsScaffold(
+                        AppRoute.McpServerImport -> PreferenceScaffold(
                             stringResource(McpR.string.mcp_import_title),
                             goBack,
                         ) {
                             McpServerImportRoute(goBack, it)
                         }
 
-                        is AppRoute.McpServerEditor -> SettingsScaffold(
+                        is AppRoute.McpServerEditor -> PreferenceScaffold(
                             stringResource(
                                 if (route.serverId == null) McpR.string.mcp_add_server
                                 else McpR.string.mcp_edit_server,
@@ -313,7 +354,7 @@ fun MainScreen(
                             McpServerEditorRoute(route.serverId, goBack, modifier = it)
                         }
 
-                        AppRoute.ModelServiceList -> SettingsScaffold(
+                        AppRoute.ModelServiceList -> PreferenceScaffold(
                             stringResource(ModelsettingsR.string.modelsettings_list_title),
                             goBack,
                         ) {
@@ -323,7 +364,7 @@ fun MainScreen(
                             )
                         }
 
-                        is AppRoute.ModelServiceDetail -> SettingsScaffold(
+                        is AppRoute.ModelServiceDetail -> PreferenceScaffold(
                             stringResource(ModelsettingsR.string.modelsettings_detail_title),
                             goBack,
                         ) {

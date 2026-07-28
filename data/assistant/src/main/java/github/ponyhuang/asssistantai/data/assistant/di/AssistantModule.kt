@@ -6,8 +6,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.asssistantai.data.assistant.AssistantVoiceSessionStore
 import github.ponyhuang.asssistantai.data.assistant.DefaultAssistantSessionCoordinator
-import github.ponyhuang.asssistantai.data.assistant.VoiceSessionIdStore
 import github.ponyhuang.asssistantai.domain.assistant.repository.AssistantSessionCoordinator
+import github.ponyhuang.asssistantai.domain.assistant.repository.VoiceSessionStore
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -19,7 +19,7 @@ abstract class AssistantModule {
     ): AssistantSessionCoordinator
 
     @Binds
-    abstract fun bindVoiceSessionIdStore(
+    abstract fun bindVoiceSessionStore(
         impl: AssistantVoiceSessionStore,
-    ): VoiceSessionIdStore
+    ): VoiceSessionStore
 }

@@ -1,7 +1,8 @@
 <resources>
     <string name="app_name">Gimi</string>
-    <string name="title_activity_main2">MainActivity2</string>
 
+    <!-- 被 Manifest 的 appfn:description/displayDescription 引用：lint ManifestResource
+         禁止其按 locale 变体化，故只能存在于 values/，不要加入 values-en/。 -->
     <string name="app_function_app_description">本地 AI 助手 — 让外部 / 系统 agent 在不打开 app 的前提下，向本 app 的 AI 助手发送文本消息并获得回答；可指定或复用会话以进行多轮对话。</string>
     <string name="app_function_app_display_description">asssistantai 本地助手</string>
     <string name="media_notification_listener_label">asssistantai media control</string>

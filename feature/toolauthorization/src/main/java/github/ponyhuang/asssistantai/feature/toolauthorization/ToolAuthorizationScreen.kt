@@ -1,5 +1,6 @@
 package github.ponyhuang.asssistantai.feature.toolauthorization
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -11,18 +12,21 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import github.ponyhuang.asssistantai.ui.settings.SettingsBanner
-import github.ponyhuang.asssistantai.ui.settings.SettingsBannerTone
-import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
-import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
+import github.ponyhuang.asssistantai.ui.preference.PreferenceBanner
+import github.ponyhuang.asssistantai.ui.preference.PreferenceBannerTone
+import github.ponyhuang.asssistantai.ui.preference.PreferenceListItem
+import github.ponyhuang.asssistantai.ui.preference.PreferencePageContainer
+import kotlinx.coroutines.flow.SharedFlow
 
 @Composable
 fun ToolAuthorizationRoute(
@@ -31,6 +35,7 @@ fun ToolAuthorizationRoute(
     viewModel: ToolAuthorizationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    ToolAuthorizationEffects(viewModel.effects)
     ToolAuthorizationScreen(
         state = state,
         onAction = viewModel::onAction,
@@ -46,13 +51,13 @@ fun ToolAuthorizationScreen(
     onNavigateToConfiguration: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsPageContainer(modifier) {
+    PreferencePageContainer(modifier) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
             item {
-                SettingsListItem(
+                PreferenceListItem(
                     icon = Icons.Default.Build,
                     title = stringResource(R.string.toolauth_customize_label),
                     subtitle = stringResource(R.string.toolauth_customize_description),
@@ -74,7 +79,7 @@ fun ToolAuthorizationScreen(
             }
             val configurationEnabled = state.isCustomizationEnabled && !state.isMutationBlocked
             item {
-                SettingsListItem(
+                PreferenceListItem(
                     icon = Icons.Default.Tune,
                     title = stringResource(R.string.toolauth_configure_tools),
                     subtitle = stringResource(
@@ -99,18 +104,31 @@ fun ToolAuthorizationScreen(
                     },
                 )
             }
-            if (state.isMutationBlocked || !state.notice.isNullOrBlank()) {
+            if (state.isMutationBlocked) {
                 item {
-                    SettingsBanner(
-                        text = state.notice?.takeUnless { it.isBlank() }
-                            ?: stringResource(R.string.toolauth_agent_mutation_blocked),
-                        tone = if (state.isMutationBlocked) {
-                            SettingsBannerTone.Error
-                        } else {
-                            SettingsBannerTone.Info
-                        },
+                    PreferenceBanner(
+                        text = stringResource(R.string.toolauth_agent_mutation_blocked),
+                        tone = PreferenceBannerTone.Error,
                         modifier = Modifier.padding(top = 4.dp),
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun ToolAuthorizationEffects(effects: SharedFlow<ToolAuthorizationEffect>) {
+    val context = LocalContext.current
+    val agentBusyMessage = stringResource(R.string.toolauth_agent_mutation_blocked)
+    LaunchedEffect(effects) {
+        effects.collect { effect ->
+            when (effect) {
+                is ToolAuthorizationEffect.ShowMessage -> {
+                    val text = when (effect.message) {
+                        ToolAuthorizationMessage.AgentBusy -> agentBusyMessage
+                    }
+                    Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
                 }
             }
         }

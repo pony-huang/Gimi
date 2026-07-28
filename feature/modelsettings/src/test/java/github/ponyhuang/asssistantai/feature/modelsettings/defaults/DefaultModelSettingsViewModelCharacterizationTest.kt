@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.feature.modelsettings.defaults
 
 import app.cash.turbine.test
+import github.ponyhuang.asssistantai.core.testing.FakeAgentRuntimeGate
 import github.ponyhuang.asssistantai.core.testing.MainDispatcherRule
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
@@ -11,7 +12,6 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalog
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.UpdateDefaultModelSettingsUseCase
 import github.ponyhuang.asssistantai.domain.conversation.usecase.RunWhenAgentIdleUseCase
-import github.ponyhuang.asssistantai.feature.modelsettings.TestAgentRuntimeGate
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -102,7 +102,7 @@ class DefaultModelSettingsViewModelCharacterizationTest {
     private fun viewModel(repository: ModelCatalogRepository) = DefaultModelSettingsViewModel(
         observeSettings = ObserveDefaultModelSettingsUseCase(repository),
         updateSettings = UpdateDefaultModelSettingsUseCase(repository),
-        runWhenAgentIdle = RunWhenAgentIdleUseCase(TestAgentRuntimeGate()),
+        runWhenAgentIdle = RunWhenAgentIdleUseCase(FakeAgentRuntimeGate()),
     )
 
     private suspend fun DefaultModelSettingsViewModel.awaitUiStateReady() {

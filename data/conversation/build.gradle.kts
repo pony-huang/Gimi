@@ -12,12 +12,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    testOptions { unitTests.isReturnDefaultValues = true }
 }
 
 dependencies {
-    implementation(project(":core:database"))
-    implementation(project(":data:agent"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:modelcatalog"))
     implementation(libs.androidx.core.ktx)

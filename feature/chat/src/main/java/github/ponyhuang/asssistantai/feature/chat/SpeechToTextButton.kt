@@ -182,7 +182,7 @@ internal fun DefaultRecordingContent(
  * @see SpeechToTextButton
  */
 public class SpeechToTextButtonState internal constructor(
-    internal val helper: SpeechRecognizerHelper,
+    internal val helper: SpeechRecognizerController,
 ) {
     /**
      * Returns the current audio level in decibels.
@@ -219,7 +219,7 @@ public fun rememberSpeechToTextButtonState(
     onError: ((String) -> Unit)? = null,
     onFinalResult: (String) -> Unit,
 ): SpeechToTextButtonState {
-    val helper = rememberSpeechRecognizerHelper(
+    val helper = rememberSpeechRecognizerController(
         onPartialResult = onPartialResult,
         onFinalResult = onFinalResult,
         onError = onError,
@@ -306,7 +306,7 @@ internal fun SpeechToTextButtonIdle() {
 internal fun SpeechToTextButtonRecording() {
     val state = remember {
         SpeechToTextButtonState(
-            helper = object : SpeechRecognizerHelper {
+            helper = object : SpeechRecognizerController {
                 override val isListening = true
                 override val rmsdB = 5f
             },

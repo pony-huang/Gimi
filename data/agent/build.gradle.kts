@@ -12,13 +12,15 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    testOptions { unitTests.isReturnDefaultValues = true }
+    // Baseline 记录现存 lint 问题（如 LocationTool 的 MissingPermission），
+    // lint 继续对新问题报错。
+    lint {
+        baseline = file("lint-baseline.xml")
+    }
 }
 
 dependencies {
     implementation(project(":core:common"))
-    implementation(project(":core:database"))
-    implementation(project(":data:modelcatalog"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:mcp"))
     implementation(project(":domain:modelcatalog"))
@@ -26,6 +28,8 @@ dependencies {
     implementation(project(":domain:workfiles"))
 
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.anthropic.java)

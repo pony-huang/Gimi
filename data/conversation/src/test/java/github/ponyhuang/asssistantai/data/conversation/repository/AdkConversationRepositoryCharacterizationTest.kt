@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.data.conversation.repository
 
 import android.content.Context
+import android.util.Log
 import app.cash.turbine.test
 import com.google.adk.kt.sessions.SessionService
 import github.ponyhuang.asssistantai.data.conversation.local.ConversationMetadataDao
@@ -11,9 +12,13 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import java.util.concurrent.CancellationException
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Before
 import org.junit.Test
 
 class AdkConversationRepositoryCharacterizationTest {
@@ -22,6 +27,17 @@ class AdkConversationRepositoryCharacterizationTest {
     private val metadataDao = mockk<ConversationMetadataDao>(relaxed = true)
     private val context = mockk<Context> {
         every { getString(any()) } returns "新对话"
+    }
+
+    @Before
+    fun setUp() {
+        mockkStatic(Log::class)
+        every { Log.w(any<String>(), any<String>()) } returns 0
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic(Log::class)
     }
 
     @Test

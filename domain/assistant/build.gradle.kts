@@ -6,5 +6,5 @@ kotlin { jvmToolchain(11) }
 
 dependencies {
     implementation(libs.javax.inject)
-    implementation(libs.kotlinx.coroutines.core)
+    api(libs.kotlinx.coroutines.core)
 }

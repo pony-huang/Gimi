@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.feature.modelsettings.list
 
 import app.cash.turbine.test
+import github.ponyhuang.asssistantai.core.testing.FakeAgentRuntimeGate
 import github.ponyhuang.asssistantai.core.testing.MainDispatcherRule
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.CatalogLoadState
@@ -10,7 +11,6 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.ObserveModelCat
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.ObserveModelServicesUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.UpdateModelServiceUseCase
 import github.ponyhuang.asssistantai.domain.conversation.usecase.RunWhenAgentIdleUseCase
-import github.ponyhuang.asssistantai.feature.modelsettings.TestAgentRuntimeGate
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -66,7 +66,7 @@ class ModelServiceListViewLLMModelCharacterizationTest {
         observeServices = ObserveModelServicesUseCase(repository),
         observeLoadState = ObserveModelCatalogLoadStateUseCase(repository),
         updateModelService = UpdateModelServiceUseCase(repository),
-        runWhenAgentIdle = RunWhenAgentIdleUseCase(TestAgentRuntimeGate()),
+        runWhenAgentIdle = RunWhenAgentIdleUseCase(FakeAgentRuntimeGate()),
     )
 
     private fun repository(): ModelCatalogRepository = mockk(relaxed = true) {

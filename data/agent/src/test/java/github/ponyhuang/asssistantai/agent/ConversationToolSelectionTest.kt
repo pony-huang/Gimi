@@ -1,9 +1,8 @@
 package github.ponyhuang.asssistantai.agent
 
-import github.ponyhuang.asssistantai.data.ApiBaseType
-import github.ponyhuang.asssistantai.data.LLMModelType
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,8 +12,8 @@ class ConversationToolSelectionTest {
     @Test
     fun conversationOfficialToolsAreLimitedToToolsSupportedByTheCurrentModel() {
         val model = ModelConfig(
-            serviceId = LLMModelType.Mimo.serviceId,
-            baseType = ApiBaseType.Standard,
+            serviceId = "mimo",
+            baseType = ApiProtocol.Standard,
             modelId = "model",
             apiKey = "key",
             fullBaseUrl = "https://example.com",
@@ -23,7 +22,7 @@ class ConversationToolSelectionTest {
         )
         val configuration = ConversationToolConfiguration(
             enabledOfficialFunctionIdsByService = mapOf(
-                LLMModelType.Mimo.serviceId to mapOf("web_search" to setOf("web_search")),
+                "mimo" to mapOf("web_search" to setOf("web_search")),
             ),
         )
 
@@ -62,8 +61,8 @@ class ConversationToolSelectionTest {
     @Test
     fun forConversationKeepsOfficialToolWithAnyFunctionSelected() {
         val model = ModelConfig(
-            serviceId = LLMModelType.Mimo.serviceId,
-            baseType = ApiBaseType.Standard,
+            serviceId = "mimo",
+            baseType = ApiProtocol.Standard,
             modelId = "model",
             apiKey = "key",
             fullBaseUrl = "https://example.com",
@@ -72,7 +71,7 @@ class ConversationToolSelectionTest {
         )
         val configuration = ConversationToolConfiguration(
             enabledOfficialFunctionIdsByService = mapOf(
-                LLMModelType.Mimo.serviceId to mapOf("web_search" to setOf("web_search")),
+                "mimo" to mapOf("web_search" to setOf("web_search")),
             ),
         )
 
@@ -85,8 +84,8 @@ class ConversationToolSelectionTest {
     @Test
     fun forConversationDropsOfficialToolWhenNoFunctionsAreSelected() {
         val model = ModelConfig(
-            serviceId = LLMModelType.Mimo.serviceId,
-            baseType = ApiBaseType.Standard,
+            serviceId = "mimo",
+            baseType = ApiProtocol.Standard,
             modelId = "model",
             apiKey = "key",
             fullBaseUrl = "https://example.com",
@@ -95,7 +94,7 @@ class ConversationToolSelectionTest {
         )
         val configuration = ConversationToolConfiguration(
             enabledOfficialFunctionIdsByService = mapOf(
-                LLMModelType.Mimo.serviceId to mapOf("web_search" to emptySet()),
+                "mimo" to mapOf("web_search" to emptySet()),
             ),
         )
 

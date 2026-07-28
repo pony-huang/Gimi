@@ -41,10 +41,10 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.mcp.model.McpTransport
 import github.ponyhuang.asssistantai.feature.mcp.R
-import github.ponyhuang.asssistantai.ui.settings.SettingsCard
-import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
-import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
-import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
+import github.ponyhuang.asssistantai.ui.preference.PreferenceCard
+import github.ponyhuang.asssistantai.ui.preference.PreferenceListItem
+import github.ponyhuang.asssistantai.ui.preference.PreferencePageContainer
+import github.ponyhuang.asssistantai.ui.preference.PreferenceSectionTitle
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,7 +55,7 @@ fun McpServerEditorScreen(
 ) {
     val draft = state.editor
     if (draft == null) {
-        SettingsPageContainer(modifier) {
+        PreferencePageContainer(modifier) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
@@ -63,7 +63,7 @@ fun McpServerEditorScreen(
         return
     }
 
-    SettingsPageContainer(modifier) {
+    PreferencePageContainer(modifier) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -71,17 +71,16 @@ fun McpServerEditorScreen(
                 .padding(vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (state.isMutationBlocked || !state.notice.isNullOrBlank()) {
+            if (state.isMutationBlocked) {
                 Text(
-                    text = state.notice?.takeUnless { it.isBlank() }
-                        ?: stringResource(R.string.mcp_agent_mutation_blocked),
+                    text = stringResource(R.string.mcp_agent_mutation_blocked),
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 24.dp),
                 )
             }
             // 启用开关是状态控制而非表单字段，置顶作主开关；
-            // 样式与语音唤醒等设置页的 SettingsListItem + 尾部 Switch 保持一致。
-            SettingsListItem(
+            // 样式与语音唤醒等设置页的 PreferenceListItem + 尾部 Switch 保持一致。
+            PreferenceListItem(
                 icon = Icons.Default.Extension,
                 title = stringResource(R.string.mcp_field_enable_server),
                 subtitle = stringResource(R.string.mcp_field_enable_subtitle),
@@ -108,8 +107,8 @@ fun McpServerEditorScreen(
                     )
                 },
             )
-            SettingsSectionTitle(text = stringResource(R.string.mcp_section_basic_info))
-            SettingsCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+            PreferenceSectionTitle(text = stringResource(R.string.mcp_section_basic_info))
+            PreferenceCard(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -179,7 +178,7 @@ fun McpServerEditorScreen(
                         },
                         label = { Text(stringResource(R.string.mcp_field_endpoint_required)) },
                         enabled = !state.isMutationBlocked,
-                        placeholder = { Text("https://example.com/mcp") },
+                        placeholder = { Text(stringResource(R.string.mcp_field_endpoint_placeholder)) },
                         modifier = Modifier.fillMaxWidth(),
                     )
                     var tokenVisible by remember { mutableStateOf(false) }
@@ -219,7 +218,7 @@ fun McpServerEditorScreen(
                         },
                         label = { Text(stringResource(R.string.mcp_field_header_optional)) },
                         enabled = !state.isMutationBlocked,
-                        placeholder = { Text("X-Api-Key=your-key\nX-Client=assistant") },
+                        placeholder = { Text(stringResource(R.string.mcp_field_header_placeholder)) },
                         supportingText = { Text(stringResource(R.string.mcp_field_header_help)) },
                         minLines = 3,
                         modifier = Modifier.fillMaxWidth(),
@@ -231,7 +230,7 @@ fun McpServerEditorScreen(
                     )
                 }
             }
-            SettingsCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+            PreferenceCard(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),

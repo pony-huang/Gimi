@@ -13,6 +13,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -38,6 +39,7 @@ class PermissionSettingsViewModelTest {
             listOf(AppPermission.RecordAudio),
             viewModel.uiState.value.runtimeRequest?.permissions,
         )
+        assertEquals(viewModel.uiState.value.runtimeRequest, viewModel.pendingRuntimeRequest)
     }
 
     @Test
@@ -70,6 +72,7 @@ class PermissionSettingsViewModelTest {
         )
 
         verify { repository.recordPermanentlyDenied(setOf(AppPermission.RecordAudio)) }
+        assertNull(viewModel.pendingRuntimeRequest)
         assertNotNull(viewModel.uiState.value.groups)
         assertTrue(!viewModel.uiState.value.allRuntimeGranted)
     }

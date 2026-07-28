@@ -8,8 +8,8 @@ import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.FunctionTool
 import com.google.adk.kt.tools.SkillToolset
 import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolRegistry
-import github.ponyhuang.asssistantai.data.LLMModelSelection
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.ToolAuthorizationRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -42,7 +42,7 @@ class AgentFactory @Inject constructor(
      * @param toolConfiguration 会话工具配置，为 null 时按全局授权决定启用哪些工具
      */
     suspend fun create(
-        selection: LLMModelSelection? = null,
+        selection: ModelSelection? = null,
         allowConfirmationRequiredTools: Boolean = true,
         toolConfiguration: ConversationToolConfiguration? = null,
     ): BaseAgent {

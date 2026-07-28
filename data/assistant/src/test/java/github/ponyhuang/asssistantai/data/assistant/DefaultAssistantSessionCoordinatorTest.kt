@@ -3,6 +3,7 @@ package github.ponyhuang.asssistantai.data.assistant
 import github.ponyhuang.asssistantai.domain.assistant.model.AssistantConfigIssue
 import github.ponyhuang.asssistantai.domain.assistant.model.AssistantInvocationSource
 import github.ponyhuang.asssistantai.domain.assistant.model.AssistantSessionPhase
+import github.ponyhuang.asssistantai.domain.assistant.repository.VoiceSessionStore
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatFunctionCall
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunPart
@@ -50,7 +51,7 @@ class DefaultAssistantSessionCoordinatorTest {
     private val modelCatalog: ModelCatalogRepository = mockk()
     private val speechRecognition: SpeechRecognitionRepository = mockk()
     private val gate = RecordingAgentRuntimeGate()
-    private val store = FakeVoiceSessionIdStore()
+    private val store = FakeVoiceSessionStore()
     private lateinit var coordinator: DefaultAssistantSessionCoordinator
 
     private val selection = ModelSelection("svc", "grp", "chat-model")
@@ -375,7 +376,7 @@ class DefaultAssistantSessionCoordinatorTest {
     )
 }
 
-private class FakeVoiceSessionIdStore : VoiceSessionIdStore {
+private class FakeVoiceSessionStore : VoiceSessionStore {
     private val _voiceSessionId = MutableStateFlow<String?>(null)
     override val voiceSessionId = _voiceSessionId
 

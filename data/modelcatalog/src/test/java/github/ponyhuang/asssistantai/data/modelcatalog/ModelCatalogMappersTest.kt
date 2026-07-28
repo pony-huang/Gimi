@@ -1,8 +1,5 @@
 package github.ponyhuang.asssistantai.data.modelcatalog
 
-import github.ponyhuang.asssistantai.data.LLMModelGroup
-import github.ponyhuang.asssistantai.data.LLMModelItem
-import github.ponyhuang.asssistantai.data.LLMModelProvider
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.MultimodalCapabilities
 import org.junit.Assert.assertTrue
 import org.junit.Test

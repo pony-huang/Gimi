@@ -8,6 +8,7 @@ import github.ponyhuang.asssistantai.domain.assistant.model.AssistantTurn
 import github.ponyhuang.asssistantai.domain.assistant.model.PendingAssistantConfirmation
 import github.ponyhuang.asssistantai.domain.assistant.repository.AssistantConfirmationHandler
 import github.ponyhuang.asssistantai.domain.assistant.repository.AssistantSessionCoordinator
+import github.ponyhuang.asssistantai.domain.assistant.repository.VoiceSessionStore
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ConversationRepository
@@ -52,7 +53,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     private val modelCatalog: ModelCatalogRepository,
     private val speechRecognition: SpeechRecognitionRepository,
     private val runtimeGate: AgentRuntimeGate,
-    private val sessionStore: VoiceSessionIdStore,
+    private val sessionStore: VoiceSessionStore,
 ) : AssistantSessionCoordinator {
 
     /** 测试可替换的任务调度器；必须在首次提交前设置。 */

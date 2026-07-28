@@ -18,7 +18,7 @@ dependencies {
     implementation(project(":core:audio"))
     implementation(project(":core:common"))
     implementation(project(":domain:speech"))
-    implementation(project(":data:assistant"))
+    implementation(project(":domain:assistant"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.gson)
     implementation(libs.hilt.android)

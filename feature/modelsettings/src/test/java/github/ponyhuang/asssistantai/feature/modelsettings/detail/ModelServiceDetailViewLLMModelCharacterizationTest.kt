@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.feature.modelsettings.detail
 
 import app.cash.turbine.test
+import github.ponyhuang.asssistantai.core.testing.FakeAgentRuntimeGate
 import github.ponyhuang.asssistantai.core.testing.MainDispatcherRule
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.Model
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelGroup
@@ -14,7 +15,6 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.RefreshModelCat
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.TestModelServiceConnectionUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.UpdateModelServiceUseCase
 import github.ponyhuang.asssistantai.domain.conversation.usecase.RunWhenAgentIdleUseCase
-import github.ponyhuang.asssistantai.feature.modelsettings.TestAgentRuntimeGate
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -41,7 +41,7 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
 
         fixture.viewModel.uiState.test {
             assertTrue(awaitItem().isLoading)
-            fixture.viewModel.onAction(LLmModelSettingDetailAction.Load(provider.id))
+            fixture.viewModel.onAction(LLMModelSettingDetailAction.Load(provider.id))
 
             var state = awaitItem()
             while (state.service == null) state = awaitItem()
@@ -51,7 +51,7 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
                 state.rows.first(),
             )
 
-            fixture.viewModel.onAction(LLmModelSettingDetailAction.ToggleGroup("chat"))
+            fixture.viewModel.onAction(LLMModelSettingDetailAction.ToggleGroup("chat"))
             do {
                 state = awaitItem()
             } while (state.rows.size != 1)
@@ -67,7 +67,7 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
     fun newlySynchronizedGroupsAreExpanded() = runTest {
         val provider = service(apiKey = "key")
         val fixture = fixture(provider)
-        fixture.viewModel.onAction(LLmModelSettingDetailAction.Load(provider.id))
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.Load(provider.id))
         advanceUntilIdle()
 
         fixture.services.value = provider.copy(
@@ -97,29 +97,38 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
     fun missingServiceRequestsCloseAndShowsExistingMessage() = runTest {
         val fixture = fixture(null)
 
-        fixture.viewModel.onAction(LLmModelSettingDetailAction.Load("missing"))
-        advanceUntilIdle()
+        fixture.viewModel.effects.test {
+            fixture.viewModel.onAction(LLMModelSettingDetailAction.Load("missing"))
 
-        val state = fixture.viewModel.uiState.value
-        assertFalse(state.isLoading)
-        assertTrue(state.shouldClose)
-        assertEquals(LLMModelSettingDetailNotice.SettingNotFoundLLM, state.notice)
+            assertEquals(
+                LLMModelSettingDetailEffect.ShowToast(
+                    LLMModelSettingDetailNotice.SettingNotFoundLLM,
+                ),
+                awaitItem(),
+            )
+            assertEquals(LLMModelSettingDetailEffect.Close, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertFalse(fixture.viewModel.uiState.value.isLoading)
     }
 
     @Test
     fun blankApiKeyReturnsFailureWithoutRequest() = runTest {
         val provider = service(apiKey = "")
         val fixture = fixture(provider)
-        fixture.viewModel.onAction(LLmModelSettingDetailAction.Load(provider.id))
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.Load(provider.id))
         advanceUntilIdle()
 
-        fixture.viewModel.onAction(LLmModelSettingDetailAction.TestConnection)
-        advanceUntilIdle()
-
-        assertEquals(
-            LLMModelSettingDetailNotice.ConnectionFailed,
-            fixture.viewModel.uiState.value.notice,
-        )
+        fixture.viewModel.effects.test {
+            fixture.viewModel.onAction(LLMModelSettingDetailAction.TestConnection)
+            assertEquals(
+                LLMModelSettingDetailEffect.ShowToast(
+                    LLMModelSettingDetailNotice.ConnectionFailed,
+                ),
+                awaitItem(),
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
         coVerify(exactly = 0) { fixture.remote.validateConnection(any()) }
     }
 
@@ -127,10 +136,10 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
     fun apiKeyChangeUpdatesStateAndRepository() = runTest {
         val provider = service(apiKey = "old")
         val fixture = fixture(provider)
-        fixture.viewModel.onAction(LLmModelSettingDetailAction.Load(provider.id))
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.Load(provider.id))
         advanceUntilIdle()
 
-        fixture.viewModel.onAction(LLmModelSettingDetailAction.ApiKeyChanged("new"))
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.ApiKeyChanged("new"))
         advanceUntilIdle()
 
         assertEquals("new", fixture.viewModel.uiState.value.service?.apiKey)
@@ -143,11 +152,11 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
             supportedProtocols = listOf(ApiProtocol.Standard),
         )
         val fixture = fixture(provider)
-        fixture.viewModel.onAction(LLmModelSettingDetailAction.Load(provider.id))
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.Load(provider.id))
         advanceUntilIdle()
 
         fixture.viewModel.onAction(
-            LLmModelSettingDetailAction.ApiProtocolChanged(ApiProtocol.Anthropic),
+            LLMModelSettingDetailAction.ApiProtocolChanged(ApiProtocol.Anthropic),
         )
         advanceUntilIdle()
 
@@ -161,11 +170,11 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
     fun protocolChangeToSupportedProtocolUpdatesStateAndRepository() = runTest {
         val provider = service(apiKey = "key")
         val fixture = fixture(provider)
-        fixture.viewModel.onAction(LLmModelSettingDetailAction.Load(provider.id))
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.Load(provider.id))
         advanceUntilIdle()
 
         fixture.viewModel.onAction(
-            LLmModelSettingDetailAction.ApiProtocolChanged(ApiProtocol.Anthropic),
+            LLMModelSettingDetailAction.ApiProtocolChanged(ApiProtocol.Anthropic),
         )
         advanceUntilIdle()
 
@@ -192,7 +201,7 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
             updateModelService = UpdateModelServiceUseCase(repository),
             testConnection = TestModelServiceConnectionUseCase(remote),
             refreshCatalog = RefreshModelCatalogUseCase(repository, remote),
-            runWhenAgentIdle = RunWhenAgentIdleUseCase(TestAgentRuntimeGate()),
+            runWhenAgentIdle = RunWhenAgentIdleUseCase(FakeAgentRuntimeGate()),
         )
         return Fixture(viewModel, repository, remote, services)
     }

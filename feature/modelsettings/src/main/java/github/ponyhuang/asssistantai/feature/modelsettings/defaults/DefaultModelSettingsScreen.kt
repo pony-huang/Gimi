@@ -21,9 +21,9 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.speech.model.TtsVoice
 import github.ponyhuang.asssistantai.feature.modelsettings.R
 import github.ponyhuang.asssistantai.ui.common.PickerSingleChoiceDialog
-import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
-import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
-import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
+import github.ponyhuang.asssistantai.ui.preference.PreferenceListItem
+import github.ponyhuang.asssistantai.ui.preference.PreferencePageContainer
+import github.ponyhuang.asssistantai.ui.preference.PreferenceSectionTitle
 
 @Composable
 fun DefaultModelSettingsScreen(
@@ -31,22 +31,21 @@ fun DefaultModelSettingsScreen(
     onAction: (DefaultModelSettingsAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsPageContainer(modifier = modifier) {
+    PreferencePageContainer(modifier = modifier) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
-            if (state.isMutationBlocked || !state.notice.isNullOrBlank()) {
+            if (state.isMutationBlocked) {
                 item {
                     Text(
-                        text = state.notice?.takeUnless { it.isBlank() }
-                            ?: stringResource(R.string.modelsettings_agent_mutation_blocked),
+                        text = stringResource(R.string.modelsettings_agent_mutation_blocked),
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                     )
                 }
             }
-            item { SettingsSectionTitle(stringResource(R.string.modelsettings_defaults_section_chat)) }
+            item { PreferenceSectionTitle(stringResource(R.string.modelsettings_defaults_section_chat)) }
             item {
                 DefaultModelOption(
                     icon = Icons.AutoMirrored.Filled.Chat,
@@ -71,7 +70,7 @@ fun DefaultModelSettingsScreen(
                     },
                 )
             }
-            item { SettingsSectionTitle(stringResource(R.string.modelsettings_defaults_section_voice)) }
+            item { PreferenceSectionTitle(stringResource(R.string.modelsettings_defaults_section_voice)) }
             item {
                 DefaultModelOption(
                     icon = Icons.Default.Mic,
@@ -99,7 +98,7 @@ fun DefaultModelSettingsScreen(
             item {
                 val voice = state.ttsVoiceOptions.firstOrNull { it.id == state.ttsVoiceId }
                 val enabled = state.ttsModels.any { it.selection() == state.ttsSelection }
-                SettingsListItem(
+                PreferenceListItem(
                     icon = Icons.Default.GraphicEq,
                     title = stringResource(R.string.modelsettings_defaults_voice_title),
                     subtitle = voice?.name ?: state.ttsVoiceId,
@@ -172,7 +171,7 @@ private fun DefaultModelOption(
     onClick: (() -> Unit)?,
 ) {
     val selected = rows.firstOrNull { it.selection() == selection }
-    SettingsListItem(
+    PreferenceListItem(
         icon = icon,
         title = title,
         subtitle = selected?.let { "${it.model.name} · ${it.service.name}" } ?: subtitle,

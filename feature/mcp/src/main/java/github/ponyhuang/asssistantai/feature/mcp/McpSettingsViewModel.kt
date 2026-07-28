@@ -3,15 +3,16 @@ package github.ponyhuang.asssistantai.feature.mcp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentMutationResult
 import github.ponyhuang.asssistantai.domain.conversation.runtime.isBusy
 import github.ponyhuang.asssistantai.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
 import github.ponyhuang.asssistantai.domain.mcp.usecase.ManageMcpServersUseCase
 import github.ponyhuang.asssistantai.domain.mcp.usecase.ObserveMcpServersUseCase
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -25,6 +26,9 @@ class McpSettingsViewModel @Inject constructor(
 ) : ViewModel() {
     private val localState = MutableStateFlow(LocalState())
 
+    private val _effects = MutableSharedFlow<McpSettingsEffect>(extraBufferCapacity = 1)
+    val effects = _effects.asSharedFlow()
+
     val uiState = combine(observeServers(), localState, runWhenAgentIdle.state) {
             servers, local, runtimeState ->
         McpSettingsUiState(
@@ -33,9 +37,7 @@ class McpSettingsViewModel @Inject constructor(
             importResult = local.importResult,
             editor = local.editor,
             isTransportMenuExpanded = local.isTransportMenuExpanded,
-            shouldClose = local.shouldClose,
             isMutationBlocked = runtimeState.isBusy,
-            notice = local.notice,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -66,18 +68,15 @@ class McpSettingsViewModel @Inject constructor(
             }
             McpSettingsAction.SaveEditor -> saveEditor()
             McpSettingsAction.DeleteEditor -> deleteEditor()
-            McpSettingsAction.CloseConsumed -> localState.update { it.copy(shouldClose = false) }
         }
     }
 
     private fun importServers() {
         mutate {
             val result = manageServers.importJson(localState.value.importJson)
-            localState.update {
-                it.copy(
-                    importResult = result.message,
-                    shouldClose = result.error == null && result.imported > 0,
-                )
+            localState.update { it.copy(importResult = result.message) }
+            if (result.error == null && result.imported > 0) {
+                _effects.tryEmit(McpSettingsEffect.Close)
             }
         }
     }
@@ -99,7 +98,7 @@ class McpSettingsViewModel @Inject constructor(
         if (draft.name.isBlank() || draft.endpointUrl.isBlank()) return
         mutate {
             manageServers.save(draft.toServer())
-            localState.update { it.copy(shouldClose = true) }
+            _effects.tryEmit(McpSettingsEffect.Close)
         }
     }
 
@@ -107,19 +106,12 @@ class McpSettingsViewModel @Inject constructor(
         val draft = localState.value.editor?.takeUnless { it.isNew } ?: return
         mutate {
             manageServers.delete(draft.id)
-            localState.update { it.copy(shouldClose = true) }
+            _effects.tryEmit(McpSettingsEffect.Close)
         }
     }
 
     private fun mutate(block: () -> Unit) {
-        viewModelScope.launch {
-            when (runWhenAgentIdle { block() }) {
-                is AgentMutationResult.Applied -> localState.update { it.copy(notice = null) }
-                AgentMutationResult.BlockedByActiveAgent -> localState.update {
-                    it.copy(notice = BLOCKED_MESSAGE)
-                }
-            }
-        }
+        viewModelScope.launch { runWhenAgentIdle { block() } }
     }
 
     private data class LocalState(
@@ -127,11 +119,5 @@ class McpSettingsViewModel @Inject constructor(
         val importResult: String? = null,
         val editor: McpEditorDraft? = null,
         val isTransportMenuExpanded: Boolean = false,
-        val shouldClose: Boolean = false,
-        val notice: String? = null,
     )
-
-    private companion object {
-        const val BLOCKED_MESSAGE = ""
-    }
 }

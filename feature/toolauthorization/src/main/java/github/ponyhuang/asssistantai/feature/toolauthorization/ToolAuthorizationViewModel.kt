@@ -3,13 +3,13 @@ package github.ponyhuang.asssistantai.feature.toolauthorization
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentMutationResult
 import github.ponyhuang.asssistantai.domain.conversation.runtime.isBusy
-import github.ponyhuang.asssistantai.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.ToolAuthorizationRepository
 import javax.inject.Inject
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -17,21 +17,20 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class ToolAuthorizationViewModel @Inject constructor(
     private val repository: ToolAuthorizationRepository,
-    private val runWhenAgentIdle: RunWhenAgentIdleUseCase,
+    private val setToolAuthorization: SetToolAuthorizationUseCase,
 ) : ViewModel() {
-    private val notice = MutableStateFlow<String?>(null)
+    private val _effects = MutableSharedFlow<ToolAuthorizationEffect>(extraBufferCapacity = 8)
+    val effects: SharedFlow<ToolAuthorizationEffect> = _effects.asSharedFlow()
 
     val uiState = combine(
         repository.isCustomizationEnabled,
         repository.tools,
-        runWhenAgentIdle.state,
-        notice,
-    ) { customizationEnabled, tools, runtimeState, currentNotice ->
+        setToolAuthorization.agentRuntimeState,
+    ) { customizationEnabled, tools, runtimeState ->
         ToolAuthorizationUiState(
             isCustomizationEnabled = customizationEnabled,
             tools = tools,
             isMutationBlocked = runtimeState.isBusy,
-            notice = currentNotice,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -44,22 +43,12 @@ class ToolAuthorizationViewModel @Inject constructor(
 
     fun onAction(action: ToolAuthorizationAction) {
         when (action) {
-            is ToolAuthorizationAction.SetCustomizationEnabled -> mutate {
-                repository.setCustomizationEnabled(action.enabled)
+            is ToolAuthorizationAction.SetCustomizationEnabled -> viewModelScope.launch {
+                val result = setToolAuthorization.setCustomizationEnabled(action.enabled)
+                if (result == ToolAuthorizationMutationResult.BlockedByActiveAgent) {
+                    _effects.emit(ToolAuthorizationEffect.ShowMessage(ToolAuthorizationMessage.AgentBusy))
+                }
             }
         }
-    }
-
-    private fun mutate(block: () -> Unit) {
-        viewModelScope.launch {
-            notice.value = when (runWhenAgentIdle { block() }) {
-                is AgentMutationResult.Applied -> null
-                AgentMutationResult.BlockedByActiveAgent -> BLOCKED_MESSAGE
-            }
-        }
-    }
-
-    private companion object {
-        const val BLOCKED_MESSAGE = ""
     }
 }

@@ -1,5 +1,8 @@
 package github.ponyhuang.asssistantai.feature.chat
 
+import android.util.Log
+import app.cash.turbine.test
+import github.ponyhuang.asssistantai.core.testing.FakeAgentRuntimeGate
 import github.ponyhuang.asssistantai.core.testing.MainDispatcherRule
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunPart
@@ -18,6 +21,7 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
 import github.ponyhuang.asssistantai.domain.mcp.repository.McpRepository
@@ -30,6 +34,9 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,9 +47,11 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
@@ -52,10 +61,22 @@ class ChatViewModelCharacterizationTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
+    @Before
+    fun setUp() {
+        mockkStatic(Log::class)
+        every { Log.i(any<String>(), any<String>()) } returns 0
+        every { Log.w(any<String>(), any<String>()) } returns 0
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic(Log::class)
+    }
+
     @Test
     fun send_preservesOptimisticUserMessage_andCompletesAssistantPartial() = runTest {
         val fixture = fixture(configured = true)
-        fixture.viewModel.send("你好")
+        fixture.viewModel.onAction(ChatAction.Send("你好"))
 
         advanceUntilIdle()
 
@@ -74,29 +95,25 @@ class ChatViewModelCharacterizationTest {
     fun send_withoutConfiguredChatModel_emitsActionableNoticeWithoutRunningAgent() = runTest {
         val fixture = fixture(configured = false)
 
-        fixture.viewModel.send("你好")
-        advanceUntilIdle()
+        fixture.viewModel.effects.test {
+            fixture.viewModel.onAction(ChatAction.Send("你好"))
+            advanceUntilIdle()
 
-        assertEquals(ChatNotice.ConfigureChatModel, fixture.viewModel.uiState.value.notice)
-        assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
-        coVerify(exactly = 0) { fixture.agent.send(any(), any(), any(), any()) }
-    }
-
-    @Test
-    fun consumeNotice_clearsOneShotEffect() = runTest {
-        val fixture = fixture(configured = false)
-        fixture.viewModel.send("你好")
-
-        fixture.viewModel.consumeNotice()
-
-        assertEquals(null, fixture.viewModel.uiState.value.notice)
+            assertEquals(
+                ChatEffect.ShowNotice(ChatNotice.ConfigureChatModel),
+                awaitItem(),
+            )
+            assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
+            coVerify(exactly = 0) { fixture.agent.send(any(), any(), any(), any()) }
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test
     fun newConversationSnapshotsGlobalToolAndMcpDefaults() = runTest {
         val fixture = fixture(configured = true)
 
-        fixture.viewModel.reset()
+        fixture.viewModel.onAction(ChatAction.NewConversation)
         advanceUntilIdle()
 
         coVerify {
@@ -118,10 +135,10 @@ class ChatViewModelCharacterizationTest {
     @Test
     fun changingSessionToolPersistsAndReleasesOnlyCurrentRunner() = runTest {
         val fixture = fixture(configured = true)
-        fixture.viewModel.reset()
+        fixture.viewModel.onAction(ChatAction.NewConversation)
         advanceUntilIdle()
 
-        fixture.viewModel.setLocalToolEnabled("compose_message", enabled = false)
+        fixture.viewModel.onAction(ChatAction.SetLocalToolEnabled("compose_message", enabled = false))
         advanceUntilIdle()
 
         coVerify {
@@ -145,7 +162,7 @@ class ChatViewModelCharacterizationTest {
             ),
         )
 
-        fixture.viewModel.send("执行工具")
+        fixture.viewModel.onAction(ChatAction.Send("执行工具"))
         advanceUntilIdle()
 
         val state = fixture.viewModel.uiState.value
@@ -163,17 +180,17 @@ class ChatViewModelCharacterizationTest {
             agentOverride = agent,
             sessionIds = listOf("session-a", "session-b"),
         )
-        fixture.viewModel.restoreOrCreateSession()
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
 
-        fixture.viewModel.send("ask-a")
+        fixture.viewModel.onAction(ChatAction.Send("ask-a"))
         runCurrent()
         agent.emit("session-a", event(text = "answer-a", invocationId = "inv-a"))
         runCurrent()
 
-        fixture.viewModel.reset()
+        fixture.viewModel.onAction(ChatAction.NewConversation)
         advanceUntilIdle()
-        fixture.viewModel.send("ask-b")
+        fixture.viewModel.onAction(ChatAction.Send("ask-b"))
         runCurrent()
         agent.emit("session-b", event(text = "answer-b", invocationId = "inv-b"))
         runCurrent()
@@ -185,18 +202,18 @@ class ChatViewModelCharacterizationTest {
         assertTrue(bState.conversationTaskStatuses["session-a"] is ConversationTaskStatus.Running)
         assertTrue(bState.conversationTaskStatuses["session-b"] is ConversationTaskStatus.Running)
 
-        fixture.viewModel.switchSession("session-a")
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
         advanceUntilIdle()
         val aState = fixture.viewModel.uiState.value
         assertTrue(aState.messages.any { it.textParts.any { part -> part.text == "answer-a" } })
         assertFalse(aState.messages.any { it.textParts.any { part -> part.text == "answer-b" } })
-        fixture.viewModel.stopStreaming()
+        fixture.viewModel.onAction(ChatAction.StopStreaming)
         runCurrent()
 
-        fixture.viewModel.switchSession("session-b")
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-b"))
         advanceUntilIdle()
         assertTrue(fixture.viewModel.uiState.value.isAgentRunning)
-        fixture.viewModel.stopStreaming()
+        fixture.viewModel.onAction(ChatAction.StopStreaming)
         runCurrent()
     }
 
@@ -208,28 +225,31 @@ class ChatViewModelCharacterizationTest {
             agentOverride = agent,
             sessionIds = listOf("s1", "s2", "s3", "s4"),
         )
-        fixture.viewModel.restoreOrCreateSession()
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
         repeat(3) { index ->
-            fixture.viewModel.send("task-$index")
+            fixture.viewModel.onAction(ChatAction.Send("task-$index"))
             runCurrent()
-            fixture.viewModel.reset()
+            fixture.viewModel.onAction(ChatAction.NewConversation)
             advanceUntilIdle()
         }
 
-        fixture.viewModel.send("task-4")
-        runCurrent()
-        assertEquals(
-            ChatNotice.ParallelTaskLimitReached,
-            fixture.viewModel.uiState.value.notice,
-        )
-        assertEquals(3, fixture.viewModel.uiState.value.conversationTaskStatuses.size)
-
-        listOf("s1", "s2", "s3").forEach { sessionId ->
-            fixture.viewModel.switchSession(sessionId)
-            advanceUntilIdle()
-            fixture.viewModel.stopStreaming()
+        fixture.viewModel.effects.test {
+            fixture.viewModel.onAction(ChatAction.Send("task-4"))
             runCurrent()
+            assertEquals(
+                ChatEffect.ShowNotice(ChatNotice.ParallelTaskLimitReached),
+                awaitItem(),
+            )
+            assertEquals(3, fixture.viewModel.uiState.value.conversationTaskStatuses.size)
+
+            listOf("s1", "s2", "s3").forEach { sessionId ->
+                fixture.viewModel.onAction(ChatAction.SwitchSession(sessionId))
+                advanceUntilIdle()
+                fixture.viewModel.onAction(ChatAction.StopStreaming)
+                runCurrent()
+            }
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -241,9 +261,9 @@ class ChatViewModelCharacterizationTest {
             agentOverride = agent,
             sessionIds = listOf("session-a", "session-b"),
         )
-        fixture.viewModel.restoreOrCreateSession()
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
-        fixture.viewModel.send("tool-a")
+        fixture.viewModel.onAction(ChatAction.Send("tool-a"))
         runCurrent()
         agent.emit(
             "session-a",
@@ -251,9 +271,9 @@ class ChatViewModelCharacterizationTest {
         )
         runCurrent()
 
-        fixture.viewModel.reset()
+        fixture.viewModel.onAction(ChatAction.NewConversation)
         advanceUntilIdle()
-        fixture.viewModel.send("task-b")
+        fixture.viewModel.onAction(ChatAction.Send("task-b"))
         runCurrent()
         assertEquals(null, fixture.viewModel.uiState.value.pendingToolConfirmation)
         assertTrue(
@@ -261,14 +281,14 @@ class ChatViewModelCharacterizationTest {
                 is ConversationTaskStatus.WaitingForConfirmation,
         )
 
-        fixture.viewModel.switchSession("session-a")
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
         advanceUntilIdle()
         assertEquals("confirm-a", fixture.viewModel.uiState.value.pendingToolConfirmation?.confirmationCallId)
-        fixture.viewModel.respondToToolConfirmation(false)
+        fixture.viewModel.onAction(ChatAction.RespondToToolConfirmation(confirmed = false))
         advanceUntilIdle()
-        fixture.viewModel.switchSession("session-b")
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-b"))
         advanceUntilIdle()
-        fixture.viewModel.stopStreaming()
+        fixture.viewModel.onAction(ChatAction.StopStreaming)
         runCurrent()
     }
 
@@ -280,11 +300,11 @@ class ChatViewModelCharacterizationTest {
             agentOverride = agent,
             sessionIds = listOf("session-a", "session-b"),
         )
-        fixture.viewModel.restoreOrCreateSession()
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
-        fixture.viewModel.send("first")
+        fixture.viewModel.onAction(ChatAction.Send("first"))
         runCurrent()
-        fixture.viewModel.reset()
+        fixture.viewModel.onAction(ChatAction.NewConversation)
         advanceUntilIdle()
 
         agent.emit(
@@ -298,13 +318,13 @@ class ChatViewModelCharacterizationTest {
             fixture.viewModel.uiState.value.conversationTaskStatuses["session-a"],
         )
 
-        fixture.viewModel.switchSession("session-a")
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
         advanceUntilIdle()
         assertEquals(null, fixture.viewModel.uiState.value.conversationTaskStatuses["session-a"])
 
-        fixture.viewModel.send("second")
+        fixture.viewModel.onAction(ChatAction.Send("second"))
         runCurrent()
-        fixture.viewModel.switchSession("session-b")
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-b"))
         advanceUntilIdle()
         agent.emit(
             "session-a",
@@ -316,7 +336,7 @@ class ChatViewModelCharacterizationTest {
             ConversationTaskStatus.Failed,
             fixture.viewModel.uiState.value.conversationTaskStatuses["session-a"],
         )
-        fixture.viewModel.switchSession("session-a")
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
         advanceUntilIdle()
         assertEquals(null, fixture.viewModel.uiState.value.conversationTaskStatuses["session-a"])
     }
@@ -329,28 +349,56 @@ class ChatViewModelCharacterizationTest {
             agentOverride = agent,
             sessionIds = listOf("session-a", "session-b"),
         )
-        fixture.viewModel.restoreOrCreateSession()
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
-        fixture.viewModel.send("running-a")
+        fixture.viewModel.onAction(ChatAction.Send("running-a"))
         runCurrent()
-        fixture.viewModel.reset()
+        fixture.viewModel.onAction(ChatAction.NewConversation)
         advanceUntilIdle()
 
-        fixture.viewModel.deleteConversation("session-a")
-        assertEquals(ChatNotice.ActiveConversationDeleteBlocked, fixture.viewModel.uiState.value.notice)
-        coVerify(exactly = 0) { fixture.conversations.deleteConversation("session-a") }
+        fixture.viewModel.effects.test {
+            fixture.viewModel.onAction(ChatAction.DeleteConversation("session-a"))
+            assertEquals(
+                ChatEffect.ShowNotice(ChatNotice.ActiveConversationDeleteBlocked),
+                awaitItem(),
+            )
+            coVerify(exactly = 0) { fixture.conversations.deleteConversation("session-a") }
 
-        val otherModel = ModelSelection("service", "chat", "other")
-        fixture.viewModel.selectModel(otherModel)
-        advanceUntilIdle()
-        coVerify { fixture.conversations.setConversationModel("session-b", any()) }
+            val otherModel = ModelSelection("service", "chat", "other")
+            fixture.viewModel.onAction(ChatAction.SelectModel(otherModel))
+            advanceUntilIdle()
+            coVerify { fixture.conversations.setConversationModel("session-b", any()) }
 
-        fixture.viewModel.switchSession("session-a")
+            fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
+            advanceUntilIdle()
+            fixture.viewModel.onAction(ChatAction.SelectModel(otherModel))
+            assertEquals(
+                ChatEffect.ShowNotice(ChatNotice.ModelSwitchBlocked),
+                awaitItem(),
+            )
+            fixture.viewModel.onAction(ChatAction.StopStreaming)
+            runCurrent()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun cancelledOfficialFunctionLoadDoesNotSwallowCancellationException() = runTest {
+        val catalog = mockk<OfficialToolFunctionCatalog>(relaxed = true) {
+            coEvery { listFunctions("web_search") } throws CancellationException("load cancelled")
+        }
+        val fixture = fixture(configured = true, officialCatalogOverride = catalog)
+
+        // 会话恢复后 marker 自动展开会触发 web_search 函数列表加载；
+        // listFunctions 抛出 CancellationException 时必须向外传播、终止该加载协程，
+        // 而不是被吞掉后把 descriptor 写成"加载完成"。
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
-        fixture.viewModel.selectModel(otherModel)
-        assertEquals(ChatNotice.ModelSwitchBlocked, fixture.viewModel.uiState.value.notice)
-        fixture.viewModel.stopStreaming()
-        runCurrent()
+
+        val descriptor = fixture.viewModel.uiState.value.officialToolDescriptors
+            .first { it.id == "web_search" }
+        assertTrue(descriptor.isLoadingFunctions)
+        assertEquals(null, descriptor.loadError)
     }
 
     private inner class ControllableAgent : ChatAgentRepository {
@@ -399,6 +447,7 @@ class ChatViewModelCharacterizationTest {
         ),
         agentOverride: ChatAgentRepository? = null,
         sessionIds: List<String> = listOf("session-1"),
+        officialCatalogOverride: OfficialToolFunctionCatalog? = null,
     ): Fixture {
         val selection = ModelSelection("service", "chat", "model")
         val services = if (configured) listOf(service()) else emptyList()
@@ -461,13 +510,14 @@ class ChatViewModelCharacterizationTest {
                 McpServer(id = "disabled-mcp", name = "Disabled", isEnabled = false),
             )
         }
-        val officialFunctionCatalog = mockk<github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunctionCatalog>(relaxed = true) {
-            coEvery { listFunctions(any()) } returns emptyList()
-        }
+        val officialFunctionCatalog = officialCatalogOverride
+            ?: mockk<OfficialToolFunctionCatalog>(relaxed = true) {
+                coEvery { listFunctions(any()) } returns emptyList()
+            }
         return Fixture(
             viewModel = ChatViewModel(
                 runner = agent,
-                agentRuntimeGate = TestAgentRuntimeGate(),
+                agentRuntimeGate = FakeAgentRuntimeGate(),
                 repository = conversations,
                 modelServices = catalog,
                 chatDisplayPreferences = display,

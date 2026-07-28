@@ -52,7 +52,7 @@ import github.ponyhuang.asssistantai.ui.settings.llmmodel.LLMModelServiceIcon
  */
 
 /**
- * 一行可选项的视图模型 — 同时携带所属服务与组，供对话框展示二级文案与构造 [LLMModelSelection]。
+ * 一行可选项的视图模型 — 同时携带所属服务与组，供对话框展示二级文案与构造 [ModelSelection]。
  */
 data class EnabledModelRow(
     val service: LLMModelSetting,

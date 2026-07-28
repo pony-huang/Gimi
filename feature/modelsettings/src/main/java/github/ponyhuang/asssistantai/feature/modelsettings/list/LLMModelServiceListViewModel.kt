@@ -9,9 +9,12 @@ import github.ponyhuang.asssistantai.domain.conversation.usecase.RunWhenAgentIdl
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.ObserveModelCatalogLoadStateUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.ObserveModelServicesUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.UpdateModelServiceUseCase
+import github.ponyhuang.asssistantai.feature.modelsettings.R
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -24,15 +27,17 @@ class LLMModelServiceListViewModel @Inject constructor(
     private val runWhenAgentIdle: RunWhenAgentIdleUseCase,
 ) : ViewModel() {
     private val query = MutableStateFlow("")
-    private val notice = MutableStateFlow<String?>(null)
+
+    // 缓冲若干条一次性反馈，避免 Route 尚未开始收集时丢失。
+    private val _effects = MutableSharedFlow<ModelServiceListEffect>(extraBufferCapacity = 8)
+    val effects = _effects.asSharedFlow()
 
     val uiState = combine(
         observeServices(),
         observeLoadState(),
         query,
         runWhenAgentIdle.state,
-        notice,
-    ) { services, loadState, currentQuery, runtimeState, currentNotice ->
+    ) { services, loadState, currentQuery, runtimeState ->
         ModelServiceListUiState(
             loadState = loadState,
             query = currentQuery,
@@ -45,7 +50,6 @@ class LLMModelServiceListViewModel @Inject constructor(
                 }
             },
             isMutationBlocked = runtimeState.isBusy,
-            notice = currentNotice,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -58,17 +62,17 @@ class LLMModelServiceListViewModel @Inject constructor(
             is ModelServiceListAction.QueryChanged -> query.value = action.value
             is ModelServiceListAction.EnabledChanged ->
                 viewModelScope.launch {
-                    notice.value = when (runWhenAgentIdle {
+                    when (runWhenAgentIdle {
                         updateModelService.enabled(action.serviceId, action.enabled)
                     }) {
-                        is AgentMutationResult.Applied -> null
-                        AgentMutationResult.BlockedByActiveAgent -> BLOCKED_MESSAGE
+                        is AgentMutationResult.Applied -> Unit
+                        AgentMutationResult.BlockedByActiveAgent -> _effects.emit(
+                            ModelServiceListEffect.ShowToast(
+                                R.string.modelsettings_agent_mutation_blocked,
+                            ),
+                        )
                     }
                 }
         }
-    }
-
-    private companion object {
-        const val BLOCKED_MESSAGE = ""
     }
 }

@@ -70,12 +70,16 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
             var state = awaitItem()
             while (!state.configurationReady) state = awaitItem()
 
-            viewModel.onAction(VoiceWakeSettingsAction.ToggleListening(enabled = true))
-            do {
-                state = awaitItem()
-            } while (state.modelDownloadPromptId == null)
+            viewModel.effects.test {
+                viewModel.onAction(VoiceWakeSettingsAction.ToggleListening(enabled = true))
 
-            assertNotNull(state.modelDownloadPromptId)
+                assertEquals(
+                    VoiceWakeSettingsEffect.ShowToast(R.string.voicewake_model_download_prompt),
+                    awaitItem(),
+                )
+                cancelAndIgnoreRemainingEvents()
+            }
+
             verify(exactly = 0) { voiceRepository.installModel(any()) }
             assertEquals(null, viewModel.uiState.value.permissionRequestId)
             verify(exactly = 0) { voiceRepository.start() }

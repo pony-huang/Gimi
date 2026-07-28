@@ -9,8 +9,10 @@ import github.ponyhuang.asssistantai.domain.speech.model.WakeModelStatus
 import github.ponyhuang.asssistantai.domain.speech.usecase.ManageVoiceWakeUseCase
 import github.ponyhuang.asssistantai.domain.speech.usecase.ObserveVoiceWakeSettingsUseCase
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -22,7 +24,9 @@ class VoiceWakeSettingsViewModel @Inject constructor(
 ) : ViewModel() {
     private val localState = MutableStateFlow(LocalState())
     private var nextPermissionRequestId = 0
-    private var nextModelDownloadPromptId = 0
+
+    private val _effects = MutableSharedFlow<VoiceWakeSettingsEffect>(extraBufferCapacity = 1)
+    val effects = _effects.asSharedFlow()
 
     val uiState = combine(observeSettings(), localState) { settings, local ->
         val activeModelId = settings.voiceState.activeModelId
@@ -34,7 +38,6 @@ class VoiceWakeSettingsViewModel @Inject constructor(
             keywordDraft = draftForActiveModel ?: settings.voiceState.keyword,
             keywordError = local.keywordError.takeIf { draftForActiveModel != null },
             permissionRequestId = local.permissionRequestId,
-            modelDownloadPromptId = local.modelDownloadPromptId,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -73,13 +76,6 @@ class VoiceWakeSettingsViewModel @Inject constructor(
                     it
                 }
             }
-            is VoiceWakeSettingsAction.ModelDownloadPromptHandled -> localState.update {
-                if (it.modelDownloadPromptId == action.promptId) {
-                    it.copy(modelDownloadPromptId = null)
-                } else {
-                    it
-                }
-            }
         }
     }
 
@@ -114,9 +110,9 @@ class VoiceWakeSettingsViewModel @Inject constructor(
         val state = uiState.value
         when {
             state.voiceState.model.status != WakeModelStatus.Ready ->
-                localState.update {
-                    it.copy(modelDownloadPromptId = ++nextModelDownloadPromptId)
-                }
+                _effects.tryEmit(
+                    VoiceWakeSettingsEffect.ShowToast(R.string.voicewake_model_download_prompt),
+                )
             !state.configurationReady -> Unit
             else -> localState.update {
                 it.copy(permissionRequestId = ++nextPermissionRequestId)
@@ -129,6 +125,5 @@ class VoiceWakeSettingsViewModel @Inject constructor(
         val keywordDraftModelId: String? = null,
         val keywordError: WakeKeywordError? = null,
         val permissionRequestId: Int? = null,
-        val modelDownloadPromptId: Int? = null,
     )
 }

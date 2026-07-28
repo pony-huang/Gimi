@@ -14,6 +14,7 @@
     <string name="mcp_import_action">Import MCP service</string>
     <string name="mcp_paste">Paste</string>
     <string name="mcp_field_json_label">MCP JSON</string>
+    <string name="mcp_field_json_placeholder">{\n  \"mcpServers\": { ... }\n}</string>
     <string name="mcp_stdio_skip_notice">stdio entries containing command / args will be skipped because Android apps cannot safely spawn local processes.</string>
     <string name="mcp_transport_sse">SSE</string>
     <string name="mcp_transport_streamable_http">Streamable HTTP</string>
@@ -24,9 +25,11 @@
     <string name="mcp_field_description">Description</string>
     <string name="mcp_field_type_required">Type *</string>
     <string name="mcp_field_endpoint_required">Server endpoint *</string>
+    <string name="mcp_field_endpoint_placeholder">https://example.com/mcp</string>
     <string name="mcp_field_bearer_token_optional">Bearer Token (optional)</string>
     <string name="mcp_field_header_optional">Custom headers (optional)</string>
     <string name="mcp_field_header_help">One per line, format: Header-Name=value</string>
+    <string name="mcp_field_header_placeholder">X-Api-Key=your-key\nX-Client=assistant</string>
     <string name="mcp_field_enable_server">Enable this server</string>
     <string name="mcp_field_enable_subtitle">When off, the assistant won’t connect to this server</string>
     <string name="mcp_sse_help">SSE and Streamable HTTP are supported; stdio is not.</string>

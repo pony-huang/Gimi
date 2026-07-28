@@ -33,9 +33,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.asssistantai.domain.toolauthorization.model.ToolDescriptor
-import github.ponyhuang.asssistantai.ui.settings.SettingsBanner
-import github.ponyhuang.asssistantai.ui.settings.SettingsBannerTone
-import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
+import github.ponyhuang.asssistantai.ui.preference.PreferenceBanner
+import github.ponyhuang.asssistantai.ui.preference.PreferenceBannerTone
+import github.ponyhuang.asssistantai.ui.preference.PreferencePageContainer
 
 @Composable
 fun ToolAuthorizationConfigurationRoute(
@@ -43,6 +43,7 @@ fun ToolAuthorizationConfigurationRoute(
     viewModel: ToolAuthorizationConfigurationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    ToolAuthorizationEffects(viewModel.effects)
     ToolAuthorizationConfigurationScreen(
         state = state,
         onAction = viewModel::onAction,
@@ -57,17 +58,12 @@ fun ToolAuthorizationConfigurationScreen(
     onAction: (ToolAuthorizationConfigurationAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsPageContainer(modifier) {
+    PreferencePageContainer(modifier) {
         Column(Modifier.fillMaxSize()) {
-            if (state.isMutationBlocked || !state.notice.isNullOrBlank()) {
-                SettingsBanner(
-                    text = state.notice?.takeUnless { it.isBlank() }
-                        ?: stringResource(R.string.toolauth_agent_mutation_blocked),
-                    tone = if (state.isMutationBlocked) {
-                        SettingsBannerTone.Error
-                    } else {
-                        SettingsBannerTone.Info
-                    },
+            if (state.isMutationBlocked) {
+                PreferenceBanner(
+                    text = stringResource(R.string.toolauth_agent_mutation_blocked),
+                    tone = PreferenceBannerTone.Error,
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }

@@ -1,19 +1,15 @@
 package github.ponyhuang.asssistantai.feature.permissions
 
 import android.Manifest
-import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityCompat
@@ -32,14 +28,8 @@ fun PermissionSettingsRoute(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val activity = context.findActivity()
+    val activity = LocalActivity.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    var requestedPermissions by remember {
-        mutableStateOf<Map<String, AppPermission>>(emptyMap())
-    }
-    var previouslyRequestedPermissions by remember {
-        mutableStateOf<Set<AppPermission>>(emptySet())
-    }
     val settingsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) {
@@ -48,24 +38,27 @@ fun PermissionSettingsRoute(
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { grants ->
+        val request = viewModel.pendingRuntimeRequest
+        val requestedPermissions = request?.permissions.orEmpty()
+        val previouslyRequested = request?.previouslyRequested.orEmpty()
         val permanentlyDenied = grants
             .filterValues { granted -> !granted }
             .keys
             .mapNotNullTo(mutableSetOf()) { name ->
-                requestedPermissions[name]?.takeIf { permission ->
-                    permission in previouslyRequestedPermissions && (
-                        activity == null || !ActivityCompat.shouldShowRequestPermissionRationale(
-                            activity,
-                            name,
+                requestedPermissions
+                    .firstOrNull { permission -> permission.androidName() == name }
+                    ?.takeIf { permission ->
+                        permission in previouslyRequested && (
+                            activity == null || !ActivityCompat.shouldShowRequestPermissionRationale(
+                                activity,
+                                name,
+                            )
                         )
-                    )
-                }
+                    }
             }
         viewModel.onAction(
             PermissionSettingsAction.RuntimePermissionsResult(permanentlyDenied),
         )
-        requestedPermissions = emptyMap()
-        previouslyRequestedPermissions = emptySet()
     }
 
     DisposableEffect(lifecycleOwner) {
@@ -80,10 +73,10 @@ fun PermissionSettingsRoute(
 
     LaunchedEffect(state.runtimeRequest) {
         val request = state.runtimeRequest ?: return@LaunchedEffect
-        requestedPermissions = request.permissions.associateBy(AppPermission::androidName)
-        previouslyRequestedPermissions = request.previouslyRequested
         viewModel.onAction(PermissionSettingsAction.RuntimeRequestHandled(request.id))
-        permissionLauncher.launch(requestedPermissions.keys.toTypedArray())
+        permissionLauncher.launch(
+            request.permissions.map(AppPermission::androidName).toTypedArray(),
+        )
     }
 
     LaunchedEffect(state.settingsRequest) {
@@ -125,10 +118,4 @@ private fun AppPermission.androidName(): String = when (this) {
     AppPermission.WriteSystemSettings,
     AppPermission.NotificationListener,
     -> error("Special permissions cannot be requested at runtime.")
-}
-
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is android.content.ContextWrapper -> baseContext.findActivity()
-    else -> null
 }

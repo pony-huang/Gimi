@@ -5,16 +5,10 @@ import androidx.core.content.edit
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import github.ponyhuang.asssistantai.domain.assistant.repository.VoiceSessionStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-
-/** 共享语音会话 id 的读写契约（供测试替换实现）。 */
-interface VoiceSessionIdStore {
-    val voiceSessionId: StateFlow<String?>
-
-    fun setVoiceSessionId(value: String?)
-}
 
 /**
  * 共享语音会话 id 的唯一所有者。
@@ -25,7 +19,7 @@ interface VoiceSessionIdStore {
 @Singleton
 class AssistantVoiceSessionStore @Inject constructor(
     @ApplicationContext context: Context,
-) : VoiceSessionIdStore {
+) : VoiceSessionStore {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val _voiceSessionId = MutableStateFlow(preferences.getString(SESSION_ID_KEY, null))
 

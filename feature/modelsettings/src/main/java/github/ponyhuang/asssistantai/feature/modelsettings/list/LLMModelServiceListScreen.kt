@@ -16,8 +16,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.asssistantai.feature.modelsettings.R
-import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
-import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
+import github.ponyhuang.asssistantai.ui.preference.PreferencePageContainer
+import github.ponyhuang.asssistantai.ui.preference.PreferenceSectionTitle
 
 @Composable
 fun LLMModelServiceListScreen(
@@ -26,16 +26,15 @@ fun LLMModelServiceListScreen(
     onNavigateToDetail: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsPageContainer(modifier = modifier) {
+    PreferencePageContainer(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
-            SettingsSectionTitle(
+            PreferenceSectionTitle(
                 text = stringResource(R.string.modelsettings_list_section_configured),
                 modifier = Modifier.padding(top = 12.dp),
             )
-            if (state.isMutationBlocked || !state.notice.isNullOrBlank()) {
+            if (state.isMutationBlocked) {
                 Text(
-                    text = state.notice?.takeUnless { it.isBlank() }
-                        ?: stringResource(R.string.modelsettings_agent_mutation_blocked),
+                    text = stringResource(R.string.modelsettings_agent_mutation_blocked),
                     color = androidx.compose.material3.MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 )

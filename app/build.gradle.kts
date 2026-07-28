@@ -1,6 +1,3 @@
-//import java.io.File
-//import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -8,35 +5,6 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt.android)
 }
-
-//val localProperties = Properties().apply {
-//    rootProject.file("local.properties")
-//        .takeIf { it.isFile }
-//        ?.inputStream()
-//        ?.use(::load)
-//}
-//
-//fun releaseSigningValue(environmentName: String, propertyName: String): String? =
-//    System.getenv(environmentName)?.takeIf(String::isNotBlank)
-//        ?: localProperties.getProperty(propertyName)?.takeIf(String::isNotBlank)
-//
-//val releaseStoreFile = releaseSigningValue(
-//    "ASSISTANTAI_RELEASE_STORE_FILE",
-//    "asssistantai.release.storeFile",
-//)
-//val releaseStorePassword = releaseSigningValue(
-//    "ASSISTANTAI_RELEASE_STORE_PASSWORD",
-//    "asssistantai.release.storePassword",
-//)
-//val releaseKeyAlias = releaseSigningValue(
-//    "ASSISTANTAI_RELEASE_KEY_ALIAS",
-//    "asssistantai.release.keyAlias",
-//)
-//val releaseKeyPassword = releaseSigningValue(
-//    "ASSISTANTAI_RELEASE_KEY_PASSWORD",
-//    "asssistantai.release.keyPassword",
-//)
-//val releaseStorePath = releaseStoreFile?.let(rootProject::file)?.absolutePath.orEmpty()
 
 android {
     namespace = "github.ponyhuang.asssistantai"
@@ -54,14 +22,6 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-//    signingConfigs {
-//        create("releasePrivate") {
-//            storeFile = rootProject.file(releaseStoreFile ?: "temp/missing-release.keystore")
-//            storePassword = releaseStorePassword.orEmpty()
-//            keyAlias = releaseKeyAlias.orEmpty()
-//            keyPassword = releaseKeyPassword.orEmpty()
-//        }
-//    }
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -70,7 +30,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-//            signingConfig = signingConfigs.getByName("releasePrivate")
         }
     }
     compileOptions {
@@ -81,8 +40,9 @@ android {
         compose = true
         buildConfig = true
     }
-    testOptions {
-        unitTests.isReturnDefaultValues  = true
+    // Baseline 记录现存 lint 问题（如 BluetoothVoiceService 蓝牙权限检查），lint 继续对新问题报错。
+    lint {
+        baseline = file("lint-baseline.xml")
     }
     packaging {
         resources {
@@ -109,57 +69,20 @@ android {
     }
 }
 
-//val verifyReleaseSigning by tasks.registering {
-//    group = "verification"
-//    description = "Fails release builds when private signing configuration is incomplete."
-//    inputs.property("releaseStoreFile", releaseStorePath)
-//    inputs.property("releaseStorePasswordConfigured", !releaseStorePassword.isNullOrBlank())
-//    inputs.property("releaseKeyAliasConfigured", !releaseKeyAlias.isNullOrBlank())
-//    inputs.property("releaseKeyPasswordConfigured", !releaseKeyPassword.isNullOrBlank())
-//    doLast {
-//        val configuredValues = mapOf(
-//            "store file" to inputs.properties["releaseStoreFile"].toString().isNotBlank(),
-//            "store password" to (inputs.properties["releaseStorePasswordConfigured"] as Boolean),
-//            "key alias" to (inputs.properties["releaseKeyAliasConfigured"] as Boolean),
-//            "key password" to (inputs.properties["releaseKeyPasswordConfigured"] as Boolean),
-//        )
-//        val missing = configuredValues.filterValues { configured -> !configured }.keys
-//        check(missing.isEmpty()) {
-//            "Release signing is incomplete. Missing ${missing.joinToString()}. " +
-//                "Configure ASSISTANTAI_RELEASE_* environment variables or " +
-//                "asssistantai.release.* entries in local.properties."
-//        }
-//        val configuredStoreFile = inputs.properties["releaseStoreFile"].toString()
-//        check(File(configuredStoreFile).isFile) {
-//            "Release signing store file does not exist: $configuredStoreFile"
-//        }
-//    }
-//}
-//
-//tasks.configureEach {
-//    if (name.contains("Release") && name != verifyReleaseSigning.name) {
-//        dependsOn(verifyReleaseSigning)
-//    }
-//}
-
 dependencies {
-    implementation(project(":domain:modelcatalog"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:speech"))
-    implementation(project(":domain:mcp"))
-    implementation(project(":domain:workfiles"))
-    implementation(project(":domain:permissions"))
-    implementation(project(":domain:toolauthorization"))
-    implementation(project(":domain:skills"))
     implementation(project(":core:audio"))
     implementation(project(":data:assistant"))
     implementation(project(":domain:assistant"))
     implementation(project(":core:common"))
     implementation(project(":data:modelcatalog"))
-    implementation(project(":core:network"))
-    implementation(project(":core:database"))
     implementation(project(":data:speech"))
     implementation(project(":data:voicewake"))
+    // BluetoothVoiceService uses org.vosk.Model directly (wakeModels.acquire /
+    // VoskWakeWordDetector), so the app must declare vosk itself instead of
+    // relying on :data:voicewake's implementation-scope transitive.
+    implementation(libs.vosk.android)
     implementation(project(":data:conversation"))
     implementation(project(":data:agent"))
     implementation(project(":data:mcp"))
@@ -185,16 +108,22 @@ dependencies {
     // implements program class". Excluding kxml2 from runtime/compile lets
     // the Android implementation take over at runtime, while leaving it on
     // lint/testAndroid configurations so build-time tooling keeps working.
-    listOf("releaseRuntimeClasspath", "releaseCompileClasspath", "releaseRuntimeOnly").forEach { configName ->
-        configurations.findByName(configName)?.exclude(group = "net.sf.kxml", module = "kxml2")
+    val kxml2ExcludedConfigurations = setOf(
+        "releaseRuntimeClasspath",
+        "releaseCompileClasspath",
+        "releaseRuntimeOnly",
+    )
+    configurations.configureEach {
+        if (name in kxml2ExcludedConfigurations) {
+            exclude(group = "net.sf.kxml", module = "kxml2")
+        }
     }
 
     implementation(libs.androidx.compose.foundation.layout)
     implementation(libs.androidx.compose.foundation)
-    implementation(libs.okhttp)
-    implementation(libs.gson)
-    implementation(libs.vosk.android)
-    implementation(libs.multiplatform.markdown.renderer.m3)
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.core)
+    implementation(libs.javax.inject)
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)

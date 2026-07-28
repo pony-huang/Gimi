@@ -13,19 +13,19 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.feature.modelsettings.R
-import github.ponyhuang.asssistantai.ui.settings.SettingsCard
-import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
-import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
+import github.ponyhuang.asssistantai.ui.preference.PreferenceCard
+import github.ponyhuang.asssistantai.ui.preference.PreferencePageContainer
+import github.ponyhuang.asssistantai.ui.preference.PreferenceSectionTitle
 
 @Composable
 fun LLMModelSettingDetailScreen(
     state: LLMModelSettingDetailUiState,
-    onAction: (LLmModelSettingDetailAction) -> Unit,
+    onAction: (LLMModelSettingDetailAction) -> Unit,
     onOpenUrl: (url: String, missingMessage: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val service = state.service ?: return
-    val dispatch: (LLmModelSettingDetailAction) -> Unit = { action ->
+    val dispatch: (LLMModelSettingDetailAction) -> Unit = { action ->
         if (!state.isMutationBlocked || !action.changesAgentConfiguration()) onAction(action)
     }
 
@@ -33,7 +33,7 @@ fun LLMModelSettingDetailScreen(
     val keyUrlMissing = stringResource(R.string.modelsettings_key_url_missing)
     val noLinkConfigured = stringResource(R.string.modelsettings_no_link_configured)
 
-    SettingsPageContainer(modifier = modifier) {
+    PreferencePageContainer(modifier = modifier) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -47,59 +47,59 @@ fun LLMModelSettingDetailScreen(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 )
             }
-            SettingsCard(
+            PreferenceCard(
                 modifier = Modifier.padding(horizontal = 16.dp)
                     .alpha(if (state.isMutationBlocked) 0.6f else 1f),
             ) {
                 HeaderSection(
                     service = service,
                     onToggleEnabled = {
-                        dispatch(LLmModelSettingDetailAction.EnabledChanged(it))
+                        dispatch(LLMModelSettingDetailAction.EnabledChanged(it))
                     },
                     onOpenHomepage = {
                         onOpenUrl(service.homepageUrl, homepageMissing)
                     },
                 )
             }
-            SettingsSectionTitle(
+            PreferenceSectionTitle(
                 text = stringResource(R.string.modelsettings_section_connection),
                 modifier = Modifier.padding(top = 20.dp),
             )
-            SettingsCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+            PreferenceCard(modifier = Modifier.padding(horizontal = 16.dp)) {
                 ApiKeySection(
                     apiKey = service.apiKey,
                     keyHelpUrl = service.keyHelpUrl,
                     isVisible = state.isApiKeyVisible,
                     isTesting = state.isTestingKey,
                     onApiKeyChange = {
-                        dispatch(LLmModelSettingDetailAction.ApiKeyChanged(it))
+                        dispatch(LLMModelSettingDetailAction.ApiKeyChanged(it))
                     },
                     onToggleVisibility = {
-                        dispatch(LLmModelSettingDetailAction.ToggleApiKeyVisibility)
+                        dispatch(LLMModelSettingDetailAction.ToggleApiKeyVisibility)
                     },
-                    onTest = { dispatch(LLmModelSettingDetailAction.TestConnection) },
+                    onTest = { dispatch(LLMModelSettingDetailAction.TestConnection) },
                     onOpenKeyHelp = {
                         onOpenUrl(service.keyHelpUrl, keyUrlMissing)
                     },
                 )
             }
-            SettingsCard(
+            PreferenceCard(
                 modifier = Modifier.padding(start = 16.dp, top = 10.dp, end = 16.dp),
             ) {
                 ApiBaseUrlSection(
                     service = service,
                     isMenuExpanded = state.isProtocolMenuExpanded,
-                    onToggleMenu = { dispatch(LLmModelSettingDetailAction.ToggleProtocolMenu) },
-                    onDismissMenu = { dispatch(LLmModelSettingDetailAction.DismissProtocolMenu) },
+                    onToggleMenu = { dispatch(LLMModelSettingDetailAction.ToggleProtocolMenu) },
+                    onDismissMenu = { dispatch(LLMModelSettingDetailAction.DismissProtocolMenu) },
                     onProtocolChange = {
-                        dispatch(LLmModelSettingDetailAction.ApiProtocolChanged(it))
+                        dispatch(LLMModelSettingDetailAction.ApiProtocolChanged(it))
                     },
                     onBaseUrlChange = {
-                        dispatch(LLmModelSettingDetailAction.ApiBaseUrlChanged(it))
+                        dispatch(LLMModelSettingDetailAction.ApiBaseUrlChanged(it))
                     },
                 )
             }
-            SettingsCard(
+            PreferenceCard(
                 modifier = Modifier.padding(start = 16.dp, top = 20.dp, end = 16.dp),
             ) {
                 LLMModelManagementSection(
@@ -112,7 +112,7 @@ fun LLMModelSettingDetailScreen(
                     onAction = dispatch,
                 )
             }
-            SettingsCard(
+            PreferenceCard(
                 modifier = Modifier.padding(start = 16.dp, top = 20.dp, end = 16.dp, bottom = 16.dp),
             ) {
                 FooterSection(
@@ -124,16 +124,16 @@ fun LLMModelSettingDetailScreen(
     }
 }
 
-private fun LLmModelSettingDetailAction.changesAgentConfiguration(): Boolean = when (this) {
-    is LLmModelSettingDetailAction.ApiKeyChanged,
-    is LLmModelSettingDetailAction.ApiBaseUrlChanged,
-    is LLmModelSettingDetailAction.ApiProtocolChanged,
-    is LLmModelSettingDetailAction.EnabledChanged,
-    is LLmModelSettingDetailAction.RemoveLLmModel,
-    is LLmModelSettingDetailAction.NewLLmModelIdChanged,
-    is LLmModelSettingDetailAction.NewLLmModelKindChanged,
-    LLmModelSettingDetailAction.ShowAddDialog,
-    LLmModelSettingDetailAction.ConfirmAddLLmModel,
-    LLmModelSettingDetailAction.RefreshModels -> true
+private fun LLMModelSettingDetailAction.changesAgentConfiguration(): Boolean = when (this) {
+    is LLMModelSettingDetailAction.ApiKeyChanged,
+    is LLMModelSettingDetailAction.ApiBaseUrlChanged,
+    is LLMModelSettingDetailAction.ApiProtocolChanged,
+    is LLMModelSettingDetailAction.EnabledChanged,
+    is LLMModelSettingDetailAction.RemoveLLMModel,
+    is LLMModelSettingDetailAction.NewLLMModelIdChanged,
+    is LLMModelSettingDetailAction.NewLLMModelKindChanged,
+    LLMModelSettingDetailAction.ShowAddDialog,
+    LLMModelSettingDetailAction.ConfirmAddLLMModel,
+    LLMModelSettingDetailAction.RefreshModels -> true
     else -> false
 }

@@ -22,6 +22,7 @@
     <string name="mcp_import_action">导入 MCP 服务</string>
     <string name="mcp_paste">粘贴</string>
     <string name="mcp_field_json_label">MCP JSON</string>
+    <string name="mcp_field_json_placeholder">{\n  \"mcpServers\": { ... }\n}</string>
     <string name="mcp_stdio_skip_notice">包含 command / args 的 stdio 配置会被跳过，因为 Android 应用无法安全启动本机命令。</string>
     <string name="mcp_transport_sse">SSE</string>
     <string name="mcp_transport_streamable_http">Streamable HTTP</string>
@@ -33,9 +34,11 @@
     <string name="mcp_field_description">描述</string>
     <string name="mcp_field_type_required">类型 *</string>
     <string name="mcp_field_endpoint_required">服务器端点 *</string>
+    <string name="mcp_field_endpoint_placeholder">https://example.com/mcp</string>
     <string name="mcp_field_bearer_token_optional">Bearer Token（可选）</string>
     <string name="mcp_field_header_optional">请求头参数（可选）</string>
     <string name="mcp_field_header_help">每行一个，格式：Header-Name=value</string>
+    <string name="mcp_field_header_placeholder">X-Api-Key=your-key\nX-Client=assistant</string>
     <string name="mcp_field_enable_server">启用此服务器</string>
     <string name="mcp_field_enable_subtitle">停用后，助手不会连接此服务器</string>
     <string name="mcp_sse_help">支持 SSE 与 Streamable HTTP，暂不支持 stdio。</string>

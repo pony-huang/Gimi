@@ -11,9 +11,12 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.asssistantai.domain.modelcatalog.usecase.UpdateDefaultModelSettingsUseCase
 import github.ponyhuang.asssistantai.domain.speech.model.TtsVoiceCatalog
+import github.ponyhuang.asssistantai.feature.modelsettings.R
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -25,14 +28,16 @@ class DefaultModelSettingsViewModel @Inject constructor(
     private val runWhenAgentIdle: RunWhenAgentIdleUseCase,
 ) : ViewModel() {
     private val dialog = MutableStateFlow<DefaultModelDialog?>(null)
-    private val notice = MutableStateFlow<String?>(null)
 
-    val uiState = combine(observeSettings(), dialog, runWhenAgentIdle.state, notice) {
-            settings, currentDialog, runtimeState, currentNotice ->
+    // 缓冲若干条一次性反馈，避免 Route 尚未开始收集时丢失。
+    private val _effects = MutableSharedFlow<DefaultModelSettingsEffect>(extraBufferCapacity = 8)
+    val effects = _effects.asSharedFlow()
+
+    val uiState = combine(observeSettings(), dialog, runWhenAgentIdle.state) {
+            settings, currentDialog, runtimeState ->
         settings.toUiState(
             dialog = currentDialog,
             isMutationBlocked = runtimeState.isBusy,
-            notice = currentNotice,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -56,11 +61,12 @@ class DefaultModelSettingsViewModel @Inject constructor(
     private fun mutate(block: () -> Unit) {
         viewModelScope.launch {
             when (runWhenAgentIdle { block() }) {
-                is AgentMutationResult.Applied -> {
-                    notice.value = null
-                    dialog.value = null
-                }
-                AgentMutationResult.BlockedByActiveAgent -> notice.value = BLOCKED_MESSAGE
+                is AgentMutationResult.Applied -> dialog.value = null
+                AgentMutationResult.BlockedByActiveAgent -> _effects.emit(
+                    DefaultModelSettingsEffect.ShowToast(
+                        R.string.modelsettings_agent_mutation_blocked,
+                    ),
+                )
             }
         }
     }
@@ -84,16 +90,11 @@ class DefaultModelSettingsViewModel @Inject constructor(
             DefaultModelDialog.TtsVoice -> Unit
         }
     }
-
-    private companion object {
-        const val BLOCKED_MESSAGE = ""
-    }
 }
 
 private fun DefaultModelSettings.toUiState(
     dialog: DefaultModelDialog?,
     isMutationBlocked: Boolean,
-    notice: String?,
 ): DefaultModelSettingsUiState {
     val configuredServices = services.filter { it.isEnabled && it.apiKey.isNotBlank() }
     return DefaultModelSettingsUiState(
@@ -108,7 +109,6 @@ private fun DefaultModelSettings.toUiState(
         ttsModels = configuredServices.rows { it.isTts },
         dialog = dialog,
         isMutationBlocked = isMutationBlocked,
-        notice = notice,
     )
 }
 

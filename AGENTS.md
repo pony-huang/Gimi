@@ -5,14 +5,14 @@
 `settings.gradle.kts` is the source of truth for this multi-module Android app:
 
 - `:app`: composition root for startup, top-level navigation, Android services/app functions, and cross-capability Hilt wiring; never a catch-all for UI, domain, data, or provider logic.
-- `:core:common`, `:core:network`, `:core:database`, `:core:testing`: narrow shared infrastructure.
+- `:core:common`, `:core:audio`, `:core:network`, `:core:testing`: narrow shared infrastructure.
 - `:core:designsystem`: theme tokens and stateless, business-agnostic Compose components.
 - `:domain:<capability>`: domain models, repository interfaces, and use cases.
 - `:data:<capability>`: repository implementations, Room/Preferences/Keystore storage, Android gateways, network clients, and third-party SDK adapters.
 - `:feature:<capability>`: feature UI, routes, contracts, ViewModels, and feature-specific components.
-- `gradle/libs.versions.toml`: dependency/version catalog; project notes live in `doc/`.
+- `gradle/libs.versions.toml`: dependency/version catalog; project working notes and temporary artifacts live under ignored `temp/`. Long-lived documentation belongs in `docs/` only after that directory is introduced.
 
-Current domain capabilities are `modelcatalog`, `conversation`, `speech`, `mcp`, `workfiles`, and `permissions`; current features are `modelsettings`, `settings`, `mcp`, `workfiles`, `permissions`, `voicewake`, and `chat`.
+Current domain capabilities are `modelcatalog`, `assistant`, `conversation`, `speech`, `mcp`, `workfiles`, `permissions`, `toolauthorization`, and `skills`. Provider/runtime-only data capabilities also include `agent` and `voicewake`. Current features are `modelsettings`, `settings`, `mcp`, `workfiles`, `permissions`, `toolauthorization`, `voicewake`, `skills`, and `chat`.
 
 Module ownership overrides legacy package names. Use packages matching the owning capability; never recreate catch-all trees such as `app/ui`, `app/data`, or `app/model`. Place new work as follows:
 
@@ -49,6 +49,7 @@ domain/data/core -X-> feature or app
 Mandatory boundaries:
 
 - Feature modules never depend on one another. Move shared business contracts to domain and genuinely business-agnostic UI to `:core:designsystem`.
+- A feature may depend on another narrow core module (e.g. `:core:common`, `:core:audio`) only when the dependency is business-agnostic and explicitly documented; otherwise expose a domain contract.
 - Feature modules never depend on `:app`; expose contracts from the owning domain or core module and perform composition in `:app`.
 - Domain code never depends on Android, Compose, Hilt, Room, OkHttp, provider SDKs, or data models; domain repositories are interfaces.
 - Keep SDK, HTTP, database, Keystore, Preferences, and Android framework details behind data/core gateways or repository implementations.
@@ -66,7 +67,7 @@ Mandatory boundaries:
 - Route composables collect state lifecycle-aware and own navigation, Toast/Snackbar delivery, activity results, permissions, URL opening, and other Android/UI side effects.
 - Screens and business components are stateless: state enters as parameters and events leave as callbacks. They do not fetch ViewModels, repositories, or Context, or launch business coroutines.
 - Keep loading, testing, refreshing, notices, and other ephemeral business-operation state in the ViewModel.
-- `:core:designsystem` components reference no ViewModels, repositories, domain models, navigation, Toast, network calls, or business coroutines; keep them independently previewable and Compose-testable.
+- `:core:designsystem` components reference no ViewModels, repositories, domain models, navigation, Toast, network calls, or business coroutines; keep them independently previewable and Compose-testable. Accepted exception: `ui/settings/llmmodel/LLMModelServiceIcon` and its `ic_model_provider_*` drawables are shared brand assets consumed by both `:feature:chat` and `:feature:modelsettings`; they stay in `:core:designsystem` because feature-to-feature dependencies are forbidden.
 - Preserve existing theme tokens, dimensions, copy, accessibility semantics, and insets unless explicitly changing them. Use Material 3/design-system tokens instead of hard-coded UI colors.
 - Edge-to-edge UI must keep controls and primary content clear of status bars, cutouts, navigation bars, and gesture areas using appropriate insets such as `statusBarsPadding`, `navigationBarsPadding`, or `safeDrawingPadding`; verify visually.
 - Default locale is Chinese (`values/`); English is in `values-en/`. Each module owns both `strings.xml` files; shared business-agnostic copy belongs in `:core:designsystem`.

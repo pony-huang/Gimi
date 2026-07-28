@@ -16,9 +16,10 @@ import github.ponyhuang.asssistantai.agent.AgentChatRunner
 import github.ponyhuang.asssistantai.agent.AgentFactory
 import github.ponyhuang.asssistantai.agent.AgentLLMModelFactory
 import github.ponyhuang.asssistantai.agent.LocalToolCatalog
+import github.ponyhuang.asssistantai.agent.conversation.AdkChatAgentRepository
 import github.ponyhuang.asssistantai.agent.plugins.ConversationGenerateTitlePlugin
-import github.ponyhuang.asssistantai.data.ModelServiceRepository
-import github.ponyhuang.asssistantai.data.modelcatalog.toData
+import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
+import github.ponyhuang.asssistantai.domain.modelcatalog.repository.AgentModelConfigurationSource
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.LocalToolDefinitionSource
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.ToolAuthorizationRepository
 import github.ponyhuang.asssistantai.domain.mcp.repository.McpRepository
@@ -52,6 +53,12 @@ object AgentModule {
 
     @Provides
     @Singleton
+    fun provideChatAgentRepository(
+        implementation: AdkChatAgentRepository,
+    ): ChatAgentRepository = implementation
+
+    @Provides
+    @Singleton
     fun provideSessionService(
         @ApplicationContext context: Context,
     ): SessionService = RoomSessionService.fromContext(context)
@@ -82,7 +89,7 @@ object AgentModule {
         sessionService: SessionService,
         artifactService: ArtifactService,
         agentFactory: AgentFactory,
-        modelServices: ModelServiceRepository,
+        modelServices: AgentModelConfigurationSource,
         toolAuthorization: ToolAuthorizationRepository,
         mcpRepository: McpRepository,
         plugins: List<@JvmSuppressWildcards Plugin>,
@@ -90,7 +97,7 @@ object AgentModule {
         factory = { selection, allowConfirmationRequiredTools, toolConfiguration ->
             modelServices.awaitReady()
             agentFactory.create(
-                selection = selection?.toData(),
+                selection = selection,
                 allowConfirmationRequiredTools = allowConfirmationRequiredTools,
                 toolConfiguration = toolConfiguration,
             )

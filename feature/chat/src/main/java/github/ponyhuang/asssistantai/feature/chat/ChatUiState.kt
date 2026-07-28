@@ -66,19 +66,10 @@ data class ChatUiState(
     /** 被用户拒绝确认的工具名（内存展示态）；工具 chip 据此显示 ✗ 而非永远悬在"未完成"。 */
     val rejectedToolNames: Set<String> = emptySet(),
     val speechPlaybackState: SpeechPlaybackState = SpeechPlaybackState(),
-    val notice: ChatNotice? = null,
 )
 
 val ChatUiState.pendingToolConfirmation: PendingToolConfirmation?
     get() = pendingToolConfirmations.firstOrNull()
-
-sealed interface ChatNotice {
-    data object ConfigureChatModel : ChatNotice
-    data object ModelSwitchBlocked : ChatNotice
-    data object ParallelTaskLimitReached : ChatNotice
-    data object ActiveConversationDeleteBlocked : ChatNotice
-    data class Message(val text: String) : ChatNotice
-}
 
 sealed interface ConversationTaskStatus {
     data class Running(val phase: AgentTaskPhase) : ConversationTaskStatus

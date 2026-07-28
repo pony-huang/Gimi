@@ -1,5 +1,6 @@
 package github.ponyhuang.asssistantai.feature.modelsettings.list
 
+import androidx.annotation.StringRes
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 
@@ -8,7 +9,6 @@ data class ModelServiceListUiState(
     val query: String = "",
     val items: List<LLMModelSetting> = emptyList(),
     val isMutationBlocked: Boolean = false,
-    val notice: String? = null,
 )
 
 sealed interface ModelServiceListAction {
@@ -17,4 +17,10 @@ sealed interface ModelServiceListAction {
         val serviceId: String,
         val enabled: Boolean,
     ) : ModelServiceListAction
+}
+
+/** 一次性 UI 反馈（Toast 等），由 Route 经 effects 通道消费。 */
+sealed interface ModelServiceListEffect {
+    /** @param messageRes 文案的 string resource id。 */
+    data class ShowToast(@StringRes val messageRes: Int) : ModelServiceListEffect
 }

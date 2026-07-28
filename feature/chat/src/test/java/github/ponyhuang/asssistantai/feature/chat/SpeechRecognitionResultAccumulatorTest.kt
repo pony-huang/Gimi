@@ -30,4 +30,83 @@ class SpeechRecognitionResultAccumulatorTest {
 
         assertEquals("下一轮", accumulator.complete("下一轮"))
     }
+
+    @Test
+    fun `committing partial results are concatenated without separator`() {
+        val accumulator = SpeechRecognitionResultAccumulator()
+
+        assertEquals("你好", accumulator.preview("你好", commit = true))
+        assertEquals("你好世界", accumulator.preview("世界", commit = true))
+    }
+
+    @Test
+    fun `consecutive identical committed partials are only kept once`() {
+        val accumulator = SpeechRecognitionResultAccumulator()
+
+        accumulator.preview("你好", commit = true)
+
+        assertEquals("你好", accumulator.preview("你好", commit = true))
+    }
+
+    @Test
+    fun `non-committing partial preview is not accumulated`() {
+        val accumulator = SpeechRecognitionResultAccumulator()
+
+        assertEquals("你", accumulator.preview("你", commit = false))
+        assertEquals("你好", accumulator.preview("你好", commit = false))
+    }
+
+    @Test
+    fun `non-committing partial preview is appended after committed segments`() {
+        val accumulator = SpeechRecognitionResultAccumulator()
+        accumulator.preview("你好", commit = true)
+
+        assertEquals("你好世", accumulator.preview("世", commit = false))
+    }
+
+    @Test
+    fun `blank committing partial is ignored`() {
+        val accumulator = SpeechRecognitionResultAccumulator()
+
+        assertEquals("", accumulator.preview("   ", commit = true))
+        assertEquals("文本", accumulator.complete("文本"))
+    }
+
+    @Test
+    fun `blank non-committing partial yields only committed segments`() {
+        val accumulator = SpeechRecognitionResultAccumulator()
+        accumulator.preview("你好", commit = true)
+
+        assertEquals("你好", accumulator.preview("", commit = false))
+    }
+
+    @Test
+    fun `partial values are trimmed before accumulation`() {
+        val accumulator = SpeechRecognitionResultAccumulator()
+
+        assertEquals("你好", accumulator.preview("  你好  ", commit = true))
+    }
+
+    @Test
+    fun `complete with null returns only committed segments`() {
+        val accumulator = SpeechRecognitionResultAccumulator()
+        accumulator.preview("你好", commit = true)
+
+        assertEquals("你好", accumulator.complete(null))
+    }
+
+    @Test
+    fun `complete with null on empty accumulator returns empty text`() {
+        val accumulator = SpeechRecognitionResultAccumulator()
+
+        assertEquals("", accumulator.complete(null))
+    }
+
+    @Test
+    fun `complete with blank text returns only committed segments`() {
+        val accumulator = SpeechRecognitionResultAccumulator()
+        accumulator.preview("你好", commit = true)
+
+        assertEquals("你好", accumulator.complete("   "))
+    }
 }

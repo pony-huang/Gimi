@@ -8,19 +8,16 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import github.ponyhuang.asssistantai.agent.AgentChatRunner
-import github.ponyhuang.asssistantai.core.database.destructiveForPrototype
-import github.ponyhuang.asssistantai.data.ChatDisplayPreferences
+import github.ponyhuang.asssistantai.data.conversation.ChatDisplayPreferences
 import github.ponyhuang.asssistantai.data.conversation.attachment.AndroidChatAttachmentRepository
-import github.ponyhuang.asssistantai.data.conversation.repository.AdkChatAgentRepository
 import github.ponyhuang.asssistantai.data.conversation.repository.AdkConversationRepository
 import github.ponyhuang.asssistantai.data.conversation.runtime.InMemoryAgentRuntimeGate
 import github.ponyhuang.asssistantai.data.conversation.local.ConversationMetadataDatabase
-import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatDisplayRepository
 import github.ponyhuang.asssistantai.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentRuntimeGate
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentSessionIdentity
 import javax.inject.Singleton
 
 @Module
@@ -32,12 +29,6 @@ object ConversationModule {
     fun provideAgentRuntimeGate(
         implementation: InMemoryAgentRuntimeGate,
     ): AgentRuntimeGate = implementation
-
-    @Provides
-    @Singleton
-    fun provideChatAgentRepository(
-        implementation: AdkChatAgentRepository,
-    ): ChatAgentRepository = implementation
 
     @Provides
     @Singleton
@@ -59,7 +50,7 @@ object ConversationModule {
         context,
         ConversationMetadataDatabase::class.java,
         ConversationMetadataDatabase.DATABASE_NAME,
-    ).destructiveForPrototype()
+    ).fallbackToDestructiveMigration(dropAllTables = true)
         .build()
 
     @Provides
@@ -69,12 +60,10 @@ object ConversationModule {
         sessionService: SessionService,
         database: ConversationMetadataDatabase,
     ): ConversationRepository = AdkConversationRepository(
-        appName = AgentChatRunner.APP_NAME,
-        userId = USER_ID,
+        appName = AgentSessionIdentity.APP_NAME,
+        userId = AgentSessionIdentity.DEFAULT_USER_ID,
         sessionService = sessionService,
         metadataDao = database.conversationMetadataDao(),
         context = context,
     )
-
-    private const val USER_ID = "user-default"
 }

@@ -1,5 +1,6 @@
 package github.ponyhuang.asssistantai.feature.modelsettings.detail
 
+import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -15,6 +16,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.asssistantai.feature.modelsettings.R
 import androidx.core.net.toUri
 
+// ModelsSynchronized 的 count 为运行时参数，文案只能在 effect 消费时解析，豁免该 lint。
+@SuppressLint("LocalContextGetResourceValueCall")
 @Composable
 fun LLMModelSettingDetailRoute(
     serviceId: String,
@@ -33,30 +36,29 @@ fun LLMModelSettingDetailRoute(
     val agentBlockedMessage = stringResource(R.string.modelsettings_agent_mutation_blocked)
 
     LaunchedEffect(serviceId) {
-        viewModel.onAction(LLmModelSettingDetailAction.Load(serviceId))
+        viewModel.onAction(LLMModelSettingDetailAction.Load(serviceId))
     }
 
-    LaunchedEffect(state.notice) {
-        val notice = state.notice ?: return@LaunchedEffect
-        val message = when (notice) {
-            LLMModelSettingDetailNotice.SettingNotFoundLLM -> serviceNotFoundMessage
-            LLMModelSettingDetailNotice.ConnectionSucceeded -> connectionSucceededMessage
-            LLMModelSettingDetailNotice.ConnectionFailed -> connectionFailedMessage
-            is LLMModelSettingDetailNotice.ModelsSynchronized -> context.getString(
-                R.string.modelsettings_notice_models_synchronized,
-                notice.count,
-            )
-            LLMModelSettingDetailNotice.LLMModelSynchronizationFailed -> modelsSyncFailedMessage
-            LLMModelSettingDetailNotice.AgentMutationBlocked -> agentBlockedMessage
-        }
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        viewModel.onAction(LLmModelSettingDetailAction.NoticeConsumed)
-    }
-
-    LaunchedEffect(state.shouldClose) {
-        if (state.shouldClose) {
-            onBack()
-            viewModel.onAction(LLmModelSettingDetailAction.CloseConsumed)
+    LaunchedEffect(Unit) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                is LLMModelSettingDetailEffect.ShowToast -> {
+                    val message = when (val notice = effect.notice) {
+                        LLMModelSettingDetailNotice.SettingNotFoundLLM -> serviceNotFoundMessage
+                        LLMModelSettingDetailNotice.ConnectionSucceeded -> connectionSucceededMessage
+                        LLMModelSettingDetailNotice.ConnectionFailed -> connectionFailedMessage
+                        is LLMModelSettingDetailNotice.ModelsSynchronized -> context.getString(
+                            R.string.modelsettings_notice_models_synchronized,
+                            notice.count,
+                        )
+                        LLMModelSettingDetailNotice.LLMModelSynchronizationFailed ->
+                            modelsSyncFailedMessage
+                        LLMModelSettingDetailNotice.AgentMutationBlocked -> agentBlockedMessage
+                    }
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                }
+                LLMModelSettingDetailEffect.Close -> onBack()
+            }
         }
     }
 

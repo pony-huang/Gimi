@@ -9,10 +9,10 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.asssistantai.core.common.coroutine.IoDispatcher
-import github.ponyhuang.asssistantai.core.database.destructiveForPrototype
-import github.ponyhuang.asssistantai.data.ModelServiceRepository
-import github.ponyhuang.asssistantai.data.LLMModelRoomDatabase
+import github.ponyhuang.asssistantai.data.modelcatalog.LLMModelRoomDatabase
+import github.ponyhuang.asssistantai.data.modelcatalog.ModelServiceRepository
 import github.ponyhuang.asssistantai.data.modelcatalog.remote.OpenAiCompatibleModelServiceGateway
+import github.ponyhuang.asssistantai.domain.modelcatalog.repository.AgentModelConfigurationSource
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.ModelServiceRemoteGateway
 import javax.inject.Singleton
@@ -27,6 +27,12 @@ abstract class ModelCatalogBindingsModule {
     abstract fun bindModelCatalogRepository(
         implementation: ModelServiceRepository,
     ): ModelCatalogRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAgentModelConfigurationSource(
+        implementation: ModelServiceRepository,
+    ): AgentModelConfigurationSource
 
     @Binds
     @Singleton
@@ -46,7 +52,7 @@ object ModelCatalogInfrastructureModule {
         context,
         LLMModelRoomDatabase::class.java,
         LLMModelRoomDatabase.DATABASE_NAME,
-    ).destructiveForPrototype().build()
+    ).fallbackToDestructiveMigration(dropAllTables = true).build()
 
     @Provides
     @IoDispatcher

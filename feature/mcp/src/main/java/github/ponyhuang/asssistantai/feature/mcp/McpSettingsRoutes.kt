@@ -33,7 +33,7 @@ fun McpServerImportRoute(
     viewModel: McpSettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    CloseEffect(state.shouldClose, onBack, viewModel)
+    CloseEffect(viewModel, onBack)
     McpServerImportScreen(
         state = state,
         onAction = viewModel::onAction,
@@ -52,7 +52,7 @@ fun McpServerEditorRoute(
     LaunchedEffect(serverId) {
         viewModel.onAction(McpSettingsAction.LoadEditor(serverId))
     }
-    CloseEffect(state.shouldClose, onBack, viewModel)
+    CloseEffect(viewModel, onBack)
     McpServerEditorScreen(
         state = state,
         onAction = viewModel::onAction,
@@ -62,14 +62,14 @@ fun McpServerEditorRoute(
 
 @Composable
 private fun CloseEffect(
-    shouldClose: Boolean,
-    onBack: () -> Unit,
     viewModel: McpSettingsViewModel,
+    onBack: () -> Unit,
 ) {
-    LaunchedEffect(shouldClose) {
-        if (shouldClose) {
-            onBack()
-            viewModel.onAction(McpSettingsAction.CloseConsumed)
+    LaunchedEffect(Unit) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                McpSettingsEffect.Close -> onBack()
+            }
         }
     }
 }

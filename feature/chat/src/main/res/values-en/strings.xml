@@ -103,6 +103,11 @@
     <string name="chat_notice_model_switch_blocked">The assistant is still generating a reply. Please wait before switching models.</string>
     <string name="chat_notice_parallel_limit">Up to 3 conversation tasks can run at once</string>
     <string name="chat_notice_active_delete_blocked">A running task or pending confirmation prevents deleting this conversation</string>
+    <string name="chat_notice_mixed_attachment_categories">Only one type of attachment can be sent at a time</string>
+    <string name="chat_notice_chat_model_unavailable">The current chat model is unavailable</string>
+    <string name="chat_notice_attachment_category_unsupported">The current model does not support this type of attachment</string>
+    <string name="chat_notice_attachment_unsupported_or_too_large">Unsupported attachment type or file too large: %1$s</string>
+    <string name="chat_notice_document_total_size_limit">Document attachments cannot exceed 50 MB in total</string>
 
     <string name="chat_tool_unknown_description">A remote tool is requesting to perform an action</string>
 

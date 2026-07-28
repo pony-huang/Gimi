@@ -42,7 +42,7 @@ fun LLMModelManagementSection(
     isAddDialogVisible: Boolean,
     newModelId: String,
     newModelKind: NewModelKind,
-    onAction: (LLmModelSettingDetailAction) -> Unit,
+    onAction: (LLMModelSettingDetailAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -60,7 +60,7 @@ fun LLMModelManagementSection(
             )
             IconButton(
                 enabled = service.apiKey.isNotBlank() && !isRefreshing,
-                onClick = { onAction(LLmModelSettingDetailAction.RefreshModels) },
+                onClick = { onAction(LLMModelSettingDetailAction.RefreshModels) },
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
@@ -70,7 +70,7 @@ fun LLMModelManagementSection(
                     ),
                 )
             }
-            IconButton(onClick = { onAction(LLmModelSettingDetailAction.ShowAddDialog) }) {
+            IconButton(onClick = { onAction(LLMModelSettingDetailAction.ShowAddDialog) }) {
                 Icon(
                     Icons.Default.Add,
                     contentDescription = stringResource(R.string.modelsettings_dialog_add_custom_model_title),
@@ -83,14 +83,14 @@ fun LLMModelManagementSection(
                 is LLMModelSettingDetailRow.GroupHeader -> GroupHeaderRow(
                     row = row,
                     onToggle = {
-                        onAction(LLmModelSettingDetailAction.ToggleGroup(row.groupId))
+                        onAction(LLMModelSettingDetailAction.ToggleGroup(row.groupId))
                     },
                 )
                 is LLMModelSettingDetailRow.LLMModelItem -> ModelItemRow(
                     row = row,
                     onRemove = {
                         onAction(
-                            LLmModelSettingDetailAction.RemoveLLmModel(
+                            LLMModelSettingDetailAction.RemoveLLMModel(
                                 groupId = row.groupId,
                                 modelId = row.model.id,
                             ),
@@ -107,13 +107,13 @@ fun LLMModelManagementSection(
             input = newModelId,
             kind = newModelKind,
             onInputChange = {
-                onAction(LLmModelSettingDetailAction.NewLLmModelIdChanged(it))
+                onAction(LLMModelSettingDetailAction.NewLLMModelIdChanged(it))
             },
             onKindChange = {
-                onAction(LLmModelSettingDetailAction.NewLLmModelKindChanged(it))
+                onAction(LLMModelSettingDetailAction.NewLLMModelKindChanged(it))
             },
-            onConfirm = { onAction(LLmModelSettingDetailAction.ConfirmAddLLmModel) },
-            onDismiss = { onAction(LLmModelSettingDetailAction.DismissAddDialog) },
+            onConfirm = { onAction(LLMModelSettingDetailAction.ConfirmAddLLMModel) },
+            onDismiss = { onAction(LLMModelSettingDetailAction.DismissAddDialog) },
         )
     }
 }

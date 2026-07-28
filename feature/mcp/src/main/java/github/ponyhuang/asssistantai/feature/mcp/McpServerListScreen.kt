@@ -36,10 +36,10 @@ import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
 import github.ponyhuang.asssistantai.domain.mcp.model.McpTransport
 import github.ponyhuang.asssistantai.feature.mcp.R
-import github.ponyhuang.asssistantai.ui.settings.SettingsCard
-import github.ponyhuang.asssistantai.ui.settings.SettingsNavigationCard
-import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
-import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
+import github.ponyhuang.asssistantai.ui.preference.PreferenceCard
+import github.ponyhuang.asssistantai.ui.preference.PreferenceNavigationCard
+import github.ponyhuang.asssistantai.ui.preference.PreferencePageContainer
+import github.ponyhuang.asssistantai.ui.preference.PreferenceSectionTitle
 
 @Composable
 fun McpServerListScreen(
@@ -50,12 +50,11 @@ fun McpServerListScreen(
     onImportServers: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsPageContainer(modifier) {
+    PreferencePageContainer(modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (state.isMutationBlocked || !state.notice.isNullOrBlank()) {
+            if (state.isMutationBlocked) {
                 Text(
-                    text = state.notice?.takeUnless { it.isBlank() }
-                        ?: stringResource(R.string.mcp_agent_mutation_blocked),
+                    text = stringResource(R.string.mcp_agent_mutation_blocked),
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                 )
@@ -148,22 +147,22 @@ fun McpServerAddOptionsScreen(
     onImport: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsPageContainer(modifier) {
+    PreferencePageContainer(modifier) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            SettingsSectionTitle(text = stringResource(R.string.mcp_section_add_methods))
-            SettingsNavigationCard(
+            PreferenceSectionTitle(text = stringResource(R.string.mcp_section_add_methods))
+            PreferenceNavigationCard(
                 icon = Icons.Default.Add,
                 title = stringResource(R.string.mcp_method_new_title),
                 subtitle = stringResource(R.string.mcp_method_new_subtitle),
                 onClick = onCreate,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
-            SettingsNavigationCard(
+            PreferenceNavigationCard(
                 icon = Icons.Default.ContentPaste,
                 title = stringResource(R.string.mcp_method_import_title),
                 subtitle = stringResource(R.string.mcp_method_import_subtitle),
@@ -181,7 +180,7 @@ fun McpServerImportScreen(
     modifier: Modifier = Modifier,
 ) {
     val clipboard = LocalClipboardManager.current
-    SettingsPageContainer(modifier) {
+    PreferencePageContainer(modifier) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -189,8 +188,8 @@ fun McpServerImportScreen(
                 .padding(vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            SettingsSectionTitle(text = stringResource(R.string.mcp_section_import_mcp))
-            SettingsCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+            PreferenceSectionTitle(text = stringResource(R.string.mcp_section_import_mcp))
+            PreferenceCard(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -200,7 +199,7 @@ fun McpServerImportScreen(
                         value = state.importJson,
                         onValueChange = { onAction(McpSettingsAction.ImportJsonChanged(it)) },
                         label = { Text(stringResource(R.string.mcp_field_json_label)) },
-                        placeholder = { Text("{\n  \"mcpServers\": { ... }\n}") },
+                        placeholder = { Text(stringResource(R.string.mcp_field_json_placeholder)) },
                         minLines = 10,
                         modifier = Modifier.fillMaxWidth(),
                     )

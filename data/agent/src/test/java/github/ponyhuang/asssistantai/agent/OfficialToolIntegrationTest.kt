@@ -4,8 +4,7 @@ import github.ponyhuang.asssistantai.agent.tools.official.KimiFormulaOfficialToo
 import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolRegistry
 import github.ponyhuang.asssistantai.agent.tools.official.WebSearchOfficialToolProvider
 import github.ponyhuang.asssistantai.agent.tools.official.kimi.KimiFormulaToolset
-import github.ponyhuang.asssistantai.data.ApiBaseType
-import github.ponyhuang.asssistantai.data.LLMModelType
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import okhttp3.OkHttpClient
 import org.junit.Assert.assertEquals
@@ -26,15 +25,15 @@ class OfficialToolIntegrationTest {
 
         val native = registry.resolve(
             config(
-                serviceId = LLMModelType.Mimo.serviceId,
-                baseType = ApiBaseType.Standard,
+                serviceId = "mimo",
+                baseType = ApiProtocol.Standard,
                 officialTools = listOf(OfficialToolIds.WEB_SEARCH),
             ),
         )
         val agentTool = registry.resolve(
             config(
-                serviceId = LLMModelType.Moonshot.serviceId,
-                baseType = ApiBaseType.Standard,
+                serviceId = "kimi",
+                baseType = ApiProtocol.Standard,
                 officialTools = listOf(OfficialToolIds.KIMI_FORMULAS),
             ),
         )
@@ -47,7 +46,7 @@ class OfficialToolIntegrationTest {
 
     private fun config(
         serviceId: String,
-        baseType: ApiBaseType,
+        baseType: ApiProtocol,
         officialTools: List<String>,
     ) = ModelConfig(
         serviceId = serviceId,

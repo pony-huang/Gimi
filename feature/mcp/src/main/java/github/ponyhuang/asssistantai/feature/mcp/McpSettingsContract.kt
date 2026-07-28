@@ -21,9 +21,7 @@ data class McpSettingsUiState(
     val importResult: String? = null,
     val editor: McpEditorDraft? = null,
     val isTransportMenuExpanded: Boolean = false,
-    val shouldClose: Boolean = false,
     val isMutationBlocked: Boolean = false,
-    val notice: String? = null,
 )
 
 sealed interface McpSettingsAction {
@@ -36,7 +34,12 @@ sealed interface McpSettingsAction {
     data class TransportSelected(val transport: McpTransport) : McpSettingsAction
     data object SaveEditor : McpSettingsAction
     data object DeleteEditor : McpSettingsAction
-    data object CloseConsumed : McpSettingsAction
+}
+
+/** 一次性 UI 反馈（关闭页面等），由 Route 经 effects 通道消费。 */
+sealed interface McpSettingsEffect {
+    /** 保存 / 删除 / 导入成功，请求关闭当前页。 */
+    data object Close : McpSettingsEffect
 }
 
 internal fun McpServer.toDraft(isNew: Boolean) = McpEditorDraft(

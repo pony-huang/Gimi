@@ -1,12 +1,11 @@
 package github.ponyhuang.asssistantai.agent.tools.official
 
 import github.ponyhuang.asssistantai.agent.tools.official.kimi.KimiFormulaManifest
-import github.ponyhuang.asssistantai.data.LLMModelType
-import github.ponyhuang.asssistantai.data.ModelServiceRepository
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
+import github.ponyhuang.asssistantai.domain.modelcatalog.repository.AgentModelConfigurationSource
 import okhttp3.OkHttpClient
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -39,7 +38,7 @@ class DefaultOfficialToolFunctionCatalog @Inject constructor(
 
 @Singleton
 class KimiFormulaCatalog @Inject constructor(
-    private val modelServices: ModelServiceRepository,
+    private val modelServices: AgentModelConfigurationSource,
     private val httpClient: OkHttpClient,
 ) {
     suspend fun fetch(): List<OfficialToolFunction> {
@@ -62,5 +61,11 @@ class KimiFormulaCatalog @Inject constructor(
 
     private fun currentMoonshotService(): LLMModelSetting? =
         modelServices.currentServices()
-            .firstOrNull { it.id == LLMModelType.Moonshot.serviceId }
+            .firstOrNull { it.id == MOONSHOT_SERVICE_ID }
+
+    private companion object {
+        // 与 :data:modelcatalog 的 LLMModelType.Moonshot.serviceId 保持一致；
+        // data 层模块不允许互相依赖，此处复制字面量。
+        const val MOONSHOT_SERVICE_ID = "kimi"
+    }
 }

@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.feature.voicewake
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -14,6 +15,8 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
+// effect 携带动态 string res id，无法在组合期用 stringResource 解析，豁免该 lint。
+@SuppressLint("LocalContextGetResourceValueCall")
 @Composable
 fun VoiceWakeSettingsRoute(
     modifier: Modifier = Modifier,
@@ -42,14 +45,16 @@ fun VoiceWakeSettingsRoute(
         }
     }
 
-    LaunchedEffect(state.modelDownloadPromptId) {
-        val promptId = state.modelDownloadPromptId ?: return@LaunchedEffect
-        Toast.makeText(
-            context,
-            context.getString(R.string.voicewake_model_download_prompt),
-            Toast.LENGTH_SHORT,
-        ).show()
-        viewModel.onAction(VoiceWakeSettingsAction.ModelDownloadPromptHandled(promptId))
+    LaunchedEffect(Unit) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                is VoiceWakeSettingsEffect.ShowToast -> Toast.makeText(
+                    context,
+                    context.getString(effect.messageRes),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
     }
 
     VoiceWakeSettingsScreen(

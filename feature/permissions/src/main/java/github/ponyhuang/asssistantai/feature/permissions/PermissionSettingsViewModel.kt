@@ -26,6 +26,14 @@ class PermissionSettingsViewModel @Inject constructor(
     val uiState = _uiState.asStateFlow()
     private var nextRequestId = 0
 
+    /**
+     * 已发起、等待系统权限框结果的运行时请求。Route 的消费动作会把它从 UiState 清掉，
+     * 但 launcher 回调仍需其中的 permissions / previouslyRequested 来判定永久拒绝，
+     * 因此由 ViewModel 持有到结果返回；不持有任何 Activity/Context。
+     */
+    var pendingRuntimeRequest: RuntimePermissionRequest? = null
+        private set
+
     fun onAction(action: PermissionSettingsAction) {
         when (action) {
             PermissionSettingsAction.Refresh -> refresh()
@@ -34,6 +42,7 @@ class PermissionSettingsViewModel @Inject constructor(
             )
             is PermissionSettingsAction.RequestGroup -> requestGroup(action.kind)
             is PermissionSettingsAction.RuntimePermissionsResult -> {
+                pendingRuntimeRequest = null
                 recordPermanentlyDenied(action.permanentlyDenied)
                 refresh()
             }
@@ -86,15 +95,13 @@ class PermissionSettingsViewModel @Inject constructor(
         if (permissions.isEmpty()) return
         val previouslyRequested = permissions
             .filterTo(mutableSetOf(), wasPermissionRequested::invoke)
-        _uiState.update {
-            it.copy(
-                runtimeRequest = RuntimePermissionRequest(
-                    id = ++nextRequestId,
-                    permissions = permissions,
-                    previouslyRequested = previouslyRequested,
-                ),
-            )
-        }
+        val request = RuntimePermissionRequest(
+            id = ++nextRequestId,
+            permissions = permissions,
+            previouslyRequested = previouslyRequested,
+        )
+        pendingRuntimeRequest = request
+        _uiState.update { it.copy(runtimeRequest = request) }
         recordRequestedPermissions(permissions.toSet())
     }
 

@@ -22,6 +22,7 @@ import github.ponyhuang.asssistantai.agent.AgentChatRunner.Companion.MAX_CACHED_
 import github.ponyhuang.asssistantai.di.AgentModule
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.conversation.model.FileAttachment
+import github.ponyhuang.asssistantai.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -275,7 +276,7 @@ class AgentChatRunner(
         }
 
     companion object {
-        const val APP_NAME: String = "Gimi"
+        const val APP_NAME: String = AgentSessionIdentity.APP_NAME
         const val MAX_CACHED_RUNNERS: Int = 10
     }
 }

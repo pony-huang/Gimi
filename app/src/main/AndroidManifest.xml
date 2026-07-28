@@ -66,13 +66,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".MainActivity2"
-            android:exported="false"
-            android:label="@string/title_activity_main2"
-            android:theme="@style/Theme.Asssistantai"
-            android:windowSoftInputMode="adjustResize"
-            tools:ignore="MissingClass" />
         <service
             android:name=".agent.tools.system.MediaNotificationListenerService"
             android:exported="true"

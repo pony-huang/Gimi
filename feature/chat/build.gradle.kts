@@ -17,7 +17,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
     buildFeatures { compose = true }
-    testOptions { unitTests.isReturnDefaultValues = true }
+    // Baseline 记录现存 lint 问题（如 ChatComposer 录音权限检查），lint 继续对新问题报错。
+    lint {
+        baseline = file("lint-baseline.xml")
+    }
 }
 
 dependencies {

@@ -7,9 +7,9 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":domain:modelcatalog"))
+    api(project(":domain:modelcatalog"))
     implementation(libs.javax.inject)
-    implementation(libs.kotlinx.coroutines.core)
+    api(libs.kotlinx.coroutines.core)
 
     testImplementation(libs.junit)
 }

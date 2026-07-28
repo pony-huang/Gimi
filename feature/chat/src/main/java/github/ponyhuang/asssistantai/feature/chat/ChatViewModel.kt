@@ -36,8 +36,10 @@ import github.ponyhuang.asssistantai.domain.toolauthorization.repository.ToolAut
 import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -79,19 +81,57 @@ class ChatViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ChatUiState())
     private val sessionCreationMutex = Mutex()
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+
+    private val _effects = MutableSharedFlow<ChatEffect>(extraBufferCapacity = 8)
+
+    /** 一次性 UI 反馈通道（Toast 等），由 Route 消费；见 [ChatEffect]。 */
+    val effects = _effects.asSharedFlow()
+
+    /**
+     * 用户意图统一入口 — 所有"发后即忘"的用户操作都经这里分发，见 [ChatAction]。
+     */
+    fun onAction(action: ChatAction) {
+        when (action) {
+            is ChatAction.Send -> send(action.text, action.draftAttachments)
+            ChatAction.StopStreaming -> stopStreaming()
+            is ChatAction.ToggleSpeechPlayback ->
+                toggleSpeechPlayback(action.messageId, action.markdown)
+            is ChatAction.RespondToToolConfirmation -> respondToToolConfirmation(action.confirmed)
+            ChatAction.RestoreOrCreateSession -> restoreOrCreateSession()
+            ChatAction.NewConversation -> reset()
+            is ChatAction.SwitchSession -> switchSession(action.sessionId)
+            ChatAction.RefreshConversations -> refreshConversations()
+            is ChatAction.DeleteConversation -> deleteConversation(action.sessionId)
+            is ChatAction.SelectModel -> selectModel(action.selection)
+            is ChatAction.SetLocalToolEnabled ->
+                setLocalToolEnabled(action.toolId, action.enabled)
+            is ChatAction.SetMcpServerEnabled ->
+                setMcpServerEnabled(action.serverId, action.enabled)
+            is ChatAction.SetOfficialFunctionEnabled -> setOfficialFunctionEnabled(
+                toolId = action.toolId,
+                functionId = action.functionId,
+                enabled = action.enabled,
+                supportedFunctionIds = action.supportedFunctionIds,
+            )
+            is ChatAction.LoadOfficialToolFunctions -> loadOfficialToolFunctions(action.toolId)
+            ChatAction.ClearToolConfigurationError -> clearToolConfigurationError()
+        }
+    }
+
+    /** 向 [effects] 通道发射一条一次性提示，由 Route 消费（Toast 等）。 */
+    private fun emitNotice(notice: ChatNotice) {
+        _effects.tryEmit(ChatEffect.ShowNotice(notice))
+    }
+
     suspend fun transcribeVoice(pcm16: ByteArray): String =
         speechRecognitionRepository.transcribe(pcm16)
 
-    fun toggleSpeechPlayback(messageId: String, markdown: String) {
+    private fun toggleSpeechPlayback(messageId: String, markdown: String) {
         speechPlaybackController.toggle(messageId, markdownToSpeechText(markdown))
     }
 
-    fun consumeNotice() {
-        _uiState.update { it.copy(notice = null) }
-    }
-
     /** Sends the user's decision back to ADK, which then either runs or rejects the paused tool. */
-    fun respondToToolConfirmation(confirmed: Boolean) {
+    private fun respondToToolConfirmation(confirmed: Boolean) {
         val sessionId = _uiState.value.sessionId
         if (sessionId.isBlank()) return
         respondToToolConfirmation(sessionId, confirmed)
@@ -190,7 +230,7 @@ class ChatViewModel @Inject constructor(
         }
         viewModelScope.launch {
             speechPlaybackController.errors.collect { message ->
-                _uiState.update { it.copy(notice = ChatNotice.Message(message)) }
+                emitNotice(ChatNotice.Message(message))
             }
         }
     }
@@ -438,11 +478,11 @@ class ChatViewModel @Inject constructor(
             ?.takeIf(::isUsableChatSelection)
             ?: defaultSelection()
         if (usableSelection == null) {
-            _uiState.update { it.copy(notice = ChatNotice.ConfigureChatModel) }
+            emitNotice(ChatNotice.ConfigureChatModel)
             return false
         }
-        validateAttachments(usableSelection, draftAttachments)?.let { error ->
-            _uiState.update { it.copy(notice = ChatNotice.Message(error)) }
+        validateAttachments(usableSelection, draftAttachments)?.let { notice ->
+            emitNotice(notice)
             return false
         }
         val sessionId = _uiState.value.sessionId
@@ -467,7 +507,7 @@ class ChatViewModel @Inject constructor(
         val runtime = runtimeFor(sessionId)
         if (runtime.isActive) return false
         if (sessionRuntimes.values.count { it.isActive } >= MAX_PARALLEL_TASKS) {
-            _uiState.update { it.copy(notice = ChatNotice.ParallelTaskLimitReached) }
+            emitNotice(ChatNotice.ParallelTaskLimitReached)
             return false
         }
         clearToolConfirmationState(runtime)
@@ -521,16 +561,16 @@ class ChatViewModel @Inject constructor(
     private fun validateAttachments(
         selection: ModelSelection,
         draftAttachments: List<DraftAttachment>,
-    ): String? {
+    ): ChatNotice? {
         if (draftAttachments.isEmpty()) return null
         if (draftAttachments.mapTo(hashSetOf()) { it.category }.size != 1) {
-            return "每次只能发送同一类型的附件"
+            return ChatNotice.MixedAttachmentCategories
         }
         val model = _uiState.value.availableLLMModelSettings
             .firstOrNull { it.id == selection.serviceId }
             ?.groups?.firstOrNull { it.id == selection.groupId }
             ?.models?.firstOrNull { it.id == selection.modelId }
-            ?: return "当前聊天模型不可用"
+            ?: return ChatNotice.ChatModelUnavailable
         val (supportedMimeTypes, maxInlineBytes) = when (draftAttachments.first().category) {
             AttachmentCategory.IMAGE -> model.capabilities.vision?.let {
                 it.supportedMimeTypes to it.maxInlineBytes
@@ -541,17 +581,17 @@ class ChatViewModel @Inject constructor(
             AttachmentCategory.DOCUMENT -> model.capabilities.documentInput?.let {
                 it.supportedMimeTypes to it.maxInlineBytes
             }
-        } ?: return "当前模型不支持此类附件"
+        } ?: return ChatNotice.AttachmentCategoryUnsupported
         val unsupported = draftAttachments.firstOrNull {
             it.mimeType !in supportedMimeTypes ||
                 maxInlineBytes?.let { limit -> it.sizeBytes > limit } == true
         }
-        if (unsupported != null) return "附件类型不受支持或文件过大：${unsupported.displayName}"
+        if (unsupported != null) return ChatNotice.AttachmentUnsupportedOrTooLarge(unsupported.displayName)
         if (
             draftAttachments.first().category == AttachmentCategory.DOCUMENT &&
             draftAttachments.sumOf(DraftAttachment::sizeBytes) > MAX_DOCUMENT_REQUEST_BYTES
         ) {
-            return "文档附件合计不能超过 50 MB"
+            return ChatNotice.DocumentTotalSizeLimitExceeded
         }
         return null
     }
@@ -583,7 +623,7 @@ class ChatViewModel @Inject constructor(
      * 供 [MainScreen] 在 `LaunchedEffect(Unit)` 内调用，让首屏打字前已经有可用 sessionId，
      * 避免依赖 `send()` 的兜底分支。仅在进程级（`_uiState.value.sessionId` 为空）执行一次；同一 ViewModel 实例内多次调用安全。
      */
-    fun restoreOrCreateSession() {
+    private fun restoreOrCreateSession() {
         if (_uiState.value.sessionId.isNotBlank()) return
         // 同步先把 isInitializing 置 true：让 MainScreen 在第一次 collect 时就拿到
         // 加载态，避免 history commit 之前出现"旧 messages 残留 → 新 history"的
@@ -640,7 +680,7 @@ class ChatViewModel @Inject constructor(
      * 即使 [ConversationRepository.createConversation] 失败（例如 Room 暂时不可用），也先清掉
      * 上一会话遗留的 [partChannels]，避免 channel 跨"空 session"残留。
      */
-    fun reset() {
+    private fun reset() {
         viewModelScope.launch {
             modelServices.awaitReady()
             val newId = createConversationWithDefaults()
@@ -655,7 +695,7 @@ class ChatViewModel @Inject constructor(
     /**
      * 切换到指定 session
      */
-    fun switchSession(sessionId: String) {
+    private fun switchSession(sessionId: String) {
         if (sessionId.isBlank()) return
         switchSessionUnchecked(sessionId)
     }
@@ -732,7 +772,7 @@ class ChatViewModel @Inject constructor(
     /**
      * 触发一次 [ConversationRepository.refresh] 拉取最新会话列表（写到 [conversations]）。
      */
-    fun refreshConversations() {
+    private fun refreshConversations() {
         viewModelScope.launch { repository.refresh() }
     }
 
@@ -750,10 +790,10 @@ class ChatViewModel @Inject constructor(
      *
      * 副作用：删除成功后同步移除 RoomDatabase 中对应的会话元数据。
      */
-    fun deleteConversation(sessionId: String) {
+    private fun deleteConversation(sessionId: String) {
         if (sessionId.isBlank()) return
         if (sessionRuntimes[sessionId]?.isActive == true) {
-            _uiState.update { it.copy(notice = ChatNotice.ActiveConversationDeleteBlocked) }
+            emitNotice(ChatNotice.ActiveConversationDeleteBlocked)
             return
         }
         if (sessionId == _uiState.value.sessionId) {
@@ -768,12 +808,12 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun selectModel(selection: ModelSelection) {
+    private fun selectModel(selection: ModelSelection) {
         val sessionId = _uiState.value.sessionId
         if (sessionId.isBlank()) return
         val runtime = runtimeFor(sessionId)
         if (runtime.isActive) {
-            _uiState.update { it.copy(notice = ChatNotice.ModelSwitchBlocked) }
+            emitNotice(ChatNotice.ModelSwitchBlocked)
             return
         }
         viewModelScope.launch {
@@ -889,7 +929,7 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun setLocalToolEnabled(toolId: String, enabled: Boolean) {
+    private fun setLocalToolEnabled(toolId: String, enabled: Boolean) {
         updateToolConfiguration { configuration ->
             configuration.copy(
                 enabledLocalToolIds = if (enabled) {
@@ -901,7 +941,7 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun setMcpServerEnabled(serverId: String, enabled: Boolean) {
+    private fun setMcpServerEnabled(serverId: String, enabled: Boolean) {
         updateToolConfiguration { configuration ->
             configuration.copy(
                 enabledMcpServerIds = if (enabled) {
@@ -917,7 +957,7 @@ class ChatViewModel @Inject constructor(
      * Toggle a single function of an official tool. The caller passes the
      * current catalog of ids so the marker can be expanded before the write.
      */
-    fun setOfficialFunctionEnabled(
+    private fun setOfficialFunctionEnabled(
         toolId: String,
         functionId: String,
         enabled: Boolean,
@@ -941,7 +981,7 @@ class ChatViewModel @Inject constructor(
      * the configuration's marker entry for the tool is replaced with the real
      * function ids so persistence stays concrete.
      */
-    fun loadOfficialToolFunctions(toolId: String) {
+    private fun loadOfficialToolFunctions(toolId: String) {
         val descriptors = _uiState.value.officialToolDescriptors
         val target = descriptors.firstOrNull { it.id == toolId } ?: return
         if (target.isLoadingFunctions) return
@@ -989,7 +1029,7 @@ class ChatViewModel @Inject constructor(
             )
         }
         viewModelScope.launch {
-            val outcome = runCatching { officialFunctionCatalog.listFunctions(toolId) }
+            val outcome = cancellationAwareRunCatching { officialFunctionCatalog.listFunctions(toolId) }
             val functions = outcome.getOrDefault(emptyList())
             val loadError = outcome.exceptionOrNull()?.message
             _uiState.update { state ->
@@ -1042,7 +1082,7 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    fun clearToolConfigurationError() {
+    private fun clearToolConfigurationError() {
         _uiState.update { it.copy(hasToolConfigurationError = false) }
     }
 
@@ -1121,7 +1161,7 @@ class ChatViewModel @Inject constructor(
      *
      * 没有进行中的 job 时直接 no-op，避免在非 streaming 状态误触。
      */
-    fun stopStreaming() {
+    private fun stopStreaming() {
         val sessionId = _uiState.value.sessionId
         val runtime = sessionRuntimes[sessionId] ?: return
         if (runtime.job?.isActive != true && runtime.pendingToolConfirmations.isEmpty()) return

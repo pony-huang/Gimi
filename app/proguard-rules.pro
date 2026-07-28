@@ -46,6 +46,15 @@
     <fields>;
 }
 
+# ModelSelection moved to the domain layer but is still Gson-persisted by
+# ModelServiceRepository (SharedPreferences); keep field names identical to the
+# legacy data-class JSON shape.
+-keep class github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection { *; }
+-keepclassmembers class github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection {
+    <init>(...);
+    <fields>;
+}
+
 # ---------------------------------------------------------------------------
 # kotlinx-serialization + Navigation 3
 #

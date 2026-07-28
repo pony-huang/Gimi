@@ -28,9 +28,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.feature.workfiles.R
 import github.ponyhuang.asssistantai.domain.workfiles.repository.WorkDirectoryOperationResult
-import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
-import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
-import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
+import github.ponyhuang.asssistantai.ui.preference.PreferenceListItem
+import github.ponyhuang.asssistantai.ui.preference.PreferencePageContainer
+import github.ponyhuang.asssistantai.ui.preference.PreferenceSectionTitle
 
 @Composable
 fun WorkFilesSettingsScreen(
@@ -38,13 +38,13 @@ fun WorkFilesSettingsScreen(
     onAction: (WorkFilesSettingsAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsPageContainer(modifier = modifier) {
+    PreferencePageContainer(modifier = modifier) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
             item {
-                SettingsListItem(
+                PreferenceListItem(
                     icon = Icons.Default.Folder,
                     title = stringResource(R.string.workfiles_title),
                     subtitle = if (state.directories.isEmpty()) {
@@ -88,7 +88,7 @@ fun WorkFilesSettingsScreen(
                     )
                 }
             }
-            item { SettingsSectionTitle(text = stringResource(R.string.workfiles_section_authorized)) }
+            item { PreferenceSectionTitle(text = stringResource(R.string.workfiles_section_authorized)) }
             if (state.directories.isEmpty()) {
                 item {
                     // 空态是行动邀请：说明 + 与右上角 + 等价的按钮，而不是一行死文字。

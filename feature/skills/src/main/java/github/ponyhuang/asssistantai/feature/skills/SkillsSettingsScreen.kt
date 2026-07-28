@@ -32,9 +32,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import github.ponyhuang.asssistantai.feature.skills.R
-import github.ponyhuang.asssistantai.ui.settings.SettingsListItem
-import github.ponyhuang.asssistantai.ui.settings.SettingsPageContainer
-import github.ponyhuang.asssistantai.ui.settings.SettingsSectionTitle
+import github.ponyhuang.asssistantai.ui.preference.PreferenceListItem
+import github.ponyhuang.asssistantai.ui.preference.PreferencePageContainer
+import github.ponyhuang.asssistantai.ui.preference.PreferenceSectionTitle
 
 @Composable
 fun SkillsSettingsScreen(
@@ -42,14 +42,14 @@ fun SkillsSettingsScreen(
     onAction: (SkillsSettingsAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsPageContainer(modifier = modifier) {
+    PreferencePageContainer(modifier = modifier) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
-            item { SettingsSectionTitle(stringResource(R.string.skills_import_section)) }
+            item { PreferenceSectionTitle(stringResource(R.string.skills_import_section)) }
             item {
-                SettingsListItem(
+                PreferenceListItem(
                     icon = Icons.Default.Link,
                     title = stringResource(R.string.skills_import_url),
                     subtitle = stringResource(R.string.skills_import_url_subtitle),
@@ -57,7 +57,7 @@ fun SkillsSettingsScreen(
                 )
             }
             item {
-                SettingsListItem(
+                PreferenceListItem(
                     icon = Icons.Default.FileOpen,
                     title = stringResource(R.string.skills_import_local),
                     subtitle = stringResource(R.string.skills_import_local_subtitle),
@@ -84,7 +84,7 @@ fun SkillsSettingsScreen(
                     }
                 }
             }
-            item { SettingsSectionTitle(stringResource(R.string.skills_installed_section)) }
+            item { PreferenceSectionTitle(stringResource(R.string.skills_installed_section)) }
             if (state.skills.isEmpty()) {
                 item {
                     Text(

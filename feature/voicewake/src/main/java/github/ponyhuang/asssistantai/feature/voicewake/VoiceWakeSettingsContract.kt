@@ -10,7 +10,6 @@ data class VoiceWakeSettingsUiState(
     val keywordDraft: String = DEFAULT_WAKE_KEYWORD,
     val keywordError: WakeKeywordError? = null,
     val permissionRequestId: Int? = null,
-    val modelDownloadPromptId: Int? = null,
 )
 
 sealed interface VoiceWakeSettingsAction {
@@ -22,5 +21,10 @@ sealed interface VoiceWakeSettingsAction {
     data class CancelInstall(val modelId: String) : VoiceWakeSettingsAction
     data class PermissionsResult(val granted: Boolean) : VoiceWakeSettingsAction
     data class PermissionRequestHandled(val requestId: Int) : VoiceWakeSettingsAction
-    data class ModelDownloadPromptHandled(val promptId: Int) : VoiceWakeSettingsAction
+}
+
+/** 一次性 UI 反馈（Toast 等），由 Route 经 effects 通道消费。 */
+sealed interface VoiceWakeSettingsEffect {
+    /** @param messageRes 文案的 string resource id。 */
+    data class ShowToast(val messageRes: Int) : VoiceWakeSettingsEffect
 }

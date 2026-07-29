@@ -41,7 +41,6 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Functions
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Search
@@ -74,6 +73,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.text.font.FontWeight
@@ -337,7 +337,7 @@ private fun AddToChatHome(
         item {
             GroupedCard {
                 NavigationRow(
-                    icon = Icons.Default.Link,
+                    icon = ImageVector.vectorResource(R.drawable.stream_ai_compose_ic_mcp),
                     title = stringResource(R.string.chat_session_mcp_title),
                     subtitle = when {
                         state.mcpServers.isEmpty() ->
@@ -770,7 +770,7 @@ private fun McpServersPage(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Icon(
-                    Icons.Default.Link,
+                    ImageVector.vectorResource(R.drawable.stream_ai_compose_ic_mcp),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(48.dp),
@@ -831,7 +831,7 @@ private fun McpServerRow(
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconBubble(Icons.Default.Link)
+        IconBubble(ImageVector.vectorResource(R.drawable.stream_ai_compose_ic_mcp))
         Column(
             modifier = Modifier
                 .weight(1f)

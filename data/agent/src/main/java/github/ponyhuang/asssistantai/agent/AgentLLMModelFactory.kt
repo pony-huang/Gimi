@@ -10,6 +10,7 @@ import github.ponyhuang.asssistantai.agent.model.Claude
 import github.ponyhuang.asssistantai.agent.model.Openai
 import github.ponyhuang.asssistantai.agent.tools.official.IAnthropicOfficialToolAdapter
 import github.ponyhuang.asssistantai.agent.tools.official.IOpenAiOfficialToolAdapter
+import github.ponyhuang.asssistantai.agent.tools.official.NativeToolSpec
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
@@ -91,7 +92,11 @@ class AgentLLMModelFactory @Inject constructor(
     }
 
 
-    fun createModel(cfg: ModelConfig): Model =
+    fun createModel(
+        cfg: ModelConfig,
+        openAiNativeSpecs: List<NativeToolSpec.OpenAi> = emptyList(),
+        anthropicNativeSpecs: List<NativeToolSpec.Anthropic> = emptyList(),
+    ): Model =
         when (cfg.baseType) {
             ApiProtocol.Standard -> object : Openai(
                 name = cfg.modelId,
@@ -106,7 +111,7 @@ class AgentLLMModelFactory @Inject constructor(
                 ) {
                     val tools = builder.build().tools().orElse(emptyList())
                     val adapted = openAiToolAdapters.fold(tools) { current, adapter ->
-                        adapter.adapt(cfg, current)
+                        adapter.adapt(cfg, current, openAiNativeSpecs)
                     }
                     if (adapted !== tools) builder.tools(adapted)
                 }
@@ -125,7 +130,7 @@ class AgentLLMModelFactory @Inject constructor(
                 ) {
                     val tools = builder.build().tools().orElse(emptyList())
                     val adapted = anthropicToolAdapters.fold(tools) { current, adapter ->
-                        adapter.adapt(cfg, current)
+                        adapter.adapt(cfg, current, anthropicNativeSpecs)
                     }
                     if (adapted !== tools) builder.tools(adapted)
                 }

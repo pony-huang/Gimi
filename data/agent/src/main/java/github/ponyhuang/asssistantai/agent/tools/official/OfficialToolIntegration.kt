@@ -1,17 +1,15 @@
 package github.ponyhuang.asssistantai.agent.tools.official
 
 import com.anthropic.models.messages.ToolUnion
-import com.anthropic.models.messages.WebSearchTool20250305
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.Toolset
-import com.openai.core.JsonValue
-import com.openai.models.FunctionDefinition
-import com.openai.models.chat.completions.ChatCompletionFunctionTool
 import com.openai.models.chat.completions.ChatCompletionTool
 import github.ponyhuang.asssistantai.agent.ModelConfig
-import github.ponyhuang.asssistantai.agent.tools.WebSearchTool
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -23,137 +21,122 @@ private const val ANTHROPIC_SERVICE_ID = "anthropic"
 private const val MINIMAX_SERVICE_ID = "minimax"
 
 /**
- * One user-selectable official tool contribution.
- *
- * Native tools contribute an ADK placeholder which is translated by a protocol adapter.
- * Agent tools contribute a [Toolset] and keep their provider-specific transport isolated.
+ * Everything the official toolsets contribute for one [ModelConfig]: local
+ * [BaseTool]s, protocol-level ADK [Toolset]s (reserved; currently unused),
+ * and vendor-native specs merged into the request by the protocol adapters.
  */
-interface OfficialToolProvider {
-    val id: String
-
-    fun contribute(config: ModelConfig): OfficialToolContribution
-}
-
 data class OfficialToolContribution(
     val tools: List<BaseTool> = emptyList(),
     val toolsets: List<Toolset> = emptyList(),
+    val openAiNativeSpecs: List<NativeToolSpec.OpenAi> = emptyList(),
+    val anthropicNativeSpecs: List<NativeToolSpec.Anthropic> = emptyList(),
 ) {
     operator fun plus(other: OfficialToolContribution): OfficialToolContribution =
         OfficialToolContribution(
             tools = tools + other.tools,
             toolsets = toolsets + other.toolsets,
+            openAiNativeSpecs = openAiNativeSpecs + other.openAiNativeSpecs,
+            anthropicNativeSpecs = anthropicNativeSpecs + other.anthropicNativeSpecs,
         )
 
-    fun deduplicated(): OfficialToolContribution = OfficialToolContribution(
+    fun deduplicated(): OfficialToolContribution = copy(
         tools = tools.distinctBy(BaseTool::name),
-        toolsets = toolsets,
+        openAiNativeSpecs = openAiNativeSpecs.distinctBy { it.toolId },
+        anthropicNativeSpecs = anthropicNativeSpecs.distinctBy { it.toolId },
     )
 }
 
+/**
+ * Sums the contributions of every applicable [OfficialToolset] for a config.
+ */
 @Singleton
 class OfficialToolRegistry @Inject constructor(
-    private val providers: Set<@JvmSuppressWildcards OfficialToolProvider>,
+    private val toolsets: Set<@JvmSuppressWildcards OfficialToolset>,
 ) {
-    fun resolve(config: ModelConfig): OfficialToolContribution {
-        val providersById = providers.groupBy(OfficialToolProvider::id)
-        return config.officialTools
-            .fold(OfficialToolContribution()) { result, id ->
-                providersById[id].orEmpty().fold(result) { contribution, provider ->
-                    contribution + provider.contribute(config)
-                }
-            }
-            .deduplicated()
-    }
+    suspend fun resolve(config: ModelConfig): OfficialToolContribution =
+        coroutineScope {
+            val applicable = toolsets.filter { it.isApplicable(config) }
+            val baseTools = applicable
+                .map { async { it.getTools(config) } }
+                .awaitAll()
+                .flatten()
+            val openAi = applicable.flatMap { it.openAiNativeSpecs(config) }
+                .filterIsInstance<NativeToolSpec.OpenAi>()
+            val anthropic = applicable.flatMap { it.anthropicNativeSpecs(config) }
+                .filterIsInstance<NativeToolSpec.Anthropic>()
+            OfficialToolContribution(
+                tools = baseTools,
+                openAiNativeSpecs = openAi,
+                anthropicNativeSpecs = anthropic,
+            ).deduplicated()
+        }
 }
 
-class WebSearchOfficialToolProvider @Inject constructor() : OfficialToolProvider {
-    override val id: String = OfficialToolIds.WEB_SEARCH
-
-    override fun contribute(config: ModelConfig): OfficialToolContribution =
-        OfficialToolContribution(tools = listOf(WebSearchTool()))
-}
-
+/**
+ * Merges vendor-native [NativeToolSpec.OpenAi] specs into the outgoing
+ * request tools, deduplicating by [NativeToolSpec.toolId].
+ */
 interface IOpenAiOfficialToolAdapter {
-    fun adapt(config: ModelConfig, tools: List<ChatCompletionTool>): List<ChatCompletionTool>
+    fun adapt(
+        config: ModelConfig,
+        tools: List<ChatCompletionTool>,
+        specs: List<NativeToolSpec.OpenAi>,
+    ): List<ChatCompletionTool>
 
     fun supports(config: ModelConfig): Boolean = false
 }
 
-open class OpenAiOfficialToolAdapter @Inject constructor() : IOpenAiOfficialToolAdapter {
+class OpenAiOfficialToolAdapter @Inject constructor() : IOpenAiOfficialToolAdapter {
+    override fun supports(config: ModelConfig): Boolean =
+        config.baseType == ApiProtocol.Standard &&
+                config.serviceId in listOf(OPENAI_SERVICE_ID, MIMO_SERVICE_ID)
+
     override fun adapt(
         config: ModelConfig,
         tools: List<ChatCompletionTool>,
+        specs: List<NativeToolSpec.OpenAi>,
     ): List<ChatCompletionTool> {
-        if (!supports(config)) {
-            return tools
-        }
-        val index = tools.indexOfFirst { tool ->
-            tool.isFunction() &&
-                    tool.asFunction().function().name() == OfficialToolIds.WEB_SEARCH
-        }
-        if (index < 0) return tools
-
-        val nativeWebSearch = ChatCompletionTool.ofFunction(
-            ChatCompletionFunctionTool.builder()
-                .type(JsonValue.from(OfficialToolIds.WEB_SEARCH))
-                .function(
-                    FunctionDefinition.builder()
-                        .name(OfficialToolIds.WEB_SEARCH)
-                        .putAdditionalProperty(
-                            "type",
-                            JsonValue.from(OfficialToolIds.WEB_SEARCH),
-                        )
-                        .build(),
-                )
-                .build(),
-        )
-        return tools.toMutableList().apply { this[index] = nativeWebSearch }
-    }
-
-    override fun supports(config: ModelConfig): Boolean {
-        return config.serviceId in listOf(OPENAI_SERVICE_ID, MIMO_SERVICE_ID) &&
-                config.baseType == ApiProtocol.Standard &&
-                OfficialToolIds.WEB_SEARCH in config.officialTools
+        if (!supports(config) || specs.isEmpty()) return tools
+        val existing = tools.filter { it.isFunction() }
+            .mapTo(mutableSetOf()) { it.asFunction().function().name() }
+        val toAppend = specs.filterNot { it.toolId in existing }.map { it.tool }
+        return if (toAppend.isEmpty()) tools else tools + toAppend
     }
 }
 
-class MimoWebSearchToolAdapter @Inject constructor() : OpenAiOfficialToolAdapter() {
-    override fun supports(config: ModelConfig): Boolean {
-        return !(config.serviceId != MIMO_SERVICE_ID ||
-                config.baseType != ApiProtocol.Standard ||
-                OfficialToolIds.WEB_SEARCH !in config.officialTools)
-    }
-}
-
+/**
+ * Anthropic-protocol dual of [IOpenAiOfficialToolAdapter].
+ */
 interface IAnthropicOfficialToolAdapter {
-    fun adapt(config: ModelConfig, tools: List<ToolUnion>): List<ToolUnion>
+    fun adapt(
+        config: ModelConfig,
+        tools: List<ToolUnion>,
+        specs: List<NativeToolSpec.Anthropic>,
+    ): List<ToolUnion>
 
     fun supports(config: ModelConfig): Boolean = false
 }
 
-open class AnthropicOfficialToolAdapter @Inject constructor() : IAnthropicOfficialToolAdapter {
+class AnthropicOfficialToolAdapter @Inject constructor() : IAnthropicOfficialToolAdapter {
+    override fun supports(config: ModelConfig): Boolean =
+        config.baseType == ApiProtocol.Anthropic &&
+                config.serviceId in listOf(ANTHROPIC_SERVICE_ID, MINIMAX_SERVICE_ID)
+
     override fun adapt(
         config: ModelConfig,
         tools: List<ToolUnion>,
+        specs: List<NativeToolSpec.Anthropic>,
     ): List<ToolUnion> {
-        if (!supports(config)) {
-            return tools
+        if (!supports(config) || specs.isEmpty()) return tools
+        val existing = buildSet {
+            tools.forEach { tool ->
+                when {
+                    tool.isTool() -> add(tool.asTool().name())
+                    tool.isWebSearchTool20250305() -> add(OfficialToolIds.WEB_SEARCH)
+                }
+            }
         }
-        val index = tools.indexOfFirst { tool ->
-            tool.isTool() && tool.asTool().name() == OfficialToolIds.WEB_SEARCH
-        }
-        if (index < 0) return tools
-
-        val nativeWebSearch = ToolUnion.ofWebSearchTool20250305(
-            WebSearchTool20250305.builder().build(),
-        )
-        return tools.toMutableList().apply { this[index] = nativeWebSearch }
-    }
-
-    override fun supports(config: ModelConfig): Boolean {
-        return config.serviceId in listOf(ANTHROPIC_SERVICE_ID, MINIMAX_SERVICE_ID) &&
-                config.baseType == ApiProtocol.Anthropic &&
-                OfficialToolIds.WEB_SEARCH in config.officialTools
+        val toAppend = specs.filterNot { it.toolId in existing }.map { it.tool }
+        return if (toAppend.isEmpty()) tools else tools + toAppend
     }
 }
-

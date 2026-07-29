@@ -9,9 +9,11 @@ import github.ponyhuang.asssistantai.agent.tools.official.AnthropicOfficialToolA
 import github.ponyhuang.asssistantai.agent.tools.official.DefaultOfficialToolFunctionCatalog
 import github.ponyhuang.asssistantai.agent.tools.official.IAnthropicOfficialToolAdapter
 import github.ponyhuang.asssistantai.agent.tools.official.IOpenAiOfficialToolAdapter
-import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolProvider
+import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.official.OpenAiOfficialToolAdapter
-import github.ponyhuang.asssistantai.agent.tools.official.WebSearchOfficialToolProvider
+import github.ponyhuang.asssistantai.agent.tools.official.anthropic.AnthropicOfficialToolset
+import github.ponyhuang.asssistantai.agent.tools.official.kimi.KimiFormulaToolset
+import github.ponyhuang.asssistantai.agent.tools.official.openai.OpenaiOfficialToolset
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunctionCatalog
 
 @Module
@@ -23,21 +25,35 @@ abstract class OfficialToolModule {
         catalog: DefaultOfficialToolFunctionCatalog,
     ): OfficialToolFunctionCatalog
 
+    // ---- Official toolsets ----
     @Binds
     @IntoSet
-    abstract fun bindWebSearchProvider(
-        provider: WebSearchOfficialToolProvider,
-    ): OfficialToolProvider
+    abstract fun bindOpenaiToolset(
+        toolset: OpenaiOfficialToolset,
+    ): OfficialToolset
 
     @Binds
     @IntoSet
-    abstract fun bindOpenaiWebSearchAdapter(
+    abstract fun bindAnthropicToolset(
+        toolset: AnthropicOfficialToolset,
+    ): OfficialToolset
+
+    @Binds
+    @IntoSet
+    abstract fun bindKimiFormulaToolset(
+        toolset: KimiFormulaToolset,
+    ): OfficialToolset
+
+    // ---- Protocol adapter sets ----
+    @Binds
+    @IntoSet
+    abstract fun bindOpenaiAdapter(
         adapter: OpenAiOfficialToolAdapter,
     ): IOpenAiOfficialToolAdapter
 
     @Binds
     @IntoSet
-    abstract fun bindAnthropicWebSearchAdapter(
+    abstract fun bindAnthropicAdapter(
         adapter: AnthropicOfficialToolAdapter,
     ): IAnthropicOfficialToolAdapter
 

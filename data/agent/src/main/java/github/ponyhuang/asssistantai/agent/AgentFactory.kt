@@ -49,8 +49,12 @@ class AgentFactory @Inject constructor(
         val selectedModelConfig = agentLLMModelFactory.selectModelConfig(selection)
         val modelConfig = toolConfiguration?.let(selectedModelConfig::forConversation)
             ?: selectedModelConfig
-        val model = agentLLMModelFactory.createModel(modelConfig)
         val officialTools = officialToolRegistry.resolve(modelConfig)
+        val model = agentLLMModelFactory.createModel(
+            cfg = modelConfig,
+            openAiNativeSpecs = officialTools.openAiNativeSpecs,
+            anthropicNativeSpecs = officialTools.anthropicNativeSpecs,
+        )
         val mcpResolution = mcpToolsetRegistry.resolve(
             toolConfiguration?.enabledMcpServerIds,
         )

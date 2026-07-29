@@ -20,7 +20,7 @@ import javax.inject.Singleton
  *
  * 负责：
  * - 通过 [AgentLLMModelFactory] 解析模型配置
- * - 组合本地工具（[LocalToolCatalog]）、MCP 工具（[McpToolRegistry]）、
+ * - 组合本地工具（[LocalToolCatalog]）、MCP 工具（[McpToolsetRegistry]）、
  *   官方工具（[OfficialToolRegistry]）和技能工具集（[SkillSource]）
  * - 按 [ToolAuthorizationRepository] 和 [ConversationToolConfiguration] 过滤启用的工具
  * - 根据 [allowConfirmationRequiredTools] 决定是否排除需要用户确认的工具
@@ -29,7 +29,7 @@ import javax.inject.Singleton
 class AgentFactory @Inject constructor(
     private val localToolCatalog: LocalToolCatalog,
     private val toolAuthorization: ToolAuthorizationRepository,
-    private val mcpToolRegistry: McpToolRegistry,
+    private val mcpToolsetRegistry: McpToolsetRegistry,
     private val skillSource: SkillSource,
     private val agentLLMModelFactory: AgentLLMModelFactory,
     private val officialToolRegistry: OfficialToolRegistry,
@@ -51,11 +51,13 @@ class AgentFactory @Inject constructor(
             ?: selectedModelConfig
         val model = agentLLMModelFactory.createModel(modelConfig)
         val officialTools = officialToolRegistry.resolve(modelConfig)
+        val mcpResolution = mcpToolsetRegistry.resolve(
+            toolConfiguration?.enabledMcpServerIds,
+        )
         val configuredTools: List<BaseTool> = buildList {
             val enabledToolIds = toolConfiguration?.enabledLocalToolIds
                 ?: toolAuthorization.enabledToolIds()
             addAll(localToolCatalog.tools().filter { it.name in enabledToolIds })
-            addAll(mcpToolRegistry.tools(toolConfiguration?.enabledMcpServerIds))
             addAll(officialTools.tools)
         }
         val tools = if (allowConfirmationRequiredTools) {
@@ -68,14 +70,13 @@ class AgentFactory @Inject constructor(
             model = model,
             instruction = Instruction(
                 AgentPrompts.defaultAssistantInstruction(
-                    tools.mapTo(
-                        linkedSetOf(),
-                        BaseTool::name
-                    )
+                    tools.mapTo(linkedSetOf(), BaseTool::name) + mcpResolution.toolNames,
                 ),
             ),
             tools = tools,
-            toolsets = officialTools.toolsets + SkillToolset(skillSource),
+            toolsets = officialTools.toolsets +
+                    SkillToolset(skillSource) +
+                    mcpResolution.toolsets,
         )
     }
 
@@ -91,6 +92,7 @@ internal fun excludeConfirmationRequiredTools(tools: List<BaseTool>): List<BaseT
                 val getter = FunctionTool::class.java
                     .getDeclaredMethod("getRequiresConfirmation")
                     .apply { isAccessible = true }
+
                 @Suppress("UNCHECKED_CAST")
                 val requiresConfirmation =
                     getter.invoke(tool) as (Map<String, Any>) -> Boolean

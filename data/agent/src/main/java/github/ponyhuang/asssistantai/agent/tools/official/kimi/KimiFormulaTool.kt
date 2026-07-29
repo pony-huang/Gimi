@@ -1,11 +1,7 @@
 package github.ponyhuang.asssistantai.agent.tools.official.kimi
 
-import com.google.adk.kt.agents.ReadonlyContext
-import com.google.adk.kt.logging.LoggerFactory
-import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.FunctionTool
 import com.google.adk.kt.tools.ToolContext
-import com.google.adk.kt.tools.Toolset
 import com.google.adk.kt.types.FunctionDeclaration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -23,41 +19,6 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-
-/**
- * Exposes Moonshot formulas as ADK tools.
- *
- * @param enabledFunctionIds when non-null, only declarations whose `name` is in
- *   this set are registered. When null, every formula returned by the manifest
- *   is exposed (legacy / no-per-conversation-config behaviour).
- */
-class KimiFormulaToolset(
-    private val apiKey: String,
-    private val httpClient: OkHttpClient,
-    private val enabledFunctionIds: Set<String>? = null,
-) : Toolset {
-
-    companion object {
-        private val logger = LoggerFactory.getLogger(KimiFormulaToolset::class)
-    }
-
-    private val manifest = KimiFormulaManifest(apiKey = apiKey, httpClient = httpClient)
-
-    override suspend fun getTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
-        withContext(Dispatchers.IO) {
-            manifest.fetch()
-                .map { declaration ->
-                    KimiFormulaTool(
-                        apiKey = apiKey,
-                        declaration = declaration,
-                        httpClient = httpClient,
-                    )
-                }
-                .filter { tool ->
-                    enabledFunctionIds == null || tool.name in enabledFunctionIds
-                }
-        }
-}
 
 internal class KimiFormulaTool(
     private val apiKey: String,

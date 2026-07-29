@@ -10,17 +10,13 @@ import com.openai.models.chat.completions.ChatCompletionFunctionTool
 import com.openai.models.chat.completions.ChatCompletionTool
 import github.ponyhuang.asssistantai.agent.ModelConfig
 import github.ponyhuang.asssistantai.agent.tools.WebSearchTool
-import github.ponyhuang.asssistantai.agent.tools.official.kimi.KimiFormulaToolset
-import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
-import okhttp3.OkHttpClient
 import javax.inject.Inject
 import javax.inject.Singleton
 
 // 与 :data:modelcatalog 的 LLMModelType.serviceId 保持一致；data 层模块不允许
 // 互相依赖，此处复制字面量。
-private const val MOONSHOT_SERVICE_ID = "kimi"
 private const val OPENAI_SERVICE_ID = "openai"
 private const val MIMO_SERVICE_ID = "mimo"
 private const val ANTHROPIC_SERVICE_ID = "anthropic"
@@ -75,27 +71,6 @@ class WebSearchOfficialToolProvider @Inject constructor() : OfficialToolProvider
 
     override fun contribute(config: ModelConfig): OfficialToolContribution =
         OfficialToolContribution(tools = listOf(WebSearchTool()))
-}
-
-class KimiFormulaOfficialToolProvider @Inject constructor(
-    private val httpClient: OkHttpClient,
-) : OfficialToolProvider {
-    override val id: String = OfficialToolIds.KIMI_FORMULAS
-
-    override fun contribute(config: ModelConfig): OfficialToolContribution {
-        if (config.serviceId != MOONSHOT_SERVICE_ID) return OfficialToolContribution()
-        val enabledFunctionIds = config.enabledOfficialFunctions[OfficialToolIds.KIMI_FORMULAS]
-            ?.takeIf { it.isNotEmpty() && ConversationToolConfiguration.ALL_FUNCTIONS_MARKER !in it }
-        return OfficialToolContribution(
-            toolsets = listOf(
-                KimiFormulaToolset(
-                    apiKey = config.apiKey,
-                    httpClient = httpClient,
-                    enabledFunctionIds = enabledFunctionIds,
-                ),
-            ),
-        )
-    }
 }
 
 interface IOpenAiOfficialToolAdapter {

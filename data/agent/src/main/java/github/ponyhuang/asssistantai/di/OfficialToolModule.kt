@@ -9,7 +9,6 @@ import github.ponyhuang.asssistantai.agent.tools.official.AnthropicOfficialToolA
 import github.ponyhuang.asssistantai.agent.tools.official.DefaultOfficialToolFunctionCatalog
 import github.ponyhuang.asssistantai.agent.tools.official.IAnthropicOfficialToolAdapter
 import github.ponyhuang.asssistantai.agent.tools.official.IOpenAiOfficialToolAdapter
-import github.ponyhuang.asssistantai.agent.tools.official.KimiFormulaOfficialToolProvider
 import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolProvider
 import github.ponyhuang.asssistantai.agent.tools.official.OpenAiOfficialToolAdapter
 import github.ponyhuang.asssistantai.agent.tools.official.WebSearchOfficialToolProvider
@@ -28,12 +27,6 @@ abstract class OfficialToolModule {
     @IntoSet
     abstract fun bindWebSearchProvider(
         provider: WebSearchOfficialToolProvider,
-    ): OfficialToolProvider
-
-    @Binds
-    @IntoSet
-    abstract fun bindKimiFormulaProvider(
-        provider: KimiFormulaOfficialToolProvider,
     ): OfficialToolProvider
 
     @Binds

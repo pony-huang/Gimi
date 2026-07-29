@@ -33,6 +33,7 @@ import com.anthropic.models.messages.ToolUseBlockParam
 import com.anthropic.models.messages.UrlImageSource
 import com.anthropic.models.messages.UrlPdfSource
 import com.anthropic.models.messages.Usage
+import com.anthropic.models.messages.WebSearchTool20250305
 import com.fasterxml.jackson.core.type.TypeReference
 import com.google.adk.kt.logging.LoggerFactory
 import com.google.adk.kt.models.LlmRequest
@@ -46,6 +47,7 @@ import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.UsageMetadata
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
@@ -399,7 +401,16 @@ open class Claude(
     protected open fun toAnthropicTools(tools: List<AdkTool>?): List<ToolUnion> =
         tools.orEmpty()
             .flatMap { it.functionDeclarations.orEmpty() }
-            .map { ToolUnion.ofTool(it.toAnthropicTool()) }
+            .map { declaration ->
+                when (declaration.name) {
+                    OfficialToolIds.WEB_SEARCH ->
+                        ToolUnion.ofWebSearchTool20250305(
+                            WebSearchTool20250305.builder().build(),
+                        )
+
+                    else -> ToolUnion.ofTool(declaration.toAnthropicTool())
+                }
+            }
 
     protected open fun Schema.toClaudeParameters(): Map<String, JsonValue> {
         val result = mutableMapOf<String, JsonValue>()

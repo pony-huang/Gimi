@@ -1,16 +1,10 @@
 package github.ponyhuang.asssistantai.agent
 
 import com.anthropic.client.okhttp.AnthropicOkHttpClient
-import com.anthropic.models.messages.MessageCreateParams
-import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.models.Model
 import com.openai.client.okhttp.OpenAIOkHttpClient
-import com.openai.models.chat.completions.ChatCompletionCreateParams
 import github.ponyhuang.asssistantai.agent.model.Claude
 import github.ponyhuang.asssistantai.agent.model.Openai
-import github.ponyhuang.asssistantai.agent.tools.official.IAnthropicOfficialToolAdapter
-import github.ponyhuang.asssistantai.agent.tools.official.IOpenAiOfficialToolAdapter
-import github.ponyhuang.asssistantai.agent.tools.official.NativeToolSpec
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
@@ -28,7 +22,6 @@ data class ModelConfig(
     val modelId: String,
     val apiKey: String,
     val fullBaseUrl: String,
-    val supportedOfficialTools: List<String> = emptyList(),
     val officialTools: List<String> = emptyList(),
     /**
      * Per-tool set of enabled function ids for [officialTools]. Empty set means
@@ -36,15 +29,13 @@ data class ModelConfig(
      * "tool not selected for this conversation".
      */
     val enabledOfficialFunctions: Map<String, Set<String>> = emptyMap(),
-    /** Vendor tool endpoints may stay on the standard API host even for Anthropic model traffic. */
-    val officialToolBaseUrl: String = fullBaseUrl,
 )
 
 internal fun ModelConfig.forConversation(
     configuration: ConversationToolConfiguration,
 ): ModelConfig {
     val functionsByTool = configuration.enabledOfficialFunctionIdsByService[serviceId].orEmpty()
-    val enabledTools = supportedOfficialTools.filter { toolId ->
+    val enabledTools = officialTools.filter { toolId ->
         functionsByTool[toolId].orEmpty().isNotEmpty()
     }
     return copy(
@@ -53,11 +44,14 @@ internal fun ModelConfig.forConversation(
     )
 }
 
+/** ADK model carrying the immutable runtime configuration used to build it. */
+internal interface ConfiguredModel : Model {
+    val modelConfig: ModelConfig
+}
+
 @Singleton
 class AgentLLMModelFactory @Inject constructor(
     private val modelServices: AgentModelConfigurationSource,
-    private val openAiToolAdapters: Set<@JvmSuppressWildcards IOpenAiOfficialToolAdapter>,
-    private val anthropicToolAdapters: Set<@JvmSuppressWildcards IAnthropicOfficialToolAdapter>,
 ) {
     /**
      * 从 [AgentModelConfigurationSource] 选当前模型配置。
@@ -92,11 +86,7 @@ class AgentLLMModelFactory @Inject constructor(
     }
 
 
-    fun createModel(
-        cfg: ModelConfig,
-        openAiNativeSpecs: List<NativeToolSpec.OpenAi> = emptyList(),
-        anthropicNativeSpecs: List<NativeToolSpec.Anthropic> = emptyList(),
-    ): Model =
+    fun createModel(cfg: ModelConfig): Model =
         when (cfg.baseType) {
             ApiProtocol.Standard -> object : Openai(
                 name = cfg.modelId,
@@ -104,17 +94,8 @@ class AgentLLMModelFactory @Inject constructor(
                     .baseUrl(cfg.fullBaseUrl)
                     .apiKey(cfg.apiKey)
                     .build(),
-            ) {
-                override fun postProcessParams(
-                    builder: ChatCompletionCreateParams.Builder,
-                    request: LlmRequest,
-                ) {
-                    val tools = builder.build().tools().orElse(emptyList())
-                    val adapted = openAiToolAdapters.fold(tools) { current, adapter ->
-                        adapter.adapt(cfg, current, openAiNativeSpecs)
-                    }
-                    if (adapted !== tools) builder.tools(adapted)
-                }
+            ), ConfiguredModel {
+                override val modelConfig: ModelConfig = cfg
             }
 
             ApiProtocol.Anthropic -> object : Claude(
@@ -123,17 +104,8 @@ class AgentLLMModelFactory @Inject constructor(
                     .baseUrl(cfg.fullBaseUrl)
                     .apiKey(cfg.apiKey)
                     .build(),
-            ) {
-                override fun postProcessParams(
-                    builder: MessageCreateParams.Builder,
-                    request: LlmRequest
-                ) {
-                    val tools = builder.build().tools().orElse(emptyList())
-                    val adapted = anthropicToolAdapters.fold(tools) { current, adapter ->
-                        adapter.adapt(cfg, current, anthropicNativeSpecs)
-                    }
-                    if (adapted !== tools) builder.tools(adapted)
-                }
+            ), ConfiguredModel {
+                override val modelConfig: ModelConfig = cfg
             }
         }
 
@@ -149,8 +121,6 @@ class AgentLLMModelFactory @Inject constructor(
         modelId = modelId,
         apiKey = apiKey,
         fullBaseUrl = modelBaseUrl,
-        supportedOfficialTools = supportedOfficialTools,
         officialTools = supportedOfficialTools,
-        officialToolBaseUrl = officialToolBaseUrl,
     )
 }

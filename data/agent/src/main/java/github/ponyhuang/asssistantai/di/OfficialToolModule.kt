@@ -5,12 +5,8 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
-import github.ponyhuang.asssistantai.agent.tools.official.AnthropicOfficialToolAdapter
 import github.ponyhuang.asssistantai.agent.tools.official.DefaultOfficialToolFunctionCatalog
-import github.ponyhuang.asssistantai.agent.tools.official.IAnthropicOfficialToolAdapter
-import github.ponyhuang.asssistantai.agent.tools.official.IOpenAiOfficialToolAdapter
 import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolset
-import github.ponyhuang.asssistantai.agent.tools.official.OpenAiOfficialToolAdapter
 import github.ponyhuang.asssistantai.agent.tools.official.anthropic.AnthropicOfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.official.kimi.KimiFormulaToolset
 import github.ponyhuang.asssistantai.agent.tools.official.openai.OpenaiOfficialToolset
@@ -25,7 +21,6 @@ abstract class OfficialToolModule {
         catalog: DefaultOfficialToolFunctionCatalog,
     ): OfficialToolFunctionCatalog
 
-    // ---- Official toolsets ----
     @Binds
     @IntoSet
     abstract fun bindOpenaiToolset(
@@ -43,18 +38,4 @@ abstract class OfficialToolModule {
     abstract fun bindKimiFormulaToolset(
         toolset: KimiFormulaToolset,
     ): OfficialToolset
-
-    // ---- Protocol adapter sets ----
-    @Binds
-    @IntoSet
-    abstract fun bindOpenaiAdapter(
-        adapter: OpenAiOfficialToolAdapter,
-    ): IOpenAiOfficialToolAdapter
-
-    @Binds
-    @IntoSet
-    abstract fun bindAnthropicAdapter(
-        adapter: AnthropicOfficialToolAdapter,
-    ): IAnthropicOfficialToolAdapter
-
 }

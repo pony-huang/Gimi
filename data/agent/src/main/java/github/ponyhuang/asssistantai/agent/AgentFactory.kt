@@ -7,7 +7,7 @@ import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.FunctionTool
 import com.google.adk.kt.tools.SkillToolset
-import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolRegistry
+import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolset
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.ToolAuthorizationRepository
@@ -21,7 +21,7 @@ import javax.inject.Singleton
  * 负责：
  * - 通过 [AgentLLMModelFactory] 解析模型配置
  * - 组合本地工具（[LocalToolCatalog]）、MCP 工具（[McpToolsetRegistry]）、
- *   官方工具（[OfficialToolRegistry]）和技能工具集（[SkillSource]）
+ *   官方工具（[OfficialToolset]）和技能工具集（[SkillSource]）
  * - 按 [ToolAuthorizationRepository] 和 [ConversationToolConfiguration] 过滤启用的工具
  * - 根据 [allowConfirmationRequiredTools] 决定是否排除需要用户确认的工具
  */
@@ -32,7 +32,7 @@ class AgentFactory @Inject constructor(
     private val mcpToolsetRegistry: McpToolsetRegistry,
     private val skillSource: SkillSource,
     private val agentLLMModelFactory: AgentLLMModelFactory,
-    private val officialToolRegistry: OfficialToolRegistry,
+    private val officialToolsets: Set<@JvmSuppressWildcards OfficialToolset>,
 ) {
     /**
      * 构建 [BaseAgent]。
@@ -49,12 +49,7 @@ class AgentFactory @Inject constructor(
         val selectedModelConfig = agentLLMModelFactory.selectModelConfig(selection)
         val modelConfig = toolConfiguration?.let(selectedModelConfig::forConversation)
             ?: selectedModelConfig
-        val officialTools = officialToolRegistry.resolve(modelConfig)
-        val model = agentLLMModelFactory.createModel(
-            cfg = modelConfig,
-            openAiNativeSpecs = officialTools.openAiNativeSpecs,
-            anthropicNativeSpecs = officialTools.anthropicNativeSpecs,
-        )
+        val model = agentLLMModelFactory.createModel(modelConfig)
         val mcpResolution = mcpToolsetRegistry.resolve(
             toolConfiguration?.enabledMcpServerIds,
         )
@@ -62,7 +57,6 @@ class AgentFactory @Inject constructor(
             val enabledToolIds = toolConfiguration?.enabledLocalToolIds
                 ?: toolAuthorization.enabledToolIds()
             addAll(localToolCatalog.tools().filter { it.name in enabledToolIds })
-            addAll(officialTools.tools)
         }
         val tools = if (allowConfirmationRequiredTools) {
             configuredTools
@@ -74,11 +68,13 @@ class AgentFactory @Inject constructor(
             model = model,
             instruction = Instruction(
                 AgentPrompts.defaultAssistantInstruction(
-                    tools.mapTo(linkedSetOf(), BaseTool::name) + mcpResolution.toolNames,
+                    tools.mapTo(linkedSetOf(), BaseTool::name) +
+                            mcpResolution.toolNames +
+                            modelConfig.officialTools,
                 ),
             ),
             tools = tools,
-            toolsets = officialTools.toolsets +
+            toolsets = officialToolsets.toList() +
                     SkillToolset(skillSource) +
                     mcpResolution.toolsets,
         )

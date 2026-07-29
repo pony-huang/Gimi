@@ -39,6 +39,7 @@ import com.openai.models.chat.completions.ChatCompletionToolMessageParam
 import com.openai.models.chat.completions.ChatCompletionUserMessageParam
 import com.openai.models.completions.CompletionUsage
 import github.ponyhuang.asssistantai.domain.conversation.model.AttachmentCategory
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
@@ -492,7 +493,28 @@ open class Openai(
     protected open fun toOpenAiTools(tools: List<AdkTool>?): List<ChatCompletionTool> =
         tools.orEmpty()
             .flatMap { it.functionDeclarations.orEmpty() }
-            .map { it.toChatCompletionTool() }
+            .map { declaration ->
+                when (declaration.name) {
+                    OfficialToolIds.WEB_SEARCH -> openAiWebSearchTool()
+                    else -> declaration.toChatCompletionTool()
+                }
+            }
+
+    private fun openAiWebSearchTool(): ChatCompletionTool =
+        ChatCompletionTool.ofFunction(
+            ChatCompletionFunctionTool.builder()
+                .type(JsonValue.from(OfficialToolIds.WEB_SEARCH))
+                .function(
+                    FunctionDefinition.builder()
+                        .name(OfficialToolIds.WEB_SEARCH)
+                        .putAdditionalProperty(
+                            "type",
+                            JsonValue.from(OfficialToolIds.WEB_SEARCH),
+                        )
+                        .build(),
+                )
+                .build(),
+        )
 
     protected open fun Schema.toOpenAiParameters(): Map<String, JsonValue> {
         val result = mutableMapOf<String, JsonValue>()

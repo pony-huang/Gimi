@@ -11,28 +11,17 @@ import okhttp3.Protocol
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KimiFormulaToolsetTest {
 
     @Test
-    fun notApplicableForNonKimiService() = runTest {
-        val toolset = KimiFormulaToolset(manifestClient(200, MANIFEST_BODY))
-        val config = config(serviceId = "openai")
-
-        assertFalse(toolset.isApplicable(config))
-        assertTrue(toolset.getTools(config).isEmpty())
-    }
-
-    @Test
     fun notApplicableWhenKimiFormulasNotEnabled() = runTest {
         val toolset = KimiFormulaToolset(manifestClient(200, MANIFEST_BODY))
         val config = config(officialTools = emptyList())
 
-        assertFalse(toolset.isApplicable(config))
-        assertTrue(toolset.getTools(config).isEmpty())
+        assertTrue(toolset.resolveTools(config).isEmpty())
     }
 
     @Test
@@ -44,7 +33,7 @@ class KimiFormulaToolsetTest {
             ),
         )
 
-        val tools = toolset.getTools(config)
+        val tools = toolset.resolveTools(config)
 
         assertEquals(listOf("translate"), tools.map { it.name })
     }
@@ -58,7 +47,7 @@ class KimiFormulaToolsetTest {
             ),
         )
 
-        assertTrue(toolset.getTools(config).isEmpty())
+        assertTrue(toolset.resolveTools(config).isEmpty())
     }
 
     @Test
@@ -71,7 +60,7 @@ class KimiFormulaToolsetTest {
             ),
         )
 
-        val tools = toolset.getTools(config)
+        val tools = toolset.resolveTools(config)
 
         assertEquals(listOf("translate"), tools.map { it.name })
     }
@@ -80,7 +69,7 @@ class KimiFormulaToolsetTest {
     fun allFunctionsWhenNoConversationConfig() = runTest {
         val toolset = KimiFormulaToolset(manifestClient(200, MANIFEST_BODY))
 
-        val tools = toolset.getTools(config())
+        val tools = toolset.resolveTools(config())
 
         assertEquals(listOf("translate"), tools.map { it.name })
     }
@@ -89,15 +78,14 @@ class KimiFormulaToolsetTest {
     fun manifestEmptyWhenNetworkFails() = runTest {
         val toolset = KimiFormulaToolset(manifestClient(500, "{}"))
 
-        assertTrue(toolset.getTools(config()).isEmpty())
+        assertTrue(toolset.resolveTools(config()).isEmpty())
     }
 
     private fun config(
-        serviceId: String = KimiFormulaToolset.MOONSHOT_SERVICE_ID,
         officialTools: List<String> = listOf(OfficialToolIds.KIMI_FORMULAS),
         enabledOfficialFunctions: Map<String, Set<String>> = emptyMap(),
     ) = ModelConfig(
-        serviceId = serviceId,
+        serviceId = "service",
         baseType = ApiProtocol.Standard,
         modelId = "model",
         apiKey = "key",

@@ -69,20 +69,6 @@ class AgentChatRunner(
         configurationRevision = configurationRevision,
     )
 
-    constructor(
-        factory: suspend (ModelSelection?, Boolean) -> BaseAgent,
-        sessionService: SessionService,
-        artifactService: ArtifactService?,
-        configurationRevision: () -> Any = { Unit },
-    ) : this(
-        factory = { selection, allowConfirmationRequiredTools, _ ->
-            factory(selection, allowConfirmationRequiredTools)
-        },
-        sessionService = sessionService,
-        artifactService = artifactService,
-        configurationRevision = configurationRevision,
-    )
-
     /** 每个会话持有独立 Runner；模型选择或配置版本变化时按会话重建。 */
     private data class RunnerEntry(
         val selection: ModelSelection?,

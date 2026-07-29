@@ -73,6 +73,8 @@ Mandatory boundaries:
 - Default locale is Chinese (`values/`); English is in `values-en/`. Each module owns both `strings.xml` files; shared business-agnostic copy belongs in `:core:designsystem`.
 - All user-facing `Text`, content descriptions, dialog/field copy, and surfaced Toasts must use `stringResource(R.string.xxx)`. Doc comments and `@Preview` fixtures are exempt.
 - Use idiomatic Kotlin, four-space indentation, nearby trailing-comma style, PascalCase for types/composables/type files, and camelCase for functions/properties/locals. Match nearby formatting and keep imports organized; no formatter or linter is configured.
+- Add concise Chinese comments to complex logic, explaining business invariants, lifecycle/call timing, and why the implementation is necessary rather than restating individual lines.
+- Every Kotlin `data class` and `data object` must have KDoc describing its responsibility and the meaning of its data. Document non-obvious properties with `@property` entries or focused property comments.
 
 ## Build and Verification
 
@@ -103,7 +105,8 @@ Testing rules:
 
 - Refactor one closed capability at a time; preserve behavior and keep logical commits independently compilable and revertible.
 - Use IDE Refactor Move or `git mv`. Move-only commits change only paths, packages, imports, and necessary visibility. Inspect `git diff --find-renames --summary`, compile affected modules, and remove empty legacy package directories.
-- Do not leave forwarding wrappers, duplicate implementations, or legacy adapters unless compatibility is required. Local data may be destructively recreated; do not add historical migrations without a requirement.
+- This project is in the development and exploration stage. Do not preserve old databases, serialized payloads, configuration fields, APIs, or compatibility adapters unless the user explicitly requests it; choose the cleanest current design, allow destructive local-data recreation, and do not add historical migrations.
+- Do not leave forwarding wrappers, duplicate implementations, or legacy adapters without an explicit current requirement.
 - Avoid drive-by package moves or broad unrelated cleanup.
 - Never commit build outputs, caches, generated reports, IDE state, API keys, tokens, or credentials. Store local secrets in ignored `local.properties` or environment variables and revoke exposed credentials.
 - Treat untracked `app/release/` APKs as local artifacts; include or delete them only when explicitly requested.

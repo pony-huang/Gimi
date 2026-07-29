@@ -17,7 +17,6 @@ class ConversationToolSelectionTest {
             modelId = "model",
             apiKey = "key",
             fullBaseUrl = "https://example.com",
-            supportedOfficialTools = listOf("web_search"),
             officialTools = listOf("web_search"),
         )
         val configuration = ConversationToolConfiguration(
@@ -66,7 +65,6 @@ class ConversationToolSelectionTest {
             modelId = "model",
             apiKey = "key",
             fullBaseUrl = "https://example.com",
-            supportedOfficialTools = listOf("web_search"),
             officialTools = listOf("web_search"),
         )
         val configuration = ConversationToolConfiguration(
@@ -89,7 +87,6 @@ class ConversationToolSelectionTest {
             modelId = "model",
             apiKey = "key",
             fullBaseUrl = "https://example.com",
-            supportedOfficialTools = listOf("web_search"),
             officialTools = listOf("web_search"),
         )
         val configuration = ConversationToolConfiguration(

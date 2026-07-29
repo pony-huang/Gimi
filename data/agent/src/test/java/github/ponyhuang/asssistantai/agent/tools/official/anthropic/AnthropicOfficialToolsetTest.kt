@@ -1,11 +1,10 @@
 package github.ponyhuang.asssistantai.agent.tools.official.anthropic
 
 import github.ponyhuang.asssistantai.agent.ModelConfig
-import github.ponyhuang.asssistantai.agent.tools.official.NativeToolSpec
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -14,55 +13,38 @@ class AnthropicOfficialToolsetTest {
     private val toolset = AnthropicOfficialToolset()
 
     @Test
-    fun applicableWhenAnthropicService() {
-        val config = config(serviceId = "anthropic", officialTools = listOf(OfficialToolIds.WEB_SEARCH))
-
-        assertTrue(toolset.isApplicable(config))
-        assertEquals(1, toolset.anthropicNativeSpecs(config).size)
-    }
-
-    @Test
-    fun applicableWhenMinimaxService() {
-        val config = config(serviceId = "minimax", officialTools = listOf(OfficialToolIds.WEB_SEARCH))
-
-        assertTrue(toolset.isApplicable(config))
-        assertEquals(1, toolset.anthropicNativeSpecs(config).size)
-    }
-
-    @Test
-    fun notApplicableWhenMismatchedProtocol() {
-        val config = config(
-            serviceId = "anthropic",
-            baseType = ApiProtocol.Standard,
-            officialTools = listOf(OfficialToolIds.WEB_SEARCH),
+    fun resolvesEnabledBuiltInToolsForAnyAnthropicService() = runTest {
+        val tools = toolset.resolveTools(
+            config(
+                serviceId = "custom-anthropic-service",
+                officialTools = listOf(OfficialToolIds.WEB_SEARCH),
+            ),
         )
 
-        assertFalse(toolset.isApplicable(config))
-        assertTrue(toolset.anthropicNativeSpecs(config).isEmpty())
+        assertEquals(listOf(OfficialToolIds.WEB_SEARCH), tools.map { it.name })
     }
 
     @Test
-    fun notApplicableWhenToolNotInOfficialTools() {
-        val config = config(serviceId = "anthropic", officialTools = emptyList())
+    fun ignoresToolsForStandardProtocol() = runTest {
+        val tools = toolset.resolveTools(
+            config(
+                serviceId = "anthropic",
+                baseType = ApiProtocol.Standard,
+                officialTools = listOf(OfficialToolIds.WEB_SEARCH),
+            ),
+        )
 
-        assertTrue(toolset.anthropicNativeSpecs(config).isEmpty())
+        assertTrue(tools.isEmpty())
     }
 
     @Test
-    fun webSearchAnthropicSpecIsWebSearchTool20250305() {
-        val config = config(serviceId = "anthropic", officialTools = listOf(OfficialToolIds.WEB_SEARCH))
-
-        val spec = toolset.anthropicNativeSpecs(config).single() as NativeToolSpec.Anthropic
-
-        assertEquals(OfficialToolIds.WEB_SEARCH, spec.toolId)
-        assertTrue(spec.tool.isWebSearchTool20250305())
-    }
-
-    @Test
-    fun openAiNativeSpecsAlwaysEmpty() {
-        val config = config(serviceId = "anthropic", officialTools = listOf(OfficialToolIds.WEB_SEARCH))
-
-        assertTrue(toolset.openAiNativeSpecs(config).isEmpty())
+    fun ignoresDisabledAndUnsupportedTools() = runTest {
+        assertTrue(toolset.resolveTools(config("anthropic", officialTools = emptyList())).isEmpty())
+        assertTrue(
+            toolset.resolveTools(
+                config("anthropic", officialTools = listOf(OfficialToolIds.KIMI_FORMULAS)),
+            ).isEmpty(),
+        )
     }
 
     private fun config(

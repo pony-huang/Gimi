@@ -57,8 +57,7 @@ private data class ModelServiceSettings(
     val apiBaseUrl: String,
     val baseType: ApiBaseType,
     val anthropicBaseUrl: String,
-    /** Null keeps settings written before official-tool selection backward compatible. */
-    val disabledOfficialTools: Set<String>? = null,
+    val disabledOfficialTools: Set<String> = emptySet(),
 )
 
 /**
@@ -367,7 +366,6 @@ class ModelServiceRepository @Inject constructor(
                 modelId = resolved.model.modelId,
                 apiKey = provider.apiKey,
                 modelBaseUrl = provider.activeApiBaseUrl.trimEnd('/'),
-                officialToolBaseUrl = provider.apiBaseUrl.trimEnd('/'),
                 supportedOfficialTools = provider.supportedOfficialTools,
             )
         }
@@ -474,7 +472,7 @@ class ModelServiceRepository @Inject constructor(
             docsUrl = entity.docsUrl,
             modelsUrl = entity.modelsUrl,
             officialToolProtocols = LLMModelConfigs.officialToolProtocolsFor(entity.serviceId),
-            disabledOfficialTools = providerSettings.disabledOfficialTools.orEmpty(),
+            disabledOfficialTools = providerSettings.disabledOfficialTools,
         )
     }
 
@@ -496,7 +494,7 @@ class ModelServiceRepository @Inject constructor(
         apiBaseUrl = value.apiBaseUrl,
         baseType = value.baseType,
         anthropicBaseUrl = value.anthropicBaseUrl,
-        disabledOfficialTools = value.disabledOfficialTools.orEmpty(),
+        disabledOfficialTools = value.disabledOfficialTools,
     )
 
     private fun readSettings(): Map<String, ModelServiceSettings>? {

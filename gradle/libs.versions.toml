@@ -17,8 +17,8 @@ kotlin = "2.4.0"
 kotlinxCoroutines = "1.11.0"
 mockk = "1.14.9"
 turbine = "1.2.1"
-mcpKotlinSdk = "0.10.0"
-ktor = "3.2.3"
+mcp = "0.15.0"
+ktor = "3.5.1"
 composeBom = "2026.02.01"
 openaiJava = "4.41.0"
 okhttp = "4.12.0"
@@ -82,7 +82,7 @@ androidx-appfunctions = { module = "androidx.appfunctions:appfunctions", version
 androidx-appfunctions-compiler = { module = "androidx.appfunctions:appfunctions-compiler", version.ref = "appfunctions" }
 androidx-appfunctions-service = { module = "androidx.appfunctions:appfunctions-service", version.ref = "appfunctions" }
 multiplatform-markdown-renderer-m3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-m3", version.ref = "multiplatformMarkdownRenderer" }
-mcp-kotlin-sdk-client = { module = "io.modelcontextprotocol:kotlin-sdk-client", version.ref = "mcpKotlinSdk" }
+mcp = { module = "io.modelcontextprotocol:kotlin-sdk", version.ref = "mcp" }
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }

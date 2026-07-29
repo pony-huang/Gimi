@@ -17,6 +17,8 @@ android {
     lint {
         baseline = file("lint-baseline.xml")
     }
+    // ADK 的 LoggerFactory 在 JVM 单测里会打到 android.util.Log。
+    testOptions { unitTests.isReturnDefaultValues = true }
 }
 
 dependencies {
@@ -36,7 +38,7 @@ dependencies {
     implementation(libs.google.adk.kotlin.core)
     implementation(libs.openai.java)
     implementation(libs.okhttp)
-    implementation(libs.mcp.kotlin.sdk.client)
+    implementation(libs.mcp)
     implementation(libs.ktor.client.okhttp)
     implementation(libs.gson)
     implementation(libs.hilt.android)

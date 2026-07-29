@@ -10,7 +10,11 @@ import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Creates alarms and timers through the device's system clock application. */
+/**
+ * 时钟域工具：通过系统时钟应用设置闹钟 / 计时器、查询本地时间。
+ *
+ * 对应 [github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory.CLOCK]。
+ */
 @Singleton
 class ClockTool @Inject constructor(
     private val queue: IntentActionQueue,
@@ -59,12 +63,7 @@ class ClockTool @Inject constructor(
         Intent(AlarmClock.ACTION_SHOW_ALARMS),
     )
 
-    @Tool(
-        name = "get_current_time",
-        description = "Gets the current local time on the device, including the configured timezone.",
-        requireConfirmation = false,
-        isLongRunning = false,
-    )
+    @Tool(name = "get_current_time", description = "Gets the current local time on the device, including the configured timezone.")
     fun getCurrentTime(): Map<String, Any> {
         val now = ZonedDateTime.now()
         val dayOfWeek = now.dayOfWeek

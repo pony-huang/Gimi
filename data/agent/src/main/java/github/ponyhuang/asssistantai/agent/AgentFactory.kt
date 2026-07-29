@@ -7,9 +7,10 @@ import com.google.adk.kt.models.Model
 import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.SkillToolset
 import com.google.adk.kt.tools.Toolset
+import github.ponyhuang.asssistantai.agent.tools.dynamic.LocalCategorySource
+import github.ponyhuang.asssistantai.agent.tools.dynamic.McpServerSource
 import github.ponyhuang.asssistantai.agent.tools.dynamic.OfficialToolCandidateSource
 import github.ponyhuang.asssistantai.agent.tools.dynamic.ToolSearchToolset
-import github.ponyhuang.asssistantai.agent.tools.dynamic.ToolsetCandidateSource
 import github.ponyhuang.asssistantai.agent.tools.mcp.ConversationMcpToolset
 import github.ponyhuang.asssistantai.agent.tools.official.DynamicOfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolset
@@ -17,6 +18,7 @@ import github.ponyhuang.asssistantai.agent.tools.system.LocalToolset
 import github.ponyhuang.asssistantai.agent.tools.system.ToolsetConfirmationResumeTool
 import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,14 +33,19 @@ import javax.inject.Singleton
  *
  * 三种访问模式（[ToolAccessMode]）：
  * - [ToolAccessMode.ALWAYS_AVAILABLE]：全部启用工具直接声明，无检索网关。
- * - [ToolAccessMode.ON_DEMAND]：只声明核心工具 + `tool_search`，业务工具按需注入。
- * - [ToolAccessMode.AUTO]：候选在声明预算内直出，否则退化为按需检索。
+ *   本地工具仍然按统一 `localToolset` 暴露，但 [LocalCatalog.toolsByCategory]
+ *   使得日后按类裁剪成为可能。
+ * - [ToolAccessMode.ON_DEMAND]：只声明核心工具 + `tool_search`，每个业务类别
+ *   （[LocalToolCategory]）注册为一个独立检索 source。
+ * - [ToolAccessMode.AUTO]：与 `ON_DEMAND` 共享同一组 source，唯一区别是
+ *   [ToolSearchToolset] 在预算可承受时直接吐出，否则退化为按需检索。
  */
 @Singleton
 class AgentFactory @Inject constructor(
     private val localToolCatalog: LocalToolCatalog,
     private val localToolset: LocalToolset,
     private val conversationMcpToolset: ConversationMcpToolset,
+    private val mcpToolsetRegistry: McpToolsetRegistry,
     private val skillSource: SkillSource,
     private val agentLLMModelFactory: AgentLLMModelFactory,
     private val officialToolsets: Set<@JvmSuppressWildcards OfficialToolset>,
@@ -74,10 +81,16 @@ class AgentFactory @Inject constructor(
     }
 
     /**
-     * 检索网关：核心工具（厂商原生官方工具 + 技能）固定声明，本地 / MCP /
-     * 可展开官方函数统一收进 [ToolSearchToolset]，按 [mode] 决定直出或检索。
+     * 检索网关：核心工具（厂商原生官方工具 + 技能）固定声明。
+     *
+     * 业务工具拆分为多个 source 后注册到 [ToolSearchToolset]：
+     * - 每个 [LocalToolCategory] 一个 source，模型命中后 `source` 字段就是类别
+     *   中文标签（"音频" / "日历" / "时钟" ...）；
+     * - 每个 MCP server 单独一个 source（基于当前 [McpToolsetRegistry] 的解析结果），
+     *   单个 server 发现失败时不影响其它 server；
+     * - 可展开官方函数（[DynamicOfficialToolset]）继续作为独立 source。
      */
-    private fun createSearchAgent(
+    private suspend fun createSearchAgent(
         selection: ModelSelection?,
         mode: ToolAccessMode,
     ): BaseAgent {
@@ -85,20 +98,12 @@ class AgentFactory @Inject constructor(
         val (dynamicOfficialToolsets, directOfficialToolsets) =
             officialToolsets.partition { it is DynamicOfficialToolset }
         val sources = buildList {
-            add(
-                ToolsetCandidateSource(
-                    id = "local",
-                    displayName = "Local tools",
-                    toolset = localToolset,
-                ),
-            )
-            add(
-                ToolsetCandidateSource(
-                    id = "mcp",
-                    displayName = "MCP servers",
-                    toolset = conversationMcpToolset,
-                ),
-            )
+            LocalToolCategory.entries.forEach { category ->
+                add(LocalCategorySource(localToolset, category))
+            }
+            mcpToolsetRegistry.resolve().handles.forEach { handle ->
+                add(McpServerSource(handle))
+            }
             dynamicOfficialToolsets
                 .filterIsInstance<DynamicOfficialToolset>()
                 .forEach { toolset ->

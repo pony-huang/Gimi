@@ -2,6 +2,7 @@ package github.ponyhuang.asssistantai.data.toolauthorization
 
 import android.content.Context
 import android.content.SharedPreferences
+import github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory
 import github.ponyhuang.asssistantai.domain.toolauthorization.model.ToolDefinition
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.LocalToolDefinitionSource
 import io.mockk.every
@@ -102,8 +103,9 @@ class ToolAuthorizationPreferencesTest {
             every { getSharedPreferences(any(), any()) } returns preferences.delegate
         }
         val source = object : LocalToolDefinitionSource {
-            override fun definitions(): List<ToolDefinition> = ids.map { id ->
-                ToolDefinition(id = id, name = id, description = "Description for $id")
+            override fun definitions(): List<ToolDefinition> = ids.mapIndexed { index, id ->
+                val category = LocalToolCategory.entries[index % LocalToolCategory.entries.size]
+                ToolDefinition(id = id, name = id, description = "Description for $id", category = category)
             }
         }
         return ToolAuthorizationPreferences(context, source)

@@ -18,7 +18,11 @@ import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Reads and creates events in the device calendar. */
+/**
+ * 日历域工具：列举设备日历、查询近期事件、直接创建事件。
+ *
+ * 对应 [github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory.CALENDAR]。
+ */
 @Singleton
 class CalendarTool @Inject constructor(
     @ApplicationContext private val context: Context,

@@ -3,20 +3,43 @@ package github.ponyhuang.asssistantai.agent.tools.system
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.provider.MediaStore
 import com.google.adk.kt.annotations.Param
 import com.google.adk.kt.annotations.Tool
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Provides access to installed apps on the device. */
+/**
+ * 应用启动域工具：系统相机拍照 / 录像、安装应用列表 / 搜索 / 打开。
+ *
+ * 对应 [github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory.LAUNCHERS]。
+ */
 @Singleton
-class PackageManagerTool @Inject constructor(
+class LaunchersTool @Inject constructor(
     @ApplicationContext private val context: Context,
     private val queue: IntentActionQueue,
 ) {
     private val packageManager: PackageManager
         get() = context.packageManager
+
+    // ---------- 相机 ----------
+
+    @Tool(name = "capture_photo", description = "Opens the system camera to take a photo.", requireConfirmation = true)
+    fun capturePhoto(): Map<String, Any> = queue.request(
+        title = "Take photo",
+        summary = "Open the system camera to take a photo.",
+        intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE),
+    )
+
+    @Tool(name = "capture_video", description = "Opens the system camera to record a video.", requireConfirmation = true)
+    fun captureVideo(): Map<String, Any> = queue.request(
+        title = "Record video",
+        summary = "Open the system camera to record a video.",
+        intent = Intent(MediaStore.ACTION_VIDEO_CAPTURE),
+    )
+
+    // ---------- 应用列表 ----------
 
     @Tool(
         name = "list_installed_apps",
@@ -85,6 +108,8 @@ class PackageManagerTool @Inject constructor(
             launchIntent,
         )
     }
+
+    // ---------- helpers ----------
 
     private fun launchableApps(): List<App> = packageManager.queryIntentActivities(
         Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),

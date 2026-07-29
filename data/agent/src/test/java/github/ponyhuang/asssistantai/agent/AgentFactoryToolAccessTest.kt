@@ -66,7 +66,14 @@ class AgentFactoryToolAccessTest {
 
     @Test
     fun autoExposesSmallCatalogDirectlyWithinBudget() = runTest {
-        val factory = factory(localTools = listOf(declarationTool("clock")))
+        val clock = declarationTool("clock")
+        val factory = factory(
+            localTools = listOf(clock),
+            // 让 LocalCategorySource 按类别返回各自唯一的工具，便于走"全量直出"路径
+            toolsByCategory = mapOf(
+                github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory.CALENDAR to listOf(clock),
+            ),
+        )
 
         val agent = factory.create(toolAccessMode = ToolAccessMode.AUTO) as LlmAgent
 
@@ -111,14 +118,23 @@ class AgentFactoryToolAccessTest {
         localTools: List<BaseTool> = emptyList(),
         confirmationRequiredToolIds: Set<String> = emptySet(),
         officialToolsets: Set<OfficialToolset> = emptySet(),
+        toolsByCategory: Map<
+            github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory,
+            List<BaseTool>,
+            > = emptyMap(),
     ): AgentFactory {
         val localToolCatalog = mockk<LocalToolCatalog>()
         every { localToolCatalog.tools() } returns localTools
         every { localToolCatalog.confirmationRequiredToolIds } returns confirmationRequiredToolIds
-        val localToolset = mockk<LocalToolset>()
+        val localToolset = mockk<LocalToolset>(relaxed = true)
         coEvery { localToolset.getTools(any()) } returns localTools
-        val mcpToolset = mockk<ConversationMcpToolset>()
-        coEvery { mcpToolset.getTools(any()) } returns emptyList()
+        coEvery { localToolset.getToolsForCategory(any(), any()) } answers {
+            val category = it.invocation.args[1] as github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory
+            toolsByCategory[category].orEmpty()
+        }
+        val mcpToolset = mockk<ConversationMcpToolset>(relaxed = true)
+        val mcpRegistry = mockk<github.ponyhuang.asssistantai.agent.McpToolsetRegistry>(relaxed = true)
+        coEvery { mcpRegistry.resolve() } returns github.ponyhuang.asssistantai.agent.McpToolsetResolution(emptyList())
         val modelFactory = mockk<AgentLLMModelFactory>()
         every { modelFactory.selectModelConfig(any()) } returns modelConfig()
         every { modelFactory.createModel(any()) } returns mockk<Model>(relaxed = true)
@@ -126,6 +142,7 @@ class AgentFactoryToolAccessTest {
             localToolCatalog = localToolCatalog,
             localToolset = localToolset,
             conversationMcpToolset = mcpToolset,
+            mcpToolsetRegistry = mcpRegistry,
             skillSource = mockk<SkillSource>(relaxed = true),
             agentLLMModelFactory = modelFactory,
             officialToolsets = officialToolsets,

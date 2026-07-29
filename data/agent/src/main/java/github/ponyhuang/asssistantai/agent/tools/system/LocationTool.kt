@@ -7,8 +7,10 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
+import android.net.Uri
 import android.os.CancellationSignal
 import android.provider.Settings
+import androidx.core.net.toUri
 import com.google.adk.kt.annotations.Param
 import com.google.adk.kt.annotations.Tool
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -19,13 +21,19 @@ import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** Reads the device's geographic location. */
+/**
+ * 位置域工具：读取设备地理位置、在地图应用展示位置。
+ *
+ * 对应 [github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory.LOCATION]。
+ */
 @Singleton
 class LocationTool @Inject constructor(
     @ApplicationContext private val context: Context,
     private val queue: IntentActionQueue,
 ) {
     private val locationManager = context.getSystemService(LocationManager::class.java)
+
+    // ---------- 当前定位 ----------
 
     @Tool(
         name = "get_current_location",
@@ -93,6 +101,21 @@ class LocationTool @Inject constructor(
         Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
     )
+
+    // ---------- 地图 ----------
+
+    @Tool(name = "show_location", description = "Opens a maps app and displays a location by name or latitude/longitude.")
+    fun showLocation(@Param("A location name or latitude,longitude pair.") query: String): Map<String, Any> {
+        val value = query.trim()
+        if (value.isEmpty()) return mapOf("success" to false, "error" to "query must not be blank.")
+        return queue.request(
+            "Open map",
+            "Show $value in a maps app.",
+            Intent(Intent.ACTION_VIEW, "geo:0,0?q=${Uri.encode(value)}".toUri()),
+        )
+    }
+
+    // ---------- helpers ----------
 
     private fun hasLocationPermission(): Boolean {
         val fine = context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==

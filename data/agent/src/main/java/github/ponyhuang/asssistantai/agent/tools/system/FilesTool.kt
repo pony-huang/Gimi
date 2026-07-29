@@ -15,13 +15,39 @@ import github.ponyhuang.asssistantai.permission.MediaPermissionActivity
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Searches user-accessible shared media and explicitly granted document trees. */
+/**
+ * 文件域工具：文件选择、共享媒体搜索、文档目录递归搜索、预览打开。
+ *
+ * 对应 [github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory.FILES]。
+ */
 @Singleton
-class LocalFileSearchTool @Inject constructor(
+class FilesTool @Inject constructor(
     @ApplicationContext private val context: Context,
     private val queue: IntentActionQueue,
     private val documentDirectories: WorkDirectoryRepository,
 ) {
+    // ---------- 文件选择 ----------
+
+    @Tool(name = "get_file", description = "Opens a file picker so the user can choose a file of the requested type.", requireConfirmation = true)
+    fun getFile(@Param("A file type such as image or pdf.") mimeType: String): Map<String, Any> =
+        pick(Intent.ACTION_GET_CONTENT, "Choose file", mimeType)
+
+    @Tool(name = "open_file", description = "Opens the system document picker so the user can select a persistent file of the requested type.", requireConfirmation = true)
+    fun openFile(@Param("A file type such as image or pdf.") mimeType: String): Map<String, Any> =
+        pick(Intent.ACTION_OPEN_DOCUMENT, "Open file", mimeType)
+
+    private fun pick(action: String, title: String, mimeType: String): Map<String, Any> {
+        val type = mimeType.trim()
+        if (type.isEmpty() || !type.contains('/')) return mapOf("success" to false, "error" to "mimeType must be a MIME type.")
+        return queue.request(
+            title,
+            "$title with type $type.",
+            Intent(action).addCategory(Intent.CATEGORY_OPENABLE).setType(type),
+        )
+    }
+
+    // ---------- 媒体文件搜索 ----------
+
     @Tool(
         name = "request_media_file_permissions",
         description = "Asks the user to grant permission to search shared images, videos, and audio files.",
@@ -67,6 +93,8 @@ class LocalFileSearchTool @Inject constructor(
         )
     }
 
+    // ---------- 文档目录搜索 ----------
+
     @Tool(
         name = "search_documents",
         description = "Recursively searches file names in document directories the user has authorized in Settings. Returns up to 50 newest matching files and their content URIs.",
@@ -96,7 +124,7 @@ class LocalFileSearchTool @Inject constructor(
         description = "Opens a file found by a local search in a compatible app for preview. The identifier must come from search_media_files or search_documents.",
         requireConfirmation = true,
     )
-    fun openLocalFile(@Param("The file identifier returned by search_media_files or search_documents.") contentUri: String): Map<String, Any> {
+    fun openLocalFile(@Param("The file identifier returned by search_mediaFiles or searchDocuments.") contentUri: String): Map<String, Any> {
         val uri = runCatching { Uri.parse(contentUri) }.getOrNull() ?: return error("contentUri is invalid.")
         if (uri.scheme != "content" || !isAllowedUri(uri)) return error(
             "contentUri is not an accessible media result or a file from an authorized document directory.",
@@ -110,6 +138,8 @@ class LocalFileSearchTool @Inject constructor(
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
         )
     }
+
+    // ---------- helpers ----------
 
     private fun queryMedia(collection: MediaCollection, query: String): List<Map<String, Any>> {
         val projection = arrayOf(
@@ -130,14 +160,16 @@ class LocalFileSearchTool @Inject constructor(
                 buildList {
                     while (cursor.moveToNext() && size < MAX_RESULTS) {
                         val id = cursor.getLong(0)
-                        add(fileResult(
-                            uri = Uri.withAppendedPath(collection.uri, id.toString()),
-                            displayName = cursor.getString(1).orEmpty(),
-                            mimeType = cursor.getString(2).orEmpty(),
-                            sizeBytes = cursor.getLong(3),
-                            modifiedTimeMillis = cursor.getLong(4) * 1000,
-                            category = collection.type,
-                        ))
+                        add(
+                            fileResult(
+                                uri = Uri.withAppendedPath(collection.uri, id.toString()),
+                                displayName = cursor.getString(1).orEmpty(),
+                                mimeType = cursor.getString(2).orEmpty(),
+                                sizeBytes = cursor.getLong(3),
+                                modifiedTimeMillis = cursor.getLong(4) * 1000,
+                                category = collection.type,
+                            ),
+                        )
                     }
                 }
             }.orEmpty()

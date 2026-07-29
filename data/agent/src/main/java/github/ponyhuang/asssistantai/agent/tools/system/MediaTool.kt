@@ -8,7 +8,9 @@ import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.provider.Settings
+import android.service.notification.NotificationListenerService
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.net.toUri
 import com.google.adk.kt.annotations.Param
 import com.google.adk.kt.annotations.Tool
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -16,17 +18,52 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Controls playback in another app's currently active media session. All media
- * control tools require notification access, granted through
- * request_notification_access.
+ * 媒体域工具：直接播放 URL、控制其它应用的活跃媒体会话（播放/暂停/切歌等）。
+ *
+ * 对应 [github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory.MEDIA]。
+ *
+ * [MediaNotificationListenerService] 与本类同居，仅作为 [MediaSessionManager.getActiveSessions]
+ * 所需的 [ComponentName] 占位 —— 它不消费任何通知。
  */
 @Singleton
-class MediaSessionManagerTool @Inject constructor(
+class MediaTool @Inject constructor(
     @ApplicationContext private val context: Context,
     private val queue: IntentActionQueue,
 ) {
     private val mediaSessionManager = context.getSystemService(MediaSessionManager::class.java)
     private val listenerComponent = ComponentName(context, MediaNotificationListenerService::class.java)
+
+    // ---------- 直接播放 URL ----------
+
+    @Tool(name = "play_media", description = "Opens a media app to play audio or video from a direct URL.", requireConfirmation = true)
+    fun playMedia(
+        @Param("An HTTP or HTTPS URL pointing to audio or video.")
+        url: String,
+        @Param("Media type to play: music or video.")
+        mediaType: String,
+    ): Map<String, Any> {
+        val uri = url.trim().toUri()
+        if (uri.scheme !in SUPPORTED_SCHEMES || uri.schemeSpecificPart.isNullOrBlank()) {
+            return mapOf(
+                "success" to false,
+                "error" to "Use a non-empty http, https, or content URL.",
+            )
+        }
+
+        val mimeType = when (mediaType.lowercase().trim()) {
+            "music" -> "audio/*"
+            "video" -> "video/*"
+            else -> return mapOf(
+                "success" to false,
+                "error" to "Unsupported media type. Use music or video.",
+            )
+        }
+        val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, mimeType)
+            .addFlags(mediaIntentFlags(uri.scheme))
+        return queue.request("Play media", "Open $mediaType media in a compatible player.", intent)
+    }
+
+    // ---------- 媒体会话控制 ----------
 
     @Tool(
         name = "has_notification_access",
@@ -160,6 +197,8 @@ class MediaSessionManagerTool @Inject constructor(
         return sendTransportCommand(parsed)
     }
 
+    // ---------- helpers ----------
+
     private fun sendTransportCommand(action: MediaAction): Map<String, Any> {
         if (!isNotificationAccessGranted()) return notificationAccessRequired()
         val manager = mediaSessionManager ?: return serviceUnavailableError()
@@ -182,7 +221,6 @@ class MediaSessionManagerTool @Inject constructor(
                 MediaAction.STOP -> transport.stop()
             }
         } catch (_: RuntimeException) {
-            // Some apps throw IllegalStateException if their session doesn't support the action.
             return mapOf(
                 "success" to false,
                 "error" to "The active media session does not support the '${action.token}' action.",
@@ -258,4 +296,24 @@ class MediaSessionManagerTool @Inject constructor(
         PAUSE("pause", setOf()),
         STOP("stop", setOf()),
     }
+
+    private companion object {
+        val SUPPORTED_SCHEMES = setOf("http", "https", "content")
+    }
 }
+
+internal fun mediaIntentFlags(scheme: String?): Int =
+    if (scheme == "content") Intent.FLAG_GRANT_READ_URI_PERMISSION else 0
+
+/**
+ * Empty notification listener service used as a token for
+ * [android.media.session.MediaSessionManager.getActiveSessions].
+ *
+ * The system grants `MediaSessionManager` access to the calling app's
+ * currently playing media sessions only when the app is registered as a
+ * notification listener **and** the user has granted it notification access
+ * via Settings  Notifications  Device & app notifications. This service
+ * exists purely so we can hand a recognisable [android.content.ComponentName]
+ * to that API; we don't consume any notifications here.
+ */
+class MediaNotificationListenerService : NotificationListenerService()

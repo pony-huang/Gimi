@@ -44,6 +44,15 @@ internal interface DynamicToolCandidateSource {
 }
 
 /**
+ * 携带业务类别的来源 —— 用于本地工具 [LocalCategorySource]，在打分和返回结果中
+ * 提供类别提示。非本地来源（[ToolsetCandidateSource] MCP / [OfficialToolCandidateSource]）
+ * 不实现此接口，保持默认行为。
+ */
+internal interface CategorizedDynamicToolCandidateSource : DynamicToolCandidateSource {
+    val category: github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory
+}
+
+/**
  * Tool search 网关
  * 大量业务工具推迟到模型调用 `tool_search` 后再注入。
  *
@@ -152,6 +161,7 @@ internal class ToolSearchToolset(
         val candidates = mutableListOf<ToolCandidate>()
         val failures = mutableListOf<SourceFailure>()
         for (source in sources) {
+            val category = (source as? CategorizedDynamicToolCandidateSource)?.category
             val cached = successfulSourceCache[source.id]
             val tools = cached
                 ?: try {
@@ -165,7 +175,7 @@ internal class ToolSearchToolset(
                 }
             tools.forEach { tool ->
                 if (tool.declaration() != null) {
-                    candidates += ToolCandidate(source.id, source.displayName, tool)
+                    candidates += ToolCandidate(source.id, source.displayName, category, tool)
                 }
             }
         }
@@ -219,6 +229,7 @@ internal class ToolSearchToolset(
         val name = normalize(candidate.tool.name.replace('_', ' '))
         val description = normalize(candidate.tool.description)
         val source = normalize(candidate.sourceDisplayName)
+        val category = candidate.category?.let { normalize(it.displayName) }.orEmpty()
         val tokens = query.split(' ').filter(String::isNotBlank)
         if (tokens.isEmpty()) return null
 
@@ -231,6 +242,9 @@ internal class ToolSearchToolset(
         score += tokens.count { token -> token in name } * 500
         score += tokens.count { token -> token in description } * 100
         score += tokens.count { token -> token in source } * 25
+        if (category.isNotEmpty()) {
+            score += tokens.count { token -> token in category } * CATEGORY_TOKEN_WEIGHT
+        }
         return score.takeIf { it > 0 }
     }
 
@@ -266,10 +280,14 @@ internal class ToolSearchToolset(
                 searchScore(query, candidates.first()) != null || normalize(query) in normalize(name)
             }
             .map { (name, candidates) ->
-                mapOf(
-                    "name" to name,
-                    "sources" to candidates.map(ToolCandidate::sourceDisplayName).distinct(),
-                )
+                buildMap {
+                    put("name", name)
+                    put("sources", candidates.map(ToolCandidate::sourceDisplayName).distinct())
+                    val categories = candidates.mapNotNull { it.category }.distinctBy { it.id }
+                    if (categories.isNotEmpty()) {
+                        put("categories", categories.map { it.id })
+                    }
+                }
             }
 
     private fun Any?.loadedToolNames(): List<String> =
@@ -319,6 +337,7 @@ internal class ToolSearchToolset(
         private const val KEY_SOURCE_ERRORS = "source_errors"
         private const val KEY_SELECTION_CHANGED = "selection_changed"
         private const val MAX_DESCRIPTION_LENGTH = 240
+        private const val CATEGORY_TOKEN_WEIGHT = 200
         private val SEARCH_SEPARATOR = Regex("[^\\p{L}\\p{N}]+")
         private val MULTIPLE_SPACES = Regex("\\s+")
         private const val TOOL_SEARCH_DESCRIPTION =
@@ -331,18 +350,21 @@ internal class ToolSearchToolset(
      *
      * @property sourceId 来源的稳定 ID。
      * @property sourceDisplayName 可安全返回给模型的来源名称。
+     * @property category 业务类别（仅本地工具携带）；非本地来源为 null。
      * @property tool 本机保存的 ADK 执行实例。
      */
     private data class ToolCandidate(
         val sourceId: String,
         val sourceDisplayName: String,
+        val category: github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory?,
         val tool: BaseTool,
     ) {
-        fun summary(): Map<String, Any> = mapOf(
-            "name" to tool.name,
-            "description" to tool.description.take(MAX_DESCRIPTION_LENGTH),
-            "source" to sourceDisplayName,
-        )
+        fun summary(): Map<String, Any> = buildMap {
+            put("name", tool.name)
+            put("description", tool.description.take(MAX_DESCRIPTION_LENGTH))
+            put("source", sourceDisplayName)
+            category?.let { put("category", it.id) }
+        }
     }
 
     /**

@@ -8,14 +8,22 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Controls the device media volume. */
+/**
+ * 音频域工具：读取 / 设置设备媒体音量。
+ *
+ * 类与 [github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory.AUDIO]
+ * 一一对应，由 [LocalToolCatalog] 按类别聚合后暴露给 Agent。
+ */
 @Singleton
-class VolumeTool @Inject constructor(
+class AudioTool @Inject constructor(
     @ApplicationContext context: Context,
 ) {
     private val audioManager = context.getSystemService(AudioManager::class.java)
 
-    @Tool(name = "get_media_volume", description = "Gets the current, minimum, and maximum media-volume levels on the device.")
+    @Tool(
+        name = "get_media_volume",
+        description = "Gets the current, minimum, and maximum media-volume levels on the device."
+    )
     fun getMediaVolume(): Map<String, Int> = mediaVolumeState()
 
     @Tool(
@@ -58,7 +66,7 @@ class VolumeTool @Inject constructor(
 
     private fun setMediaVolumeGradually(targetLevel: Int) {
         var level = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-        // 丝滑音调
+        // 丝滑增长
         while (level != targetLevel) {
             level += if (targetLevel > level) 1 else -1
             audioManager.setStreamVolume(

@@ -4,6 +4,7 @@ data class ToolDefinition(
     val id: String,
     val name: String,
     val description: String,
+    val category: LocalToolCategory,
 )
 
 data class ToolDescriptor(

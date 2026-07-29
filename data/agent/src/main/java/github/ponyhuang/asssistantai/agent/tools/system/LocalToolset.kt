@@ -6,6 +6,7 @@ import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.asssistantai.agent.LocalToolCatalog
 import github.ponyhuang.asssistantai.agent.tools.allowConfirmationRequiredTools
 import github.ponyhuang.asssistantai.agent.tools.toolConfigurationOrNull
+import github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.ToolAuthorizationRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,6 +20,9 @@ import javax.inject.Singleton
  *   [LocalToolCatalog.confirmationRequiredToolIds]。
  *
  * 因此会话内勾选变化不需要重建 Agent。
+ *
+ * [getToolsForCategory] 是为 `ToolSearchToolset` 按类别展开 source 时提供的
+ * 内部入口；`getTools(readonlyContext)` 仍按全部类别返回。
  */
 @Singleton
 class LocalToolset @Inject constructor(
@@ -26,16 +30,30 @@ class LocalToolset @Inject constructor(
     private val toolAuthorization: ToolAuthorizationRepository,
 ) : Toolset {
 
-    override suspend fun getTools(readonlyContext: ReadonlyContext?): List<BaseTool> {
+    override suspend fun getTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
+        getToolsForCategory(readonlyContext, category = null)
+
+    /**
+     * 按 [category] 过滤的工具加载入口。
+     *
+     * @param category 非 null 时仅返回该类别的工具；null 表示全部（与 [getTools] 等价）。
+     */
+    suspend fun getToolsForCategory(
+        readonlyContext: ReadonlyContext?,
+        category: LocalToolCategory?,
+    ): List<BaseTool> {
         val globallyAuthorized = toolAuthorization.enabledToolIds()
         val selected = readonlyContext.toolConfigurationOrNull()
             ?.enabledLocalToolIds
             ?.intersect(globallyAuthorized)
             ?: globallyAuthorized
         val allowConfirmation = readonlyContext.allowConfirmationRequiredTools()
-        return catalog.tools().filter { tool ->
-            tool.name in selected &&
-                (allowConfirmation || tool.name !in catalog.confirmationRequiredToolIds)
+        return catalog.toolsByCategory().flatMap { (cat, tools) ->
+            if (category != null && cat != category) return@flatMap emptyList()
+            tools.filter { tool ->
+                tool.name in selected &&
+                    (allowConfirmation || tool.name !in catalog.confirmationRequiredToolIds)
+            }
         }
     }
 }

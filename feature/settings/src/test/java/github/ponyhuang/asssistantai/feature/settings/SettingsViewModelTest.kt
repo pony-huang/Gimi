@@ -75,7 +75,14 @@ private class FakeChatDisplayRepository : ChatDisplayRepository {
     private val mutableShowToolActivity = MutableStateFlow(false)
     override val showToolActivity: StateFlow<Boolean> = mutableShowToolActivity
 
+    private val mutableDarkThemeOverride = MutableStateFlow<Boolean?>(null)
+    override val darkThemeOverride: StateFlow<Boolean?> = mutableDarkThemeOverride
+
     override fun setShowToolActivity(show: Boolean) {
         mutableShowToolActivity.value = show
+    }
+
+    override fun setDarkThemeOverride(enabled: Boolean) {
+        mutableDarkThemeOverride.value = enabled
     }
 }

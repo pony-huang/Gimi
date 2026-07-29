@@ -44,5 +44,13 @@ interface ConversationRepository {
 interface ChatDisplayRepository {
     val showToolActivity: StateFlow<Boolean>
 
+    /**
+     * 夜间模式覆盖值；`null` 表示跟随系统（官方文档推荐的默认项）。
+     * 用户一旦拨动开关就写入明确的浅/深偏好，之后不再随系统变化。
+     */
+    val darkThemeOverride: StateFlow<Boolean?>
+
     fun setShowToolActivity(show: Boolean)
+
+    fun setDarkThemeOverride(enabled: Boolean)
 }

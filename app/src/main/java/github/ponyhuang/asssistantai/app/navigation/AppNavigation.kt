@@ -8,6 +8,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -155,6 +156,11 @@ fun MainScreen(
             returnToChat()
             backStack.add(AppRoute.Settings)
             scope.launch { drawerState.close() }
+        },
+        // 未显式切换时跟随系统，与 MainActivity 的主题解析规则保持一致。
+        darkTheme = uiState.darkThemeOverride ?: isSystemInDarkTheme(),
+        onDarkThemeChange = { enabled ->
+            viewModel.onAction(ChatAction.SetDarkTheme(enabled))
         },
     ) {
         NavDisplay(

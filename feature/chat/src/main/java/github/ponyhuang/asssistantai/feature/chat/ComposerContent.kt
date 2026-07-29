@@ -63,7 +63,8 @@ internal fun DefaultComposerLeadingContent(params: ComposerLeadingContentParams)
             .size(48.dp)
             .testTag("chat_composer_add"),
         colors = IconButtonDefaults.filledIconButtonColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            // 输入栏背景已是 surfaceContainer，按钮再抬一级形成清晰层级
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
     ) {

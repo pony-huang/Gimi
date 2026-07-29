@@ -63,6 +63,7 @@
     <string name="chat_open_drawer">打开历史对话抽屉</string>
     <string name="chat_new_conversation">新建对话</string>
     <string name="chat_settings">设置</string>
+    <string name="chat_dark_mode_toggle">夜间模式</string>
     <string name="chat_tool_confirmation_title">允许执行工具？</string>
     <string name="chat_action_reject">拒绝</string>
     <string name="chat_action_allow">允许</string>

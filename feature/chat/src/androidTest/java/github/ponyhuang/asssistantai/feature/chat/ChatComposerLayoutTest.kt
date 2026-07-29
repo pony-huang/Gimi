@@ -7,13 +7,17 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.asssistantai.domain.conversation.model.DraftAttachment
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
 import github.ponyhuang.asssistantai.domain.toolauthorization.model.ToolDescriptor
 import org.junit.Rule
@@ -109,21 +113,48 @@ class ChatComposerLayoutTest {
     }
 
     @Test
-    fun addToChatSheetDoesNotExposeUnusedToolAccessMode() {
+    fun addToChatSheetOpensToolAccessPageAndSelectsMode() {
+        var selectedMode: ToolAccessMode? = null
         setComposer(
             addToChatState = ChatAddToChatState(
                 configuration = ConversationToolConfiguration(),
             ),
+            onToolAccessModeChange = { selectedMode = it },
         )
 
         composeRule.onNodeWithTag("chat_composer_add").performClick()
-        composeRule.onNodeWithTag("tool-access-nav").assertDoesNotExist()
+        composeRule.onNodeWithTag("tool-access-nav").performClick()
+        composeRule.onNodeWithTag("tool-access-page").assertIsDisplayed()
+        composeRule.onNodeWithTag("tool-access-auto").assertIsSelected()
+        composeRule.onNodeWithTag("tool-access-on-demand").assertIsEnabled().performClick()
+        composeRule.runOnIdle {
+            assert(selectedMode == ToolAccessMode.ON_DEMAND)
+        }
+        composeRule.onNodeWithTag("add-to-chat-back").performClick()
+        composeRule.onNodeWithTag("add-to-chat-home").assertIsDisplayed()
+    }
+
+    @Test
+    fun toolAccessModesAreDisabledWhileAgentRuns() {
+        setComposer(
+            addToChatState = ChatAddToChatState(
+                configuration = ConversationToolConfiguration(),
+                isMutationBlocked = true,
+            ),
+        )
+
+        composeRule.onNodeWithTag("chat_composer_add").performClick()
+        composeRule.onNodeWithTag("tool-access-nav").performClick()
+        composeRule.onNodeWithTag("tool-access-auto").assertIsNotEnabled()
+        composeRule.onNodeWithTag("tool-access-on-demand").assertIsNotEnabled()
+        composeRule.onNodeWithTag("tool-access-always").assertIsNotEnabled()
     }
 
     private fun setComposer(
         messageData: MessageData = MessageData(),
         isGenerating: Boolean = false,
         addToChatState: ChatAddToChatState = ChatAddToChatState(),
+        onToolAccessModeChange: (ToolAccessMode) -> Unit = {},
     ) {
         composeRule.setContent {
             MaterialTheme {
@@ -134,6 +165,7 @@ class ChatComposerLayoutTest {
                     messageData = messageData,
                     isVoiceInputAvailable = true,
                     addToChatState = addToChatState,
+                    onToolAccessModeChange = onToolAccessModeChange,
                     modelSelectorContent = {
                         Text(
                             text = "Test model",

@@ -1,6 +1,5 @@
 package github.ponyhuang.asssistantai.agent
 
-import com.google.adk.kt.tools.BaseTool
 import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
 import github.ponyhuang.asssistantai.domain.mcp.repository.McpRepository
@@ -24,8 +23,7 @@ class McpToolsetRegistry @Inject constructor(
 ) {
     private val mutex = Mutex()
     private var cachedKey: CacheKey? = null
-    private var cachedToolsets: List<McpToolset> = emptyList()
-    private var cachedToolNames: Set<String> = emptySet()
+    private var cachedHandles: List<McpToolsetHandle> = emptyList()
 
     /**
      * 返回当前启用的 MCP 服务器对应的 [McpToolset] 列表及工具名称集合。
@@ -37,33 +35,30 @@ class McpToolsetRegistry @Inject constructor(
     ): McpToolsetResolution = mutex.withLock {
         val key = CacheKey(servers.revision.value, selectedServerIds)
         if (key == cachedKey) {
-            return@withLock McpToolsetResolution(cachedToolsets, cachedToolNames)
+            return@withLock McpToolsetResolution(cachedHandles)
         }
 
         // 关闭旧的工具集（释放会话和传输资源）
-        cachedToolsets.forEach { toolset ->
-            runCatching { toolset.close() }
+        cachedHandles.forEach { handle ->
+            runCatching { handle.toolset.close() }
         }
 
         val selected = selectMcpServers(servers.currentServers(), selectedServerIds)
-        val toolsets = selected
+        val handles = selected
             .filter { it.endpointUrl.isNotBlank() }
             .mapNotNull { server ->
-                cancellationAwareRunCatching { server.toMcpToolset() }.getOrNull()
+                cancellationAwareRunCatching {
+                    McpToolsetHandle(
+                        serverId = server.id,
+                        displayName = server.name.ifBlank { server.id },
+                        toolset = server.toMcpToolset(),
+                    )
+                }.getOrNull()
             }
 
-        // 预先获取工具名称用于 instruction prompt。
-        // headerProvider 为 null 时 McpToolset 内部会缓存工具列表。
-        val names = toolsets.flatMap { toolset ->
-            cancellationAwareRunCatching {
-                toolset.getTools(null).map(BaseTool::name)
-            }.getOrDefault(emptyList())
-        }.toSet()
-
         cachedKey = key
-        cachedToolsets = toolsets
-        cachedToolNames = names
-        McpToolsetResolution(toolsets, names)
+        cachedHandles = handles
+        McpToolsetResolution(handles)
     }
 
     private data class CacheKey(
@@ -72,10 +67,26 @@ class McpToolsetRegistry @Inject constructor(
     )
 }
 
-/** [McpToolsetRegistry.resolve] 的返回结果。 */
+/**
+ * 当前会话所选 MCP servers 的惰性 Toolset 解析结果。
+ *
+ * @property handles 每个 server 独立的绑定；单个来源发现失败不会影响其他来源。
+ */
 data class McpToolsetResolution(
-    val toolsets: List<McpToolset>,
-    val toolNames: Set<String>,
+    val handles: List<McpToolsetHandle>,
+)
+
+/**
+ * 一个已选择 MCP server 与其惰性 Toolset 的绑定。
+ *
+ * @property serverId server 的稳定 ID，用于动态候选来源隔离。
+ * @property displayName 可安全展示给模型的 server 名称。
+ * @property toolset 负责连接、缓存声明和执行调用的 MCP Toolset。
+ */
+data class McpToolsetHandle(
+    val serverId: String,
+    val displayName: String,
+    val toolset: McpToolset,
 )
 
 /**

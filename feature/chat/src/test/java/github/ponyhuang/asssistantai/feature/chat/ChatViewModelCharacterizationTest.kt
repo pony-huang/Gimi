@@ -8,6 +8,7 @@ import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunPart
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatFunctionCall
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
 import github.ponyhuang.asssistantai.domain.conversation.model.ToolConfirmationRequest
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
@@ -145,6 +146,24 @@ class ChatViewModelCharacterizationTest {
             fixture.conversations.setConversationToolConfiguration(
                 "session-1",
                 match { "compose_message" !in it.enabledLocalToolIds },
+            )
+        }
+        coVerify { fixture.agent.releaseSession("session-1") }
+    }
+
+    @Test
+    fun changingToolAccessModePersistsAndReleasesOnlyCurrentRunner() = runTest {
+        val fixture = fixture(configured = true)
+        fixture.viewModel.onAction(ChatAction.NewConversation)
+        advanceUntilIdle()
+
+        fixture.viewModel.onAction(ChatAction.SetToolAccessMode(ToolAccessMode.ON_DEMAND))
+        advanceUntilIdle()
+
+        coVerify {
+            fixture.conversations.setConversationToolConfiguration(
+                "session-1",
+                match { it.toolAccessMode == ToolAccessMode.ON_DEMAND },
             )
         }
         coVerify { fixture.agent.releaseSession("session-1") }

@@ -42,6 +42,21 @@ class ChatMessageVisibilityTest {
     }
 
     @Test
+    fun hidesToolSearchProtocolMessagesEvenWhenToolActivityIsEnabled() {
+        val call = assistantMessage(
+            functionCalls = listOf(FunctionCallView("search-1", ToolSearchProtocolName, "{}")),
+        )
+        val response = assistantMessage(
+            functionResponses = listOf(FunctionResponseView("search-1", ToolSearchProtocolName)),
+        )
+
+        assertTrue(call.visibleFunctionCalls().isEmpty())
+        assertTrue(response.visibleFunctionResponses().isEmpty())
+        assertFalse(call.isVisibleInChat(showToolActivity = true))
+        assertFalse(response.isVisibleInChat(showToolActivity = true))
+    }
+
+    @Test
     fun keepsRealToolCallsWhileFilteringConfirmation() {
         val message = assistantMessage(
             functionCalls = listOf(

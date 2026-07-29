@@ -16,7 +16,14 @@ import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-/** One user-facing function exposed by a Moonshot formula URI. */
+/**
+ * One user-facing function exposed by a Moonshot formula URI.
+ *
+ * @property name Function name sent to the model.
+ * @property description Human-readable capability description used for discovery.
+ * @property parameters Optional ADK parameter declaration.
+ * @property formulaUri Moonshot formula endpoint identifier used during execution.
+ */
 internal data class FormulaDeclaration(
     val name: String,
     val description: String,

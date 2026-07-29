@@ -35,6 +35,17 @@ interface OfficialToolset : Toolset {
     override suspend fun getTools(readonlyContext: ReadonlyContext?): List<BaseTool> = emptyList()
 }
 
+/**
+ * 需要进入 Tool access 动态候选目录的官方函数工具集。
+ *
+ * 厂商原生工具不实现该接口，仍由 [OfficialToolset.processLlmRequest] 直接注入；
+ * 会展开为普通函数声明的工具集实现本接口，由统一动态 Toolset 控制暴露时机。
+ */
+interface DynamicOfficialToolset : OfficialToolset {
+    val sourceId: String
+    val sourceDisplayName: String
+}
+
 /** Declaration-only tool executed by the remote model provider, never by the local Agent runtime. */
 internal class OfficialBuiltInTool(
     toolId: String,

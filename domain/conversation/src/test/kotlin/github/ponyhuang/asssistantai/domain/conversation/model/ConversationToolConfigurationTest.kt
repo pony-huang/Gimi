@@ -8,6 +8,30 @@ import org.junit.Test
 class ConversationToolConfigurationTest {
 
     @Test
+    fun newConversationsDefaultToAutomaticToolAccess() {
+        assertEquals(
+            ToolAccessMode.AUTO,
+            ConversationToolConfiguration().toolAccessMode,
+        )
+    }
+
+    @Test
+    fun toolAccessModeSurvivesOtherConfigurationUpdates() {
+        val configuration = ConversationToolConfiguration(
+            toolAccessMode = ToolAccessMode.ON_DEMAND,
+        )
+
+        val updated = configuration
+            .initializeOfficialFunctions("kimi", setOf("kimi_formulas"))
+            .sanitize(
+                availableLocalToolIds = emptySet(),
+                availableMcpServerIds = emptySet(),
+            )
+
+        assertEquals(ToolAccessMode.ON_DEMAND, updated.toolAccessMode)
+    }
+
+    @Test
     fun officialFunctionsDefaultToTheAllMarkerForAnUnseenService() {
         val configuration = ConversationToolConfiguration()
 

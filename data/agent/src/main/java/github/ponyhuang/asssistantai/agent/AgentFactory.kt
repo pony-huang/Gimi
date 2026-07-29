@@ -7,8 +7,16 @@ import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.FunctionTool
 import com.google.adk.kt.tools.SkillToolset
+import github.ponyhuang.asssistantai.agent.tools.dynamic.DynamicToolAccessToolset
+import github.ponyhuang.asssistantai.agent.tools.dynamic.DynamicToolCandidateSource
+import github.ponyhuang.asssistantai.agent.tools.dynamic.OfficialToolCandidateSource
+import github.ponyhuang.asssistantai.agent.tools.dynamic.StaticToolCandidateSource
+import github.ponyhuang.asssistantai.agent.tools.dynamic.TOOL_SEARCH_NAME
+import github.ponyhuang.asssistantai.agent.tools.dynamic.ToolsetCandidateSource
+import github.ponyhuang.asssistantai.agent.tools.official.DynamicOfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolset
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.ToolAuthorizationRepository
 import javax.inject.Inject
@@ -53,30 +61,72 @@ class AgentFactory @Inject constructor(
         val mcpResolution = mcpToolsetRegistry.resolve(
             toolConfiguration?.enabledMcpServerIds,
         )
-        val configuredTools: List<BaseTool> = buildList {
-            val enabledToolIds = toolConfiguration?.enabledLocalToolIds
-                ?: toolAuthorization.enabledToolIds()
-            addAll(localToolCatalog.tools().filter { it.name in enabledToolIds })
-        }
-        val tools = if (allowConfirmationRequiredTools) {
-            configuredTools
+        val globallyAuthorizedToolIds = toolAuthorization.enabledToolIds()
+        val selectedLocalToolIds = toolConfiguration?.enabledLocalToolIds
+            ?.intersect(globallyAuthorizedToolIds)
+            ?: globallyAuthorizedToolIds
+        val selectedLocalTools = localToolCatalog.tools().filter { it.name in selectedLocalToolIds }
+        val localTools = if (allowConfirmationRequiredTools) {
+            selectedLocalTools
         } else {
-            excludeConfirmationRequiredTools(configuredTools)
+            excludeConfirmationRequiredTools(selectedLocalTools)
         }
+        val (dynamicOfficialToolsets, directOfficialToolsets) =
+            officialToolsets.partition { it is DynamicOfficialToolset }
+        val dynamicSources: List<DynamicToolCandidateSource> = buildList {
+            if (localTools.isNotEmpty()) {
+                add(
+                    StaticToolCandidateSource(
+                        id = "local",
+                        displayName = "Local tools",
+                        tools = localTools,
+                    ),
+                )
+            }
+            mcpResolution.handles.forEach { handle ->
+                add(
+                    ToolsetCandidateSource(
+                        id = "mcp:${handle.serverId}",
+                        displayName = handle.displayName,
+                        toolset = handle.toolset,
+                    ),
+                )
+            }
+            dynamicOfficialToolsets
+                .filterIsInstance<DynamicOfficialToolset>()
+                .forEach { toolset ->
+                    add(OfficialToolCandidateSource(toolset, modelConfig))
+                }
+        }
+        val accessMode = toolConfiguration?.toolAccessMode
+            ?: ToolAccessMode.ALWAYS_AVAILABLE
+        val dynamicToolset = dynamicSources
+            .takeIf(List<DynamicToolCandidateSource>::isNotEmpty)
+            ?.let { sources ->
+                DynamicToolAccessToolset(
+                    mode = accessMode,
+                    sources = sources,
+                )
+            }
         return LlmAgent(
             name = "Assistant",
             model = model,
             instruction = Instruction(
                 AgentPrompts.defaultAssistantInstruction(
-                    tools.mapTo(linkedSetOf(), BaseTool::name) +
-                            mcpResolution.toolNames +
-                            modelConfig.officialTools,
+                    buildSet {
+                        addAll(modelConfig.officialTools)
+                        if (dynamicSources.isNotEmpty()) add(TOOL_SEARCH_NAME)
+                    },
+                    dynamicToolSearchEnabled =
+                        dynamicToolset != null && accessMode != ToolAccessMode.ALWAYS_AVAILABLE,
                 ),
             ),
-            tools = tools,
-            toolsets = officialToolsets.toList() +
-                    SkillToolset(skillSource) +
-                    mcpResolution.toolsets,
+            tools = emptyList(),
+            toolsets = buildList {
+                addAll(directOfficialToolsets)
+                dynamicToolset?.let(::add)
+                add(SkillToolset(skillSource))
+            },
         )
     }
 

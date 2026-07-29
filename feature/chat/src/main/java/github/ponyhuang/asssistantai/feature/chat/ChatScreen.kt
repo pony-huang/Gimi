@@ -70,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.conversation.model.Message
 import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
 import github.ponyhuang.asssistantai.domain.conversation.model.DraftAttachment
+import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.MultimodalCapabilities
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
@@ -121,6 +122,7 @@ fun ChatScaffold(
     onConfigureModels: () -> Unit,
     onNewConversation: () -> Unit,
     onLocalToolEnabledChange: (String, Boolean) -> Unit,
+    onToolAccessModeChange: (ToolAccessMode) -> Unit,
     onMcpServerEnabledChange: (String, Boolean) -> Unit,
     onOfficialToolOpened: (String) -> Unit,
     onOfficialToolFunctionEnabledChange: (String, String, Boolean) -> Unit,
@@ -278,6 +280,7 @@ fun ChatScaffold(
                     ),
                     attachmentCapabilities = attachmentCapabilities,
                     onLocalToolEnabledChange = onLocalToolEnabledChange,
+                    onToolAccessModeChange = onToolAccessModeChange,
                     onMcpServerEnabledChange = onMcpServerEnabledChange,
                     onOfficialToolOpened = onOfficialToolOpened,
                     onOfficialToolFunctionEnabledChange = onOfficialToolFunctionEnabledChange,

@@ -23,6 +23,13 @@
     <string name="chat_attachment_unsupported">当前模型不支持此类附件</string>
     <string name="chat_attachment_open_failed">没有可用于打开此文档的应用</string>
     <string name="chat_session_tools_title">工具</string>
+    <string name="chat_tool_access_title">工具访问</string>
+    <string name="chat_tool_access_auto">自动</string>
+    <string name="chat_tool_access_auto_description">助手会为你选择</string>
+    <string name="chat_tool_access_on_demand">按需</string>
+    <string name="chat_tool_access_on_demand_description">需要时加载，模型调用更多、准确率可能降低</string>
+    <string name="chat_tool_access_always">始终可用</string>
+    <string name="chat_tool_access_always_description">从开始即可使用，模型调用更少、准确率更高</string>
     <string name="chat_session_mcp_title">MCP</string>
     <string name="chat_session_only_notice">仅影响当前会话</string>
     <string name="chat_session_tools_running_notice">会话运行中，暂时无法修改工具</string>

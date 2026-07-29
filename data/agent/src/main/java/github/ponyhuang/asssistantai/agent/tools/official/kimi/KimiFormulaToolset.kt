@@ -2,7 +2,7 @@ package github.ponyhuang.asssistantai.agent.tools.official.kimi
 
 import com.google.adk.kt.tools.BaseTool
 import github.ponyhuang.asssistantai.agent.ModelConfig
-import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolset
+import github.ponyhuang.asssistantai.agent.tools.official.DynamicOfficialToolset
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import javax.inject.Inject
@@ -17,16 +17,19 @@ import okhttp3.OkHttpClient
  * [ModelConfig.enabledOfficialFunctions]).
  */
 class KimiFormulaToolset @Inject constructor(
+    private val cache: KimiFormulaCache,
     private val httpClient: OkHttpClient,
-) : OfficialToolset {
+) : DynamicOfficialToolset {
+    override val sourceId: String = "official:kimi_formulas"
+    override val sourceDisplayName: String = "Kimi formulas"
+
     override suspend fun resolveTools(config: ModelConfig): List<BaseTool> {
         if (OfficialToolIds.KIMI_FORMULAS !in config.officialTools) return emptyList()
         val enabledFunctionIds = config.enabledOfficialFunctions[OfficialToolIds.KIMI_FORMULAS]
             ?.takeIf {
                 it.isNotEmpty() && ConversationToolConfiguration.ALL_FUNCTIONS_MARKER !in it
             }
-        return KimiFormulaManifest(apiKey = config.apiKey, httpClient = httpClient)
-            .fetch()
+        return cache.fetch(serviceId = config.serviceId, apiKey = config.apiKey)
             .map { declaration ->
                 KimiFormulaTool(
                     apiKey = config.apiKey,

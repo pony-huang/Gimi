@@ -198,6 +198,9 @@ fun MainScreen(
                                 onLocalToolEnabledChange = { toolId, enabled ->
                                     viewModel.onAction(ChatAction.SetLocalToolEnabled(toolId, enabled))
                                 },
+                                onToolAccessModeChange = { mode ->
+                                    viewModel.onAction(ChatAction.SetToolAccessMode(mode))
+                                },
                                 onMcpServerEnabledChange = { serverId, enabled ->
                                     viewModel.onAction(ChatAction.SetMcpServerEnabled(serverId, enabled))
                                 },

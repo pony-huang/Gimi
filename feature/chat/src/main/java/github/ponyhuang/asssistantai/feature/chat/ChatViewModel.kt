@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.asssistantai.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.asssistantai.domain.conversation.model.DraftAttachment
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
@@ -105,6 +106,7 @@ class ChatViewModel @Inject constructor(
             is ChatAction.SelectModel -> selectModel(action.selection)
             is ChatAction.SetLocalToolEnabled ->
                 setLocalToolEnabled(action.toolId, action.enabled)
+            is ChatAction.SetToolAccessMode -> setToolAccessMode(action.mode)
             is ChatAction.SetMcpServerEnabled ->
                 setMcpServerEnabled(action.serverId, action.enabled)
             is ChatAction.SetOfficialFunctionEnabled -> setOfficialFunctionEnabled(
@@ -938,6 +940,12 @@ class ChatViewModel @Inject constructor(
                     configuration.enabledLocalToolIds - toolId
                 },
             )
+        }
+    }
+
+    private fun setToolAccessMode(mode: ToolAccessMode) {
+        updateToolConfiguration { configuration ->
+            configuration.copy(toolAccessMode = mode)
         }
     }
 

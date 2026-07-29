@@ -12,13 +12,21 @@ import github.ponyhuang.asssistantai.domain.conversation.model.MessageRole
  */
 internal const val ConfirmationToolName = "adk_request_confirmation"
 
-/** 过滤掉确认协议信令后的工具调用列表。 */
-internal fun Message.visibleFunctionCalls(): List<FunctionCallView> =
-    functionCalls.filterNot { it.name == ConfirmationToolName }
+/**
+ * 动态工具检索的内部工具名。检索调用和响应必须保留在 ADK session 中恢复声明选择，
+ * 但不属于面向用户的工具执行活动，因此聊天界面不渲染它。
+ */
+internal const val ToolSearchProtocolName = "tool_search"
 
-/** 过滤掉确认协议信令后的工具响应列表。 */
+private val HiddenProtocolToolNames = setOf(ConfirmationToolName, ToolSearchProtocolName)
+
+/** 过滤掉内部协议信令后的工具调用列表。 */
+internal fun Message.visibleFunctionCalls(): List<FunctionCallView> =
+    functionCalls.filterNot { it.name in HiddenProtocolToolNames }
+
+/** 过滤掉内部协议信令后的工具响应列表。 */
 internal fun Message.visibleFunctionResponses(): List<FunctionResponseView> =
-    functionResponses.filterNot { it.name == ConfirmationToolName }
+    functionResponses.filterNot { it.name in HiddenProtocolToolNames }
 
 /** Whether a message has any content that can be rendered with the current display preference. */
 internal fun Message.isVisibleInChat(showToolActivity: Boolean): Boolean =

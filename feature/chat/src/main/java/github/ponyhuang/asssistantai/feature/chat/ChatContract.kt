@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.feature.chat
 
 import github.ponyhuang.asssistantai.domain.conversation.model.DraftAttachment
+import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 
 /**
@@ -49,6 +50,9 @@ sealed interface ChatAction {
 
     /** 启用 / 停用某个本地工具。 */
     data class SetLocalToolEnabled(val toolId: String, val enabled: Boolean) : ChatAction
+
+    /** 设置当前会话向模型声明函数工具的加载方式。 */
+    data class SetToolAccessMode(val mode: ToolAccessMode) : ChatAction
 
     /** 启用 / 停用某个 MCP server。 */
     data class SetMcpServerEnabled(val serverId: String, val enabled: Boolean) : ChatAction

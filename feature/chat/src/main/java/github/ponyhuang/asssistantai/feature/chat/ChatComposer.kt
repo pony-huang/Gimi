@@ -57,6 +57,7 @@ import github.ponyhuang.asssistantai.core.common.concurrent.cancellationAwareRun
 import github.ponyhuang.asssistantai.feature.chat.R
 import github.ponyhuang.asssistantai.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.asssistantai.domain.conversation.model.DraftAttachment
+import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.MultimodalCapabilities
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.delay
@@ -103,6 +104,7 @@ public fun ChatComposer(
     modelSelectorContent: @Composable () -> Unit = { },
     addToChatState: ChatAddToChatState = ChatAddToChatState(),
     onLocalToolEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
+    onToolAccessModeChange: (ToolAccessMode) -> Unit = { _ -> },
     onMcpServerEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
     onOfficialToolOpened: (String) -> Unit = { _ -> },
     onOfficialToolFunctionEnabledChange: (String, String, Boolean) -> Unit = { _, _, _ -> },
@@ -426,6 +428,7 @@ public fun ChatComposer(
             filesEnabled = attachmentCapabilities.supportsAudio ||
                 attachmentCapabilities.supportsDocuments,
             onLocalToolEnabledChange = onLocalToolEnabledChange,
+            onToolAccessModeChange = onToolAccessModeChange,
             onMcpServerEnabledChange = onMcpServerEnabledChange,
             onOfficialToolOpened = onOfficialToolOpened,
             onOfficialToolFunctionEnabledChange = onOfficialToolFunctionEnabledChange,

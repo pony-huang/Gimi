@@ -30,6 +30,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -38,12 +39,14 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Functions
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -81,6 +84,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
+import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.mcp.model.McpTransport
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
@@ -89,6 +93,7 @@ import github.ponyhuang.asssistantai.domain.toolauthorization.model.ToolDescript
 private enum class AddToChatPage {
     HOME,
     LOCAL_TOOLS,
+    TOOL_ACCESS,
     MCP,
     OFFICIAL_TOOL,
 }
@@ -104,6 +109,7 @@ internal fun ChatAddToChatSheet(
     imagesEnabled: Boolean,
     filesEnabled: Boolean,
     onLocalToolEnabledChange: (String, Boolean) -> Unit,
+    onToolAccessModeChange: (ToolAccessMode) -> Unit,
     onMcpServerEnabledChange: (String, Boolean) -> Unit,
     onOfficialToolOpened: (String) -> Unit,
     onOfficialToolFunctionEnabledChange: (String, String, Boolean) -> Unit,
@@ -157,6 +163,7 @@ internal fun ChatAddToChatSheet(
                 ) {
                     val isFullHeightPage = when (currentPage) {
                         AddToChatPage.LOCAL_TOOLS -> true
+                        AddToChatPage.TOOL_ACCESS -> true
                         AddToChatPage.MCP -> state.mcpServers.isNotEmpty()
                         AddToChatPage.OFFICIAL_TOOL -> state.officialTools.any {
                             it.functions.isNotEmpty() || it.isLoadingFunctions
@@ -176,6 +183,8 @@ internal fun ChatAddToChatSheet(
                             title = when (currentPage) {
                                 AddToChatPage.HOME -> stringResource(R.string.chat_add_to_chat_title)
                                 AddToChatPage.LOCAL_TOOLS -> stringResource(R.string.chat_session_tools_title)
+                                AddToChatPage.TOOL_ACCESS ->
+                                    stringResource(R.string.chat_tool_access_title)
                                 AddToChatPage.MCP -> stringResource(R.string.chat_session_mcp_title)
                                 AddToChatPage.OFFICIAL_TOOL ->
                                     stringResource(R.string.chat_official_tools_title)
@@ -195,6 +204,7 @@ internal fun ChatAddToChatSheet(
                                 imagesEnabled = imagesEnabled,
                                 filesEnabled = filesEnabled,
                                 onOpenTools = { page = AddToChatPage.LOCAL_TOOLS },
+                                onOpenToolAccess = { page = AddToChatPage.TOOL_ACCESS },
                                 onOpenMcp = { page = AddToChatPage.MCP },
                                 onOpenOfficialTools = {
                                     state.officialTools.forEach { tool ->
@@ -206,6 +216,10 @@ internal fun ChatAddToChatSheet(
                             AddToChatPage.LOCAL_TOOLS -> LocalToolsPage(
                                 state = state,
                                 onEnabledChange = onLocalToolEnabledChange,
+                            )
+                            AddToChatPage.TOOL_ACCESS -> ToolAccessPage(
+                                state = state,
+                                onModeChange = onToolAccessModeChange,
                             )
                             AddToChatPage.MCP -> McpServersPage(
                                 state = state,
@@ -272,6 +286,7 @@ private fun AddToChatHome(
     imagesEnabled: Boolean,
     filesEnabled: Boolean,
     onOpenTools: () -> Unit,
+    onOpenToolAccess: () -> Unit,
     onOpenMcp: () -> Unit,
     onOpenOfficialTools: () -> Unit,
 ) {
@@ -331,6 +346,16 @@ private fun AddToChatHome(
                     subtitle = enabledCountText(state.enabledLocalToolCount, isMcp = false),
                     onClick = onOpenTools,
                     testTag = "session-tools-nav",
+                )
+                HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
+                NavigationRow(
+                    icon = Icons.Default.Tune,
+                    title = stringResource(R.string.chat_tool_access_title),
+                    subtitle = toolAccessModeLabel(
+                        state.configuration?.toolAccessMode ?: ToolAccessMode.AUTO,
+                    ),
+                    onClick = onOpenToolAccess,
+                    testTag = "tool-access-nav",
                 )
             }
         }
@@ -436,6 +461,95 @@ private fun NavigationRow(
             )
         }
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+    }
+}
+
+@Composable
+private fun ToolAccessPage(
+    state: ChatAddToChatState,
+    onModeChange: (ToolAccessMode) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("tool-access-page"),
+    ) {
+        PageStatus(state)
+        LazyColumn(
+            contentPadding = PaddingValues(bottom = 24.dp),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            items(ToolAccessMode.entries, key = ToolAccessMode::name) { mode ->
+                ToolAccessModeRow(
+                    mode = mode,
+                    selected = state.configuration?.toolAccessMode == mode,
+                    enabled = state.configuration != null && !state.isMutationBlocked,
+                    onClick = { onModeChange(mode) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ToolAccessModeRow(
+    mode: ToolAccessMode,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val contentColor = if (selected) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 96.dp)
+            .selectable(
+                selected = selected,
+                enabled = enabled,
+                role = Role.RadioButton,
+                onClick = onClick,
+            )
+            .testTag(
+                when (mode) {
+                    ToolAccessMode.AUTO -> "tool-access-auto"
+                    ToolAccessMode.ON_DEMAND -> "tool-access-on-demand"
+                    ToolAccessMode.ALWAYS_AVAILABLE -> "tool-access-always"
+                },
+            )
+            .padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = toolAccessModeLabel(mode),
+                style = MaterialTheme.typography.titleMedium,
+                color = contentColor,
+            )
+            Text(
+                text = toolAccessModeDescription(mode),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        if (selected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .padding(start = 16.dp)
+                    .size(28.dp),
+            )
+        }
     }
 }
 
@@ -1002,6 +1116,24 @@ private fun toolFilterLabel(filter: SessionToolFilter): String = stringResource(
         SessionToolFilter.ALL -> R.string.chat_session_tools_filter_all
         SessionToolFilter.ENABLED -> R.string.chat_session_tools_filter_enabled
         SessionToolFilter.DISABLED -> R.string.chat_session_tools_filter_disabled
+    },
+)
+
+@Composable
+private fun toolAccessModeLabel(mode: ToolAccessMode): String = stringResource(
+    when (mode) {
+        ToolAccessMode.AUTO -> R.string.chat_tool_access_auto
+        ToolAccessMode.ON_DEMAND -> R.string.chat_tool_access_on_demand
+        ToolAccessMode.ALWAYS_AVAILABLE -> R.string.chat_tool_access_always
+    },
+)
+
+@Composable
+private fun toolAccessModeDescription(mode: ToolAccessMode): String = stringResource(
+    when (mode) {
+        ToolAccessMode.AUTO -> R.string.chat_tool_access_auto_description
+        ToolAccessMode.ON_DEMAND -> R.string.chat_tool_access_on_demand_description
+        ToolAccessMode.ALWAYS_AVAILABLE -> R.string.chat_tool_access_always_description
     },
 )
 

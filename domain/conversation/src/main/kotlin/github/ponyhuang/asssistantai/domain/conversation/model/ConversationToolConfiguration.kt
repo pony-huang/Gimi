@@ -1,6 +1,18 @@
 package github.ponyhuang.asssistantai.domain.conversation.model
 
 /**
+ * 会话把已启用工具暴露给模型的方式。
+ *
+ * [AUTO] 根据声明预算选择直接加载或按需检索；[ON_DEMAND] 始终先检索；
+ * [ALWAYS_AVAILABLE] 从当前用户轮次的第一次模型请求起加载全部已启用工具。
+ */
+enum class ToolAccessMode {
+    AUTO,
+    ON_DEMAND,
+    ALWAYS_AVAILABLE,
+}
+
+/**
  * Persistent, per-conversation tool selection state.
  *
  * Official tool selection is stored at function granularity: a tool id only
@@ -10,11 +22,17 @@ package github.ponyhuang.asssistantai.domain.conversation.model
  * [ALL_FUNCTIONS_MARKER] as a sentinel meaning "every function of this tool is
  * enabled" — it is expanded to the real id set the moment the catalog becomes
  * available.
+ *
+ * @property enabledLocalToolIds 当前会话选择的本地工具 ID。
+ * @property enabledMcpServerIds 当前会话选择的 MCP server ID。
+ * @property enabledOfficialFunctionIdsByService 按模型服务和官方工具分组的函数选择。
+ * @property toolAccessMode 当前会话采用的工具声明加载模式。
  */
 data class ConversationToolConfiguration(
     val enabledLocalToolIds: Set<String> = emptySet(),
     val enabledMcpServerIds: Set<String> = emptySet(),
     val enabledOfficialFunctionIdsByService: Map<String, Map<String, Set<String>>> = emptyMap(),
+    val toolAccessMode: ToolAccessMode = ToolAccessMode.AUTO,
 ) {
     fun enabledOfficialFunctionIds(serviceId: String, toolId: String): Set<String> =
         enabledOfficialFunctionIdsByService[serviceId]?.get(toolId).orEmpty()

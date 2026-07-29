@@ -18,7 +18,7 @@ class KimiFormulaToolsetTest {
 
     @Test
     fun notApplicableWhenKimiFormulasNotEnabled() = runTest {
-        val toolset = KimiFormulaToolset(manifestClient(200, MANIFEST_BODY))
+        val toolset = toolset(manifestClient(200, MANIFEST_BODY))
         val config = config(officialTools = emptyList())
 
         assertTrue(toolset.resolveTools(config).isEmpty())
@@ -26,7 +26,7 @@ class KimiFormulaToolsetTest {
 
     @Test
     fun filteredByEnabledFunctionIds() = runTest {
-        val toolset = KimiFormulaToolset(manifestClient(200, MANIFEST_BODY))
+        val toolset = toolset(manifestClient(200, MANIFEST_BODY))
         val config = config(
             enabledOfficialFunctions = mapOf(
                 OfficialToolIds.KIMI_FORMULAS to setOf("translate"),
@@ -40,7 +40,7 @@ class KimiFormulaToolsetTest {
 
     @Test
     fun emptyWhenEnabledFunctionIdsMatchNothing() = runTest {
-        val toolset = KimiFormulaToolset(manifestClient(200, MANIFEST_BODY))
+        val toolset = toolset(manifestClient(200, MANIFEST_BODY))
         val config = config(
             enabledOfficialFunctions = mapOf(
                 OfficialToolIds.KIMI_FORMULAS to setOf("missing_function"),
@@ -52,7 +52,7 @@ class KimiFormulaToolsetTest {
 
     @Test
     fun allFunctionsWhenMarkerPresent() = runTest {
-        val toolset = KimiFormulaToolset(manifestClient(200, MANIFEST_BODY))
+        val toolset = toolset(manifestClient(200, MANIFEST_BODY))
         val config = config(
             enabledOfficialFunctions = mapOf(
                 OfficialToolIds.KIMI_FORMULAS to
@@ -67,7 +67,7 @@ class KimiFormulaToolsetTest {
 
     @Test
     fun allFunctionsWhenNoConversationConfig() = runTest {
-        val toolset = KimiFormulaToolset(manifestClient(200, MANIFEST_BODY))
+        val toolset = toolset(manifestClient(200, MANIFEST_BODY))
 
         val tools = toolset.resolveTools(config())
 
@@ -76,7 +76,7 @@ class KimiFormulaToolsetTest {
 
     @Test
     fun manifestEmptyWhenNetworkFails() = runTest {
-        val toolset = KimiFormulaToolset(manifestClient(500, "{}"))
+        val toolset = toolset(manifestClient(500, "{}"))
 
         assertTrue(toolset.resolveTools(config()).isEmpty())
     }
@@ -92,6 +92,11 @@ class KimiFormulaToolsetTest {
         fullBaseUrl = "https://example.com",
         officialTools = officialTools,
         enabledOfficialFunctions = enabledOfficialFunctions,
+    )
+
+    private fun toolset(httpClient: OkHttpClient) = KimiFormulaToolset(
+        cache = KimiFormulaCache(httpClient),
+        httpClient = httpClient,
     )
 
     private companion object {

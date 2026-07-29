@@ -1,8 +1,8 @@
 package github.ponyhuang.asssistantai.data.conversation.local
 
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -21,12 +21,27 @@ class ConversationToolConfigurationCodecTest {
                     ),
                 ),
             ),
+            toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
         )
 
         val encoded = ConversationToolConfigurationCodec.encode(configuration)
 
-        assertFalse(encoded.contains("toolAccessMode"))
+        assertEquals(true, encoded.contains("\"toolAccessMode\":\"ALWAYS_AVAILABLE\""))
         assertEquals(configuration, ConversationToolConfigurationCodec.decode(encoded))
+    }
+
+    @Test
+    fun missingToolAccessModeDefaultsToAutomatic() {
+        val decoded = ConversationToolConfigurationCodec.decode(
+            """
+            {
+              "enabledLocalToolIds": ["clock"],
+              "enabledMcpServerIds": ["server-1"]
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(ToolAccessMode.AUTO, decoded?.toolAccessMode)
     }
 
     @Test

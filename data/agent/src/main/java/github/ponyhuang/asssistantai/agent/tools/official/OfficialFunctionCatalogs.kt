@@ -1,12 +1,11 @@
 package github.ponyhuang.asssistantai.agent.tools.official
 
-import github.ponyhuang.asssistantai.agent.tools.official.kimi.KimiFormulaManifest
+import github.ponyhuang.asssistantai.agent.tools.official.kimi.KimiFormulaCache
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.AgentModelConfigurationSource
-import okhttp3.OkHttpClient
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -46,16 +45,11 @@ class DefaultOfficialToolFunctionCatalog @Inject constructor(
 @Singleton
 class KimiFormulaCatalog @Inject constructor(
     private val modelServices: AgentModelConfigurationSource,
-    private val httpClient: OkHttpClient,
+    private val cache: KimiFormulaCache,
 ) {
     suspend fun fetch(): List<OfficialToolFunction> {
         val service = currentMoonshotService() ?: return emptyList()
-        val manifest = KimiFormulaManifest(
-            apiKey = service.apiKey,
-            httpClient = httpClient,
-        )
-        return runCatching { manifest.fetch() }
-            .getOrDefault(emptyList())
+        return cache.fetch(serviceId = service.id, apiKey = service.apiKey)
             .map { declaration ->
                 OfficialToolFunction(
                     id = declaration.name,

@@ -206,6 +206,18 @@ enum class LLMModelType(
         officialToolProtocols = mapOf(
             OfficialToolIds.KIMI_FORMULAS to ApiBaseType.entries,
         ),
+    ),
+    Glm(
+        serviceId = "glm",
+        serviceName = "GLM",
+        defaultBaseUrl = "https://open.bigmodel.cn/api/paas/v4/",
+        defaultBaseType = ApiBaseType.Anthropic,
+        supportedBaseTypes = ApiBaseType.entries,
+        defaultAnthropicBaseUrl = "https://open.bigmodel.cn/api/anthropic",
+        homepageUrl = "https://bigmodel.cn/",
+        keyHelpUrl = "https://bigmodel.cn/usercenter/proj-mgmt/apikeys",
+        docsUrl = "https://docs.bigmodel.cn/",
+        modelsUrl = "https://docs.bigmodel.cn/cn/guide/start/model-overview",
     );
 
     fun toProvider(
@@ -265,6 +277,7 @@ object LLMModelConfigs {
         LLMModelType.OpenAI.toProvider(),
         LLMModelType.Anthropic.toProvider(),
         LLMModelType.Moonshot.toProvider(),
+        LLMModelType.Glm.toProvider(),
     ).sortedBy { it.serviceId }
 
     fun fromServiceId(serviceId: String): LLMModelType? =

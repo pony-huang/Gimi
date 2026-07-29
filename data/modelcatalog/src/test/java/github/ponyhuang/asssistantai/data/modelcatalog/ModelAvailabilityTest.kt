@@ -37,6 +37,19 @@ class ModelAvailabilityTest {
     }
 
     @Test
+    fun builtInGlmExposesBothOpenAiAndAnthropicEndpoints() {
+        val providers = LLMModelConfigs.services.associateBy { it.serviceId }
+
+        val glm = providers.getValue(LLMModelType.Glm.serviceId)
+        assertFalse(glm.isEnabled)
+        assertEquals(ApiBaseType.entries.toSet(), glm.supportedBaseTypes.toSet())
+        assertEquals(ApiBaseType.Anthropic, glm.baseType)
+        assertEquals("https://open.bigmodel.cn/api/paas/v4/", glm.apiBaseUrl)
+        assertEquals("https://open.bigmodel.cn/api/anthropic", glm.anthropicBaseUrl)
+        assertTrue(glm.supportedOfficialTools.isEmpty())
+    }
+
+    @Test
     fun builtInProvidersDeclareTheirOfficialToolIntegrations() {
         val providers = LLMModelConfigs.services.associateBy { it.serviceId }
 

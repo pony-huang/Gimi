@@ -44,7 +44,7 @@ internal interface DynamicToolCandidateSource {
 }
 
 /**
- * Tool search 网关 —— 参考 Kimi「动态加载工具」设计：核心工具固定声明，
+ * Tool search 网关
  * 大量业务工具推迟到模型调用 `tool_search` 后再注入。
  *
  * `LlmAgentTurn` 在每次模型调用前都会重新调用 [getTools]。`tool_search` 命中后

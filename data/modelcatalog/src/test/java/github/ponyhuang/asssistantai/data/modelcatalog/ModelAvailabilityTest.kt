@@ -46,7 +46,14 @@ class ModelAvailabilityTest {
         assertEquals(ApiBaseType.Anthropic, glm.baseType)
         assertEquals("https://open.bigmodel.cn/api/paas/v4/", glm.apiBaseUrl)
         assertEquals("https://open.bigmodel.cn/api/anthropic", glm.anthropicBaseUrl)
-        assertTrue(glm.supportedOfficialTools.isEmpty())
+        assertEquals(
+            listOf(OfficialToolIds.GLM_WEB_SEARCH),
+            glm.supportedOfficialTools,
+        )
+        assertEquals(
+            listOf(OfficialToolIds.GLM_WEB_SEARCH),
+            glm.copy(baseType = ApiBaseType.Standard).supportedOfficialTools,
+        )
     }
 
     @Test

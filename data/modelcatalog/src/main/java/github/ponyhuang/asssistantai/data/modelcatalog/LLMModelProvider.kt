@@ -218,6 +218,9 @@ enum class LLMModelType(
         keyHelpUrl = "https://bigmodel.cn/usercenter/proj-mgmt/apikeys",
         docsUrl = "https://docs.bigmodel.cn/",
         modelsUrl = "https://docs.bigmodel.cn/cn/guide/start/model-overview",
+        officialToolProtocols = mapOf(
+            OfficialToolIds.GLM_WEB_SEARCH to ApiBaseType.entries,
+        ),
     );
 
     fun toProvider(

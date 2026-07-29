@@ -1009,6 +1009,7 @@ private fun toolFilterLabel(filter: SessionToolFilter): String = stringResource(
 private fun officialToolLabel(toolId: String): String = when (toolId) {
     OfficialToolIds.WEB_SEARCH -> stringResource(R.string.chat_official_tool_web_search)
     OfficialToolIds.KIMI_FORMULAS -> stringResource(R.string.chat_official_tool_kimi_formulas)
+    OfficialToolIds.GLM_WEB_SEARCH -> stringResource(R.string.chat_official_tool_glm_web_search)
     else -> toolId
 }
 
@@ -1018,5 +1019,7 @@ private fun officialToolDescription(toolId: String): String = when (toolId) {
         stringResource(R.string.chat_official_tool_web_search_description)
     OfficialToolIds.KIMI_FORMULAS ->
         stringResource(R.string.chat_official_tool_kimi_formulas_description)
+    OfficialToolIds.GLM_WEB_SEARCH ->
+        stringResource(R.string.chat_official_tool_glm_web_search_description)
     else -> stringResource(R.string.chat_official_tool_default_description)
 }

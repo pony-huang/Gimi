@@ -32,6 +32,13 @@ class DefaultOfficialToolFunctionCatalog @Inject constructor(
             ),
         )
         OfficialToolIds.KIMI_FORMULAS -> kimiFormulaCatalog.fetch()
+        OfficialToolIds.GLM_WEB_SEARCH -> listOf(
+            OfficialToolFunction(
+                id = OfficialToolIds.GLM_WEB_SEARCH,
+                name = "网页搜索",
+                description = "搜索最新的互联网信息",
+            ),
+        )
         else -> emptyList()
     }
 }

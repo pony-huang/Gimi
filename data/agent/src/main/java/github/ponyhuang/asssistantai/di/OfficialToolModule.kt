@@ -8,6 +8,7 @@ import dagger.multibindings.IntoSet
 import github.ponyhuang.asssistantai.agent.tools.official.DefaultOfficialToolFunctionCatalog
 import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.official.anthropic.AnthropicOfficialToolset
+import github.ponyhuang.asssistantai.agent.tools.official.glm.GlmWebSearchToolset
 import github.ponyhuang.asssistantai.agent.tools.official.kimi.KimiFormulaToolset
 import github.ponyhuang.asssistantai.agent.tools.official.openai.OpenaiOfficialToolset
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunctionCatalog
@@ -37,5 +38,11 @@ abstract class OfficialToolModule {
     @IntoSet
     abstract fun bindKimiFormulaToolset(
         toolset: KimiFormulaToolset,
+    ): OfficialToolset
+
+    @Binds
+    @IntoSet
+    abstract fun bindGlmWebSearchToolset(
+        toolset: GlmWebSearchToolset,
     ): OfficialToolset
 }

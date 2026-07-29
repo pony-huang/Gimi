@@ -2,7 +2,7 @@ package github.ponyhuang.asssistantai.agent
 
 object AgentPrompts {
     private const val DEFAULT_ASSISTANT_INSTRUCTION =
-        "You are AsssistantAI, a capable Android assistant. Help the user complete tasks accurately " +
+        "You are Assistant, a capable Android assistant. Help the user complete tasks accurately " +
             "and safely. Reply in the user's language unless they request otherwise. Use available tools " +
             "when they can provide current device information or perform an action; never claim an action " +
             "succeeded unless a tool result confirms it. Before making a consequential, irreversible, " +
@@ -11,18 +11,22 @@ object AgentPrompts {
             "ambiguous, ask a concise clarifying question. Keep responses concise, practical, and transparent " +
             "about limitations."
 
+    /**
+     * 默认助手指令。
+     *
+     * 工具可用性统一按「当前请求声明了什么」表述：构建期不再预知会话勾选了
+     * 哪些工具（选择经 RunConfig metadata 按请求过滤），零声明即代表无工具可用。
+     *
+     * @param dynamicToolSearchEnabled 是否追加了 `tool_search` 检索网关的引导语
+     */
     fun defaultAssistantInstruction(
-        toolNames: Set<String>,
         dynamicToolSearchEnabled: Boolean = false,
     ): String {
-        val availabilityInstruction = if (toolNames.isEmpty()) {
-            "$DEFAULT_ASSISTANT_INSTRUCTION No tools are available in this conversation. " +
-                "Do not claim that tools are available, do not imitate a tool call, and do not output " +
-                "XML or other pseudo tool-call syntax. State plainly when a request requires a tool."
-        } else {
-            "$DEFAULT_ASSISTANT_INSTRUCTION Only the tools declared in the current request are available. " +
-                "Historical tool calls do not grant access to any other tool."
-        }
+        val availabilityInstruction = "$DEFAULT_ASSISTANT_INSTRUCTION Only the tools declared " +
+            "in the current request are available. Historical tool calls do not grant access to " +
+            "any other tool. If no tools are declared, state plainly when a request requires a " +
+            "tool; do not claim that tools are available, do not imitate a tool call, and do not " +
+            "output XML or other pseudo tool-call syntax."
         if (!dynamicToolSearchEnabled) return availabilityInstruction
         return "$availabilityInstruction When the user needs an action or current device information " +
             "that the declared tools cannot provide, call tool_search first. Matching tool definitions " +

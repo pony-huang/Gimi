@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.agent.tools.official.glm
 
 import github.ponyhuang.asssistantai.agent.ModelConfig
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import kotlinx.coroutines.test.runTest
@@ -20,14 +21,26 @@ class GlmWebSearchToolsetTest {
         val toolset = GlmWebSearchToolset(OkHttpClient())
         val config = config(officialTools = emptyList())
 
-        assertTrue(toolset.resolveTools(config).isEmpty())
+        assertTrue(toolset.resolveTools(config, selection = null).isEmpty())
+    }
+
+    @Test
+    fun notApplicableWhenConversationSelectionExcludesIt() = runTest {
+        val toolset = GlmWebSearchToolset(OkHttpClient())
+        val selection = ConversationToolConfiguration(
+            enabledOfficialFunctionIdsByService = mapOf(
+                "glm" to mapOf(OfficialToolIds.GLM_WEB_SEARCH to emptySet()),
+            ),
+        )
+
+        assertTrue(toolset.resolveTools(config(), selection).isEmpty())
     }
 
     @Test
     fun resolvesSingleWebSearchTool() = runTest {
         val toolset = GlmWebSearchToolset(OkHttpClient())
 
-        val tools = toolset.resolveTools(config())
+        val tools = toolset.resolveTools(config(), selection = null)
 
         assertEquals(listOf(GlmWebSearchTool.NAME), tools.map { it.name })
         assertEquals(
@@ -41,7 +54,7 @@ class GlmWebSearchToolsetTest {
         val toolset = GlmWebSearchToolset(OkHttpClient())
         val config = config(baseType = ApiProtocol.Anthropic)
 
-        assertEquals(1, toolset.resolveTools(config).size)
+        assertEquals(1, toolset.resolveTools(config, selection = null).size)
     }
 
     private fun config(

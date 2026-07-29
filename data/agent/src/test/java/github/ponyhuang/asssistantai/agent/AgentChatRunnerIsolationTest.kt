@@ -3,6 +3,7 @@ package github.ponyhuang.asssistantai.agent
 import com.google.adk.kt.agents.LlmAgent
 import com.google.adk.kt.sessions.SessionService
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import android.util.Log
 import io.mockk.every
@@ -41,7 +42,7 @@ class AgentChatRunnerIsolationTest {
     fun sessionsOwnIndependentRunnersAndConfirmationReusesItsSessionRunner() = runTest {
         val createdSelections = mutableListOf<ModelSelection?>()
         val runner = AgentChatRunner(
-            factory = { selection ->
+            factory = { selection, _ ->
                 createdSelections += selection
                 mockk<LlmAgent>(relaxed = true)
             },
@@ -69,7 +70,7 @@ class AgentChatRunnerIsolationTest {
         var revision = 0
         var creations = 0
         val runner = AgentChatRunner(
-            factory = {
+            factory = { _, _ ->
                 creations += 1
                 mockk<LlmAgent>(relaxed = true)
             },
@@ -94,7 +95,7 @@ class AgentChatRunnerIsolationTest {
     fun runnerCacheEvictsLeastRecentlyUsedSession() = runTest {
         var creations = 0
         val runner = AgentChatRunner(
-            factory = {
+            factory = { _, _ ->
                 creations += 1
                 mockk<LlmAgent>(relaxed = true)
             },
@@ -111,10 +112,10 @@ class AgentChatRunnerIsolationTest {
     }
 
     @Test
-    fun conversationToolConfigurationChangeRebuildsOnlyThatSession() = runTest {
+    fun conversationToolSelectionChangeDoesNotRebuildRunner() = runTest {
         var creations = 0
         val runner = AgentChatRunner(
-            factory = { _, _, _ ->
+            factory = { _, _ ->
                 creations += 1
                 mockk<LlmAgent>(relaxed = true)
             },
@@ -129,7 +130,43 @@ class AgentChatRunnerIsolationTest {
 
         runner.send("user", "session-a", selection, "a", toolConfiguration = clockOnly)
         runner.send("user", "session-b", selection, "b", toolConfiguration = clockOnly)
+        // 会话内工具勾选变化经 RunConfig metadata 透传，不触发 Agent 重建。
         runner.send("user", "session-a", selection, "a2", toolConfiguration = clockAndLocation)
+
+        assertEquals(2, creations)
+    }
+
+    @Test
+    fun toolAccessModeChangeRebuildsOnlyThatSession() = runTest {
+        var creations = 0
+        val runner = AgentChatRunner(
+            factory = { _, _ ->
+                creations += 1
+                mockk<LlmAgent>(relaxed = true)
+            },
+            sessionService = mockk<SessionService>(relaxed = true),
+            artifactService = null,
+        )
+        val selection = ModelSelection("service", "group", "model")
+
+        runner.send(
+            "user", "session-a", selection, "a",
+            toolConfiguration = ConversationToolConfiguration(
+                toolAccessMode = ToolAccessMode.AUTO,
+            ),
+        )
+        runner.send(
+            "user", "session-b", selection, "b",
+            toolConfiguration = ConversationToolConfiguration(
+                toolAccessMode = ToolAccessMode.AUTO,
+            ),
+        )
+        runner.send(
+            "user", "session-a", selection, "a2",
+            toolConfiguration = ConversationToolConfiguration(
+                toolAccessMode = ToolAccessMode.ON_DEMAND,
+            ),
+        )
 
         assertEquals(3, creations)
     }

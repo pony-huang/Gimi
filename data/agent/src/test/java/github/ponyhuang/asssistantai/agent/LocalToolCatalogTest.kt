@@ -67,13 +67,12 @@ class LocalToolCatalogTest {
     }
 
     @Test
-    fun appFunctionToolFilteringRemovesConfirmationRequiredTools() {
-        val filteredIds = excludeConfirmationRequiredTools(catalog().tools())
-            .mapTo(mutableSetOf()) { it.name }
+    fun confirmationRequiredToolIdsAreResolvedOnceAtCatalogLevel() {
+        val confirmationIds = catalog().confirmationRequiredToolIds
 
-        assertTrue("get_current_time" in filteredIds)
-        assertFalse("get_current_location" in filteredIds)
-        assertFalse("list_calendars" in filteredIds)
+        assertTrue("list_calendars" in confirmationIds)
+        assertTrue("get_current_location" in confirmationIds)
+        assertFalse("get_current_time" in confirmationIds)
     }
 
     private fun catalog() = LocalToolCatalog(

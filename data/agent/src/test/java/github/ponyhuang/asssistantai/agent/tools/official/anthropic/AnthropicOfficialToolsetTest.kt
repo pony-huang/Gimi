@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.agent.tools.official.anthropic
 
 import github.ponyhuang.asssistantai.agent.ModelConfig
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import kotlinx.coroutines.test.runTest
@@ -19,6 +20,7 @@ class AnthropicOfficialToolsetTest {
                 serviceId = "custom-anthropic-service",
                 officialTools = listOf(OfficialToolIds.WEB_SEARCH),
             ),
+            selection = null,
         )
 
         assertEquals(listOf(OfficialToolIds.WEB_SEARCH), tools.map { it.name })
@@ -32,6 +34,7 @@ class AnthropicOfficialToolsetTest {
                 baseType = ApiProtocol.Standard,
                 officialTools = listOf(OfficialToolIds.WEB_SEARCH),
             ),
+            selection = null,
         )
 
         assertTrue(tools.isEmpty())
@@ -39,12 +42,31 @@ class AnthropicOfficialToolsetTest {
 
     @Test
     fun ignoresDisabledAndUnsupportedTools() = runTest {
-        assertTrue(toolset.resolveTools(config("anthropic", officialTools = emptyList())).isEmpty())
+        assertTrue(
+            toolset.resolveTools(config("anthropic", officialTools = emptyList()), null).isEmpty(),
+        )
         assertTrue(
             toolset.resolveTools(
                 config("anthropic", officialTools = listOf(OfficialToolIds.KIMI_FORMULAS)),
+                selection = null,
             ).isEmpty(),
         )
+    }
+
+    @Test
+    fun dropsToolWhenConversationSelectionExcludesIt() = runTest {
+        val selection = ConversationToolConfiguration(
+            enabledOfficialFunctionIdsByService = mapOf(
+                "anthropic" to mapOf(OfficialToolIds.WEB_SEARCH to emptySet()),
+            ),
+        )
+
+        val tools = toolset.resolveTools(
+            config("anthropic", officialTools = listOf(OfficialToolIds.WEB_SEARCH)),
+            selection,
+        )
+
+        assertTrue(tools.isEmpty())
     }
 
     private fun config(

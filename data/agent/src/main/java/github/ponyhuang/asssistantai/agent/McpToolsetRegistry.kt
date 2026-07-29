@@ -15,15 +15,16 @@ import kotlinx.coroutines.sync.withLock
  * 替代了旧的 [McpToolRegistry]，采用 [McpToolset] 的会话池化、自动恢复和重试机制，
  * 代替原来每次发现和执行都新建连接的方式。
  *
- * 工具集按 `(revision, selectedServerIds)` 缓存，revision 变化时旧会话自动关闭。
+ * 工具集按 `(revision, selectedServerIds)` 做小容量 LRU 缓存；revision 变化时
+ * 全部关闭重建。不同会话的服务器选择交替出现时各自命中缓存，不会反复关闭重连。
  */
 @Singleton
 class McpToolsetRegistry @Inject constructor(
     private val servers: McpRepository,
 ) {
     private val mutex = Mutex()
-    private var cachedKey: CacheKey? = null
-    private var cachedHandles: List<McpToolsetHandle> = emptyList()
+    private val cache = LinkedHashMap<CacheKey, List<McpToolsetHandle>>(8, 0.75f, true)
+    private var cachedRevision: Long? = null
 
     /**
      * 返回当前启用的 MCP 服务器对应的 [McpToolset] 列表及工具名称集合。
@@ -33,15 +34,13 @@ class McpToolsetRegistry @Inject constructor(
     suspend fun resolve(
         selectedServerIds: Set<String>? = null,
     ): McpToolsetResolution = mutex.withLock {
-        val key = CacheKey(servers.revision.value, selectedServerIds)
-        if (key == cachedKey) {
-            return@withLock McpToolsetResolution(cachedHandles)
+        val revision = servers.revision.value
+        if (cachedRevision != revision) {
+            closeAll()
+            cachedRevision = revision
         }
-
-        // 关闭旧的工具集（释放会话和传输资源）
-        cachedHandles.forEach { handle ->
-            runCatching { handle.toolset.close() }
-        }
+        val key = CacheKey(revision, selectedServerIds)
+        cache[key]?.let { return@withLock McpToolsetResolution(it) }
 
         val selected = selectMcpServers(servers.currentServers(), selectedServerIds)
         val handles = selected
@@ -56,15 +55,32 @@ class McpToolsetRegistry @Inject constructor(
                 }.getOrNull()
             }
 
-        cachedKey = key
-        cachedHandles = handles
+        cache[key] = handles
+        // 超出容量时淘汰最久未用的条目并关闭其连接，避免传输资源泄漏。
+        while (cache.size > MAX_CACHED_SELECTIONS) {
+            val eldest = cache.entries.first()
+            eldest.value.forEach { handle -> runCatching { handle.toolset.close() } }
+            cache.remove(eldest.key)
+        }
         McpToolsetResolution(handles)
+    }
+
+    /** 关闭并清空全部缓存的工具集（释放会话和传输资源）。 */
+    private fun closeAll() {
+        cache.values.flatten().forEach { handle ->
+            runCatching { handle.toolset.close() }
+        }
+        cache.clear()
     }
 
     private data class CacheKey(
         val revision: Long,
         val selectedServerIds: Set<String>?,
     )
+
+    private companion object {
+        const val MAX_CACHED_SELECTIONS: Int = 4
+    }
 }
 
 /**

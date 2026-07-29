@@ -94,12 +94,11 @@ object AgentModule {
         mcpRepository: McpRepository,
         plugins: List<@JvmSuppressWildcards Plugin>,
     ): AgentChatRunner = AgentChatRunner(
-        factory = { selection, allowConfirmationRequiredTools, toolConfiguration ->
+        factory = { selection, toolAccessMode ->
             modelServices.awaitReady()
             agentFactory.create(
                 selection = selection,
-                allowConfirmationRequiredTools = allowConfirmationRequiredTools,
-                toolConfiguration = toolConfiguration,
+                toolAccessMode = toolAccessMode,
             )
         },
         sessionService = sessionService,

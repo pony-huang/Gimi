@@ -19,6 +19,7 @@ class OpenaiOfficialToolsetTest {
                 serviceId = "custom-standard-service",
                 officialTools = listOf(OfficialToolIds.WEB_SEARCH),
             ),
+            selection = null,
         )
 
         assertEquals(listOf(OfficialToolIds.WEB_SEARCH), tools.map { it.name })
@@ -32,6 +33,7 @@ class OpenaiOfficialToolsetTest {
                 baseType = ApiProtocol.Anthropic,
                 officialTools = listOf(OfficialToolIds.WEB_SEARCH),
             ),
+            selection = null,
         )
 
         assertTrue(tools.isEmpty())
@@ -39,10 +41,13 @@ class OpenaiOfficialToolsetTest {
 
     @Test
     fun ignoresDisabledAndUnsupportedTools() = runTest {
-        assertTrue(toolset.resolveTools(config("openai", officialTools = emptyList())).isEmpty())
+        assertTrue(
+            toolset.resolveTools(config("openai", officialTools = emptyList()), null).isEmpty(),
+        )
         assertTrue(
             toolset.resolveTools(
                 config("openai", officialTools = listOf(OfficialToolIds.KIMI_FORMULAS)),
+                selection = null,
             ).isEmpty(),
         )
     }

@@ -8,6 +8,7 @@ import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.FunctionDeclaration
 import github.ponyhuang.asssistantai.agent.ConfiguredModel
 import github.ponyhuang.asssistantai.agent.ModelConfig
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import io.mockk.mockk
 import kotlinx.coroutines.async
@@ -75,7 +76,10 @@ class OfficialToolsetRequestTest {
     private class FakeOfficialToolset : OfficialToolset {
         val seenConfigurations = mutableListOf<ModelConfig>()
 
-        override suspend fun resolveTools(config: ModelConfig): List<BaseTool> {
+        override suspend fun resolveTools(
+            config: ModelConfig,
+            selection: ConversationToolConfiguration?,
+        ): List<BaseTool> {
             seenConfigurations += config
             return config.officialTools.map(::DeclarationTool)
         }

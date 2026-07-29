@@ -4,6 +4,7 @@ import com.google.adk.kt.agents.ReadonlyContext
 import com.google.adk.kt.agents.RunConfig
 import com.google.adk.kt.artifacts.ArtifactService
 import com.google.adk.kt.events.Event
+import com.google.adk.kt.events.EventActions
 import com.google.adk.kt.memory.MemoryService
 import com.google.adk.kt.sessions.Session
 import com.google.adk.kt.sessions.SessionKey
@@ -17,13 +18,15 @@ import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class DynamicToolAccessToolsetTest {
+class ToolSearchToolsetTest {
 
     @Test
     fun onDemandStartsWithOnlyToolSearch() = runTest {
@@ -37,7 +40,7 @@ class DynamicToolAccessToolsetTest {
 
     @Test
     fun alwaysAvailableExposesEveryUnambiguousToolWithoutSearch() = runTest {
-        val toolset = DynamicToolAccessToolset(
+        val toolset = ToolSearchToolset(
             mode = ToolAccessMode.ALWAYS_AVAILABLE,
             sources = listOf(
                 source("local", tool("set_alarm"), tool("get_location")),
@@ -54,12 +57,12 @@ class DynamicToolAccessToolsetTest {
     @Test
     fun automaticModeLoadsSmallCatalogAndSearchesLargeCatalog() = runTest {
         val budget = ToolAccessBudget(maxTools = 2, maxSchemaBytes = 16 * 1024)
-        val small = DynamicToolAccessToolset(
+        val small = ToolSearchToolset(
             mode = ToolAccessMode.AUTO,
             sources = listOf(source("local", tool("one"), tool("two"))),
             budget = budget,
         )
-        val large = DynamicToolAccessToolset(
+        val large = ToolSearchToolset(
             mode = ToolAccessMode.AUTO,
             sources = listOf(source("local", tool("one"), tool("two"), tool("three"))),
             budget = budget,
@@ -71,7 +74,7 @@ class DynamicToolAccessToolsetTest {
 
     @Test
     fun automaticModeFallsBackToSearchWhenAnySourceFails() = runTest {
-        val toolset = DynamicToolAccessToolset(
+        val toolset = ToolSearchToolset(
             mode = ToolAccessMode.AUTO,
             sources = listOf(
                 source("local", tool("set_alarm")),
@@ -84,7 +87,7 @@ class DynamicToolAccessToolsetTest {
 
     @Test
     fun searchRanksNamesBeforeDescriptionsAndAppliesTheBudget() = runTest {
-        val toolset = DynamicToolAccessToolset(
+        val toolset = ToolSearchToolset(
             mode = ToolAccessMode.ON_DEMAND,
             sources = listOf(
                 source(
@@ -97,7 +100,7 @@ class DynamicToolAccessToolsetTest {
             budget = ToolAccessBudget(maxTools = 2, maxSchemaBytes = 16 * 1024),
         )
 
-        val result = toolset.search("calendar", context())
+        val result = toolset.search("calendar", toolContext(context()))
         val loaded = result.loadedToolNames()
 
         assertEquals(listOf("calendar_search", "create_calendar_event"), loaded)
@@ -107,18 +110,53 @@ class DynamicToolAccessToolsetTest {
     }
 
     @Test
+    fun successfulSearchPersistsTheSelectionIntoSessionState() = runTest {
+        val toolset = toolset(
+            mode = ToolAccessMode.ON_DEMAND,
+            tools = listOf(tool("set_alarm"), tool("get_location")),
+        )
+        val actions = EventActions()
+
+        toolset.search("alarm", toolContext(context(), actions))
+
+        assertEquals(
+            listOf("set_alarm"),
+            actions.stateDelta[ToolSearchToolset.STATE_KEY_LOADED_TOOLS],
+        )
+    }
+
+    @Test
+    fun persistedStateSelectionSurvivesIntoANewInvocation() = runTest {
+        val toolset = toolset(
+            mode = ToolAccessMode.ON_DEMAND,
+            tools = listOf(tool("set_alarm"), tool("get_location")),
+        )
+        // 模拟新一轮用户请求：无任何当前 invocation 事件，只有持久化的 session state。
+        val newTurnContext = context(
+            state = mapOf(
+                ToolSearchToolset.STATE_KEY_LOADED_TOOLS to listOf("set_alarm"),
+            ),
+        )
+
+        assertEquals(
+            listOf(TOOL_SEARCH_NAME, "set_alarm"),
+            toolset.getTools(newTurnContext).map(BaseTool::name),
+        )
+    }
+
+    @Test
     fun bestOversizedMatchCanUseTheBudgetAlone() = runTest {
         val oversized = tool(
             name = "large_tool",
             description = "large ".repeat(200),
         )
-        val toolset = DynamicToolAccessToolset(
+        val toolset = ToolSearchToolset(
             mode = ToolAccessMode.ON_DEMAND,
             sources = listOf(source("local", oversized, tool("large_backup"))),
             budget = ToolAccessBudget(maxTools = 8, maxSchemaBytes = 100),
         )
 
-        val result = toolset.search("large_tool", context())
+        val result = toolset.search("large_tool", toolContext(context()))
 
         assertEquals(listOf("large_tool"), result.loadedToolNames())
         assertEquals(1, result["omitted_match_count"])
@@ -174,7 +212,7 @@ class DynamicToolAccessToolsetTest {
     }
 
     @Test
-    fun aNewInvocationDoesNotInheritThePreviousSelection() = runTest {
+    fun aNewInvocationDoesNotInheritThePreviousSelectionWithoutPersistedState() = runTest {
         val toolset = toolset(
             mode = ToolAccessMode.ON_DEMAND,
             tools = listOf(tool("set_alarm"), tool("get_location")),
@@ -184,6 +222,7 @@ class DynamicToolAccessToolsetTest {
             listOf(TOOL_SEARCH_NAME, "set_alarm"),
             toolset.getTools(context(searchEvent("set_alarm"))).map(BaseTool::name),
         )
+        // 没有持久化 state 时（兼容旧会话），新 invocation 不继承上一轮的选择。
         assertEquals(
             listOf(TOOL_SEARCH_NAME),
             toolset.getTools(context()).map(BaseTool::name),
@@ -209,7 +248,7 @@ class DynamicToolAccessToolsetTest {
 
     @Test
     fun duplicateCallableNamesAreNeverLoaded() = runTest {
-        val toolset = DynamicToolAccessToolset(
+        val toolset = ToolSearchToolset(
             mode = ToolAccessMode.ON_DEMAND,
             sources = listOf(
                 source("local", tool("duplicate"), tool("unique")),
@@ -217,7 +256,7 @@ class DynamicToolAccessToolsetTest {
             ),
         )
 
-        val result = toolset.search("duplicate", context())
+        val result = toolset.search("duplicate", toolContext(context()))
 
         assertTrue(result.loadedToolNames().isEmpty())
         assertTrue((result["ambiguous_tools"] as List<*>).isNotEmpty())
@@ -225,12 +264,12 @@ class DynamicToolAccessToolsetTest {
 
     @Test
     fun sourceFailuresAreSanitizedInSearchResults() = runTest {
-        val toolset = DynamicToolAccessToolset(
+        val toolset = ToolSearchToolset(
             mode = ToolAccessMode.ON_DEMAND,
             sources = listOf(failingSource("private-server")),
         )
 
-        val result = toolset.search("files", context())
+        val result = toolset.search("files", toolContext(context()))
         val errors = result["source_errors"] as List<*>
 
         assertEquals(1, errors.size)
@@ -241,7 +280,7 @@ class DynamicToolAccessToolsetTest {
     private fun toolset(
         mode: ToolAccessMode,
         tools: List<BaseTool>,
-    ): DynamicToolAccessToolset = DynamicToolAccessToolset(
+    ): ToolSearchToolset = ToolSearchToolset(
         mode = mode,
         sources = listOf(source("local", *tools.toTypedArray())),
     )
@@ -275,8 +314,20 @@ class DynamicToolAccessToolsetTest {
         description: String = name,
     ): BaseTool = DeclarationTool(name, description)
 
-    private fun context(vararg events: Event): ReadonlyContext =
-        FakeReadonlyContext(events.toList())
+    private fun context(
+        vararg events: Event,
+        state: Map<String, Any> = emptyMap(),
+    ): ReadonlyContext = FakeReadonlyContext(events.toList(), state)
+
+    private fun toolContext(
+        readonlyContext: ReadonlyContext,
+        actions: EventActions = EventActions(),
+    ): ToolContext {
+        val toolContext = mockk<ToolContext>()
+        every { toolContext.context } returns readonlyContext
+        every { toolContext.actions } returns actions
+        return toolContext
+    }
 
     private fun searchEvent(
         vararg names: String,
@@ -332,6 +383,7 @@ class DynamicToolAccessToolsetTest {
 
     private class FakeReadonlyContext(
         private val events: List<Event>,
+        override val state: Map<String, Any> = emptyMap(),
     ) : ReadonlyContext {
         override val session: Session = Session(
             SessionKey("app", "user", "session"),
@@ -340,7 +392,6 @@ class DynamicToolAccessToolsetTest {
         override val runConfig: RunConfig? = null
         override val invocationId: String = INVOCATION_ID
         override val agentName: String = "Assistant"
-        override val state: Map<String, Any> = emptyMap()
         override val userId: String = "user"
         override val userContent: Content? = null
         override val branch: String? = null

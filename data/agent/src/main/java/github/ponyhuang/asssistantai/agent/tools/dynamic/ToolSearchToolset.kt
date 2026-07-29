@@ -33,7 +33,8 @@ internal data class ToolAccessBudget(
  * 可供动态检索的一个工具来源。
  *
  * 来源只负责在本机解析 [BaseTool]；是否向模型暴露以及失败隔离由
- * [DynamicToolAccessToolset] 统一处理。
+ * [ToolSearchToolset] 统一处理。来源自身可以按 invocation 上下文
+ * （RunConfig metadata）做会话级过滤。
  */
 internal interface DynamicToolCandidateSource {
     val id: String
@@ -43,13 +44,16 @@ internal interface DynamicToolCandidateSource {
 }
 
 /**
- * 按会话模式和当前 invocation 的搜索事件动态生成 ADK 工具列表。
+ * Tool search 网关 —— 参考 Kimi「动态加载工具」设计：核心工具固定声明，
+ * 大量业务工具推迟到模型调用 `tool_search` 后再注入。
  *
- * `LlmAgentTurn` 在每次模型调用前都会重新调用 [getTools]。因此 `tool_search`
- * 的函数响应一旦写入当前 invocation，下一步即可同时注册声明和执行实例；
- * 确认恢复时也能从同一 invocation 的持久化事件恢复，不依赖进程内选择状态。
+ * `LlmAgentTurn` 在每次模型调用前都会重新调用 [getTools]。`tool_search` 命中后
+ * 选中的工具名会写入 session state（[STATE_KEY_LOADED_TOOLS]），后续请求 —— 包括
+ * 新的用户轮次 —— 都继续携带这些工具声明，保持请求前缀稳定（前缀缓存友好），
+ * 模型也不需要每轮重新检索。确认恢复时同样从持久化 state 重建选择，不依赖
+ * 进程内状态。
  */
-internal class DynamicToolAccessToolset(
+internal class ToolSearchToolset(
     private val mode: ToolAccessMode,
     private val sources: List<DynamicToolCandidateSource>,
     private val budget: ToolAccessBudget = ToolAccessBudget(),
@@ -60,7 +64,7 @@ internal class DynamicToolAccessToolset(
     private val searchTool = ToolSearchTool(this)
 
     override suspend fun getTools(readonlyContext: ReadonlyContext?): List<BaseTool> {
-        val selectedNames = latestSuccessfulSelection(readonlyContext)
+        val selectedNames = latestSelection(readonlyContext)
         if (selectedNames != null) {
             return listOf(searchTool) + resolveSelectedTools(selectedNames, readonlyContext)
         }
@@ -80,12 +84,12 @@ internal class DynamicToolAccessToolset(
 
     internal suspend fun search(
         rawQuery: String,
-        readonlyContext: ReadonlyContext?,
+        toolContext: ToolContext,
     ): Map<String, Any> {
         val query = rawQuery.trim()
         if (query.isEmpty()) return unchangedSearchResult()
 
-        val discovery = discover(readonlyContext)
+        val discovery = discover(toolContext.context)
         val ranked = discovery.uniqueCandidates
             .mapNotNull { candidate ->
                 searchScore(query, candidate)?.let { score -> candidate to score }
@@ -103,6 +107,9 @@ internal class DynamicToolAccessToolset(
                 sourceErrors = discovery.sourceErrors,
             )
         }
+
+        // 命中即持久化：写入 session state，后续请求（含新用户轮次）继续携带这些声明。
+        toolContext.actions.stateDelta[STATE_KEY_LOADED_TOOLS] = selected.map { it.tool.name }
 
         return mapOf(
             KEY_LOADED_TOOLS to selected.map { it.summary() },
@@ -165,10 +172,18 @@ internal class DynamicToolAccessToolset(
         Discovery.from(candidates, failures)
     }
 
-    private suspend fun latestSuccessfulSelection(
+    /**
+     * 当前生效的工具选择：优先读 session state 中持久化的选择（跨轮保留）；
+     * 无记录时回退到当前 invocation 的 `tool_search` 事件扫描（兼容 state delta
+     * 尚未合并进 session 的窗口期）。
+     */
+    private suspend fun latestSelection(
         readonlyContext: ReadonlyContext?,
     ): List<String>? {
         if (readonlyContext == null) return null
+        val persisted = readonlyContext.state[STATE_KEY_LOADED_TOOLS] as? List<*>
+        val persistedNames = persisted?.filterIsInstance<String>().orEmpty()
+        if (persistedNames.isNotEmpty()) return persistedNames
         val events = readonlyContext.getEvents(currentInvocation = true)
         return events.asReversed()
             .asSequence()
@@ -263,7 +278,7 @@ internal class DynamicToolAccessToolset(
         }
 
     private class ToolSearchTool(
-        private val owner: DynamicToolAccessToolset,
+        private val owner: ToolSearchToolset,
     ) : BaseTool(
         name = TOOL_SEARCH_NAME,
         description = TOOL_SEARCH_DESCRIPTION,
@@ -288,22 +303,25 @@ internal class DynamicToolAccessToolset(
             args: Map<String, Any>,
         ): Any = owner.search(
             rawQuery = args[ARG_QUERY] as? String ?: "",
-            readonlyContext = context.context,
+            toolContext = context,
         )
     }
 
-    private companion object {
-        const val NO_INVOCATION_ID = "__no_invocation__"
-        const val ARG_QUERY = "query"
-        const val KEY_LOADED_TOOLS = "loaded_tools"
-        const val KEY_OMITTED_MATCH_COUNT = "omitted_match_count"
-        const val KEY_AMBIGUOUS_TOOLS = "ambiguous_tools"
-        const val KEY_SOURCE_ERRORS = "source_errors"
-        const val KEY_SELECTION_CHANGED = "selection_changed"
-        const val MAX_DESCRIPTION_LENGTH = 240
-        val SEARCH_SEPARATOR = Regex("[^\\p{L}\\p{N}]+")
-        val MULTIPLE_SPACES = Regex("\\s+")
-        const val TOOL_SEARCH_DESCRIPTION =
+    internal companion object {
+        /** session state 中持久化 `tool_search` 选中工具名的 key。 */
+        const val STATE_KEY_LOADED_TOOLS: String = "selkie.tool_search.loaded_tools"
+
+        private const val NO_INVOCATION_ID = "__no_invocation__"
+        private const val ARG_QUERY = "query"
+        private const val KEY_LOADED_TOOLS = "loaded_tools"
+        private const val KEY_OMITTED_MATCH_COUNT = "omitted_match_count"
+        private const val KEY_AMBIGUOUS_TOOLS = "ambiguous_tools"
+        private const val KEY_SOURCE_ERRORS = "source_errors"
+        private const val KEY_SELECTION_CHANGED = "selection_changed"
+        private const val MAX_DESCRIPTION_LENGTH = 240
+        private val SEARCH_SEPARATOR = Regex("[^\\p{L}\\p{N}]+")
+        private val MULTIPLE_SPACES = Regex("\\s+")
+        private const val TOOL_SEARCH_DESCRIPTION =
             "Searches enabled local, MCP, and formula tools by capability. Matching tool " +
                 "definitions become available in the next model step."
     }

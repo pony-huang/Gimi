@@ -21,19 +21,27 @@ class KimiFormulaToolsetTest {
         val toolset = toolset(manifestClient(200, MANIFEST_BODY))
         val config = config(officialTools = emptyList())
 
-        assertTrue(toolset.resolveTools(config).isEmpty())
+        assertTrue(toolset.resolveTools(config, selection = null).isEmpty())
+    }
+
+    @Test
+    fun emptyWhenToolAbsentFromConversationSelection() = runTest {
+        val toolset = toolset(manifestClient(200, MANIFEST_BODY))
+        val selection = ConversationToolConfiguration(
+            enabledOfficialFunctionIdsByService = mapOf(
+                SERVICE_ID to mapOf("web_search" to setOf("web_search")),
+            ),
+        )
+
+        assertTrue(toolset.resolveTools(config(), selection).isEmpty())
     }
 
     @Test
     fun filteredByEnabledFunctionIds() = runTest {
         val toolset = toolset(manifestClient(200, MANIFEST_BODY))
-        val config = config(
-            enabledOfficialFunctions = mapOf(
-                OfficialToolIds.KIMI_FORMULAS to setOf("translate"),
-            ),
-        )
+        val selection = selection(OfficialToolIds.KIMI_FORMULAS to setOf("translate"))
 
-        val tools = toolset.resolveTools(config)
+        val tools = toolset.resolveTools(config(), selection)
 
         assertEquals(listOf("translate"), tools.map { it.name })
     }
@@ -41,26 +49,20 @@ class KimiFormulaToolsetTest {
     @Test
     fun emptyWhenEnabledFunctionIdsMatchNothing() = runTest {
         val toolset = toolset(manifestClient(200, MANIFEST_BODY))
-        val config = config(
-            enabledOfficialFunctions = mapOf(
-                OfficialToolIds.KIMI_FORMULAS to setOf("missing_function"),
-            ),
-        )
+        val selection = selection(OfficialToolIds.KIMI_FORMULAS to setOf("missing_function"))
 
-        assertTrue(toolset.resolveTools(config).isEmpty())
+        assertTrue(toolset.resolveTools(config(), selection).isEmpty())
     }
 
     @Test
     fun allFunctionsWhenMarkerPresent() = runTest {
         val toolset = toolset(manifestClient(200, MANIFEST_BODY))
-        val config = config(
-            enabledOfficialFunctions = mapOf(
-                OfficialToolIds.KIMI_FORMULAS to
-                        setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
-            ),
+        val selection = selection(
+            OfficialToolIds.KIMI_FORMULAS to
+                    setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
         )
 
-        val tools = toolset.resolveTools(config)
+        val tools = toolset.resolveTools(config(), selection)
 
         assertEquals(listOf("translate"), tools.map { it.name })
     }
@@ -69,7 +71,7 @@ class KimiFormulaToolsetTest {
     fun allFunctionsWhenNoConversationConfig() = runTest {
         val toolset = toolset(manifestClient(200, MANIFEST_BODY))
 
-        val tools = toolset.resolveTools(config())
+        val tools = toolset.resolveTools(config(), selection = null)
 
         assertEquals(listOf("translate"), tools.map { it.name })
     }
@@ -78,20 +80,24 @@ class KimiFormulaToolsetTest {
     fun manifestEmptyWhenNetworkFails() = runTest {
         val toolset = toolset(manifestClient(500, "{}"))
 
-        assertTrue(toolset.resolveTools(config()).isEmpty())
+        assertTrue(toolset.resolveTools(config(), selection = null).isEmpty())
     }
 
     private fun config(
         officialTools: List<String> = listOf(OfficialToolIds.KIMI_FORMULAS),
-        enabledOfficialFunctions: Map<String, Set<String>> = emptyMap(),
     ) = ModelConfig(
-        serviceId = "service",
+        serviceId = SERVICE_ID,
         baseType = ApiProtocol.Standard,
         modelId = "model",
         apiKey = "key",
         fullBaseUrl = "https://example.com",
         officialTools = officialTools,
-        enabledOfficialFunctions = enabledOfficialFunctions,
+    )
+
+    private fun selection(
+        vararg functionsByTool: Pair<String, Set<String>>,
+    ) = ConversationToolConfiguration(
+        enabledOfficialFunctionIdsByService = mapOf(SERVICE_ID to mapOf(*functionsByTool)),
     )
 
     private fun toolset(httpClient: OkHttpClient) = KimiFormulaToolset(
@@ -100,6 +106,7 @@ class KimiFormulaToolsetTest {
     )
 
     private companion object {
+        const val SERVICE_ID = "service"
         const val MANIFEST_BODY =
             """{"tools":[{"function":{"name":"translate","description":"Translate text"}}]}"""
 

@@ -5,7 +5,6 @@ import com.google.adk.kt.models.Model
 import com.openai.client.okhttp.OpenAIOkHttpClient
 import github.ponyhuang.asssistantai.agent.model.Claude
 import github.ponyhuang.asssistantai.agent.model.Openai
-import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ResolvedAgentModel
@@ -15,6 +14,9 @@ import javax.inject.Singleton
 
 /**
  * 解析后的模型配置（[AgentLLMModelFactory.createModel] 用）。
+ *
+ * 只描述服务级能力（协议、端点、支持的官方工具）；会话级工具勾选
+ * 通过 RunConfig metadata 透传，由各 Toolset 按请求自行过滤。
  */
 data class ModelConfig(
     val serviceId: String,
@@ -23,26 +25,7 @@ data class ModelConfig(
     val apiKey: String,
     val fullBaseUrl: String,
     val officialTools: List<String> = emptyList(),
-    /**
-     * Per-tool set of enabled function ids for [officialTools]. Empty set means
-     * "tool enabled but no specific function"; the absence of an entry means
-     * "tool not selected for this conversation".
-     */
-    val enabledOfficialFunctions: Map<String, Set<String>> = emptyMap(),
 )
-
-internal fun ModelConfig.forConversation(
-    configuration: ConversationToolConfiguration,
-): ModelConfig {
-    val functionsByTool = configuration.enabledOfficialFunctionIdsByService[serviceId].orEmpty()
-    val enabledTools = officialTools.filter { toolId ->
-        functionsByTool[toolId].orEmpty().isNotEmpty()
-    }
-    return copy(
-        officialTools = enabledTools,
-        enabledOfficialFunctions = functionsByTool,
-    )
-}
 
 /** ADK model carrying the immutable runtime configuration used to build it. */
 internal interface ConfiguredModel : Model {

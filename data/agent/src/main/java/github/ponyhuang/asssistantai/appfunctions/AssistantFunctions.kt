@@ -81,6 +81,13 @@ class AssistantFunctions
             sessionId: String,
             message: String,
         ): AssistantReply = withContext(Dispatchers.IO) {
+            // TODO(appfunctions): Agent 工具配置改为 RunConfig metadata 透传后，
+            //  该入口的语义（无 UI 确认、无会话工具配置）尚未重新验证，
+            //  按需求暂时停用；恢复时移除本 throw 并还原下方注释掉的实现。
+            throw AppFunctionAppUnknownException(
+                "Assistant AppFunction is temporarily unavailable.",
+            )
+            /*
             modelServices.awaitReady()
             if (message.isBlank()) {
                 throw AppFunctionInvalidArgumentException("message must not be blank")
@@ -159,6 +166,7 @@ class AssistantFunctions
                 sessionId = effectiveSessionId,
                 reply = collectedEvents.finalAssistantText(),
             )
+            */
         }
 
         private companion object {

@@ -1,35 +1,14 @@
 package github.ponyhuang.asssistantai.agent
 
+import github.ponyhuang.asssistantai.agent.tools.official.isOfficialToolEnabled
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationToolSelectionTest {
-
-    @Test
-    fun conversationOfficialToolsAreLimitedToToolsSupportedByTheCurrentModel() {
-        val model = ModelConfig(
-            serviceId = "mimo",
-            baseType = ApiProtocol.Standard,
-            modelId = "model",
-            apiKey = "key",
-            fullBaseUrl = "https://example.com",
-            officialTools = listOf("web_search"),
-        )
-        val configuration = ConversationToolConfiguration(
-            enabledOfficialFunctionIdsByService = mapOf(
-                "mimo" to mapOf("web_search" to setOf("web_search")),
-            ),
-        )
-
-        assertEquals(
-            listOf("web_search"),
-            model.forConversation(configuration).officialTools,
-        )
-    }
 
     @Test
     fun sessionMcpSelectionIgnoresGlobalEnabledFlagAfterSnapshot() {
@@ -58,43 +37,43 @@ class ConversationToolSelectionTest {
     }
 
     @Test
-    fun forConversationKeepsOfficialToolWithAnyFunctionSelected() {
-        val model = ModelConfig(
-            serviceId = "mimo",
-            baseType = ApiProtocol.Standard,
-            modelId = "model",
-            apiKey = "key",
-            fullBaseUrl = "https://example.com",
-            officialTools = listOf("web_search"),
-        )
+    fun officialToolIsEnabledWithAnyFunctionSelected() {
         val configuration = ConversationToolConfiguration(
             enabledOfficialFunctionIdsByService = mapOf(
                 "mimo" to mapOf("web_search" to setOf("web_search")),
             ),
         )
 
-        val resolved = model.forConversation(configuration)
-
-        assertEquals(listOf("web_search"), resolved.officialTools)
-        assertTrue(resolved.enabledOfficialFunctions.containsKey("web_search"))
+        assertTrue(configuration.isOfficialToolEnabled("mimo", "web_search"))
     }
 
     @Test
-    fun forConversationDropsOfficialToolWhenNoFunctionsAreSelected() {
-        val model = ModelConfig(
-            serviceId = "mimo",
-            baseType = ApiProtocol.Standard,
-            modelId = "model",
-            apiKey = "key",
-            fullBaseUrl = "https://example.com",
-            officialTools = listOf("web_search"),
-        )
+    fun officialToolIsDisabledWhenNoFunctionsAreSelected() {
         val configuration = ConversationToolConfiguration(
             enabledOfficialFunctionIdsByService = mapOf(
                 "mimo" to mapOf("web_search" to emptySet()),
             ),
         )
 
-        assertEquals(emptyList<String>(), model.forConversation(configuration).officialTools)
+        assertFalse(configuration.isOfficialToolEnabled("mimo", "web_search"))
+    }
+
+    @Test
+    fun officialToolIsDisabledWhenAbsentFromConversationSelection() {
+        val configuration = ConversationToolConfiguration(
+            enabledOfficialFunctionIdsByService = mapOf(
+                "mimo" to mapOf("web_search" to setOf("web_search")),
+            ),
+        )
+
+        assertFalse(configuration.isOfficialToolEnabled("mimo", "kimi_formulas"))
+    }
+
+    @Test
+    fun absentConversationSelectionEnablesEveryServiceLevelTool() {
+        val configuration: ConversationToolConfiguration? = null
+
+        assertTrue(configuration.isOfficialToolEnabled("mimo", "web_search"))
+        assertTrue(configuration.isOfficialToolEnabled("mimo", "kimi_formulas"))
     }
 }

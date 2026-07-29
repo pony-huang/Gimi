@@ -3,6 +3,7 @@ package github.ponyhuang.asssistantai.agent.tools.official.kimi
 import com.google.adk.kt.tools.BaseTool
 import github.ponyhuang.asssistantai.agent.ModelConfig
 import github.ponyhuang.asssistantai.agent.tools.official.DynamicOfficialToolset
+import github.ponyhuang.asssistantai.agent.tools.official.isOfficialToolEnabled
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import javax.inject.Inject
@@ -13,8 +14,8 @@ import okhttp3.OkHttpClient
  * paradigm that the protocol-native toolsets are modeled after.
  *
  * Owns the remote manifest fetch, per-call [BaseTool] instantiation, and
- * user-level function filtering (from
- * [ModelConfig.enabledOfficialFunctions]).
+ * user-level function filtering (from the conversation tool configuration
+ * carried by the invocation).
  */
 class KimiFormulaToolset @Inject constructor(
     private val cache: KimiFormulaCache,
@@ -23,9 +24,16 @@ class KimiFormulaToolset @Inject constructor(
     override val sourceId: String = "official:kimi_formulas"
     override val sourceDisplayName: String = "Kimi formulas"
 
-    override suspend fun resolveTools(config: ModelConfig): List<BaseTool> {
+    override suspend fun resolveTools(
+        config: ModelConfig,
+        selection: ConversationToolConfiguration?,
+    ): List<BaseTool> {
         if (OfficialToolIds.KIMI_FORMULAS !in config.officialTools) return emptyList()
-        val enabledFunctionIds = config.enabledOfficialFunctions[OfficialToolIds.KIMI_FORMULAS]
+        if (!selection.isOfficialToolEnabled(config.serviceId, OfficialToolIds.KIMI_FORMULAS)) {
+            return emptyList()
+        }
+        val enabledFunctionIds = selection
+            ?.enabledOfficialFunctionIds(config.serviceId, OfficialToolIds.KIMI_FORMULAS)
             ?.takeIf {
                 it.isNotEmpty() && ConversationToolConfiguration.ALL_FUNCTIONS_MARKER !in it
             }

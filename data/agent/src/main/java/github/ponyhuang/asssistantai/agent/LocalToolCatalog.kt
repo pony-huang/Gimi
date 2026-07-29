@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.agent
 
 import com.google.adk.kt.tools.BaseTool
+import com.google.adk.kt.tools.FunctionTool
 import github.ponyhuang.asssistantai.agent.tools.system.BrightnessTool
 import github.ponyhuang.asssistantai.agent.tools.system.CalendarTool
 import github.ponyhuang.asssistantai.agent.tools.system.CameraTool
@@ -66,7 +67,37 @@ class LocalToolCatalog @Inject constructor(
 
     fun tools(): List<BaseTool> = localTools
 
+    /**
+     * 需要用户确认的工具 ID 集合。
+     *
+     * 在目录构建时一次性解析（进程内只跑一次），供按请求过滤使用；
+     * 避免在 Agent 创建路径上重复反射。
+     */
+    val confirmationRequiredToolIds: Set<String> by lazy {
+        localTools.mapNotNull { tool ->
+            tool.takeIf(::requiresConfirmation)?.name
+        }.toSet()
+    }
+
     override fun definitions(): List<ToolDefinition> = localTools.map { tool ->
         ToolDefinition(id = tool.name, name = tool.name, description = tool.description)
+    }
+
+    /**
+     * ADK `FunctionTool.requiresConfirmation` 是 protected 成员，无公开 API 可判定
+     * 确认门；这里仅反射读取一次。判定失败时按「需要确认」兜底，宁可误排除也不放行。
+     */
+    private fun requiresConfirmation(tool: BaseTool): Boolean {
+        if (tool !is FunctionTool) return false
+        return runCatching {
+            val getter = FunctionTool::class.java
+                .getDeclaredMethod("getRequiresConfirmation")
+                .apply { isAccessible = true }
+
+            @Suppress("UNCHECKED_CAST")
+            val requiresConfirmation =
+                getter.invoke(tool) as (Map<String, Any>) -> Boolean
+            requiresConfirmation(emptyMap())
+        }.getOrDefault(true)
     }
 }

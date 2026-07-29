@@ -107,9 +107,9 @@ fun ModelStatusDisplay(
                 LLMModelServiceIcon(
                     serviceId = serviceId.orEmpty(),
                     modifier = Modifier
-                        .size(20.dp)
+                        .size(26.dp)
                         .alpha(iconAlpha),
-                    contentPadding = 3.dp,
+                    contentPadding = 4.dp,
                 )
                 Spacer(Modifier.width(6.dp))
             }

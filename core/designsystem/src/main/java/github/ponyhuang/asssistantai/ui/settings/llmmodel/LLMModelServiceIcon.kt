@@ -24,7 +24,7 @@ import github.ponyhuang.asssistantai.core.designsystem.R
  * 图标资源来自 lobe-icons（SVG 转 vector drawable）：
  * - `res/drawable/` 放普通（单色）版，用于浅色模式；
  * - `res/drawable-night/` 放 `-color` 彩色版，用于深色模式
- *   （OpenAI / Anthropic / Xiaomi MIMO 无 color 版，深色用反白单色）。
+ *   （OpenAI / Anthropic 无 color 版，深色用反白单色）。
  * 系统按夜间模式自动切换资源，调用点无需关心主题。
  */
 @Composable

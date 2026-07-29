@@ -83,10 +83,38 @@ class AgentFactoryToolAccessTest {
         assertTrue(agent.toolsets.none { it is ToolSearchToolset })
     }
 
+    @Test
+    fun localToolRemainsResolvableForConfirmationResumeWithoutDuplicateDeclaration() = runTest {
+        val factory = factory(
+            localTools = listOf(declarationTool("adjust_media_volume")),
+            confirmationRequiredToolIds = setOf("adjust_media_volume"),
+        )
+
+        val agent = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND) as LlmAgent
+
+        assertEquals(listOf("adjust_media_volume"), agent.tools.map(BaseTool::name))
+        assertEquals(null, agent.tools.single().declaration())
+    }
+
+    @Test
+    fun localToolWithoutConfirmationIsNotRegisteredAsResumeFallback() = runTest {
+        val factory = factory(
+            localTools = listOf(declarationTool("get_media_volume")),
+        )
+
+        val agent = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND) as LlmAgent
+
+        assertTrue(agent.tools.isEmpty())
+    }
+
     private fun factory(
         localTools: List<BaseTool> = emptyList(),
+        confirmationRequiredToolIds: Set<String> = emptySet(),
         officialToolsets: Set<OfficialToolset> = emptySet(),
     ): AgentFactory {
+        val localToolCatalog = mockk<LocalToolCatalog>()
+        every { localToolCatalog.tools() } returns localTools
+        every { localToolCatalog.confirmationRequiredToolIds } returns confirmationRequiredToolIds
         val localToolset = mockk<LocalToolset>()
         coEvery { localToolset.getTools(any()) } returns localTools
         val mcpToolset = mockk<ConversationMcpToolset>()
@@ -95,6 +123,7 @@ class AgentFactoryToolAccessTest {
         every { modelFactory.selectModelConfig(any()) } returns modelConfig()
         every { modelFactory.createModel(any()) } returns mockk<Model>(relaxed = true)
         return AgentFactory(
+            localToolCatalog = localToolCatalog,
             localToolset = localToolset,
             conversationMcpToolset = mcpToolset,
             skillSource = mockk<SkillSource>(relaxed = true),

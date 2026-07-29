@@ -14,6 +14,7 @@ import github.ponyhuang.asssistantai.agent.tools.mcp.ConversationMcpToolset
 import github.ponyhuang.asssistantai.agent.tools.official.DynamicOfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.system.LocalToolset
+import github.ponyhuang.asssistantai.agent.tools.system.ToolsetConfirmationResumeTool
 import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import javax.inject.Inject
@@ -35,6 +36,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class AgentFactory @Inject constructor(
+    private val localToolCatalog: LocalToolCatalog,
     private val localToolset: LocalToolset,
     private val conversationMcpToolset: ConversationMcpToolset,
     private val skillSource: SkillSource,
@@ -131,7 +133,11 @@ class AgentFactory @Inject constructor(
                 dynamicToolSearchEnabled = dynamicToolSearchEnabled,
             ),
         ),
-        tools = emptyList(),
+        // ADK 0.6.0 的确认恢复处理器只查 agent.tools；隐藏代理不声明 schema，
+        // 但可在恢复时按当前请求上下文重新定位 Toolset 中的真实执行实例。
+        tools = localToolCatalog.tools()
+            .filter { tool -> tool.name in localToolCatalog.confirmationRequiredToolIds }
+            .map { tool -> ToolsetConfirmationResumeTool(localToolset, tool) },
         toolsets = toolsets,
     )
 }

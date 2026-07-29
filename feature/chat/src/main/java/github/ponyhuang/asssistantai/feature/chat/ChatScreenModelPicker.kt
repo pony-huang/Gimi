@@ -95,7 +95,8 @@ fun ModelStatusDisplay(
         onClick = { onClick?.invoke() },
         enabled = onClick != null,
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        // 与输入栏内其他按钮一致，比栏背景 surfaceContainer 抬一级
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
         modifier = modifier.heightIn(min = 48.dp),
     ) {
         Row(
@@ -106,9 +107,9 @@ fun ModelStatusDisplay(
                 LLMModelServiceIcon(
                     serviceId = serviceId.orEmpty(),
                     modifier = Modifier
-                        .size(20.dp)
+                        .size(26.dp)
                         .alpha(iconAlpha),
-                    contentPadding = 3.dp,
+                    contentPadding = 4.dp,
                 )
                 Spacer(Modifier.width(6.dp))
             }

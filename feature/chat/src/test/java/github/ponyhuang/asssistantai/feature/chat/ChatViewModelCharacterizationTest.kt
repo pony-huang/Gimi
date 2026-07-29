@@ -37,6 +37,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
+import io.mockk.verify
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -131,6 +132,16 @@ class ChatViewModelCharacterizationTest {
                 },
             )
         }
+    }
+
+    @Test
+    fun setDarkThemeDelegatesToDisplayPreferences() = runTest {
+        val fixture = fixture(configured = true)
+
+        fixture.viewModel.onAction(ChatAction.SetDarkTheme(true))
+        advanceUntilIdle()
+
+        verify { fixture.display.setDarkThemeOverride(true) }
     }
 
     @Test
@@ -491,6 +502,8 @@ class ChatViewModelCharacterizationTest {
         }
         val display = mockk<ChatDisplayRepository> {
             every { showToolActivity } returns MutableStateFlow(true)
+            every { darkThemeOverride } returns MutableStateFlow(null)
+            every { setDarkThemeOverride(any()) } returns Unit
         }
         val recognition = mockk<SpeechRecognitionRepository>(relaxed = true) {
             every { availability } returns MutableStateFlow(false)
@@ -549,6 +562,7 @@ class ChatViewModelCharacterizationTest {
             ),
             conversations = conversations,
             agent = agent,
+            display = display,
         )
     }
 
@@ -614,5 +628,6 @@ class ChatViewModelCharacterizationTest {
         val viewModel: ChatViewModel,
         val conversations: ConversationRepository,
         val agent: ChatAgentRepository,
+        val display: ChatDisplayRepository,
     )
 }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,8 +19,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.DrawerState
@@ -28,6 +31,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +73,8 @@ import github.ponyhuang.asssistantai.ui.theme.AsssistantaiTheme
  * @param onConversationClick 点击某个对话时回调（实现方负责关闭抽屉）
  * @param onDeleteClick       删除某个对话时回调（实现方应再次校验不是 currentSessionId）
  * @param onSettingsClick     点击底部"设置"按钮时回调（实现方负责关闭抽屉并跳转）
+ * @param darkTheme           当前是否处于夜间模式（已解析系统默认值后的结果）
+ * @param onDarkThemeChange   拨动底部夜间模式开关时回调（实现方负责持久化并应用主题）
  * @param modifier            修饰符
  * @param content             抽屉背后的主屏幕内容
  */
@@ -83,6 +89,8 @@ fun ChatDrawer(
     onConversationClick: (Conversation) -> Unit,
     onDeleteClick: (Conversation) -> Unit,
     onSettingsClick: () -> Unit,
+    darkTheme: Boolean,
+    onDarkThemeChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
@@ -101,6 +109,8 @@ fun ChatDrawer(
                     onConversationClick = onConversationClick,
                     onDeleteClick = onDeleteClick,
                     onSettingsClick = onSettingsClick,
+                    darkTheme = darkTheme,
+                    onDarkThemeChange = onDarkThemeChange,
                 )
             }
         },
@@ -122,8 +132,11 @@ private fun HistoryDrawerContent(
     onConversationClick: (Conversation) -> Unit,
     onDeleteClick: (Conversation) -> Unit,
     onSettingsClick: () -> Unit,
+    darkTheme: Boolean,
+    onDarkThemeChange: (Boolean) -> Unit,
 ) {
     var menuConversation by remember { mutableStateOf<Conversation?>(null) }
+    val darkModeContentDescription = stringResource(R.string.chat_dark_mode_toggle)
 
     Column(
         modifier = Modifier
@@ -173,7 +186,7 @@ private fun HistoryDrawerContent(
             color = MaterialTheme.colorScheme.outlineVariant,
         )
 
-        // ── 底部固定 - 设置入口 ─────────────────────────────
+        // ── 底部固定 - 设置入口 + 夜间模式开关 ────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -193,6 +206,20 @@ private fun HistoryDrawerContent(
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(start = 20.dp),
             )
+            Spacer(modifier = Modifier.weight(1f))
+            // 图标展示"点击后切换到的模式"：当前浅色显示月亮，当前深色显示太阳。
+            // IconButton 自身消费点击，不会触发整行的设置跳转。
+            IconButton(onClick = { onDarkThemeChange(!darkTheme) }) {
+                Icon(
+                    imageVector = if (darkTheme) {
+                        Icons.Default.LightMode
+                    } else {
+                        Icons.Default.DarkMode
+                    },
+                    contentDescription = darkModeContentDescription,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
 
         menuConversation?.let { conversation ->
@@ -420,7 +447,9 @@ private fun ChatDrawerPreview() {
             currentSessionId = "1",
             onConversationClick = { },
             onDeleteClick = { },
-            onSettingsClick = { }
+            onSettingsClick = { },
+            darkTheme = false,
+            onDarkThemeChange = { },
         ) {
             // 预览中作为占位的主屏幕内容
             Box(
@@ -444,7 +473,9 @@ private fun ChatDrawerEmptyPreview() {
             currentSessionId = "",
             onConversationClick = { },
             onDeleteClick = { },
-            onSettingsClick = { }
+            onSettingsClick = { },
+            darkTheme = false,
+            onDarkThemeChange = { },
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -467,7 +498,9 @@ private fun ChatDrawerClosedPreview() {
             currentSessionId = "",
             onConversationClick = { },
             onDeleteClick = { },
-            onSettingsClick = { }
+            onSettingsClick = { },
+            darkTheme = false,
+            onDarkThemeChange = { },
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),

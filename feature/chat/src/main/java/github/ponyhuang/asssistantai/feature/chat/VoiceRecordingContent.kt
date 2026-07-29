@@ -57,7 +57,8 @@ internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
                 .size(48.dp)
                 .testTag(VOICE_CANCEL_TEST_TAG),
             colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                // 与输入栏内其他按钮一致，比栏背景 surfaceContainer 抬一级
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             ),
         ) {

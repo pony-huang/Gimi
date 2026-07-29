@@ -61,6 +61,8 @@ data class ChatUiState(
     val officialToolDescriptors: List<OfficialToolDescriptor> = emptyList(),
     val hasToolConfigurationError: Boolean = false,
     val showToolActivity: Boolean = true,
+    /** 夜间模式覆盖值；`null` 表示跟随系统。由抽屉里的开关写入，MainActivity 据此解析主题。 */
+    val darkThemeOverride: Boolean? = null,
     val isSpeechRecognitionAvailable: Boolean = false,
     val pendingToolConfirmations: List<PendingToolConfirmation> = emptyList(),
     /** 被用户拒绝确认的工具名（内存展示态）；工具 chip 据此显示 ✗ 而非永远悬在"未完成"。 */

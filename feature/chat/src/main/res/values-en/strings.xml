@@ -60,6 +60,7 @@
     <string name="chat_open_drawer">Open history drawer</string>
     <string name="chat_new_conversation">New conversation</string>
     <string name="chat_settings">Settings</string>
+    <string name="chat_dark_mode_toggle">Dark mode</string>
     <string name="chat_tool_confirmation_title">Allow running this tool?</string>
     <string name="chat_action_reject">Reject</string>
     <string name="chat_action_allow">Allow</string>

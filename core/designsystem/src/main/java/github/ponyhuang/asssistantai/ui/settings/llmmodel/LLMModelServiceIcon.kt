@@ -22,9 +22,11 @@ import github.ponyhuang.asssistantai.core.designsystem.R
  * Consistent, brand-faithful icon treatment for model service surfaces.
  *
  * 图标资源来自 lobe-icons（SVG 转 vector drawable）：
- * - `res/drawable/` 放普通（单色）版，用于浅色模式；
- * - `res/drawable-night/` 放 `-color` 彩色版，用于深色模式
- *   （OpenAI / Anthropic 无 color 版，深色用反白单色）。
+ * - 有 `-color` 彩色版且浅色背景可辨的服务（DeepSeek / MiniMax / ChatGLM）
+ *   统一使用彩色版，深浅色模式通用，只放 `res/drawable/`；
+ * - 其余服务（OpenAI / Anthropic / XiaomiMiMo / Kimi）保留单色：
+ *   lobe-icons 无其彩色版，或彩色版为白色主体（Kimi 白 K）在浅色背景下不可见；
+ *   `res/drawable/` 为浅色模式用，`res/drawable-night/` 为深色模式反白/彩色版。
  * 系统按夜间模式自动切换资源，调用点无需关心主题。
  */
 @Composable

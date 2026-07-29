@@ -125,7 +125,6 @@ internal fun ChatAddToChatSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -403,7 +402,7 @@ private fun AttachmentShortcut(
         enabled = enabled,
         modifier = modifier.height(108.dp),
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -423,7 +422,7 @@ private fun AttachmentShortcut(
 private fun GroupedCard(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(content = content)
@@ -1086,14 +1085,14 @@ private fun InlineNotice(
 private fun IconBubble(icon: ImageVector) {
     Surface(
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        color = MaterialTheme.colorScheme.primaryContainer,
         modifier = Modifier.size(44.dp),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(22.dp),
             )
         }

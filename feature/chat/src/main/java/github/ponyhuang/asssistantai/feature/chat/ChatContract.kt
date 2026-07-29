@@ -70,6 +70,9 @@ sealed interface ChatAction {
 
     /** 用户关闭工具配置保存失败的提示。 */
     data object ClearToolConfigurationError : ChatAction
+
+    /** 切换夜间模式（写入明确偏好，不再跟随系统）。 */
+    data class SetDarkTheme(val enabled: Boolean) : ChatAction
 }
 
 /**

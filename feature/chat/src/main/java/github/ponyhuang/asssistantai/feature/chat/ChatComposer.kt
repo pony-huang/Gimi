@@ -343,8 +343,10 @@ public fun ChatComposer(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 2.dp,
+            // 用中性容器色而非 surface+tonalElevation：后者会叠加 primary 色偏蓝，
+            // 浅色下与白色背景拉不开、深色下过亮。
+            color = MaterialTheme.colorScheme.surfaceContainer,
+            tonalElevation = 0.dp,
         ) {
             val recordingState = voiceInputState as? VoiceInputUiState.Recording
             if (recordingState != null) {

@@ -117,6 +117,8 @@ class ChatViewModel @Inject constructor(
             )
             is ChatAction.LoadOfficialToolFunctions -> loadOfficialToolFunctions(action.toolId)
             ChatAction.ClearToolConfigurationError -> clearToolConfigurationError()
+            is ChatAction.SetDarkTheme ->
+                chatDisplayPreferences.setDarkThemeOverride(action.enabled)
         }
     }
 
@@ -213,6 +215,11 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             chatDisplayPreferences.showToolActivity.collect { show ->
                 _uiState.update { it.copy(showToolActivity = show) }
+            }
+        }
+        viewModelScope.launch {
+            chatDisplayPreferences.darkThemeOverride.collect { override ->
+                _uiState.update { it.copy(darkThemeOverride = override) }
             }
         }
         viewModelScope.launch {

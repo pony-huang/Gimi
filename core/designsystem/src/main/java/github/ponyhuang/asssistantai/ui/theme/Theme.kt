@@ -34,7 +34,14 @@ val DeepSeekDarkColorScheme = darkColorScheme(
     inverseOnSurface = ChatGptLightText,
     surfaceVariant = ChatGptDarkSurfaceVariant,
     onSurfaceVariant = ChatGptDarkMutedText,
-    outline = Color(0xFF555555),
+    outline = Color(0xFF3C3C41),
+    surfaceDim = ChatGptDarkSurfaceDim,
+    surfaceBright = ChatGptDarkSurfaceBright,
+    surfaceContainerLowest = ChatGptDarkSurfaceContainerLowest,
+    surfaceContainerLow = ChatGptDarkSurfaceContainerLow,
+    surfaceContainer = ChatGptDarkSurfaceContainer,
+    surfaceContainerHigh = ChatGptDarkSurfaceContainerHigh,
+    surfaceContainerHighest = ChatGptDarkSurfaceContainerHighest,
 )
 
 val DeepSeekLightColorScheme = lightColorScheme(
@@ -64,6 +71,13 @@ val DeepSeekLightColorScheme = lightColorScheme(
     surfaceVariant = ChatGptLightSurfaceVariant,
     onSurfaceVariant = ChatGptLightMutedText,
     outline = Color(0xFFD4D4D4),
+    surfaceDim = ChatGptLightSurfaceDim,
+    surfaceBright = ChatGptLightSurfaceBright,
+    surfaceContainerLowest = ChatGptLightSurfaceContainerLowest,
+    surfaceContainerLow = ChatGptLightSurfaceContainerLow,
+    surfaceContainer = ChatGptLightSurfaceContainer,
+    surfaceContainerHigh = ChatGptLightSurfaceContainerHigh,
+    surfaceContainerHighest = ChatGptLightSurfaceContainerHighest,
 )
 
 @Composable

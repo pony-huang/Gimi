@@ -35,24 +35,23 @@ internal data class FormulaDeclaration(
  */
 internal class KimiFormulaManifest(
     private val apiKey: String,
-    private val baseUrl: String,
     private val httpClient: OkHttpClient,
 ) {
     suspend fun fetch(): List<FormulaDeclaration> = withContext(Dispatchers.IO) {
-        val base = baseUrl.trimEnd('/')
+
         coroutineScope {
             FORMULA_URIS.map { uri ->
                 async {
-                    runCatching { load(base, uri) }
+                    runCatching { load(uri) }
                         .getOrDefault(emptyList())
                 }
             }.awaitAll()
         }.flatten().deduplicate()
     }
 
-    private fun load(base: String, uri: String): List<FormulaDeclaration> {
+    private fun load(uri: String): List<FormulaDeclaration> {
         val request = Request.Builder()
-            .url("$base/formulas/$uri/tools")
+            .url("https://api.moonshot.cn/v1/formulas/$uri/tools")
             .header("Authorization", "Bearer $apiKey")
             .build()
 

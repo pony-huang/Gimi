@@ -90,7 +90,6 @@ class KimiFormulaOfficialToolProvider @Inject constructor(
             toolsets = listOf(
                 KimiFormulaToolset(
                     apiKey = config.apiKey,
-                    baseUrl = config.officialToolBaseUrl,
                     httpClient = httpClient,
                     enabledFunctionIds = enabledFunctionIds,
                 ),

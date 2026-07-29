@@ -33,7 +33,6 @@ import okhttp3.RequestBody.Companion.toRequestBody
  */
 class KimiFormulaToolset(
     private val apiKey: String,
-    private val baseUrl: String,
     private val httpClient: OkHttpClient,
     private val enabledFunctionIds: Set<String>? = null,
 ) : Toolset {
@@ -42,14 +41,13 @@ class KimiFormulaToolset(
         private val logger = LoggerFactory.getLogger(KimiFormulaToolset::class)
     }
 
-    private val manifest = KimiFormulaManifest(apiKey = apiKey, baseUrl = baseUrl, httpClient = httpClient)
+    private val manifest = KimiFormulaManifest(apiKey = apiKey, httpClient = httpClient)
 
     override suspend fun getTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
         withContext(Dispatchers.IO) {
             manifest.fetch()
                 .map { declaration ->
                     KimiFormulaTool(
-                        baseUrl = baseUrl,
                         apiKey = apiKey,
                         declaration = declaration,
                         httpClient = httpClient,
@@ -62,7 +60,6 @@ class KimiFormulaToolset(
 }
 
 internal class KimiFormulaTool(
-    private val baseUrl: String,
     private val apiKey: String,
     private val declaration: FormulaDeclaration,
     private val httpClient: OkHttpClient,
@@ -98,7 +95,7 @@ internal class KimiFormulaTool(
         }
 
         val request = Request.Builder()
-            .url("$baseUrl/formulas/${declaration.formulaUri}/fibers")
+            .url("https://api.moonshot.cn/v1/formulas/${declaration.formulaUri}/fibers")
             .header("Authorization", "Bearer $apiKey")
             .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
             .build()

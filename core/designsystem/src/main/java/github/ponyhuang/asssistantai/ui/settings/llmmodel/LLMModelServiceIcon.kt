@@ -67,5 +67,6 @@ private fun modelServiceIconFor(serviceId: String): Int? = when (serviceId) {
     "openai" -> R.drawable.ic_model_provider_openai
     "anthropic" -> R.drawable.ic_model_provider_anthropic
     "kimi" -> R.drawable.ic_model_provider_kimi
+    "glm" -> R.drawable.ic_model_provider_chatglm
     else -> null
 }

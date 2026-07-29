@@ -45,7 +45,6 @@ class KimiFormulaCatalog @Inject constructor(
         val service = currentMoonshotService() ?: return emptyList()
         val manifest = KimiFormulaManifest(
             apiKey = service.apiKey,
-            baseUrl = service.apiBaseUrl,
             httpClient = httpClient,
         )
         return runCatching { manifest.fetch() }

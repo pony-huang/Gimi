@@ -26,8 +26,8 @@ import github.ponyhuang.asssistantai.domain.conversation.model.FunctionResponseV
 import github.ponyhuang.asssistantai.ui.theme.AsssistantaiTheme
 
 /**
- * 工具名展示：MCP 工具注册名带 `mcp_<服务器id前8位>_` 前缀（见 McpToolRegistry），
- * 哈希前缀对用户无意义，展示时剥掉，只留远端工具本身的可读名。
+ * 工具名展示：MCP 工具由 [McpToolsetRegistry] 通过 [McpToolset] 接入，
+ * 使用远端工具原始名称；保留此前缀正则以兼容历史工具名格式。
  */
 private val McpNamePrefix = Regex("^mcp_[A-Za-z0-9_-]{8}_")
 

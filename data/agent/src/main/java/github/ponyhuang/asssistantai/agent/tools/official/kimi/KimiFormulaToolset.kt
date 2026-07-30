@@ -7,7 +7,6 @@ import github.ponyhuang.asssistantai.agent.tools.official.apiKeyForService
 import github.ponyhuang.asssistantai.agent.tools.official.belongsToModelFamily
 import github.ponyhuang.asssistantai.agent.tools.official.isOfficialToolEnabled
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.AgentModelConfigurationSource
 import javax.inject.Inject
 import okhttp3.OkHttpClient
@@ -25,7 +24,7 @@ class KimiFormulaToolset @Inject constructor(
     private val httpClient: OkHttpClient,
     private val modelServices: AgentModelConfigurationSource,
 ) : DynamicOfficialToolset {
-    override val sourceId: String = "official:kimi_formulas"
+    override val sourceId: String = "official:$TOOL_ID"
     override val sourceDisplayName: String = "Kimi formulas"
 
     override suspend fun resolveTools(
@@ -34,11 +33,11 @@ class KimiFormulaToolset @Inject constructor(
     ): List<BaseTool> {
         if (!config.modelId.belongsToModelFamily("kimi", "moonshot")) return emptyList()
         val apiKey = modelServices.apiKeyForService(config.serviceId) ?: return emptyList()
-        if (!selection.isOfficialToolEnabled(config.serviceId, OfficialToolIds.KIMI_FORMULAS)) {
+        if (!selection.isOfficialToolEnabled(config.serviceId, TOOL_ID)) {
             return emptyList()
         }
         val enabledFunctionIds = selection
-            ?.enabledOfficialFunctionIds(config.serviceId, OfficialToolIds.KIMI_FORMULAS)
+            ?.enabledOfficialFunctionIds(config.serviceId, TOOL_ID)
             ?.takeIf {
                 it.isNotEmpty() && ConversationToolConfiguration.ALL_FUNCTIONS_MARKER !in it
             }
@@ -54,5 +53,9 @@ class KimiFormulaToolset @Inject constructor(
                 )
             }
             .filter { tool -> enabledFunctionIds == null || tool.name in enabledFunctionIds }
+    }
+
+    internal companion object {
+        const val TOOL_ID: String = "kimi_formulas"
     }
 }

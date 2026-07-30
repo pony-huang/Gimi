@@ -5,7 +5,6 @@ import github.ponyhuang.asssistantai.agent.ModelRuntimeMetadata
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.AgentModelConfigurationSource
 import io.mockk.every
 import io.mockk.mockk
@@ -26,7 +25,7 @@ class GlmWebSearchToolsetMetadataTest {
         val selection = ConversationToolConfiguration(
             enabledOfficialFunctionIdsByService = mapOf(
                 SERVICE_ID to mapOf(
-                    OfficialToolIds.GLM_WEB_SEARCH to setOf(GlmWebSearchTool.NAME),
+                    GlmWebSearchToolset.TOOL_ID to setOf(GlmWebSearchTool.NAME),
                 ),
             ),
         )

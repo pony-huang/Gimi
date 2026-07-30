@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent.tools.official.openai
+package github.ponyhuang.asssistantai.agent.tools.official.mimo
 
 import github.ponyhuang.asssistantai.agent.ModelRuntimeMetadata
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
@@ -8,24 +8,24 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class OpenaiOfficialToolsetTest {
+class MimoOfficialToolsetTest {
 
-    private val toolset = OpenaiOfficialToolset()
+    private val toolset = MimoOfficialToolset()
 
     @Test
-    fun resolvesEnabledBuiltInToolsForOpenaiService() = runTest {
+    fun resolvesEnabledBuiltInToolsForMimoStandardService() = runTest {
         val tools = toolset.resolveTools(
-            config(serviceId = "openai"),
+            config(serviceId = "mimo"),
             selection = null,
         )
 
-        assertEquals(listOf(OpenaiOfficialToolset.WEB_SEARCH_TOOL_ID), tools.map { it.name })
+        assertEquals(listOf(MimoOfficialToolset.WEB_SEARCH_TOOL_ID), tools.map { it.name })
     }
 
     @Test
     fun ignoresOtherStandardServices() = runTest {
         val tools = toolset.resolveTools(
-            config(serviceId = "mimo"),
+            config(serviceId = "openai"),
             selection = null,
         )
 
@@ -33,10 +33,10 @@ class OpenaiOfficialToolsetTest {
     }
 
     @Test
-    fun ignoresOpenaiServiceUsingAnthropicProtocol() = runTest {
+    fun ignoresMimoAnthropicProtocol() = runTest {
         val tools = toolset.resolveTools(
             config(
-                serviceId = "openai",
+                serviceId = "mimo",
                 baseType = ApiProtocol.Anthropic,
             ),
             selection = null,
@@ -49,11 +49,11 @@ class OpenaiOfficialToolsetTest {
     fun dropsToolWhenConversationSelectionExcludesIt() = runTest {
         val selection = ConversationToolConfiguration(
             enabledOfficialFunctionIdsByService = mapOf(
-                "openai" to mapOf(OpenaiOfficialToolset.WEB_SEARCH_TOOL_ID to emptySet()),
+                "mimo" to mapOf(MimoOfficialToolset.WEB_SEARCH_TOOL_ID to emptySet()),
             ),
         )
 
-        val tools = toolset.resolveTools(config("openai"), selection)
+        val tools = toolset.resolveTools(config("mimo"), selection)
 
         assertTrue(tools.isEmpty())
     }

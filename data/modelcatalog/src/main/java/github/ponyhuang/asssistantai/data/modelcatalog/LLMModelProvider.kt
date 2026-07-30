@@ -1,7 +1,10 @@
 package github.ponyhuang.asssistantai.data.modelcatalog
 
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.MultimodalCapabilities
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
+
+private const val WEB_SEARCH_TOOL_ID: String = "web_search"
+private const val KIMI_FORMULAS_TOOL_ID: String = "kimi_formulas"
+private const val GLM_WEB_SEARCH_TOOL_ID: String = "glm_web_search"
 
 /**
  * 模型服务与配置中心 — 数据契约。
@@ -146,7 +149,7 @@ enum class LLMModelType(
         docsUrl = "https://platform.minimaxi.com/document",
         modelsUrl = "https://platform.minimaxi.com/document/Models",
         officialToolProtocols = mapOf(
-            OfficialToolIds.WEB_SEARCH to listOf(ApiBaseType.Anthropic),
+            WEB_SEARCH_TOOL_ID to listOf(ApiBaseType.Anthropic),
         ),
     ),
     Mimo(
@@ -161,7 +164,7 @@ enum class LLMModelType(
         docsUrl = "https://mimo.mi.com/docs",
         modelsUrl = "https://mimo.mi.com/docs/zh-CN/quick-start/summary/model",
         officialToolProtocols = mapOf(
-            OfficialToolIds.WEB_SEARCH to listOf(ApiBaseType.Standard),
+            WEB_SEARCH_TOOL_ID to listOf(ApiBaseType.Standard),
         ),
     ),
     OpenAI(
@@ -175,7 +178,7 @@ enum class LLMModelType(
         docsUrl = "https://platform.openai.com/docs",
         modelsUrl = "https://platform.openai.com/docs/models",
         officialToolProtocols = mapOf(
-            OfficialToolIds.WEB_SEARCH to listOf(ApiBaseType.Standard),
+            WEB_SEARCH_TOOL_ID to listOf(ApiBaseType.Standard),
         ),
     ),
     Anthropic(
@@ -190,7 +193,7 @@ enum class LLMModelType(
         docsUrl = "https://docs.anthropic.com/",
         modelsUrl = "https://docs.anthropic.com/en/docs/about-claude/models",
         officialToolProtocols = mapOf(
-            OfficialToolIds.WEB_SEARCH to listOf(ApiBaseType.Anthropic),
+            WEB_SEARCH_TOOL_ID to listOf(ApiBaseType.Anthropic),
         ),
     ),
     Moonshot(
@@ -205,7 +208,7 @@ enum class LLMModelType(
         docsUrl = "https://platform.kimi.com/docs",
         modelsUrl = "https://platform.kimi.com/docs/api/models-overview",
         officialToolProtocols = mapOf(
-            OfficialToolIds.KIMI_FORMULAS to ApiBaseType.entries,
+            KIMI_FORMULAS_TOOL_ID to ApiBaseType.entries,
         ),
     ),
     Glm(
@@ -220,7 +223,7 @@ enum class LLMModelType(
         docsUrl = "https://docs.bigmodel.cn/",
         modelsUrl = "https://docs.bigmodel.cn/cn/guide/start/model-overview",
         officialToolProtocols = mapOf(
-            OfficialToolIds.GLM_WEB_SEARCH to ApiBaseType.entries,
+            GLM_WEB_SEARCH_TOOL_ID to ApiBaseType.entries,
         ),
     );
 

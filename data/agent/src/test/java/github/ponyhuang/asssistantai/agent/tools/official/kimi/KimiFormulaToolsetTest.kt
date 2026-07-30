@@ -4,7 +4,6 @@ import github.ponyhuang.asssistantai.agent.ModelRuntimeMetadata
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.AgentModelConfigurationSource
 import io.mockk.every
 import io.mockk.mockk
@@ -43,7 +42,7 @@ class KimiFormulaToolsetTest {
     @Test
     fun filteredByEnabledFunctionIds() = runTest {
         val toolset = toolset(manifestClient(200, MANIFEST_BODY))
-        val selection = selection(OfficialToolIds.KIMI_FORMULAS to setOf("translate"))
+        val selection = selection(KimiFormulaToolset.TOOL_ID to setOf("translate"))
 
         val tools = toolset.resolveTools(config(), selection)
 
@@ -53,7 +52,7 @@ class KimiFormulaToolsetTest {
     @Test
     fun emptyWhenEnabledFunctionIdsMatchNothing() = runTest {
         val toolset = toolset(manifestClient(200, MANIFEST_BODY))
-        val selection = selection(OfficialToolIds.KIMI_FORMULAS to setOf("missing_function"))
+        val selection = selection(KimiFormulaToolset.TOOL_ID to setOf("missing_function"))
 
         assertTrue(toolset.resolveTools(config(), selection).isEmpty())
     }
@@ -62,7 +61,7 @@ class KimiFormulaToolsetTest {
     fun allFunctionsWhenMarkerPresent() = runTest {
         val toolset = toolset(manifestClient(200, MANIFEST_BODY))
         val selection = selection(
-            OfficialToolIds.KIMI_FORMULAS to
+            KimiFormulaToolset.TOOL_ID to
                     setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
         )
 

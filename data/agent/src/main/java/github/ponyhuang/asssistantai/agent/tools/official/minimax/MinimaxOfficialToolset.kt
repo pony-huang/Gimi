@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent.tools.official.openai
+package github.ponyhuang.asssistantai.agent.tools.official.minimax
 
 import com.google.adk.kt.tools.BaseTool
 import github.ponyhuang.asssistantai.agent.ModelRuntimeMetadata
@@ -10,17 +10,17 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import javax.inject.Inject
 
 /**
- * Official toolset for OpenAI.
+ * MiniMax 官方工具声明。
  *
- * Adds declaration-only tools for OpenAI's API. [github.ponyhuang.asssistantai.agent.model.Openai]
- * converts these reserved declarations to their provider-native wire shapes.
+ * MiniMax 的 Web Search 仅由 Anthropic 兼容端点支持；同时按服务 ID 隔离，
+ * 避免用户自建的 Anthropic 协议服务被误注入 MiniMax 专属工具。
  */
-class OpenaiOfficialToolset @Inject constructor() : OfficialToolset {
+class MinimaxOfficialToolset @Inject constructor() : OfficialToolset {
     override suspend fun resolveTools(
         config: ModelRuntimeMetadata,
         selection: ConversationToolConfiguration?,
     ): List<BaseTool> {
-        if (config.serviceId != "openai" || config.baseType != ApiProtocol.Standard) {
+        if (config.serviceId != "minimax" || config.baseType != ApiProtocol.Anthropic) {
             return emptyList()
         }
         return listOf(WEB_SEARCH_TOOL_ID)

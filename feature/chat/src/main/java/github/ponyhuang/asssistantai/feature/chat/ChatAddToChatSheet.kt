@@ -87,8 +87,11 @@ import github.ponyhuang.asssistantai.domain.mcp.model.McpServer
 import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.mcp.model.McpTransport
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunction
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.asssistantai.domain.toolauthorization.model.ToolDescriptor
+
+private const val WEB_SEARCH_TOOL_ID: String = "web_search"
+private const val KIMI_FORMULAS_TOOL_ID: String = "kimi_formulas"
+private const val GLM_WEB_SEARCH_TOOL_ID: String = "glm_web_search"
 
 private enum class AddToChatPage {
     HOME,
@@ -1135,19 +1138,19 @@ private fun toolAccessModeDescription(mode: ToolAccessMode): String = stringReso
 
 @Composable
 private fun officialToolLabel(toolId: String): String = when (toolId) {
-    OfficialToolIds.WEB_SEARCH -> stringResource(R.string.chat_official_tool_web_search)
-    OfficialToolIds.KIMI_FORMULAS -> stringResource(R.string.chat_official_tool_kimi_formulas)
-    OfficialToolIds.GLM_WEB_SEARCH -> stringResource(R.string.chat_official_tool_glm_web_search)
+    WEB_SEARCH_TOOL_ID -> stringResource(R.string.chat_official_tool_web_search)
+    KIMI_FORMULAS_TOOL_ID -> stringResource(R.string.chat_official_tool_kimi_formulas)
+    GLM_WEB_SEARCH_TOOL_ID -> stringResource(R.string.chat_official_tool_glm_web_search)
     else -> toolId
 }
 
 @Composable
 private fun officialToolDescription(toolId: String): String = when (toolId) {
-    OfficialToolIds.WEB_SEARCH ->
+    WEB_SEARCH_TOOL_ID ->
         stringResource(R.string.chat_official_tool_web_search_description)
-    OfficialToolIds.KIMI_FORMULAS ->
+    KIMI_FORMULAS_TOOL_ID ->
         stringResource(R.string.chat_official_tool_kimi_formulas_description)
-    OfficialToolIds.GLM_WEB_SEARCH ->
+    GLM_WEB_SEARCH_TOOL_ID ->
         stringResource(R.string.chat_official_tool_glm_web_search_description)
     else -> stringResource(R.string.chat_official_tool_default_description)
 }

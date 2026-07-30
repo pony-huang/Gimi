@@ -3,7 +3,6 @@ package github.ponyhuang.asssistantai.agent.tools.official.anthropic
 import github.ponyhuang.asssistantai.agent.ModelRuntimeMetadata
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -14,17 +13,27 @@ class AnthropicOfficialToolsetTest {
     private val toolset = AnthropicOfficialToolset()
 
     @Test
-    fun resolvesEnabledBuiltInToolsForAnyAnthropicService() = runTest {
+    fun resolvesEnabledBuiltInToolsForAnthropicService() = runTest {
         val tools = toolset.resolveTools(
-            config(serviceId = "custom-anthropic-service"),
+            config(serviceId = "anthropic"),
             selection = null,
         )
 
-        assertEquals(listOf(OfficialToolIds.WEB_SEARCH), tools.map { it.name })
+        assertEquals(listOf(AnthropicOfficialToolset.WEB_SEARCH_TOOL_ID), tools.map { it.name })
     }
 
     @Test
-    fun ignoresToolsForStandardProtocol() = runTest {
+    fun ignoresOtherAnthropicServices() = runTest {
+        val tools = toolset.resolveTools(
+            config(serviceId = "minimax"),
+            selection = null,
+        )
+
+        assertTrue(tools.isEmpty())
+    }
+
+    @Test
+    fun ignoresAnthropicServiceUsingStandardProtocol() = runTest {
         val tools = toolset.resolveTools(
             config(
                 serviceId = "anthropic",
@@ -40,14 +49,11 @@ class AnthropicOfficialToolsetTest {
     fun dropsToolWhenConversationSelectionExcludesIt() = runTest {
         val selection = ConversationToolConfiguration(
             enabledOfficialFunctionIdsByService = mapOf(
-                "anthropic" to mapOf(OfficialToolIds.WEB_SEARCH to emptySet()),
+                "anthropic" to mapOf(AnthropicOfficialToolset.WEB_SEARCH_TOOL_ID to emptySet()),
             ),
         )
 
-        val tools = toolset.resolveTools(
-            config("anthropic"),
-            selection,
-        )
+        val tools = toolset.resolveTools(config("anthropic"), selection)
 
         assertTrue(tools.isEmpty())
     }

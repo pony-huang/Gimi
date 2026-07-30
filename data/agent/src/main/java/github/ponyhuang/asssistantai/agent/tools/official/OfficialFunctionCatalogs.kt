@@ -2,17 +2,18 @@ package github.ponyhuang.asssistantai.agent.tools.official
 
 import github.ponyhuang.asssistantai.agent.tools.official.glm.GlmReaderTool
 import github.ponyhuang.asssistantai.agent.tools.official.glm.GlmWebSearchTool
+import github.ponyhuang.asssistantai.agent.tools.official.glm.GlmWebSearchToolset
 import github.ponyhuang.asssistantai.agent.tools.official.kimi.KimiFormulaCache
+import github.ponyhuang.asssistantai.agent.tools.official.kimi.KimiFormulaToolset
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunctionCatalog
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.AgentModelConfigurationSource
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Resolves the available functions for each [OfficialToolIds] category using
+ * Resolves the available functions for each official-tool category using
  * the currently selected model service. Protocol-native Web Search and GLM web
  * functions are static; Kimi Formulas are pulled from the Moonshot manifest.
  *
@@ -25,15 +26,15 @@ class DefaultOfficialToolFunctionCatalog @Inject constructor(
 ) : OfficialToolFunctionCatalog {
 
     override suspend fun listFunctions(toolId: String): List<OfficialToolFunction> = when (toolId) {
-        OfficialToolIds.WEB_SEARCH -> listOf(
+        WEB_SEARCH_TOOL_ID -> listOf(
             OfficialToolFunction(
-                id = OfficialToolIds.WEB_SEARCH,
+                id = WEB_SEARCH_TOOL_ID,
                 name = "网页搜索",
                 description = "搜索最新的互联网信息",
             ),
         )
-        OfficialToolIds.KIMI_FORMULAS -> kimiFormulaCatalog.fetch()
-        OfficialToolIds.GLM_WEB_SEARCH -> listOf(
+        KimiFormulaToolset.TOOL_ID -> kimiFormulaCatalog.fetch()
+        GlmWebSearchToolset.TOOL_ID -> listOf(
             OfficialToolFunction(
                 id = GlmWebSearchTool.NAME,
                 name = "网页搜索",
@@ -48,6 +49,8 @@ class DefaultOfficialToolFunctionCatalog @Inject constructor(
         else -> emptyList()
     }
 }
+
+private const val WEB_SEARCH_TOOL_ID: String = "web_search"
 
 @Singleton
 class KimiFormulaCatalog @Inject constructor(

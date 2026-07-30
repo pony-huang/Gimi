@@ -5,7 +5,6 @@ import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Tool
 import com.openai.client.OpenAIClient
 import com.openai.core.jsonMapper
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -17,13 +16,13 @@ class OfficialBuiltInToolConversionTest {
     fun openAiConvertsWebSearchToProviderBuiltInShape() {
         val converted = TestOpenai().convert(
             FunctionDeclaration(
-                name = OfficialToolIds.WEB_SEARCH,
-                description = OfficialToolIds.WEB_SEARCH,
+                name = WEB_SEARCH_TOOL_ID,
+                description = WEB_SEARCH_TOOL_ID,
             ),
         ).single()
 
         val json = jsonMapper().writeValueAsString(converted)
-        assertTrue(json.contains("\"type\":\"${OfficialToolIds.WEB_SEARCH}\""))
+        assertTrue(json.contains("\"type\":\"$WEB_SEARCH_TOOL_ID\""))
     }
 
     @Test
@@ -41,8 +40,8 @@ class OfficialBuiltInToolConversionTest {
     fun anthropicConvertsWebSearchToProviderBuiltInShape() {
         val converted = TestClaude().convert(
             FunctionDeclaration(
-                name = OfficialToolIds.WEB_SEARCH,
-                description = OfficialToolIds.WEB_SEARCH,
+                name = WEB_SEARCH_TOOL_ID,
+                description = WEB_SEARCH_TOOL_ID,
             ),
         ).single()
 
@@ -69,3 +68,5 @@ class OfficialBuiltInToolConversionTest {
             toAnthropicTools(listOf(Tool(functionDeclarations = declarations.toList())))
     }
 }
+
+private const val WEB_SEARCH_TOOL_ID: String = "web_search"

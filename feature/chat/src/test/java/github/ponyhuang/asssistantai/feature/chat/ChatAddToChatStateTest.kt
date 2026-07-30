@@ -2,7 +2,6 @@ package github.ponyhuang.asssistantai.feature.chat
 
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunction
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.asssistantai.domain.toolauthorization.model.ToolDescriptor
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -62,14 +61,14 @@ class ChatAddToChatStateTest {
             configuration = ConversationToolConfiguration(
                 enabledOfficialFunctionIdsByService = mapOf(
                     "kimi" to mapOf(
-                        OfficialToolIds.KIMI_FORMULAS to
+                        KIMI_FORMULAS_TOOL_ID to
                             setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
                     ),
                 ),
             ),
             officialTools = listOf(
                 OfficialToolDescriptor(
-                    id = OfficialToolIds.KIMI_FORMULAS,
+                    id = KIMI_FORMULAS_TOOL_ID,
                     functions = listOf(
                         OfficialToolFunction("convert", "convert", "convert formula"),
                         OfficialToolFunction("rethink", "rethink", "rethink formula"),
@@ -78,7 +77,7 @@ class ChatAddToChatStateTest {
             ),
         )
 
-        assertEquals(2, state.enabledOfficialFunctionCount(OfficialToolIds.KIMI_FORMULAS))
+        assertEquals(2, state.enabledOfficialFunctionCount(KIMI_FORMULAS_TOOL_ID))
     }
 
     private fun tool(id: String, name: String, enabled: Boolean) = ToolDescriptor(
@@ -88,3 +87,5 @@ class ChatAddToChatStateTest {
         isEnabled = enabled,
     )
 }
+
+private const val KIMI_FORMULAS_TOOL_ID: String = "kimi_formulas"

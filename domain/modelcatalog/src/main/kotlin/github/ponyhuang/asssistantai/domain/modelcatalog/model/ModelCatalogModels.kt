@@ -1,11 +1,5 @@
 package github.ponyhuang.asssistantai.domain.modelcatalog.model
 
-object OfficialToolIds {
-    const val WEB_SEARCH: String = "web_search"
-    const val KIMI_FORMULAS: String = "kimi_formulas"
-    const val GLM_WEB_SEARCH: String = "glm_web_search"
-}
-
 data class LLMModelSetting(
     val id: String,
     val name: String,

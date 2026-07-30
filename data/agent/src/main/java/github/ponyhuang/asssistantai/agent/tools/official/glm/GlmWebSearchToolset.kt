@@ -7,7 +7,6 @@ import github.ponyhuang.asssistantai.agent.tools.official.apiKeyForService
 import github.ponyhuang.asssistantai.agent.tools.official.belongsToModelFamily
 import github.ponyhuang.asssistantai.agent.tools.official.isOfficialToolEnabled
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.AgentModelConfigurationSource
 import okhttp3.OkHttpClient
 import javax.inject.Inject
@@ -33,7 +32,7 @@ class GlmWebSearchToolset @Inject constructor(
         if (
             !selection.isOfficialToolEnabled(
                 config.serviceId,
-                OfficialToolIds.GLM_WEB_SEARCH,
+                TOOL_ID,
             )
         ) {
             return emptyList()
@@ -41,7 +40,7 @@ class GlmWebSearchToolset @Inject constructor(
 
         val selectedFunctionIds = selection?.enabledOfficialFunctionIds(
             config.serviceId,
-            OfficialToolIds.GLM_WEB_SEARCH,
+            TOOL_ID,
         )
         val api = GlmWebToolApi(
             apiKey = apiKey,
@@ -52,5 +51,9 @@ class GlmWebSearchToolset @Inject constructor(
             GlmWebSearchTool(api),
             GlmReaderTool(api),
         ).filter { selectedFunctionIds == null || it.name in selectedFunctionIds }
+    }
+
+    internal companion object {
+        const val TOOL_ID: String = "glm_web_search"
     }
 }

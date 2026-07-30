@@ -6,7 +6,6 @@ import github.ponyhuang.asssistantai.agent.tools.official.KimiFormulaCatalog
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.AgentModelConfigurationSource
 import io.mockk.every
 import io.mockk.mockk
@@ -35,7 +34,7 @@ class GlmWebSearchToolsetTest {
         val toolset = toolset()
         val selection = ConversationToolConfiguration(
             enabledOfficialFunctionIdsByService = mapOf(
-                "glm" to mapOf(OfficialToolIds.GLM_WEB_SEARCH to emptySet()),
+                "glm" to mapOf(GlmWebSearchToolset.TOOL_ID to emptySet()),
             ),
         )
 
@@ -68,7 +67,7 @@ class GlmWebSearchToolsetTest {
         val selection = ConversationToolConfiguration(
             enabledOfficialFunctionIdsByService = mapOf(
                 "glm" to mapOf(
-                    OfficialToolIds.GLM_WEB_SEARCH to setOf(GlmReaderTool.NAME),
+                    GlmWebSearchToolset.TOOL_ID to setOf(GlmReaderTool.NAME),
                 ),
             ),
         )
@@ -82,7 +81,7 @@ class GlmWebSearchToolsetTest {
     fun officialCatalogListsSearchAndReaderFunctions() = runTest {
         val catalog = DefaultOfficialToolFunctionCatalog(mockk<KimiFormulaCatalog>())
 
-        val functions = catalog.listFunctions(OfficialToolIds.GLM_WEB_SEARCH)
+        val functions = catalog.listFunctions(GlmWebSearchToolset.TOOL_ID)
 
         assertEquals(
             listOf(GlmWebSearchTool.NAME, GlmReaderTool.NAME),

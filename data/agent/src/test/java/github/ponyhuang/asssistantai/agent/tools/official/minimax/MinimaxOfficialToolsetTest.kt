@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent.tools.official.openai
+package github.ponyhuang.asssistantai.agent.tools.official.minimax
 
 import github.ponyhuang.asssistantai.agent.ModelRuntimeMetadata
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
@@ -8,24 +8,24 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class OpenaiOfficialToolsetTest {
+class MinimaxOfficialToolsetTest {
 
-    private val toolset = OpenaiOfficialToolset()
+    private val toolset = MinimaxOfficialToolset()
 
     @Test
-    fun resolvesEnabledBuiltInToolsForOpenaiService() = runTest {
+    fun resolvesEnabledBuiltInToolsForMiniMaxAnthropicService() = runTest {
         val tools = toolset.resolveTools(
-            config(serviceId = "openai"),
+            config(serviceId = "minimax"),
             selection = null,
         )
 
-        assertEquals(listOf(OpenaiOfficialToolset.WEB_SEARCH_TOOL_ID), tools.map { it.name })
+        assertEquals(listOf(MinimaxOfficialToolset.WEB_SEARCH_TOOL_ID), tools.map { it.name })
     }
 
     @Test
-    fun ignoresOtherStandardServices() = runTest {
+    fun ignoresOtherAnthropicServices() = runTest {
         val tools = toolset.resolveTools(
-            config(serviceId = "mimo"),
+            config(serviceId = "anthropic"),
             selection = null,
         )
 
@@ -33,11 +33,11 @@ class OpenaiOfficialToolsetTest {
     }
 
     @Test
-    fun ignoresOpenaiServiceUsingAnthropicProtocol() = runTest {
+    fun ignoresMiniMaxStandardProtocol() = runTest {
         val tools = toolset.resolveTools(
             config(
-                serviceId = "openai",
-                baseType = ApiProtocol.Anthropic,
+                serviceId = "minimax",
+                baseType = ApiProtocol.Standard,
             ),
             selection = null,
         )
@@ -49,18 +49,21 @@ class OpenaiOfficialToolsetTest {
     fun dropsToolWhenConversationSelectionExcludesIt() = runTest {
         val selection = ConversationToolConfiguration(
             enabledOfficialFunctionIdsByService = mapOf(
-                "openai" to mapOf(OpenaiOfficialToolset.WEB_SEARCH_TOOL_ID to emptySet()),
+                "minimax" to mapOf(MinimaxOfficialToolset.WEB_SEARCH_TOOL_ID to emptySet()),
             ),
         )
 
-        val tools = toolset.resolveTools(config("openai"), selection)
+        val tools = toolset.resolveTools(
+            config("minimax"),
+            selection,
+        )
 
         assertTrue(tools.isEmpty())
     }
 
     private fun config(
         serviceId: String,
-        baseType: ApiProtocol = ApiProtocol.Standard,
+        baseType: ApiProtocol = ApiProtocol.Anthropic,
     ) = ModelRuntimeMetadata(
         serviceId = serviceId,
         baseType = baseType,

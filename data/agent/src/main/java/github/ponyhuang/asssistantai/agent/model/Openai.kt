@@ -39,7 +39,6 @@ import com.openai.models.chat.completions.ChatCompletionToolMessageParam
 import com.openai.models.chat.completions.ChatCompletionUserMessageParam
 import com.openai.models.completions.CompletionUsage
 import github.ponyhuang.asssistantai.domain.conversation.model.AttachmentCategory
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
@@ -60,6 +59,7 @@ open class Openai(
 ) : Model {
 
     companion object {
+        private const val WEB_SEARCH_TOOL_ID: String = "web_search"
         private val JSON_MAPPER = jsonMapper()
         private val logger = LoggerFactory.getLogger(Openai::class)
         private val THOUGHT_DELTA_FIELDS = setOf(
@@ -495,7 +495,7 @@ open class Openai(
             .flatMap { it.functionDeclarations.orEmpty() }
             .map { declaration ->
                 when (declaration.name) {
-                    OfficialToolIds.WEB_SEARCH -> openAiWebSearchTool()
+                    WEB_SEARCH_TOOL_ID -> openAiWebSearchTool()
                     else -> declaration.toChatCompletionTool()
                 }
             }
@@ -503,13 +503,13 @@ open class Openai(
     private fun openAiWebSearchTool(): ChatCompletionTool =
         ChatCompletionTool.ofFunction(
             ChatCompletionFunctionTool.builder()
-                .type(JsonValue.from(OfficialToolIds.WEB_SEARCH))
+                .type(JsonValue.from(WEB_SEARCH_TOOL_ID))
                 .function(
                     FunctionDefinition.builder()
-                        .name(OfficialToolIds.WEB_SEARCH)
+                        .name(WEB_SEARCH_TOOL_ID)
                         .putAdditionalProperty(
                             "type",
-                            JsonValue.from(OfficialToolIds.WEB_SEARCH),
+                            JsonValue.from(WEB_SEARCH_TOOL_ID),
                         )
                         .build(),
                 )

@@ -47,7 +47,6 @@ import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.UsageMetadata
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
@@ -68,6 +67,7 @@ open class Claude(
 ) : Model {
 
     companion object {
+        private const val WEB_SEARCH_TOOL_ID: String = "web_search"
         private val JSON_MAPPER = jsonMapper()
         private val logger = LoggerFactory.getLogger(Claude::class)
     }
@@ -403,7 +403,7 @@ open class Claude(
             .flatMap { it.functionDeclarations.orEmpty() }
             .map { declaration ->
                 when (declaration.name) {
-                    OfficialToolIds.WEB_SEARCH ->
+                    WEB_SEARCH_TOOL_ID ->
                         ToolUnion.ofWebSearchTool20250305(
                             WebSearchTool20250305.builder().build(),
                         )

@@ -1,6 +1,5 @@
 package github.ponyhuang.asssistantai.data.modelcatalog
 
-import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -47,11 +46,11 @@ class ModelAvailabilityTest {
         assertEquals("https://open.bigmodel.cn/api/paas/v4/", glm.apiBaseUrl)
         assertEquals("https://open.bigmodel.cn/api/anthropic", glm.anthropicBaseUrl)
         assertEquals(
-            listOf(OfficialToolIds.GLM_WEB_SEARCH),
+            listOf(GLM_WEB_SEARCH_TOOL_ID),
             glm.toDomain().supportedOfficialTools,
         )
         assertEquals(
-            listOf(OfficialToolIds.GLM_WEB_SEARCH),
+            listOf(GLM_WEB_SEARCH_TOOL_ID),
             glm.copy(baseType = ApiBaseType.Standard).toDomain().supportedOfficialTools,
         )
     }
@@ -63,15 +62,15 @@ class ModelAvailabilityTest {
         val miniMax = providers.getValue(LLMModelType.MiniMax.serviceId)
         assertTrue(miniMax.toDomain().supportedOfficialTools.isEmpty())
         assertEquals(
-            listOf(OfficialToolIds.WEB_SEARCH),
+            listOf(WEB_SEARCH_TOOL_ID),
             miniMax.copy(baseType = ApiBaseType.Anthropic).toDomain().supportedOfficialTools,
         )
         assertEquals(
-            listOf(OfficialToolIds.WEB_SEARCH),
+            listOf(WEB_SEARCH_TOOL_ID),
             providers.getValue(LLMModelType.Mimo.serviceId).toDomain().supportedOfficialTools,
         )
         assertEquals(
-            listOf(OfficialToolIds.KIMI_FORMULAS),
+            listOf(KIMI_FORMULAS_TOOL_ID),
             providers.getValue(LLMModelType.Moonshot.serviceId).toDomain().supportedOfficialTools,
         )
         assertTrue(
@@ -82,7 +81,7 @@ class ModelAvailabilityTest {
                 .isEmpty(),
         )
         assertEquals(
-            listOf(OfficialToolIds.WEB_SEARCH),
+            listOf(WEB_SEARCH_TOOL_ID),
             providers.getValue(LLMModelType.Anthropic.serviceId).toDomain().supportedOfficialTools,
         )
         assertFalse(
@@ -123,3 +122,7 @@ class ModelAvailabilityTest {
         apiBaseUrl = "https://example.com",
     )
 }
+
+private const val WEB_SEARCH_TOOL_ID: String = "web_search"
+private const val KIMI_FORMULAS_TOOL_ID: String = "kimi_formulas"
+private const val GLM_WEB_SEARCH_TOOL_ID: String = "glm_web_search"

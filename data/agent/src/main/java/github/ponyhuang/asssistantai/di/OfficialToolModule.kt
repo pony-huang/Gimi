@@ -10,6 +10,8 @@ import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.official.anthropic.AnthropicOfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.official.glm.GlmWebSearchToolset
 import github.ponyhuang.asssistantai.agent.tools.official.kimi.KimiFormulaToolset
+import github.ponyhuang.asssistantai.agent.tools.official.mimo.MimoOfficialToolset
+import github.ponyhuang.asssistantai.agent.tools.official.minimax.MinimaxOfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.official.openai.OpenaiOfficialToolset
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunctionCatalog
 
@@ -32,6 +34,18 @@ abstract class OfficialToolModule {
     @IntoSet
     abstract fun bindAnthropicToolset(
         toolset: AnthropicOfficialToolset,
+    ): OfficialToolset
+
+    @Binds
+    @IntoSet
+    abstract fun bindMiniMaxToolset(
+        toolset: MinimaxOfficialToolset,
+    ): OfficialToolset
+
+    @Binds
+    @IntoSet
+    abstract fun bindMimoToolset(
+        toolset: MimoOfficialToolset,
     ): OfficialToolset
 
     @Binds

@@ -1,7 +1,7 @@
 package github.ponyhuang.asssistantai.domain.modelcatalog.model
 
 /**
- * A single user-selectable function exposed by an [OfficialToolIds] category.
+ * A single user-selectable function exposed by an official-tool category.
  *
  * `id` is the stable identifier persisted in `ConversationToolConfiguration` and
  * passed through to the agent layer to filter the actual toolset. For providers

@@ -9,8 +9,6 @@ control music, check your calendar — without leaving the app.
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-`Android 15+` · `Jetpack Compose` · `Material 3` · [`Apache-2.0`](LICENSE)
-
 </div>
 
 ---
@@ -30,14 +28,14 @@ action the assistant wants to take can be reviewed before it happens.
 
 ## Highlights
 
-### 💬 A chat that does more than chat
+### A chat that does more than chat
 
 Stream replies in real time, attach photos from your camera or gallery, browse
 your conversation history in a side drawer, and read replies aloud. Switch models
 mid-conversation without losing your place. Run up to three tasks at once and
 watch each one's progress.
 
-### 🎙️ Voice, hands-free
+### Voice, hands-free
 
 Tap the mic to dictate, or set a **wake word** and let Gimi listen in the
 background — pair a Bluetooth headset and you can ask for something without
@@ -45,49 +43,51 @@ touching your phone at all. Wake-word detection runs entirely on-device; the
 Chinese model ships with the app and the English model is a small optional
 download.
 
-### 🧰 Tools that touch the real device
+### Tools that touch the real device
 
 The assistant has a built-in toolbox it can reach for when your request calls for
 it:
 
-| | |
-|---|---|
-| ⏰ **Time** | Set alarms and timers, check the clock |
-| 📅 **Calendar** | See what's coming up, create events |
-| 🎵 **Media** | Play, pause, skip tracks — including in other apps |
-| 🔊 **Audio** | Read and adjust media volume |
-| 💡 **Display** | Screen brightness, auto-brightness, screen timeout |
-| 📍 **Location** | Where you are, open it on a map |
-| 📁 **Files** | Search photos, videos, audio, and documents you've shared |
-| 📱 **Apps** | List, search, and open installed apps; take a photo or video |
-| 📞 **Contact** | Dial a number, draft a message, look up a contact |
-| 🌐 **Web** | Search the web and open links |
-| ⚙️ **Settings** | Jump straight to the right system settings page |
+|              |                                                              |
+|--------------|--------------------------------------------------------------|
+| **Time**     | Set alarms and timers, check the clock                       |
+| **Calendar** | See what's coming up, create events                          |
+| **Media**    | Play, pause, skip tracks — including in other apps           |
+| **Audio**    | Read and adjust media volume                                 |
+| **Display**  | Screen brightness, auto-brightness, screen timeout           |
+| **Location** | Where you are, open it on a map                              |
+| **Files**    | Search photos, videos, audio, and documents you've shared    |
+| **Apps**     | List, search, and open installed apps; take a photo or video |
+| **Contact**  | Dial a number, draft a message, look up a contact            |
+| **Web**      | Search the web and open links                                |
+| **Settings** | Jump straight to the right system settings page              |
 
-### 🔌 Bring your own tools with MCP
+### Bring your own tools with MCP
 
 Connect remote **MCP servers** (SSE or Streamable HTTP) to give the assistant
 abilities Gimi doesn't ship with. Add one by hand, or paste an existing
 `mcpServers` JSON config to import several at once. Toggle each server on or off
 whenever you like.
 
-### 📦 Skills
+### Skills
 
 Install reusable instruction packs from a URL or a local ZIP file. A skill is
 just a bundle of guidance and resources the assistant can draw on — install it
 once and it's available whenever it's relevant.
 
-### 📂 Working files
+### Working files
 
 Pick folders you want the assistant to be able to search. It can only see the
 folders you explicitly authorize, and you can revoke access at any time.
 
-### 🔒 You stay in charge
+### You stay in charge
 
 - **Ask before acting** — sensitive tool calls pause and wait for your Allow or Reject.
 - **Per-tool authorization** — turn the toolbox down to exactly the tools you want available.
-- **Plain-language permissions** — one screen explains what each Android permission is for and lets you grant or revoke it.
-- **Nothing extra phones home** — your API keys stay on your device and talk directly to the provider you chose.
+- **Plain-language permissions** — one screen explains what each Android permission is for and lets
+  you grant or revoke it.
+- **Nothing extra phones home** — your API keys stay on your device and talk directly to the
+  provider you chose.
 
 ## Supported model providers
 
@@ -95,10 +95,10 @@ Add your own API key for any of these:
 
 <div align="center">
 
-| | | | |
-|---|---|---|---|
-| **OpenAI** | **Anthropic** | **DeepSeek** | **Moonshot (Kimi)** |
-| **GLM (Zhipu)** | **MiniMax** | **MiMo (Xiaomi)** | |
+|                 |               |                   |                     |
+|-----------------|---------------|-------------------|---------------------|
+| **OpenAI**      | **Anthropic** | **DeepSeek**      | **Moonshot (Kimi)** |
+| **GLM (Zhipu)** | **MiniMax**   | **MiMo (Xiaomi)** |                     |
 
 </div>
 
@@ -148,22 +148,12 @@ contributor guide.
 
 Gimi stands on the shoulders of some excellent open-source work:
 
-- **[GetStream/chat-ai-samples](https://github.com/GetStream/chat-ai-samples)** — a
-  wonderful reference for what a modern Android AI chat experience should feel
-  like.
-- **[mikepenz/multiplatform-markdown-renderer](https://github.com/mikepenz/multiplatform-markdown-renderer)** —
-  renders every markdown reply you see in the chat.
-- **[google/adk-kotlin](https://github.com/google/adk-kotlin)** — the agent
-  toolkit that lets the assistant plan, call tools, and follow through.
+- **[GetStream/chat-ai-samples](https://github.com/GetStream/chat-ai-samples)**
 
-Thank you to the maintainers and contributors of all three. 🙏
+- **[mikepenz/multiplatform-markdown-renderer](https://github.com/mikepenz/multiplatform-markdown-renderer)**
+
+- **[google/adk-kotlin](https://github.com/google/adk-kotlin)**
 
 ## License
 
 Gimi is released under the [Apache License 2.0](LICENSE).
-
-<div align="center">
-
-Made with Kotlin and a lot of coffee.
-
-</div>

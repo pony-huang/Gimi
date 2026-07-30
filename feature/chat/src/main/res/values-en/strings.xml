@@ -22,10 +22,10 @@
     <string name="chat_attachment_open_failed">No app is available to open this document</string>
     <string name="chat_session_tools_title">Tools</string>
     <string name="chat_tool_access_title">Tool access</string>
-    <string name="chat_tool_access_on_demand">On demand</string>
-    <string name="chat_tool_access_on_demand_description">Load when needed. More model calls, potentially lower accuracy</string>
+    <string name="chat_tool_access_on_demand">Auto search (Recommended)</string>
+    <string name="chat_tool_access_on_demand_description">Tools are searched and loaded only when needed. Keeps context lean, but requires more model calls and may be slightly less accurate</string>
     <string name="chat_tool_access_always">Always available</string>
-    <string name="chat_tool_access_always_description">Ready from the start. Fewer model calls, higher accuracy</string>
+    <string name="chat_tool_access_always_description">All tools are loaded from the start. Fewer model calls and higher accuracy, at the cost of more context</string>
     <string name="chat_session_mcp_title">MCP</string>
     <string name="chat_session_only_notice">Applies to this chat only</string>
     <string name="chat_session_tools_running_notice">Tools cannot be changed while this chat is running</string>

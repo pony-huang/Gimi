@@ -57,13 +57,18 @@ import com.google.adk.kt.types.Tool as AdkTool
 
 /**
  * Claude (Anthropic) Model — ADK [Model] bridge to the Anthropic Java SDK.
-
+ *
+ * @property providerBuiltInToolNames 当前服务以厂商原生形态执行的官方内置工具名
+ * （如 Anthropic/MiniMax 的 `web_search`）；不在集合内的同名声明视为本地可执行函数，
+ * 保持普通 tool 下发。
+ *
  * @author pony
  * @date 2026/6/28
  */
 open class Claude(
     override val name: String,
     private val client: AnthropicClient,
+    private val providerBuiltInToolNames: Set<String> = emptySet(),
 ) : Model {
 
     companion object {
@@ -402,10 +407,16 @@ open class Claude(
             .flatMap { it.functionDeclarations.orEmpty() }
             .map { declaration ->
                 when (declaration.name) {
+                    // 仅当当前服务把 web_search 声明为厂商内置工具时才转换 wire 形态；
+                    // 同名真实函数（GLM 搜索、MCP 工具）保持普通 tool 下发。
                     WEB_SEARCH_TOOL_ID ->
-                        ToolUnion.ofWebSearchTool20250305(
-                            WebSearchTool20250305.builder().build(),
-                        )
+                        if (WEB_SEARCH_TOOL_ID in providerBuiltInToolNames) {
+                            ToolUnion.ofWebSearchTool20250305(
+                                WebSearchTool20250305.builder().build(),
+                            )
+                        } else {
+                            ToolUnion.ofTool(declaration.toAnthropicTool())
+                        }
 
                     else -> ToolUnion.ofTool(declaration.toAnthropicTool())
                 }

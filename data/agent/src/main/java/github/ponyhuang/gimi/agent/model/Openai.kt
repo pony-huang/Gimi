@@ -50,12 +50,17 @@ import com.google.adk.kt.types.Tool as AdkTool
 /**
  * OpenAI Model — ADK [Model] bridge to the OpenAI Java SDK.
  *
+ * @property providerBuiltInToolNames 当前服务以厂商原生形态执行的官方内置工具名
+ * （如 OpenAI/MiMo 的 `web_search`）；不在集合内的同名声明视为本地可执行函数，
+ * 保持普通 function 下发。
+ *
  * @author pony
  * @date 2026/6/21
  */
 open class Openai(
     override val name: String,
     private val client: OpenAIClient,
+    private val providerBuiltInToolNames: Set<String> = emptySet(),
 ) : Model {
 
     companion object {
@@ -495,7 +500,15 @@ open class Openai(
             .flatMap { it.functionDeclarations.orEmpty() }
             .map { declaration ->
                 when (declaration.name) {
-                    WEB_SEARCH_TOOL_ID -> openAiWebSearchTool()
+                    // 仅当当前服务把 web_search 声明为厂商内置工具时才转换 wire 形态；
+                    // 同名真实函数（GLM 搜索、Kimi 公式、MCP 工具）保持普通 function 下发。
+                    WEB_SEARCH_TOOL_ID ->
+                        if (WEB_SEARCH_TOOL_ID in providerBuiltInToolNames) {
+                            openAiWebSearchTool()
+                        } else {
+                            declaration.toChatCompletionTool()
+                        }
+
                     else -> declaration.toChatCompletionTool()
                 }
             }

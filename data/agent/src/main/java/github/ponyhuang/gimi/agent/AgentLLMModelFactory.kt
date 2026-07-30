@@ -5,6 +5,8 @@ import com.google.adk.kt.models.Model
 import com.openai.client.okhttp.OpenAIOkHttpClient
 import github.ponyhuang.gimi.agent.model.Claude
 import github.ponyhuang.gimi.agent.model.Openai
+import github.ponyhuang.gimi.agent.tools.official.anthropic.AnthropicOfficialToolset
+import github.ponyhuang.gimi.agent.tools.official.openai.OpenaiOfficialToolset
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedAgentModel
@@ -102,6 +104,7 @@ class AgentLLMModelFactory @Inject constructor(
                     .baseUrl(cfg.fullBaseUrl)
                     .apiKey(cfg.apiKey)
                     .build(),
+                providerBuiltInToolNames = cfg.providerBuiltInToolNames(),
             )
 
             ApiProtocol.Anthropic -> Claude(
@@ -110,8 +113,28 @@ class AgentLLMModelFactory @Inject constructor(
                     .baseUrl(cfg.fullBaseUrl)
                     .apiKey(cfg.apiKey)
                     .build(),
+                providerBuiltInToolNames = cfg.providerBuiltInToolNames(),
             )
         }
+
+    /**
+     * 当前服务以厂商原生形态执行的官方内置工具名。
+     *
+     * 与各 official toolset 的服务门控保持一致：仅 openai/mimo（Standard）和
+     * anthropic/minimax（Anthropic）的 web_search 由厂商远端执行；其余服务的
+     * 同名声明（GLM 本地搜索、Kimi 公式、MCP 工具）都是可执行函数，不得转换。
+     */
+    private fun ModelConfig.providerBuiltInToolNames(): Set<String> = when (baseType) {
+        ApiProtocol.Standard -> when (serviceId) {
+            "openai", "mimo" -> setOf(OpenaiOfficialToolset.WEB_SEARCH_TOOL_ID)
+            else -> emptySet()
+        }
+
+        ApiProtocol.Anthropic -> when (serviceId) {
+            "anthropic", "minimax" -> setOf(AnthropicOfficialToolset.WEB_SEARCH_TOOL_ID)
+            else -> emptySet()
+        }
+    }
 
     fun selectFastModelConfig(): ModelConfig? {
         val resolved = modelServices.resolveChatModel(modelServices.fastSelection.value)

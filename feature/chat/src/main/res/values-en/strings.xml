@@ -22,8 +22,6 @@
     <string name="chat_attachment_open_failed">No app is available to open this document</string>
     <string name="chat_session_tools_title">Tools</string>
     <string name="chat_tool_access_title">Tool access</string>
-    <string name="chat_tool_access_auto">Auto</string>
-    <string name="chat_tool_access_auto_description">The assistant chooses for you</string>
     <string name="chat_tool_access_on_demand">On demand</string>
     <string name="chat_tool_access_on_demand_description">Load when needed. More model calls, potentially lower accuracy</string>
     <string name="chat_tool_access_always">Always available</string>

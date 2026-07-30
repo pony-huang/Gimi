@@ -8,10 +8,18 @@ import org.junit.Test
 class ConversationToolConfigurationTest {
 
     @Test
-    fun newConversationsDefaultToAutomaticToolAccess() {
+    fun newConversationsDefaultToAlwaysAvailableToolAccess() {
         assertEquals(
-            ToolAccessMode.AUTO,
+            ToolAccessMode.ALWAYS_AVAILABLE,
             ConversationToolConfiguration().toolAccessMode,
+        )
+    }
+
+    @Test
+    fun toolAccessModesOnlyContainExplicitLoadingPolicies() {
+        assertEquals(
+            listOf(ToolAccessMode.ON_DEMAND, ToolAccessMode.ALWAYS_AVAILABLE),
+            ToolAccessMode.entries,
         )
     }
 

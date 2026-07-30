@@ -22,23 +22,30 @@ import github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCat
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * 一次 Agent 构建的产物。
+ *
+ * @property agent 交给 ADK Runner 执行的 Agent。
+ * @property modelRuntime 可安全放入本次 invocation RunConfig 的非敏感模型信息。
+ */
+data class AgentRuntime(
+    val agent: BaseAgent,
+    val modelRuntime: ModelRuntimeMetadata,
+)
 
 /**
- * Agent 工厂 — 按工具访问模式构建三种独立的 [BaseAgent]。
+ * Agent 工厂 — 按工具访问模式构建两种独立的 [BaseAgent]。
  *
- * 构建期只绑定服务级能力（模型、候选工具来源）；会话级工具勾选
- * （本地工具 / MCP server / 官方函数）通过 `RunConfig.customMetadata` 透传，
- * 由各 Toolset 在每次模型请求时自行过滤 —— 因此会话内修改工具选择
- * 不会触发 Agent 重建。
+ * 构建期生成 Agent 和不含凭据的 [ModelRuntimeMetadata]；后者与会话级工具勾选
+ * 一起进入 invocation RunConfig，各 Toolset 在每次模型请求时自行读取和过滤，
+ * 因此会话内修改工具选择不会触发 Agent 重建。
  *
- * 三种访问模式（[ToolAccessMode]）：
+ * 两种访问模式（[ToolAccessMode]）：
  * - [ToolAccessMode.ALWAYS_AVAILABLE]：全部启用工具直接声明，无检索网关。
  *   本地工具仍然按统一 `localToolset` 暴露，但 [LocalCatalog.toolsByCategory]
  *   使得日后按类裁剪成为可能。
  * - [ToolAccessMode.ON_DEMAND]：只声明核心工具 + `tool_search`，每个业务类别
  *   （[LocalToolCategory]）注册为一个独立检索 source。
- * - [ToolAccessMode.AUTO]：与 `ON_DEMAND` 共享同一组 source，唯一区别是
- *   [ToolSearchToolset] 在预算可承受时直接吐出，否则退化为按需检索。
  */
 @Singleton
 class AgentFactory @Inject constructor(
@@ -51,7 +58,7 @@ class AgentFactory @Inject constructor(
     private val officialToolsets: Set<@JvmSuppressWildcards OfficialToolset>,
 ) {
     /**
-     * 按访问模式构建 [BaseAgent]。
+     * 按访问模式构建 [AgentRuntime]。
      *
      * @param selection 模型选择；为 null 时使用默认模型
      * @param toolAccessMode 工具声明加载模式
@@ -59,16 +66,22 @@ class AgentFactory @Inject constructor(
     suspend fun create(
         selection: ModelSelection? = null,
         toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
-    ): BaseAgent = when (toolAccessMode) {
-        ToolAccessMode.ALWAYS_AVAILABLE -> createAlwaysAvailableAgent(selection)
-        ToolAccessMode.ON_DEMAND -> createSearchAgent(selection, ToolAccessMode.ON_DEMAND)
-        ToolAccessMode.AUTO -> createSearchAgent(selection, ToolAccessMode.AUTO)
+    ): AgentRuntime {
+        val modelConfig = agentLLMModelFactory.selectModelConfig(selection)
+        val model = agentLLMModelFactory.createModel(modelConfig)
+        val agent = when (toolAccessMode) {
+            ToolAccessMode.ALWAYS_AVAILABLE -> createAlwaysAvailableAgent(model)
+            ToolAccessMode.ON_DEMAND -> createSearchAgent(model, ToolAccessMode.ON_DEMAND)
+        }
+        return AgentRuntime(
+            agent = agent,
+            modelRuntime = modelConfig.toRuntimeMetadata(),
+        )
     }
 
     /** 全量直出：所有启用工具从首个请求起直接声明。 */
-    private fun createAlwaysAvailableAgent(selection: ModelSelection?): BaseAgent {
-        val (model, _) = createModel(selection)
-        return baseAgent(
+    private fun createAlwaysAvailableAgent(model: Model): BaseAgent =
+        baseAgent(
             model = model,
             dynamicToolSearchEnabled = false,
             toolsets = buildList {
@@ -78,7 +91,6 @@ class AgentFactory @Inject constructor(
                 add(SkillToolset(skillSource))
             },
         )
-    }
 
     /**
      * 检索网关：核心工具（厂商原生官方工具 + 技能）固定声明。
@@ -91,10 +103,9 @@ class AgentFactory @Inject constructor(
      * - 可展开官方函数（[DynamicOfficialToolset]）继续作为独立 source。
      */
     private suspend fun createSearchAgent(
-        selection: ModelSelection?,
+        model: Model,
         mode: ToolAccessMode,
     ): BaseAgent {
-        val (model, modelConfig) = createModel(selection)
         val (dynamicOfficialToolsets, directOfficialToolsets) =
             officialToolsets.partition { it is DynamicOfficialToolset }
         val sources = buildList {
@@ -107,7 +118,7 @@ class AgentFactory @Inject constructor(
             dynamicOfficialToolsets
                 .filterIsInstance<DynamicOfficialToolset>()
                 .forEach { toolset ->
-                    add(OfficialToolCandidateSource(toolset, modelConfig))
+                    add(OfficialToolCandidateSource(toolset))
                 }
         }
         return baseAgent(
@@ -119,11 +130,6 @@ class AgentFactory @Inject constructor(
                 add(SkillToolset(skillSource))
             },
         )
-    }
-
-    private fun createModel(selection: ModelSelection?): Pair<Model, ModelConfig> {
-        val modelConfig = agentLLMModelFactory.selectModelConfig(selection)
-        return agentLLMModelFactory.createModel(modelConfig) to modelConfig
     }
 
     private fun baseAgent(

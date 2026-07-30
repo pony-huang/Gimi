@@ -366,7 +366,6 @@ class ModelServiceRepository @Inject constructor(
                 modelId = resolved.model.modelId,
                 apiKey = provider.apiKey,
                 modelBaseUrl = provider.activeApiBaseUrl.trimEnd('/'),
-                supportedOfficialTools = provider.supportedOfficialTools,
             )
         }
 
@@ -470,9 +469,7 @@ class ModelServiceRepository @Inject constructor(
             homepageUrl = entity.homepageUrl,
             keyHelpUrl = entity.keyHelpUrl,
             docsUrl = entity.docsUrl,
-            modelsUrl = entity.modelsUrl,
-            officialToolProtocols = LLMModelConfigs.officialToolProtocolsFor(entity.serviceId),
-            disabledOfficialTools = providerSettings.disabledOfficialTools,
+            modelsUrl = entity.modelsUrl
         )
     }
 
@@ -484,8 +481,7 @@ class ModelServiceRepository @Inject constructor(
         apiKey = apiKey,
         apiBaseUrl = apiBaseUrl,
         baseType = baseType,
-        anthropicBaseUrl = anthropicBaseUrl,
-        disabledOfficialTools = disabledOfficialTools,
+        anthropicBaseUrl = anthropicBaseUrl
     )
 
     private fun LLMModelProvider.applySettings(value: ModelServiceSettings): LLMModelProvider = copy(
@@ -494,7 +490,6 @@ class ModelServiceRepository @Inject constructor(
         apiBaseUrl = value.apiBaseUrl,
         baseType = value.baseType,
         anthropicBaseUrl = value.anthropicBaseUrl,
-        disabledOfficialTools = value.disabledOfficialTools,
     )
 
     private fun readSettings(): Map<String, ModelServiceSettings>? {

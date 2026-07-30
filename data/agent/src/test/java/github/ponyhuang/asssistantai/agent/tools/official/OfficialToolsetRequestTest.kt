@@ -1,20 +1,19 @@
 package github.ponyhuang.asssistantai.agent.tools.official
 
+import com.google.adk.kt.agents.ReadonlyContext
+import com.google.adk.kt.agents.RunConfig
 import com.google.adk.kt.models.LlmRequest
-import com.google.adk.kt.models.LlmResponse
-import com.google.adk.kt.models.Model
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.FunctionDeclaration
-import github.ponyhuang.asssistantai.agent.ConfiguredModel
-import github.ponyhuang.asssistantai.agent.ModelConfig
+import github.ponyhuang.asssistantai.agent.ModelRuntimeMetadata
+import github.ponyhuang.asssistantai.agent.tools.ToolRunMetadata
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -23,12 +22,12 @@ import org.junit.Test
 class OfficialToolsetRequestTest {
 
     @Test
-    fun expandsToolsFromTheRequestModelConfiguration() = runTest {
-        val config = config(officialTools = listOf("request_tool"))
-        val request = LlmRequest(model = FakeConfiguredModel(config))
+    fun expandsToolsFromTheInvocationRunConfig() = runTest {
+        val config = config(modelId = "request_tool")
+        val request = LlmRequest()
         val toolset = FakeOfficialToolset()
 
-        val processed = toolset.processLlmRequest(mockk(relaxed = true), request)
+        val processed = toolset.processLlmRequest(toolContext(config), request)
 
         assertEquals(
             listOf("request_tool"),
@@ -40,8 +39,8 @@ class OfficialToolsetRequestTest {
     }
 
     @Test
-    fun leavesRequestUntouchedWhenModelDoesNotExposeConfiguration() = runTest {
-        val request = LlmRequest(model = mockk<Model>(relaxed = true))
+    fun leavesRequestUntouchedWhenRunConfigDoesNotExposeConfiguration() = runTest {
+        val request = LlmRequest()
 
         val processed = FakeOfficialToolset()
             .processLlmRequest(mockk(relaxed = true), request)
@@ -51,16 +50,15 @@ class OfficialToolsetRequestTest {
 
     @Test
     fun concurrentRequestsUseTheirOwnModelConfiguration() = runTest {
-        val toolContext = mockk<ToolContext>(relaxed = true)
         val toolset = FakeOfficialToolset()
-        val requests = listOf(
-            config(officialTools = listOf("first_tool")),
-            config(officialTools = listOf("second_tool")),
-        ).map { config -> LlmRequest(model = FakeConfiguredModel(config)) }
+        val configurations = listOf(
+            config(modelId = "first_tool"),
+            config(modelId = "second_tool"),
+        )
 
-        val resolvedNames = requests.map { request ->
+        val resolvedNames = configurations.map { config ->
             async {
-                toolset.processLlmRequest(toolContext, request)
+                toolset.processLlmRequest(toolContext(config), LlmRequest())
                     .config.tools.orEmpty()
                     .flatMap { it.functionDeclarations.orEmpty() }
                     .map { it.name }
@@ -74,14 +72,14 @@ class OfficialToolsetRequestTest {
     }
 
     private class FakeOfficialToolset : OfficialToolset {
-        val seenConfigurations = mutableListOf<ModelConfig>()
+        val seenConfigurations = mutableListOf<ModelRuntimeMetadata>()
 
         override suspend fun resolveTools(
-            config: ModelConfig,
+            config: ModelRuntimeMetadata,
             selection: ConversationToolConfiguration?,
         ): List<BaseTool> {
             seenConfigurations += config
-            return config.officialTools.map(::DeclarationTool)
+            return listOf(DeclarationTool(config.modelId))
         }
     }
 
@@ -95,25 +93,26 @@ class OfficialToolsetRequestTest {
         ): Any = emptyMap<String, Any>()
     }
 
-    private class FakeConfiguredModel(
-        override val modelConfig: ModelConfig,
-    ) : ConfiguredModel {
-        override val name: String = modelConfig.modelId
-
-        override fun generateContent(
-            request: LlmRequest,
-            stream: Boolean,
-        ): Flow<LlmResponse> = emptyFlow()
+    private fun toolContext(config: ModelRuntimeMetadata): ToolContext {
+        val readonlyContext = mockk<ReadonlyContext>()
+        every { readonlyContext.runConfig } returns RunConfig(
+            customMetadata = ToolRunMetadata.of(
+                modelRuntime = config,
+                toolConfiguration = null,
+                allowConfirmationRequiredTools = true,
+            ),
+        )
+        return mockk {
+            every { context } returns readonlyContext
+        }
     }
 
     private fun config(
-        officialTools: List<String> = emptyList(),
-    ) = ModelConfig(
+        modelId: String = "model",
+    ) = ModelRuntimeMetadata(
         serviceId = "service",
         baseType = ApiProtocol.Standard,
-        modelId = "model",
-        apiKey = "key",
+        modelId = modelId,
         fullBaseUrl = "https://example.com",
-        officialTools = officialTools,
     )
 }

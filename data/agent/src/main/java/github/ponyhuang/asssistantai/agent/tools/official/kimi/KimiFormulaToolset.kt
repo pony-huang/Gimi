@@ -1,11 +1,14 @@
 package github.ponyhuang.asssistantai.agent.tools.official.kimi
 
 import com.google.adk.kt.tools.BaseTool
-import github.ponyhuang.asssistantai.agent.ModelConfig
+import github.ponyhuang.asssistantai.agent.ModelRuntimeMetadata
 import github.ponyhuang.asssistantai.agent.tools.official.DynamicOfficialToolset
+import github.ponyhuang.asssistantai.agent.tools.official.apiKeyForService
+import github.ponyhuang.asssistantai.agent.tools.official.belongsToModelFamily
 import github.ponyhuang.asssistantai.agent.tools.official.isOfficialToolEnabled
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
+import github.ponyhuang.asssistantai.domain.modelcatalog.repository.AgentModelConfigurationSource
 import javax.inject.Inject
 import okhttp3.OkHttpClient
 
@@ -20,15 +23,17 @@ import okhttp3.OkHttpClient
 class KimiFormulaToolset @Inject constructor(
     private val cache: KimiFormulaCache,
     private val httpClient: OkHttpClient,
+    private val modelServices: AgentModelConfigurationSource,
 ) : DynamicOfficialToolset {
     override val sourceId: String = "official:kimi_formulas"
     override val sourceDisplayName: String = "Kimi formulas"
 
     override suspend fun resolveTools(
-        config: ModelConfig,
+        config: ModelRuntimeMetadata,
         selection: ConversationToolConfiguration?,
     ): List<BaseTool> {
-        if (OfficialToolIds.KIMI_FORMULAS !in config.officialTools) return emptyList()
+        if (!config.modelId.belongsToModelFamily("kimi", "moonshot")) return emptyList()
+        val apiKey = modelServices.apiKeyForService(config.serviceId) ?: return emptyList()
         if (!selection.isOfficialToolEnabled(config.serviceId, OfficialToolIds.KIMI_FORMULAS)) {
             return emptyList()
         }
@@ -37,10 +42,13 @@ class KimiFormulaToolset @Inject constructor(
             ?.takeIf {
                 it.isNotEmpty() && ConversationToolConfiguration.ALL_FUNCTIONS_MARKER !in it
             }
-        return cache.fetch(serviceId = config.serviceId, apiKey = config.apiKey)
+        return cache.fetch(
+            serviceId = config.serviceId,
+            apiKey = apiKey,
+        )
             .map { declaration ->
                 KimiFormulaTool(
-                    apiKey = config.apiKey,
+                    apiKey = apiKey,
                     declaration = declaration,
                     httpClient = httpClient,
                 )

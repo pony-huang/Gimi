@@ -3,11 +3,10 @@ package github.ponyhuang.asssistantai.domain.conversation.model
 /**
  * 会话把已启用工具暴露给模型的方式。
  *
- * [AUTO] 根据声明预算选择直接加载或按需检索；[ON_DEMAND] 始终先检索；
- * [ALWAYS_AVAILABLE] 从当前用户轮次的第一次模型请求起加载全部已启用工具。
+ * [ON_DEMAND] 始终先检索；[ALWAYS_AVAILABLE] 从当前用户轮次的第一次模型请求起
+ * 加载全部已启用工具。
  */
 enum class ToolAccessMode {
-    AUTO,
     ON_DEMAND,
     ALWAYS_AVAILABLE,
 }
@@ -32,7 +31,7 @@ data class ConversationToolConfiguration(
     val enabledLocalToolIds: Set<String> = emptySet(),
     val enabledMcpServerIds: Set<String> = emptySet(),
     val enabledOfficialFunctionIdsByService: Map<String, Map<String, Set<String>>> = emptyMap(),
-    val toolAccessMode: ToolAccessMode = ToolAccessMode.AUTO,
+    val toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
 ) {
     fun enabledOfficialFunctionIds(serviceId: String, toolId: String): Set<String> =
         enabledOfficialFunctionIdsByService[serviceId]?.get(toolId).orEmpty()

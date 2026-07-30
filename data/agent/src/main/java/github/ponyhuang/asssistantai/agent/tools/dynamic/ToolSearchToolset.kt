@@ -9,7 +9,6 @@ import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -69,7 +68,6 @@ internal class ToolSearchToolset(
 ) : Toolset {
     private val discoveryMutex = Mutex()
     private val successfulSourceCache = mutableMapOf<String, List<BaseTool>>()
-    private val autoOnDemandInvocations = ConcurrentHashMap.newKeySet<String>()
     private val searchTool = ToolSearchTool(this)
 
     override suspend fun getTools(readonlyContext: ReadonlyContext?): List<BaseTool> {
@@ -82,7 +80,6 @@ internal class ToolSearchToolset(
             ToolAccessMode.ON_DEMAND -> listOf(searchTool)
             ToolAccessMode.ALWAYS_AVAILABLE ->
                 discover(readonlyContext).uniqueCandidates.map(ToolCandidate::tool)
-            ToolAccessMode.AUTO -> automaticTools(readonlyContext)
         }
     }
 
@@ -127,24 +124,6 @@ internal class ToolSearchToolset(
             KEY_SOURCE_ERRORS to discovery.sourceErrors.map(SourceFailure::summary),
             KEY_SELECTION_CHANGED to true,
         )
-    }
-
-    private suspend fun automaticTools(
-        readonlyContext: ReadonlyContext?,
-    ): List<BaseTool> {
-        val invocationId = readonlyContext?.invocationId ?: NO_INVOCATION_ID
-        if (invocationId in autoOnDemandInvocations) return listOf(searchTool)
-
-        val discovery = discover(readonlyContext)
-        val candidates = discovery.uniqueCandidates
-        val fitsBudget = candidates.size <= budget.maxTools &&
-                candidates.sumOf(::schemaBytes) <= budget.maxSchemaBytes
-        return if (discovery.sourceErrors.isEmpty() && fitsBudget) {
-            candidates.map(ToolCandidate::tool)
-        } else {
-            autoOnDemandInvocations += invocationId
-            listOf(searchTool)
-        }
     }
 
     private suspend fun resolveSelectedTools(
@@ -329,7 +308,6 @@ internal class ToolSearchToolset(
         /** session state 中持久化 `tool_search` 选中工具名的 key。 */
         const val STATE_KEY_LOADED_TOOLS: String = "selkie.tool_search.loaded_tools"
 
-        private const val NO_INVOCATION_ID = "__no_invocation__"
         private const val ARG_QUERY = "query"
         private const val KEY_LOADED_TOOLS = "loaded_tools"
         private const val KEY_OMITTED_MATCH_COUNT = "omitted_match_count"

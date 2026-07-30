@@ -1,6 +1,6 @@
 package github.ponyhuang.asssistantai.agent.tools.official.anthropic
 
-import github.ponyhuang.asssistantai.agent.ModelConfig
+import github.ponyhuang.asssistantai.agent.ModelRuntimeMetadata
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
@@ -16,10 +16,7 @@ class AnthropicOfficialToolsetTest {
     @Test
     fun resolvesEnabledBuiltInToolsForAnyAnthropicService() = runTest {
         val tools = toolset.resolveTools(
-            config(
-                serviceId = "custom-anthropic-service",
-                officialTools = listOf(OfficialToolIds.WEB_SEARCH),
-            ),
+            config(serviceId = "custom-anthropic-service"),
             selection = null,
         )
 
@@ -32,25 +29,11 @@ class AnthropicOfficialToolsetTest {
             config(
                 serviceId = "anthropic",
                 baseType = ApiProtocol.Standard,
-                officialTools = listOf(OfficialToolIds.WEB_SEARCH),
             ),
             selection = null,
         )
 
         assertTrue(tools.isEmpty())
-    }
-
-    @Test
-    fun ignoresDisabledAndUnsupportedTools() = runTest {
-        assertTrue(
-            toolset.resolveTools(config("anthropic", officialTools = emptyList()), null).isEmpty(),
-        )
-        assertTrue(
-            toolset.resolveTools(
-                config("anthropic", officialTools = listOf(OfficialToolIds.KIMI_FORMULAS)),
-                selection = null,
-            ).isEmpty(),
-        )
     }
 
     @Test
@@ -62,7 +45,7 @@ class AnthropicOfficialToolsetTest {
         )
 
         val tools = toolset.resolveTools(
-            config("anthropic", officialTools = listOf(OfficialToolIds.WEB_SEARCH)),
+            config("anthropic"),
             selection,
         )
 
@@ -72,13 +55,10 @@ class AnthropicOfficialToolsetTest {
     private fun config(
         serviceId: String,
         baseType: ApiProtocol = ApiProtocol.Anthropic,
-        officialTools: List<String>,
-    ) = ModelConfig(
+    ) = ModelRuntimeMetadata(
         serviceId = serviceId,
         baseType = baseType,
         modelId = "model",
-        apiKey = "key",
         fullBaseUrl = "https://example.com",
-        officialTools = officialTools,
     )
 }

@@ -15,8 +15,14 @@ import javax.inject.Singleton
 /**
  * 解析后的模型配置（[AgentLLMModelFactory.createModel] 用）。
  *
- * 只描述服务级能力（协议、端点、支持的官方工具）；会话级工具勾选
- * 通过 RunConfig metadata 透传，由各 Toolset 按请求自行过滤。
+ * 只描述当前请求的不可变模型运行参数（服务、协议、模型 ID、端点和凭据）。
+ * 会话级工具勾选仍由 invocation context 提供，不与凭据混存。
+ *
+ * @property serviceId 模型服务稳定 ID，用于匹配当前会话的官方函数选择。
+ * @property baseType 当前服务使用的 API 协议。
+ * @property modelId 实际请求模型 ID，也是厂商模型家族判断的唯一依据。
+ * @property apiKey 当前模型服务的凭据，仅保留在请求模型配置中。
+ * @property fullBaseUrl 已解析到协议所需层级的模型服务端点。
  */
 data class ModelConfig(
     val serviceId: String,
@@ -24,13 +30,32 @@ data class ModelConfig(
     val modelId: String,
     val apiKey: String,
     val fullBaseUrl: String,
-    val officialTools: List<String> = emptyList(),
 )
 
-/** ADK model carrying the immutable runtime configuration used to build it. */
-internal interface ConfiguredModel : Model {
-    val modelConfig: ModelConfig
-}
+/**
+ * 可安全写入 ADK `RunConfig.customMetadata` 的模型运行信息。
+ *
+ * 该类型刻意不包含 API Key：ADK 会把 custom metadata 合并进持久化 Event，
+ * 凭据必须在官方工具真正执行前根据 [serviceId] 从安全配置源重新解析。
+ *
+ * @property serviceId 模型服务稳定 ID。
+ * @property baseType 当前请求使用的协议。
+ * @property modelId 实际模型 ID。
+ * @property fullBaseUrl 当前协议对应的完整服务端点。
+ */
+data class ModelRuntimeMetadata(
+    val serviceId: String,
+    val baseType: ApiProtocol,
+    val modelId: String,
+    val fullBaseUrl: String,
+)
+
+internal fun ModelConfig.toRuntimeMetadata(): ModelRuntimeMetadata = ModelRuntimeMetadata(
+    serviceId = serviceId,
+    baseType = baseType,
+    modelId = modelId,
+    fullBaseUrl = fullBaseUrl,
+)
 
 @Singleton
 class AgentLLMModelFactory @Inject constructor(
@@ -71,25 +96,21 @@ class AgentLLMModelFactory @Inject constructor(
 
     fun createModel(cfg: ModelConfig): Model =
         when (cfg.baseType) {
-            ApiProtocol.Standard -> object : Openai(
+            ApiProtocol.Standard -> Openai(
                 name = cfg.modelId,
                 client = OpenAIOkHttpClient.builder()
                     .baseUrl(cfg.fullBaseUrl)
                     .apiKey(cfg.apiKey)
                     .build(),
-            ), ConfiguredModel {
-                override val modelConfig: ModelConfig = cfg
-            }
+            )
 
-            ApiProtocol.Anthropic -> object : Claude(
+            ApiProtocol.Anthropic -> Claude(
                 name = cfg.modelId,
                 client = AnthropicOkHttpClient.builder()
                     .baseUrl(cfg.fullBaseUrl)
                     .apiKey(cfg.apiKey)
                     .build(),
-            ), ConfiguredModel {
-                override val modelConfig: ModelConfig = cfg
-            }
+            )
         }
 
     fun selectFastModelConfig(): ModelConfig? {
@@ -103,7 +124,6 @@ class AgentLLMModelFactory @Inject constructor(
         baseType = protocol,
         modelId = modelId,
         apiKey = apiKey,
-        fullBaseUrl = modelBaseUrl,
-        officialTools = supportedOfficialTools,
+        fullBaseUrl = modelBaseUrl
     )
 }

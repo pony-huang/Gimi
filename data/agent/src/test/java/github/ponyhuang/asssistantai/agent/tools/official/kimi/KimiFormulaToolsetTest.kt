@@ -1,9 +1,13 @@
 package github.ponyhuang.asssistantai.agent.tools.official.kimi
 
-import github.ponyhuang.asssistantai.agent.ModelConfig
+import github.ponyhuang.asssistantai.agent.ModelRuntimeMetadata
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
+import github.ponyhuang.asssistantai.domain.modelcatalog.repository.AgentModelConfigurationSource
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -17,9 +21,9 @@ import org.junit.Test
 class KimiFormulaToolsetTest {
 
     @Test
-    fun notApplicableWhenKimiFormulasNotEnabled() = runTest {
+    fun notApplicableWhenModelIsNotKimi() = runTest {
         val toolset = toolset(manifestClient(200, MANIFEST_BODY))
-        val config = config(officialTools = emptyList())
+        val config = config(modelId = "other-model")
 
         assertTrue(toolset.resolveTools(config, selection = null).isEmpty())
     }
@@ -83,15 +87,41 @@ class KimiFormulaToolsetTest {
         assertTrue(toolset.resolveTools(config(), selection = null).isEmpty())
     }
 
+    @Test
+    fun usesApiKeyFromSecureServiceConfiguration() = runTest {
+        var authorization: String? = null
+        val toolset = toolset(
+            manifestClient(200, MANIFEST_BODY) { request ->
+                authorization = request.header("Authorization")
+            },
+            credential = "service-key",
+        )
+
+        toolset.resolveTools(config(), selection = null)
+
+        assertEquals("Bearer service-key", authorization)
+    }
+
+    @Test
+    fun resolvesForAnthropicProtocol() = runTest {
+        val toolset = toolset(manifestClient(200, MANIFEST_BODY))
+
+        val tools = toolset.resolveTools(
+            config(baseType = ApiProtocol.Anthropic),
+            selection = null,
+        )
+
+        assertEquals(listOf("translate"), tools.map { it.name })
+    }
+
     private fun config(
-        officialTools: List<String> = listOf(OfficialToolIds.KIMI_FORMULAS),
-    ) = ModelConfig(
+        modelId: String = "kimi-k2.5",
+        baseType: ApiProtocol = ApiProtocol.Standard,
+    ) = ModelRuntimeMetadata(
         serviceId = SERVICE_ID,
-        baseType = ApiProtocol.Standard,
-        modelId = "model",
-        apiKey = "key",
+        baseType = baseType,
+        modelId = modelId,
         fullBaseUrl = "https://example.com",
-        officialTools = officialTools,
     )
 
     private fun selection(
@@ -100,20 +130,39 @@ class KimiFormulaToolsetTest {
         enabledOfficialFunctionIdsByService = mapOf(SERVICE_ID to mapOf(*functionsByTool)),
     )
 
-    private fun toolset(httpClient: OkHttpClient) = KimiFormulaToolset(
-        cache = KimiFormulaCache(httpClient),
-        httpClient = httpClient,
-    )
+    private fun toolset(
+        httpClient: OkHttpClient,
+        credential: String = "key",
+    ): KimiFormulaToolset {
+        val service = mockk<LLMModelSetting> {
+            every { id } returns SERVICE_ID
+            every { isEnabled } returns true
+            every { apiKey } returns credential
+        }
+        val modelServices = mockk<AgentModelConfigurationSource> {
+            every { currentServices() } returns listOf(service)
+        }
+        return KimiFormulaToolset(
+            cache = KimiFormulaCache(httpClient),
+            httpClient = httpClient,
+            modelServices = modelServices,
+        )
+    }
 
     private companion object {
-        const val SERVICE_ID = "service"
+        const val SERVICE_ID = "kimi"
         const val MANIFEST_BODY =
             """{"tools":[{"function":{"name":"translate","description":"Translate text"}}]}"""
 
         /** Short-circuits every manifest request with a canned response. */
-        fun manifestClient(code: Int, body: String): OkHttpClient =
+        fun manifestClient(
+            code: Int,
+            body: String,
+            onRequest: (okhttp3.Request) -> Unit = {},
+        ): OkHttpClient =
             OkHttpClient.Builder()
                 .addInterceptor { chain ->
+                    onRequest(chain.request())
                     Response.Builder()
                         .request(chain.request())
                         .protocol(Protocol.HTTP_1_1)

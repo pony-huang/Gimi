@@ -31,7 +31,7 @@ class ConversationToolConfigurationCodecTest {
     }
 
     @Test
-    fun missingToolAccessModeDefaultsToAutomatic() {
+    fun missingToolAccessModeDefaultsToAlwaysAvailable() {
         val decoded = ConversationToolConfigurationCodec.decode(
             """
             {
@@ -41,7 +41,35 @@ class ConversationToolConfigurationCodecTest {
             """.trimIndent(),
         )
 
-        assertEquals(ToolAccessMode.AUTO, decoded?.toolAccessMode)
+        assertEquals(ToolAccessMode.ALWAYS_AVAILABLE, decoded?.toolAccessMode)
+    }
+
+    @Test
+    fun legacyAutomaticToolAccessDefaultsToAlwaysAvailable() {
+        val decoded = ConversationToolConfigurationCodec.decode(
+            """
+            {
+              "enabledLocalToolIds": ["clock"],
+              "toolAccessMode": "AUTO"
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(ToolAccessMode.ALWAYS_AVAILABLE, decoded?.toolAccessMode)
+    }
+
+    @Test
+    fun onDemandToolAccessRoundTrips() {
+        val configuration = ConversationToolConfiguration(
+            toolAccessMode = ToolAccessMode.ON_DEMAND,
+        )
+
+        assertEquals(
+            configuration,
+            ConversationToolConfigurationCodec.decode(
+                ConversationToolConfigurationCodec.encode(configuration),
+            ),
+        )
     }
 
     @Test

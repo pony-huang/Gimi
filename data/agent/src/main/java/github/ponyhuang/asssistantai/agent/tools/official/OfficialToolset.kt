@@ -6,32 +6,33 @@ import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.tools.Toolset
 import com.google.adk.kt.types.FunctionDeclaration
-import github.ponyhuang.asssistantai.agent.ConfiguredModel
-import github.ponyhuang.asssistantai.agent.ModelConfig
+import github.ponyhuang.asssistantai.agent.ModelRuntimeMetadata
+import github.ponyhuang.asssistantai.agent.tools.modelRuntimeMetadataOrNull
 import github.ponyhuang.asssistantai.agent.tools.toolConfigurationOrNull
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.asssistantai.domain.modelcatalog.repository.AgentModelConfigurationSource
 
 /**
  * Request-scoped official tools integrated through ADK's [Toolset] lifecycle.
  *
- * `LlmAgentTurn.prepareRequest` runs [processLlmRequest] after the request processors have attached
- * the current model. Each resolved [BaseTool] then processes that same request, which both appends
+ * `LlmAgentTurn.prepareRequest` runs [processLlmRequest] with the current invocation context.
+ * Each resolved [BaseTool] then processes that same request, which both appends
  * its declaration and records the executable instance in ADK's request-local tool map. The normal
  * [getTools] hook intentionally returns an empty list so ADK does not register the same tools twice.
  *
  * 会话级函数选择不再烘进模型配置，而是每次请求从 invocation 上下文
- * （RunConfig metadata，见 [toolConfigurationOrNull]）读取 —— 会话勾选变化不需要重建 Agent。
+ * （见 [toolConfigurationOrNull]）读取，因此会话勾选变化不需要重建 Agent。
  */
 interface OfficialToolset : Toolset {
 
     /**
      * 解析当前请求可用的官方工具。
      *
-     * @param config 请求模型携带的服务级不可变配置（支持哪些官方工具）。
-     * @param selection 会话级函数勾选；为 null 表示无会话配置，服务级支持的工具全部启用。
+     * @param config 当前 invocation RunConfig 携带的非敏感模型运行信息。
+     * @param selection 当前 invocation 的会话级工具选择；null 表示沿用默认启用语义。
      */
     suspend fun resolveTools(
-        config: ModelConfig,
+        config: ModelRuntimeMetadata,
         selection: ConversationToolConfiguration?,
     ): List<BaseTool>
 
@@ -39,8 +40,9 @@ interface OfficialToolset : Toolset {
         toolContext: ToolContext,
         llmRequest: LlmRequest,
     ): LlmRequest {
-        val config = (llmRequest.model as? ConfiguredModel)?.modelConfig ?: return llmRequest
-        val selection = toolContext.context.toolConfigurationOrNull()
+        val readonlyContext = toolContext.context
+        val config = readonlyContext.modelRuntimeMetadataOrNull() ?: return llmRequest
+        val selection = readonlyContext.toolConfigurationOrNull()
         return resolveTools(config, selection).fold(llmRequest) { request, tool ->
             tool.processLlmRequest(toolContext, request)
         }
@@ -59,6 +61,30 @@ internal fun ConversationToolConfiguration?.isOfficialToolEnabled(
     serviceId: String,
     toolId: String,
 ): Boolean = this == null || enabledOfficialFunctionIds(serviceId, toolId).isNotEmpty()
+
+/** 从安全模型配置源读取当前启用服务的凭据；凭据不会进入 RunConfig metadata。 */
+internal fun AgentModelConfigurationSource.apiKeyForService(serviceId: String): String? =
+    currentServices()
+        .firstOrNull { service -> service.id == serviceId && service.isEnabled }
+        ?.apiKey
+        ?.takeIf(String::isNotBlank)
+
+/**
+ * 按实际请求模型 ID 判断模型家族。
+ *
+ * 模型 ID 可能是普通名称，也可能带 `models/` 等路径前缀；家族名后只接受常见
+ * 分隔符，避免把 `glmatrix` 之类无关名称误判为 GLM。
+ */
+internal fun String.belongsToModelFamily(vararg familyNames: String): Boolean {
+    val modelId = substringAfterLast('/').lowercase()
+    return familyNames.any { familyName ->
+        val family = familyName.lowercase()
+        modelId == family ||
+                modelId.startsWith("$family-") ||
+                modelId.startsWith("${family}_") ||
+                modelId.startsWith("$family.")
+    }
+}
 
 /**
  * 需要进入 Tool access 动态候选目录的官方函数工具集。

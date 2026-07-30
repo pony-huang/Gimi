@@ -55,37 +55,6 @@ class ToolSearchToolsetTest {
     }
 
     @Test
-    fun automaticModeLoadsSmallCatalogAndSearchesLargeCatalog() = runTest {
-        val budget = ToolAccessBudget(maxTools = 2, maxSchemaBytes = 16 * 1024)
-        val small = ToolSearchToolset(
-            mode = ToolAccessMode.AUTO,
-            sources = listOf(source("local", tool("one"), tool("two"))),
-            budget = budget,
-        )
-        val large = ToolSearchToolset(
-            mode = ToolAccessMode.AUTO,
-            sources = listOf(source("local", tool("one"), tool("two"), tool("three"))),
-            budget = budget,
-        )
-
-        assertEquals(listOf("one", "two"), small.getTools(context()).map(BaseTool::name))
-        assertEquals(listOf(TOOL_SEARCH_NAME), large.getTools(context()).map(BaseTool::name))
-    }
-
-    @Test
-    fun automaticModeFallsBackToSearchWhenAnySourceFails() = runTest {
-        val toolset = ToolSearchToolset(
-            mode = ToolAccessMode.AUTO,
-            sources = listOf(
-                source("local", tool("set_alarm")),
-                failingSource("offline-mcp"),
-            ),
-        )
-
-        assertEquals(listOf(TOOL_SEARCH_NAME), toolset.getTools(context()).map(BaseTool::name))
-    }
-
-    @Test
     fun searchRanksNamesBeforeDescriptionsAndAppliesTheBudget() = runTest {
         val toolset = ToolSearchToolset(
             mode = ToolAccessMode.ON_DEMAND,

@@ -78,10 +78,13 @@ class KimiFormulaCacheTest {
             nowMillis = { 0L },
         )
 
-        assertEquals(emptyList<FormulaDeclaration>(), cache.fetch("kimi", "key"))
+        assertEquals(
+            emptyList<FormulaDeclaration>(),
+            cache.fetch(serviceId = "kimi", apiKey = "key"),
+        )
         assertEquals(
             listOf("recovered"),
-            cache.fetch("kimi", "key").map { it.name },
+            cache.fetch(serviceId = "kimi", apiKey = "key").map { it.name },
         )
         assertEquals(2, loadCount)
     }

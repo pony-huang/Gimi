@@ -1,5 +1,7 @@
 package github.ponyhuang.asssistantai.agent.tools.official
 
+import github.ponyhuang.asssistantai.agent.tools.official.glm.GlmReaderTool
+import github.ponyhuang.asssistantai.agent.tools.official.glm.GlmWebSearchTool
 import github.ponyhuang.asssistantai.agent.tools.official.kimi.KimiFormulaCache
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolFunction
@@ -11,8 +13,8 @@ import javax.inject.Singleton
 
 /**
  * Resolves the available functions for each [OfficialToolIds] category using
- * the currently selected model service. Web Search is a single static
- * placeholder; Kimi Formulas are pulled from the Moonshot formula manifest.
+ * the currently selected model service. Protocol-native Web Search and GLM web
+ * functions are static; Kimi Formulas are pulled from the Moonshot manifest.
  *
  * Implementations return an empty list when the tool is not applicable to the
  * active service so callers can treat unsupported categories uniformly.
@@ -33,9 +35,14 @@ class DefaultOfficialToolFunctionCatalog @Inject constructor(
         OfficialToolIds.KIMI_FORMULAS -> kimiFormulaCatalog.fetch()
         OfficialToolIds.GLM_WEB_SEARCH -> listOf(
             OfficialToolFunction(
-                id = OfficialToolIds.GLM_WEB_SEARCH,
+                id = GlmWebSearchTool.NAME,
                 name = "网页搜索",
                 description = "搜索最新的互联网信息",
+            ),
+            OfficialToolFunction(
+                id = GlmReaderTool.NAME,
+                name = "网页阅读",
+                description = "读取并解析指定网页内容",
             ),
         )
         else -> emptyList()
@@ -49,7 +56,10 @@ class KimiFormulaCatalog @Inject constructor(
 ) {
     suspend fun fetch(): List<OfficialToolFunction> {
         val service = currentMoonshotService() ?: return emptyList()
-        return cache.fetch(serviceId = service.id, apiKey = service.apiKey)
+        return cache.fetch(
+            serviceId = service.id,
+            apiKey = service.apiKey,
+        )
             .map { declaration ->
                 OfficialToolFunction(
                     id = declaration.name,

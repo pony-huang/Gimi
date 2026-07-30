@@ -1,6 +1,7 @@
 package github.ponyhuang.asssistantai.agent.tools.official.openai
 
-import github.ponyhuang.asssistantai.agent.ModelConfig
+import github.ponyhuang.asssistantai.agent.ModelRuntimeMetadata
+import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
 import kotlinx.coroutines.test.runTest
@@ -15,10 +16,7 @@ class OpenaiOfficialToolsetTest {
     @Test
     fun resolvesEnabledBuiltInToolsForAnyStandardService() = runTest {
         val tools = toolset.resolveTools(
-            config(
-                serviceId = "custom-standard-service",
-                officialTools = listOf(OfficialToolIds.WEB_SEARCH),
-            ),
+            config(serviceId = "custom-standard-service"),
             selection = null,
         )
 
@@ -31,7 +29,6 @@ class OpenaiOfficialToolsetTest {
             config(
                 serviceId = "openai",
                 baseType = ApiProtocol.Anthropic,
-                officialTools = listOf(OfficialToolIds.WEB_SEARCH),
             ),
             selection = null,
         )
@@ -40,28 +37,25 @@ class OpenaiOfficialToolsetTest {
     }
 
     @Test
-    fun ignoresDisabledAndUnsupportedTools() = runTest {
-        assertTrue(
-            toolset.resolveTools(config("openai", officialTools = emptyList()), null).isEmpty(),
+    fun dropsToolWhenConversationSelectionExcludesIt() = runTest {
+        val selection = ConversationToolConfiguration(
+            enabledOfficialFunctionIdsByService = mapOf(
+                "openai" to mapOf(OfficialToolIds.WEB_SEARCH to emptySet()),
+            ),
         )
-        assertTrue(
-            toolset.resolveTools(
-                config("openai", officialTools = listOf(OfficialToolIds.KIMI_FORMULAS)),
-                selection = null,
-            ).isEmpty(),
-        )
+
+        val tools = toolset.resolveTools(config("openai"), selection)
+
+        assertTrue(tools.isEmpty())
     }
 
     private fun config(
         serviceId: String,
         baseType: ApiProtocol = ApiProtocol.Standard,
-        officialTools: List<String>,
-    ) = ModelConfig(
+    ) = ModelRuntimeMetadata(
         serviceId = serviceId,
         baseType = baseType,
         modelId = "model",
-        apiKey = "key",
         fullBaseUrl = "https://example.com",
-        officialTools = officialTools,
     )
 }

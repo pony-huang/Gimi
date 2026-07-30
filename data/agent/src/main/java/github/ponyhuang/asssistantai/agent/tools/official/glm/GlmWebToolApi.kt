@@ -14,7 +14,15 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 
-/** One entry of the GLM `search_result` array exposed to the model. */
+/**
+ * One entry of the GLM `search_result` array exposed to the model.
+ *
+ * @property title page title.
+ * @property link canonical page URL returned by GLM.
+ * @property content extracted page summary or body.
+ * @property media source site name.
+ * @property publishDate publication date reported by the source.
+ */
 internal data class GlmSearchResult(
     val title: String,
     val link: String,
@@ -24,13 +32,28 @@ internal data class GlmSearchResult(
 )
 
 /**
- * Client for the GLM Web Search API (`POST {base}/web_search`).
+ * Parsed `reader_result` returned by the GLM Reader API.
+ *
+ * @property title page title.
+ * @property url final page URL.
+ * @property description page description extracted by GLM.
+ * @property content page content in the requested return format.
+ */
+internal data class GlmReaderResult(
+    val title: String,
+    val url: String,
+    val description: String,
+    val content: String,
+)
+
+/**
+ * Client for the GLM Web Search and Reader APIs.
  *
  * Kept separate from [GlmWebSearchTool] so the request/response mapping can be
  * unit-tested with a canned [OkHttpClient], mirroring the Kimi formula
  * manifest/tool split.
  */
-internal class GlmWebSearchApi(
+internal class GlmWebToolApi(
     private val apiKey: String,
     private val baseUrl: String,
     private val httpClient: OkHttpClient,
@@ -57,9 +80,33 @@ internal class GlmWebSearchApi(
             .build()
 
         httpClient.newCall(request).execute().use { response ->
-            val body = response.body?.string().orEmpty()
+            val body = response.body.string()
             check(response.isSuccessful) { "HTTP ${response.code} from GLM web search: $body" }
             parseResults(body)
+        }
+    }
+    suspend fun reader(
+        url: String,
+        timeout: Int?,
+        noCache: Boolean?,
+        returnFormat: String?,
+    ): GlmReaderResult = withContext(Dispatchers.IO) {
+        val payload = buildJsonObject {
+            put("url", url)
+            timeout?.let { put("timeout", it) }
+            noCache?.let { put("no_cache", it) }
+            returnFormat?.let { put("return_format", it) }
+        }
+        val request = Request.Builder()
+            .url(readerUrl(baseUrl))
+            .header("Authorization", "Bearer $apiKey")
+            .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+
+        httpClient.newCall(request).execute().use { response ->
+            val body = response.body.string()
+            check(response.isSuccessful) { "HTTP ${response.code} from GLM reader: $body" }
+            parseReaderResult(body)
         }
     }
 
@@ -77,11 +124,25 @@ internal class GlmWebSearchApi(
         }
     }
 
+    private fun parseReaderResult(body: String): GlmReaderResult {
+        val result = Json.parseToJsonElement(body).jsonObject["reader_result"]
+            ?.jsonObject
+            ?: error("Missing reader_result from GLM reader")
+        return GlmReaderResult(
+            title = result["title"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            url = result["url"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            description = result["description"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            content = result["content"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+        )
+    }
+
     companion object {
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
         private const val DEFAULT_SEARCH_ENGINE = "search_std"
         private const val DEFAULT_WEB_SEARCH_URL =
             "https://open.bigmodel.cn/api/paas/v4/web_search"
+        private const val DEFAULT_READER_URL =
+            "https://open.bigmodel.cn/api/paas/v4/reader"
         private const val ANTHROPIC_BASE_URL_SUFFIX = "/api/anthropic"
 
         /**
@@ -89,11 +150,24 @@ internal class GlmWebSearchApi(
          * 该协议下回退到 paas v4 默认地址；其余情况在标准地址后拼接路径。
          */
         internal fun webSearchUrl(baseUrl: String): String {
+            return toolUrl(baseUrl, "web_search", DEFAULT_WEB_SEARCH_URL)
+        }
+
+        /** Reader 与 Web Search 使用相同的基础地址回退规则。 */
+        internal fun readerUrl(baseUrl: String): String {
+            return toolUrl(baseUrl, "reader", DEFAULT_READER_URL)
+        }
+
+        private fun toolUrl(
+            baseUrl: String,
+            path: String,
+            defaultUrl: String,
+        ): String {
             val trimmed = baseUrl.trim().trimEnd('/')
-            return if (trimmed.endsWith(ANTHROPIC_BASE_URL_SUFFIX)) {
-                DEFAULT_WEB_SEARCH_URL
+            return if (trimmed.isEmpty() || trimmed.endsWith(ANTHROPIC_BASE_URL_SUFFIX)) {
+                defaultUrl
             } else {
-                "$trimmed/web_search"
+                "$trimmed/$path"
             }
         }
     }

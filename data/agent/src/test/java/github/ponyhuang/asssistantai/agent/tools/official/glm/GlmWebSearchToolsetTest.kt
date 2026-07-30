@@ -1,9 +1,15 @@
 package github.ponyhuang.asssistantai.agent.tools.official.glm
 
-import github.ponyhuang.asssistantai.agent.ModelConfig
+import github.ponyhuang.asssistantai.agent.ModelRuntimeMetadata
+import github.ponyhuang.asssistantai.agent.tools.official.DefaultOfficialToolFunctionCatalog
+import github.ponyhuang.asssistantai.agent.tools.official.KimiFormulaCatalog
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
+import github.ponyhuang.asssistantai.domain.modelcatalog.repository.AgentModelConfigurationSource
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -17,16 +23,16 @@ import org.junit.Test
 class GlmWebSearchToolsetTest {
 
     @Test
-    fun notApplicableWhenGlmWebSearchNotEnabled() = runTest {
-        val toolset = GlmWebSearchToolset(OkHttpClient())
-        val config = config(officialTools = emptyList())
+    fun notApplicableWhenModelIsNotGlm() = runTest {
+        val toolset = toolset()
+        val config = config(modelId = "other-model")
 
         assertTrue(toolset.resolveTools(config, selection = null).isEmpty())
     }
 
     @Test
     fun notApplicableWhenConversationSelectionExcludesIt() = runTest {
-        val toolset = GlmWebSearchToolset(OkHttpClient())
+        val toolset = toolset()
         val selection = ConversationToolConfiguration(
             enabledOfficialFunctionIdsByService = mapOf(
                 "glm" to mapOf(OfficialToolIds.GLM_WEB_SEARCH to emptySet()),
@@ -37,47 +43,95 @@ class GlmWebSearchToolsetTest {
     }
 
     @Test
-    fun resolvesSingleWebSearchTool() = runTest {
-        val toolset = GlmWebSearchToolset(OkHttpClient())
+    fun resolvesWebSearchAndReaderTools() = runTest {
+        val toolset = toolset()
 
         val tools = toolset.resolveTools(config(), selection = null)
 
-        assertEquals(listOf(GlmWebSearchTool.NAME), tools.map { it.name })
+        assertEquals(
+            listOf(GlmWebSearchTool.NAME, GlmReaderTool.NAME),
+            tools.map { it.name },
+        )
         assertEquals(
             listOf("search_query"),
-            tools.single().declaration()!!.parameters?.required,
+            tools.first().declaration()!!.parameters?.required,
+        )
+        assertEquals(
+            listOf("url"),
+            tools.last().declaration()!!.parameters?.required,
+        )
+    }
+
+    @Test
+    fun filtersIndividualGlmFunctionsFromConversationSelection() = runTest {
+        val toolset = toolset()
+        val selection = ConversationToolConfiguration(
+            enabledOfficialFunctionIdsByService = mapOf(
+                "glm" to mapOf(
+                    OfficialToolIds.GLM_WEB_SEARCH to setOf(GlmReaderTool.NAME),
+                ),
+            ),
+        )
+
+        val tools = toolset.resolveTools(config(), selection)
+
+        assertEquals(listOf(GlmReaderTool.NAME), tools.map { it.name })
+    }
+
+    @Test
+    fun officialCatalogListsSearchAndReaderFunctions() = runTest {
+        val catalog = DefaultOfficialToolFunctionCatalog(mockk<KimiFormulaCatalog>())
+
+        val functions = catalog.listFunctions(OfficialToolIds.GLM_WEB_SEARCH)
+
+        assertEquals(
+            listOf(GlmWebSearchTool.NAME, GlmReaderTool.NAME),
+            functions.map { it.id },
         )
     }
 
     @Test
     fun resolvesForAnthropicProtocolConfigs() = runTest {
-        val toolset = GlmWebSearchToolset(OkHttpClient())
+        val toolset = toolset()
         val config = config(baseType = ApiProtocol.Anthropic)
 
-        assertEquals(1, toolset.resolveTools(config, selection = null).size)
+        assertEquals(2, toolset.resolveTools(config, selection = null).size)
     }
 
     private fun config(
-        officialTools: List<String> = listOf(OfficialToolIds.GLM_WEB_SEARCH),
+        modelId: String = "glm-4.6",
         baseType: ApiProtocol = ApiProtocol.Standard,
-    ) = ModelConfig(
+    ) = ModelRuntimeMetadata(
         serviceId = "glm",
         baseType = baseType,
-        modelId = "glm-4.6",
-        apiKey = "key",
+        modelId = modelId,
         fullBaseUrl = "https://open.bigmodel.cn/api/paas/v4/",
-        officialTools = officialTools,
     )
+
+    private fun toolset(
+        httpClient: OkHttpClient = OkHttpClient(),
+        credential: String = "key",
+    ): GlmWebSearchToolset {
+        val service = mockk<LLMModelSetting> {
+            every { id } returns "glm"
+            every { isEnabled } returns true
+            every { apiKey } returns credential
+        }
+        val modelServices = mockk<AgentModelConfigurationSource> {
+            every { currentServices() } returns listOf(service)
+        }
+        return GlmWebSearchToolset(httpClient, modelServices)
+    }
 }
 
-class GlmWebSearchApiTest {
+class GlmWebToolApiTest {
 
     @Test
     fun postsSearchRequestAndMapsResults() = runTest {
         var captured: okhttp3.Request? = null
-        val api = GlmWebSearchApi(
+        val api = GlmWebToolApi(
             apiKey = "secret",
-            baseUrl = "https://open.bigmodel.cn/api/paas/v4/",
+            baseUrl = "",
             httpClient = cannedClient(200, SEARCH_BODY) { captured = it },
         )
 
@@ -124,19 +178,66 @@ class GlmWebSearchApiTest {
     fun anthropicBaseUrlFallsBackToPaasEndpoint() {
         assertEquals(
             "https://open.bigmodel.cn/api/paas/v4/web_search",
-            GlmWebSearchApi.webSearchUrl("https://open.bigmodel.cn/api/anthropic"),
+            GlmWebToolApi.webSearchUrl("https://open.bigmodel.cn/api/anthropic"),
         )
         assertEquals(
             "https://proxy.example.com/v4/web_search",
-            GlmWebSearchApi.webSearchUrl("https://proxy.example.com/v4/"),
+            GlmWebToolApi.webSearchUrl("https://proxy.example.com/v4/"),
+        )
+        assertEquals(
+            "https://open.bigmodel.cn/api/paas/v4/reader",
+            GlmWebToolApi.readerUrl("https://open.bigmodel.cn/api/anthropic"),
+        )
+        assertEquals(
+            "https://proxy.example.com/v4/reader",
+            GlmWebToolApi.readerUrl("https://proxy.example.com/v4/"),
+        )
+    }
+
+    @Test
+    fun postsReaderRequestAndMapsResult() = runTest {
+        var captured: okhttp3.Request? = null
+        val api = GlmWebToolApi(
+            apiKey = "secret",
+            baseUrl = "https://proxy.example.com/v4/",
+            httpClient = cannedClient(200, READER_BODY) { captured = it },
+        )
+
+        val result = api.reader(
+            url = "https://example.com/article",
+            timeout = 15,
+            noCache = true,
+            returnFormat = "markdown",
+        )
+
+        val request = requireNotNull(captured)
+        assertEquals("https://proxy.example.com/v4/reader", request.url.toString())
+        assertEquals("Bearer secret", request.header("Authorization"))
+        val payload = request.body!!.let {
+            val buffer = okio.Buffer()
+            it.writeTo(buffer)
+            buffer.readUtf8()
+        }
+        assertTrue(payload.contains("\"url\":\"https://example.com/article\""))
+        assertTrue(payload.contains("\"timeout\":15"))
+        assertTrue(payload.contains("\"no_cache\":true"))
+        assertTrue(payload.contains("\"return_format\":\"markdown\""))
+        assertEquals(
+            GlmReaderResult(
+                title = "示例文章",
+                url = "https://example.com/article",
+                description = "文章描述",
+                content = "# 正文",
+            ),
+            result,
         )
     }
 
     @Test
     fun httpFailureThrowsWithResponseBody() = runTest {
-        val api = GlmWebSearchApi(
+        val api = GlmWebToolApi(
             apiKey = "secret",
-            baseUrl = "https://open.bigmodel.cn/api/paas/v4/",
+            baseUrl = "",
             httpClient = cannedClient(500, """{"error":"boom"}"""),
         )
 
@@ -165,6 +266,18 @@ class GlmWebSearchApiTest {
                   "publish_date": "2026-07-01"
                 }
               ]
+            }
+        """
+
+        const val READER_BODY = """
+            {
+              "id": "reader-1",
+              "reader_result": {
+                "content": "# 正文",
+                "description": "文章描述",
+                "title": "示例文章",
+                "url": "https://example.com/article"
+              }
             }
         """
 

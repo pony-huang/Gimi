@@ -351,7 +351,7 @@ private fun AddToChatHome(
                     icon = Icons.Default.Tune,
                     title = stringResource(R.string.chat_tool_access_title),
                     subtitle = toolAccessModeLabel(
-                        state.configuration?.toolAccessMode ?: ToolAccessMode.AUTO,
+                        state.configuration?.toolAccessMode ?: ToolAccessMode.ALWAYS_AVAILABLE,
                     ),
                     onClick = onOpenToolAccess,
                     testTag = "tool-access-nav",
@@ -514,7 +514,6 @@ private fun ToolAccessModeRow(
             )
             .testTag(
                 when (mode) {
-                    ToolAccessMode.AUTO -> "tool-access-auto"
                     ToolAccessMode.ON_DEMAND -> "tool-access-on-demand"
                     ToolAccessMode.ALWAYS_AVAILABLE -> "tool-access-always"
                 },
@@ -1121,7 +1120,6 @@ private fun toolFilterLabel(filter: SessionToolFilter): String = stringResource(
 @Composable
 private fun toolAccessModeLabel(mode: ToolAccessMode): String = stringResource(
     when (mode) {
-        ToolAccessMode.AUTO -> R.string.chat_tool_access_auto
         ToolAccessMode.ON_DEMAND -> R.string.chat_tool_access_on_demand
         ToolAccessMode.ALWAYS_AVAILABLE -> R.string.chat_tool_access_always
     },
@@ -1130,7 +1128,6 @@ private fun toolAccessModeLabel(mode: ToolAccessMode): String = stringResource(
 @Composable
 private fun toolAccessModeDescription(mode: ToolAccessMode): String = stringResource(
     when (mode) {
-        ToolAccessMode.AUTO -> R.string.chat_tool_access_auto_description
         ToolAccessMode.ON_DEMAND -> R.string.chat_tool_access_on_demand_description
         ToolAccessMode.ALWAYS_AVAILABLE -> R.string.chat_tool_access_always_description
     },

@@ -8,5 +8,4 @@ data class ResolvedAgentModel(
     val apiKey: String,
     /** 已 trimEnd('/') 的 activeApiBaseUrl。 */
     val modelBaseUrl: String,
-    val supportedOfficialTools: List<String> = emptyList(),
 )

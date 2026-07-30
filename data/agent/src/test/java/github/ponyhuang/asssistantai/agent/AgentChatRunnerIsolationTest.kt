@@ -4,6 +4,7 @@ import com.google.adk.kt.agents.LlmAgent
 import com.google.adk.kt.sessions.SessionService
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
+import github.ponyhuang.asssistantai.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
 import android.util.Log
 import io.mockk.every
@@ -44,7 +45,7 @@ class AgentChatRunnerIsolationTest {
         val runner = AgentChatRunner(
             factory = { selection, _ ->
                 createdSelections += selection
-                mockk<LlmAgent>(relaxed = true)
+                runtime(selection)
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
@@ -70,9 +71,9 @@ class AgentChatRunnerIsolationTest {
         var revision = 0
         var creations = 0
         val runner = AgentChatRunner(
-            factory = { _, _ ->
+            factory = { selection, _ ->
                 creations += 1
-                mockk<LlmAgent>(relaxed = true)
+                runtime(selection)
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
@@ -95,9 +96,9 @@ class AgentChatRunnerIsolationTest {
     fun runnerCacheEvictsLeastRecentlyUsedSession() = runTest {
         var creations = 0
         val runner = AgentChatRunner(
-            factory = { _, _ ->
+            factory = { selection, _ ->
                 creations += 1
-                mockk<LlmAgent>(relaxed = true)
+                runtime(selection)
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
@@ -115,9 +116,9 @@ class AgentChatRunnerIsolationTest {
     fun conversationToolSelectionChangeDoesNotRebuildRunner() = runTest {
         var creations = 0
         val runner = AgentChatRunner(
-            factory = { _, _ ->
+            factory = { selection, _ ->
                 creations += 1
-                mockk<LlmAgent>(relaxed = true)
+                runtime(selection)
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
@@ -140,9 +141,9 @@ class AgentChatRunnerIsolationTest {
     fun toolAccessModeChangeRebuildsOnlyThatSession() = runTest {
         var creations = 0
         val runner = AgentChatRunner(
-            factory = { _, _ ->
+            factory = { selection, _ ->
                 creations += 1
-                mockk<LlmAgent>(relaxed = true)
+                runtime(selection)
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
@@ -152,13 +153,13 @@ class AgentChatRunnerIsolationTest {
         runner.send(
             "user", "session-a", selection, "a",
             toolConfiguration = ConversationToolConfiguration(
-                toolAccessMode = ToolAccessMode.AUTO,
+                toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
             ),
         )
         runner.send(
             "user", "session-b", selection, "b",
             toolConfiguration = ConversationToolConfiguration(
-                toolAccessMode = ToolAccessMode.AUTO,
+                toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
             ),
         )
         runner.send(
@@ -170,4 +171,14 @@ class AgentChatRunnerIsolationTest {
 
         assertEquals(3, creations)
     }
+
+    private fun runtime(selection: ModelSelection? = null) = AgentRuntime(
+        agent = mockk<LlmAgent>(relaxed = true),
+        modelRuntime = ModelRuntimeMetadata(
+            serviceId = selection?.serviceId ?: "service",
+            baseType = ApiProtocol.Standard,
+            modelId = selection?.modelId ?: "model",
+            fullBaseUrl = "https://example.com",
+        ),
+    )
 }

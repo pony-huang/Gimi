@@ -24,8 +24,6 @@
     <string name="chat_attachment_open_failed">没有可用于打开此文档的应用</string>
     <string name="chat_session_tools_title">工具</string>
     <string name="chat_tool_access_title">工具访问</string>
-    <string name="chat_tool_access_auto">自动</string>
-    <string name="chat_tool_access_auto_description">助手会为你选择</string>
     <string name="chat_tool_access_on_demand">按需</string>
     <string name="chat_tool_access_on_demand_description">需要时加载，模型调用更多、准确率可能降低</string>
     <string name="chat_tool_access_always">始终可用</string>

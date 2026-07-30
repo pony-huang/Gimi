@@ -20,8 +20,7 @@ fun LLMModelProvider.toDomain(): LLMModelSetting = LLMModelSetting(
     homepageUrl = homepageUrl,
     keyHelpUrl = keyHelpUrl,
     docsUrl = docsUrl,
-    modelsUrl = modelsUrl,
-    supportedOfficialTools = supportedOfficialTools,
+    modelsUrl = modelsUrl
 )
 
 fun Model.toData(): LLMModelItem = LLMModelItem(

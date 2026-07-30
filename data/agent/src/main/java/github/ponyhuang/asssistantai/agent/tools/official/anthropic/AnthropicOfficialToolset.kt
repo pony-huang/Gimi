@@ -1,7 +1,7 @@
 package github.ponyhuang.asssistantai.agent.tools.official.anthropic
 
 import com.google.adk.kt.tools.BaseTool
-import github.ponyhuang.asssistantai.agent.ModelConfig
+import github.ponyhuang.asssistantai.agent.ModelRuntimeMetadata
 import github.ponyhuang.asssistantai.agent.tools.official.OfficialBuiltInTool
 import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.official.isOfficialToolEnabled
@@ -18,17 +18,12 @@ import javax.inject.Inject
  */
 class AnthropicOfficialToolset @Inject constructor() : OfficialToolset {
     override suspend fun resolveTools(
-        config: ModelConfig,
+        config: ModelRuntimeMetadata,
         selection: ConversationToolConfiguration?,
     ): List<BaseTool> {
         if (config.baseType != ApiProtocol.Anthropic) return emptyList()
-        return config.officialTools
-            .filter(SUPPORTED_TOOL_IDS::contains)
+        return listOf(OfficialToolIds.WEB_SEARCH)
             .filter { toolId -> selection.isOfficialToolEnabled(config.serviceId, toolId) }
             .map(::OfficialBuiltInTool)
-    }
-
-    private companion object {
-        val SUPPORTED_TOOL_IDS: Set<String> = setOf(OfficialToolIds.WEB_SEARCH)
     }
 }

@@ -36,7 +36,10 @@ class KimiFormulaCache internal constructor(
         serviceId: String,
         apiKey: String,
     ): List<FormulaDeclaration> = mutex.withLock {
-        val key = CacheKey(serviceId = serviceId, apiKey = apiKey)
+        val key = CacheKey(
+            serviceId = serviceId,
+            apiKey = apiKey,
+        )
         val now = nowMillis()
         entries[key]
             ?.takeIf { entry -> now - entry.loadedAtMillis < CACHE_DURATION_MILLIS }

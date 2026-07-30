@@ -25,7 +25,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 三种工具访问模式的 Agent 组装验证。
+ * 两种工具访问模式的 Agent 组装验证。
  *
  * 会话级工具勾选不再经过 AgentFactory（改由 RunConfig metadata 透传 + 各
  * Toolset 自过滤），这里只验证每种模式挂载的 Toolset 组合。
@@ -38,7 +38,7 @@ class AgentFactoryToolAccessTest {
         val formula = FakeDynamicOfficialToolset("formula_tool")
         val factory = factory(officialToolsets = setOf(native, formula))
 
-        val agent = factory.create(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE) as LlmAgent
+        val agent = factory.create(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE).agent as LlmAgent
 
         assertTrue(native in agent.toolsets)
         assertTrue(formula in agent.toolsets)
@@ -56,7 +56,7 @@ class AgentFactoryToolAccessTest {
             officialToolsets = setOf(native, formula),
         )
 
-        val agent = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND) as LlmAgent
+        val agent = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
 
         assertTrue(native in agent.toolsets)
         assertFalse(formula in agent.toolsets)
@@ -65,27 +65,10 @@ class AgentFactoryToolAccessTest {
     }
 
     @Test
-    fun autoExposesSmallCatalogDirectlyWithinBudget() = runTest {
-        val clock = declarationTool("clock")
-        val factory = factory(
-            localTools = listOf(clock),
-            // 让 LocalCategorySource 按类别返回各自唯一的工具，便于走"全量直出"路径
-            toolsByCategory = mapOf(
-                github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory.CALENDAR to listOf(clock),
-            ),
-        )
-
-        val agent = factory.create(toolAccessMode = ToolAccessMode.AUTO) as LlmAgent
-
-        val search = agent.toolsets.filterIsInstance<ToolSearchToolset>().single()
-        assertEquals(listOf("clock"), search.getTools().map(BaseTool::name))
-    }
-
-    @Test
     fun defaultModeIsAlwaysAvailable() = runTest {
         val factory = factory()
 
-        val agent = factory.create() as LlmAgent
+        val agent = factory.create().agent as LlmAgent
 
         assertTrue(agent.toolsets.none { it is ToolSearchToolset })
     }
@@ -97,7 +80,7 @@ class AgentFactoryToolAccessTest {
             confirmationRequiredToolIds = setOf("adjust_media_volume"),
         )
 
-        val agent = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND) as LlmAgent
+        val agent = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
 
         assertEquals(listOf("adjust_media_volume"), agent.tools.map(BaseTool::name))
         assertEquals(null, agent.tools.single().declaration())
@@ -109,7 +92,7 @@ class AgentFactoryToolAccessTest {
             localTools = listOf(declarationTool("get_media_volume")),
         )
 
-        val agent = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND) as LlmAgent
+        val agent = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
 
         assertTrue(agent.tools.isEmpty())
     }
@@ -155,14 +138,13 @@ class AgentFactoryToolAccessTest {
         modelId = "model",
         apiKey = "key",
         fullBaseUrl = "https://example.com",
-        officialTools = listOf("web_search", "kimi_formulas"),
     )
 
     private class FakeOfficialToolset(
         private val toolName: String,
     ) : OfficialToolset {
         override suspend fun resolveTools(
-            config: ModelConfig,
+            config: ModelRuntimeMetadata,
             selection: ConversationToolConfiguration?,
         ): List<BaseTool> = listOf(declarationTool(toolName))
     }
@@ -174,7 +156,7 @@ class AgentFactoryToolAccessTest {
         override val sourceDisplayName: String = "Formula"
 
         override suspend fun resolveTools(
-            config: ModelConfig,
+            config: ModelRuntimeMetadata,
             selection: ConversationToolConfiguration?,
         ): List<BaseTool> = listOf(declarationTool(toolName))
     }

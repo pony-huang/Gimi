@@ -125,7 +125,8 @@ class ChatComposerLayoutTest {
         composeRule.onNodeWithTag("chat_composer_add").performClick()
         composeRule.onNodeWithTag("tool-access-nav").performClick()
         composeRule.onNodeWithTag("tool-access-page").assertIsDisplayed()
-        composeRule.onNodeWithTag("tool-access-auto").assertIsSelected()
+        composeRule.onNodeWithTag("tool-access-auto").assertDoesNotExist()
+        composeRule.onNodeWithTag("tool-access-always").assertIsSelected()
         composeRule.onNodeWithTag("tool-access-on-demand").assertIsEnabled().performClick()
         composeRule.runOnIdle {
             assert(selectedMode == ToolAccessMode.ON_DEMAND)
@@ -145,7 +146,6 @@ class ChatComposerLayoutTest {
 
         composeRule.onNodeWithTag("chat_composer_add").performClick()
         composeRule.onNodeWithTag("tool-access-nav").performClick()
-        composeRule.onNodeWithTag("tool-access-auto").assertIsNotEnabled()
         composeRule.onNodeWithTag("tool-access-on-demand").assertIsNotEnabled()
         composeRule.onNodeWithTag("tool-access-always").assertIsNotEnabled()
     }

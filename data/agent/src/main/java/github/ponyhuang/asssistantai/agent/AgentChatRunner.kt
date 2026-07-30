@@ -54,21 +54,29 @@ class AgentChatRunner(
     private val factory: suspend (
         ModelSelection?,
         ToolAccessMode,
-    ) -> BaseAgent,
+    ) -> AgentRuntime,
     private val sessionService: SessionService,
     private val artifactService: ArtifactService?,
     private val configurationRevision: () -> Any = { Unit },
     private val plugins: List<Plugin> = emptyList()
 ) {
     /**
-     * 每个会话持有独立 Runner；仅模型选择、配置版本、访问模式或确认开关变化时重建。
-     * [customMetadata] 记录最近一次 [send] 透传的工具配置，供确认恢复时复用。
+     * 每个会话持有的 Runner 快照。
+     *
+     * @property selection 构建 Agent 时使用的显式模型选择。
+     * @property revision 构建时的外部配置版本。
+     * @property toolAccessMode 工具加载模式。
+     * @property allowConfirmationRequiredTools 是否允许确认型工具。
+     * @property modelRuntime 不含凭据的模型运行信息。
+     * @property customMetadata 最近一次请求的 RunConfig metadata，供确认恢复复用。
+     * @property runner 当前会话独占的 ADK Runner。
      */
     private data class RunnerEntry(
         val selection: ModelSelection?,
         val revision: Any,
         val toolAccessMode: ToolAccessMode,
         val allowConfirmationRequiredTools: Boolean,
+        val modelRuntime: ModelRuntimeMetadata,
         val customMetadata: Map<String, Any>,
         val runner: InMemoryRunner,
     )
@@ -143,14 +151,13 @@ class AgentChatRunner(
         allowConfirmationRequiredTools: Boolean = true,
         toolConfiguration: ConversationToolConfiguration? = null,
     ): Flow<Event> {
-        val customMetadata = ToolRunMetadata.of(toolConfiguration, allowConfirmationRequiredTools)
         // 快照当前 runner；中途 recreate() 不会改本次 send 的行为。
-        val activeRunner = currentRunnerForNewTurn(
+        val activeEntry = currentEntryForNewTurn(
             sessionId,
             selection,
             toolConfiguration?.toolAccessMode ?: ToolAccessMode.ALWAYS_AVAILABLE,
             allowConfirmationRequiredTools,
-            customMetadata,
+            toolConfiguration,
         )
         val parts = buildList {
             text.takeIf(String::isNotBlank)?.let { add(Part(text = it)) }
@@ -172,7 +179,7 @@ class AgentChatRunner(
             role = Role.USER,
             parts = parts,
         )
-        return activeRunner.runAsync(
+        return activeEntry.runner.runAsync(
             userId = userId,
             sessionId = sessionId,
             invocationId = null,
@@ -180,7 +187,7 @@ class AgentChatRunner(
             stateDelta = null,
             runConfig = RunConfig(
                 streamingMode = StreamingMode.SSE,
-                customMetadata = customMetadata,
+                customMetadata = activeEntry.customMetadata,
             ),
         ).flowOn(Dispatchers.IO)
     }
@@ -227,13 +234,13 @@ class AgentChatRunner(
         ).flowOn(Dispatchers.IO)
     }
 
-    private suspend fun currentRunnerForNewTurn(
+    private suspend fun currentEntryForNewTurn(
         sessionId: String,
         selection: ModelSelection?,
         toolAccessMode: ToolAccessMode,
         allowConfirmationRequiredTools: Boolean,
-        customMetadata: Map<String, Any>,
-    ): InMemoryRunner {
+        toolConfiguration: ConversationToolConfiguration?,
+    ): RunnerEntry {
         val expectedRevision = configurationRevision()
         return runnerMutex.withLock {
             runners[sessionId]
@@ -243,18 +250,33 @@ class AgentChatRunner(
                             it.toolAccessMode == toolAccessMode &&
                             it.allowConfirmationRequiredTools == allowConfirmationRequiredTools
                 }
-                ?.copy(customMetadata = customMetadata)
+                ?.let { entry ->
+                    entry.copy(
+                        customMetadata = ToolRunMetadata.of(
+                            modelRuntime = entry.modelRuntime,
+                            toolConfiguration = toolConfiguration,
+                            allowConfirmationRequiredTools = allowConfirmationRequiredTools,
+                        ),
+                    )
+                }
                 ?.also { updated -> runners[sessionId] = updated }
-                ?.runner
-                ?: buildRunner(factory(selection, toolAccessMode)).also { newRunner ->
-                    runners[sessionId] = RunnerEntry(
+                ?: factory(selection, toolAccessMode).let { runtime ->
+                    RunnerEntry(
                         selection,
                         expectedRevision,
                         toolAccessMode,
                         allowConfirmationRequiredTools,
-                        customMetadata,
-                        newRunner,
-                    )
+                        runtime.modelRuntime,
+                        ToolRunMetadata.of(
+                            modelRuntime = runtime.modelRuntime,
+                            toolConfiguration = toolConfiguration,
+                            allowConfirmationRequiredTools = allowConfirmationRequiredTools,
+                        ),
+                        buildRunner(runtime.agent),
+                    ).also { newEntry ->
+                        runners[sessionId] = newEntry
+                    }
+                }.also {
                     while (runners.size > MAX_CACHED_RUNNERS) {
                         runners.remove(runners.entries.first().key)
                     }

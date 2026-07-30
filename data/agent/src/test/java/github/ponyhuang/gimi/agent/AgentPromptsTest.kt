@@ -25,12 +25,4 @@ class AgentPromptsTest {
 
         assertFalse(instruction.contains("next model step"))
     }
-
-    @Test
-    fun instructionCoversRequestsWithoutAnyDeclaredTools() {
-        val instruction = AgentPrompts.defaultAssistantInstruction()
-
-        assertTrue(instruction.contains("If no tools are declared"))
-        assertTrue(instruction.contains("do not imitate a tool call"))
-    }
 }

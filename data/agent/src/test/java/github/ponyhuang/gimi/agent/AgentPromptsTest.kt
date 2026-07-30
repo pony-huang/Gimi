@@ -9,7 +9,7 @@ class AgentPromptsTest {
     @Test
     fun dynamicModeExplainsHowToSearchBeforeCallingUnavailableTools() {
         val instruction = AgentPrompts.defaultAssistantInstruction(
-            dynamicToolSearchEnabled = true,
+            toolSearchEnabled = true,
         )
 
         assertTrue(instruction.contains("tool_search"))
@@ -20,7 +20,7 @@ class AgentPromptsTest {
     @Test
     fun alwaysAvailableModeDoesNotAddDynamicSearchInstructions() {
         val instruction = AgentPrompts.defaultAssistantInstruction(
-            dynamicToolSearchEnabled = false,
+            toolSearchEnabled = false,
         )
 
         assertFalse(instruction.contains("next model step"))

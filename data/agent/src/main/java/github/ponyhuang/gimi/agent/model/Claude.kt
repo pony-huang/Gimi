@@ -175,7 +175,6 @@ open class Claude(
         val delta = event.asContentBlockDelta().delta()
         if (!delta.isText()) return
         val text = delta.asText().text()
-        logger.trace { "Claude streaming text chunk: $text" }
         emit(
             LlmResponse(
                 content = Content(role = Role.MODEL, parts = listOf(Part(text = text))),

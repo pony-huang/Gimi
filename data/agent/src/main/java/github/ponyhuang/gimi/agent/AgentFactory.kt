@@ -82,7 +82,7 @@ class AgentFactory @Inject constructor(
     private fun createAlwaysAvailableAgent(model: Model): BaseAgent =
         baseAgent(
             model = model,
-            dynamicToolSearchEnabled = false,
+            toolSearchEnabled = false,
             toolsets = buildList {
                 add(localToolset)
                 add(conversationMcpToolset)
@@ -119,7 +119,7 @@ class AgentFactory @Inject constructor(
         }
         return baseAgent(
             model = model,
-            dynamicToolSearchEnabled = true,
+            toolSearchEnabled = true,
             toolsets = buildList {
                 addAll(directOfficialToolsets)
                 add(
@@ -136,18 +136,16 @@ class AgentFactory @Inject constructor(
 
     private fun baseAgent(
         model: Model,
-        dynamicToolSearchEnabled: Boolean,
+        toolSearchEnabled: Boolean,
         toolsets: List<Toolset>,
     ): BaseAgent = LlmAgent(
         name = "Assistant",
         model = model,
         instruction = Instruction(
             AgentPrompts.defaultAssistantInstruction(
-                dynamicToolSearchEnabled = dynamicToolSearchEnabled,
+                toolSearchEnabled = toolSearchEnabled,
             ),
         ),
-        // ADK 0.6.0 的确认恢复处理器只查 agent.tools；隐藏代理不声明 schema，
-        // 但可在恢复时按当前请求上下文重新定位 Toolset 中的真实执行实例。
         tools = localToolCatalog.tools()
             .filter { tool -> tool.name in localToolCatalog.confirmationRequiredToolIds }
             .map { tool -> ToolsetConfirmationResumeTool(localToolset, tool) },

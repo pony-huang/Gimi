@@ -6,6 +6,7 @@ import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.FunctionDeclaration
+import github.ponyhuang.gimi.agent.tools.appfunctions.AppFunctionToolset
 import github.ponyhuang.gimi.agent.tools.search.TOOL_SEARCH_NAME
 import github.ponyhuang.gimi.agent.tools.search.ToolSearchToolset
 import github.ponyhuang.gimi.agent.tools.search.ToolVectorSearch
@@ -98,9 +99,22 @@ class AgentFactoryToolAccessTest {
         assertTrue(agent.tools.isEmpty())
     }
 
+    @Test
+    fun appFunctionRemainsResolvableForConfirmationResumeWithoutDirectDeclaration() = runTest {
+        val factory = factory(
+            appFunctionTools = listOf(declarationTool("appfn_notes_create_1234")),
+        )
+
+        val agent = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
+
+        assertEquals(listOf("appfn_notes_create_1234"), agent.tools.map(BaseTool::name))
+        assertEquals(null, agent.tools.single().declaration())
+    }
+
     private fun factory(
         localTools: List<BaseTool> = emptyList(),
         confirmationRequiredToolIds: Set<String> = emptySet(),
+        appFunctionTools: List<BaseTool> = emptyList(),
         officialToolsets: Set<OfficialToolset> = emptySet(),
     ): AgentFactory {
         val localToolCatalog = mockk<LocalToolCatalog>()
@@ -109,6 +123,8 @@ class AgentFactoryToolAccessTest {
         val localToolset = mockk<LocalToolset>(relaxed = true)
         coEvery { localToolset.getTools(any()) } returns localTools
         val mcpToolset = mockk<ConversationMcpToolset>(relaxed = true)
+        val appFunctionToolset = mockk<AppFunctionToolset>(relaxed = true)
+        coEvery { appFunctionToolset.getTools(any()) } returns appFunctionTools
         val mcpRegistry = mockk<github.ponyhuang.gimi.agent.McpToolsetRegistry>(relaxed = true)
         coEvery { mcpRegistry.resolve() } returns github.ponyhuang.gimi.agent.McpToolsetResolution(emptyList())
         val modelFactory = mockk<AgentLLMModelFactory>()
@@ -117,6 +133,7 @@ class AgentFactoryToolAccessTest {
         return AgentFactory(
             localToolCatalog = localToolCatalog,
             localToolset = localToolset,
+            appFunctionToolset = appFunctionToolset,
             conversationMcpToolset = mcpToolset,
             mcpToolsetRegistry = mcpRegistry,
             skillSource = mockk<SkillSource>(relaxed = true),

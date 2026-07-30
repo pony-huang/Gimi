@@ -36,6 +36,9 @@ import github.ponyhuang.gimi.feature.chat.ChatNotice
 import github.ponyhuang.gimi.feature.chat.ChatScaffold
 import github.ponyhuang.gimi.feature.chat.ChatViewModel
 import github.ponyhuang.gimi.feature.chat.ViewModelStore
+import github.ponyhuang.gimi.feature.appfunctions.AppFunctionAppDetailRoute
+import github.ponyhuang.gimi.feature.appfunctions.AppFunctionsSettingsRoute
+import github.ponyhuang.gimi.feature.appfunctions.R as AppFunctionsR
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.feature.chat.R as ChatR
 import github.ponyhuang.gimi.feature.conversation.ChatDrawer
@@ -251,6 +254,9 @@ fun MainScreen(
                                 onNavigateToToolAuthorization = {
                                     backStack.add(AppRoute.ToolAuthorizationSettings)
                                 },
+                                onNavigateToAppFunctions = {
+                                    backStack.add(AppRoute.AppFunctionsSettings)
+                                },
                                 modifier = modifier,
                             )
                         }
@@ -300,6 +306,28 @@ fun MainScreen(
                             goBack,
                         ) {
                             ToolAuthorizationConfigurationRoute(modifier = it)
+                        }
+
+                        AppRoute.AppFunctionsSettings -> PreferenceScaffold(
+                            stringResource(AppFunctionsR.string.appfunctions_title),
+                            goBack,
+                        ) {
+                            AppFunctionsSettingsRoute(
+                                onOpenApp = { packageName ->
+                                    backStack.add(AppRoute.AppFunctionAppDetail(packageName))
+                                },
+                                modifier = it,
+                            )
+                        }
+
+                        is AppRoute.AppFunctionAppDetail -> PreferenceScaffold(
+                            stringResource(AppFunctionsR.string.appfunctions_title),
+                            goBack,
+                        ) {
+                            AppFunctionAppDetailRoute(
+                                packageName = route.packageName,
+                                modifier = it,
+                            )
                         }
 
                         AppRoute.SkillsSettings -> PreferenceScaffold(

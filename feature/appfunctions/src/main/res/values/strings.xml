@@ -1,0 +1,26 @@
+<resources>
+    <string name="appfunctions_title">AppFunctions</string>
+    <string name="appfunctions_experimental_title">AppFunctions</string>
+    <string name="appfunctions_experimental_summary">手动启动后发现其他应用提供的函数；新应用和新函数默认关闭。</string>
+    <string name="appfunctions_status_enabled">已启动</string>
+    <string name="appfunctions_status_disabled">未启动</string>
+    <string name="appfunctions_apps_section">提供应用</string>
+    <string name="appfunctions_discovering">正在发现外部 AppFunctions…</string>
+    <string name="appfunctions_empty">尚未发现可配置的外部 AppFunction。</string>
+    <string name="appfunctions_filter_empty">没有符合当前条件的函数。</string>
+    <string name="appfunctions_app_count">已启用 %1$d / %2$d；不支持 %3$d</string>
+    <string name="appfunctions_search_label">搜索函数</string>
+    <string name="appfunctions_filter_all">全部</string>
+    <string name="appfunctions_filter_enabled">已启用</string>
+    <string name="appfunctions_filter_disabled">未启用</string>
+    <string name="appfunctions_filter_unavailable">不可用</string>
+    <string name="appfunctions_unsupported_title">当前设备不支持</string>
+    <string name="appfunctions_unsupported_summary">需要 Android 16+ 或 Jetpack AppFunctions 可识别的系统扩展实现。</string>
+    <string name="appfunctions_permission_title">缺少系统授权</string>
+    <string name="appfunctions_permission_summary">系统或 OEM 尚未授予 EXECUTE_APP_FUNCTIONS；普通侧载版本无法自行获取此授权。</string>
+    <string name="appfunctions_discovery_error">发现失败</string>
+    <string name="appfunctions_provider_disabled">提供方已在系统中停用此函数。</string>
+    <string name="appfunctions_function_unsupported">首版无法安全加载此类型：%1$s</string>
+    <string name="appfunctions_agent_busy">Agent 正在运行，请结束当前任务后再修改 AppFunctions。</string>
+    <string name="appfunctions_unavailable_action">当前设备能力或系统授权不允许启动 AppFunctions。</string>
+</resources>

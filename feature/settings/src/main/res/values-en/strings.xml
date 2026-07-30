@@ -29,6 +29,8 @@
 
     <string name="settings_tool_authorization_title">Tool authorization</string>
     <string name="settings_tool_authorization_subtitle">Choose which local tools the assistant may use</string>
+    <string name="settings_appfunctions_title">AppFunctions</string>
+    <string name="settings_appfunctions_subtitle">Discover and authorize Agent tools from other apps</string>
 
     <string name="settings_permissions_title">Permissions</string>
     <string name="settings_permissions_subtitle">Pre-grant permissions needed for chat and voice features</string>

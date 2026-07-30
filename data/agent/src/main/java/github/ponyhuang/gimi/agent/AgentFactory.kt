@@ -7,10 +7,12 @@ import com.google.adk.kt.models.Model
 import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.SkillToolset
 import com.google.adk.kt.tools.Toolset
+import github.ponyhuang.gimi.agent.tools.appfunctions.AppFunctionToolset
 import github.ponyhuang.gimi.agent.tools.search.LocalToolSource
 import github.ponyhuang.gimi.agent.tools.search.McpServerSource
 import github.ponyhuang.gimi.agent.tools.search.OfficialToolCandidateSource
 import github.ponyhuang.gimi.agent.tools.search.ToolSearchToolset
+import github.ponyhuang.gimi.agent.tools.search.ToolsetCandidateSource
 import github.ponyhuang.gimi.agent.tools.search.ToolVectorSearch
 import github.ponyhuang.gimi.agent.tools.mcp.ConversationMcpToolset
 import github.ponyhuang.gimi.agent.tools.official.SearchOfficialToolset
@@ -49,6 +51,7 @@ data class AgentRuntime(
 class AgentFactory @Inject constructor(
     private val localToolCatalog: LocalToolCatalog,
     private val localToolset: LocalToolset,
+    private val appFunctionToolset: AppFunctionToolset,
     private val conversationMcpToolset: ConversationMcpToolset,
     private val mcpToolsetRegistry: McpToolsetRegistry,
     private val skillSource: SkillSource,
@@ -68,9 +71,13 @@ class AgentFactory @Inject constructor(
     ): AgentRuntime {
         val modelConfig = agentLLMModelFactory.selectModelConfig(selection)
         val model = agentLLMModelFactory.createModel(modelConfig)
+        val appFunctionResumeTools = appFunctionToolset.getTools(null)
+            .map { tool -> ToolsetConfirmationResumeTool(appFunctionToolset, tool) }
         val agent = when (toolAccessMode) {
-            ToolAccessMode.ALWAYS_AVAILABLE -> createAlwaysAvailableAgent(model)
-            ToolAccessMode.ON_DEMAND -> createSearchAgent(model, ToolAccessMode.ON_DEMAND)
+            ToolAccessMode.ALWAYS_AVAILABLE ->
+                createAlwaysAvailableAgent(model, appFunctionResumeTools)
+            ToolAccessMode.ON_DEMAND ->
+                createSearchAgent(model, ToolAccessMode.ON_DEMAND, appFunctionResumeTools)
         }
         return AgentRuntime(
             agent = agent,
@@ -79,12 +86,17 @@ class AgentFactory @Inject constructor(
     }
 
     /** 全量直出：所有启用工具从首个请求起直接声明。 */
-    private fun createAlwaysAvailableAgent(model: Model): BaseAgent =
+    private fun createAlwaysAvailableAgent(
+        model: Model,
+        appFunctionResumeTools: List<ToolsetConfirmationResumeTool>,
+    ): BaseAgent =
         baseAgent(
             model = model,
             toolSearchEnabled = false,
+            appFunctionResumeTools = appFunctionResumeTools,
             toolsets = buildList {
                 add(localToolset)
+                add(appFunctionToolset)
                 add(conversationMcpToolset)
                 addAll(officialToolsets)
                 add(SkillToolset(skillSource))
@@ -103,11 +115,19 @@ class AgentFactory @Inject constructor(
     private suspend fun createSearchAgent(
         model: Model,
         mode: ToolAccessMode,
+        appFunctionResumeTools: List<ToolsetConfirmationResumeTool>,
     ): BaseAgent {
         val (officialToolsets, directOfficialToolsets) =
             officialToolsets.partition { it is SearchOfficialToolset }
         val sources = buildList {
             add(LocalToolSource(localToolCatalog, localToolset))
+            add(
+                ToolsetCandidateSource(
+                    id = "appfunctions",
+                    displayName = "AppFunctions",
+                    toolset = appFunctionToolset,
+                ),
+            )
             mcpToolsetRegistry.resolveAll().handles.forEach { handle ->
                 add(McpServerSource(handle))
             }
@@ -120,6 +140,7 @@ class AgentFactory @Inject constructor(
         return baseAgent(
             model = model,
             toolSearchEnabled = true,
+            appFunctionResumeTools = appFunctionResumeTools,
             toolsets = buildList {
                 addAll(directOfficialToolsets)
                 add(
@@ -137,6 +158,7 @@ class AgentFactory @Inject constructor(
     private fun baseAgent(
         model: Model,
         toolSearchEnabled: Boolean,
+        appFunctionResumeTools: List<ToolsetConfirmationResumeTool>,
         toolsets: List<Toolset>,
     ): BaseAgent = LlmAgent(
         name = "Assistant",
@@ -146,9 +168,14 @@ class AgentFactory @Inject constructor(
                 toolSearchEnabled = toolSearchEnabled,
             ),
         ),
-        tools = localToolCatalog.tools()
-            .filter { tool -> tool.name in localToolCatalog.confirmationRequiredToolIds }
-            .map { tool -> ToolsetConfirmationResumeTool(localToolset, tool) },
+        tools = buildList {
+            addAll(
+                localToolCatalog.tools()
+                    .filter { tool -> tool.name in localToolCatalog.confirmationRequiredToolIds }
+                    .map { tool -> ToolsetConfirmationResumeTool(localToolset, tool) },
+            )
+            addAll(appFunctionResumeTools)
+        },
         toolsets = toolsets,
     )
 }

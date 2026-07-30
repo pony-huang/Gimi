@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Tune
@@ -83,6 +84,16 @@ fun SettingsScreen(
                     onClick = { onAction(SettingsAction.OpenToolAuthorization) },
                 )
             }
+            if (state.showAppFunctions) {
+                item {
+                    PreferenceNavigationCard(
+                        icon = Icons.Default.Science,
+                        title = stringResource(R.string.settings_appfunctions_title),
+                        subtitle = stringResource(R.string.settings_appfunctions_subtitle),
+                        onClick = { onAction(SettingsAction.OpenAppFunctions) },
+                    )
+                }
+            }
             item {
                 PreferenceNavigationCard(
                     icon = Icons.Default.Extension,
@@ -145,7 +156,10 @@ private fun SettingsHomePreview() {
     AsssistantaiTheme {
         PreferenceScaffold(title = stringResource(R.string.settings_title), onBack = {}) { modifier ->
             SettingsScreen(
-                state = SettingsUiState(showToolActivity = true),
+                state = SettingsUiState(
+                    showToolActivity = true,
+                    showAppFunctions = true,
+                ),
                 appVersionName = "1.0",
                 onAction = {},
                 modifier = modifier,

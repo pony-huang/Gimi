@@ -23,7 +23,7 @@ composeBom = "2026.02.01"
 openaiJava = "4.41.0"
 okhttp = "4.12.0"
 objectbox = "6.0.0-beta"
-appfunctions = "1.0.0-alpha09"
+appfunctions = "1.0.0-alpha10"
 multiplatformMarkdownRenderer = "0.43.0"
 room = "2.8.4"
 sentenceEmbeddings = "0.0.6"
@@ -88,8 +88,6 @@ objectbox-processor = { module = "io.objectbox:objectbox-processor", version.ref
 objectbox-windows = { module = "io.objectbox:objectbox-windows", version.ref = "objectbox" }
 sentence-embeddings = { module = "io.gitlab.shubham0204:sentence-embeddings", version.ref = "sentenceEmbeddings" }
 androidx-appfunctions = { module = "androidx.appfunctions:appfunctions", version.ref = "appfunctions" }
-androidx-appfunctions-compiler = { module = "androidx.appfunctions:appfunctions-compiler", version.ref = "appfunctions" }
-androidx-appfunctions-service = { module = "androidx.appfunctions:appfunctions-service", version.ref = "appfunctions" }
 multiplatform-markdown-renderer-m3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-m3", version.ref = "multiplatformMarkdownRenderer" }
 mcp = { module = "io.modelcontextprotocol:kotlin-sdk", version.ref = "mcp" }
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }

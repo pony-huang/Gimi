@@ -35,6 +35,7 @@ android {
 
 dependencies {
     implementation(project(":core:common"))
+    implementation(project(":domain:appfunctions"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:mcp"))
     implementation(project(":domain:modelcatalog"))
@@ -58,9 +59,6 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.androidx.appfunctions)
-    implementation(libs.androidx.appfunctions.service)
-    ksp(libs.androidx.appfunctions.compiler)
     ksp(libs.androidx.room.compiler)
     ksp(libs.google.adk.kotlin.processor)
     ksp(libs.hilt.android.compiler)

@@ -18,6 +18,7 @@ fun SettingsRoute(
     onNavigateToWorkFiles: () -> Unit,
     onNavigateToPermissions: () -> Unit,
     onNavigateToToolAuthorization: () -> Unit,
+    onNavigateToAppFunctions: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -34,6 +35,7 @@ fun SettingsRoute(
                 SettingsEffect.NavigateToWorkFiles -> onNavigateToWorkFiles()
                 SettingsEffect.NavigateToPermissions -> onNavigateToPermissions()
                 SettingsEffect.NavigateToToolAuthorization -> onNavigateToToolAuthorization()
+                SettingsEffect.NavigateToAppFunctions -> onNavigateToAppFunctions()
             }
         }
     }

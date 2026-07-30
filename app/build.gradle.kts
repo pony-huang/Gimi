@@ -116,6 +116,7 @@ dependencies {
     implementation(project(":data:permissions"))
     implementation(project(":data:toolauthorization"))
     implementation(project(":data:skills"))
+    implementation(project(":data:appfunctions"))
     implementation(project(":core:designsystem"))
     implementation(project(":feature:modelsettings"))
     implementation(project(":feature:mcp"))
@@ -125,6 +126,7 @@ dependencies {
     implementation(project(":feature:voicewake"))
     implementation(project(":feature:settings"))
     implementation(project(":feature:skills"))
+    implementation(project(":feature:appfunctions"))
     implementation(project(":feature:chat"))
     testImplementation(project(":core:testing"))
     // Drop kxml2 from the release runtime configurations only. Android's
@@ -179,8 +181,4 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    // AppFunctions — expose on-device agent workflows to system agents via
-    // androidx.appfunctions (Android 16+, Jetpack backwards-compat layer).
-    implementation(libs.androidx.appfunctions)
-    implementation(libs.androidx.appfunctions.service)
 }

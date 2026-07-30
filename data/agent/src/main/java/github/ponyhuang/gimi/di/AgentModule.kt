@@ -25,6 +25,7 @@ import github.ponyhuang.gimi.agent.tools.search.ToolEmbeddingModel
 import github.ponyhuang.gimi.agent.tools.search.ToolVectorEntity
 import github.ponyhuang.gimi.agent.tools.search.ToolVectorSearch
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
+import github.ponyhuang.gimi.domain.appfunctions.repository.AppFunctionRepository
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import github.ponyhuang.gimi.domain.toolauthorization.repository.LocalToolDefinitionSource
@@ -126,6 +127,7 @@ object AgentModule {
         agentFactory: AgentFactory,
         modelServices: AgentModelConfigurationSource,
         toolAuthorization: ToolAuthorizationRepository,
+        appFunctionRepository: AppFunctionRepository,
         mcpRepository: McpRepository,
         plugins: List<@JvmSuppressWildcards Plugin>,
     ): AgentChatRunner = AgentChatRunner(
@@ -139,10 +141,11 @@ object AgentModule {
         sessionService = sessionService,
         artifactService = artifactService,
         configurationRevision = {
-            Triple(
+            listOf(
                 toolAuthorization.revision.value,
                 mcpRepository.revision.value,
                 modelServices.configurationRevision.value,
+                appFunctionRepository.revision.value,
             )
         },
         plugins = plugins,

@@ -16,10 +16,26 @@ android {
         applicationId = "github.ponyhuang.gimi"
         minSdk = 35
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0-alpha"
+        // CI 发布流程通过 -P 注入版本（见 .github/workflows/release.yml）；
+        // 未注入时使用本地开发默认值。
+        versionCode = providers.gradleProperty("releaseVersionCode").map(String::toInt).getOrElse(1)
+        versionName = providers.gradleProperty("releaseVersionName").getOrElse("0.1.0-alpha")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        create("release") {
+            // 发布密钥库由 CI 以 -P 属性注入；本地无配置时 release 构建回退到 debug 签名，
+            // 保证任何人都能构建出可安装的 release APK（开源项目无商店分发要求）。
+            val storeFilePath = providers.gradleProperty("releaseStoreFile").orNull
+            if (storeFilePath != null) {
+                storeFile = file(storeFilePath)
+                storePassword = providers.gradleProperty("releaseStorePassword").orNull
+                keyAlias = providers.gradleProperty("releaseKeyAlias").orNull
+                keyPassword = providers.gradleProperty("releaseKeyPassword").orNull
+            }
+        }
     }
 
     buildTypes {
@@ -30,6 +46,16 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            // 签名优先级：CI -P 注入 > IDE「Generate Signed APK」向导注入 > debug 回退。
+            // 向导打包时 AGP 注入 android.injected.signing.* 属性，此时不指定 signingConfig，
+            // 交由 AGP 应用向导选择的密钥库（本地与 CI 使用同一密钥库，签名一致）。
+            val hasCiSigning = providers.gradleProperty("releaseStoreFile").isPresent
+            val hasIdeSigning = providers.gradleProperty("android.injected.signing.store.file").isPresent
+            signingConfig = when {
+                hasCiSigning -> signingConfigs.getByName("release")
+                hasIdeSigning -> null
+                else -> signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions {

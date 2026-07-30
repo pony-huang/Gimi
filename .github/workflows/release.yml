@@ -1,0 +1,110 @@
+name: publish-android-release
+
+on:
+  # 版本推进方式一：推送 v* 标签（如 git tag v0.2.0 && git push origin v0.2.0）。
+  push:
+    tags: ['v*']
+  # 版本推进方式二：手动触发；version 留空时使用 app/build.gradle.kts 中的当前版本号。
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '发布版本号（不含 v 前缀；留空则使用当前版本号）'
+        required: false
+        type: string
+      prerelease:
+        description: '标记为预发布（pre-release）；版本号含 - 时自动视为预发布'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+# 发布不允许并发，避免重复 tag/Release。
+concurrency:
+  group: publish-android-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build & Publish
+    runs-on: ubuntu-latest
+    env:
+      REPO_NAME: ${{ github.event.repository.name }}
+      RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 版本来源优先级：手动输入 > 标签名（去掉 v 前缀）> build.gradle.kts 当前默认版本。
+      - name: Resolve version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            V="${{ inputs.version }}"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="$(sed -n 's/.*getOrElse("\([^"]*\)").*/\1/p' app/build.gradle.kts | head -1)"
+          fi
+          if [ -z "$V" ]; then
+            echo "无法解析发布版本号，请手动输入 version" >&2
+            exit 1
+          fi
+          echo "value=$V" >> "$GITHUB_OUTPUT"
+          case "$V" in
+            *-*) echo "auto_prerelease=true" >> "$GITHUB_OUTPUT" ;;
+            *)   echo "auto_prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+          echo "发布版本: $V"
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # 可选签名：配置了 RELEASE_KEYSTORE_BASE64 等 secret 时用正式密钥库签名，
+      # 否则构建脚本回退到 debug 签名（见 app/build.gradle.kts）。
+      - name: Decode release keystore
+        if: ${{ env.RELEASE_KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release-keystore.jks"
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/release-keystore.jks" >> "$GITHUB_ENV"
+
+      - name: Build release APK
+        run: |
+          SIGNING_ARGS=""
+          if [ -n "$KEYSTORE_PATH" ]; then
+            SIGNING_ARGS="-PreleaseStoreFile=$KEYSTORE_PATH -PreleaseStorePassword=${{ secrets.RELEASE_KEYSTORE_PASSWORD }} -PreleaseKeyAlias=${{ secrets.RELEASE_KEY_ALIAS }} -PreleaseKeyPassword=${{ secrets.RELEASE_KEY_PASSWORD }}"
+          fi
+          ./gradlew app:assembleRelease --stacktrace \
+            -PreleaseVersionName="${{ steps.version.outputs.value }}" \
+            -PreleaseVersionCode="${{ github.run_number }}" \
+            $SIGNING_ARGS
+
+      - name: Package artifacts
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          mkdir -p dist
+          for apk in app/build/outputs/apk/release/*.apk; do
+            base="$(basename "$apk" .apk)"
+            abi="${base#app-}"
+            abi="${abi%-release}"
+            cp "$apk" "dist/${REPO_NAME}-v${VERSION}-${abi}.apk"
+          done
+          cp app/build/outputs/mapping/release/mapping.txt "dist/mapping-v${VERSION}.txt"
+          ls -la dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.value }}
+          name: v${{ steps.version.outputs.value }}
+          prerelease: ${{ inputs.prerelease || steps.version.outputs.auto_prerelease == 'true' }}
+          generate_release_notes: true
+          files: dist/*

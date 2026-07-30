@@ -90,6 +90,11 @@ Run from the repository root with `gradlew.bat` on Windows:
 
 Android Studio may run the `app` debug configuration on a device or emulator.
 
+GitHub Actions (`.github/workflows/`):
+
+- `ci.yml`: push/PR to `main` runs `testDebugUnitTest`, `assembleDebug`, and `app:lintDebug` on JDK 21 (Ubuntu).
+- `release.yml` (`publish-android-release`): triggered by pushing a `v*` tag or by manual `workflow_dispatch` (empty version input falls back to the `versionName` default in `app/build.gradle.kts`). Builds `app:assembleRelease` with `-PreleaseVersionName`/`-PreleaseVersionCode` injected and attaches APKs and the R8 mapping file to a GitHub Release. Signing priority: CI `-P` properties > IDE Generate Signed APK wizard injection (`android.injected.signing.*`) > debug fallback (see `app/build.gradle.kts`); CI official signing activates only when the `RELEASE_KEYSTORE_BASE64`/`RELEASE_KEYSTORE_PASSWORD`/`RELEASE_KEY_ALIAS`/`RELEASE_KEY_PASSWORD` secrets are configured. No Google Play publishing.
+
 Testing rules:
 
 - Use JUnit 4 in the owning module's `src/test`; use behavior-based `*Test.kt` names. Put Android/Compose interaction coverage in `src/androidTest`.

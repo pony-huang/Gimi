@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "github.ponyhuang.asssistantai.feature.permissions"
+    namespace = "github.ponyhuang.gimi.feature.permissions"
     compileSdk { version = release(37) }
     defaultConfig {
         minSdk = 35

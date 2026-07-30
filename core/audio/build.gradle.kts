@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "github.ponyhuang.asssistantai.core.audio"
+    namespace = "github.ponyhuang.gimi.core.audio"
     compileSdk { version = release(37) }
     defaultConfig { minSdk = 35 }
     compileOptions {

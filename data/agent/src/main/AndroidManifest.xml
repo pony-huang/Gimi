@@ -3,15 +3,15 @@
 
     <application>
         <activity
-            android:name="github.ponyhuang.asssistantai.permission.CalendarPermissionActivity"
+            android:name="github.ponyhuang.gimi.permission.CalendarPermissionActivity"
             android:exported="false"
             android:theme="@style/Theme.Asssistantai" />
         <activity
-            android:name="github.ponyhuang.asssistantai.permission.LocationPermissionActivity"
+            android:name="github.ponyhuang.gimi.permission.LocationPermissionActivity"
             android:exported="false"
             android:theme="@style/Theme.Asssistantai" />
         <activity
-            android:name="github.ponyhuang.asssistantai.permission.MediaPermissionActivity"
+            android:name="github.ponyhuang.gimi.permission.MediaPermissionActivity"
             android:exported="false"
             android:theme="@style/Theme.Asssistantai" />
     </application>

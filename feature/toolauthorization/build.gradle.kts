@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "github.ponyhuang.asssistantai.feature.toolauthorization"
+    namespace = "github.ponyhuang.gimi.feature.toolauthorization"
     compileSdk { version = release(37) }
     defaultConfig {
         minSdk = 35

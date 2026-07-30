@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "github.ponyhuang.asssistantai.feature.modelsettings"
+    namespace = "github.ponyhuang.gimi.feature.modelsettings"
     compileSdk { version = release(37) }
     defaultConfig {
         minSdk = 35

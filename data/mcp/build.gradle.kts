@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "github.ponyhuang.asssistantai.data.mcp"
+    namespace = "github.ponyhuang.gimi.data.mcp"
     compileSdk { version = release(37) }
     defaultConfig { minSdk = 35 }
     compileOptions {

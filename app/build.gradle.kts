@@ -7,17 +7,17 @@ plugins {
 }
 
 android {
-    namespace = "github.ponyhuang.asssistantai"
+    namespace = "github.ponyhuang.gimi"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "github.ponyhuang.asssistantai"
+        applicationId = "github.ponyhuang.gimi"
         minSdk = 35
         targetSdk = 37
         versionCode = 1
-        versionName = "1.0.0-alpha.1"
+        versionName = "0.1.0-alpha"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

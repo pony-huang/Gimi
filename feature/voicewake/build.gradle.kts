@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "github.ponyhuang.asssistantai.feature.voicewake"
+    namespace = "github.ponyhuang.gimi.feature.voicewake"
     compileSdk { version = release(37) }
     defaultConfig {
         minSdk = 35

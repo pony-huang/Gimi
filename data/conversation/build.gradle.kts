@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "github.ponyhuang.asssistantai.data.conversation"
+    namespace = "github.ponyhuang.gimi.data.conversation"
     compileSdk { version = release(37) }
     defaultConfig { minSdk = 35 }
     compileOptions {

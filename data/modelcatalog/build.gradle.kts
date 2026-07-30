@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "github.ponyhuang.asssistantai.data.modelcatalog"
+    namespace = "github.ponyhuang.gimi.data.modelcatalog"
     compileSdk { version = release(37) }
 
     defaultConfig {

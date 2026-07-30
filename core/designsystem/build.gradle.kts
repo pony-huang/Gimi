@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "github.ponyhuang.asssistantai.core.designsystem"
+    namespace = "github.ponyhuang.gimi.core.designsystem"
     compileSdk { version = release(37) }
     defaultConfig { minSdk = 35 }
     compileOptions {

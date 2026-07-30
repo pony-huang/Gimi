@@ -1,0 +1,388 @@
+package github.ponyhuang.gimi.feature.chat
+
+import android.content.ClipData
+import android.widget.Toast
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.conversation.model.FunctionCallView
+import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
+import github.ponyhuang.gimi.domain.conversation.model.Message
+import github.ponyhuang.gimi.domain.conversation.model.MessageRole
+import github.ponyhuang.gimi.domain.conversation.model.Messages
+import github.ponyhuang.gimi.domain.conversation.model.TextPart
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState
+import github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackStatus
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+
+/**
+ * 聊天气泡文本 —— [ChatBubble] 的便捷包装，内部使用 [TextContent] 渲染，
+ * 自动支持 **粗体**、*斜体*、`行内代码`、代码块、标题、列表等 Markdown 语法。
+ *
+ * ## 流式渲染
+ *
+ * `partial = true` 且 `chunkChannel != null` 时走 [TextContent] 的增量解析路径，
+ * 与 [MessageBubble] / [ThoughtBubble] 的流式行为一致 —— partial 阶段每来一段增量
+ * 不会触发整段重解析。
+ *
+ * 旧调用点 `ChatBubbleText(text, role, modifier)` 保持完全兼容（默认 `partial = false` /
+ * `chunkChannel = null`，走静态路径）。
+ *
+ * @param text         消息文本（Markdown）
+ * @param role         消息角色
+ * @param chunkChannel reducer 暴露的文本增量 channel；流式场景由调用方注入
+ * @param partial      是否处于流式 partial 阶段
+ * @param modifier     修饰符
+ */
+@Composable
+fun ChatBubbleText(
+    text: String,
+    role: MessageRole,
+    chunkChannel: ReceiveChannel<String>? = null,
+    partial: Boolean = false,
+    modifier: Modifier = Modifier,
+) {
+    ChatBubble(role = role, modifier = modifier) {
+        CompositionLocalProvider {
+            TextContent(
+                text = text,
+                partial = partial,
+                chunkChannel = chunkChannel,
+                modifier = if (role == MessageRole.User) modifier else modifier.fillMaxWidth(),
+                fillAvailableWidth = role != MessageRole.User,
+            )
+        }
+    }
+}
+
+
+/**
+ * 消息气泡 — 把 [Message] 渲染到 [ChatBubble] 的 content slot 里。
+ *
+ * 渲染顺序：
+ * 1. 工具活动 chip 行（call/response 按 id 配对为单 chip，确认协议信令已过滤）
+ * 2. 每个 [TextPart]：
+ *    - `thought == true` → 走 [ThoughtBubble]（同样支持流式渲染）
+ *    - 否则 → 流式 Markdown（经由 [TextContent] 收口）
+ *
+ * @param partChannelProvider reducer 暴露的"按 TextPart.id 取 chunk channel"函数。
+ *        Composable 拿到 channel 后用 `for (chunk in channel) streamingState.append(chunk)`
+ *        把 reducer 产生的文本 delta 持续送进流式解析器。
+ */
+@Composable
+fun MessageBubble(
+    message: Message,
+    partChannelProvider: (partId: String) -> ReceiveChannel<String>?,
+    showToolActivity: Boolean = true,
+    isAgentRunning: Boolean = false,
+    rejectedToolNames: Set<String> = emptySet(),
+    awaitingConfirmationToolNames: Set<String> = emptySet(),
+    speechPlaybackState: SpeechPlaybackState = SpeechPlaybackState(),
+    onToggleSpeechPlayback: (messageId: String, text: String) -> Unit = { _, _ -> },
+    onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit =
+        {},
+    modifier: Modifier = Modifier
+) {
+    val role = message.role
+    val fillsBubbleWidth = role != MessageRole.User
+    ChatBubble(role = role, modifier = modifier) {
+        Column(modifier = if (fillsBubbleWidth) Modifier.fillMaxWidth() else Modifier) {
+            // 工具活动 chip 行：call/response 按 id 配对成单个状态 chip（见 ToolCallChip），
+            // 确认协议信令（adk_request_confirmation）在 visibleFunction* 里已过滤。
+            if (showToolActivity) {
+                val calls = message.visibleFunctionCalls()
+                val responses = message.visibleFunctionResponses()
+                if (calls.isNotEmpty() || responses.isNotEmpty()) {
+                    val respondedIds = responses.mapTo(HashSet()) { it.id }
+                    val calledIds = calls.mapTo(HashSet()) { it.id }
+                    ChipRow(fillAvailableWidth = fillsBubbleWidth) {
+                        calls.forEach { call ->
+                            // id 为空时无法可靠配对，保守按"未完成"处理，避免误标 ✓。
+                            val completed = call.id.isNotEmpty() && call.id in respondedIds
+                            // 显式拒绝（内存态）优先；任务已结束（非流式、未在跑）而响应
+                            // 始终未到的，视为未执行/被中断，同样给 ✗ 而不是永远悬着。
+                            val rejected = !completed &&
+                                (call.name in rejectedToolNames ||
+                                    (!message.partial && !isAgentRunning))
+                            val awaitingConfirmation = !completed && !rejected &&
+                                call.name in awaitingConfirmationToolNames
+                            ToolCallChip(
+                                call = call,
+                                completed = completed,
+                                inProgress = !completed && !rejected && !awaitingConfirmation,
+                                rejected = rejected,
+                                awaitingConfirmation = awaitingConfirmation,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                        }
+                        responses.forEach { response ->
+                            if (response.id.isEmpty() || response.id !in calledIds) {
+                                ToolResponseChip(
+                                    response = response,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            MessageAttachments(
+                attachments = message.fileAttachments,
+                onOpenDocument = onOpenDocument,
+            )
+
+            if (message.textParts.isNotEmpty() ||
+                message.functionCalls.isNotEmpty() ||
+                message.functionResponses.isNotEmpty()
+            ) {
+                message.textParts.forEach { part ->
+                    RenderTextPart(
+                        part = part,
+                        partial = message.partial,
+                        chunkChannel = partChannelProvider(part.id),
+                        fillAvailableWidth = fillsBubbleWidth,
+                    )
+                }
+            }
+
+            assistantReplyTextForCopy(message)?.let { text ->
+                AssistantMessageActions(
+                    messageId = message.id,
+                    text = text,
+                    speechPlaybackState = speechPlaybackState,
+                    onToggleSpeechPlayback = onToggleSpeechPlayback,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Returns the original Markdown body that may be copied from a completed assistant reply.
+ * Thought content and tool activity are intentionally excluded from the user-facing reply.
+ */
+private fun assistantReplyTextForCopy(message: Message): String? {
+    if (message.role != MessageRole.Assistant || message.partial) return null
+
+    return message.textParts
+        .asSequence()
+        .filterNot { it.thought }
+        .joinToString(separator = "") { it.text }
+        .takeIf(String::isNotBlank)
+}
+
+/** A compact action row shown after a completed assistant reply. */
+@Composable
+private fun AssistantMessageActions(
+    messageId: String,
+    text: String,
+    speechPlaybackState: SpeechPlaybackState,
+    onToggleSpeechPlayback: (messageId: String, text: String) -> Unit,
+) {
+    val clipboard = LocalClipboard.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val copiedMessage = stringResource(R.string.chat_message_copied)
+        // 复制成功后的短暂 ✓ 反馈：动作有始有终，不只依赖 Toast（部分 ROM 会吞掉）。
+        var justCopied by remember { mutableStateOf(false) }
+        IconButton(
+            onClick = {
+                scope.launch {
+                    clipboard.setClipEntry(
+                        ClipEntry(ClipData.newPlainText("assistant response", text)),
+                    )
+                    justCopied = true
+                    Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                    delay(1_600)
+                    justCopied = false
+                }
+            },
+        ) {
+            Icon(
+                imageVector = if (justCopied) Icons.Default.Check else Icons.Default.ContentCopy,
+                contentDescription = stringResource(R.string.chat_message_copy),
+                tint = if (justCopied) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        val isCurrent = speechPlaybackState.messageId == messageId
+        val status = if (isCurrent) speechPlaybackState.status else SpeechPlaybackStatus.Idle
+        IconButton(onClick = { onToggleSpeechPlayback(messageId, text) }) {
+            when (status) {
+                SpeechPlaybackStatus.Loading -> CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                )
+                SpeechPlaybackStatus.Playing -> Icon(
+                    imageVector = Icons.Default.Pause,
+                    contentDescription = stringResource(R.string.chat_message_pause_playback),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+                SpeechPlaybackStatus.Paused,
+                SpeechPlaybackStatus.Idle,
+                -> Icon(
+                    imageVector = Icons.AutoMirrored.Filled.VolumeUp,
+                    contentDescription = stringResource(
+                        if (status == SpeechPlaybackStatus.Paused) R.string.chat_message_resume_playback
+                        else R.string.chat_message_play_reply,
+                    ),
+                    tint = if (status == SpeechPlaybackStatus.Paused) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChipRow(
+    fillAvailableWidth: Boolean,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Row(
+        modifier = (if (fillAvailableWidth) Modifier.fillMaxWidth() else Modifier)
+            .padding(bottom = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        content()
+    }
+}
+
+/**
+ * 流式渲染一段普通 markdown 文本。
+ *
+ * 薄壳 — 真正的 partial / static 双路径决策收口在 [TextContent] 里。
+ *
+ * - `partial = true` 且 `chunkChannel != null` → 增量解析路径（`StreamingMarkdownState`）
+ * - 其它 → 静态路径（`Markdown(content = part.text)`）
+ *
+ * 用户消息和已完成的 assistant 消息 MUST 走静态路径才能显示文字
+ * （`StreamingMarkdownState` 没有"设置初始内容"的方法，只能 `append`）。
+ */
+@Composable
+private fun RenderTextPart(
+    part: TextPart,
+    partial: Boolean,
+    chunkChannel: ReceiveChannel<String>?,
+    fillAvailableWidth: Boolean,
+) {
+    TextContent(
+        text = part.text,
+        partial = partial,
+        chunkChannel = chunkChannel,
+        modifier = if (fillAvailableWidth) Modifier.fillMaxWidth() else Modifier,
+        fillAvailableWidth = fillAvailableWidth,
+    )
+}
+
+
+@Preview(showBackground = true)
+@Composable
+private fun MessageBubblePreview() {
+    AsssistantaiTheme {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(8.dp)
+        ) {
+            MessageBubble(
+                message = Messages.fromUser("帮我查一下今天上海的天气"),
+                partChannelProvider = { null },
+            )
+            MessageBubble(
+                message = Message(
+                    author = "DefaultAssistant",
+                    role = MessageRole.Assistant,
+                    textParts = listOf(
+                        TextPart(text = "需要先查天气才能给建议。", thought = true),
+                    ),
+                    partial = true,
+                ),
+                partChannelProvider = { null },
+            )
+            MessageBubble(
+                message = Message(
+                    author = "DefaultAssistant",
+                    role = MessageRole.Assistant,
+                    textParts = listOf(
+                        TextPart(text = "上海今天晴，28°C。", thought = false),
+                    ),
+                    functionCalls = listOf(
+                        FunctionCallView(
+                            id = "c1",
+                            name = "getCurrentWeather",
+                            argsSummary = "(city=\"上海\")"
+                        )
+                    ),
+                    functionResponses = listOf(
+                        FunctionResponseView(
+                            id = "c1",
+                            name = "getCurrentWeather"
+                        )
+                    ),
+                ),
+                partChannelProvider = { null },
+            )
+            MessageBubble(
+                message = Message(
+                    author = "DefaultAssistant",
+                    role = MessageRole.Assistant,
+                    textParts = listOf(
+                        TextPart(text = "建议带伞，穿短袖。", thought = false),
+                    ),
+                    partial = true,
+                ),
+                partChannelProvider = { null },
+            )
+        }
+    }
+}

@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "github.ponyhuang.asssistantai.data.agent"
+    namespace = "github.ponyhuang.gimi.data.agent"
     compileSdk { version = release(37) }
     defaultConfig { minSdk = 35 }
     compileOptions {
@@ -91,7 +91,7 @@ kapt {
         )
         arg(
             "objectbox.myObjectBoxPackage",
-            "github.ponyhuang.asssistantai.agent.tools.search",
+            "github.ponyhuang.gimi.agent.tools.search",
         )
     }
 }

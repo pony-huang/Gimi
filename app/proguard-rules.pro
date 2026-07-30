@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# R8 / ProGuard keep rules for github.ponyhuang.asssistantai
+# R8 / ProGuard keep rules for github.ponyhuang.gimi
 #
 # Each entry below covers a case where R8 cannot prove a class is reachable
 # even though the runtime does (reflection, manifest lookup, native binding).
@@ -40,8 +40,8 @@
 # Sites: LLMModelSelectionCodec, LLMModelServiceDatabase,
 #        McpServerRepository, SpeechSynthesis.
 # ---------------------------------------------------------------------------
--keep class github.ponyhuang.asssistantai.data.** { *; }
--keepclassmembers class github.ponyhuang.asssistantai.data.** {
+-keep class github.ponyhuang.gimi.data.** { *; }
+-keepclassmembers class github.ponyhuang.gimi.data.** {
     <init>(...);
     <fields>;
 }
@@ -49,8 +49,8 @@
 # ModelSelection moved to the domain layer but is still Gson-persisted by
 # ModelServiceRepository (SharedPreferences); keep field names identical to the
 # legacy data-class JSON shape.
--keep class github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection { *; }
--keepclassmembers class github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection {
+-keep class github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection { *; }
+-keepclassmembers class github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection {
     <init>(...);
     <fields>;
 }
@@ -62,8 +62,8 @@
 # build time, but Navigation 3 looks them up by class name from saved state.
 # Keep the sealed interface + nested data objects / data classes.
 # ---------------------------------------------------------------------------
--keep,includedescriptorclasses class github.ponyhuang.asssistantai.ui.navigation.** { *; }
--keepclassmembers class github.ponyhuang.asssistantai.ui.navigation.** {
+-keep,includedescriptorclasses class github.ponyhuang.gimi.ui.navigation.** { *; }
+-keepclassmembers class github.ponyhuang.gimi.ui.navigation.** {
     *** Companion;
     kotlinx.serialization.KSerializer serializer(...);
 }
@@ -112,5 +112,5 @@
 # ---------------------------------------------------------------------------
 # Manifest entry points (belt-and-suspenders — Hilt plugin already keeps these)
 # ---------------------------------------------------------------------------
--keep class github.ponyhuang.asssistantai.MainActivity { *; }
--keep class github.ponyhuang.asssistantai.voice.BluetoothVoiceService { *; }
+-keep class github.ponyhuang.gimi.MainActivity { *; }
+-keep class github.ponyhuang.gimi.voice.BluetoothVoiceService { *; }

@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "github.ponyhuang.asssistantai.feature.chat"
+    namespace = "github.ponyhuang.gimi.feature.chat"
     compileSdk { version = release(37) }
     defaultConfig {
         minSdk = 35

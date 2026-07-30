@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent.tools.dynamic
+package github.ponyhuang.asssistantai.agent.tools.search
 
 import com.google.adk.kt.agents.ReadonlyContext
 import com.google.adk.kt.tools.BaseTool
@@ -6,7 +6,7 @@ import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.asssistantai.agent.McpToolsetHandle
 import github.ponyhuang.asssistantai.agent.tools.modelRuntimeMetadataOrNull
 import github.ponyhuang.asssistantai.agent.tools.toolConfigurationOrNull
-import github.ponyhuang.asssistantai.agent.tools.official.DynamicOfficialToolset
+import github.ponyhuang.asssistantai.agent.tools.official.SearchOfficialToolset
 
 /**
  * 单个 MCP server 在 [ToolSearchToolset] 中的候选来源。
@@ -21,7 +21,7 @@ import github.ponyhuang.asssistantai.agent.tools.official.DynamicOfficialToolset
  */
 internal class McpServerSource(
     private val handle: McpToolsetHandle,
-) : DynamicToolCandidateSource {
+) : ToolCandidateSource {
     override val id: String = "mcp:${handle.serverId}"
     override val displayName: String = handle.displayName
 
@@ -40,7 +40,7 @@ internal class McpServerSource(
 }
 
 /**
- * 通用 [Toolset] 适配器：把任意 ADK [Toolset] 暴露为 [DynamicToolCandidateSource]。
+ * 通用 [Toolset] 适配器：把任意 ADK [Toolset] 暴露为 [ToolCandidateSource]。
  *
  * 用于 search 模式以外的"想再外加一个 Toolset 当 source"的场合。MCP 单独的
  * [McpServerSource] 不走这里 —— 它每个 server 一份，保持失败隔离与单一来源归类。
@@ -49,7 +49,7 @@ internal class ToolsetCandidateSource(
     override val id: String,
     override val displayName: String,
     private val toolset: Toolset,
-) : DynamicToolCandidateSource {
+) : ToolCandidateSource {
     override suspend fun loadAllTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
         toolset.getTools(readonlyContext)
 
@@ -65,8 +65,8 @@ internal class ToolsetCandidateSource(
  * 动态目录只决定这些函数何时把 schema 暴露给模型，不再次解释厂商协议。
  */
 internal class OfficialToolCandidateSource(
-    private val toolset: DynamicOfficialToolset,
-) : DynamicToolCandidateSource {
+    private val toolset: SearchOfficialToolset,
+) : ToolCandidateSource {
     override val id: String = toolset.sourceId
     override val displayName: String = toolset.sourceDisplayName
 

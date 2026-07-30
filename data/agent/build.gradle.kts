@@ -91,7 +91,7 @@ kapt {
         )
         arg(
             "objectbox.myObjectBoxPackage",
-            "github.ponyhuang.asssistantai.agent.tools.dynamic",
+            "github.ponyhuang.asssistantai.agent.tools.search",
         )
     }
 }

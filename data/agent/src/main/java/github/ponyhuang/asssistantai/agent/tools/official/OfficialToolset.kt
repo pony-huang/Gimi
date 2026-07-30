@@ -92,7 +92,7 @@ internal fun String.belongsToModelFamily(vararg familyNames: String): Boolean {
  * 厂商原生工具不实现该接口，仍由 [OfficialToolset.processLlmRequest] 直接注入；
  * 会展开为普通函数声明的工具集实现本接口，由统一动态 Toolset 控制暴露时机。
  */
-interface DynamicOfficialToolset : OfficialToolset {
+interface SearchOfficialToolset : OfficialToolset {
     val sourceId: String
     val sourceDisplayName: String
 }

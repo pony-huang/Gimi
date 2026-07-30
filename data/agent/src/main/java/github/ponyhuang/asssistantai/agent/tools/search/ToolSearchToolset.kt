@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent.tools.dynamic
+package github.ponyhuang.asssistantai.agent.tools.search
 
 import com.google.adk.kt.agents.ReadonlyContext
 import com.google.adk.kt.models.LlmRequest
@@ -14,7 +14,6 @@ import java.security.MessageDigest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 internal const val TOOL_SEARCH_NAME: String = "tool_search"
@@ -36,7 +35,7 @@ internal data class ToolAccessBudget(
  * 来源分别暴露完整目录和当前启用目录。向量同步始终使用 [loadAllTools]，只有
  * 最近邻搜索完成后才调用 [loadEnabledTools] 应用当前会话开关与授权。
  */
-internal interface DynamicToolCandidateSource {
+internal interface ToolCandidateSource {
     val id: String
     val displayName: String
 
@@ -57,7 +56,7 @@ internal interface DynamicToolCandidateSource {
  */
 internal class ToolSearchToolset(
     private val mode: ToolAccessMode,
-    private val sources: List<DynamicToolCandidateSource>,
+    private val sources: List<ToolCandidateSource>,
     private val vectorSearch: ToolVectorSearch,
     private val budget: ToolAccessBudget = ToolAccessBudget(),
 ) : Toolset {
@@ -248,7 +247,7 @@ internal class ToolSearchToolset(
         val runtime = readonlyContext.modelRuntimeMetadataOrNull()
         return buildString {
             append("sources:")
-            append(sources.joinToString(separator = ",", transform = DynamicToolCandidateSource::id))
+            append(sources.joinToString(separator = ",", transform = ToolCandidateSource::id))
             if (runtime != null) {
                 append("|service:")
                 append(runtime.serviceId)

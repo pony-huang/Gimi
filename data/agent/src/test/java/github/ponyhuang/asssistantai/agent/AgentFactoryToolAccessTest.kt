@@ -6,11 +6,11 @@ import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.FunctionDeclaration
-import github.ponyhuang.asssistantai.agent.tools.dynamic.TOOL_SEARCH_NAME
-import github.ponyhuang.asssistantai.agent.tools.dynamic.ToolSearchToolset
-import github.ponyhuang.asssistantai.agent.tools.dynamic.ToolVectorSearch
+import github.ponyhuang.asssistantai.agent.tools.search.TOOL_SEARCH_NAME
+import github.ponyhuang.asssistantai.agent.tools.search.ToolSearchToolset
+import github.ponyhuang.asssistantai.agent.tools.search.ToolVectorSearch
 import github.ponyhuang.asssistantai.agent.tools.mcp.ConversationMcpToolset
-import github.ponyhuang.asssistantai.agent.tools.official.DynamicOfficialToolset
+import github.ponyhuang.asssistantai.agent.tools.official.SearchOfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.system.LocalToolset
 import github.ponyhuang.asssistantai.domain.conversation.model.ConversationToolConfiguration
@@ -36,7 +36,7 @@ class AgentFactoryToolAccessTest {
     @Test
     fun alwaysAvailableAttachesEveryToolsetDirectlyWithoutSearchGateway() = runTest {
         val native = FakeOfficialToolset("web_search")
-        val formula = FakeDynamicOfficialToolset("formula_tool")
+        val formula = FakeSearchOfficialToolset("formula_tool")
         val factory = factory(officialToolsets = setOf(native, formula))
 
         val agent = factory.create(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE).agent as LlmAgent
@@ -51,7 +51,7 @@ class AgentFactoryToolAccessTest {
     @Test
     fun onDemandKeepsNativeOfficialDirectAndHidesCandidatesBehindSearch() = runTest {
         val native = FakeOfficialToolset("web_search")
-        val formula = FakeDynamicOfficialToolset("formula_tool")
+        val formula = FakeSearchOfficialToolset("formula_tool")
         val factory = factory(
             localTools = listOf(declarationTool("clock")),
             officialToolsets = setOf(native, formula),
@@ -143,9 +143,9 @@ class AgentFactoryToolAccessTest {
         ): List<BaseTool> = listOf(declarationTool(toolName))
     }
 
-    private class FakeDynamicOfficialToolset(
+    private class FakeSearchOfficialToolset(
         private val toolName: String,
-    ) : DynamicOfficialToolset {
+    ) : SearchOfficialToolset {
         override val sourceId: String = "formula"
         override val sourceDisplayName: String = "Formula"
 

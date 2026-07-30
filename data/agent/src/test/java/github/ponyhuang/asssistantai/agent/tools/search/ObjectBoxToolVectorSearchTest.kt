@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent.tools.dynamic
+package github.ponyhuang.asssistantai.agent.tools.search
 
 import io.objectbox.BoxStore
 import kotlinx.coroutines.test.runTest

@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent.tools.dynamic
+package github.ponyhuang.asssistantai.agent.tools.search
 
 import com.google.adk.kt.agents.ReadonlyContext
 import com.google.adk.kt.agents.RunConfig
@@ -312,7 +312,7 @@ class ToolSearchToolsetTest {
     private fun source(
         id: String,
         vararg tools: BaseTool,
-    ): DynamicToolCandidateSource = source(
+    ): ToolCandidateSource = source(
         id = id,
         allTools = tools.toList(),
         enabledTools = tools.toList(),
@@ -322,7 +322,7 @@ class ToolSearchToolsetTest {
         id: String,
         allTools: List<BaseTool>,
         enabledTools: List<BaseTool>,
-    ): DynamicToolCandidateSource = object : DynamicToolCandidateSource {
+    ): ToolCandidateSource = object : ToolCandidateSource {
         override val id: String = id
         override val displayName: String = id
 
@@ -335,8 +335,8 @@ class ToolSearchToolsetTest {
         ): List<BaseTool> = enabledTools
     }
 
-    private fun failingSource(id: String): DynamicToolCandidateSource =
-        object : DynamicToolCandidateSource {
+    private fun failingSource(id: String): ToolCandidateSource =
+        object : ToolCandidateSource {
             override val id: String = id
             override val displayName: String = id
 

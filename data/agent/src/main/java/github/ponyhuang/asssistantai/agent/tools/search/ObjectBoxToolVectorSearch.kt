@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent.tools.dynamic
+package github.ponyhuang.asssistantai.agent.tools.search
 
 import io.objectbox.Box
 import java.security.MessageDigest
@@ -40,15 +40,13 @@ class ObjectBoxToolVectorSearch @Inject constructor(
                 .nearestNeighbors(queryVector, maxResultCount)
                 .and(ToolVectorEntity_.scopeKey.equal(effectiveScope))
             val objectBoxQuery = box.query(nearest).build()
-            try {
+            objectBoxQuery.use { objectBoxQuery ->
                 objectBoxQuery.findWithScores().map { result ->
                     ToolVectorMatch(
                         key = result.get().documentKey,
                         distance = result.score,
                     )
                 }
-            } finally {
-                objectBoxQuery.close()
             }
         }
     }
@@ -62,10 +60,8 @@ class ObjectBoxToolVectorSearch @Inject constructor(
         }
 
         val existingQuery = box.query(ToolVectorEntity_.scopeKey.equal(scopeKey)).build()
-        val existing = try {
+        val existing = existingQuery.use { existingQuery ->
             existingQuery.find()
-        } finally {
-            existingQuery.close()
         }
         val existingByKey = existing.associateBy(ToolVectorEntity::documentKey)
         val desiredKeys = documents.mapTo(hashSetOf(), ToolVectorDocument::key)

@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent.tools.dynamic
+package github.ponyhuang.asssistantai.agent.tools.search
 
 import android.content.Context
 import com.ml.shubham0204.sentence_embeddings.SentenceEmbedding

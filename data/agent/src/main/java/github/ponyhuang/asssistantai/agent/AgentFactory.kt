@@ -7,13 +7,13 @@ import com.google.adk.kt.models.Model
 import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.SkillToolset
 import com.google.adk.kt.tools.Toolset
-import github.ponyhuang.asssistantai.agent.tools.dynamic.LocalToolSource
-import github.ponyhuang.asssistantai.agent.tools.dynamic.McpServerSource
-import github.ponyhuang.asssistantai.agent.tools.dynamic.OfficialToolCandidateSource
-import github.ponyhuang.asssistantai.agent.tools.dynamic.ToolSearchToolset
-import github.ponyhuang.asssistantai.agent.tools.dynamic.ToolVectorSearch
+import github.ponyhuang.asssistantai.agent.tools.search.LocalToolSource
+import github.ponyhuang.asssistantai.agent.tools.search.McpServerSource
+import github.ponyhuang.asssistantai.agent.tools.search.OfficialToolCandidateSource
+import github.ponyhuang.asssistantai.agent.tools.search.ToolSearchToolset
+import github.ponyhuang.asssistantai.agent.tools.search.ToolVectorSearch
 import github.ponyhuang.asssistantai.agent.tools.mcp.ConversationMcpToolset
-import github.ponyhuang.asssistantai.agent.tools.official.DynamicOfficialToolset
+import github.ponyhuang.asssistantai.agent.tools.official.SearchOfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.system.LocalToolset
 import github.ponyhuang.asssistantai.agent.tools.system.ToolsetConfirmationResumeTool
@@ -98,21 +98,21 @@ class AgentFactory @Inject constructor(
      * - 全部本地工具构成一个扁平 source；
      * - 每个 MCP server 单独一个 source（基于当前 [McpToolsetRegistry] 的解析结果），
      *   单个 server 发现失败时不影响其它 server；
-     * - 可展开官方函数（[DynamicOfficialToolset]）继续作为独立 source。
+     * - 可展开官方函数（[SearchOfficialToolset]）继续作为独立 source。
      */
     private suspend fun createSearchAgent(
         model: Model,
         mode: ToolAccessMode,
     ): BaseAgent {
-        val (dynamicOfficialToolsets, directOfficialToolsets) =
-            officialToolsets.partition { it is DynamicOfficialToolset }
+        val (officialToolsets, directOfficialToolsets) =
+            officialToolsets.partition { it is SearchOfficialToolset }
         val sources = buildList {
             add(LocalToolSource(localToolCatalog, localToolset))
             mcpToolsetRegistry.resolveAll().handles.forEach { handle ->
                 add(McpServerSource(handle))
             }
-            dynamicOfficialToolsets
-                .filterIsInstance<DynamicOfficialToolset>()
+            officialToolsets
+                .filterIsInstance<SearchOfficialToolset>()
                 .forEach { toolset ->
                     add(OfficialToolCandidateSource(toolset))
                 }

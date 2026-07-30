@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent.tools.dynamic
+package github.ponyhuang.asssistantai.agent.tools.search
 
 import io.objectbox.annotation.Entity
 import io.objectbox.annotation.HnswIndex
@@ -28,7 +28,33 @@ data class ToolVectorEntity(
         distanceType = VectorDistanceType.COSINE,
     )
     var embedding: FloatArray = FloatArray(0),
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as ToolVectorEntity
+
+        if (id != other.id) return false
+        if (scopeKey != other.scopeKey) return false
+        if (documentKey != other.documentKey) return false
+        if (contentHash != other.contentHash) return false
+        if (searchableText != other.searchableText) return false
+        if (!embedding.contentEquals(other.embedding)) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = id.hashCode()
+        result = 31 * result + scopeKey.hashCode()
+        result = 31 * result + documentKey.hashCode()
+        result = 31 * result + contentHash.hashCode()
+        result = 31 * result + searchableText.hashCode()
+        result = 31 * result + embedding.contentHashCode()
+        return result
+    }
+}
 
 /** 工具向量模型的固定维度常量。 */
 object ToolEmbeddingDimensions {

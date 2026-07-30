@@ -2,7 +2,7 @@ package github.ponyhuang.asssistantai.agent.tools.official.kimi
 
 import com.google.adk.kt.tools.BaseTool
 import github.ponyhuang.asssistantai.agent.ModelRuntimeMetadata
-import github.ponyhuang.asssistantai.agent.tools.official.DynamicOfficialToolset
+import github.ponyhuang.asssistantai.agent.tools.official.SearchOfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.official.apiKeyForService
 import github.ponyhuang.asssistantai.agent.tools.official.belongsToModelFamily
 import github.ponyhuang.asssistantai.agent.tools.official.isOfficialToolEnabled
@@ -23,7 +23,7 @@ class KimiFormulaToolset @Inject constructor(
     private val cache: KimiFormulaCache,
     private val httpClient: OkHttpClient,
     private val modelServices: AgentModelConfigurationSource,
-) : DynamicOfficialToolset {
+) : SearchOfficialToolset {
     override val sourceId: String = "official:$TOOL_ID"
     override val sourceDisplayName: String = "Kimi formulas"
 

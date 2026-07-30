@@ -1,4 +1,4 @@
-package github.ponyhuang.asssistantai.agent.tools.dynamic
+package github.ponyhuang.asssistantai.agent.tools.search
 
 import com.google.adk.kt.agents.ReadonlyContext
 import com.google.adk.kt.tools.BaseTool
@@ -14,7 +14,7 @@ import github.ponyhuang.asssistantai.agent.tools.system.LocalToolset
 internal class LocalToolSource(
     private val catalog: LocalToolCatalog,
     private val toolset: LocalToolset,
-) : DynamicToolCandidateSource {
+) : ToolCandidateSource {
     override val id: String = "local"
     override val displayName: String = "Local"
 

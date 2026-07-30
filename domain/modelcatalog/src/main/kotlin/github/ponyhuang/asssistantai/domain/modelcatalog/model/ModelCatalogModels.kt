@@ -20,8 +20,6 @@ data class LLMModelSetting(
     val iconRes: Int? = null,
     val homepageUrl: String = "",
     val keyHelpUrl: String = "",
-    val docsUrl: String = "",
-    val modelsUrl: String = "",
     /** Official tools exposed by this provider. They are enabled by default. */
     val supportedOfficialTools: List<String> = emptyList(),
 ) {

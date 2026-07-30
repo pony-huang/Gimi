@@ -31,7 +31,6 @@ fun LLMModelSettingDetailScreen(
 
     val homepageMissing = stringResource(R.string.modelsettings_homepage_missing)
     val keyUrlMissing = stringResource(R.string.modelsettings_key_url_missing)
-    val noLinkConfigured = stringResource(R.string.modelsettings_no_link_configured)
 
     PreferencePageContainer(modifier = modifier) {
         Column(
@@ -110,14 +109,6 @@ fun LLMModelSettingDetailScreen(
                     newModelId = state.newModelId,
                     newModelKind = state.newModelKind,
                     onAction = dispatch,
-                )
-            }
-            PreferenceCard(
-                modifier = Modifier.padding(start = 16.dp, top = 20.dp, end = 16.dp, bottom = 16.dp),
-            ) {
-                FooterSection(
-                    service = service,
-                    onOpenUrl = { url -> onOpenUrl(url, noLinkConfigured) },
                 )
             }
         }

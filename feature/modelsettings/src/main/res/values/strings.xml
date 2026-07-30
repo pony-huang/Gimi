@@ -30,7 +30,6 @@
     <string name="modelsettings_section_connection">连接配置</string>
     <string name="modelsettings_homepage_missing">未配置主页链接</string>
     <string name="modelsettings_key_url_missing">未配置密钥获取链接</string>
-    <string name="modelsettings_no_link_configured">未配置对应链接</string>
     <string name="modelsettings_no_browser">未找到可用的浏览器</string>
     <string name="modelsettings_notice_service_not_found">未找到该服务</string>
     <string name="modelsettings_notice_connection_succeeded">检测成功</string>
@@ -63,16 +62,10 @@
     <string name="modelsettings_dialog_no_voices">暂无可用音色</string>
     <string name="modelsettings_dialog_no_models">暂无可用模型，请先在模型服务中启用至少一个模型。</string>
 
-    <!-- FooterSection -->
+    <!-- 新增模型对话框 -->
     <string name="modelsettings_new_model_chat">聊天模型</string>
     <string name="modelsettings_new_model_stt">语音识别模型（STT）</string>
     <string name="modelsettings_new_model_tts">语音合成模型（TTS）</string>
-
-    <string name="modelsettings_footer_intro_label">查看 </string>
-    <string name="modelsettings_footer_docs_label">%1$s 文档</string>
-    <string name="modelsettings_footer_and_label"> 和 </string>
-    <string name="modelsettings_footer_models_label">模型</string>
-    <string name="modelsettings_footer_tail_label"> 获取更多详情</string>
 
     <!-- 路由标题（由 :app 注入 SettingsScaffold 使用） -->
     <string name="modelsettings_list_title">模型服务</string>

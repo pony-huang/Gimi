@@ -25,7 +25,6 @@
     <string name="modelsettings_section_connection">Connection</string>
     <string name="modelsettings_homepage_missing">Homepage URL is not configured</string>
     <string name="modelsettings_key_url_missing">API key help URL is not configured</string>
-    <string name="modelsettings_no_link_configured">The corresponding URL is not configured</string>
     <string name="modelsettings_no_browser">No browser available</string>
     <string name="modelsettings_notice_service_not_found">Service not found</string>
     <string name="modelsettings_notice_connection_succeeded">Connection succeeded</string>
@@ -59,12 +58,6 @@
     <string name="modelsettings_new_model_chat">Chat model</string>
     <string name="modelsettings_new_model_stt">Speech recognition model (STT)</string>
     <string name="modelsettings_new_model_tts">Speech synthesis model (TTS)</string>
-
-    <string name="modelsettings_footer_intro_label">View </string>
-    <string name="modelsettings_footer_docs_label">the %1$s docs</string>
-    <string name="modelsettings_footer_and_label"> and </string>
-    <string name="modelsettings_footer_models_label">the model list</string>
-    <string name="modelsettings_footer_tail_label"> for more details</string>
 
     <!-- Navigation screen titles (consumed by :app SettingsScaffold) -->
     <string name="modelsettings_list_title">Model services</string>

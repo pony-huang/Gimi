@@ -19,8 +19,6 @@ fun LLMModelProvider.toDomain(): LLMModelSetting = LLMModelSetting(
     iconRes = iconRes,
     homepageUrl = homepageUrl,
     keyHelpUrl = keyHelpUrl,
-    docsUrl = docsUrl,
-    modelsUrl = modelsUrl,
     supportedOfficialTools = supportedOfficialTools,
 )
 

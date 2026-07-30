@@ -21,8 +21,6 @@ data class LLMModelConfigEntity(
     val modelGroupsJson: String,
     val homepageUrl: String,
     val keyHelpUrl: String,
-    val docsUrl: String,
-    val modelsUrl: String,
 )
 
 @Dao
@@ -86,8 +84,6 @@ internal fun lLMModelConfigEntities(gson: Gson = Gson()): List<LLMModelConfigEnt
             ),
             homepageUrl = provider.homepageUrl,
             keyHelpUrl = provider.keyHelpUrl,
-            docsUrl = provider.docsUrl,
-            modelsUrl = provider.modelsUrl,
         )
     }
 

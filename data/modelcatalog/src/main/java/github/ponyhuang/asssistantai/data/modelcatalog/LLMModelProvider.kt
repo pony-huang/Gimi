@@ -21,8 +21,6 @@ private const val GLM_WEB_SEARCH_TOOL_ID: String = "glm_web_search"
  *                  新增厂商时只需在 [LLMModelConfigs] 中赋值即可，无需改 UI 调用点。
  * @property homepageUrl 平台官方主页（Header 外链目标）。
  * @property keyHelpUrl "点击这里获取密钥" 富文本跳转目标。
- * @property docsUrl "深度求索 文档" 富文本跳转目标。
- * @property modelsUrl "模型" 富文本跳转目标。
  * @property officialToolProtocols 官方工具 ID 到支持协议的静态映射；运行时按当前协议
  * 计算菜单可见能力，不保存到用户配置。
  */
@@ -39,8 +37,6 @@ data class LLMModelProvider(
     val iconRes: Int? = null,
     val homepageUrl: String = "",
     val keyHelpUrl: String = "",
-    val docsUrl: String = "",
-    val modelsUrl: String = "",
     val officialToolProtocols: Map<String, List<ApiBaseType>> = emptyMap(),
 ) {
     /** 当前 [baseType] 对应的实际请求地址。两种协议的地址分别保存，切换时互不覆盖。 */
@@ -120,8 +116,6 @@ enum class LLMModelType(
     val defaultAnthropicBaseUrl: String? = null,
     val homepageUrl: String = "",
     val keyHelpUrl: String = "",
-    val docsUrl: String = "",
-    val modelsUrl: String = "",
     val officialToolProtocols: Map<String, List<ApiBaseType>> = emptyMap(),
     val iconRes: Int? = null,
 ) {
@@ -134,8 +128,6 @@ enum class LLMModelType(
         defaultAnthropicBaseUrl = "https://api.deepseek.com/anthropic",
         homepageUrl = "https://www.deepseek.com/",
         keyHelpUrl = "https://platform.deepseek.com/api_keys",
-        docsUrl = "https://api-docs.deepseek.com/",
-        modelsUrl = "https://api-docs.deepseek.com/quick_start/pricing",
     ),
     MiniMax(
         serviceId = "minimax",
@@ -146,8 +138,6 @@ enum class LLMModelType(
         defaultAnthropicBaseUrl = "https://api.minimaxi.com/anthropic",
         homepageUrl = "https://www.minimaxi.com/",
         keyHelpUrl = "https://platform.minimaxi.com/user-center/basic-information/interface-key",
-        docsUrl = "https://platform.minimaxi.com/document",
-        modelsUrl = "https://platform.minimaxi.com/document/Models",
         officialToolProtocols = mapOf(
             WEB_SEARCH_TOOL_ID to listOf(ApiBaseType.Anthropic),
         ),
@@ -161,8 +151,6 @@ enum class LLMModelType(
         defaultAnthropicBaseUrl = "https://api.xiaomimimo.com/anthropic",
         homepageUrl = "https://mimo.mi.com/",
         keyHelpUrl = "https://platform.xiaomimimo.com/console/api-keys",
-        docsUrl = "https://mimo.mi.com/docs",
-        modelsUrl = "https://mimo.mi.com/docs/zh-CN/quick-start/summary/model",
         officialToolProtocols = mapOf(
             WEB_SEARCH_TOOL_ID to listOf(ApiBaseType.Standard),
         ),
@@ -175,8 +163,6 @@ enum class LLMModelType(
         supportedBaseTypes = listOf(ApiBaseType.Standard),
         homepageUrl = "https://openai.com/",
         keyHelpUrl = "https://platform.openai.com/api-keys",
-        docsUrl = "https://platform.openai.com/docs",
-        modelsUrl = "https://platform.openai.com/docs/models",
         officialToolProtocols = mapOf(
             WEB_SEARCH_TOOL_ID to listOf(ApiBaseType.Standard),
         ),
@@ -190,8 +176,6 @@ enum class LLMModelType(
         defaultAnthropicBaseUrl = "https://api.anthropic.com",
         homepageUrl = "https://www.anthropic.com/",
         keyHelpUrl = "https://console.anthropic.com/settings/keys",
-        docsUrl = "https://docs.anthropic.com/",
-        modelsUrl = "https://docs.anthropic.com/en/docs/about-claude/models",
         officialToolProtocols = mapOf(
             WEB_SEARCH_TOOL_ID to listOf(ApiBaseType.Anthropic),
         ),
@@ -205,8 +189,6 @@ enum class LLMModelType(
         defaultAnthropicBaseUrl = "https://api.moonshot.cn/anthropic",
         homepageUrl = "https://www.kimi.com/",
         keyHelpUrl = "https://platform.kimi.com/console/api-keys",
-        docsUrl = "https://platform.kimi.com/docs",
-        modelsUrl = "https://platform.kimi.com/docs/api/models-overview",
         officialToolProtocols = mapOf(
             KIMI_FORMULAS_TOOL_ID to ApiBaseType.entries,
         ),
@@ -220,8 +202,6 @@ enum class LLMModelType(
         defaultAnthropicBaseUrl = "https://open.bigmodel.cn/api/anthropic",
         homepageUrl = "https://bigmodel.cn/",
         keyHelpUrl = "https://bigmodel.cn/usercenter/proj-mgmt/apikeys",
-        docsUrl = "https://docs.bigmodel.cn/",
-        modelsUrl = "https://docs.bigmodel.cn/cn/guide/start/model-overview",
         officialToolProtocols = mapOf(
             GLM_WEB_SEARCH_TOOL_ID to ApiBaseType.entries,
         ),
@@ -243,8 +223,6 @@ enum class LLMModelType(
         lLMModelGroups = modelGroups,
         homepageUrl = homepageUrl,
         keyHelpUrl = keyHelpUrl,
-        docsUrl = docsUrl,
-        modelsUrl = modelsUrl,
         officialToolProtocols = officialToolProtocols,
         iconRes = iconRes,
     )

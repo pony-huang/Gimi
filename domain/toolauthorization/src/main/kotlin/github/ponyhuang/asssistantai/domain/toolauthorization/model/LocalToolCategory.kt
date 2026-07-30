@@ -3,11 +3,8 @@ package github.ponyhuang.asssistantai.domain.toolauthorization.model
 /**
  * 设备本地工具的业务大类。
  *
- * 与 `:data:agent.tools.system` 下的 `XxxTool` 类一一对应：每个类别一个
- * `XxxTool.kt` 文件，通过 `LocalToolCatalog` 按类别聚合后暴露给 Agent 与 UI。
- *
- * 同时作为 `tool_search` 检索信号（[github.ponyhuang.asssistantai.agent.tools.dynamic]
- * 内的网关在打分与返回结果中携带本类别），并作为后续设置页按类别分组的稳定维度。
+ * 仅作为权限设置页的稳定展示分组；Agent 运行时目录和 `tool_search` 均使用
+ * 扁平工具集合，不再按本枚举拆分候选来源或参与相关性计算。
  *
  * @property id 跨模块稳定的字符串 ID，用于 invocation 上下文与序列化。
  * @property displayName 面向终端用户的中文展示名。

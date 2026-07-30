@@ -22,12 +22,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 本地系统工具的统一目录：把每个 [LocalToolCategory] 下的 [AudioTool]/[CalendarTool]…
- * 暴露的工具聚合到一处，并保证跨类别的工具 ID 全局唯一。
+ * 本地系统工具的统一目录：以扁平列表聚合全部 ADK 工具，并保证工具 ID 全局唯一。
  *
- * `XxxTool` 类与 [LocalToolCategory] 一一对应；新增类别只需：
- *   1. 新建 `XxxTool.kt` 并暴露若干 `@Tool` 方法；
- *   2. 在本类的 [toolsByCategory] 中新增一项。
+ * [LocalToolCategory] 仅作为设置页所需的展示元数据保存在每个注册项上，不再参与
+ * Agent 的工具发现和检索。向量检索始终面对完整扁平目录。
  */
 @Singleton
 class LocalToolCatalog @Inject constructor(
@@ -45,28 +43,22 @@ class LocalToolCatalog @Inject constructor(
     webTool: WebTool,
 ) : LocalToolDefinitionSource {
 
-    /**
-     * 类别 → 该类别暴露的 ADK [BaseTool] 列表。
-     *
-     * 顺序既影响 [tools] 的拼接顺序，也是 [LocalToolset] 过滤时的迭代顺序；
-     * 不会影响功能正确性。
-     */
-    private val toolsByCategory: Map<LocalToolCategory, List<BaseTool>> = mapOf(
-        LocalToolCategory.AUDIO to audioTool.generatedTools(),
-        LocalToolCategory.CALENDAR to calendarTool.generatedTools(),
-        LocalToolCategory.CLOCK to clockTool.generatedTools(),
-        LocalToolCategory.COMMUNICATION to communicationTool.generatedTools(),
-        LocalToolCategory.DEVICE to deviceTool.generatedTools(),
-        LocalToolCategory.FILES to filesTool.generatedTools(),
-        LocalToolCategory.LAUNCHERS to launchersTool.generatedTools(),
-        LocalToolCategory.LOCATION to locationTool.generatedTools(),
-        LocalToolCategory.MEDIA to mediaTool.generatedTools(),
-        LocalToolCategory.PEOPLE to peopleTool.generatedTools(),
-        LocalToolCategory.SETTINGS to settingsTool.generatedTools(),
-        LocalToolCategory.WEB to webTool.generatedTools(),
-    ).also { byCategory ->
-        // 全局 ID 唯一性校验：重复 ID 会让 AmbiguousCandidateSource 在 tool_search 时拒绝整组。
-        val duplicateIds = byCategory.values.flatten()
+    private val registeredTools: List<RegisteredLocalTool> = buildList {
+        addAll(audioTool.generatedTools().registeredAs(LocalToolCategory.AUDIO))
+        addAll(calendarTool.generatedTools().registeredAs(LocalToolCategory.CALENDAR))
+        addAll(clockTool.generatedTools().registeredAs(LocalToolCategory.CLOCK))
+        addAll(communicationTool.generatedTools().registeredAs(LocalToolCategory.COMMUNICATION))
+        addAll(deviceTool.generatedTools().registeredAs(LocalToolCategory.DEVICE))
+        addAll(filesTool.generatedTools().registeredAs(LocalToolCategory.FILES))
+        addAll(launchersTool.generatedTools().registeredAs(LocalToolCategory.LAUNCHERS))
+        addAll(locationTool.generatedTools().registeredAs(LocalToolCategory.LOCATION))
+        addAll(mediaTool.generatedTools().registeredAs(LocalToolCategory.MEDIA))
+        addAll(peopleTool.generatedTools().registeredAs(LocalToolCategory.PEOPLE))
+        addAll(settingsTool.generatedTools().registeredAs(LocalToolCategory.SETTINGS))
+        addAll(webTool.generatedTools().registeredAs(LocalToolCategory.WEB))
+    }.also { registrations ->
+        // 向量命中后仍按工具 ID 解析执行实例，因此目录级 ID 必须唯一。
+        val duplicateIds = registrations.map(RegisteredLocalTool::tool)
             .groupingBy(BaseTool::name)
             .eachCount()
             .filterValues { it > 1 }
@@ -76,11 +68,8 @@ class LocalToolCatalog @Inject constructor(
         }
     }
 
-    /** 扁平化视图：所有类别下全部工具，按 [toolsByCategory] 声明顺序拼接。 */
-    fun tools(): List<BaseTool> = toolsByCategory.values.flatten()
-
-    /** 按类别暴露的工具表，供 [github.ponyhuang.asssistantai.agent.tools.system.LocalToolset] 按类别过滤。 */
-    fun toolsByCategory(): Map<LocalToolCategory, List<BaseTool>> = toolsByCategory
+    /** 所有本地工具的扁平视图，顺序与注册顺序一致。 */
+    fun tools(): List<BaseTool> = registeredTools.map(RegisteredLocalTool::tool)
 
     /**
      * 需要用户确认的工具 ID 集合。
@@ -89,15 +78,19 @@ class LocalToolCatalog @Inject constructor(
      * 避免在 Agent 创建路径上重复反射。
      */
     val confirmationRequiredToolIds: Set<String> by lazy {
-        toolsByCategory.values.flatten().mapNotNull { tool ->
+        tools().mapNotNull { tool ->
             tool.takeIf(::requiresConfirmation)?.name
         }.toSet()
     }
 
-    override fun definitions(): List<ToolDefinition> = toolsByCategory.flatMap { (category, tools) ->
-        tools.map { tool ->
-            ToolDefinition(id = tool.name, name = tool.name, description = tool.description, category = category)
-        }
+    override fun definitions(): List<ToolDefinition> = registeredTools.map { registration ->
+        val tool = registration.tool
+        ToolDefinition(
+            id = tool.name,
+            name = tool.name,
+            description = tool.description,
+            category = registration.category,
+        )
     }
 
     /**
@@ -117,4 +110,21 @@ class LocalToolCatalog @Inject constructor(
             requiresConfirmation(emptyMap())
         }.getOrDefault(true)
     }
+
+    private fun List<BaseTool>.registeredAs(
+        category: LocalToolCategory,
+    ): List<RegisteredLocalTool> = map { tool ->
+        RegisteredLocalTool(category = category, tool = tool)
+    }
+
+    /**
+     * 扁平目录中的单个本地工具注册项。
+     *
+     * @property category 仅供权限设置界面分组展示的业务元数据。
+     * @property tool Agent 实际声明和执行的 ADK 工具实例。
+     */
+    private data class RegisteredLocalTool(
+        val category: LocalToolCategory,
+        val tool: BaseTool,
+    )
 }

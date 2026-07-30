@@ -25,8 +25,18 @@ internal class McpServerSource(
     override val id: String = "mcp:${handle.serverId}"
     override val displayName: String = handle.displayName
 
-    override suspend fun loadTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
+    override suspend fun loadAllTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
         handle.toolset.getTools(readonlyContext)
+
+    override suspend fun loadEnabledTools(
+        readonlyContext: ReadonlyContext?,
+    ): List<BaseTool> {
+        val selectedServerIds = readonlyContext.toolConfigurationOrNull()?.enabledMcpServerIds
+        val enabled = selectedServerIds
+            ?.let { selected -> handle.serverId in selected }
+            ?: handle.isGloballyEnabled
+        return if (enabled) loadAllTools(readonlyContext) else emptyList()
+    }
 }
 
 /**
@@ -40,8 +50,12 @@ internal class ToolsetCandidateSource(
     override val displayName: String,
     private val toolset: Toolset,
 ) : DynamicToolCandidateSource {
-    override suspend fun loadTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
+    override suspend fun loadAllTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
         toolset.getTools(readonlyContext)
+
+    override suspend fun loadEnabledTools(
+        readonlyContext: ReadonlyContext?,
+    ): List<BaseTool> = loadAllTools(readonlyContext)
 }
 
 /**
@@ -56,7 +70,14 @@ internal class OfficialToolCandidateSource(
     override val id: String = toolset.sourceId
     override val displayName: String = toolset.sourceDisplayName
 
-    override suspend fun loadTools(readonlyContext: ReadonlyContext?): List<BaseTool> {
+    override suspend fun loadAllTools(readonlyContext: ReadonlyContext?): List<BaseTool> {
+        val modelRuntime = readonlyContext.modelRuntimeMetadataOrNull() ?: return emptyList()
+        return toolset.resolveTools(modelRuntime, selection = null)
+    }
+
+    override suspend fun loadEnabledTools(
+        readonlyContext: ReadonlyContext?,
+    ): List<BaseTool> {
         val modelRuntime = readonlyContext.modelRuntimeMetadataOrNull() ?: return emptyList()
         return toolset.resolveTools(modelRuntime, readonlyContext.toolConfigurationOrNull())
     }

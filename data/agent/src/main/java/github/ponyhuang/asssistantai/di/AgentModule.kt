@@ -18,11 +18,19 @@ import github.ponyhuang.asssistantai.agent.AgentLLMModelFactory
 import github.ponyhuang.asssistantai.agent.LocalToolCatalog
 import github.ponyhuang.asssistantai.agent.conversation.AdkChatAgentRepository
 import github.ponyhuang.asssistantai.agent.plugins.ConversationGenerateTitlePlugin
+import github.ponyhuang.asssistantai.agent.tools.dynamic.MiniLmToolEmbeddingModel
+import github.ponyhuang.asssistantai.agent.tools.dynamic.MyObjectBox
+import github.ponyhuang.asssistantai.agent.tools.dynamic.ObjectBoxToolVectorSearch
+import github.ponyhuang.asssistantai.agent.tools.dynamic.ToolEmbeddingModel
+import github.ponyhuang.asssistantai.agent.tools.dynamic.ToolVectorEntity
+import github.ponyhuang.asssistantai.agent.tools.dynamic.ToolVectorSearch
 import github.ponyhuang.asssistantai.domain.conversation.repository.ChatAgentRepository
+import github.ponyhuang.asssistantai.domain.mcp.repository.McpRepository
 import github.ponyhuang.asssistantai.domain.modelcatalog.repository.AgentModelConfigurationSource
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.LocalToolDefinitionSource
 import github.ponyhuang.asssistantai.domain.toolauthorization.repository.ToolAuthorizationRepository
-import github.ponyhuang.asssistantai.domain.mcp.repository.McpRepository
+import io.objectbox.Box
+import io.objectbox.BoxStore
 import java.io.File
 import javax.inject.Singleton
 
@@ -50,6 +58,33 @@ object AgentModule {
     fun provideLocalToolDefinitionSource(
         catalog: LocalToolCatalog,
     ): LocalToolDefinitionSource = catalog
+
+    @Provides
+    @Singleton
+    fun provideToolEmbeddingModel(
+        implementation: MiniLmToolEmbeddingModel,
+    ): ToolEmbeddingModel = implementation
+
+    @Provides
+    @Singleton
+    fun provideToolVectorSearch(
+        implementation: ObjectBoxToolVectorSearch,
+    ): ToolVectorSearch = implementation
+
+    @Provides
+    @Singleton
+    fun provideToolVectorBoxStore(
+        @ApplicationContext context: Context,
+    ): BoxStore = MyObjectBox.builder()
+        .androidContext(context)
+        .name("tool-vector-search")
+        .build()
+
+    @Provides
+    @Singleton
+    fun provideToolVectorBox(
+        store: BoxStore,
+    ): Box<ToolVectorEntity> = store.boxFor(ToolVectorEntity::class.java)
 
     @Provides
     @Singleton

@@ -46,6 +46,7 @@ class ToolSearchToolsetTest {
                 source("local", tool("set_alarm"), tool("get_location")),
                 source("mcp", tool("create_issue")),
             ),
+            vectorSearch = FakeToolVectorSearch(),
         )
 
         assertEquals(
@@ -66,6 +67,7 @@ class ToolSearchToolsetTest {
                     tool("unrelated", "Search calendar backups"),
                 ),
             ),
+            vectorSearch = FakeToolVectorSearch(),
             budget = ToolAccessBudget(maxTools = 2, maxSchemaBytes = 16 * 1024),
         )
 
@@ -76,6 +78,54 @@ class ToolSearchToolsetTest {
         assertEquals(1, result["omitted_match_count"])
         assertEquals(true, result["selection_changed"])
         assertFalse(result.toString().contains("parameters"))
+    }
+
+    @Test
+    fun searchMatchesToolsBySemanticMeaningInsteadOfSharedKeywords() = runTest {
+        val toolset = toolset(
+            mode = ToolAccessMode.ON_DEMAND,
+            tools = listOf(
+                tool("set_alarm", "Creates an alarm in the system clock."),
+                tool("get_location", "Gets the current device location."),
+            ),
+            semanticMatches = mapOf(
+                "wake me up tomorrow morning" to listOf("set_alarm"),
+            ),
+        )
+
+        val result = toolset.search("wake me up tomorrow morning", toolContext(context()))
+
+        assertEquals(listOf("set_alarm"), result.loadedToolNames())
+    }
+
+    @Test
+    fun searchIndexesAllToolsBeforeFilteringTheCurrentUserSelection() = runTest {
+        val vectorSearch = FakeToolVectorSearch(
+            semanticMatches = mapOf(
+                "clock" to listOf("disabled_clock", "enabled_clock"),
+            ),
+        )
+        val toolset = ToolSearchToolset(
+            mode = ToolAccessMode.ON_DEMAND,
+            sources = listOf(
+                source(
+                    id = "local",
+                    allTools = listOf(tool("disabled_clock"), tool("enabled_clock")),
+                    enabledTools = listOf(tool("enabled_clock")),
+                ),
+            ),
+            vectorSearch = vectorSearch,
+        )
+
+        val result = toolset.search("clock", toolContext(context()))
+
+        assertEquals(
+            setOf("disabled_clock", "enabled_clock"),
+            vectorSearch.lastDocuments.mapTo(hashSetOf()) { document ->
+                document.text.lineSequence().first().removePrefix("Tool: ")
+            },
+        )
+        assertEquals(listOf("enabled_clock"), result.loadedToolNames())
     }
 
     @Test
@@ -122,6 +172,7 @@ class ToolSearchToolsetTest {
         val toolset = ToolSearchToolset(
             mode = ToolAccessMode.ON_DEMAND,
             sources = listOf(source("local", oversized, tool("large_backup"))),
+            vectorSearch = FakeToolVectorSearch(),
             budget = ToolAccessBudget(maxTools = 8, maxSchemaBytes = 100),
         )
 
@@ -223,6 +274,7 @@ class ToolSearchToolsetTest {
                 source("local", tool("duplicate"), tool("unique")),
                 source("mcp", tool("duplicate")),
             ),
+            vectorSearch = FakeToolVectorSearch(),
         )
 
         val result = toolset.search("duplicate", toolContext(context()))
@@ -236,6 +288,7 @@ class ToolSearchToolsetTest {
         val toolset = ToolSearchToolset(
             mode = ToolAccessMode.ON_DEMAND,
             sources = listOf(failingSource("private-server")),
+            vectorSearch = FakeToolVectorSearch(),
         )
 
         val result = toolset.search("files", toolContext(context()))
@@ -249,21 +302,37 @@ class ToolSearchToolsetTest {
     private fun toolset(
         mode: ToolAccessMode,
         tools: List<BaseTool>,
+        semanticMatches: Map<String, List<String>> = emptyMap(),
     ): ToolSearchToolset = ToolSearchToolset(
         mode = mode,
         sources = listOf(source("local", *tools.toTypedArray())),
+        vectorSearch = FakeToolVectorSearch(semanticMatches),
     )
 
     private fun source(
         id: String,
         vararg tools: BaseTool,
+    ): DynamicToolCandidateSource = source(
+        id = id,
+        allTools = tools.toList(),
+        enabledTools = tools.toList(),
+    )
+
+    private fun source(
+        id: String,
+        allTools: List<BaseTool>,
+        enabledTools: List<BaseTool>,
     ): DynamicToolCandidateSource = object : DynamicToolCandidateSource {
         override val id: String = id
         override val displayName: String = id
 
-        override suspend fun loadTools(
+        override suspend fun loadAllTools(
             readonlyContext: ReadonlyContext?,
-        ): List<BaseTool> = tools.toList()
+        ): List<BaseTool> = allTools
+
+        override suspend fun loadEnabledTools(
+            readonlyContext: ReadonlyContext?,
+        ): List<BaseTool> = enabledTools
     }
 
     private fun failingSource(id: String): DynamicToolCandidateSource =
@@ -271,12 +340,47 @@ class ToolSearchToolsetTest {
             override val id: String = id
             override val displayName: String = id
 
-            override suspend fun loadTools(
+            override suspend fun loadAllTools(
                 readonlyContext: ReadonlyContext?,
             ): List<BaseTool> = error(
                 "https://secret.example.com?token=do-not-leak",
             )
+
+            override suspend fun loadEnabledTools(
+                readonlyContext: ReadonlyContext?,
+            ): List<BaseTool> = loadAllTools(readonlyContext)
         }
+
+    private class FakeToolVectorSearch(
+        private val semanticMatches: Map<String, List<String>> = emptyMap(),
+    ) : ToolVectorSearch {
+        var lastDocuments: List<ToolVectorDocument> = emptyList()
+            private set
+
+        override suspend fun search(
+            scopeKey: String,
+            documents: List<ToolVectorDocument>,
+            query: String,
+            maxResultCount: Int,
+        ): List<ToolVectorMatch> {
+            lastDocuments = documents
+            val keys = semanticMatches[query]?.mapNotNull { toolName ->
+                documents.firstOrNull { document ->
+                    document.text.startsWith("Tool: $toolName\n")
+                }?.key
+            } ?: run {
+                val normalizedQuery = query.lowercase().replace('_', ' ')
+                val tokens = normalizedQuery.split(' ').filter(String::isNotBlank)
+                documents.filter { document ->
+                    val text = document.text.lowercase().replace('_', ' ')
+                    normalizedQuery in text || tokens.any { token -> token in text }
+                }.map(ToolVectorDocument::key)
+            }
+            return keys.take(maxResultCount).mapIndexed { index, key ->
+                ToolVectorMatch(key = key, distance = index.toDouble())
+            }
+        }
+    }
 
     private fun tool(
         name: String,

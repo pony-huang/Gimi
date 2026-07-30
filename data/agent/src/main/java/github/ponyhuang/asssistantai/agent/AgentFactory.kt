@@ -7,10 +7,11 @@ import com.google.adk.kt.models.Model
 import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.SkillToolset
 import com.google.adk.kt.tools.Toolset
-import github.ponyhuang.asssistantai.agent.tools.dynamic.LocalCategorySource
+import github.ponyhuang.asssistantai.agent.tools.dynamic.LocalToolSource
 import github.ponyhuang.asssistantai.agent.tools.dynamic.McpServerSource
 import github.ponyhuang.asssistantai.agent.tools.dynamic.OfficialToolCandidateSource
 import github.ponyhuang.asssistantai.agent.tools.dynamic.ToolSearchToolset
+import github.ponyhuang.asssistantai.agent.tools.dynamic.ToolVectorSearch
 import github.ponyhuang.asssistantai.agent.tools.mcp.ConversationMcpToolset
 import github.ponyhuang.asssistantai.agent.tools.official.DynamicOfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolset
@@ -18,7 +19,6 @@ import github.ponyhuang.asssistantai.agent.tools.system.LocalToolset
 import github.ponyhuang.asssistantai.agent.tools.system.ToolsetConfirmationResumeTool
 import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.asssistantai.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -42,10 +42,8 @@ data class AgentRuntime(
  *
  * 两种访问模式（[ToolAccessMode]）：
  * - [ToolAccessMode.ALWAYS_AVAILABLE]：全部启用工具直接声明，无检索网关。
- *   本地工具仍然按统一 `localToolset` 暴露，但 [LocalCatalog.toolsByCategory]
- *   使得日后按类裁剪成为可能。
- * - [ToolAccessMode.ON_DEMAND]：只声明核心工具 + `tool_search`，每个业务类别
- *   （[LocalToolCategory]）注册为一个独立检索 source。
+ * - [ToolAccessMode.ON_DEMAND]：只声明核心工具 + `tool_search`，可搜索工具先统一
+ *   写入向量索引，命中后再按当前会话开关和授权状态过滤。
  */
 @Singleton
 class AgentFactory @Inject constructor(
@@ -56,6 +54,7 @@ class AgentFactory @Inject constructor(
     private val skillSource: SkillSource,
     private val agentLLMModelFactory: AgentLLMModelFactory,
     private val officialToolsets: Set<@JvmSuppressWildcards OfficialToolset>,
+    private val toolVectorSearch: ToolVectorSearch,
 ) {
     /**
      * 按访问模式构建 [AgentRuntime]。
@@ -96,8 +95,7 @@ class AgentFactory @Inject constructor(
      * 检索网关：核心工具（厂商原生官方工具 + 技能）固定声明。
      *
      * 业务工具拆分为多个 source 后注册到 [ToolSearchToolset]：
-     * - 每个 [LocalToolCategory] 一个 source，模型命中后 `source` 字段就是类别
-     *   中文标签（"音频" / "日历" / "时钟" ...）；
+     * - 全部本地工具构成一个扁平 source；
      * - 每个 MCP server 单独一个 source（基于当前 [McpToolsetRegistry] 的解析结果），
      *   单个 server 发现失败时不影响其它 server；
      * - 可展开官方函数（[DynamicOfficialToolset]）继续作为独立 source。
@@ -109,10 +107,8 @@ class AgentFactory @Inject constructor(
         val (dynamicOfficialToolsets, directOfficialToolsets) =
             officialToolsets.partition { it is DynamicOfficialToolset }
         val sources = buildList {
-            LocalToolCategory.entries.forEach { category ->
-                add(LocalCategorySource(localToolset, category))
-            }
-            mcpToolsetRegistry.resolve().handles.forEach { handle ->
+            add(LocalToolSource(localToolCatalog, localToolset))
+            mcpToolsetRegistry.resolveAll().handles.forEach { handle ->
                 add(McpServerSource(handle))
             }
             dynamicOfficialToolsets
@@ -126,7 +122,13 @@ class AgentFactory @Inject constructor(
             dynamicToolSearchEnabled = true,
             toolsets = buildList {
                 addAll(directOfficialToolsets)
-                add(ToolSearchToolset(mode = mode, sources = sources))
+                add(
+                    ToolSearchToolset(
+                        mode = mode,
+                        sources = sources,
+                        vectorSearch = toolVectorSearch,
+                    ),
+                )
                 add(SkillToolset(skillSource))
             },
         )

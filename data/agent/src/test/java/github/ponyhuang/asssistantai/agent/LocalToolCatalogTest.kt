@@ -74,6 +74,15 @@ class LocalToolCatalogTest {
         assertFalse("get_current_time" in confirmationIds)
     }
 
+    @Test
+    fun catalogDoesNotExposeCategoryBasedToolLookup() {
+        assertFalse(
+            LocalToolCatalog::class.java.declaredMethods.any { method ->
+                method.name == "toolsByCategory"
+            },
+        )
+    }
+
     private fun catalog() = LocalToolCatalog(
         audioTool = mockk<AudioTool>(relaxed = true),
         calendarTool = mockk<CalendarTool>(relaxed = true),

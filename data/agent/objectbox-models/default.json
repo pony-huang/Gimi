@@ -1,0 +1,63 @@
+{
+  "_note1": "KEEP THIS FILE! Check it into a version control system (VCS) like git.",
+  "_note2": "ObjectBox manages crucial IDs for your object model. See docs for details.",
+  "_note3": "If you have VCS merge conflicts, you must resolve them according to ObjectBox docs.",
+  "entities": [
+    {
+      "id": "1:3876948572149519024",
+      "lastPropertyId": "6:4274248207388403653",
+      "name": "ToolVectorEntity",
+      "properties": [
+        {
+          "id": "1:255360312609959932",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:3268415209462813462",
+          "name": "scopeKey",
+          "indexId": "1:7573650185452519531",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "3:1496865936588933761",
+          "name": "documentKey",
+          "indexId": "2:3455894462678845907",
+          "type": 9,
+          "flags": 2048
+        },
+        {
+          "id": "4:3994179388359224521",
+          "name": "contentHash",
+          "type": 9
+        },
+        {
+          "id": "5:1764543012208010493",
+          "name": "searchableText",
+          "type": 9
+        },
+        {
+          "id": "6:4274248207388403653",
+          "name": "embedding",
+          "indexId": "3:4506618668709154142",
+          "type": 28,
+          "flags": 8
+        }
+      ],
+      "relations": []
+    }
+  ],
+  "lastEntityId": "1:3876948572149519024",
+  "lastIndexId": "3:4506618668709154142",
+  "lastRelationId": "0:0",
+  "lastSequenceId": "0:0",
+  "modelVersion": 5,
+  "modelVersionParserMinimum": 5,
+  "retiredEntityUids": [],
+  "retiredIndexUids": [],
+  "retiredPropertyUids": [],
+  "retiredRelationUids": [],
+  "version": 1
+}

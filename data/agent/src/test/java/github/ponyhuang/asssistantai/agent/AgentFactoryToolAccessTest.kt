@@ -8,6 +8,7 @@ import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.FunctionDeclaration
 import github.ponyhuang.asssistantai.agent.tools.dynamic.TOOL_SEARCH_NAME
 import github.ponyhuang.asssistantai.agent.tools.dynamic.ToolSearchToolset
+import github.ponyhuang.asssistantai.agent.tools.dynamic.ToolVectorSearch
 import github.ponyhuang.asssistantai.agent.tools.mcp.ConversationMcpToolset
 import github.ponyhuang.asssistantai.agent.tools.official.DynamicOfficialToolset
 import github.ponyhuang.asssistantai.agent.tools.official.OfficialToolset
@@ -101,20 +102,12 @@ class AgentFactoryToolAccessTest {
         localTools: List<BaseTool> = emptyList(),
         confirmationRequiredToolIds: Set<String> = emptySet(),
         officialToolsets: Set<OfficialToolset> = emptySet(),
-        toolsByCategory: Map<
-            github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory,
-            List<BaseTool>,
-            > = emptyMap(),
     ): AgentFactory {
         val localToolCatalog = mockk<LocalToolCatalog>()
         every { localToolCatalog.tools() } returns localTools
         every { localToolCatalog.confirmationRequiredToolIds } returns confirmationRequiredToolIds
         val localToolset = mockk<LocalToolset>(relaxed = true)
         coEvery { localToolset.getTools(any()) } returns localTools
-        coEvery { localToolset.getToolsForCategory(any(), any()) } answers {
-            val category = it.invocation.args[1] as github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory
-            toolsByCategory[category].orEmpty()
-        }
         val mcpToolset = mockk<ConversationMcpToolset>(relaxed = true)
         val mcpRegistry = mockk<github.ponyhuang.asssistantai.agent.McpToolsetRegistry>(relaxed = true)
         coEvery { mcpRegistry.resolve() } returns github.ponyhuang.asssistantai.agent.McpToolsetResolution(emptyList())
@@ -129,6 +122,7 @@ class AgentFactoryToolAccessTest {
             skillSource = mockk<SkillSource>(relaxed = true),
             agentLLMModelFactory = modelFactory,
             officialToolsets = officialToolsets,
+            toolVectorSearch = mockk<ToolVectorSearch>(relaxed = true),
         )
     }
 

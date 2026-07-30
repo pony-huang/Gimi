@@ -8,7 +8,9 @@ import com.google.adk.kt.tools.Toolset
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
+import github.ponyhuang.asssistantai.agent.tools.modelRuntimeMetadataOrNull
 import github.ponyhuang.asssistantai.domain.conversation.model.ToolAccessMode
+import java.security.MessageDigest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -31,24 +33,16 @@ internal data class ToolAccessBudget(
 /**
  * 可供动态检索的一个工具来源。
  *
- * 来源只负责在本机解析 [BaseTool]；是否向模型暴露以及失败隔离由
- * [ToolSearchToolset] 统一处理。来源自身可以按 invocation 上下文
- * （RunConfig metadata）做会话级过滤。
+ * 来源分别暴露完整目录和当前启用目录。向量同步始终使用 [loadAllTools]，只有
+ * 最近邻搜索完成后才调用 [loadEnabledTools] 应用当前会话开关与授权。
  */
 internal interface DynamicToolCandidateSource {
     val id: String
     val displayName: String
 
-    suspend fun loadTools(readonlyContext: ReadonlyContext?): List<BaseTool>
-}
+    suspend fun loadAllTools(readonlyContext: ReadonlyContext?): List<BaseTool>
 
-/**
- * 携带业务类别的来源 —— 用于本地工具 [LocalCategorySource]，在打分和返回结果中
- * 提供类别提示。非本地来源（[ToolsetCandidateSource] MCP / [OfficialToolCandidateSource]）
- * 不实现此接口，保持默认行为。
- */
-internal interface CategorizedDynamicToolCandidateSource : DynamicToolCandidateSource {
-    val category: github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory
+    suspend fun loadEnabledTools(readonlyContext: ReadonlyContext?): List<BaseTool>
 }
 
 /**
@@ -64,10 +58,11 @@ internal interface CategorizedDynamicToolCandidateSource : DynamicToolCandidateS
 internal class ToolSearchToolset(
     private val mode: ToolAccessMode,
     private val sources: List<DynamicToolCandidateSource>,
+    private val vectorSearch: ToolVectorSearch,
     private val budget: ToolAccessBudget = ToolAccessBudget(),
 ) : Toolset {
     private val discoveryMutex = Mutex()
-    private val successfulSourceCache = mutableMapOf<String, List<BaseTool>>()
+    private val allToolsSourceCache = mutableMapOf<String, List<BaseTool>>()
     private val searchTool = ToolSearchTool(this)
 
     override suspend fun getTools(readonlyContext: ReadonlyContext?): List<BaseTool> {
@@ -79,7 +74,7 @@ internal class ToolSearchToolset(
         return when (mode) {
             ToolAccessMode.ON_DEMAND -> listOf(searchTool)
             ToolAccessMode.ALWAYS_AVAILABLE ->
-                discover(readonlyContext).uniqueCandidates.map(ToolCandidate::tool)
+                discoverEnabled(readonlyContext).uniqueCandidates.map(ToolCandidate::tool)
         }
     }
 
@@ -95,22 +90,24 @@ internal class ToolSearchToolset(
         val query = rawQuery.trim()
         if (query.isEmpty()) return unchangedSearchResult()
 
-        val discovery = discover(toolContext.context)
-        val ranked = discovery.uniqueCandidates
-            .mapNotNull { candidate ->
-                searchScore(query, candidate)?.let { score -> candidate to score }
-            }
-            .sortedWith(
-                compareByDescending<Pair<ToolCandidate, Int>> { it.second }
-                    .thenBy { it.first.tool.name },
-            )
-            .map(Pair<ToolCandidate, Int>::first)
+        val allTools = discoverAll(toolContext.context)
+        val enabledTools = discoverEnabled(toolContext.context)
+        val enabledByKey = enabledTools.uniqueCandidates.associateBy(ToolCandidate::key)
+        val matches = vectorSearch.search(
+            scopeKey = vectorScopeKey(toolContext.context),
+            documents = allTools.allCandidates.map(ToolCandidate::vectorDocument),
+            query = query,
+            // 过滤发生在搜索之后；取回完整排序才能保证关闭项不会挤掉启用项。
+            maxResultCount = allTools.allCandidates.size,
+        )
+        val ranked = matches.mapNotNull { match -> enabledByKey[match.key] }
 
         val selected = selectWithinBudget(ranked)
         if (selected.isEmpty()) {
             return unchangedSearchResult(
-                ambiguous = discovery.ambiguousCandidates(query),
-                sourceErrors = discovery.sourceErrors,
+                ambiguous = allTools.ambiguousCandidates(matches.mapTo(hashSetOf(), ToolVectorMatch::key)),
+                sourceErrors = (allTools.sourceErrors + enabledTools.sourceErrors)
+                    .distinctBy(SourceFailure::sourceId),
             )
         }
 
@@ -120,8 +117,12 @@ internal class ToolSearchToolset(
         return mapOf(
             KEY_LOADED_TOOLS to selected.map { it.summary() },
             KEY_OMITTED_MATCH_COUNT to ranked.size - selected.size,
-            KEY_AMBIGUOUS_TOOLS to discovery.ambiguousCandidates(query),
-            KEY_SOURCE_ERRORS to discovery.sourceErrors.map(SourceFailure::summary),
+            KEY_AMBIGUOUS_TOOLS to allTools.ambiguousCandidates(
+                matches.mapTo(hashSetOf(), ToolVectorMatch::key),
+            ),
+            KEY_SOURCE_ERRORS to (allTools.sourceErrors + enabledTools.sourceErrors)
+                .distinctBy(SourceFailure::sourceId)
+                .map(SourceFailure::summary),
             KEY_SELECTION_CHANGED to true,
         )
     }
@@ -130,22 +131,41 @@ internal class ToolSearchToolset(
         names: List<String>,
         readonlyContext: ReadonlyContext?,
     ): List<BaseTool> {
-        val candidates = discover(readonlyContext).uniqueCandidates.associateBy { it.tool.name }
+        val candidates = discoverEnabled(readonlyContext)
+            .uniqueCandidates
+            .associateBy { it.tool.name }
         return names.mapNotNull(candidates::get).map(ToolCandidate::tool)
     }
 
-    private suspend fun discover(
+    private suspend fun discoverAll(
         readonlyContext: ReadonlyContext?,
     ): Discovery = discoveryMutex.withLock {
+        discoverSources(readonlyContext, useAllTools = true)
+    }
+
+    private suspend fun discoverEnabled(
+        readonlyContext: ReadonlyContext?,
+    ): Discovery = discoveryMutex.withLock {
+        discoverSources(readonlyContext, useAllTools = false)
+    }
+
+    private suspend fun discoverSources(
+        readonlyContext: ReadonlyContext?,
+        useAllTools: Boolean,
+    ): Discovery {
         val candidates = mutableListOf<ToolCandidate>()
         val failures = mutableListOf<SourceFailure>()
         for (source in sources) {
-            val category = (source as? CategorizedDynamicToolCandidateSource)?.category
-            val cached = successfulSourceCache[source.id]
+            val cached = allToolsSourceCache[source.id].takeIf { useAllTools }
             val tools = cached
                 ?: try {
-                    source.loadTools(readonlyContext).also { loaded ->
-                        successfulSourceCache[source.id] = loaded
+                    val loaded = if (useAllTools) {
+                        source.loadAllTools(readonlyContext)
+                    } else {
+                        source.loadEnabledTools(readonlyContext)
+                    }
+                    loaded.also {
+                        if (useAllTools) allToolsSourceCache[source.id] = it
                     }
                 } catch (error: Throwable) {
                     if (error is CancellationException) throw error
@@ -154,11 +174,15 @@ internal class ToolSearchToolset(
                 }
             tools.forEach { tool ->
                 if (tool.declaration() != null) {
-                    candidates += ToolCandidate(source.id, source.displayName, category, tool)
+                    candidates += ToolCandidate(
+                        sourceId = source.id,
+                        sourceDisplayName = source.displayName,
+                        tool = tool,
+                    )
                 }
             }
         }
-        Discovery.from(candidates, failures)
+        return Discovery.from(candidates, failures)
     }
 
     /**
@@ -200,33 +224,6 @@ internal class ToolSearchToolset(
         return selected
     }
 
-    private fun searchScore(
-        rawQuery: String,
-        candidate: ToolCandidate,
-    ): Int? {
-        val query = normalize(rawQuery)
-        val name = normalize(candidate.tool.name.replace('_', ' '))
-        val description = normalize(candidate.tool.description)
-        val source = normalize(candidate.sourceDisplayName)
-        val category = candidate.category?.let { normalize(it.displayName) }.orEmpty()
-        val tokens = query.split(' ').filter(String::isNotBlank)
-        if (tokens.isEmpty()) return null
-
-        var score = when {
-            name == query -> 10_000
-            name.startsWith(query) -> 5_000
-            query in name -> 3_000
-            else -> 0
-        }
-        score += tokens.count { token -> token in name } * 500
-        score += tokens.count { token -> token in description } * 100
-        score += tokens.count { token -> token in source } * 25
-        if (category.isNotEmpty()) {
-            score += tokens.count { token -> token in category } * CATEGORY_TOKEN_WEIGHT
-        }
-        return score.takeIf { it > 0 }
-    }
-
     private fun schemaBytes(candidate: ToolCandidate): Int =
         candidate.tool.declaration()
             ?.let { declaration ->
@@ -247,25 +244,31 @@ internal class ToolSearchToolset(
         KEY_SELECTION_CHANGED to false,
     )
 
-    private fun normalize(value: String): String =
-        value.lowercase()
-            .replace(SEARCH_SEPARATOR, " ")
-            .trim()
-            .replace(MULTIPLE_SPACES, " ")
+    private fun vectorScopeKey(readonlyContext: ReadonlyContext?): String {
+        val runtime = readonlyContext.modelRuntimeMetadataOrNull()
+        return buildString {
+            append("sources:")
+            append(sources.joinToString(separator = ",", transform = DynamicToolCandidateSource::id))
+            if (runtime != null) {
+                append("|service:")
+                append(runtime.serviceId)
+                append("|model:")
+                append(runtime.modelId)
+            }
+        }
+    }
 
-    private fun Discovery.ambiguousCandidates(query: String): List<Map<String, Any>> =
+    private fun Discovery.ambiguousCandidates(
+        matchedKeys: Set<String>,
+    ): List<Map<String, Any>> =
         ambiguousByName.entries
-            .filter { (name, candidates) ->
-                searchScore(query, candidates.first()) != null || normalize(query) in normalize(name)
+            .filter { (_, candidates) ->
+                candidates.any { candidate -> candidate.key in matchedKeys }
             }
             .map { (name, candidates) ->
                 buildMap {
                     put("name", name)
                     put("sources", candidates.map(ToolCandidate::sourceDisplayName).distinct())
-                    val categories = candidates.mapNotNull { it.category }.distinctBy { it.id }
-                    if (categories.isNotEmpty()) {
-                        put("categories", categories.map { it.id })
-                    }
                 }
             }
 
@@ -315,9 +318,6 @@ internal class ToolSearchToolset(
         private const val KEY_SOURCE_ERRORS = "source_errors"
         private const val KEY_SELECTION_CHANGED = "selection_changed"
         private const val MAX_DESCRIPTION_LENGTH = 240
-        private const val CATEGORY_TOKEN_WEIGHT = 200
-        private val SEARCH_SEPARATOR = Regex("[^\\p{L}\\p{N}]+")
-        private val MULTIPLE_SPACES = Regex("\\s+")
         private const val TOOL_SEARCH_DESCRIPTION =
             "Searches enabled local, MCP, and formula tools by capability. Matching tool " +
                 "definitions become available in the next model step."
@@ -328,20 +328,38 @@ internal class ToolSearchToolset(
      *
      * @property sourceId 来源的稳定 ID。
      * @property sourceDisplayName 可安全返回给模型的来源名称。
-     * @property category 业务类别（仅本地工具携带）；非本地来源为 null。
      * @property tool 本机保存的 ADK 执行实例。
      */
     private data class ToolCandidate(
         val sourceId: String,
         val sourceDisplayName: String,
-        val category: github.ponyhuang.asssistantai.domain.toolauthorization.model.LocalToolCategory?,
         val tool: BaseTool,
     ) {
+        private val declarationJson: String = Json.encodeToString(
+            FunctionDeclaration.serializer(),
+            requireNotNull(tool.declaration()),
+        )
+        val key: String = "$sourceId:${tool.name}:${sha256(declarationJson).take(KEY_HASH_LENGTH)}"
+
+        fun vectorDocument(): ToolVectorDocument {
+            return ToolVectorDocument(
+                key = key,
+                text = buildString {
+                    appendLine("Tool: ${tool.name}")
+                    appendLine("Description: ${tool.description}")
+                    append("Input schema: $declarationJson")
+                },
+            )
+        }
+
         fun summary(): Map<String, Any> = buildMap {
             put("name", tool.name)
             put("description", tool.description.take(MAX_DESCRIPTION_LENGTH))
             put("source", sourceDisplayName)
-            category?.let { put("category", it.id) }
+        }
+
+        private companion object {
+            const val KEY_HASH_LENGTH: Int = 16
         }
     }
 
@@ -364,11 +382,13 @@ internal class ToolSearchToolset(
     /**
      * 一次候选发现的去重结果。
      *
+     * @property allCandidates 来源返回的全部可声明工具；无论是否重名都写入向量索引。
      * @property uniqueCandidates 名称唯一、可安全暴露的工具。
      * @property ambiguousByName 发生名称冲突、必须拒绝暴露的工具。
      * @property sourceErrors 本次发现失败的来源。
      */
     private data class Discovery(
+        val allCandidates: List<ToolCandidate>,
         val uniqueCandidates: List<ToolCandidate>,
         val ambiguousByName: Map<String, List<ToolCandidate>>,
         val sourceErrors: List<SourceFailure>,
@@ -380,6 +400,7 @@ internal class ToolSearchToolset(
             ): Discovery {
                 val byName = candidates.groupBy { it.tool.name }
                 return Discovery(
+                    allCandidates = candidates,
                     uniqueCandidates = byName.values
                         .filter { it.size == 1 }
                         .map(List<ToolCandidate>::single),
@@ -390,3 +411,8 @@ internal class ToolSearchToolset(
         }
     }
 }
+
+private fun sha256(value: String): String =
+    MessageDigest.getInstance("SHA-256")
+        .digest(value.toByteArray())
+        .joinToString(separator = "") { byte -> "%02x".format(byte) }

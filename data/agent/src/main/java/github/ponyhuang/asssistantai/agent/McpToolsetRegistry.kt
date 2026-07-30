@@ -50,6 +50,7 @@ class McpToolsetRegistry @Inject constructor(
                     McpToolsetHandle(
                         serverId = server.id,
                         displayName = server.name.ifBlank { server.id },
+                        isGloballyEnabled = server.isEnabled,
                         toolset = server.toMcpToolset(),
                     )
                 }.getOrNull()
@@ -63,6 +64,17 @@ class McpToolsetRegistry @Inject constructor(
             cache.remove(eldest.key)
         }
         McpToolsetResolution(handles)
+    }
+
+    /**
+     * 解析全部已配置且地址有效的 MCP server，不在此阶段应用启用开关。
+     *
+     * `tool_search` 需要先把完整工具目录写入向量索引，再对向量命中结果应用
+     * 当前会话选择；因此发现目录时不能只连接已启用 server。
+     */
+    suspend fun resolveAll(): McpToolsetResolution {
+        val allServerIds = servers.currentServers().mapTo(linkedSetOf(), McpServer::id)
+        return resolve(allServerIds)
     }
 
     /** 关闭并清空全部缓存的工具集（释放会话和传输资源）。 */
@@ -97,11 +109,13 @@ data class McpToolsetResolution(
  *
  * @property serverId server 的稳定 ID，用于动态候选来源隔离。
  * @property displayName 可安全展示给模型的 server 名称。
+ * @property isGloballyEnabled 未提供会话级选择时采用的全局开关状态。
  * @property toolset 负责连接、缓存声明和执行调用的 MCP Toolset。
  */
 data class McpToolsetHandle(
     val serverId: String,
     val displayName: String,
+    val isGloballyEnabled: Boolean,
     val toolset: McpToolset,
 )
 

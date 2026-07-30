@@ -20,6 +20,8 @@ import github.ponyhuang.asssistantai.domain.modelcatalog.model.OfficialToolIds
  * @property keyHelpUrl "点击这里获取密钥" 富文本跳转目标。
  * @property docsUrl "深度求索 文档" 富文本跳转目标。
  * @property modelsUrl "模型" 富文本跳转目标。
+ * @property officialToolProtocols 官方工具 ID 到支持协议的静态映射；运行时按当前协议
+ * 计算菜单可见能力，不保存到用户配置。
  */
 data class LLMModelProvider(
     val serviceId: String,
@@ -36,6 +38,7 @@ data class LLMModelProvider(
     val keyHelpUrl: String = "",
     val docsUrl: String = "",
     val modelsUrl: String = "",
+    val officialToolProtocols: Map<String, List<ApiBaseType>> = emptyMap(),
 ) {
     /** 当前 [baseType] 对应的实际请求地址。两种协议的地址分别保存，切换时互不覆盖。 */
     val activeApiBaseUrl: String
@@ -43,6 +46,12 @@ data class LLMModelProvider(
             ApiBaseType.Standard -> apiBaseUrl
             ApiBaseType.Anthropic -> anthropicBaseUrl
         }
+
+    val supportedOfficialTools: List<String>
+        get() = officialToolProtocols
+            .filterValues { baseType in it }
+            .keys
+            .toList()
 
 }
 
@@ -110,6 +119,7 @@ enum class LLMModelType(
     val keyHelpUrl: String = "",
     val docsUrl: String = "",
     val modelsUrl: String = "",
+    val officialToolProtocols: Map<String, List<ApiBaseType>> = emptyMap(),
     val iconRes: Int? = null,
 ) {
     DeepSeek(
@@ -135,6 +145,9 @@ enum class LLMModelType(
         keyHelpUrl = "https://platform.minimaxi.com/user-center/basic-information/interface-key",
         docsUrl = "https://platform.minimaxi.com/document",
         modelsUrl = "https://platform.minimaxi.com/document/Models",
+        officialToolProtocols = mapOf(
+            OfficialToolIds.WEB_SEARCH to listOf(ApiBaseType.Anthropic),
+        ),
     ),
     Mimo(
         serviceId = "mimo",
@@ -147,6 +160,9 @@ enum class LLMModelType(
         keyHelpUrl = "https://platform.xiaomimimo.com/console/api-keys",
         docsUrl = "https://mimo.mi.com/docs",
         modelsUrl = "https://mimo.mi.com/docs/zh-CN/quick-start/summary/model",
+        officialToolProtocols = mapOf(
+            OfficialToolIds.WEB_SEARCH to listOf(ApiBaseType.Standard),
+        ),
     ),
     OpenAI(
         serviceId = "openai",
@@ -158,6 +174,9 @@ enum class LLMModelType(
         keyHelpUrl = "https://platform.openai.com/api-keys",
         docsUrl = "https://platform.openai.com/docs",
         modelsUrl = "https://platform.openai.com/docs/models",
+        officialToolProtocols = mapOf(
+            OfficialToolIds.WEB_SEARCH to listOf(ApiBaseType.Standard),
+        ),
     ),
     Anthropic(
         serviceId = "anthropic",
@@ -170,6 +189,9 @@ enum class LLMModelType(
         keyHelpUrl = "https://console.anthropic.com/settings/keys",
         docsUrl = "https://docs.anthropic.com/",
         modelsUrl = "https://docs.anthropic.com/en/docs/about-claude/models",
+        officialToolProtocols = mapOf(
+            OfficialToolIds.WEB_SEARCH to listOf(ApiBaseType.Anthropic),
+        ),
     ),
     Moonshot(
         serviceId = "kimi",
@@ -182,6 +204,9 @@ enum class LLMModelType(
         keyHelpUrl = "https://platform.kimi.com/console/api-keys",
         docsUrl = "https://platform.kimi.com/docs",
         modelsUrl = "https://platform.kimi.com/docs/api/models-overview",
+        officialToolProtocols = mapOf(
+            OfficialToolIds.KIMI_FORMULAS to ApiBaseType.entries,
+        ),
     ),
     Glm(
         serviceId = "glm",
@@ -194,6 +219,9 @@ enum class LLMModelType(
         keyHelpUrl = "https://bigmodel.cn/usercenter/proj-mgmt/apikeys",
         docsUrl = "https://docs.bigmodel.cn/",
         modelsUrl = "https://docs.bigmodel.cn/cn/guide/start/model-overview",
+        officialToolProtocols = mapOf(
+            OfficialToolIds.GLM_WEB_SEARCH to ApiBaseType.entries,
+        ),
     );
 
     fun toProvider(
@@ -214,6 +242,7 @@ enum class LLMModelType(
         keyHelpUrl = keyHelpUrl,
         docsUrl = docsUrl,
         modelsUrl = modelsUrl,
+        officialToolProtocols = officialToolProtocols,
         iconRes = iconRes,
     )
 
@@ -263,4 +292,7 @@ object LLMModelConfigs {
 
     fun supportedBaseTypesFor(serviceId: String): List<ApiBaseType> =
         fromServiceId(serviceId)?.supportedBaseTypes ?: ApiBaseType.entries
+
+    fun officialToolProtocolsFor(serviceId: String): Map<String, List<ApiBaseType>> =
+        fromServiceId(serviceId)?.officialToolProtocols.orEmpty()
 }

@@ -469,7 +469,9 @@ class ModelServiceRepository @Inject constructor(
             homepageUrl = entity.homepageUrl,
             keyHelpUrl = entity.keyHelpUrl,
             docsUrl = entity.docsUrl,
-            modelsUrl = entity.modelsUrl
+            modelsUrl = entity.modelsUrl,
+            // 官方工具能力与协议约束属于厂商静态元数据，不能随 Room 中的模型列表丢失。
+            officialToolProtocols = LLMModelConfigs.officialToolProtocolsFor(entity.serviceId),
         )
     }
 

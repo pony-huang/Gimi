@@ -48,11 +48,11 @@ class ModelAvailabilityTest {
         assertEquals("https://open.bigmodel.cn/api/anthropic", glm.anthropicBaseUrl)
         assertEquals(
             listOf(OfficialToolIds.GLM_WEB_SEARCH),
-            glm.supportedOfficialTools,
+            glm.toDomain().supportedOfficialTools,
         )
         assertEquals(
             listOf(OfficialToolIds.GLM_WEB_SEARCH),
-            glm.copy(baseType = ApiBaseType.Standard).supportedOfficialTools,
+            glm.copy(baseType = ApiBaseType.Standard).toDomain().supportedOfficialTools,
         )
     }
 
@@ -61,34 +61,41 @@ class ModelAvailabilityTest {
         val providers = LLMModelConfigs.services.associateBy { it.serviceId }
 
         val miniMax = providers.getValue(LLMModelType.MiniMax.serviceId)
-        assertTrue(miniMax.supportedOfficialTools.isEmpty())
+        assertTrue(miniMax.toDomain().supportedOfficialTools.isEmpty())
         assertEquals(
             listOf(OfficialToolIds.WEB_SEARCH),
-            miniMax.copy(baseType = ApiBaseType.Anthropic).supportedOfficialTools,
+            miniMax.copy(baseType = ApiBaseType.Anthropic).toDomain().supportedOfficialTools,
         )
         assertEquals(
             listOf(OfficialToolIds.WEB_SEARCH),
-            providers.getValue(LLMModelType.Mimo.serviceId).supportedOfficialTools,
+            providers.getValue(LLMModelType.Mimo.serviceId).toDomain().supportedOfficialTools,
         )
         assertEquals(
             listOf(OfficialToolIds.KIMI_FORMULAS),
-            providers.getValue(LLMModelType.Moonshot.serviceId).supportedOfficialTools,
+            providers.getValue(LLMModelType.Moonshot.serviceId).toDomain().supportedOfficialTools,
         )
         assertTrue(
             providers.getValue(LLMModelType.Mimo.serviceId)
                 .copy(baseType = ApiBaseType.Anthropic)
+                .toDomain()
                 .supportedOfficialTools
                 .isEmpty(),
         )
         assertEquals(
             listOf(OfficialToolIds.WEB_SEARCH),
-            providers.getValue(LLMModelType.Anthropic.serviceId).supportedOfficialTools,
+            providers.getValue(LLMModelType.Anthropic.serviceId).toDomain().supportedOfficialTools,
         )
         assertFalse(
-            providers.getValue(LLMModelType.OpenAI.serviceId).supportedOfficialTools.isEmpty(),
+            providers.getValue(LLMModelType.OpenAI.serviceId)
+                .toDomain()
+                .supportedOfficialTools
+                .isEmpty(),
         )
         assertFalse(
-            providers.getValue(LLMModelType.OpenAI.serviceId).supportedOfficialTools.isEmpty(),
+            providers.getValue(LLMModelType.OpenAI.serviceId)
+                .toDomain()
+                .supportedOfficialTools
+                .isEmpty(),
         )
     }
 

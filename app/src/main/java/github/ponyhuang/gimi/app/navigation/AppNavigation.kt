@@ -134,6 +134,10 @@ fun MainScreen(
                         notice.displayName,
                     )
                     ChatNotice.DocumentTotalSizeLimitExceeded -> chatNoticeDocumentTotalSizeLimit
+                    is ChatNotice.McpServerSkipped -> context.getString(
+                        ChatR.string.chat_notice_mcp_server_skipped,
+                        notice.serverName,
+                    )
                     is ChatNotice.Message -> notice.text
                 }
             }

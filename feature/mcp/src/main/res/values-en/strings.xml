@@ -28,12 +28,16 @@
     <string name="mcp_field_endpoint_placeholder">https://example.com/mcp</string>
     <string name="mcp_field_bearer_token_optional">Bearer Token (optional)</string>
     <string name="mcp_field_header_optional">Custom headers (optional)</string>
-    <string name="mcp_field_header_help">One per line, format: Header-Name=value</string>
     <string name="mcp_field_header_placeholder">X-Api-Key=your-key\nX-Client=assistant</string>
     <string name="mcp_field_enable_server">Enable this server</string>
     <string name="mcp_field_enable_subtitle">When off, the assistant won’t connect to this server</string>
-    <string name="mcp_sse_help">SSE and Streamable HTTP are supported; stdio is not.</string>
     <string name="mcp_save">Save</string>
+    <string name="mcp_connection_testing">Verifying connection…</string>
+    <string name="mcp_capabilities_tools">Tools (%1$d)</string>
+    <string name="mcp_capabilities_resources">Resources (%1$d)</string>
+    <string name="mcp_capabilities_prompts">Prompts (%1$d)</string>
+    <string name="mcp_capabilities_retry">Retry</string>
+    <string name="mcp_edit_action">Edit</string>
     <string name="mcp_delete_server">Delete server</string>
     <string name="mcp_delete_confirm_title">Delete server?</string>
     <string name="mcp_delete_confirm_message">Once deleted, the assistant can no longer use the tools provided by %1$s.</string>

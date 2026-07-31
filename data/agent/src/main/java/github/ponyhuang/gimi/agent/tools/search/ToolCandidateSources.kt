@@ -7,6 +7,7 @@ import github.ponyhuang.gimi.agent.McpToolsetHandle
 import github.ponyhuang.gimi.agent.tools.modelRuntimeMetadataOrNull
 import github.ponyhuang.gimi.agent.tools.toolConfigurationOrNull
 import github.ponyhuang.gimi.agent.tools.official.SearchOfficialToolset
+import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 
 /**
  * 单个 MCP server 在 [ToolSearchToolset] 中的候选来源。
@@ -26,7 +27,9 @@ internal class McpServerSource(
     override val displayName: String = handle.displayName
 
     override suspend fun loadAllTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
-        handle.toolset.getTools(readonlyContext)
+        // 单个 server 发现失败（不可达 / 超时）只丢弃该来源，不影响索引中的其它来源。
+        cancellationAwareRunCatching { handle.toolset.getTools(readonlyContext) }
+            .getOrDefault(emptyList())
 
     override suspend fun loadEnabledTools(
         readonlyContext: ReadonlyContext?,

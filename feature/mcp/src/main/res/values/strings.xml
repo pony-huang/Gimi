@@ -37,12 +37,16 @@
     <string name="mcp_field_endpoint_placeholder">https://example.com/mcp</string>
     <string name="mcp_field_bearer_token_optional">Bearer Token（可选）</string>
     <string name="mcp_field_header_optional">请求头参数（可选）</string>
-    <string name="mcp_field_header_help">每行一个，格式：Header-Name=value</string>
     <string name="mcp_field_header_placeholder">X-Api-Key=your-key\nX-Client=assistant</string>
     <string name="mcp_field_enable_server">启用此服务器</string>
     <string name="mcp_field_enable_subtitle">停用后，助手不会连接此服务器</string>
-    <string name="mcp_sse_help">支持 SSE 与 Streamable HTTP，暂不支持 stdio。</string>
     <string name="mcp_save">保存</string>
+    <string name="mcp_connection_testing">正在验证连接…</string>
+    <string name="mcp_capabilities_tools">工具（%1$d）</string>
+    <string name="mcp_capabilities_resources">资源（%1$d）</string>
+    <string name="mcp_capabilities_prompts">提示词（%1$d）</string>
+    <string name="mcp_capabilities_retry">重试</string>
+    <string name="mcp_edit_action">编辑</string>
     <string name="mcp_delete_server">删除服务器</string>
     <string name="mcp_delete_confirm_title">删除服务器？</string>
     <string name="mcp_delete_confirm_message">删除后，助手将无法再使用“%1$s”提供的工具。</string>

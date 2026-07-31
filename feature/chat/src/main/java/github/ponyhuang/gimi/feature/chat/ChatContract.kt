@@ -112,6 +112,9 @@ sealed interface ChatNotice {
     /** 文档附件合计大小超过单次请求上限。 */
     data object DocumentTotalSizeLimitExceeded : ChatNotice
 
+    /** 会话勾选的 MCP 服务器连接失败，本轮已跳过。 */
+    data class McpServerSkipped(val serverName: String) : ChatNotice
+
     /** 上游（语音播放等）给出的动态文本，不经资源映射。 */
     data class Message(val text: String) : ChatNotice
 }

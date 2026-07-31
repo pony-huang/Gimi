@@ -1,7 +1,9 @@
 package github.ponyhuang.gimi.domain.mcp.usecase
 
 import github.ponyhuang.gimi.domain.mcp.model.McpImportResult
+import github.ponyhuang.gimi.domain.mcp.model.McpProbeResult
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
+import github.ponyhuang.gimi.domain.mcp.repository.McpConnectionTester
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,6 +58,53 @@ class McpUseCasesTest {
 
         assertEquals(result, ManageMcpServersUseCase(repository).importJson("{}"))
         assertEquals(listOf("{}"), repository.importedJson)
+    }
+
+    @Test
+    fun testConnectionDelegatesToTester() = runTest {
+        val server = McpServer(name = "search")
+        val tester = FakeMcpConnectionTester()
+        tester.result = McpProbeResult(reachable = true)
+
+        assertEquals(
+            McpProbeResult(reachable = true),
+            TestMcpConnectionUseCase(tester)(server),
+        )
+        assertEquals(listOf(server), tester.testedServers)
+    }
+
+    @Test
+    fun fetchCapabilitiesResolvesServerThenDelegatesToTester() = runTest {
+        val server = McpServer(name = "search")
+        repository.serverResult = server
+        val tester = FakeMcpConnectionTester()
+        tester.result = McpProbeResult(reachable = true)
+
+        assertEquals(
+            McpProbeResult(reachable = true),
+            FetchMcpServerCapabilitiesUseCase(tester, repository)("id-1"),
+        )
+        assertEquals(listOf("id-1"), repository.serverCalls)
+        assertEquals(listOf(server), tester.testedServers)
+    }
+
+    @Test
+    fun fetchCapabilitiesReturnsNullWhenServerIsMissing() = runTest {
+        repository.serverResult = null
+        val tester = FakeMcpConnectionTester()
+
+        assertEquals(null, FetchMcpServerCapabilitiesUseCase(tester, repository)("id-404"))
+        assertEquals(emptyList<McpServer>(), tester.testedServers)
+    }
+
+    private class FakeMcpConnectionTester : McpConnectionTester {
+        var result = McpProbeResult(reachable = false)
+        val testedServers = mutableListOf<McpServer>()
+
+        override suspend fun test(server: McpServer): McpProbeResult {
+            testedServers += server
+            return result
+        }
     }
 
     private class FakeMcpRepository : McpRepository {

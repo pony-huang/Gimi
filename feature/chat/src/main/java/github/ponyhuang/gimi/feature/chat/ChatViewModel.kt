@@ -29,7 +29,9 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
+import github.ponyhuang.gimi.domain.mcp.model.McpSkippedServer
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
+import github.ponyhuang.gimi.domain.mcp.repository.McpSkipReporter
 import github.ponyhuang.gimi.domain.speech.repository.SpeechRecognitionRepository
 import github.ponyhuang.gimi.domain.speech.repository.SpeechPlaybackRepository
 import github.ponyhuang.gimi.domain.speech.usecase.markdownToSpeechText
@@ -73,6 +75,7 @@ class ChatViewModel @Inject constructor(
     private val chatDisplayPreferences: ChatDisplayRepository,
     private val toolAuthorization: ToolAuthorizationRepository,
     private val mcpRepository: McpRepository,
+    private val mcpSkipReporter: McpSkipReporter,
     private val speechRecognitionRepository: SpeechRecognitionRepository,
     private val speechPlaybackController: SpeechPlaybackRepository,
     private val attachments: ChatAttachmentRepository,
@@ -242,6 +245,22 @@ class ChatViewModel @Inject constructor(
                 emitNotice(ChatNotice.Message(message))
             }
         }
+        viewModelScope.launch {
+            mcpSkipReporter.skipped.collect { skipped ->
+                notifySkippedMcpServers(skipped)
+            }
+        }
+    }
+
+    /** 已提示过的 (sessionId, serverId)，保证每个服务器每个会话只提示一次。 */
+    private val notifiedSkippedMcpServers = mutableSetOf<String>()
+
+    private fun notifySkippedMcpServers(skipped: List<McpSkippedServer>) {
+        val sessionId = _uiState.value.sessionId
+        if (sessionId.isBlank() || skipped.isEmpty()) return
+        skipped
+            .filter { notifiedSkippedMcpServers.add("$sessionId:${it.serverId}") }
+            .forEach { emitNotice(ChatNotice.McpServerSkipped(it.displayName)) }
     }
 
     private val sessionRuntimes = linkedMapOf<String, ChatSessionRuntime>()

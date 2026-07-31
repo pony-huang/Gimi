@@ -4,11 +4,12 @@ on:
   # 版本推进方式一：推送 v* 标签（如 git tag v0.2.0 && git push origin v0.2.0）。
   push:
     tags: ['v*']
-  # 版本推进方式二：手动触发；version 留空时使用 app/build.gradle.kts 中的当前版本号。
+  # 版本推进方式二：手动触发；version 留空时优先使用 GitHub 最新 tag，
+  # 仓库还没有 tag 时回退到 app/build.gradle.kts 中的当前版本号。
   workflow_dispatch:
     inputs:
       version:
-        description: '发布版本号（不含 v 前缀；留空则使用当前版本号）'
+        description: '发布版本号（不含 v 前缀；留空则优先使用 GitHub 最新 tag）'
         required: false
         type: string
       prerelease:
@@ -36,16 +37,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 版本来源优先级：手动输入 > 标签名（去掉 v 前缀）> build.gradle.kts 当前默认版本。
+      # 版本来源优先级：手动输入 > 当前标签名（去掉 v 前缀）> GitHub 最新 tag > build.gradle.kts 当前默认版本。
       - name: Resolve version
         id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ -n "${{ inputs.version }}" ]; then
             V="${{ inputs.version }}"
           elif [ "${{ github.ref_type }}" = "tag" ]; then
             V="${GITHUB_REF_NAME#v}"
           else
-            V="$(sed -n 's/.*getOrElse("\([^"]*\)").*/\1/p' app/build.gradle.kts | head -1)"
+            # 手动触发且未填版本：优先取 GitHub 最新 tag（按语义化版本排序）。
+            LATEST_TAG="$(gh api repos/${{ github.repository }}/tags --jq '.[].name' | grep -E '^v?[0-9]' | sort -rV | head -1 || true)"
+            if [ -n "$LATEST_TAG" ]; then
+              V="${LATEST_TAG#v}"
+            else
+              V="$(sed -n 's/.*getOrElse("\([^"]*\)").*/\1/p' app/build.gradle.kts | head -1)"
+            fi
           fi
           if [ -z "$V" ]; then
             echo "Failed to resolve release version; please provide the version input manually" >&2

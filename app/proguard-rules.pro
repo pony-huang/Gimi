@@ -20,6 +20,21 @@
 -dontwarn kotlinx.coroutines.debug.**
 
 # ---------------------------------------------------------------------------
+# App code: no obfuscation, no member stripping
+#
+# This is an open-source, exploration-stage project, so obfuscation buys
+# nothing here — but a missing keep rule repeatedly breaks reflection-based
+# serialization (Gson fields + generic signatures, kotlinx.serializer lookup,
+# enum names). Example: R8 renamed ConversationToolConfiguration's fields and
+# stripped the Map<String, Map<String, Set<String>>> signature, so Gson decoded
+# the nested function-id sets as ArrayList and the Set checkcast in
+# enabledOfficialFunctionIds crashed with ClassCastException on session restore.
+# Keeping the whole app package also keeps release stack traces readable
+# without a mapping file. R8 still shrinks and obfuscates third-party code.
+# ---------------------------------------------------------------------------
+-keep class github.ponyhuang.gimi.** { *; }
+
+# ---------------------------------------------------------------------------
 # kxml2 / XmlPullParser
 #
 # kxml2 jar is excluded via `configurations.all { exclude(...) }` in
@@ -29,44 +44,6 @@
 # ---------------------------------------------------------------------------
 -dontwarn org.xmlpull.v1.**
 -dontwarn org.kxml2.**
-
-# ---------------------------------------------------------------------------
-# Gson-reflected data classes
-#
-# Gson instantiates these via java.lang.reflect without calling constructors
-# directly. -keep + -keepclassmembers ensures field names survive renaming so
-# the JSON ↔ object mapping still matches.
-#
-# Sites: LLMModelSelectionCodec, LLMModelServiceDatabase,
-#        McpServerRepository, SpeechSynthesis.
-# ---------------------------------------------------------------------------
--keep class github.ponyhuang.gimi.data.** { *; }
--keepclassmembers class github.ponyhuang.gimi.data.** {
-    <init>(...);
-    <fields>;
-}
-
-# ModelSelection moved to the domain layer but is still Gson-persisted by
-# ModelServiceRepository (SharedPreferences); keep field names identical to the
-# legacy data-class JSON shape.
--keep class github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection { *; }
--keepclassmembers class github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection {
-    <init>(...);
-    <fields>;
-}
-
-# ---------------------------------------------------------------------------
-# kotlinx-serialization + Navigation 3
-#
-# The kotlinx-serialization compiler plugin emits serializer companions at
-# build time, but Navigation 3 looks them up by class name from saved state.
-# Keep the sealed interface + nested data objects / data classes.
-# ---------------------------------------------------------------------------
--keep,includedescriptorclasses class github.ponyhuang.gimi.ui.navigation.** { *; }
--keepclassmembers class github.ponyhuang.gimi.ui.navigation.** {
-    *** Companion;
-    kotlinx.serialization.KSerializer serializer(...);
-}
 
 # ---------------------------------------------------------------------------
 # anthropic-java SDK
@@ -110,7 +87,14 @@
 -dontwarn java.lang.reflect.AnnotatedType
 
 # ---------------------------------------------------------------------------
-# Manifest entry points (belt-and-suspenders — Hilt plugin already keeps these)
+# SnakeYAML (transitive via google-adk skills)
+#
+# R8 flattens obfuscated classes into the default package (TypeDescription -> mo6),
+# and a class in the default package makes Class.getPackage() return null on ART.
+# TypeDescription / PropertySubstitute call getPackage().getName() unconditionally
+# in their initializers, so the first SKILL.md parse dies with
+# ExceptionInInitializerError(NPE) and the class stays poisoned for the process.
+# Keep snakeyaml's package names so getPackage() stays non-null; class-name
+# obfuscation and shrinking inside the packages are unaffected.
 # ---------------------------------------------------------------------------
--keep class github.ponyhuang.gimi.MainActivity { *; }
--keep class github.ponyhuang.gimi.voice.BluetoothVoiceService { *; }
+-keeppackagenames org.yaml.snakeyaml.**

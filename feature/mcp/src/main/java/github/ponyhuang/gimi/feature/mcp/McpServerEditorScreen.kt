@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -219,14 +220,8 @@ fun McpServerEditorScreen(
                         label = { Text(stringResource(R.string.mcp_field_header_optional)) },
                         enabled = !state.isMutationBlocked,
                         placeholder = { Text(stringResource(R.string.mcp_field_header_placeholder)) },
-                        supportingText = { Text(stringResource(R.string.mcp_field_header_help)) },
                         minLines = 3,
                         modifier = Modifier.fillMaxWidth(),
-                    )
-                    Text(
-                        stringResource(R.string.mcp_sse_help),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -237,11 +232,27 @@ fun McpServerEditorScreen(
                 ) {
                     Button(
                         onClick = { onAction(McpSettingsAction.SaveEditor) },
-                        enabled = !state.isMutationBlocked &&
+                        enabled = !state.isMutationBlocked && !state.isTestingConnection &&
                             draft.name.isNotBlank() && draft.endpointUrl.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(stringResource(R.string.mcp_save))
+                        if (state.isTestingConnection) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.padding(end = 8.dp).size(18.dp),
+                                strokeWidth = 2.dp,
+                            )
+                            Text(stringResource(R.string.mcp_connection_testing))
+                        } else {
+                            Text(stringResource(R.string.mcp_save))
+                        }
+                    }
+                    state.connectionError?.let { error ->
+                        Text(
+                            text = error,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                     if (!draft.isNew) {
                         var showDeleteDialog by remember { mutableStateOf(false) }

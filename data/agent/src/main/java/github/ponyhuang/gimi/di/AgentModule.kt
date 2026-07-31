@@ -12,6 +12,8 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import github.ponyhuang.gimi.agent.AdkMcpConnectionTester
+import github.ponyhuang.gimi.agent.AdkMcpSkipReporter
 import github.ponyhuang.gimi.agent.AgentChatRunner
 import github.ponyhuang.gimi.agent.AgentFactory
 import github.ponyhuang.gimi.agent.AgentLLMModelFactory
@@ -26,7 +28,9 @@ import github.ponyhuang.gimi.agent.tools.search.ToolVectorEntity
 import github.ponyhuang.gimi.agent.tools.search.ToolVectorSearch
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.appfunctions.repository.AppFunctionRepository
+import github.ponyhuang.gimi.domain.mcp.repository.McpConnectionTester
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
+import github.ponyhuang.gimi.domain.mcp.repository.McpSkipReporter
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import github.ponyhuang.gimi.domain.toolauthorization.repository.LocalToolDefinitionSource
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
@@ -59,6 +63,18 @@ object AgentModule {
     fun provideLocalToolDefinitionSource(
         catalog: LocalToolCatalog,
     ): LocalToolDefinitionSource = catalog
+
+    @Provides
+    @Singleton
+    fun provideMcpConnectionTester(
+        implementation: AdkMcpConnectionTester,
+    ): McpConnectionTester = implementation
+
+    @Provides
+    @Singleton
+    fun provideMcpSkipReporter(
+        implementation: AdkMcpSkipReporter,
+    ): McpSkipReporter = implementation
 
     @Provides
     @Singleton

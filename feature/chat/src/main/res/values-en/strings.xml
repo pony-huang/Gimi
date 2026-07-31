@@ -116,6 +116,7 @@
     <string name="chat_notice_attachment_category_unsupported">The current model does not support this type of attachment</string>
     <string name="chat_notice_attachment_unsupported_or_too_large">Unsupported attachment type or file too large: %1$s</string>
     <string name="chat_notice_document_total_size_limit">Document attachments cannot exceed 50 MB in total</string>
+    <string name="chat_notice_mcp_server_skipped">MCP server “%1$s” is unreachable and was skipped for this session</string>
 
     <string name="chat_tool_unknown_description">A remote tool is requesting to perform an action</string>
 

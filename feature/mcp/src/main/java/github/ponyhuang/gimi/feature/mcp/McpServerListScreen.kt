@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.mcp
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -16,14 +17,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,9 +81,15 @@ fun McpServerListScreen(
                         McpServerCard(
                             server = server,
                             mutationEnabled = !state.isMutationBlocked,
-                            onClick = { onNavigateToEditor(server.id) },
+                            expanded = state.expandedServerId == server.id,
+                            capabilityState = state.capabilities[server.id],
+                            onClick = { onAction(McpSettingsAction.ServerCardClicked(server.id)) },
+                            onEditClick = { onNavigateToEditor(server.id) },
                             onToggleEnabled = {
                                 onAction(McpSettingsAction.ToggleServer(server, it))
+                            },
+                            onRetryCapabilities = {
+                                onAction(McpSettingsAction.RefreshCapabilities(server.id))
                             },
                         )
                     }
@@ -251,44 +262,151 @@ fun McpServerImportScreen(
 private fun McpServerCard(
     server: McpServer,
     mutationEnabled: Boolean,
+    expanded: Boolean,
+    capabilityState: ServerCapabilityState?,
     onClick: () -> Unit,
+    onEditClick: () -> Unit,
     onToggleEnabled: (Boolean) -> Unit,
+    onRetryCapabilities: () -> Unit,
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(horizontal = 24.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Icon(
-            Icons.Default.Extension,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(32.dp),
-        )
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                server.name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Icon(
+                Icons.Default.Extension,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp),
             )
-            Text(
-                // host 是最有辨识度的信息，放前面；空间不足时截断的是传输方式而非 host。
-                "${server.endpointHost()} · ${server.transport.displayName()}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    server.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    // host 是最有辨识度的信息，放前面；空间不足时截断的是传输方式而非 host。
+                    "${server.endpointHost()} · ${server.transport.displayName()}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            // 卡片点击改为展开/折叠，编辑入口挪到独立图标保持可发现性。
+            IconButton(onClick = onEditClick) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = stringResource(R.string.mcp_edit_action),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = server.isEnabled,
+                onCheckedChange = onToggleEnabled,
+                enabled = mutationEnabled,
             )
         }
-        Switch(
-            checked = server.isEnabled,
-            onCheckedChange = onToggleEnabled,
-            enabled = mutationEnabled,
+        AnimatedVisibility(visible = expanded) {
+            McpServerCapabilities(
+                capabilityState = capabilityState,
+                onRetry = onRetryCapabilities,
+            )
+        }
+    }
+}
+
+/** 展开区域：展示该 MCP 服务器声明的工具 / 资源 / 提示词。 */
+@Composable
+private fun McpServerCapabilities(
+    capabilityState: ServerCapabilityState?,
+    onRetry: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp, start = 48.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        when (capabilityState) {
+            null, ServerCapabilityState.Loading -> Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                )
+                Text(
+                    stringResource(R.string.mcp_connection_testing),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            is ServerCapabilityState.Failed -> Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    capabilityState.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onRetry) {
+                    Text(stringResource(R.string.mcp_capabilities_retry))
+                }
+            }
+            is ServerCapabilityState.Loaded -> {
+                val result = capabilityState.result
+                CapabilitySection(
+                    title = stringResource(R.string.mcp_capabilities_tools, result.tools.size),
+                    entries = result.tools.map { tool ->
+                        if (tool.description.isBlank()) tool.name else "${tool.name} — ${tool.description}"
+                    },
+                )
+                if (result.resources.isNotEmpty()) {
+                    CapabilitySection(
+                        title = stringResource(R.string.mcp_capabilities_resources, result.resources.size),
+                        entries = result.resources,
+                    )
+                }
+                if (result.prompts.isNotEmpty()) {
+                    CapabilitySection(
+                        title = stringResource(R.string.mcp_capabilities_prompts, result.prompts.size),
+                        entries = result.prompts,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CapabilitySection(
+    title: String,
+    entries: List<String>,
+) {
+    Text(
+        title,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    entries.forEach { entry ->
+        Text(
+            entry,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

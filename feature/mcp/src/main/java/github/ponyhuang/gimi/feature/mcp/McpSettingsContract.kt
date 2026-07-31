@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.mcp
 
+import github.ponyhuang.gimi.domain.mcp.model.McpProbeResult
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 
@@ -15,6 +16,13 @@ data class McpEditorDraft(
     val isEnabled: Boolean,
 )
 
+/** 列表展开的服务器能力状态；[Loaded]/[Failed] 携带探测时的配置快照用于失效判断。 */
+sealed interface ServerCapabilityState {
+    data object Loading : ServerCapabilityState
+    data class Loaded(val result: McpProbeResult, val serverSnapshot: McpServer) : ServerCapabilityState
+    data class Failed(val message: String, val serverSnapshot: McpServer) : ServerCapabilityState
+}
+
 data class McpSettingsUiState(
     val servers: List<McpServer> = emptyList(),
     val importJson: String = "",
@@ -22,10 +30,16 @@ data class McpSettingsUiState(
     val editor: McpEditorDraft? = null,
     val isTransportMenuExpanded: Boolean = false,
     val isMutationBlocked: Boolean = false,
+    val isTestingConnection: Boolean = false,
+    val connectionError: String? = null,
+    val expandedServerId: String? = null,
+    val capabilities: Map<String, ServerCapabilityState> = emptyMap(),
 )
 
 sealed interface McpSettingsAction {
     data class ToggleServer(val server: McpServer, val enabled: Boolean) : McpSettingsAction
+    data class ServerCardClicked(val serverId: String) : McpSettingsAction
+    data class RefreshCapabilities(val serverId: String) : McpSettingsAction
     data class ImportJsonChanged(val value: String) : McpSettingsAction
     data object ImportServers : McpSettingsAction
     data class LoadEditor(val serverId: String?) : McpSettingsAction

@@ -558,6 +558,9 @@ class ChatViewModelCharacterizationTest {
                 attachments = attachments,
                 toolAuthorization = toolAuthorization,
                 mcpRepository = mcpRepository,
+                mcpSkipReporter = mockk {
+                    every { skipped } returns MutableStateFlow(emptyList())
+                },
                 officialFunctionCatalog = officialFunctionCatalog,
             ),
             conversations = conversations,

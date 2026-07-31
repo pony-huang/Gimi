@@ -16,19 +16,17 @@ Chat, talk, and get things done — alarms, files, music, calendar — all in on
 
 You bring your own API key. Gimi gives its model access to your device: alarms, calendar, media,
 screen brightness, folders you pick, and any external tools you add. No vendor lock-in. No
-subscription. Actions need your approval before they run.
+subscription.
 
 ## Features
 
 ### Chat
 
-Stream replies. Attach photos from camera or gallery. Switch models mid-conversation. Run up to
-three tasks at once.
+Stream replies. Attach photos from camera or gallery.
 
 ### Voice
 
-Tap-to-talk or set a wake word for hands-free use. Wake-word detection runs on-device. Chinese model
-included; English model is a small download.
+Tap-to-talk or set a wake word for hands-free use.
 
 ### Built-in tools
 
@@ -48,13 +46,12 @@ included; English model is a small download.
 
 ### MCP
 
-Connect remote MCP servers (SSE or Streamable HTTP) for extra tools. Add one manually or paste a
-JSON config to import several at once.
+Connect remote MCP servers (SSE or Streamable HTTP) for extra tools.
 
 ### Skills
 
 Install instruction packs from a URL or local ZIP. A skill bundles guidance and resources the
-assistant can use.
+assistant can use when needed. (No script execution)
 
 ### Working files
 
@@ -65,7 +62,7 @@ Pick folders for the assistant to search. Only folders you authorize are visible
 - Sensitive actions pause and wait for Allow/Reject.
 - Enable only the tools you want.
 - Permissions page explains what each one does.
-- API keys stay on-device.
+- API keys stay on-device; never pass through third parties.
 
 ## Supported providers
 
@@ -74,8 +71,7 @@ Pick folders for the assistant to search. Only folders you authorize are visible
 | **OpenAI**      | **Anthropic** | **DeepSeek**      | **Moonshot (Kimi)** |
 | **GLM (Zhipu)** | **MiniMax**   | **MiMo (Xiaomi)** |                     |
 
-OpenAI-compatible and Anthropic-style endpoints are supported. Other services work via custom API
-address.
+OpenAI-compatible and Anthropic-style endpoints are supported.
 
 Also configurable: a quick model for conversation titles, a speech recognition model, and a speech
 synthesis model.

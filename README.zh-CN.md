@@ -12,6 +12,14 @@
 
 ---
 
+## 应用截图
+
+<p align="center">
+  <img src="doc/img1.jpg" width="30%" alt="聊天" />
+  <img src="doc/img2.jpg" width="30%" alt="语音" />
+  <img src="doc/img3.jpg" width="30%" alt="工具" />
+</p>
+
 ## 能干什么
 
 你填自己的 API Key。Gimi 让模型能操作你的设备：闹钟、日历、媒体播放、屏幕亮度、你指定的文件夹，以及你接入的外部工具。不绑定厂商，不需要订阅。

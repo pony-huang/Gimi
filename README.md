@@ -82,7 +82,7 @@ synthesis model.
 
 ## Getting started
 
-1. Install the APK. Requires Android 15+.
+1. Install the APK. Requires Android 14+.
 2. *Settings → Model services*: pick a provider, paste your key, tap **Test**.
 3. *Settings → Default models*: choose your chat model. Add voice models if needed.
 4. *Settings → Permissions*: grant what you're comfortable with. All optional.

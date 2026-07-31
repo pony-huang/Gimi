@@ -6,7 +6,7 @@ plugins {
 android {
     namespace = "github.ponyhuang.gimi.core.designsystem"
     compileSdk { version = release(37) }
-    defaultConfig { minSdk = 35 }
+    defaultConfig { minSdk = 34 }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11

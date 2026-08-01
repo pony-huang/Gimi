@@ -1,54 +1,39 @@
 package github.ponyhuang.gimi.agent
 
 import com.google.adk.kt.logging.LoggerFactory
-import github.ponyhuang.gimi.agent.tools.mcp.McpSessionManager
+import github.ponyhuang.gimi.agent.tools.mcp.McpToolException.McpToolLoadingException
+import github.ponyhuang.gimi.agent.tools.mcp.McpToolset
 import github.ponyhuang.gimi.domain.mcp.model.McpProbeResult
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.model.McpToolSummary
 import github.ponyhuang.gimi.domain.mcp.repository.McpConnectionTester
-import javax.inject.Inject
-import javax.inject.Singleton
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * [McpConnectionTester] 的生产实现：对给定配置做一次真实的连接握手 + 能力列举。
  *
- * 使用 [McpSessionManager.createSession] 构建一次性会话（不入池），探测完成后立即关闭，
- * 因此不会污染 [McpToolsetRegistry] 的会话池，失败探测也不会留下缓存。
+ * 通过 [McpServer.toMcpToolset] 构建一次性 [McpToolset]，用 [McpToolset.getTools] 完成握手并
+ * 拉取工具列表，探测完成后立即 [McpToolset.close]，因此不会污染 [McpToolsetRegistry] 的会话池，
+ * 失败探测也不会留下缓存。
  */
 @Singleton
 class AdkMcpConnectionTester @Inject constructor() : McpConnectionTester {
 
     override suspend fun test(server: McpServer): McpProbeResult {
-        val session = McpSessionManager.createSession(server.toMcpConnectionParameters())
+        val toolset = server.toMcpToolset()
         try {
             return withTimeout(PROBE_TIMEOUT) {
-                session.connect()
-                val client = session.client
-                val capabilities = client.serverCapabilities
+                // getTools 内部完成会话建立 + 握手 + 工具列举，失败会重试后抛出。
+                val tools = toolset.getTools(null)
                 McpProbeResult(
                     reachable = true,
-                    serverName = client.serverVersion?.name,
-                    serverVersion = client.serverVersion?.version,
-                    tools = client.listTools().tools.map {
-                        McpToolSummary(name = it.name, description = it.description ?: "")
-                    },
-                    // 服务器声明支持才列举；单个能力调用失败不影响整体探测结论。
-                    resources = if (capabilities?.resources != null) {
-                        runCatching { client.listResources().resources.map { it.name } }
-                            .getOrDefault(emptyList())
-                    } else {
-                        emptyList()
-                    },
-                    prompts = if (capabilities?.prompts != null) {
-                        runCatching { client.listPrompts().prompts.map { it.name } }
-                            .getOrDefault(emptyList())
-                    } else {
-                        emptyList()
-                    },
+                    tools = tools.map { McpToolSummary(name = it.name, description = it.description) },
+                    resources = runCatching { toolset.listResources() }.getOrDefault(emptyList()),
                 )
             }
         } catch (e: TimeoutCancellationException) {
@@ -58,9 +43,10 @@ class AdkMcpConnectionTester @Inject constructor() : McpConnectionTester {
             throw e
         } catch (e: Exception) {
             logger.warn(e) { "MCP probe failed for ${server.endpointUrl}: ${e.message}" }
-            return unreachable(e.message)
+            val detail = (e as? McpToolLoadingException)?.cause?.message ?: e.message
+            return unreachable(detail)
         } finally {
-            session.close()
+            toolset.close()
         }
     }
 
@@ -71,7 +57,7 @@ class AdkMcpConnectionTester @Inject constructor() : McpConnectionTester {
     )
 
     private companion object {
-        val PROBE_TIMEOUT = 10.seconds
+        val PROBE_TIMEOUT = 60.seconds
         val logger = LoggerFactory.getLogger(AdkMcpConnectionTester::class)
     }
 }

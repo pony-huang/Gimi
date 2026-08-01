@@ -31,6 +31,7 @@ internal fun McpServer.toMcpConnectionParameters(): McpConnectionParameters {
         )
         McpTransport.SSE -> McpConnectionParameters.Sse(
             url = endpointUrl.trim(),
+            sseEndpoint = "",
             headers = headers,
         )
     }

@@ -12,13 +12,13 @@ import com.google.adk.kt.plugins.Plugin
 import com.google.adk.kt.runners.InMemoryRunner
 import com.google.adk.kt.sessions.SessionService
 import com.google.adk.kt.summarizer.EventsCompactionConfig
-import com.google.adk.kt.types.FileData
 import com.google.adk.kt.types.Content
+import com.google.adk.kt.types.FileData
 import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.FunctionResponse
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
-import github.ponyhuang.gimi.agent.AgentChatRunner.Companion.MAX_CACHED_RUNNERS
+import github.ponyhuang.gimi.agent.AgentChatRunner.Companion.MAX_CACHED_RUNTIMES
 import github.ponyhuang.gimi.agent.tools.ToolRunMetadata
 import github.ponyhuang.gimi.di.AgentModule
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
@@ -37,18 +37,24 @@ import kotlinx.coroutines.sync.withLock
  * Agent 聊天运行器 — 把 ADK `InMemoryRunner.runAsync(...)` 封装为 `Flow<Event>`。
  *
  * 设计要点：
- * - 按会话缓存 `InMemoryRunner`（LRU 上限 [MAX_CACHED_RUNNERS]），每个会话持有独立 runner。
- *   仅当模型选择、配置版本、工具访问模式或确认工具开关变化时才重建 —— 会话级
- *   工具勾选通过 `RunConfig.customMetadata`（[ToolRunMetadata]）按请求透传给各
- *   Toolset 自行过滤，不再触发 Agent 重建。
+ * - ADK Runner 本身不持有会话状态（历史、恢复点全部落在 [SessionService] 的 Session
+ *   事件里），因此相同构建配置的会话可以安全共享同一个 Agent/Runner。
+ * - 运行时按 [AgentKey]（模型选择 + [ToolAccessMode] + 外部配置版本）做 LRU 缓存
+ *   （上限 [MAX_CACHED_RUNTIMES]），不同会话只要配置相同就复用同一份昂贵构建产物
+ *   （模型客户端、MCP 解析结果等），不再每会话各建一个 Agent。
+ * - 会话级工具勾选、确认工具开关通过 `RunConfig.customMetadata`（[ToolRunMetadata]）
+ *   按请求透传给各 Toolset 自行过滤，均不参与缓存键 —— 切换勾选或确认开关不会触发
+ *   Agent 重建。
+ * - 每个会话仅保存轻量 [SessionBinding]（最近使用的 key + metadata），供
+ *   [respondToToolConfirmation] 恢复暂停的调用时复用。
  * - 构造期由 [AgentModule] 通过 Hilt 注入 [sessionService]、[artifactService]、[plugins]
  *   及 [configurationRevision]；不持有 in-memory 默认实现。
- * - [factory] 在 runner 重建时按需调用，保证模型/访问模式切换立即生效。当前正在
+ * - [factory] 仅在缓存未命中时按需调用，保证模型/访问模式切换立即生效。当前正在
  *   `runAsync` 中的会话不受影响（[send] 入口处已快照 runner 引用）。
  * - 不对 `Event` 做任何加工；Event → UI 渲染的合并工作由 `ChatViewModel` 的 reducer 完成。
  * - `runConfig` 默认开启 SSE 流式，便于 UI 端做打字机效果。
  *
- * 线程模型：runner 缓存由 [runnerMutex] 保护，所有调用都通过协程 `Flow` 完成。
+ * 线程模型：缓存由 [runnerMutex] 保护，所有调用都通过协程 `Flow` 完成。
  */
 class AgentChatRunner(
     private val factory: suspend (
@@ -61,27 +67,48 @@ class AgentChatRunner(
     private val plugins: List<Plugin> = emptyList()
 ) {
     /**
-     * 每个会话持有的 Runner 快照。
+     * Agent 构建的唯一缓存键。
      *
-     * @property selection 构建 Agent 时使用的显式模型选择。
-     * @property revision 构建时的外部配置版本。
-     * @property toolAccessMode 工具加载模式。
-     * @property allowConfirmationRequiredTools 是否允许确认型工具。
-     * @property modelRuntime 不含凭据的模型运行信息。
-     * @property customMetadata 最近一次请求的 RunConfig metadata，供确认恢复复用。
-     * @property runner 当前会话独占的 ADK Runner。
+     * @property selection 构建 Agent 时使用的显式模型选择（模型名称）。
+     * @property toolAccessMode 工具声明加载模式。
+     * @property revision 构建时的外部配置版本（工具授权/MCP/模型目录/AppFunction）。
      */
-    private data class RunnerEntry(
+    private data class AgentKey(
         val selection: ModelSelection?,
-        val revision: Any,
         val toolAccessMode: ToolAccessMode,
-        val allowConfirmationRequiredTools: Boolean,
+        val revision: Any,
+    )
+
+    /**
+     * 同一 [AgentKey] 下所有会话共享的运行时。
+     *
+     * @property modelRuntime 不含凭据的模型运行信息。
+     * @property runner 可跨会话共享的 ADK Runner（会话状态在 SessionService 中）。
+     */
+    private class SharedRuntime(
         val modelRuntime: ModelRuntimeMetadata,
-        val customMetadata: Map<String, Any>,
         val runner: InMemoryRunner,
     )
 
-    private val runners = LinkedHashMap<String, RunnerEntry>(16, 0.75f, true)
+    /**
+     * 会话的轻量绑定：最近一轮使用的缓存键与 RunConfig metadata。
+     *
+     * @property key 最近一轮使用的 [AgentKey]。
+     * @property customMetadata 最近一次请求的 RunConfig metadata，供确认恢复复用。
+     */
+    private data class SessionBinding(
+        val key: AgentKey,
+        val customMetadata: Map<String, Any>,
+    )
+
+    /** 一次 send/resume 的执行快照：共享 runner + 本会话 metadata。 */
+    private data class ActiveTurn(
+        val runner: InMemoryRunner,
+        val customMetadata: Map<String, Any>,
+    )
+
+    private val runtimes = LinkedHashMap<AgentKey, SharedRuntime>(16, 0.75f, true)
+    private val sessionBindings = LinkedHashMap<String, SessionBinding>(16, 0.75f, true)
     private val runnerMutex = Mutex()
 
     private fun buildRunner(agent: BaseAgent): InMemoryRunner = InMemoryRunner(
@@ -98,35 +125,39 @@ class AgentChatRunner(
     )
 
     /**
-     * 清空所有缓存的 runner。
+     * 清空所有缓存的运行时与会话绑定。
      *
      * 下次 [send] 时 [factory] 会被重新调用以使用最新的模型/工具配置构建 agent。
      * 当前正在 `runAsync` 中的会话不受影响。
      */
     suspend fun recreate() {
         runnerMutex.withLock {
-            runners.clear()
+            runtimes.clear()
+            sessionBindings.clear()
         }
     }
 
     /**
-     * 清空所有缓存的 runner，不创建替代。
+     * 清空所有缓存的运行时与会话绑定，不创建替代。
      *
      * 当没有可用模型时调用，确保已禁用或删除的模型不会被后续请求使用。
      */
     suspend fun invalidate() {
         runnerMutex.withLock {
-            runners.clear()
+            runtimes.clear()
+            sessionBindings.clear()
         }
     }
 
     /**
-     * 释放指定会话的 runner 缓存。
+     * 释放指定会话的绑定。
+     *
+     * 共享运行时可能仍被其它会话使用，不在此处移除，由 LRU 自行淘汰。
      *
      * @param sessionId 要释放的会话 ID
      */
     suspend fun releaseSession(sessionId: String) {
-        runnerMutex.withLock { runners.remove(sessionId) }
+        runnerMutex.withLock { sessionBindings.remove(sessionId) }
     }
 
     /**
@@ -151,8 +182,7 @@ class AgentChatRunner(
         allowConfirmationRequiredTools: Boolean = true,
         toolConfiguration: ConversationToolConfiguration? = null,
     ): Flow<Event> {
-        // 快照当前 runner；中途 recreate() 不会改本次 send 的行为。
-        val activeEntry = currentEntryForNewTurn(
+        val activeTurn = currentTurnForNewMessage(
             sessionId,
             selection,
             toolConfiguration?.toolAccessMode ?: ToolAccessMode.ALWAYS_AVAILABLE,
@@ -179,7 +209,7 @@ class AgentChatRunner(
             role = Role.USER,
             parts = parts,
         )
-        return activeEntry.runner.runAsync(
+        return activeTurn.runner.runAsync(
             userId = userId,
             sessionId = sessionId,
             invocationId = null,
@@ -187,7 +217,7 @@ class AgentChatRunner(
             stateDelta = null,
             runConfig = RunConfig(
                 streamingMode = StreamingMode.SSE,
-                customMetadata = activeEntry.customMetadata,
+                customMetadata = activeTurn.customMetadata,
             ),
         ).flowOn(Dispatchers.IO)
     }
@@ -207,7 +237,7 @@ class AgentChatRunner(
         confirmationCallId: String,
         confirmed: Boolean,
     ): Flow<Event> {
-        val entry = currentEntryForResume(sessionId)
+        val activeTurn = currentTurnForResume(sessionId)
         val confirmationResponse = Content(
             role = Role.USER,
             parts = listOf(
@@ -220,7 +250,7 @@ class AgentChatRunner(
                 ),
             ),
         )
-        return entry.runner.runAsync(
+        return activeTurn.runner.runAsync(
             userId = userId,
             sessionId = sessionId,
             invocationId = null,
@@ -229,69 +259,58 @@ class AgentChatRunner(
             // 恢复调用沿用最近一次 send 的工具配置，保证 Toolset 过滤上下文一致。
             runConfig = RunConfig(
                 streamingMode = StreamingMode.SSE,
-                customMetadata = entry.customMetadata,
+                customMetadata = activeTurn.customMetadata,
             ),
         ).flowOn(Dispatchers.IO)
     }
 
-    private suspend fun currentEntryForNewTurn(
+    private suspend fun currentTurnForNewMessage(
         sessionId: String,
         selection: ModelSelection?,
         toolAccessMode: ToolAccessMode,
         allowConfirmationRequiredTools: Boolean,
         toolConfiguration: ConversationToolConfiguration?,
-    ): RunnerEntry {
-        val expectedRevision = configurationRevision()
+    ): ActiveTurn {
+        val key = AgentKey(selection, toolAccessMode, configurationRevision())
         return runnerMutex.withLock {
-            runners[sessionId]
-                ?.takeIf {
-                    it.selection == selection &&
-                            it.revision == expectedRevision &&
-                            it.toolAccessMode == toolAccessMode &&
-                            it.allowConfirmationRequiredTools == allowConfirmationRequiredTools
-                }
-                ?.let { entry ->
-                    entry.copy(
-                        customMetadata = ToolRunMetadata.of(
-                            modelRuntime = entry.modelRuntime,
-                            toolConfiguration = toolConfiguration,
-                            allowConfirmationRequiredTools = allowConfirmationRequiredTools,
-                        ),
-                    )
-                }
-                ?.also { updated -> runners[sessionId] = updated }
-                ?: factory(selection, toolAccessMode).let { runtime ->
-                    RunnerEntry(
-                        selection,
-                        expectedRevision,
-                        toolAccessMode,
-                        allowConfirmationRequiredTools,
-                        runtime.modelRuntime,
-                        ToolRunMetadata.of(
-                            modelRuntime = runtime.modelRuntime,
-                            toolConfiguration = toolConfiguration,
-                            allowConfirmationRequiredTools = allowConfirmationRequiredTools,
-                        ),
-                        buildRunner(runtime.agent),
-                    ).also { newEntry ->
-                        runners[sessionId] = newEntry
-                    }
-                }.also {
-                    while (runners.size > MAX_CACHED_RUNNERS) {
-                        runners.remove(runners.entries.first().key)
-                    }
-                }
+            val runtime = runtimes[key] ?: factory(selection, toolAccessMode).let { agentRuntime ->
+                SharedRuntime(
+                    modelRuntime = agentRuntime.modelRuntime,
+                    runner = buildRunner(agentRuntime.agent),
+                ).also { runtimes[key] = it }
+            }
+            while (runtimes.size > MAX_CACHED_RUNTIMES) {
+                runtimes.remove(runtimes.entries.first().key)
+            }
+            val metadata = ToolRunMetadata.of(
+                modelRuntime = runtime.modelRuntime,
+                toolConfiguration = toolConfiguration,
+                allowConfirmationRequiredTools = allowConfirmationRequiredTools,
+            )
+            sessionBindings[sessionId] = SessionBinding(key, metadata)
+            while (sessionBindings.size > MAX_SESSION_BINDINGS) {
+                sessionBindings.remove(sessionBindings.entries.first().key)
+            }
+            ActiveTurn(runtime.runner, metadata)
         }
     }
 
-    private suspend fun currentEntryForResume(sessionId: String): RunnerEntry =
+    private suspend fun currentTurnForResume(sessionId: String): ActiveTurn =
         runnerMutex.withLock {
-            runners[sessionId]
+            val binding = sessionBindings[sessionId]
                 ?: error("No active runner is available for session $sessionId.")
+            val runtime = runtimes[binding.key]
+                ?: error("No active runner is available for session $sessionId.")
+            ActiveTurn(runtime.runner, binding.customMetadata)
         }
 
     companion object {
         const val APP_NAME: String = AgentSessionIdentity.APP_NAME
-        const val MAX_CACHED_RUNNERS: Int = 10
+
+        /** 共享运行时（Agent + Runner）的 LRU 上限，按 [AgentKey] 计数。 */
+        const val MAX_CACHED_RUNTIMES: Int = 10
+
+        /** 会话绑定的 LRU 上限；绑定很轻量，保留比运行时更长的历史以支持确认恢复。 */
+        const val MAX_SESSION_BINDINGS: Int = 50
     }
 }

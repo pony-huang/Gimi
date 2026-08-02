@@ -17,7 +17,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 
-class AgentChatRunnerIsolationTest {
+class AgentChatRunnerCacheTest {
 
     @Before
     fun setUp() {
@@ -40,7 +40,7 @@ class AgentChatRunnerIsolationTest {
     }
 
     @Test
-    fun sessionsOwnIndependentRunnersAndConfirmationReusesItsSessionRunner() = runTest {
+    fun sessionsWithSameConfigurationShareOneRuntimeAndConfirmationReusesIt() = runTest {
         val createdSelections = mutableListOf<ModelSelection?>()
         val runner = AgentChatRunner(
             factory = { selection, _ ->
@@ -56,18 +56,20 @@ class AgentChatRunnerIsolationTest {
         runner.send("user", "session-a", selection, "a2")
         runner.send("user", "session-b", selection, "b")
 
-        assertEquals(listOf(selection, selection), createdSelections)
+        // 相同模型 + 访问模式的会话共享同一份 Agent/Runner，只构建一次。
+        assertEquals(listOf(selection), createdSelections)
 
         runner.respondToToolConfirmation("user", "session-a", "confirmation", true)
-        assertEquals(2, createdSelections.size)
+        assertEquals(1, createdSelections.size)
 
+        // 释放会话只移除绑定；共享运行时仍可复用，不触发重建。
         runner.releaseSession("session-a")
         runner.send("user", "session-a", selection, "a3")
-        assertEquals(3, createdSelections.size)
+        assertEquals(1, createdSelections.size)
     }
 
     @Test
-    fun modelOrConfigurationRevisionChangeRebuildsOnlyTheAddressedSession() = runTest {
+    fun modelOrConfigurationRevisionChangeCreatesNewSharedRuntime() = runTest {
         var revision = 0
         var creations = 0
         val runner = AgentChatRunner(
@@ -85,15 +87,16 @@ class AgentChatRunnerIsolationTest {
         runner.send("user", "session-a", first, "a")
         runner.send("user", "session-b", first, "b")
         runner.send("user", "session-a", second, "a2")
-        assertEquals(3, creations)
+        // first 配置两个会话共享（1 次），切换到 second 新建（共 2 次）。
+        assertEquals(2, creations)
 
         revision += 1
         runner.send("user", "session-b", first, "b2")
-        assertEquals(4, creations)
+        assertEquals(3, creations)
     }
 
     @Test
-    fun runnerCacheEvictsLeastRecentlyUsedSession() = runTest {
+    fun runtimeCacheEvictsLeastRecentlyUsedConfiguration() = runTest {
         var creations = 0
         val runner = AgentChatRunner(
             factory = { selection, _ ->
@@ -104,16 +107,18 @@ class AgentChatRunnerIsolationTest {
             artifactService = null,
         )
 
-        repeat(AgentChatRunner.MAX_CACHED_RUNNERS + 1) { index ->
-            runner.send("user", "session-$index", text = "message")
-        }
-        runner.send("user", "session-0", text = "again")
+        fun selection(index: Int) = ModelSelection("service", "group", "model-$index")
 
-        assertEquals(AgentChatRunner.MAX_CACHED_RUNNERS + 2, creations)
+        repeat(AgentChatRunner.MAX_CACHED_RUNTIMES + 1) { index ->
+            runner.send("user", "session-$index", selection(index), text = "message")
+        }
+        runner.send("user", "session-0", selection(0), text = "again")
+
+        assertEquals(AgentChatRunner.MAX_CACHED_RUNTIMES + 2, creations)
     }
 
     @Test
-    fun conversationToolSelectionChangeDoesNotRebuildRunner() = runTest {
+    fun conversationToolSelectionChangeDoesNotRebuildRuntime() = runTest {
         var creations = 0
         val runner = AgentChatRunner(
             factory = { selection, _ ->
@@ -134,11 +139,11 @@ class AgentChatRunnerIsolationTest {
         // 会话内工具勾选变化经 RunConfig metadata 透传，不触发 Agent 重建。
         runner.send("user", "session-a", selection, "a2", toolConfiguration = clockAndLocation)
 
-        assertEquals(2, creations)
+        assertEquals(1, creations)
     }
 
     @Test
-    fun toolAccessModeChangeRebuildsOnlyThatSession() = runTest {
+    fun toolAccessModeChangeCreatesNewSharedRuntime() = runTest {
         var creations = 0
         val runner = AgentChatRunner(
             factory = { selection, _ ->
@@ -169,7 +174,28 @@ class AgentChatRunnerIsolationTest {
             ),
         )
 
-        assertEquals(3, creations)
+        assertEquals(2, creations)
+    }
+
+    @Test
+    fun confirmationToolsToggleDoesNotRebuildRuntime() = runTest {
+        var creations = 0
+        val runner = AgentChatRunner(
+            factory = { selection, _ ->
+                creations += 1
+                runtime(selection)
+            },
+            sessionService = mockk<SessionService>(relaxed = true),
+            artifactService = null,
+        )
+        val selection = ModelSelection("service", "group", "model")
+
+        runner.send("user", "session-a", selection, "a", allowConfirmationRequiredTools = true)
+        // 确认工具开关经 RunConfig metadata 透传，不参与缓存键，不触发重建。
+        runner.send("user", "session-a", selection, "a2", allowConfirmationRequiredTools = false)
+        runner.send("user", "session-b", selection, "b", allowConfirmationRequiredTools = false)
+
+        assertEquals(1, creations)
     }
 
     private fun runtime(selection: ModelSelection? = null) = AgentRuntime(

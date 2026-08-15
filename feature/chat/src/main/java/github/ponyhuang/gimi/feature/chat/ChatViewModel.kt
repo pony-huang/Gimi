@@ -13,6 +13,7 @@ import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRunLease
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
@@ -73,6 +74,7 @@ class ChatViewModel @Inject constructor(
     private val repository: ConversationRepository,
     private val modelServices: ModelCatalogRepository,
     private val chatDisplayPreferences: ChatDisplayRepository,
+    private val toolApproval: ToolApprovalRepository,
     private val toolAuthorization: ToolAuthorizationRepository,
     private val mcpRepository: McpRepository,
     private val mcpSkipReporter: McpSkipReporter,
@@ -100,7 +102,9 @@ class ChatViewModel @Inject constructor(
             ChatAction.StopStreaming -> stopStreaming()
             is ChatAction.ToggleSpeechPlayback ->
                 toggleSpeechPlayback(action.messageId, action.markdown)
-            is ChatAction.RespondToToolConfirmation -> respondToToolConfirmation(action.confirmed)
+            is ChatAction.RespondToToolConfirmation ->
+                respondToToolConfirmation(action.confirmed, action.alwaysAllow)
+            is ChatAction.SetFullAccess -> setFullAccess(action.enabled)
             ChatAction.RestoreOrCreateSession -> restoreOrCreateSession()
             ChatAction.NewConversation -> reset()
             is ChatAction.SwitchSession -> switchSession(action.sessionId)
@@ -138,16 +142,21 @@ class ChatViewModel @Inject constructor(
     }
 
     /** Sends the user's decision back to ADK, which then either runs or rejects the paused tool. */
-    private fun respondToToolConfirmation(confirmed: Boolean) {
+    private fun respondToToolConfirmation(confirmed: Boolean, alwaysAllow: Boolean = false) {
         val sessionId = _uiState.value.sessionId
         if (sessionId.isBlank()) return
-        respondToToolConfirmation(sessionId, confirmed)
+        respondToToolConfirmation(sessionId, confirmed, alwaysAllow)
     }
 
-    private fun respondToToolConfirmation(sessionId: String, confirmed: Boolean) {
+    private fun respondToToolConfirmation(
+        sessionId: String,
+        confirmed: Boolean,
+        alwaysAllow: Boolean = false,
+    ) {
         val runtime = runtimeFor(sessionId)
         val request = runtime.pendingToolConfirmations.firstOrNull() ?: return
         if (confirmed) {
+            if (alwaysAllow) toolApproval.setAlwaysAllowed(request.toolName)
             runtime.approvedToolsThisTurn += request.toolName
         } else {
             runtime.approvedToolsThisTurn.clear()
@@ -226,6 +235,11 @@ class ChatViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            toolApproval.fullAccess.collect { enabled ->
+                _uiState.update { it.copy(fullAccess = enabled) }
+            }
+        }
+        viewModelScope.launch {
             speechRecognitionRepository.availability.collect { available ->
                 _uiState.update { it.copy(isSpeechRecognitionAvailable = available) }
             }
@@ -254,6 +268,18 @@ class ChatViewModel @Inject constructor(
 
     /** 已提示过的 (sessionId, serverId)，保证每个服务器每个会话只提示一次。 */
     private val notifiedSkippedMcpServers = mutableSetOf<String>()
+
+    /**
+     * 切换 Full access 全局开关。开启瞬间把所有已挂起的确认卡片立即放行，
+     * 避免开关"看起来没生效"。
+     */
+    private fun setFullAccess(enabled: Boolean) {
+        toolApproval.setFullAccess(enabled)
+        if (!enabled) return
+        sessionRuntimes.values
+            .filter { it.pendingToolConfirmations.isNotEmpty() }
+            .forEach { respondToToolConfirmation(it.sessionId, confirmed = true) }
+    }
 
     private fun notifySkippedMcpServers(skipped: List<McpSkippedServer>) {
         val sessionId = _uiState.value.sessionId
@@ -1287,6 +1313,11 @@ class ChatViewModel @Inject constructor(
             )
         }
         if (incoming.isEmpty()) return
+        // Full access 或「总是允许」白名单命中的工具：预置进 approvedToolsThisTurn，
+        // run 流结束时 finishRunIfOwned 会走既有的同轮自动放行通道直接 confirmed=true，
+        // 不再弹出确认卡片。
+        incoming.filter { toolApproval.isAutoApproved(it.toolName) }
+            .forEach { runtime.approvedToolsThisTurn += it.toolName }
         runtime.phase = AgentTaskPhase.WAITING_FOR_CONFIRMATION
         viewModelScope.launch {
             runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)

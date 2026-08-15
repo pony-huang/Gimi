@@ -65,6 +65,8 @@ data class ChatUiState(
     val darkThemeOverride: Boolean? = null,
     val isSpeechRecognitionAvailable: Boolean = false,
     val pendingToolConfirmations: List<PendingToolConfirmation> = emptyList(),
+    /** Full access 全局开关：开启后所有需要确认的工具调用自动放行。 */
+    val fullAccess: Boolean = false,
     /** 被用户拒绝确认的工具名（内存展示态）；工具 chip 据此显示 ✗ 而非永远悬在"未完成"。 */
     val rejectedToolNames: Set<String> = emptySet(),
     val speechPlaybackState: SpeechPlaybackState = SpeechPlaybackState(),

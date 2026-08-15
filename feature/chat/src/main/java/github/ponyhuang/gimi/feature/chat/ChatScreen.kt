@@ -115,6 +115,8 @@ fun ChatScaffold(
     onToggleSpeechPlayback: (String, String) -> Unit,
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit,
     onToolConfirmation: (Boolean) -> Unit,
+    onToolConfirmationAlwaysAllow: () -> Unit,
+    onFullAccessChange: (Boolean) -> Unit,
     onSelectModel: (github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection) -> Unit,
     onModelSwitchBlocked: () -> Unit,
     onOpenDrawer: () -> Unit,
@@ -272,6 +274,7 @@ fun ChatScaffold(
                         mcpServers = state.availableMcpServers,
                         officialTools = state.officialToolDescriptors,
                         isMutationBlocked = state.isAgentRunning,
+                        fullAccess = state.fullAccess,
                         errorMessage = if (state.hasToolConfigurationError) {
                             stringResource(R.string.chat_session_tool_save_failed)
                         } else {
@@ -282,6 +285,7 @@ fun ChatScaffold(
                     onLocalToolEnabledChange = onLocalToolEnabledChange,
                     onToolAccessModeChange = onToolAccessModeChange,
                     onMcpServerEnabledChange = onMcpServerEnabledChange,
+                    onFullAccessChange = onFullAccessChange,
                     onOfficialToolOpened = onOfficialToolOpened,
                     onOfficialToolFunctionEnabledChange = onOfficialToolFunctionEnabledChange,
                     onOfficialToolFunctionsRetry = onOfficialToolFunctionsRetry,
@@ -383,6 +387,7 @@ fun ChatScaffold(
                                 request = request,
                                 onConfirm = { onToolConfirmation(true) },
                                 onReject = { onToolConfirmation(false) },
+                                onAlwaysAllow = onToolConfirmationAlwaysAllow,
                             )
                         }
                     }
@@ -405,6 +410,7 @@ private fun ToolConfirmationCard(
     request: PendingToolConfirmation,
     onConfirm: () -> Unit,
     onReject: () -> Unit,
+    onAlwaysAllow: () -> Unit,
 ) {
     Surface(
         shape = RoundedCornerShape(20.dp),
@@ -459,10 +465,23 @@ private fun ToolConfirmationCard(
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // 「总是允许」是带持久副作用的动作，放在行首与一次性动作拉开距离；
                 // 拒绝是次要动作：弱化颜色，把视觉重量让给主操作「允许」。
+                TextButton(
+                    onClick = onAlwaysAllow,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                ) {
+                    Text(
+                        stringResource(R.string.chat_action_always_allow),
+                        maxLines = 1,
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
                 TextButton(
                     onClick = onReject,
                     colors = ButtonDefaults.textButtonColors(

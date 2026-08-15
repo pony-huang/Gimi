@@ -62,6 +62,9 @@
     <string name="chat_tool_confirmation_title">Allow running this tool?</string>
     <string name="chat_action_reject">Reject</string>
     <string name="chat_action_allow">Allow</string>
+    <string name="chat_action_always_allow">Always allow</string>
+    <string name="chat_full_access_title">Full access</string>
+    <string name="chat_full_access_description">When on, tool calls that require confirmation are allowed automatically without showing a confirmation card</string>
 
     <string name="chat_model_picker_change">Select model</string>
     <string name="chat_model_loading">Loading models…</string>

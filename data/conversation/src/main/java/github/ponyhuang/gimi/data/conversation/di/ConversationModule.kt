@@ -9,6 +9,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.gimi.data.conversation.ChatDisplayPreferences
+import github.ponyhuang.gimi.data.conversation.ToolApprovalPreferences
 import github.ponyhuang.gimi.data.conversation.attachment.AndroidChatAttachmentRepository
 import github.ponyhuang.gimi.data.conversation.repository.AdkConversationRepository
 import github.ponyhuang.gimi.data.conversation.runtime.InMemoryAgentRuntimeGate
@@ -16,6 +17,7 @@ import github.ponyhuang.gimi.data.conversation.local.ConversationMetadataDatabas
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import javax.inject.Singleton
@@ -41,6 +43,12 @@ object ConversationModule {
     fun provideChatDisplayRepository(
         implementation: ChatDisplayPreferences,
     ): ChatDisplayRepository = implementation
+
+    @Provides
+    @Singleton
+    fun provideToolApprovalRepository(
+        implementation: ToolApprovalPreferences,
+    ): ToolApprovalRepository = implementation
 
     @Provides
     @Singleton

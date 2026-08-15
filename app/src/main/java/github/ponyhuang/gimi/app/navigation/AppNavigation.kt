@@ -192,6 +192,17 @@ fun MainScreen(
                                 onToolConfirmation = { confirmed ->
                                     viewModel.onAction(ChatAction.RespondToToolConfirmation(confirmed))
                                 },
+                                onToolConfirmationAlwaysAllow = {
+                                    viewModel.onAction(
+                                        ChatAction.RespondToToolConfirmation(
+                                            confirmed = true,
+                                            alwaysAllow = true,
+                                        ),
+                                    )
+                                },
+                                onFullAccessChange = { enabled ->
+                                    viewModel.onAction(ChatAction.SetFullAccess(enabled))
+                                },
                                 onSelectModel = { selection ->
                                     viewModel.onAction(ChatAction.SelectModel(selection))
                                 },

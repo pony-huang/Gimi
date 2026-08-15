@@ -15,6 +15,7 @@ import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
@@ -323,6 +324,95 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun fullAccessAutoApprovesConfirmationWithoutShowingCard() = runTest {
+        val agent = ControllableAgent()
+        val fixture = fixture(configured = true, agentOverride = agent)
+        fixture.toolApproval.setFullAccess(true)
+        fixture.viewModel.onAction(ChatAction.Send("执行工具"))
+        runCurrent()
+        agent.emit(
+            "session-1",
+            confirmationEvent(confirmation("confirm-1", "compose_message", emptyMap())),
+        )
+        runCurrent()
+        agent.complete("session-1")
+        advanceUntilIdle()
+
+        assertTrue(fixture.viewModel.uiState.value.pendingToolConfirmations.isEmpty())
+        assertEquals(listOf("confirm-1" to true), agent.confirmationResponses)
+        assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
+    }
+
+    @Test
+    fun alwaysAllowedToolAutoApprovesConfirmationWithoutShowingCard() = runTest {
+        val agent = ControllableAgent()
+        val fixture = fixture(configured = true, agentOverride = agent)
+        fixture.toolApproval.setAlwaysAllowed("compose_message")
+        fixture.viewModel.onAction(ChatAction.Send("执行工具"))
+        runCurrent()
+        agent.emit(
+            "session-1",
+            confirmationEvent(confirmation("confirm-1", "compose_message", emptyMap())),
+        )
+        runCurrent()
+        agent.complete("session-1")
+        advanceUntilIdle()
+
+        assertTrue(fixture.viewModel.uiState.value.pendingToolConfirmations.isEmpty())
+        assertEquals(listOf("confirm-1" to true), agent.confirmationResponses)
+    }
+
+    @Test
+    fun alwaysAllowResponsePersistsToolToWhitelist() = runTest {
+        val fixture = fixture(
+            configured = true,
+            events = listOf(
+                confirmationEvent(confirmation("confirm-1", "compose_message", emptyMap())),
+            ),
+        )
+        fixture.viewModel.onAction(ChatAction.Send("执行工具"))
+        advanceUntilIdle()
+        assertEquals(
+            "confirm-1",
+            fixture.viewModel.uiState.value.pendingToolConfirmation?.confirmationCallId,
+        )
+
+        fixture.viewModel.onAction(
+            ChatAction.RespondToToolConfirmation(confirmed = true, alwaysAllow = true),
+        )
+        advanceUntilIdle()
+
+        assertTrue("compose_message" in fixture.toolApproval.alwaysAllowedToolNames.value)
+        assertTrue(fixture.viewModel.uiState.value.pendingToolConfirmations.isEmpty())
+    }
+
+    @Test
+    fun enablingFullAccessReleasesAlreadyPendingConfirmation() = runTest {
+        val agent = ControllableAgent()
+        val fixture = fixture(configured = true, agentOverride = agent)
+        fixture.viewModel.onAction(ChatAction.Send("执行工具"))
+        runCurrent()
+        agent.emit(
+            "session-1",
+            confirmationEvent(confirmation("confirm-1", "compose_message", emptyMap())),
+        )
+        runCurrent()
+        agent.complete("session-1")
+        advanceUntilIdle()
+        assertEquals(
+            "confirm-1",
+            fixture.viewModel.uiState.value.pendingToolConfirmation?.confirmationCallId,
+        )
+
+        fixture.viewModel.onAction(ChatAction.SetFullAccess(true))
+        advanceUntilIdle()
+
+        assertTrue(fixture.viewModel.uiState.value.fullAccess)
+        assertTrue(fixture.viewModel.uiState.value.pendingToolConfirmations.isEmpty())
+        assertEquals(listOf("confirm-1" to true), agent.confirmationResponses)
+    }
+
+    @Test
     fun backgroundCompletionAndFailureRemainUnreadUntilConversationIsOpened() = runTest {
         val agent = ControllableAgent()
         val fixture = fixture(
@@ -457,14 +547,19 @@ class ChatViewModelCharacterizationTest {
             sessionId: String,
             confirmationCallId: String,
             confirmed: Boolean,
-        ): Flow<ChatRunEvent> = flowOf(
-            event(
-                text = "confirmation handled",
-                invocationId = "confirm-$sessionId",
-                partial = false,
-                turnComplete = true,
-            ),
-        )
+        ): Flow<ChatRunEvent> {
+            confirmationResponses += confirmationCallId to confirmed
+            return flowOf(
+                event(
+                    text = "confirmation handled",
+                    invocationId = "confirm-$sessionId",
+                    partial = false,
+                    turnComplete = true,
+                ),
+            )
+        }
+
+        val confirmationResponses = mutableListOf<Pair<String, Boolean>>()
 
         override suspend fun releaseSession(sessionId: String) = Unit
     }
@@ -546,6 +641,7 @@ class ChatViewModelCharacterizationTest {
             ?: mockk<OfficialToolFunctionCatalog>(relaxed = true) {
                 coEvery { listFunctions(any()) } returns emptyList()
             }
+        val toolApproval = FakeToolApprovalRepository()
         return Fixture(
             viewModel = ChatViewModel(
                 runner = agent,
@@ -553,6 +649,7 @@ class ChatViewModelCharacterizationTest {
                 repository = conversations,
                 modelServices = catalog,
                 chatDisplayPreferences = display,
+                toolApproval = toolApproval,
                 speechRecognitionRepository = recognition,
                 speechPlaybackController = playback,
                 attachments = attachments,
@@ -566,6 +663,7 @@ class ChatViewModelCharacterizationTest {
             conversations = conversations,
             agent = agent,
             display = display,
+            toolApproval = toolApproval,
         )
     }
 
@@ -632,5 +730,28 @@ class ChatViewModelCharacterizationTest {
         val conversations: ConversationRepository,
         val agent: ChatAgentRepository,
         val display: ChatDisplayRepository,
+        val toolApproval: FakeToolApprovalRepository,
     )
+}
+
+private class FakeToolApprovalRepository : ToolApprovalRepository {
+    private val _alwaysAllowedToolNames = MutableStateFlow<Set<String>>(emptySet())
+    private val _fullAccess = MutableStateFlow(false)
+    override val alwaysAllowedToolNames = _alwaysAllowedToolNames
+    override val fullAccess = _fullAccess
+
+    override fun setAlwaysAllowed(toolName: String) {
+        _alwaysAllowedToolNames.value = _alwaysAllowedToolNames.value + toolName
+    }
+
+    override fun removeAlwaysAllowed(toolName: String) {
+        _alwaysAllowedToolNames.value = _alwaysAllowedToolNames.value - toolName
+    }
+
+    override fun setFullAccess(enabled: Boolean) {
+        _fullAccess.value = enabled
+    }
+
+    override fun isAutoApproved(toolName: String): Boolean =
+        _fullAccess.value || toolName in _alwaysAllowedToolNames.value
 }

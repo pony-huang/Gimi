@@ -12,6 +12,7 @@ import github.ponyhuang.gimi.domain.assistant.repository.VoiceSessionStore
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskSource
@@ -54,6 +55,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     private val speechRecognition: SpeechRecognitionRepository,
     private val runtimeGate: AgentRuntimeGate,
     private val sessionStore: VoiceSessionStore,
+    private val toolApproval: ToolApprovalRepository,
 ) : AssistantSessionCoordinator {
 
     /** 测试可替换的任务调度器；必须在首次提交前设置。 */
@@ -158,6 +160,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                 lease.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
                 val request = run.pendingConfirmations.removeFirst()
                 val confirmed = request.toolName in run.approvedTools ||
+                    toolApproval.isAutoApproved(request.toolName) ||
                     awaitConfirmation(request, confirmationHandler)
                 if (confirmed) {
                     run.approvedTools += request.toolName

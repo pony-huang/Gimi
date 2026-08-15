@@ -10,6 +10,7 @@ import github.ponyhuang.gimi.domain.conversation.model.ChatRunPart
 import github.ponyhuang.gimi.domain.conversation.model.ToolConfirmationRequest
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentMutationResult
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRunLease
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
@@ -52,6 +53,7 @@ class DefaultAssistantSessionCoordinatorTest {
     private val speechRecognition: SpeechRecognitionRepository = mockk()
     private val gate = RecordingAgentRuntimeGate()
     private val store = FakeVoiceSessionStore()
+    private val toolApproval = FakeToolApprovalRepository()
     private lateinit var coordinator: DefaultAssistantSessionCoordinator
 
     private val selection = ModelSelection("svc", "grp", "chat-model")
@@ -71,6 +73,7 @@ class DefaultAssistantSessionCoordinatorTest {
             speechRecognition = speechRecognition,
             runtimeGate = gate,
             sessionStore = store,
+            toolApproval = toolApproval,
         )
     }
 
@@ -306,6 +309,43 @@ class DefaultAssistantSessionCoordinatorTest {
         )
     }
 
+    @Test
+    fun `full access auto approves confirmation without waiting`() = runTest {
+        coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
+        toolApproval.setFullAccess(true)
+        coEvery { chatAgent.send(any(), any(), any(), any()) } returns flowOf(
+            confirmationEvent("confirm-1", "brightness_set"),
+        )
+        coEvery {
+            chatAgent.respondToToolConfirmation(any(), any(), any())
+        } returns flowOf(textEvent("已调亮。"))
+
+        coordinator.submit("调亮屏幕", AssistantInvocationSource.BLUETOOTH_WAKE)
+        advanceUntilIdle()
+
+        coVerify { chatAgent.respondToToolConfirmation("voice-session-1", "confirm-1", true) }
+        assertEquals(AssistantSessionPhase.FOLLOW_UP_IDLE, coordinator.state.value.phase)
+        assertEquals("已调亮。", coordinator.state.value.turn?.responseText)
+    }
+
+    @Test
+    fun `always allowed tool auto approves confirmation without waiting`() = runTest {
+        coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
+        toolApproval.setAlwaysAllowed("brightness_set")
+        coEvery { chatAgent.send(any(), any(), any(), any()) } returns flowOf(
+            confirmationEvent("confirm-1", "brightness_set"),
+        )
+        coEvery {
+            chatAgent.respondToToolConfirmation(any(), any(), any())
+        } returns flowOf(textEvent("已调亮。"))
+
+        coordinator.submit("调亮屏幕", AssistantInvocationSource.BLUETOOTH_WAKE)
+        advanceUntilIdle()
+
+        coVerify { chatAgent.respondToToolConfirmation("voice-session-1", "confirm-1", true) }
+        assertEquals("已调亮。", coordinator.state.value.turn?.responseText)
+    }
+
     private fun service(): LLMModelSetting = LLMModelSetting(
         id = "svc",
         name = "Service",
@@ -374,6 +414,28 @@ class DefaultAssistantSessionCoordinatorTest {
         errorMessage = null,
         timestamp = 0L,
     )
+}
+
+private class FakeToolApprovalRepository : ToolApprovalRepository {
+    private val _alwaysAllowedToolNames = MutableStateFlow<Set<String>>(emptySet())
+    private val _fullAccess = MutableStateFlow(false)
+    override val alwaysAllowedToolNames = _alwaysAllowedToolNames
+    override val fullAccess = _fullAccess
+
+    override fun setAlwaysAllowed(toolName: String) {
+        _alwaysAllowedToolNames.value = _alwaysAllowedToolNames.value + toolName
+    }
+
+    override fun removeAlwaysAllowed(toolName: String) {
+        _alwaysAllowedToolNames.value = _alwaysAllowedToolNames.value - toolName
+    }
+
+    override fun setFullAccess(enabled: Boolean) {
+        _fullAccess.value = enabled
+    }
+
+    override fun isAutoApproved(toolName: String): Boolean =
+        _fullAccess.value || toolName in _alwaysAllowedToolNames.value
 }
 
 private class FakeVoiceSessionStore : VoiceSessionStore {

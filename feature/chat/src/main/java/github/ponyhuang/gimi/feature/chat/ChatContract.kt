@@ -28,7 +28,14 @@ sealed interface ChatAction {
     data class ToggleSpeechPlayback(val messageId: String, val markdown: String) : ChatAction
 
     /** 把用户对挂起工具调用的确认 / 拒绝决定送回 runner。 */
-    data class RespondToToolConfirmation(val confirmed: Boolean) : ChatAction
+    data class RespondToToolConfirmation(
+        val confirmed: Boolean,
+        /** 为 true 时把该工具记入全局「总是允许」白名单，之后不再询问。 */
+        val alwaysAllow: Boolean = false,
+    ) : ChatAction
+
+    /** 切换 Full access：开启后所有需要确认的工具调用自动放行（全局持久化）。 */
+    data class SetFullAccess(val enabled: Boolean) : ChatAction
 
     /** 启动期会话恢复：恢复上次会话 / 最近会话 / 新建空会话。 */
     data object RestoreOrCreateSession : ChatAction

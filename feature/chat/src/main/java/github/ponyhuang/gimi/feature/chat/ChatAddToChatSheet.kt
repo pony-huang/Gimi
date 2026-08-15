@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Functions
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Search
@@ -114,6 +115,7 @@ internal fun ChatAddToChatSheet(
     onLocalToolEnabledChange: (String, Boolean) -> Unit,
     onToolAccessModeChange: (ToolAccessMode) -> Unit,
     onMcpServerEnabledChange: (String, Boolean) -> Unit,
+    onFullAccessChange: (Boolean) -> Unit,
     onOfficialToolOpened: (String) -> Unit,
     onOfficialToolFunctionEnabledChange: (String, String, Boolean) -> Unit,
     onOfficialToolFunctionsRetry: (String) -> Unit,
@@ -208,6 +210,7 @@ internal fun ChatAddToChatSheet(
                                 onOpenTools = { page = AddToChatPage.LOCAL_TOOLS },
                                 onOpenToolAccess = { page = AddToChatPage.TOOL_ACCESS },
                                 onOpenMcp = { page = AddToChatPage.MCP },
+                                onFullAccessChange = onFullAccessChange,
                                 onOpenOfficialTools = {
                                     state.officialTools.forEach { tool ->
                                         onOfficialToolOpened(tool.id)
@@ -291,6 +294,7 @@ private fun AddToChatHome(
     onOpenToolAccess: () -> Unit,
     onOpenMcp: () -> Unit,
     onOpenOfficialTools: () -> Unit,
+    onFullAccessChange: (Boolean) -> Unit,
 ) {
     val listState = rememberLazyListState()
     LazyColumn(
@@ -358,6 +362,11 @@ private fun AddToChatHome(
                     ),
                     onClick = onOpenToolAccess,
                     testTag = "tool-access-nav",
+                )
+                HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
+                FullAccessSwitchRow(
+                    checked = state.fullAccess,
+                    onCheckedChange = onFullAccessChange,
                 )
             }
         }
@@ -463,6 +472,46 @@ private fun NavigationRow(
             )
         }
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+    }
+}
+
+@Composable
+private fun FullAccessSwitchRow(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 76.dp)
+            .toggleable(
+                value = checked,
+                role = Role.Switch,
+                onValueChange = onCheckedChange,
+            )
+            .testTag("full-access-switch")
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconBubble(Icons.Default.Lock)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp),
+        ) {
+            Text(
+                stringResource(R.string.chat_full_access_title),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                stringResource(R.string.chat_full_access_description),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

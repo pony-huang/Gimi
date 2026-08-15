@@ -38,6 +38,8 @@ data class ChatAddToChatState(
     val mcpServers: List<McpServer> = emptyList(),
     val officialTools: List<OfficialToolDescriptor> = emptyList(),
     val isMutationBlocked: Boolean = false,
+    /** Full access 全局开关：开启后所有需要确认的工具调用自动放行。 */
+    val fullAccess: Boolean = false,
     val errorMessage: String? = null,
 ) {
     val enabledLocalToolCount: Int

@@ -36,5 +36,31 @@
     <string name="settings_permissions_subtitle">Pre-grant permissions needed for chat and voice features</string>
 
     <string name="settings_about_title">About</string>
-    <string name="settings_about_subtitle">Assistant AI %1$s</string>
+    <string name="settings_about_subtitle">Version %1$s · GitHub</string>
+
+    <string name="settings_update_title">Check for updates</string>
+    <string name="update_subtitle_current">Current version %1$s</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_available_subtitle">New version %1$s available</string>
+    <string name="update_downloading_subtitle">Downloading %1$d%%</string>
+    <string name="update_downloaded_subtitle">%1$s downloaded, tap to install</string>
+    <string name="update_up_to_date">You\'re on the latest version</string>
+    <string name="update_error_network">Network error, please try again later</string>
+    <string name="update_error_rate_limited">Checking too frequently, please try again later</string>
+    <string name="update_error_no_compatible_apk">No installer package matches this device</string>
+    <string name="update_error_checksum">Package verification failed, please retry</string>
+    <string name="update_available_title">New version %1$s</string>
+    <string name="update_available_body">Current version %1$s\n\n%2$s</string>
+    <string name="update_changelog_empty">No release notes</string>
+    <string name="update_download_now">Update now</string>
+    <string name="update_cancel">Cancel</string>
+    <string name="update_downloading_title">Downloading %1$s</string>
+    <string name="update_cancel_download">Cancel download</string>
+    <string name="update_downloaded_title">Download complete</string>
+    <string name="update_downloaded_body">%1$s has been downloaded. Install now?</string>
+    <string name="update_install">Install</string>
+    <string name="update_signature_mismatch">This package\'s signature differs from the installed app and cannot be installed over it. Uninstall the current version from app details first (chat history may be lost), then install the new version.</string>
+    <string name="update_open_app_details">Open app details</string>
+    <string name="update_failed_title">Update failed</string>
+    <string name="update_retry">Retry</string>
 </resources>

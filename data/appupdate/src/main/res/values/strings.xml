@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_update_channel_name">应用更新</string>
+    <string name="app_update_downloading_title">正在下载更新 %1$s</string>
+    <string name="app_update_downloading_progress">%1$d%% · %2$s / %3$s</string>
+    <string name="app_update_download_complete_title">更新下载完成</string>
+    <string name="app_update_download_complete_text">点击安装 %1$s</string>
+    <string name="app_update_download_failed">更新下载失败</string>
+    <string name="app_update_cancel">取消</string>
+</resources>

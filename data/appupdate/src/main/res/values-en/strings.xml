@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_update_channel_name">App updates</string>
+    <string name="app_update_downloading_title">Downloading update %1$s</string>
+    <string name="app_update_downloading_progress">%1$d%% · %2$s / %3$s</string>
+    <string name="app_update_download_complete_title">Update downloaded</string>
+    <string name="app_update_download_complete_text">Tap to install %1$s</string>
+    <string name="app_update_download_failed">Update download failed</string>
+    <string name="app_update_cancel">Cancel</string>
+</resources>

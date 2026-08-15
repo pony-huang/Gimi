@@ -105,7 +105,8 @@ fun MainScreen(
         if (backStack.size > 1) backStack.removeLastOrNull()
     }
     val returnToChat = {
-        while (backStack.size > 1) backStack.removeLast()
+        // 不用 removeLast：minSdk 34 下 lint 会报 NewApi（API 35 的 java.util.List#removeLast）。
+        while (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
     }
 
     LaunchedEffect(requestedSessionId) {

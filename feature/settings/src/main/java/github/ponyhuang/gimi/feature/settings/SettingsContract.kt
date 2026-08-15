@@ -22,6 +22,9 @@ sealed interface SettingsAction {
     data object OpenToolAuthorization : SettingsAction
     /** 打开 AppFunctions 尝鲜设置。 */
     data object OpenAppFunctions : SettingsAction
+
+    /** 在浏览器中打开 GitHub 项目页。 */
+    data object OpenProjectPage : SettingsAction
     data class SetToolActivityVisible(val visible: Boolean) : SettingsAction
 }
 
@@ -36,4 +39,7 @@ sealed interface SettingsEffect {
     data object NavigateToToolAuthorization : SettingsEffect
     /** 导航到 AppFunctions 尝鲜设置。 */
     data object NavigateToAppFunctions : SettingsEffect
+
+    /** 打开 GitHub 项目页（https://github.com/pony-huang/Gimi）。 */
+    data object OpenProjectPage : SettingsEffect
 }

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Switch
@@ -21,7 +22,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.appupdate.repository.AppUpdateState
 import github.ponyhuang.gimi.feature.settings.R
+import github.ponyhuang.gimi.feature.settings.update.UpdateAction
+import github.ponyhuang.gimi.feature.settings.update.UpdateUiState
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferenceNavigationCard
@@ -35,6 +39,8 @@ fun SettingsScreen(
     appVersionName: String,
     onAction: (SettingsAction) -> Unit,
     modifier: Modifier = Modifier,
+    updateState: UpdateUiState = UpdateUiState(),
+    onUpdateAction: (UpdateAction) -> Unit = {},
 ) {
     PreferencePageContainer(modifier = modifier) {
         LazyColumn(
@@ -136,13 +142,34 @@ fun SettingsScreen(
             }
             item {
                 PreferenceListItem(
+                    icon = Icons.Default.SystemUpdate,
+                    title = stringResource(R.string.settings_update_title),
+                    subtitle = updateSubtitle(updateState),
+                    onClick = { onUpdateAction(UpdateAction.CheckNow) },
+                )
+            }
+            item {
+                PreferenceListItem(
                     icon = Icons.Default.Info,
                     title = stringResource(R.string.settings_about_title),
                     subtitle = stringResource(R.string.settings_about_subtitle, appVersionName),
+                    onClick = { onAction(SettingsAction.OpenProjectPage) },
                 )
             }
         }
     }
+}
+
+@Composable
+private fun updateSubtitle(updateState: UpdateUiState): String = when (val status = updateState.status) {
+    is AppUpdateState.Checking -> stringResource(R.string.update_checking)
+    is AppUpdateState.Available ->
+        stringResource(R.string.update_available_subtitle, status.info.tagName)
+    is AppUpdateState.Downloading ->
+        stringResource(R.string.update_downloading_subtitle, (status.progress * 100).toInt())
+    is AppUpdateState.Downloaded ->
+        stringResource(R.string.update_downloaded_subtitle, status.info.tagName)
+    else -> stringResource(R.string.update_subtitle_current, updateState.currentVersionName)
 }
 
 @Preview(name = "Phone", device = Devices.PHONE, showBackground = true)

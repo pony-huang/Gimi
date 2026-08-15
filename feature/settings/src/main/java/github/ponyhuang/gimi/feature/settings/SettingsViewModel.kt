@@ -56,6 +56,8 @@ class SettingsViewModel @Inject constructor(
                 emitEffect(SettingsEffect.NavigateToToolAuthorization)
             SettingsAction.OpenAppFunctions ->
                 emitEffect(SettingsEffect.NavigateToAppFunctions)
+            SettingsAction.OpenProjectPage ->
+                emitEffect(SettingsEffect.OpenProjectPage)
             is SettingsAction.SetToolActivityVisible ->
                 chatDisplayRepository.setShowToolActivity(action.visible)
         }

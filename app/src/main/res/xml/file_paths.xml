@@ -6,4 +6,7 @@
     <cache-path
         name="message_attachments"
         path="message-attachments/" />
+    <cache-path
+        name="updates"
+        path="updates/" />
 </paths>

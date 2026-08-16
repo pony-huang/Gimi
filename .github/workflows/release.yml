@@ -127,7 +127,7 @@ jobs:
           echo "Release v${VERSION} not found; it will be created by the upload step"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.version.outputs.value }}
           name: v${{ steps.version.outputs.value }}

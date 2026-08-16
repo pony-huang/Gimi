@@ -5,11 +5,10 @@ import com.google.adk.kt.logging.LoggerFactory
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.agent.tools.mcp.McpToolException.McpToolLoadingException
-import io.modelcontextprotocol.kotlin.sdk.types.Progress
-import io.modelcontextprotocol.kotlin.sdk.types.ReadResourceRequest
-import io.modelcontextprotocol.kotlin.sdk.types.ReadResourceRequestParams
+import io.modelcontextprotocol.spec.McpSchema.ReadResourceRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.reactor.awaitSingle
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -94,13 +93,16 @@ internal constructor(
     session: McpSession,
     headers: Map<String, String>,
   ): List<BaseTool> {
-    val toolsResponse = session.client.listTools(options = mcpSessionManager.requestOptions())
+    val meta = mcpSessionManager.requestMeta()
+    val toolsResponse =
+      if (meta == null) session.client.listTools().awaitSingle()
+      else session.client.listTools(null, meta).awaitSingle()
     val tools: MutableList<BaseTool> =
       toolsResponse.tools
         .map {
           McpTool(
-            name = it.name,
-            description = it.description ?: "",
+            name = it.name(),
+            description = it.description() ?: "",
             mcpSchemaTool = it,
             mcpSessionManager = mcpSessionManager,
             headers = headers,
@@ -110,7 +112,7 @@ internal constructor(
 
     val capabilities = session.client.serverCapabilities
 
-    if (useMcpResources && capabilities?.resources != null) {
+    if (useMcpResources && capabilities?.resources() != null) {
       tools.add(ListMcpResourcesTool(session, mcpSessionManager))
       tools.add(LoadMcpResourceTool(this, maxMcpResourceLength))
       tools.add(ListMcpResourceTemplatesTool(session, mcpSessionManager))
@@ -122,20 +124,19 @@ internal constructor(
   suspend fun listResources(readonlyContext: ReadonlyContext? = null): List<String> {
     val headers = readonlyContext?.let { headerProvider?.invoke(it) } ?: emptyMap()
     val session = mcpSessionManager.getSession(headers)
-    val result = session.client.listResources(options = mcpSessionManager.requestOptions())
-    return result.resources.map { it.name }
+    val meta = mcpSessionManager.requestMeta()
+    val result =
+      if (meta == null) session.client.listResources().awaitSingle()
+      else session.client.listResources(null, meta).awaitSingle()
+    return result.resources().map { it.name() }
   }
 
   /** Fetches and returns a list of contents of the resource with the given URI. */
   suspend fun readResource(uri: String, readonlyContext: ReadonlyContext? = null): Any {
     val headers = readonlyContext?.let { headerProvider?.invoke(it) } ?: emptyMap()
     val session = mcpSessionManager.getSession(headers)
-    val readResult =
-      session.client.readResource(
-        request = ReadResourceRequest(ReadResourceRequestParams(uri)),
-        options = mcpSessionManager.requestOptions(),
-      )
-    return readResult.contents
+    val request = ReadResourceRequest(uri, mcpSessionManager.requestMeta())
+    return session.client.readResource(request).awaitSingle().contents()
   }
 
   private fun handleLoadError(e: Exception, attempt: Int) {
@@ -203,15 +204,14 @@ internal constructor(
      *   bearer token) without blocking a thread. When non-`null`, sessions are not cached across
      *   invocations so that headers can vary per-context (e.g. per-user authentication). When
      *   `null`, a single session is opened lazily and reused.
-     * @param progressConsumers Callbacks invoked for every
-     *   [Progress][io.modelcontextprotocol.kotlin.sdk.types.Progress] update received from the MCP
+     * @param progressConsumers Callbacks invoked for every progress update received from the MCP
      *   server during long-running tool executions.
      * @throws IllegalArgumentException if zero or more than one of [stdioConnectionParams],
      *   [sseConnectionParams], and [streamableHttpConnectionParams] is set.
      */
     fun toToolset(
       headerProvider: (suspend (ReadonlyContext) -> Map<String, String>)? = null,
-      progressConsumers: List<(Progress) -> Unit> = emptyList(),
+      progressConsumers: List<(McpProgressUpdate) -> Unit> = emptyList(),
     ): McpToolset {
       val params =
         listOfNotNull(stdioConnectionParams, sseConnectionParams, streamableHttpConnectionParams)

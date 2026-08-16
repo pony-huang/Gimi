@@ -1,33 +1,26 @@
 package github.ponyhuang.gimi.agent.tools.mcp
 
 import com.google.adk.kt.logging.LoggerFactory
-import io.modelcontextprotocol.kotlin.sdk.client.Client
-import io.modelcontextprotocol.kotlin.sdk.shared.RequestOptions
+import io.modelcontextprotocol.client.McpAsyncClient
+import java.util.UUID
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.reactor.awaitSingleOrNull
 
-/**
- * An initialized MCP client together with the resources its transport was built from.
- *
- * `Client.close()` shuts the protocol down but leaves the Ktor `HttpClient` (or the stdio child
- * process) the transport borrowed running, so both are closed together here and a session -- not a
- * bare client -- is what the pool hands out.
- */
-internal class McpSession(val client: Client, private val handle: McpTransportHandle) {
-  /** Runs the MCP initialization handshake over this session's transport. */
+/** One initialized Java SDK client; the client owns and closes its transport. */
+internal class McpSession(val client: McpAsyncClient) {
+  /** Runs the MCP initialization handshake. */
   suspend fun connect() {
-    client.connect(handle.transport)
+    client.initialize().awaitSingleOrNull()
   }
 
-  /** Closes the client and releases its transport resources. Best-effort: never throws. */
+  /** Closes protocol and transport resources. Best-effort and cancellation-aware. */
   suspend fun close() {
     try {
-      client.close()
+      client.closeGracefully().awaitSingleOrNull()
+    } catch (e: CancellationException) {
+      throw e
     } catch (e: Exception) {
       logger.warn(e) { "Failed to close MCP client: ${e.message}" }
-    }
-    try {
-      handle.release()
-    } catch (e: Exception) {
-      logger.warn(e) { "Failed to release MCP transport resources: ${e.message}" }
     }
   }
 
@@ -36,53 +29,21 @@ internal class McpSession(val client: Client, private val handle: McpTransportHa
   }
 }
 
-/**
- * Owns and manages MCP client sessions.
- *
- * Implementations are the single owner of the sessions they hand out: sessions are pooled and
- * shared (so a stdio server is backed by exactly one child process), transparently replaced when
- * they die, and torn down wholesale on [close]. Callers ([github.ponyhuang.gimi.agent.tools.mcp.McpTool], [McpToolset]) hold a reference
- * to the manager rather than caching sessions themselves.
- */
+/** Owns pooled MCP sessions and request-scoped progress metadata. */
 internal interface SessionManager : AutoCloseable {
-  /**
-   * Returns an initialized session for the given [headers], creating and initializing one if none
-   * is pooled yet. Sessions are keyed so that equivalent [headers] share a single session (a stdio
-   * connection ignores headers and always shares one session).
-   *
-   * Pass the failed session as [stale] to recover from a dead one: if [stale] is still the pooled
-   * session for these [headers] it is evicted, closed, and recreated; if another caller already
-   * replaced it (dedup across tools sharing the session), the current pooled session is returned.
-   * So the underlying client is created at most once per failure, and the common fetch is just
-   * `getSession(headers)` with [stale] defaulting to `null`.
-   */
   suspend fun getSession(
     headers: Map<String, String> = emptyMap(),
     stale: McpSession? = null,
   ): McpSession
 
-  /**
-   * Closes every session this manager created. Safe to call more than once.
-   *
-   * Being [AutoCloseable] allows `use {}`, and matches `MCPSessionManager.close` in ADK Python.
-   */
   override fun close()
 
-  /**
-   * Whether any progress consumer is registered on the sessions this manager creates.
-   *
-   * MCP progress is opt-in per request: a server may only emit progress notifications that
-   * reference a progress token the client supplied, so a request has to carry one for a consumer to
-   * ever be called. [requestOptions] wires the callback (and therefore the token) only when this is
-   * `true`, so servers are not asked to produce progress that nothing reads.
-   */
   val hasProgressConsumers: Boolean
 
-  /**
-   * Per-request options for calls made on sessions from this manager: the request timeout derived
-   * from the connection parameters, plus a progress callback fanning out to the registered
-   * consumers when there are any. The SDK attaches the `_meta.progressToken` itself whenever a
-   * progress callback is present.
-   */
-  fun requestOptions(): RequestOptions
+  /** Returns `_meta` fields for a request, or null when progress is not observed. */
+  fun requestMeta(): Map<String, Any>? = requestMeta(hasProgressConsumers)
 }
+
+/** Creates a unique MCP progress token only when a consumer can observe notifications. */
+internal fun requestMeta(hasProgressConsumers: Boolean): Map<String, Any>? =
+  if (hasProgressConsumers) mapOf("progressToken" to UUID.randomUUID().toString()) else null

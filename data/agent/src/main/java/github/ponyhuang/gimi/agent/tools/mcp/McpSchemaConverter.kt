@@ -4,15 +4,9 @@ import com.google.adk.kt.logging.LoggerFactory
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
-import io.modelcontextprotocol.kotlin.sdk.types.Tool
-import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
+import io.modelcontextprotocol.spec.McpSchema.Tool
 
-/** Converts between MCP schema types and ADK types. */
+/** Converts between MCP JSON Schema maps and ADK types. */
 internal object McpSchemaConverter {
 
   private val logger = LoggerFactory.getLogger(McpSchemaConverter::class)
@@ -20,12 +14,12 @@ internal object McpSchemaConverter {
   /** Converts an MCP [Tool] to an ADK [FunctionDeclaration]. */
   fun Tool.toAdkFunctionDeclaration(): FunctionDeclaration =
     FunctionDeclaration(
-      name = name,
-      description = description ?: "",
-      parameters = inputSchema.toAdkSchema(),
+      name = name(),
+      description = description() ?: "",
+      parameters = inputSchema().toAdkRootSchema(),
     )
 
-  /** Parses a type string into an ADK [Type]. */
+  /** Parses a JSON Schema type string into an ADK [Type]. */
   fun parseTypeString(typeStr: String?): Type =
     when (typeStr) {
       null -> Type.TYPE_UNSPECIFIED
@@ -38,53 +32,49 @@ internal object McpSchemaConverter {
       else -> throw IllegalArgumentException("Unknown type: $typeStr")
     }
 
-  /**
-   * Converts an MCP [ToolSchema] to an ADK [Schema]. A tool schema is always a JSON-Schema object;
-   * only its properties can be of any type.
-   */
-  fun ToolSchema.toAdkSchema(): Schema =
+  private fun Map<String, Any>.toAdkRootSchema(): Schema =
     Schema(
       type = Type.OBJECT,
-      properties = properties.toAdkProperties(),
-      required = required,
+      properties = mapValue("properties").toAdkProperties(),
+      required = stringListValue("required"),
       description = null,
     )
 
-  /** Parses a JSON-Schema fragment into an ADK [Schema]. */
-  fun JsonObject.toAdkSchema(): Schema =
+  /** Parses a JSON Schema fragment into an ADK [Schema]. */
+  private fun Map<String, Any>.toAdkSchema(): Schema =
     Schema(
       type = parseTypeString(readTypeString()),
-      properties = (this["properties"] as? JsonObject).toAdkProperties(),
-      items = (this["items"] as? JsonObject)?.toAdkSchema(),
-      required = (this["required"] as? JsonArray)?.mapNotNull { it.contentOrNull() },
-      description = this["description"].contentOrNull(),
+      properties = mapValue("properties").toAdkProperties(),
+      items = mapValue("items")?.toAdkSchema(),
+      required = stringListValue("required"),
+      description = this["description"] as? String,
     )
 
-  private fun JsonObject?.toAdkProperties(): Map<String, Schema>? =
-    this
-      ?.mapNotNull { (key, value) -> (value as? JsonObject)?.let { key to it.toAdkSchema() } }
-      ?.toMap()
+  private fun Map<String, Any>?.toAdkProperties(): Map<String, Schema>? =
+    this?.mapNotNull { (key, value) -> value.asStringAnyMap()?.let { key to it.toAdkSchema() } }?.toMap()
 
-  /**
-   * Reads the `type` keyword, which JSON Schema allows to be either a single type or a union of
-   * them.
-   */
-  private fun JsonObject.readTypeString(): String? =
-    when (val typeValue = this["type"]) {
-      is JsonArray -> {
-        val typeList = typeValue.mapNotNull { it.contentOrNull() }
-        if (typeList.size > 1) {
+  private fun Map<String, Any>.readTypeString(): String? =
+    when (val value = this["type"]) {
+      is List<*> -> {
+        val types = value.filterIsInstance<String>()
+        if (types.size > 1) {
           logger.warn {
-            "MCP tool schema declares a union type $typeList; ADK schemas support a single " +
-              "type, so only \"${typeList.first()}\" is used and the remaining types are ignored."
+            "MCP tool schema declares a union type $types; ADK schemas support a single type, " +
+              "so only \"${types.first()}\" is used and the remaining types are ignored."
           }
         }
-        typeList.firstOrNull()
+        types.firstOrNull()
       }
-      else -> typeValue.contentOrNull()
+      is String -> value
+      else -> null
     }
 
-  /** The element's string content, or `null` when it is absent, a JSON `null`, or not a primitive. */
-  private fun JsonElement?.contentOrNull(): String? =
-    (this as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content
+  private fun Map<String, Any>.mapValue(key: String): Map<String, Any>? =
+    this[key].asStringAnyMap()
+
+  private fun Map<String, Any>.stringListValue(key: String): List<String>? =
+    (this[key] as? List<*>)?.filterIsInstance<String>()
+
+  @Suppress("UNCHECKED_CAST")
+  private fun Any?.asStringAnyMap(): Map<String, Any>? = this as? Map<String, Any>
 }

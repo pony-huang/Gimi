@@ -6,9 +6,8 @@ import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.agent.tools.mcp.McpToolException.McpToolExecutionException
-import io.modelcontextprotocol.kotlin.sdk.types.ListResourcesRequest
-import io.modelcontextprotocol.kotlin.sdk.types.PaginatedRequestParams
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.reactor.awaitSingle
 
 /** A built-in tool that allows the ADK agents to list resources exposed by the MCP server. */
 internal class ListMcpResourcesTool(
@@ -20,24 +19,23 @@ internal class ListMcpResourcesTool(
     try {
       val cursor = args["cursor"] as? String
 
+      val meta = mcpSessionManager.requestMeta()
       val result =
-        mcpSession.client.listResources(
-          request = ListResourcesRequest(PaginatedRequestParams(cursor = cursor)),
-          options = mcpSessionManager.requestOptions(),
-        )
+        if (meta == null) mcpSession.client.listResources(cursor).awaitSingle()
+        else mcpSession.client.listResources(cursor, meta).awaitSingle()
 
       val resources =
-        result.resources.map { resource ->
+        result.resources().map { resource ->
           buildMap {
-            put(RESOURCE_NAME, resource.name)
-            put(RESOURCE_URI, resource.uri)
-            resource.description?.let { description -> put(RESOURCE_DESCRIPTION, description) }
-            resource.mimeType?.let { mimeType -> put(RESOURCE_MIME_TYPE, mimeType) }
+            put(RESOURCE_NAME, resource.name())
+            put(RESOURCE_URI, resource.uri())
+            resource.description()?.let { description -> put(RESOURCE_DESCRIPTION, description) }
+            resource.mimeType()?.let { mimeType -> put(RESOURCE_MIME_TYPE, mimeType) }
           }
         }
 
       val response = mutableMapOf<String, Any>("resources" to resources)
-      result.nextCursor?.let { response["nextCursor"] = it }
+      result.nextCursor()?.let { response["nextCursor"] = it }
       return response
     } catch (e: CancellationException) {
       throw e // Re-throw cancellation exceptions as they are not indicative of a tool failure.

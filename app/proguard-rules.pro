@@ -19,6 +19,17 @@
 # at runtime by kotlinx-coroutines debug agents, but harmless if absent.
 -dontwarn kotlinx.coroutines.debug.**
 
+# Reactor exposes optional Micrometer context propagation and BlockHound service hooks. The app
+# does not enable either integration; suppress only the exact optional API types reported by R8.
+-dontwarn io.micrometer.context.ContextAccessor
+-dontwarn io.micrometer.context.ContextRegistry
+-dontwarn io.micrometer.context.ContextSnapshot$Scope
+-dontwarn io.micrometer.context.ContextSnapshot
+-dontwarn io.micrometer.context.ContextSnapshotFactory$Builder
+-dontwarn io.micrometer.context.ContextSnapshotFactory
+-dontwarn io.micrometer.context.ThreadLocalAccessor
+-dontwarn reactor.blockhound.integration.BlockHoundIntegration
+
 # ---------------------------------------------------------------------------
 # App code: no obfuscation, no member stripping
 #

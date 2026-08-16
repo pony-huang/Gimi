@@ -2,13 +2,7 @@ package github.ponyhuang.gimi.agent.tools.mcp
 
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.agent.tools.mcp.McpSchemaConverter.toAdkFunctionDeclaration
-import io.modelcontextprotocol.kotlin.sdk.types.Tool
-import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
-import kotlinx.serialization.json.putJsonObject
+import io.modelcontextprotocol.spec.McpSchema.Tool
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -21,17 +15,14 @@ class McpSchemaConverterTest {
     val tool =
       tool(
         inputSchema =
-          ToolSchema(
+          schema(
             properties =
-              buildJsonObject {
-                putJsonObject("city") {
-                  put("type", "string")
-                  put("description", "City to look up.")
-                }
-                putJsonObject("days") { put("type", "integer") }
-              },
+              mapOf(
+                "city" to mapOf("type" to "string", "description" to "City to look up."),
+                "days" to mapOf("type" to "integer"),
+              ),
             required = listOf("city"),
-          )
+          ),
       )
 
     val declaration = tool.toAdkFunctionDeclaration()
@@ -51,20 +42,18 @@ class McpSchemaConverterTest {
     val tool =
       tool(
         inputSchema =
-          ToolSchema(
+          schema(
             properties =
-              buildJsonObject {
-                putJsonObject("tags") {
-                  put("type", "array")
-                  putJsonObject("items") { put("type", "string") }
-                }
-                putJsonObject("filter") {
-                  put("type", "object")
-                  putJsonObject("properties") { putJsonObject("q") { put("type", "string") } }
-                  putJsonArray("required") { add(JsonPrimitive("q")) }
-                }
-              }
-          )
+              mapOf(
+                "tags" to mapOf("type" to "array", "items" to mapOf("type" to "string")),
+                "filter" to
+                  mapOf(
+                    "type" to "object",
+                    "properties" to mapOf("q" to mapOf("type" to "string")),
+                    "required" to listOf("q"),
+                  ),
+              ),
+          ),
       )
 
     val parameters = tool.toAdkFunctionDeclaration().parameters!!
@@ -84,17 +73,7 @@ class McpSchemaConverterTest {
     val tool =
       tool(
         inputSchema =
-          ToolSchema(
-            properties =
-              buildJsonObject {
-                putJsonObject("note") {
-                  putJsonArray("type") {
-                    add(JsonPrimitive("string"))
-                    add(JsonPrimitive("null"))
-                  }
-                }
-              }
-          )
+          schema(properties = mapOf("note" to mapOf("type" to listOf("string", "null")))),
       )
 
     val parameters = tool.toAdkFunctionDeclaration().parameters!!
@@ -107,7 +86,7 @@ class McpSchemaConverterTest {
     val tool =
       tool(
         inputSchema =
-          ToolSchema(properties = buildJsonObject { putJsonObject("anything") { put("x", 1) } })
+          schema(properties = mapOf("anything" to mapOf("x" to 1)))
       )
 
     val parameters = tool.toAdkFunctionDeclaration().parameters!!
@@ -117,7 +96,7 @@ class McpSchemaConverterTest {
 
   @Test
   fun `converts a schema without properties`() {
-    val parameters = tool(inputSchema = ToolSchema()).toAdkFunctionDeclaration().parameters!!
+    val parameters = tool(inputSchema = schema()).toAdkFunctionDeclaration().parameters!!
 
     assertEquals(Type.OBJECT, parameters.type)
     assertNull(parameters.properties)
@@ -129,9 +108,7 @@ class McpSchemaConverterTest {
     val tool =
       tool(
         inputSchema =
-          ToolSchema(
-            properties = buildJsonObject { putJsonObject("weird") { put("type", "tuple") } }
-          )
+          schema(properties = mapOf("weird" to mapOf("type" to "tuple")))
       )
 
     assertThrows(IllegalArgumentException::class.java) { tool.toAdkFunctionDeclaration() }
@@ -140,15 +117,23 @@ class McpSchemaConverterTest {
   @Test
   fun `falls back to an empty description`() {
     val declaration =
-      Tool(name = "no_description", inputSchema = ToolSchema()).toAdkFunctionDeclaration()
+      tool(inputSchema = schema(), description = null).toAdkFunctionDeclaration()
 
     assertEquals("", declaration.description)
   }
 
-  private fun tool(inputSchema: ToolSchema): Tool =
-    Tool(
-      name = "get_weather",
-      inputSchema = inputSchema,
-      description = "Returns the weather.",
-    )
+  private fun tool(
+    inputSchema: Map<String, Any>,
+    description: String? = "Returns the weather.",
+  ): Tool = Tool.builder("get_weather", inputSchema).description(description).build()
+
+  private fun schema(
+    properties: Map<String, Any>? = null,
+    required: List<String>? = null,
+  ): Map<String, Any> =
+    buildMap {
+      put("type", "object")
+      properties?.let { put("properties", it) }
+      required?.let { put("required", it) }
+    }
 }

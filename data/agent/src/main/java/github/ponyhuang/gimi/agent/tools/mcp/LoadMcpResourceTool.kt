@@ -6,8 +6,8 @@ import github.ponyhuang.gimi.agent.tools.mcp.McpToolException.McpToolExecutionEx
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
-import io.modelcontextprotocol.kotlin.sdk.types.BlobResourceContents
-import io.modelcontextprotocol.kotlin.sdk.types.TextResourceContents
+import io.modelcontextprotocol.spec.McpSchema.BlobResourceContents
+import io.modelcontextprotocol.spec.McpSchema.TextResourceContents
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -35,7 +35,7 @@ internal class LoadMcpResourceTool(
         .map { content ->
           when (content) {
             is TextResourceContents -> {
-              val text = content.text
+              val text = content.text()
               if (text.length > maxMcpResourceLength) {
                 text.take(maxMcpResourceLength) + "... [Content truncated due to size limit]"
               } else {

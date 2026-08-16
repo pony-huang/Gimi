@@ -80,7 +80,7 @@ internal class GlmWebToolApi(
             .build()
 
         httpClient.newCall(request).execute().use { response ->
-            val body = response.body.string()
+            val body = requireNotNull(response.body) { "GLM web search returned an empty body" }.string()
             check(response.isSuccessful) { "HTTP ${response.code} from GLM web search: $body" }
             parseResults(body)
         }
@@ -104,7 +104,7 @@ internal class GlmWebToolApi(
             .build()
 
         httpClient.newCall(request).execute().use { response ->
-            val body = response.body.string()
+            val body = requireNotNull(response.body) { "GLM reader returned an empty body" }.string()
             check(response.isSuccessful) { "HTTP ${response.code} from GLM reader: $body" }
             parseReaderResult(body)
         }

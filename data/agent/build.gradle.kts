@@ -8,7 +8,10 @@ plugins {
 android {
     namespace = "github.ponyhuang.gimi.data.agent"
     compileSdk { version = release(37) }
-    defaultConfig { minSdk = 34 }
+    defaultConfig {
+        minSdk = 34
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -54,11 +57,12 @@ dependencies {
     implementation(libs.objectbox.android)
     implementation(libs.objectbox.kotlin)
     implementation(libs.sentence.embeddings)
-    implementation(libs.mcp)
-    implementation(libs.ktor.client.okhttp)
+    implementation(libs.mcp.java.core)
+    implementation(libs.mcp.java.json.jackson2)
     implementation(libs.gson)
     implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.reactor)
     ksp(libs.androidx.room.compiler)
     ksp(libs.google.adk.kotlin.processor)
     ksp(libs.hilt.android.compiler)
@@ -75,6 +79,8 @@ dependencies {
     testImplementation(libs.objectbox.macos)
     testImplementation(libs.objectbox.windows)
     testImplementation(libs.turbine)
+
+    androidTestImplementation(libs.androidx.junit)
 }
 
 ksp {

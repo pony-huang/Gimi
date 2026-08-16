@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.agent.tools.official
 
+import github.ponyhuang.gimi.agent.tools.official.gemini.GeminiOfficialToolset
 import github.ponyhuang.gimi.agent.tools.official.glm.GlmReaderTool
 import github.ponyhuang.gimi.agent.tools.official.glm.GlmWebSearchTool
 import github.ponyhuang.gimi.agent.tools.official.glm.GlmWebSearchToolset
@@ -34,6 +35,20 @@ class DefaultOfficialToolFunctionCatalog @Inject constructor(
             ),
         )
         KimiFormulaToolset.TOOL_ID -> kimiFormulaCatalog.fetch()
+        GeminiOfficialToolset.URL_CONTEXT_TOOL_ID -> listOf(
+            OfficialToolFunction(
+                id = GeminiOfficialToolset.URL_CONTEXT_TOOL_ID,
+                name = "网页读取",
+                description = "读取链接指向的网页内容",
+            ),
+        )
+        GeminiOfficialToolset.GOOGLE_MAPS_TOOL_ID -> listOf(
+            OfficialToolFunction(
+                id = GeminiOfficialToolset.GOOGLE_MAPS_TOOL_ID,
+                name = "Google 地图",
+                description = "查询地点与地理信息",
+            ),
+        )
         GlmWebSearchToolset.TOOL_ID -> listOf(
             OfficialToolFunction(
                 id = GlmWebSearchTool.NAME,

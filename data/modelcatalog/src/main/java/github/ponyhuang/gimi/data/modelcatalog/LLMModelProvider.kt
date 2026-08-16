@@ -5,6 +5,8 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 private const val WEB_SEARCH_TOOL_ID: String = "web_search"
 private const val KIMI_FORMULAS_TOOL_ID: String = "kimi_formulas"
 private const val GLM_WEB_SEARCH_TOOL_ID: String = "glm_web_search"
+private const val URL_CONTEXT_TOOL_ID: String = "url_context"
+private const val GOOGLE_MAPS_TOOL_ID: String = "google_maps"
 
 /**
  * 模型服务与配置中心 — 数据契约。
@@ -14,7 +16,8 @@ private const val GLM_WEB_SEARCH_TOOL_ID: String = "glm_web_search"
  * @property apiKey API 密钥；可填多个，逗号分隔（UI HelperText 已说明）。
  * @property baseType 接口标准类型，决定预览拼接路径。
  * @property supportedBaseTypes 该厂商允许的接口标准集合。OpenAI 仅支持 Standard，
- *                  Anthropic 仅支持 Anthropic，其余厂商两种皆可。UI 协议下拉按此过滤，
+ *                  Anthropic 仅支持 Anthropic，Gemini 仅支持 Gemini（ADK 原生实现，无需填写
+ *                  API 地址），其余厂商 Standard / Anthropic 皆可。UI 协议下拉按此过滤，
  *                  持久化的非法取值会在加载时回退到集合首项。
  * @property lLMModelGroups 该服务下的模型组列表。
  * @property iconRes 品牌图标 drawable 资源 ID；null 时回退到默认机器人图标。
@@ -31,7 +34,7 @@ data class LLMModelProvider(
     val apiKey: String,
     val apiBaseUrl: String,
     val baseType: ApiBaseType = ApiBaseType.Standard,
-    val supportedBaseTypes: List<ApiBaseType> = ApiBaseType.entries,
+    val supportedBaseTypes: List<ApiBaseType> = DUAL_API_BASE_TYPES,
     val anthropicBaseUrl: String = apiBaseUrl,
     val lLMModelGroups: List<LLMModelGroup> = emptyList(),
     val iconRes: Int? = null,
@@ -44,6 +47,8 @@ data class LLMModelProvider(
         get() = when (baseType) {
             ApiBaseType.Standard -> apiBaseUrl
             ApiBaseType.Anthropic -> anthropicBaseUrl
+            // Gemini 走 ADK 原生实现，无需请求地址；apiBaseUrl 仅供连接测试 / 模型刷新。
+            ApiBaseType.Gemini -> apiBaseUrl
         }
 
     val supportedOfficialTools: List<String>
@@ -105,7 +110,11 @@ val LLMModelProvider.isConfiguredForChat: Boolean
 enum class ApiBaseType() {
     Standard,
     Anthropic,
+    Gemini,
 }
+
+/** 双协议厂商（OpenAI 兼容 + Anthropic 兼容）允许的接口标准集合；Gemini 仅自家厂商使用。 */
+val DUAL_API_BASE_TYPES: List<ApiBaseType> = listOf(ApiBaseType.Standard, ApiBaseType.Anthropic)
 
 enum class LLMModelType(
     val serviceId: String,
@@ -124,7 +133,7 @@ enum class LLMModelType(
         serviceName = "Deepseek",
         defaultBaseUrl = "https://api.deepseek.com",
         defaultBaseType = ApiBaseType.Anthropic,
-        supportedBaseTypes = ApiBaseType.entries,
+        supportedBaseTypes = DUAL_API_BASE_TYPES,
         defaultAnthropicBaseUrl = "https://api.deepseek.com/anthropic",
         homepageUrl = "https://www.deepseek.com/",
         keyHelpUrl = "https://platform.deepseek.com/api_keys",
@@ -134,7 +143,7 @@ enum class LLMModelType(
         serviceName = "MiniMax",
         defaultBaseUrl = "https://api.minimaxi.com/v1",
         defaultBaseType = ApiBaseType.Standard,
-        supportedBaseTypes = ApiBaseType.entries,
+        supportedBaseTypes = DUAL_API_BASE_TYPES,
         defaultAnthropicBaseUrl = "https://api.minimaxi.com/anthropic",
         homepageUrl = "https://www.minimaxi.com/",
         keyHelpUrl = "https://platform.minimaxi.com/user-center/basic-information/interface-key",
@@ -147,7 +156,7 @@ enum class LLMModelType(
         serviceName = "MIMO",
         defaultBaseUrl = "https://api.xiaomimimo.com/v1",
         defaultBaseType = ApiBaseType.Standard,
-        supportedBaseTypes = ApiBaseType.entries,
+        supportedBaseTypes = DUAL_API_BASE_TYPES,
         defaultAnthropicBaseUrl = "https://api.xiaomimimo.com/anthropic",
         homepageUrl = "https://mimo.mi.com/",
         keyHelpUrl = "https://platform.xiaomimimo.com/console/api-keys",
@@ -180,17 +189,34 @@ enum class LLMModelType(
             WEB_SEARCH_TOOL_ID to listOf(ApiBaseType.Anthropic),
         ),
     ),
+    Gemini(
+        serviceId = "gemini",
+        serviceName = "Gemini",
+        // 聊天走 ADK 原生 Gemini 实现（只需 API Key）；该地址是 Gemini 的 OpenAI 兼容端点，
+        // 仅供连接测试与模型列表刷新复用 OpenAI 兼容网关，UI 上不展示、不需要用户填写。
+        defaultBaseUrl = "https://generativelanguage.googleapis.com/v1beta/openai",
+        defaultBaseType = ApiBaseType.Gemini,
+        supportedBaseTypes = listOf(ApiBaseType.Gemini),
+        homepageUrl = "https://gemini.google.com/",
+        keyHelpUrl = "https://aistudio.google.com/app/apikey",
+        // Google Search 复用 web_search ID（选择按服务隔离）；三个工具都由 ADK 原生注入。
+        officialToolProtocols = mapOf(
+            WEB_SEARCH_TOOL_ID to listOf(ApiBaseType.Gemini),
+            URL_CONTEXT_TOOL_ID to listOf(ApiBaseType.Gemini),
+            GOOGLE_MAPS_TOOL_ID to listOf(ApiBaseType.Gemini),
+        ),
+    ),
     Moonshot(
         serviceId = "kimi",
         serviceName = "Moonshot",
         defaultBaseUrl = "https://api.moonshot.cn/v1",
         defaultBaseType = ApiBaseType.Standard,
-        supportedBaseTypes = ApiBaseType.entries,
+        supportedBaseTypes = DUAL_API_BASE_TYPES,
         defaultAnthropicBaseUrl = "https://api.moonshot.cn/anthropic",
         homepageUrl = "https://www.kimi.com/",
         keyHelpUrl = "https://platform.kimi.com/console/api-keys",
         officialToolProtocols = mapOf(
-            KIMI_FORMULAS_TOOL_ID to ApiBaseType.entries,
+            KIMI_FORMULAS_TOOL_ID to DUAL_API_BASE_TYPES,
         ),
     ),
     Glm(
@@ -198,12 +224,12 @@ enum class LLMModelType(
         serviceName = "GLM",
         defaultBaseUrl = "https://open.bigmodel.cn/api/paas/v4/",
         defaultBaseType = ApiBaseType.Anthropic,
-        supportedBaseTypes = ApiBaseType.entries,
+        supportedBaseTypes = DUAL_API_BASE_TYPES,
         defaultAnthropicBaseUrl = "https://open.bigmodel.cn/api/anthropic",
         homepageUrl = "https://bigmodel.cn/",
         keyHelpUrl = "https://bigmodel.cn/usercenter/proj-mgmt/apikeys",
         officialToolProtocols = mapOf(
-            GLM_WEB_SEARCH_TOOL_ID to ApiBaseType.entries,
+            GLM_WEB_SEARCH_TOOL_ID to DUAL_API_BASE_TYPES,
         ),
     );
 
@@ -261,6 +287,7 @@ object LLMModelConfigs {
         LLMModelType.Mimo.toProvider(),
         LLMModelType.OpenAI.toProvider(),
         LLMModelType.Anthropic.toProvider(),
+        LLMModelType.Gemini.toProvider(),
         LLMModelType.Moonshot.toProvider(),
         LLMModelType.Glm.toProvider(),
     ).sortedBy { it.serviceId }
@@ -272,7 +299,7 @@ object LLMModelConfigs {
         fromServiceId(serviceId)?.iconRes
 
     fun supportedBaseTypesFor(serviceId: String): List<ApiBaseType> =
-        fromServiceId(serviceId)?.supportedBaseTypes ?: ApiBaseType.entries
+        fromServiceId(serviceId)?.supportedBaseTypes ?: DUAL_API_BASE_TYPES
 
     fun officialToolProtocolsFor(serviceId: String): Map<String, List<ApiBaseType>> =
         fromServiceId(serviceId)?.officialToolProtocols.orEmpty()

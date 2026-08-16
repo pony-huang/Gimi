@@ -212,6 +212,8 @@ class ModelServiceRepository @Inject constructor(
             when (provider.baseType) {
                 ApiBaseType.Standard -> provider.copy(apiBaseUrl = value)
                 ApiBaseType.Anthropic -> provider.copy(anthropicBaseUrl = value)
+                // Gemini 不暴露地址编辑；即使写入也只影响测试 / 刷新用的兼容端点。
+                ApiBaseType.Gemini -> provider.copy(apiBaseUrl = value)
             }
         }
     }

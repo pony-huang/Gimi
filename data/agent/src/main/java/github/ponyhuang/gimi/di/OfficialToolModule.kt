@@ -8,6 +8,7 @@ import dagger.multibindings.IntoSet
 import github.ponyhuang.gimi.agent.tools.official.DefaultOfficialToolFunctionCatalog
 import github.ponyhuang.gimi.agent.tools.official.OfficialToolset
 import github.ponyhuang.gimi.agent.tools.official.anthropic.AnthropicOfficialToolset
+import github.ponyhuang.gimi.agent.tools.official.gemini.GeminiOfficialToolset
 import github.ponyhuang.gimi.agent.tools.official.glm.GlmWebSearchToolset
 import github.ponyhuang.gimi.agent.tools.official.kimi.KimiFormulaToolset
 import github.ponyhuang.gimi.agent.tools.official.mimo.MimoOfficialToolset
@@ -58,5 +59,11 @@ abstract class OfficialToolModule {
     @IntoSet
     abstract fun bindGlmWebSearchToolset(
         toolset: GlmWebSearchToolset,
+    ): OfficialToolset
+
+    @Binds
+    @IntoSet
+    abstract fun bindGeminiToolset(
+        toolset: GeminiOfficialToolset,
     ): OfficialToolset
 }

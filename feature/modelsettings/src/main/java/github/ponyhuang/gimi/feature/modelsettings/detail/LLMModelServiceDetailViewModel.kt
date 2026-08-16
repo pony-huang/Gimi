@@ -150,6 +150,7 @@ class ModelServiceDetailViewModel @Inject constructor(
                     service = when (service.apiProtocol) {
                         ApiProtocol.Standard -> service.copy(apiBaseUrl = value)
                         ApiProtocol.Anthropic -> service.copy(anthropicBaseUrl = value)
+                        ApiProtocol.Gemini -> service.copy(apiBaseUrl = value)
                     },
                 )
             }

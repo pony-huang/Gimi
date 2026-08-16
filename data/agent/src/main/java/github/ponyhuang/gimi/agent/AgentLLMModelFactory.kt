@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.agent
 
 import com.anthropic.client.okhttp.AnthropicOkHttpClient
+import com.google.adk.kt.models.Gemini
 import com.google.adk.kt.models.Model
 import com.openai.client.okhttp.OpenAIOkHttpClient
 import github.ponyhuang.gimi.agent.model.Claude
@@ -115,6 +116,12 @@ class AgentLLMModelFactory @Inject constructor(
                     .build(),
                 providerBuiltInToolNames = cfg.providerBuiltInToolNames(),
             )
+
+            // ADK 原生 Gemini：只需 API Key，端点固定为 Google 默认地址。
+            ApiProtocol.Gemini -> Gemini(
+                name = cfg.modelId,
+                apiKey = cfg.apiKey,
+            )
         }
 
     /**
@@ -134,6 +141,9 @@ class AgentLLMModelFactory @Inject constructor(
             "anthropic", "minimax" -> setOf(AnthropicOfficialToolset.WEB_SEARCH_TOOL_ID)
             else -> emptySet()
         }
+
+        // Gemini 暂无厂商远端执行的官方内置工具。
+        ApiProtocol.Gemini -> emptySet()
     }
 
     fun selectFastModelConfig(): ModelConfig? {

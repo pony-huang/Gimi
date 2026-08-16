@@ -33,11 +33,13 @@ fun Model.toData(): LLMModelItem = LLMModelItem(
 fun ApiProtocol.toData(): ApiBaseType = when (this) {
     ApiProtocol.Standard -> ApiBaseType.Standard
     ApiProtocol.Anthropic -> ApiBaseType.Anthropic
+    ApiProtocol.Gemini -> ApiBaseType.Gemini
 }
 
 fun ApiBaseType.toDomain(): ApiProtocol = when (this) {
     ApiBaseType.Standard -> ApiProtocol.Standard
     ApiBaseType.Anthropic -> ApiProtocol.Anthropic
+    ApiBaseType.Gemini -> ApiProtocol.Gemini
 }
 
 private fun LLMModelGroup.toDomain(): ModelGroup = ModelGroup(

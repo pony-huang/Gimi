@@ -41,7 +41,7 @@ class ModelAvailabilityTest {
 
         val glm = providers.getValue(LLMModelType.Glm.serviceId)
         assertFalse(glm.isEnabled)
-        assertEquals(ApiBaseType.entries.toSet(), glm.supportedBaseTypes.toSet())
+        assertEquals(DUAL_API_BASE_TYPES.toSet(), glm.supportedBaseTypes.toSet())
         assertEquals(ApiBaseType.Anthropic, glm.baseType)
         assertEquals("https://open.bigmodel.cn/api/paas/v4/", glm.apiBaseUrl)
         assertEquals("https://open.bigmodel.cn/api/anthropic", glm.anthropicBaseUrl)
@@ -99,6 +99,20 @@ class ModelAvailabilityTest {
     }
 
     @Test
+    fun builtInGeminiIsSingleProtocolAndStartsDisabled() {
+        val providers = LLMModelConfigs.services.associateBy { it.serviceId }
+
+        val gemini = providers.getValue(LLMModelType.Gemini.serviceId)
+        assertFalse(gemini.isEnabled)
+        assertEquals(listOf(ApiBaseType.Gemini), gemini.supportedBaseTypes)
+        assertEquals(ApiBaseType.Gemini, gemini.baseType)
+        assertEquals(
+            listOf(WEB_SEARCH_TOOL_ID, URL_CONTEXT_TOOL_ID, GOOGLE_MAPS_TOOL_ID),
+            gemini.toDomain().supportedOfficialTools,
+        )
+    }
+
+    @Test
     fun onlyOrdinaryModelsAreChatModels() {
         assertTrue(LLMModelItem("chat", "Chat").isChatModel)
         assertFalse(LLMModelItem("stt", "STT", isStt = true).isChatModel)
@@ -126,3 +140,5 @@ class ModelAvailabilityTest {
 private const val WEB_SEARCH_TOOL_ID: String = "web_search"
 private const val KIMI_FORMULAS_TOOL_ID: String = "kimi_formulas"
 private const val GLM_WEB_SEARCH_TOOL_ID: String = "glm_web_search"
+private const val URL_CONTEXT_TOOL_ID: String = "url_context"
+private const val GOOGLE_MAPS_TOOL_ID: String = "google_maps"

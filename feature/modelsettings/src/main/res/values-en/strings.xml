@@ -8,6 +8,7 @@
     <string name="modelsettings_api_url_label">API endpoint</string>
     <string name="modelsettings_api_protocol_standard">Standard API endpoint</string>
     <string name="modelsettings_api_protocol_anthropic">Anthropic API endpoint</string>
+    <string name="modelsettings_api_protocol_gemini">Gemini API</string>
 
     <string name="modelsettings_open_homepage">Open homepage</string>
 

@@ -10,6 +10,7 @@
     <string name="modelsettings_api_url_label">API 地址</string>
     <string name="modelsettings_api_protocol_standard">标准 API 地址</string>
     <string name="modelsettings_api_protocol_anthropic">Anthropic API 地址</string>
+    <string name="modelsettings_api_protocol_gemini">Gemini API</string>
 
     <!-- HeaderSection -->
     <string name="modelsettings_open_homepage">打开主页</string>

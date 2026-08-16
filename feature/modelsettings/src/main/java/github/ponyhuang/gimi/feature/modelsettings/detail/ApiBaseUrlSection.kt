@@ -32,11 +32,14 @@ fun ApiBaseUrlSection(
     val allOptions = listOf(
         ApiProtocol.Standard to stringResource(R.string.modelsettings_api_protocol_standard),
         ApiProtocol.Anthropic to stringResource(R.string.modelsettings_api_protocol_anthropic),
+        ApiProtocol.Gemini to stringResource(R.string.modelsettings_api_protocol_gemini),
     )
-    // 单协议厂商（OpenAI 仅 Standard、Anthropic 仅 Anthropic）只展示其支持的接口标准。
+    // 单协议厂商（OpenAI 仅 Standard、Anthropic 仅 Anthropic、Gemini 仅 Gemini）只展示其支持的接口标准。
     val options = allOptions.filter { it.first in service.supportedProtocols }
     val currentLabel = options.firstOrNull { it.first == service.apiProtocol }?.second
         ?: options.first().second
+    // Gemini 走 ADK 原生实现，端点固定为 Google 默认地址，用户只需填写密钥。
+    val showsBaseUrlField = service.apiProtocol != ApiProtocol.Gemini
 
     Column(
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -81,12 +84,14 @@ fun ApiBaseUrlSection(
             }
         }
 
-        OutlinedTextField(
-            value = service.activeApiBaseUrl,
-            onValueChange = onBaseUrlChange,
-            singleLine = true,
-            label = { Text(stringResource(R.string.modelsettings_api_url_label)) },
-            modifier = Modifier.fillMaxWidth(),
-        )
+        if (showsBaseUrlField) {
+            OutlinedTextField(
+                value = service.activeApiBaseUrl,
+                onValueChange = onBaseUrlChange,
+                singleLine = true,
+                label = { Text(stringResource(R.string.modelsettings_api_url_label)) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }

@@ -48,6 +48,10 @@
     <string name="chat_official_tool_kimi_formulas_description">Use Kimi formula calculations</string>
     <string name="chat_official_tool_glm_web_search">GLM web search</string>
     <string name="chat_official_tool_glm_web_search_description">Search the web for current information with Zhipu’s search engine</string>
+    <string name="chat_official_tool_url_context">URL reader</string>
+    <string name="chat_official_tool_url_context_description">Read the content of linked web pages</string>
+    <string name="chat_official_tool_google_maps">Google Maps</string>
+    <string name="chat_official_tool_google_maps_description">Look up places and geographic information</string>
     <string name="chat_official_tool_default_description">An official tool provided by the model service</string>
     <string name="chat_official_tools_title">Official built-in tools</string>
     <string name="chat_official_tool_functions_loading">Loading available functions…</string>

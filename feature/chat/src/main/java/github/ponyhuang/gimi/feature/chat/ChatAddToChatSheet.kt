@@ -93,6 +93,8 @@ import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
 private const val WEB_SEARCH_TOOL_ID: String = "web_search"
 private const val KIMI_FORMULAS_TOOL_ID: String = "kimi_formulas"
 private const val GLM_WEB_SEARCH_TOOL_ID: String = "glm_web_search"
+private const val URL_CONTEXT_TOOL_ID: String = "url_context"
+private const val GOOGLE_MAPS_TOOL_ID: String = "google_maps"
 
 private enum class AddToChatPage {
     HOME,
@@ -1190,6 +1192,8 @@ private fun officialToolLabel(toolId: String): String = when (toolId) {
     WEB_SEARCH_TOOL_ID -> stringResource(R.string.chat_official_tool_web_search)
     KIMI_FORMULAS_TOOL_ID -> stringResource(R.string.chat_official_tool_kimi_formulas)
     GLM_WEB_SEARCH_TOOL_ID -> stringResource(R.string.chat_official_tool_glm_web_search)
+    URL_CONTEXT_TOOL_ID -> stringResource(R.string.chat_official_tool_url_context)
+    GOOGLE_MAPS_TOOL_ID -> stringResource(R.string.chat_official_tool_google_maps)
     else -> toolId
 }
 
@@ -1201,5 +1205,9 @@ private fun officialToolDescription(toolId: String): String = when (toolId) {
         stringResource(R.string.chat_official_tool_kimi_formulas_description)
     GLM_WEB_SEARCH_TOOL_ID ->
         stringResource(R.string.chat_official_tool_glm_web_search_description)
+    URL_CONTEXT_TOOL_ID ->
+        stringResource(R.string.chat_official_tool_url_context_description)
+    GOOGLE_MAPS_TOOL_ID ->
+        stringResource(R.string.chat_official_tool_google_maps_description)
     else -> stringResource(R.string.chat_official_tool_default_description)
 }

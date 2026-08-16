@@ -22,7 +22,7 @@ import github.ponyhuang.gimi.core.designsystem.R
  * Consistent, brand-faithful icon treatment for model service surfaces.
  *
  * 图标资源来自 lobe-icons（SVG 转 vector drawable）：
- * - 有 `-color` 彩色版且浅色背景可辨的服务（DeepSeek / MiniMax / ChatGLM）
+ * - 有 `-color` 彩色版且浅色背景可辨的服务（DeepSeek / MiniMax / ChatGLM / Gemini）
  *   统一使用彩色版，深浅色模式通用，只放 `res/drawable/`；
  * - 其余服务（OpenAI / Anthropic / XiaomiMiMo / Kimi）保留单色：
  *   lobe-icons 无其彩色版，或彩色版为白色主体（Kimi 白 K）在浅色背景下不可见；
@@ -68,6 +68,7 @@ private fun modelServiceIconFor(serviceId: String): Int? = when (serviceId) {
     "mimo" -> R.drawable.ic_model_provider_xiaomimimo
     "openai" -> R.drawable.ic_model_provider_openai
     "anthropic" -> R.drawable.ic_model_provider_anthropic
+    "gemini" -> R.drawable.ic_model_provider_gemini
     "kimi" -> R.drawable.ic_model_provider_kimi
     "glm" -> R.drawable.ic_model_provider_chatglm
     else -> null

@@ -108,11 +108,28 @@ jobs:
           done
           ls -la dist/
 
+      # release-please 合并 Release PR 时先建 tag 再建 Release，本工作流由 tag 推送触发，
+      # 上传产物前等待 Release 就绪；Release 正文（分组更新日志）已由 release-please 写自 CHANGELOG.md。
+      - name: Wait for GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          for i in $(seq 1 24); do
+            if gh release view "v${VERSION}" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+              echo "Release v${VERSION} is ready"
+              exit 0
+            fi
+            echo "Waiting for release v${VERSION} to be created... ($i/24)"
+            sleep 5
+          done
+          # 手动打 tag（未经 release-please）时没有 Release 对象，由下一步自动创建。
+          echo "Release v${VERSION} not found; it will be created by the upload step"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.value }}
           name: v${{ steps.version.outputs.value }}
           prerelease: ${{ inputs.prerelease || steps.version.outputs.auto_prerelease == 'true' }}
-          generate_release_notes: true
           files: dist/*

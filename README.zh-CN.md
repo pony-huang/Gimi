@@ -15,14 +15,15 @@
 ## 应用截图
 
 <p align="center">
-  <img src="doc/img1.jpg" width="30%" alt="聊天" />
-  <img src="doc/img2.jpg" width="30%" alt="语音" />
-  <img src="doc/img3.jpg" width="30%" alt="工具" />
+  <img src="doc/img1.jpg" width="24%" alt="聊天" />
+  <img src="doc/img2.jpg" width="24%" alt="语音" />
+  <img src="doc/img3.jpg" width="24%" alt="工具" />
+  <img src="doc/img4.png" width="24%" alt="模型服务" />
 </p>
 
 ## 能干什么
 
-你填自己的 API Key。Gimi 让模型能操作你的设备：闹钟、日历、媒体播放、屏幕亮度、你指定的文件夹，以及你接入的外部工具。不绑定厂商，不需要订阅。
+你填自己的 API Key。Gimi 让模型能操作你的设备：闹钟、日历、媒体播放、屏幕亮度、你指定的文件夹，以及你接入的外部工具。
 
 ## 功能
 
@@ -82,7 +83,7 @@
 
 ## 快速上手
 
-1. 装 APK。需要 Android 15+。
+1. 装 APK。需要 Android 14+。
 2. *设置 → 模型服务*：选服务商，贴 Key，点「检测」。
 3. *设置 → 默认模型*：选对话模型。需要语音就一并配置。
 4. *设置 → 权限*：看说明，愿意给的就给。全可选。

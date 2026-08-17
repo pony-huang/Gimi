@@ -15,9 +15,10 @@ Chat, talk, and get things done — alarms, files, music, calendar — all in on
 ## Screenshots
 
 <p align="center">
-  <img src="doc/img1.jpg" width="30%" alt="Chat" />
-  <img src="doc/img2.jpg" width="30%" alt="Voice" />
-  <img src="doc/img3.jpg" width="30%" alt="Tools" />
+  <img src="doc/img1.jpg" width="24%" alt="Chat" />
+  <img src="doc/img2.jpg" width="24%" alt="Voice" />
+  <img src="doc/img3.jpg" width="24%" alt="Tools" />
+  <img src="doc/img4.png" width="24%" alt="Model services" />
 </p>
 
 ## What it does

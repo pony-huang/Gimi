@@ -1,10 +1,16 @@
 <div align="center">
 
+<img src="doc/icon.webp" width="120" alt="Gimi" />
+
 # Gimi
 
 **你手机上的 AI 助手。**
 
 聊天、语音、干活 —— 闹钟、文件、音乐、日程，一个应用搞定。
+
+[![CI](https://github.com/pony-huang/Gimi/actions/workflows/ci.yml/badge.svg)](https://github.com/pony-huang/Gimi/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/pony-huang/Gimi)](https://github.com/pony-huang/Gimi/releases/latest)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 

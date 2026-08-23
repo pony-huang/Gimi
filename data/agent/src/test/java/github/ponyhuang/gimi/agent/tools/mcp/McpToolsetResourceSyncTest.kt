@@ -23,6 +23,23 @@ import reactor.core.publisher.Mono
 class McpToolsetResourceSyncTest {
 
     @Test
+    fun noArgListResourcesReturnsTheFirstTypedPage() = runTest {
+        val client = mockk<McpAsyncClient>()
+        every { client.listResources(null as String?) } returns
+            Mono.just(
+                ListResourcesResult.builder(
+                    listOf(Resource.builder("file:///guide.md", "guide").build()),
+                ).nextCursor("page-2").build(),
+            )
+        val toolset = McpToolset(StaticSessionManager(McpSession(client)))
+
+        val listing: McpResourceListing = toolset.listResources()
+
+        assertEquals("guide", listing.resources.single().name)
+        assertEquals("page-2", listing.nextCursor)
+    }
+
+    @Test
     fun resourceToolsRemainEnabledWhenServerToolFilterRejectsEverything() = runTest {
         val client = resourceCapableClient()
         every { client.listTools() } returns Mono.just(

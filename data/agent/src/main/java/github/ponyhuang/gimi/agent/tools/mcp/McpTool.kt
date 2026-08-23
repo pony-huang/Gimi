@@ -13,7 +13,7 @@ import io.modelcontextprotocol.spec.McpSchema.Tool as McpSchemaTool
 import io.modelcontextprotocol.spec.McpSchema.ToolAnnotations
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.reactor.awaitSingle
+import kotlinx.coroutines.reactor.awaitSingleOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -23,6 +23,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Turns an MCP Tool into an ADK [BaseTool].
@@ -41,9 +42,10 @@ internal constructor(
   private val headers: Map<String, String> = emptyMap(),
 ) : BaseTool(name, description) {
 
-  override fun declaration(): FunctionDeclaration? {
+  /** Immutable MCP schemas are converted once even though ADK requests declarations repeatedly. */
+  private val convertedDeclaration: FunctionDeclaration by lazy {
     try {
-      return mcpSchemaTool.toAdkFunctionDeclaration()
+      mcpSchemaTool.toAdkFunctionDeclaration()
     } catch (e: RuntimeException) {
       throw McpToolDeclarationException(
         "MCP tool:$name failed to get declaration, inputSchema:${mcpSchemaTool.inputSchema()}. outputSchema: ${mcpSchemaTool.outputSchema()}",
@@ -51,6 +53,8 @@ internal constructor(
       )
     }
   }
+
+  override fun declaration(): FunctionDeclaration? = convertedDeclaration
 
   /**
    * Calls the MCP tool.
@@ -64,9 +68,12 @@ internal constructor(
    */
   override suspend fun run(context: ToolContext, args: Map<String, Any?>): Any {
     val callResult = retrySessionCall {
-      client.callTool(CallToolRequest(name, args, mcpSessionManager.requestMeta())).awaitSingle()
+      client
+        .callTool(CallToolRequest(name, args, mcpSessionManager.requestMeta(context.functionCallId)))
+        .awaitSingleOrNull()
     }
-    return callResult.toJsonNativeMap()
+    return callResult?.toJsonNativeMap()
+      ?: mapOf("error" to "MCP framework error: CallToolResult was null")
   }
 
   private suspend fun <T> retrySessionCall(
@@ -85,7 +92,7 @@ internal constructor(
         if (e is CancellationException) {
           throw e
         }
-        delay(delayMs)
+        delay(delayMs.milliseconds)
         logger.warn(e) { "Retrying callTool due to: ${e.message}" }
       }
     }

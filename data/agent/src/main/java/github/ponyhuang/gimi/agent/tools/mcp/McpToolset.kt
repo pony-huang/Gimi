@@ -120,13 +120,8 @@ internal constructor(
         return LoadedTools(serverTools, emptyList())
     }
 
-    /**
-     * Preserves the project-facing probe API by returning every advertised resource name.
-     *
-     * Name resolution is deliberately bounded and cursor-aware; a broken server cannot make the
-     * probe loop forever by returning the same continuation cursor.
-     */
-    suspend fun listResources(readonlyContext: ReadonlyContext? = null): List<String> =
+    /** Returns every advertised resource name for the app's connection probe. */
+    internal suspend fun listResourceNames(readonlyContext: ReadonlyContext? = null): List<String> =
         listAllResources(readonlyContext).map { it.name }
 
     /** Returns one page of MCP resources and its continuation cursor. */

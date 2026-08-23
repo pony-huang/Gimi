@@ -33,7 +33,7 @@ class AdkMcpConnectionTester @Inject constructor() : McpConnectionTester {
                 McpProbeResult(
                     reachable = true,
                     tools = tools.map { McpToolSummary(name = it.name, description = it.description) },
-                    resources = runCatching { toolset.listResources() }.getOrDefault(emptyList()),
+                    resources = runCatching { toolset.listResourceNames() }.getOrDefault(emptyList()),
                 )
             }
         } catch (e: TimeoutCancellationException) {

@@ -2,6 +2,8 @@ package github.ponyhuang.gimi.agent.tools.mcp
 
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.agent.tools.mcp.McpSchemaConverter.toAdkFunctionDeclaration
+import github.ponyhuang.gimi.agent.tools.mcp.McpSchemaConverter.toAdkSchema
+import io.modelcontextprotocol.spec.McpSchema.JsonSchema
 import io.modelcontextprotocol.spec.McpSchema.Tool
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -10,6 +12,26 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class McpSchemaConverterTest {
+
+  @Test
+  @Suppress("DEPRECATION")
+  fun `converts the Java SDK JsonSchema API`() {
+    val inputSchema =
+      JsonSchema(
+        "object",
+        mapOf("query" to mapOf("type" to "string")),
+        listOf("query"),
+        false,
+        emptyMap(),
+        emptyMap(),
+      )
+
+    val converted = inputSchema.toAdkSchema()
+
+    assertEquals(Type.OBJECT, converted.type)
+    assertEquals(Type.STRING, converted.properties!!["query"]!!.type)
+    assertEquals(listOf("query"), converted.required)
+  }
 
   @Test
   fun `converts tool with primitive properties`() {

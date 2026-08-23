@@ -4,6 +4,7 @@ import com.google.adk.kt.logging.LoggerFactory
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
+import io.modelcontextprotocol.spec.McpSchema.JsonSchema
 import io.modelcontextprotocol.spec.McpSchema.Tool
 
 /** Converts MCP JSON Schema maps into the ADK schema model without leaking MCP SDK types. */
@@ -37,6 +38,24 @@ internal object McpSchemaConverter {
             parameters = inputSchema().toAdkRootSchema(),
             response = outputSchema()?.let(::toResponseSchema),
         )
+
+    /** Converts the Java MCP SDK's legacy typed schema record into the ADK schema model. */
+    @Suppress("DEPRECATION")
+    fun JsonSchema.toAdkSchema(): Schema {
+        val definitions = buildMap {
+            definitions()?.let(::putAll)
+            defs()?.let(::putAll)
+        }
+        val properties = properties().toAdkSchemaMap(depth = 1, scope = RefScope(definitions))
+        val type = parseTypeString(type())
+        return Schema(
+            type = type,
+            properties = properties,
+            items = defaultItems(type),
+            required = required().requiredIn(properties),
+            description = null,
+        )
+    }
 
     private fun Map<String, Any>.toAdkRootSchema(): Schema =
         parsePropertyMap(this, depth = 0, definitions = declaredDefinitions())

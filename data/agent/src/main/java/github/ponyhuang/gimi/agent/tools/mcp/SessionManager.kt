@@ -41,9 +41,17 @@ internal interface SessionManager : AutoCloseable {
   val hasProgressConsumers: Boolean
 
   /** Returns `_meta` fields for a request, or null when progress is not observed. */
-  fun requestMeta(): Map<String, Any>? = requestMeta(hasProgressConsumers)
+  fun requestMeta(progressToken: Any? = null): Map<String, Any>? =
+    requestMeta(hasProgressConsumers, progressToken)
 }
 
-/** Creates a unique MCP progress token only when a consumer can observe notifications. */
-internal fun requestMeta(hasProgressConsumers: Boolean): Map<String, Any>? =
-  if (hasProgressConsumers) mapOf("progressToken" to UUID.randomUUID().toString()) else null
+/** Uses [progressToken] or creates one only when a consumer can observe notifications. */
+internal fun requestMeta(
+  hasProgressConsumers: Boolean,
+  progressToken: Any? = null,
+): Map<String, Any>? =
+  if (hasProgressConsumers) {
+    mapOf("progressToken" to (progressToken ?: UUID.randomUUID().toString()))
+  } else {
+    null
+  }

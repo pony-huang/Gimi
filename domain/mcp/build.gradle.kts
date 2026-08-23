@@ -7,6 +7,8 @@ kotlin {
 }
 
 dependencies {
+    api(project(":domain:conversation"))
+
     implementation(libs.javax.inject)
     api(libs.kotlinx.coroutines.core)
 

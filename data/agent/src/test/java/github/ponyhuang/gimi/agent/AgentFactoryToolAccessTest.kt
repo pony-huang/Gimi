@@ -10,6 +10,7 @@ import github.ponyhuang.gimi.agent.tools.search.TOOL_SEARCH_NAME
 import github.ponyhuang.gimi.agent.tools.search.ToolSearchToolset
 import github.ponyhuang.gimi.agent.tools.search.ToolVectorSearch
 import github.ponyhuang.gimi.agent.tools.mcp.ConversationMcpToolset
+import github.ponyhuang.gimi.agent.tools.mcp.McpConfigurationTool
 import github.ponyhuang.gimi.agent.tools.official.SearchOfficialToolset
 import github.ponyhuang.gimi.agent.tools.official.OfficialToolset
 import github.ponyhuang.gimi.agent.tools.system.LocalToolset
@@ -75,6 +76,20 @@ class AgentFactoryToolAccessTest {
     }
 
     @Test
+    fun mcpConfigurationImportIsDirectlyAvailableInBothAccessModes() = runTest {
+        val configurationTool = mockk<McpConfigurationTool>(relaxed = true) {
+            every { name } returns McpConfigurationTool.NAME
+        }
+        val factory = factory(mcpConfigurationTool = configurationTool)
+
+        val always = factory.create(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE).agent as LlmAgent
+        val onDemand = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
+
+        assertTrue(configurationTool in always.tools)
+        assertTrue(configurationTool in onDemand.tools)
+    }
+
+    @Test
     fun localToolRemainsResolvableForConfirmationResumeWithoutDuplicateDeclaration() = runTest {
         val factory = factory(
             localTools = listOf(declarationTool("adjust_media_volume")),
@@ -83,8 +98,11 @@ class AgentFactoryToolAccessTest {
 
         val agent = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
 
-        assertEquals(listOf("adjust_media_volume"), agent.tools.map(BaseTool::name))
-        assertEquals(null, agent.tools.single().declaration())
+        assertEquals(
+            listOf("adjust_media_volume", McpConfigurationTool.NAME),
+            agent.tools.map(BaseTool::name),
+        )
+        assertEquals(null, agent.tools.first().declaration())
     }
 
     @Test
@@ -95,13 +113,16 @@ class AgentFactoryToolAccessTest {
 
         val agent = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
 
-        assertTrue(agent.tools.isEmpty())
+        assertEquals(listOf(McpConfigurationTool.NAME), agent.tools.map(BaseTool::name))
     }
 
     private fun factory(
         localTools: List<BaseTool> = emptyList(),
         confirmationRequiredToolIds: Set<String> = emptySet(),
         officialToolsets: Set<OfficialToolset> = emptySet(),
+        mcpConfigurationTool: McpConfigurationTool = mockk(relaxed = true) {
+            every { name } returns McpConfigurationTool.NAME
+        },
     ): AgentFactory {
         val localToolCatalog = mockk<LocalToolCatalog>()
         every { localToolCatalog.tools() } returns localTools
@@ -123,6 +144,7 @@ class AgentFactoryToolAccessTest {
             agentLLMModelFactory = modelFactory,
             officialToolsets = officialToolsets,
             toolVectorSearch = mockk<ToolVectorSearch>(relaxed = true),
+            mcpConfigurationTool = mcpConfigurationTool,
         )
     }
 

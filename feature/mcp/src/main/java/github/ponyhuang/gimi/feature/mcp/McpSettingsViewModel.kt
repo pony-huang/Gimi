@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.conversation.runtime.isBusy
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
+import github.ponyhuang.gimi.domain.mcp.model.McpImportResult
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.usecase.FetchMcpServerCapabilitiesUseCase
 import github.ponyhuang.gimi.domain.mcp.usecase.ManageMcpServersUseCase
@@ -86,7 +87,7 @@ class McpSettingsViewModel @Inject constructor(
     private fun importServers() {
         mutate {
             val result = manageServers.importJson(localState.value.importJson)
-            localState.update { it.copy(importResult = result.message) }
+            localState.update { it.copy(importResult = result) }
             if (result.error == null && result.imported > 0) {
                 _effects.tryEmit(McpSettingsEffect.Close)
             }
@@ -185,7 +186,7 @@ class McpSettingsViewModel @Inject constructor(
 
     private data class LocalState(
         val importJson: String = "",
-        val importResult: String? = null,
+        val importResult: McpImportResult? = null,
         val editor: McpEditorDraft? = null,
         val isTransportMenuExpanded: Boolean = false,
         val isTestingConnection: Boolean = false,

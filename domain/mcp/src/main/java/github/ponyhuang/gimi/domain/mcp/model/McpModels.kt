@@ -19,14 +19,33 @@ data class McpServer(
     val isEnabled: Boolean = true,
 )
 
+/**
+ * MCP 配置批量导入结果。
+ *
+ * @property created 新建的服务器数量。
+ * @property updated 按名称更新的服务器数量。
+ * @property skipped 因传输方式或字段无效而跳过的条目数量。
+ * @property affectedServerIds 成功新增或更新的服务器稳定 ID。
+ * @property error 顶层输入无法处理时的错误；部分条目无效时使用 [skipped] 表达。
+ */
 data class McpImportResult(
-    val imported: Int = 0,
+    val created: Int = 0,
+    val updated: Int = 0,
     val skipped: Int = 0,
+    val affectedServerIds: Set<String> = emptySet(),
     val error: String? = null,
 ) {
-    val message: String
-        get() = error ?: buildString {
-            append("已导入 $imported 个 MCP 服务")
-            if (skipped > 0) append("；跳过 $skipped 个不受支持的 stdio 或无效配置")
-        }
+    val imported: Int
+        get() = created + updated
 }
+
+/**
+ * Agent 导入 MCP 配置并尝试绑定当前会话后的结果。
+ *
+ * @property importResult 全局 MCP 配置的导入结果。
+ * @property conversationActivated 受影响服务器是否已加入当前会话工具选择。
+ */
+data class McpConversationImportResult(
+    val importResult: McpImportResult,
+    val conversationActivated: Boolean,
+)

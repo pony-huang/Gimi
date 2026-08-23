@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.mcp
 
+import github.ponyhuang.gimi.domain.mcp.model.McpImportResult
 import github.ponyhuang.gimi.domain.mcp.model.McpProbeResult
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
@@ -26,7 +27,7 @@ sealed interface ServerCapabilityState {
 data class McpSettingsUiState(
     val servers: List<McpServer> = emptyList(),
     val importJson: String = "",
-    val importResult: String? = null,
+    val importResult: McpImportResult? = null,
     val editor: McpEditorDraft? = null,
     val isTransportMenuExpanded: Boolean = false,
     val isMutationBlocked: Boolean = false,

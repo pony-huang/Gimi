@@ -214,8 +214,22 @@ fun McpServerImportScreen(
                         minLines = 10,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    state.importResult?.let {
-                        Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    state.importResult?.let { result ->
+                        val resultText = result.error ?: if (result.skipped > 0) {
+                            stringResource(
+                                R.string.mcp_import_result_with_skipped,
+                                result.created,
+                                result.updated,
+                                result.skipped,
+                            )
+                        } else {
+                            stringResource(
+                                R.string.mcp_import_result,
+                                result.created,
+                                result.updated,
+                            )
+                        }
+                        Text(resultText, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),

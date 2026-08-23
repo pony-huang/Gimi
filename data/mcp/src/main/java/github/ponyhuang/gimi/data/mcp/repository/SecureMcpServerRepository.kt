@@ -56,16 +56,20 @@ class SecureMcpServerRepository @Inject constructor(
             wrappedSource.isJsonObject -> wrappedSource.asJsonObject
             else -> return McpImportResult(error = "mcpServers 必须是对象")
         }
-        val imported = mutableListOf<McpServer>()
+        val updatedServers = servers.value.toMutableList()
+        val affectedServerIds = linkedSetOf<String>()
+        var created = 0
+        var updated = 0
         var skipped = 0
         source.entrySet().take(MAX_IMPORT_SERVERS).forEach { (name, element) ->
-            if (name.length > MAX_FIELD_CHARACTERS) {
+            val normalizedName = name.trim()
+            if (normalizedName.isEmpty() || normalizedName.length > MAX_FIELD_CHARACTERS) {
                 skipped++
                 return@forEach
             }
             val config = element.takeIf { it.isJsonObject }?.asJsonObject
                 ?: run { skipped++; return@forEach }
-            val url = config.string("url")
+            val url = config.string("url")?.trim()
             if (url.isNullOrBlank() || url.length > MAX_FIELD_CHARACTERS) {
                 skipped++
                 return@forEach
@@ -80,20 +84,44 @@ class SecureMcpServerRepository @Inject constructor(
                 skipped++
                 return@forEach
             }
-            imported += McpServer(
-                name = name,
-                endpointUrl = url,
-                transport = transport,
-                headers = config.get("headers")
-                    ?.takeIf { it.isJsonObject }
-                    ?.asJsonObject
-                    ?.toHeaderLines()
-                    .orEmpty(),
-            )
+            val headers = config.get("headers")
+                ?.takeIf { it.isJsonObject }
+                ?.asJsonObject
+                ?.toHeaderLines()
+                .orEmpty()
+            val existingIndex = updatedServers.indexOfFirst { it.name.trim() == normalizedName }
+            if (existingIndex < 0) {
+                McpServer(
+                    name = normalizedName,
+                    endpointUrl = url,
+                    transport = transport,
+                    headers = headers,
+                ).also { server ->
+                    updatedServers += server
+                    affectedServerIds += server.id
+                    created++
+                }
+            } else {
+                val existing = updatedServers[existingIndex]
+                updatedServers[existingIndex] = existing.copy(
+                    name = normalizedName,
+                    endpointUrl = url,
+                    transport = transport,
+                    bearerToken = "",
+                    headers = headers,
+                )
+                affectedServerIds += existing.id
+                updated++
+            }
         }
         skipped += (source.size() - MAX_IMPORT_SERVERS).coerceAtLeast(0)
-        if (imported.isNotEmpty()) persist(servers.value + imported)
-        return McpImportResult(imported = imported.size, skipped = skipped)
+        if (affectedServerIds.isNotEmpty()) persist(updatedServers)
+        return McpImportResult(
+            created = created,
+            updated = updated,
+            skipped = skipped,
+            affectedServerIds = affectedServerIds,
+        )
     }
 
     private fun load(): List<McpServer> = runCatching {

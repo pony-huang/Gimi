@@ -33,26 +33,7 @@ class McpModelsTest {
     }
 
     @Test
-    fun importResultMessageSummarizesImportedCount() {
-        assertEquals("已导入 3 个 MCP 服务", McpImportResult(imported = 3).message)
-    }
-
-    @Test
-    fun importResultMessageMentionsSkippedEntriesOnlyWhenPresent() {
-        assertEquals(
-            "已导入 2 个 MCP 服务；跳过 1 个不受支持的 stdio 或无效配置",
-            McpImportResult(imported = 2, skipped = 1).message,
-        )
-        assertEquals(
-            "已导入 2 个 MCP 服务",
-            McpImportResult(imported = 2, skipped = 0).message,
-        )
-    }
-
-    @Test
-    fun importResultErrorReplacesSuccessMessage() {
-        val result = McpImportResult(imported = 2, skipped = 1, error = "解析失败")
-
-        assertEquals("解析失败", result.message)
+    fun importResultCombinesCreatedAndUpdatedCounts() {
+        assertEquals(5, McpImportResult(created = 3, updated = 2).imported)
     }
 }

@@ -1,12 +1,18 @@
 package github.ponyhuang.gimi.domain.mcp.usecase
 
+import github.ponyhuang.gimi.domain.conversation.model.Conversation
+import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.gimi.domain.conversation.model.Message
+import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.mcp.model.McpImportResult
 import github.ponyhuang.gimi.domain.mcp.model.McpProbeResult
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.repository.McpConnectionTester
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -53,11 +59,41 @@ class McpUseCasesTest {
 
     @Test
     fun manageServersImportJsonDelegatesAndReturnsResult() {
-        val result = McpImportResult(imported = 2, skipped = 1)
+        val result = McpImportResult(created = 2, skipped = 1)
         repository.importResult = result
 
         assertEquals(result, ManageMcpServersUseCase(repository).importJson("{}"))
         assertEquals(listOf("{}"), repository.importedJson)
+    }
+
+    @Test
+    fun importForConversationEnablesAffectedServersWithoutChangingOtherSelections() = runTest {
+        repository.importResult = McpImportResult(
+            created = 1,
+            updated = 1,
+            affectedServerIds = setOf("mcp-d", "mcp-e"),
+        )
+        val conversations = FakeConversationRepository(
+            storedConfiguration = ConversationToolConfiguration(
+                enabledLocalToolIds = setOf("clock"),
+                enabledMcpServerIds = setOf("mcp-a", "mcp-b", "mcp-c"),
+            ),
+        )
+
+        val result = ImportMcpServersForConversationUseCase(repository, conversations)(
+            sessionId = "session-1",
+            json = "{}",
+        )
+
+        assertEquals(true, result.conversationActivated)
+        assertEquals(setOf("mcp-d", "mcp-e"), result.importResult.affectedServerIds)
+        assertEquals(
+            ConversationToolConfiguration(
+                enabledLocalToolIds = setOf("clock"),
+                enabledMcpServerIds = setOf("mcp-a", "mcp-b", "mcp-c", "mcp-d", "mcp-e"),
+            ),
+            conversations.savedConfiguration,
+        )
     }
 
     @Test
@@ -139,5 +175,43 @@ class McpUseCasesTest {
             importedJson += json
             return importResult
         }
+    }
+
+    private class FakeConversationRepository(
+        private val storedConfiguration: ConversationToolConfiguration?,
+    ) : ConversationRepository {
+        var savedConfiguration: ConversationToolConfiguration? = null
+
+        override val conversations: StateFlow<List<Conversation>> = MutableStateFlow(emptyList())
+        override val conversationContentUpdates: SharedFlow<String> = MutableSharedFlow()
+
+        override suspend fun refresh() = Unit
+        override suspend fun refreshConversation(sessionId: String) = Unit
+        override suspend fun listConversations(): List<Conversation> = emptyList()
+        override suspend fun loadMessages(sessionId: String): List<Message>? = emptyList()
+        override suspend fun lastConversationId(): String? = null
+        override suspend fun activateConversation(sessionId: String, defaultModel: String): String = defaultModel
+        override suspend fun setConversationModel(sessionId: String, model: String) = Unit
+        override suspend fun conversationToolConfiguration(
+            sessionId: String,
+        ): ConversationToolConfiguration? = storedConfiguration
+
+        override suspend fun setConversationToolConfiguration(
+            sessionId: String,
+            configuration: ConversationToolConfiguration,
+        ): Boolean {
+            savedConfiguration = configuration
+            return true
+        }
+
+        override suspend fun discardConversationMetadata(sessionId: String) = Unit
+        override suspend fun createConversation(
+            initialModel: String,
+            activate: Boolean,
+            initialToolConfiguration: ConversationToolConfiguration?,
+        ): String = "session"
+
+        override suspend fun deleteConversation(sessionId: String) = Unit
+        override fun notifyConversationContentChanged(sessionId: String) = Unit
     }
 }

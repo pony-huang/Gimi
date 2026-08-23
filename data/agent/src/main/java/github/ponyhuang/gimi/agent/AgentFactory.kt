@@ -13,6 +13,7 @@ import github.ponyhuang.gimi.agent.tools.search.OfficialToolCandidateSource
 import github.ponyhuang.gimi.agent.tools.search.ToolSearchToolset
 import github.ponyhuang.gimi.agent.tools.search.ToolVectorSearch
 import github.ponyhuang.gimi.agent.tools.mcp.ConversationMcpToolset
+import github.ponyhuang.gimi.agent.tools.mcp.McpConfigurationTool
 import github.ponyhuang.gimi.agent.tools.official.SearchOfficialToolset
 import github.ponyhuang.gimi.agent.tools.official.OfficialToolset
 import github.ponyhuang.gimi.agent.tools.system.LocalToolset
@@ -55,6 +56,7 @@ class AgentFactory @Inject constructor(
     private val agentLLMModelFactory: AgentLLMModelFactory,
     private val officialToolsets: Set<@JvmSuppressWildcards OfficialToolset>,
     private val toolVectorSearch: ToolVectorSearch,
+    private val mcpConfigurationTool: McpConfigurationTool,
 ) {
     /**
      * 按访问模式构建 [AgentRuntime]。
@@ -156,6 +158,7 @@ class AgentFactory @Inject constructor(
                     .filter { tool -> tool.name in localToolCatalog.confirmationRequiredToolIds }
                     .map { tool -> ToolsetConfirmationResumeTool(localToolset, tool) },
             )
+            add(mcpConfigurationTool)
         },
         toolsets = toolsets,
     )

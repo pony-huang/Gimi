@@ -54,7 +54,8 @@ class McpSettingsViewModelCharacterizationTest {
     @Test
     fun successfulImportPublishesResultAndRequestsClose() = runTest {
         val repository = repository()
-        every { repository.importJson("{}") } returns McpImportResult(imported = 1)
+        val importResult = McpImportResult(created = 1)
+        every { repository.importJson("{}") } returns importResult
         val viewModel = viewModel(repository)
 
         viewModel.effects.test {
@@ -68,7 +69,7 @@ class McpSettingsViewModelCharacterizationTest {
                     state = awaitItem()
                 } while (state.importResult == null)
 
-                assertEquals("已导入 1 个 MCP 服务", state.importResult)
+                assertEquals(importResult, state.importResult)
                 cancelAndIgnoreRemainingEvents()
             }
             assertEquals(McpSettingsEffect.Close, awaitItem())

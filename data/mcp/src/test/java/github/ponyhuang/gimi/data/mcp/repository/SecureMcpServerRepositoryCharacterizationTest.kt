@@ -1,11 +1,60 @@
 package github.ponyhuang.gimi.data.mcp.repository
 
+import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 class SecureMcpServerRepositoryCharacterizationTest {
+    @Test
+    fun importPortableJsonUpdatesSameNameWithoutCreatingDuplicate() {
+        val storage = FakeStorage()
+        val repository = SecureMcpServerRepository(storage)
+        val original = McpServer(
+            id = "stable-id",
+            name = "github",
+            description = "Keep this description",
+            endpointUrl = "https://old.example.com/mcp",
+            bearerToken = "old-token",
+            isEnabled = false,
+        )
+        repository.save(original)
+        val revisionBeforeImport = repository.revision.value
+
+        val result = repository.importJson(
+            """
+            {
+              "mcpServers": {
+                " github ": {
+                  "type": "sse",
+                  "url": " https://new.example.com/sse ",
+                  "headers": { "Authorization": "Bearer new-token" }
+                },
+                "maps": {
+                  "url": "https://maps.example.com/mcp"
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(1, result.created)
+        assertEquals(1, result.updated)
+        assertEquals(setOf("stable-id", repository.currentServers()[1].id), result.affectedServerIds)
+        assertEquals(revisionBeforeImport + 1, repository.revision.value)
+        assertEquals(2, repository.currentServers().size)
+        assertEquals(
+            original.copy(
+                endpointUrl = "https://new.example.com/sse",
+                transport = McpTransport.SSE,
+                bearerToken = "",
+                headers = "Authorization=Bearer new-token",
+            ),
+            repository.currentServers().first(),
+        )
+    }
+
     @Test
     fun importPortableJsonAcceptsHttpAndSseAndSkipsStdio() {
         val storage = FakeStorage()

@@ -136,6 +136,47 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun sendReloadsPersistedToolConfigurationAfterAgentImportsMcpServers() = runTest {
+        val fixture = fixture(configured = true)
+        val beforeImport = ConversationToolConfiguration(
+            enabledLocalToolIds = setOf("compose_message"),
+            enabledMcpServerIds = setOf("mcp-a", "mcp-b", "mcp-c"),
+        )
+        val afterImport = beforeImport.copy(
+            enabledMcpServerIds = beforeImport.enabledMcpServerIds + setOf("mcp-d", "mcp-e"),
+        )
+        every { fixture.mcpRepository.currentServers() } returns
+            listOf("mcp-a", "mcp-b", "mcp-c", "mcp-d", "mcp-e").map { id ->
+                McpServer(id = id, name = id, isEnabled = true)
+            }
+        coEvery {
+            fixture.conversations.conversationToolConfiguration("session-1")
+        } returnsMany listOf(beforeImport, afterImport)
+
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        fixture.viewModel.onAction(ChatAction.Send("use the new tools"))
+        advanceUntilIdle()
+
+        coVerify {
+            fixture.agent.send(
+                "session-1",
+                any(),
+                "use the new tools",
+                any(),
+                match {
+                    it.enabledLocalToolIds == afterImport.enabledLocalToolIds &&
+                        it.enabledMcpServerIds == afterImport.enabledMcpServerIds
+                },
+            )
+        }
+        assertEquals(
+            afterImport.enabledMcpServerIds,
+            fixture.viewModel.uiState.value.toolConfiguration?.enabledMcpServerIds,
+        )
+    }
+
+    @Test
     fun setDarkThemeDelegatesToDisplayPreferences() = runTest {
         val fixture = fixture(configured = true)
 
@@ -664,6 +705,7 @@ class ChatViewModelCharacterizationTest {
             agent = agent,
             display = display,
             toolApproval = toolApproval,
+            mcpRepository = mcpRepository,
         )
     }
 
@@ -731,6 +773,7 @@ class ChatViewModelCharacterizationTest {
         val agent: ChatAgentRepository,
         val display: ChatDisplayRepository,
         val toolApproval: FakeToolApprovalRepository,
+        val mcpRepository: McpRepository,
     )
 }
 

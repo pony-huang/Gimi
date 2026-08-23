@@ -577,6 +577,10 @@ class ChatViewModel @Inject constructor(
 
         runtime.job = viewModelScope.launch {
             ensureRunLease(runtime).updatePhase(AgentTaskPhase.GENERATING)
+            // Agent 工具可能在上一轮直接更新了当前会话的 MCP 选择；发送前以持久化配置
+            // 为准，避免把旧的内存快照继续传给下一轮 Runner。
+            loadOrInitializeToolConfiguration(sessionId, selection)
+            publishRuntime(runtime)
             val preparedAttachments = cancellationAwareRunCatching {
                 attachments.read(sessionId, draftAttachments)
             }.getOrElse { failure ->

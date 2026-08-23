@@ -40,7 +40,7 @@ internal class KimiFormulaTool(
         parameters = declaration.parameters,
     )
 
-    override suspend fun execute(context: ToolContext, args: Map<String, Any>): Any =
+    override suspend fun execute(context: ToolContext, args: Map<String, Any?>): Any =
         withContext(Dispatchers.IO) {
             runCatching {
                 executeFiber(args)
@@ -49,7 +49,7 @@ internal class KimiFormulaTool(
             }
         }
 
-    private fun executeFiber(args: Map<String, Any>): Any {
+    private fun executeFiber(args: Map<String, Any?>): Any {
         val payload = buildJsonObject {
             put("name", declaration.name)
             put("arguments", args.toJsonElement().toString())

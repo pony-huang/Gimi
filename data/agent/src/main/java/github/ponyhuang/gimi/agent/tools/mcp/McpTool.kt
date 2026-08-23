@@ -62,7 +62,7 @@ internal constructor(
    * callback, which [SessionManager.requestOptions] wires up only when a consumer is listening --
    * so servers are not asked to produce progress that nothing reads.
    */
-  override suspend fun run(context: ToolContext, args: Map<String, Any>): Any {
+  override suspend fun run(context: ToolContext, args: Map<String, Any?>): Any {
     val callResult = retrySessionCall {
       client.callTool(CallToolRequest(name, args, mcpSessionManager.requestMeta())).awaitSingle()
     }

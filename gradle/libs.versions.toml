@@ -2,7 +2,7 @@
 agp = "9.2.1"
 anthropicJava = "2.44.1"
 coreKtx = "1.19.0"
-googleAdk = "0.6.0"
+googleAdk = "0.8.0"
 gson = "2.14.0"
 hilt = "2.60"
 androidxHilt = "1.4.0"

@@ -105,6 +105,6 @@ internal class OfficialBuiltInTool(
     override fun declaration(): FunctionDeclaration =
         FunctionDeclaration(name = name, description = description)
 
-    override suspend fun run(context: ToolContext, args: Map<String, Any>): Any =
+    override suspend fun run(context: ToolContext, args: Map<String, Any?>): Any =
         throw UnsupportedOperationException("$name is executed by the model provider")
 }

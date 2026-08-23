@@ -7,35 +7,30 @@ import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.agent.tools.mcp.McpToolException.McpToolExecutionException
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.reactor.awaitSingle
 
 /** A built-in tool that allows the ADK agents to list resources exposed by the MCP server. */
 internal class ListMcpResourcesTool(
-  private val mcpSession: McpSession,
-  private val mcpSessionManager: SessionManager,
-) : BaseTool("list_mcp_resources", "List resources available on the MCP server.") {
+  private val mcpToolset: McpToolset,
+) : BaseTool("list_mcp_resources", DESCRIPTION) {
 
-  override suspend fun run(context: ToolContext, args: Map<String, Any>): Any {
+  override suspend fun run(context: ToolContext, args: Map<String, Any?>): Any {
     try {
       val cursor = args["cursor"] as? String
 
-      val meta = mcpSessionManager.requestMeta()
-      val result =
-        if (meta == null) mcpSession.client.listResources(cursor).awaitSingle()
-        else mcpSession.client.listResources(cursor, meta).awaitSingle()
+      val result = mcpToolset.listResources(cursor, context.context)
 
       val resources =
-        result.resources().map { resource ->
+        result.resources.map { resource ->
           buildMap {
-            put(RESOURCE_NAME, resource.name())
-            put(RESOURCE_URI, resource.uri())
-            resource.description()?.let { description -> put(RESOURCE_DESCRIPTION, description) }
-            resource.mimeType()?.let { mimeType -> put(RESOURCE_MIME_TYPE, mimeType) }
+            put(RESOURCE_NAME, resource.name)
+            put(RESOURCE_URI, resource.uri)
+            resource.description?.let { description -> put(RESOURCE_DESCRIPTION, description) }
+            resource.mimeType?.let { mimeType -> put(RESOURCE_MIME_TYPE, mimeType) }
           }
         }
 
       val response = mutableMapOf<String, Any>("resources" to resources)
-      result.nextCursor()?.let { response["nextCursor"] = it }
+      result.nextCursor?.let { response["nextCursor"] = it }
       return response
     } catch (e: CancellationException) {
       throw e // Re-throw cancellation exceptions as they are not indicative of a tool failure.
@@ -65,9 +60,14 @@ internal class ListMcpResourcesTool(
   }
 
   companion object {
-    const val RESOURCE_NAME = "name"
-    const val RESOURCE_URI = "uri"
-    const val RESOURCE_DESCRIPTION = "description"
-    const val RESOURCE_MIME_TYPE = "mimeType"
+    private const val DESCRIPTION =
+      "List resources available on the MCP server. Returns one page and an optional " +
+        "'nextCursor'; pass it back as 'cursor' until no cursor remains. Use each entry's 'uri' " +
+        "with load_mcp_resource to avoid resolving a non-unique name."
+
+    private const val RESOURCE_NAME = "name"
+    private const val RESOURCE_URI = "uri"
+    private const val RESOURCE_DESCRIPTION = "description"
+    private const val RESOURCE_MIME_TYPE = "mimeType"
   }
 }

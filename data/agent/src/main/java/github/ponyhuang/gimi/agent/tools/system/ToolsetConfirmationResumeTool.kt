@@ -31,7 +31,7 @@ internal class ToolsetConfirmationResumeTool(
 
     override suspend fun run(
         context: ToolContext,
-        args: Map<String, Any>,
+        args: Map<String, Any?>,
     ): Any {
         val activeTool = source.getTools(context.context).firstOrNull { candidate ->
             candidate.name == name

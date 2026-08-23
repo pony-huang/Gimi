@@ -23,7 +23,7 @@ internal class GlmWebSearchTool(
         parameters = PARAMETERS,
     )
 
-    override suspend fun execute(context: ToolContext, args: Map<String, Any>): Any {
+    override suspend fun execute(context: ToolContext, args: Map<String, Any?>): Any {
         val query = (args[ARG_QUERY] as? String)?.takeIf(String::isNotBlank)
             ?: return mapOf(ERROR_KEY to "Missing required argument: $ARG_QUERY")
         return runCatching {
@@ -96,7 +96,7 @@ internal class GlmReaderTool(
         parameters = PARAMETERS,
     )
 
-    override suspend fun execute(context: ToolContext, args: Map<String, Any>): Any {
+    override suspend fun execute(context: ToolContext, args: Map<String, Any?>): Any {
         val url = (args[ARG_URL] as? String)?.takeIf(String::isNotBlank)
             ?: return mapOf(ERROR_KEY to "Missing required argument: $ARG_URL")
         return runCatching {

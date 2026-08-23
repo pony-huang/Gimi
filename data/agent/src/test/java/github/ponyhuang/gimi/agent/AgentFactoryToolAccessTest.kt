@@ -165,7 +165,7 @@ class AgentFactoryToolAccessTest {
 
                 override suspend fun run(
                     context: ToolContext,
-                    args: Map<String, Any>,
+                    args: Map<String, Any?>,
                 ): Any = emptyMap<String, Any>()
             }
     }

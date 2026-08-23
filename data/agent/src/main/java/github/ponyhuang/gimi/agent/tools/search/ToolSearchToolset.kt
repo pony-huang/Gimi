@@ -299,7 +299,7 @@ internal class ToolSearchToolset(
 
         override suspend fun run(
             context: ToolContext,
-            args: Map<String, Any>,
+            args: Map<String, Any?>,
         ): Any = owner.search(
             rawQuery = args[ARG_QUERY] as? String ?: "",
             toolContext = context,

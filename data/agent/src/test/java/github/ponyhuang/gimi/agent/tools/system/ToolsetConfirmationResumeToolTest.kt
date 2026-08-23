@@ -15,13 +15,13 @@ class ToolsetConfirmationResumeToolTest {
 
     @Test
     fun delegatesToToolThatIsStillAvailableInCurrentRequestContext() = runTest {
-        var receivedArgs: Map<String, Any>? = null
+        var receivedArgs: Map<String, Any?>? = null
         val activeTool = object : BaseTool("adjust_media_volume", "Adjust volume") {
             override fun declaration(): FunctionDeclaration? = null
 
             override suspend fun run(
                 context: ToolContext,
-                args: Map<String, Any>,
+                args: Map<String, Any?>,
             ): Any {
                 receivedArgs = args
                 return mapOf("appliedLevel" to 50)

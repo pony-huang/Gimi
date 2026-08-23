@@ -71,7 +71,7 @@ class AgentChatRunner(
      *
      * @property selection 构建 Agent 时使用的显式模型选择（模型名称）。
      * @property toolAccessMode 工具声明加载模式。
-     * @property revision 构建时的外部配置版本（工具授权/MCP/模型目录/AppFunction）。
+     * @property revision 构建时的外部配置版本（工具授权/MCP/模型目录）。
      */
     private data class AgentKey(
         val selection: ModelSelection?,

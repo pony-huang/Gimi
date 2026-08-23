@@ -3,11 +3,6 @@ package github.ponyhuang.gimi.feature.settings
 import app.cash.turbine.test
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
-import github.ponyhuang.gimi.domain.appfunctions.model.AppFunctionCatalogState
-import github.ponyhuang.gimi.domain.appfunctions.model.AppFunctionExecutionResult
-import github.ponyhuang.gimi.domain.appfunctions.model.AppFunctionKey
-import github.ponyhuang.gimi.domain.appfunctions.model.AppFunctionsSupport
-import github.ponyhuang.gimi.domain.appfunctions.repository.AppFunctionRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,7 +21,7 @@ class SettingsViewModelTest {
     @Test
     fun toolActivitySwitchPassesThroughToRepository() = runTest(mainDispatcherRule.dispatcher) {
         val repository = FakeChatDisplayRepository()
-        val viewModel = SettingsViewModel(repository, FakeAppFunctionRepository())
+        val viewModel = SettingsViewModel(repository)
 
         viewModel.uiState.test {
             assertFalse(awaitItem().showToolActivity)
@@ -43,7 +38,6 @@ class SettingsViewModelTest {
     fun navigationActionsEmitMatchingEffects() = runTest {
         val viewModel = SettingsViewModel(
             FakeChatDisplayRepository(),
-            FakeAppFunctionRepository(),
         )
 
         viewModel.effects.test {
@@ -63,8 +57,6 @@ class SettingsViewModelTest {
             assertEquals(SettingsEffect.NavigateToPermissions, awaitItem())
             viewModel.onAction(SettingsAction.OpenToolAuthorization)
             assertEquals(SettingsEffect.NavigateToToolAuthorization, awaitItem())
-            viewModel.onAction(SettingsAction.OpenAppFunctions)
-            assertEquals(SettingsEffect.NavigateToAppFunctions, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -73,7 +65,6 @@ class SettingsViewModelTest {
     fun toggleActionDoesNotEmitEffect() = runTest {
         val viewModel = SettingsViewModel(
             FakeChatDisplayRepository(),
-            FakeAppFunctionRepository(),
         )
 
         viewModel.effects.test {
@@ -82,28 +73,6 @@ class SettingsViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
-
-    @Test
-    fun appFunctionsMenuRequiresRuntimeManagerSupport() =
-        runTest(mainDispatcherRule.dispatcher) {
-            val unsupported = SettingsViewModel(
-                FakeChatDisplayRepository(),
-                FakeAppFunctionRepository(AppFunctionsSupport.UNSUPPORTED_DEVICE),
-            )
-            val supported = SettingsViewModel(
-                FakeChatDisplayRepository(),
-                FakeAppFunctionRepository(AppFunctionsSupport.MISSING_SYSTEM_PERMISSION),
-            )
-
-            unsupported.uiState.test {
-                assertFalse(awaitItem().showAppFunctions)
-                cancelAndIgnoreRemainingEvents()
-            }
-            supported.uiState.test {
-                assertTrue(awaitItem().showAppFunctions)
-                cancelAndIgnoreRemainingEvents()
-            }
-        }
 }
 
 private class FakeChatDisplayRepository : ChatDisplayRepository {
@@ -120,22 +89,4 @@ private class FakeChatDisplayRepository : ChatDisplayRepository {
     override fun setDarkThemeOverride(enabled: Boolean) {
         mutableDarkThemeOverride.value = enabled
     }
-}
-
-private class FakeAppFunctionRepository(
-    support: AppFunctionsSupport = AppFunctionsSupport.AVAILABLE,
-) : AppFunctionRepository {
-    override val state = MutableStateFlow(AppFunctionCatalogState(support = support))
-    override val revision = MutableStateFlow(0L)
-
-    override suspend fun setFeatureEnabled(enabled: Boolean): Boolean = true
-
-    override suspend fun setAppEnabled(packageName: String, enabled: Boolean) = Unit
-
-    override suspend fun setFunctionEnabled(key: AppFunctionKey, enabled: Boolean) = Unit
-
-    override suspend fun execute(
-        key: AppFunctionKey,
-        arguments: Map<String, Any>,
-    ): AppFunctionExecutionResult = AppFunctionExecutionResult.Success(Unit)
 }

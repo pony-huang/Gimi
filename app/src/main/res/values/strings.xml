@@ -1,8 +1,6 @@
 <resources>
     <string name="app_name">Gimi</string>
 
-    <!-- 被 Manifest 的 appfn:description/displayDescription 引用：lint ManifestResource
-         禁止其按 locale 变体化，故只能存在于 values/，不要加入 values-en/。 -->
     <string name="media_notification_listener_label">asssistantai media control</string>
     <string name="bluetooth_voice_channel_name">语音唤醒</string>
     <string name="bluetooth_voice_notification_title">语音唤醒助手</string>

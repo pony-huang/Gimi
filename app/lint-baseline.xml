@@ -157,28 +157,6 @@
 
     <issue
         id="GradleDependency"
-        message="A newer version of androidx.appfunctions:appfunctions than 1.0.0-alpha09 is available: 1.0.0-alpha10"
-        errorLine1="appfunctions = &quot;1.0.0-alpha09&quot;"
-        errorLine2="               ~~~~~~~~~~~~~~~">
-        <location
-            file="../gradle/libs.versions.toml"
-            line="26"
-            column="16"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.appfunctions:appfunctions-compiler than 1.0.0-alpha09 is available: 1.0.0-alpha10"
-        errorLine1="appfunctions = &quot;1.0.0-alpha09&quot;"
-        errorLine2="               ~~~~~~~~~~~~~~~">
-        <location
-            file="../gradle/libs.versions.toml"
-            line="26"
-            column="16"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
         message="A newer version of androidx.annotation:annotation than 1.9.1 is available: 1.10.0"
         errorLine1="androidxAnnotation = &quot;1.9.1&quot;"
         errorLine2="                     ~~~~~~~">
@@ -340,28 +318,6 @@
             file="../gradle/libs.versions.toml"
             line="34"
             column="24"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;app_function_app_description&quot; is not translated in &quot;en&quot; (English)"
-        errorLine1="    &lt;string name=&quot;app_function_app_description&quot;>本地 AI 助手 — 让外部 / 系统 agent 在不打开 app 的前提下，向本 app 的 AI 助手发送文本消息并获得回答；可指定或复用会话以进行多轮对话。&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="6"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;app_function_app_display_description&quot; is not translated in &quot;en&quot; (English)"
-        errorLine1="    &lt;string name=&quot;app_function_app_display_description&quot;>asssistantai 本地助手&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="7"
-            column="13"/>
     </issue>
 
     <issue

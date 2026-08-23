@@ -4,7 +4,7 @@
 # Each entry below covers a case where R8 cannot prove a class is reachable
 # even though the runtime does (reflection, manifest lookup, native binding).
 # Everything else is handled by consumer-rules.pro embedded in each AAR
-# (Compose, Hilt, Room, AppFunctions, openai-java, anthropic-java, google-adk,
+# (Compose, Hilt, Room, openai-java, anthropic-java, google-adk,
 # vosk-android, ktor) — those are merged automatically.
 # ---------------------------------------------------------------------------
 

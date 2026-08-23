@@ -4,7 +4,7 @@
 
 `settings.gradle.kts` is the source of truth for this multi-module Android app:
 
-- `:app`: composition root for startup, top-level navigation, Android services/app functions, and cross-capability Hilt wiring; never a catch-all for UI, domain, data, or provider logic.
+- `:app`: composition root for startup, top-level navigation, Android services, and cross-capability Hilt wiring; never a catch-all for UI, domain, data, or provider logic.
 - `:core:common`, `:core:audio`, `:core:network`, `:core:testing`: narrow shared infrastructure.
 - `:core:designsystem`: theme tokens and stateless, business-agnostic Compose components.
 - `:domain:<capability>`: domain models, repository interfaces, and use cases.

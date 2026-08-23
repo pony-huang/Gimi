@@ -5,7 +5,6 @@ import kotlinx.coroutines.flow.StateFlow
 enum class AgentTaskSource {
     CHAT,
     BLUETOOTH_VOICE,
-    APP_FUNCTION,
     SYSTEM_ASSISTANT,
 }
 

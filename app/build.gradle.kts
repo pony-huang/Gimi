@@ -116,7 +116,6 @@ dependencies {
     implementation(project(":data:permissions"))
     implementation(project(":data:toolauthorization"))
     implementation(project(":data:skills"))
-    implementation(project(":data:appfunctions"))
     implementation(project(":data:appupdate"))
     implementation(project(":core:designsystem"))
     implementation(project(":feature:modelsettings"))
@@ -127,7 +126,6 @@ dependencies {
     implementation(project(":feature:voicewake"))
     implementation(project(":feature:settings"))
     implementation(project(":feature:skills"))
-    implementation(project(":feature:appfunctions"))
     implementation(project(":feature:chat"))
     testImplementation(project(":core:testing"))
     // Drop kxml2 from the release runtime configurations only. Android's

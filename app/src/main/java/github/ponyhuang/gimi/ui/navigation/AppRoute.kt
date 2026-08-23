@@ -29,18 +29,6 @@ sealed interface AppRoute : NavKey {
     @Serializable
     data object ToolAuthorizationConfiguration : AppRoute
 
-    /** AppFunctions 尝鲜总开关及提供应用目录。 */
-    @Serializable
-    data object AppFunctionsSettings : AppRoute
-
-    /**
-     * 单个提供应用的函数授权页。
-     *
-     * @property packageName 提供应用包名。
-     */
-    @Serializable
-    data class AppFunctionAppDetail(val packageName: String) : AppRoute
-
     @Serializable
     data object SkillsSettings : AppRoute
 

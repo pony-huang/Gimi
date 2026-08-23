@@ -26,7 +26,6 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":domain:appupdate"))
     implementation(project(":domain:conversation"))
-    implementation(project(":domain:appfunctions"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.compose.foundation)

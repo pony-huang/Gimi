@@ -4,40 +4,25 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
-import github.ponyhuang.gimi.domain.appfunctions.model.AppFunctionsSupport
-import github.ponyhuang.gimi.domain.appfunctions.repository.AppFunctionRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val chatDisplayRepository: ChatDisplayRepository,
-    appFunctionRepository: AppFunctionRepository,
 ) : ViewModel() {
-    val uiState: StateFlow<SettingsUiState> = combine(
-        chatDisplayRepository.showToolActivity,
-        appFunctionRepository.state,
-    ) { showToolActivity, appFunctions ->
-        SettingsUiState(
-            showToolActivity = showToolActivity,
-            showAppFunctions =
-                appFunctions.support != AppFunctionsSupport.UNSUPPORTED_DEVICE,
-        )
-    }
+    val uiState: StateFlow<SettingsUiState> = chatDisplayRepository.showToolActivity
+        .map(::SettingsUiState)
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = SettingsUiState(
-                showToolActivity = chatDisplayRepository.showToolActivity.value,
-                showAppFunctions = appFunctionRepository.state.value.support !=
-                    AppFunctionsSupport.UNSUPPORTED_DEVICE,
-            ),
+            initialValue = SettingsUiState(chatDisplayRepository.showToolActivity.value),
         )
 
     private val mutableEffects = MutableSharedFlow<SettingsEffect>()
@@ -54,8 +39,6 @@ class SettingsViewModel @Inject constructor(
             SettingsAction.OpenPermissions -> emitEffect(SettingsEffect.NavigateToPermissions)
             SettingsAction.OpenToolAuthorization ->
                 emitEffect(SettingsEffect.NavigateToToolAuthorization)
-            SettingsAction.OpenAppFunctions ->
-                emitEffect(SettingsEffect.NavigateToAppFunctions)
             SettingsAction.OpenProjectPage ->
                 emitEffect(SettingsEffect.OpenProjectPage)
             is SettingsAction.SetToolActivityVisible ->

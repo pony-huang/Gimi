@@ -38,7 +38,6 @@ android {
 
 dependencies {
     implementation(project(":core:common"))
-    implementation(project(":domain:appfunctions"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:mcp"))
     implementation(project(":domain:modelcatalog"))
@@ -81,10 +80,6 @@ dependencies {
     testImplementation(libs.turbine)
 
     androidTestImplementation(libs.androidx.junit)
-}
-
-ksp {
-    arg("appfunctions:aggregateAppFunctions", "true")
 }
 
 kapt {

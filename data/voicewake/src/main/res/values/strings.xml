@@ -11,4 +11,6 @@
     <string name="wake_model_files_incomplete">唤醒模型文件不完整</string>
     <string name="wake_model_install_failed">唤醒模型安装失败</string>
     <string name="wake_model_download_failed">唤醒模型下载失败</string>
+    <string name="wake_model_removing">正在移除唤醒模型</string>
+    <string name="wake_model_remove_failed">唤醒模型移除失败</string>
 </resources>

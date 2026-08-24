@@ -10,6 +10,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.speech.model.VoiceWakeState
+import github.ponyhuang.gimi.domain.speech.model.VoiceWakeStatus
 import github.ponyhuang.gimi.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.gimi.domain.speech.model.WakeModelState
 import github.ponyhuang.gimi.domain.speech.model.WakeModelStatus
@@ -19,6 +20,7 @@ import github.ponyhuang.gimi.domain.speech.usecase.ObserveVoiceWakeSettingsUseCa
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import io.mockk.verifyOrder
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -131,6 +133,30 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
             viewModel.onAction(VoiceWakeSettingsAction.SelectModel(WakeModelCatalog.Chinese.id))
 
             verify(exactly = 0) { voiceRepository.installModel(any()) }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun removingActiveModelStopsListeningBeforeDeletingModel() = runTest {
+        val voiceState = voiceState(ready = true).apply {
+            value = value.copy(status = VoiceWakeStatus.Listening)
+        }
+        val voiceRepository = voiceRepository(voiceState)
+        val viewModel = viewModel(modelRepository(), voiceRepository)
+
+        viewModel.uiState.test {
+            var state = awaitItem()
+            while (!state.configurationReady || !state.voiceState.isRunning) state = awaitItem()
+
+            viewModel.onAction(
+                VoiceWakeSettingsAction.RemoveModel(WakeModelCatalog.Chinese.id),
+            )
+
+            verifyOrder {
+                voiceRepository.stop()
+                voiceRepository.removeModel(WakeModelCatalog.Chinese.id)
+            }
             cancelAndIgnoreRemainingEvents()
         }
     }

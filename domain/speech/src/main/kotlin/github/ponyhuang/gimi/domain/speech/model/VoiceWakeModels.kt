@@ -13,7 +13,7 @@ enum class VoiceWakeStatus {
     Error,
 }
 
-enum class WakeModelStatus { Missing, Downloading, Extracting, Ready, Error }
+enum class WakeModelStatus { Missing, Downloading, Extracting, Ready, Removing, Error }
 
 /** 单个离线唤醒模型的安装状态、进度与失败信息。 */
 data class WakeModelState(

@@ -15,6 +15,9 @@ interface VoiceWakeRepository {
     /** 取消正在进行的模型安装/下载。 */
     fun cancelInstall(modelId: String)
 
+    /** 删除指定模型的本地文件。 */
+    fun removeModel(modelId: String)
+
     fun start()
 
     fun stop()

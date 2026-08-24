@@ -70,6 +70,10 @@ class VoiceWakeSettingsViewModel @Inject constructor(
                 }
                 manageVoiceWake.cancelInstall(action.modelId)
             }
+            is VoiceWakeSettingsAction.RemoveModel -> {
+                localState.update { it.copy(isStartPending = false) }
+                manageVoiceWake.removeModel(action.modelId)
+            }
             is VoiceWakeSettingsAction.PermissionsResult -> {
                 val state = uiState.value
                 if (
@@ -117,6 +121,7 @@ class VoiceWakeSettingsViewModel @Inject constructor(
             WakeModelStatus.Downloading,
             WakeModelStatus.Extracting,
             -> localState.update { it.copy(isStartPending = true) }
+            WakeModelStatus.Removing -> Unit
             WakeModelStatus.Ready -> if (state.configurationReady) localState.update {
                 it.copy(permissionRequestId = ++nextPermissionRequestId)
             }

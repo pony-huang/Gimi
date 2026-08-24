@@ -19,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,6 +38,7 @@ class WakeModelRepository @Inject constructor(
     private val downloader = WakeModelDownloader(okHttpClient)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val rootDir = File(context.filesDir, "voice/wake-model")
+    private val fileStore = WakeModelFileStore(rootDir)
     private val _states = MutableStateFlow(initialStates())
     private val installJobs = ConcurrentHashMap<String, Job>()
 
@@ -69,6 +71,35 @@ class WakeModelRepository @Inject constructor(
     fun cancelInstall(modelId: String) {
         installJobs.remove(modelId)?.cancel()
         updateState(modelId, WakeModelState())
+    }
+
+    fun remove(modelId: String) {
+        if (WakeModelCatalog.byId(modelId) == null) return
+        if (_states.value[modelId]?.status != WakeModelStatus.Ready) return
+        val installing = installJobs.remove(modelId)
+        updateState(
+            modelId,
+            WakeModelState(
+                status = WakeModelStatus.Removing,
+                progress = 1f,
+                message = getString(R.string.wake_model_removing),
+            ),
+        )
+        scope.launch {
+            installing?.cancelAndJoin()
+            val removed = fileStore.remove(modelId)
+            updateState(
+                modelId,
+                if (removed) {
+                    WakeModelState()
+                } else {
+                    WakeModelState(
+                        status = WakeModelStatus.Error,
+                        message = getString(R.string.wake_model_remove_failed),
+                    )
+                },
+            )
+        }
     }
 
     private suspend fun installInternal(info: WakeModelInfo) {
@@ -181,7 +212,7 @@ class WakeModelRepository @Inject constructor(
 
     private fun getString(resId: Int): String = context.getString(resId)
 
-    private fun installedDir(modelId: String): File = File(rootDir, modelId)
+    private fun installedDir(modelId: String): File = fileStore.installedDir(modelId)
 
     private fun initialStates(): Map<String, WakeModelState> {
         return WakeModelCatalog.models.associate { info ->

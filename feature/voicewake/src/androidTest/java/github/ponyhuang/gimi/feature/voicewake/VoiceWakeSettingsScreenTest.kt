@@ -95,6 +95,33 @@ class VoiceWakeSettingsScreenTest {
     }
 
     @Test
+    fun readyModelShowsRemoveButtonAndEmitsRemoveAction() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val removeLabel = if (context.resources.configuration.locales[0].language == "zh") {
+            "移除"
+        } else {
+            "Remove"
+        }
+        var action: VoiceWakeSettingsAction? = null
+        composeRule.setContent {
+            AsssistantaiTheme {
+                VoiceWakeSettingsScreen(
+                    state = VoiceWakeSettingsUiState(voiceState = twoModelState()),
+                    onAction = { action = it },
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(removeLabel).performClick()
+
+        assertEquals("RemoveModel", action?.javaClass?.simpleName)
+        assertEquals(
+            WakeModelCatalog.Chinese.id,
+            action?.javaClass?.getMethod("getModelId")?.invoke(action),
+        )
+    }
+
+    @Test
     fun runningListenerShowsLiveStatusInSubtitle() {
         composeRule.setContent {
             AsssistantaiTheme {

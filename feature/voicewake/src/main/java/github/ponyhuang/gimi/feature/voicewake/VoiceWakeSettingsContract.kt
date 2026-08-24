@@ -30,6 +30,9 @@ sealed interface VoiceWakeSettingsAction {
     /** 取消指定唤醒模型的下载或解包。 */
     data class CancelInstall(val modelId: String) : VoiceWakeSettingsAction
 
+    /** 移除指定唤醒模型的本地文件。 */
+    data class RemoveModel(val modelId: String) : VoiceWakeSettingsAction
+
     /** 提交系统权限请求结果。 */
     data class PermissionsResult(val granted: Boolean) : VoiceWakeSettingsAction
 

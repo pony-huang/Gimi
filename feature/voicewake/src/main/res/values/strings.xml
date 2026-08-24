@@ -11,11 +11,13 @@
     <string name="voicewake_model_status_download_required">选择后自动下载约 %1$d MB，识别仅在本机进行</string>
     <string name="voicewake_model_downloading_progress">正在下载 %1$d%%</string>
     <string name="voicewake_model_installing">正在安装模型</string>
+    <string name="voicewake_model_removing">正在移除模型</string>
     <string name="voicewake_model_ready">已就绪，仅在本机识别“%1$s”</string>
     <string name="voicewake_model_install_failed">安装失败</string>
     <string name="voicewake_action_download">下载</string>
     <string name="voicewake_action_retry">重试</string>
     <string name="voicewake_action_cancel">取消</string>
+    <string name="voicewake_action_remove">移除</string>
 
     <string name="voicewake_section_keyword_with_language">唤醒词 · %1$s</string>
     <string name="voicewake_language_zh">中文</string>

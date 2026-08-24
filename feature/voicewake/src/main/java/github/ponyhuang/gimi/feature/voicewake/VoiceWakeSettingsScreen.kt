@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.BluetoothAudio
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -93,6 +94,7 @@ fun VoiceWakeSettingsScreen(
                     onSelect = { onAction(VoiceWakeSettingsAction.SelectModel(model.id)) },
                     onInstall = { onAction(VoiceWakeSettingsAction.InstallModel(model.id)) },
                     onCancel = { onAction(VoiceWakeSettingsAction.CancelInstall(model.id)) },
+                    onRemove = { onAction(VoiceWakeSettingsAction.RemoveModel(model.id)) },
                 )
             }
 
@@ -140,6 +142,7 @@ private fun WakeModelRow(
     onSelect: () -> Unit,
     onInstall: () -> Unit,
     onCancel: () -> Unit,
+    onRemove: () -> Unit,
 ) {
     ListItem(
         headlineContent = {
@@ -177,6 +180,7 @@ private fun WakeModelRow(
                     )
                 }
                 WakeModelStatus.Extracting -> Text(stringResource(R.string.voicewake_model_installing))
+                WakeModelStatus.Removing -> Text(stringResource(R.string.voicewake_model_removing))
                 WakeModelStatus.Ready -> Text(
                     stringResource(
                         R.string.voicewake_model_ready,
@@ -205,6 +209,13 @@ private fun WakeModelRow(
             ) {
                 TextButton(onClick = onCancel) {
                     Text(stringResource(R.string.voicewake_action_cancel))
+                }
+            } else if (modelState.status == WakeModelStatus.Ready) {
+                TextButton(onClick = onRemove) {
+                    Text(
+                        text = stringResource(R.string.voicewake_action_remove),
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
             }
         },

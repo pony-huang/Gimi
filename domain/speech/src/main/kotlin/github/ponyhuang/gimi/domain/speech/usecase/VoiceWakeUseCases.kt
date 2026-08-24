@@ -31,6 +31,14 @@ class ManageVoiceWakeUseCase @Inject constructor(
 
     fun cancelInstall(modelId: String) = repository.cancelInstall(modelId)
 
+    fun removeModel(modelId: String) {
+        val state = repository.state.value
+        if (state.activeModelId == modelId && state.isRunning) {
+            repository.stop()
+        }
+        repository.removeModel(modelId)
+    }
+
     fun start() = repository.start()
 
     fun stop() = repository.stop()

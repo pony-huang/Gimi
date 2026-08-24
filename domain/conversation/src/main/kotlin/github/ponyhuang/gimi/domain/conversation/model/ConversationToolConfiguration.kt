@@ -24,12 +24,14 @@ enum class ToolAccessMode {
  *
  * @property enabledLocalToolIds 当前会话选择的本地工具 ID。
  * @property enabledMcpServerIds 当前会话选择的 MCP server ID。
+ * @property pendingMcpCredentialServerId 当前会话最近一次等待补充认证凭据的 MCP server ID。
  * @property enabledOfficialFunctionIdsByService 按模型服务和官方工具分组的函数选择。
  * @property toolAccessMode 当前会话采用的工具声明加载模式。
  */
 data class ConversationToolConfiguration(
     val enabledLocalToolIds: Set<String> = emptySet(),
     val enabledMcpServerIds: Set<String> = emptySet(),
+    val pendingMcpCredentialServerId: String? = null,
     val enabledOfficialFunctionIdsByService: Map<String, Map<String, Set<String>>> = emptyMap(),
     val toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
 ) {

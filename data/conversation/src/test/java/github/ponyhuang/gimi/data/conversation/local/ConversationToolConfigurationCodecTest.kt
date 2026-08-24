@@ -13,6 +13,7 @@ class ConversationToolConfigurationCodecTest {
         val configuration = ConversationToolConfiguration(
             enabledLocalToolIds = setOf("clock", "location"),
             enabledMcpServerIds = setOf("server-1"),
+            pendingMcpCredentialServerId = "server-1",
             enabledOfficialFunctionIdsByService = mapOf(
                 "mimo" to mapOf("web_search" to setOf("web_search")),
                 "kimi" to mapOf(
@@ -27,6 +28,7 @@ class ConversationToolConfigurationCodecTest {
         val encoded = ConversationToolConfigurationCodec.encode(configuration)
 
         assertEquals(true, encoded.contains("\"toolAccessMode\":\"ALWAYS_AVAILABLE\""))
+        assertEquals(true, encoded.contains("\"pendingMcpCredentialServerId\":\"server-1\""))
         assertEquals(configuration, ConversationToolConfigurationCodec.decode(encoded))
     }
 

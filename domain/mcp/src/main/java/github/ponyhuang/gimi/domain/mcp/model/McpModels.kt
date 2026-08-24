@@ -26,6 +26,7 @@ data class McpServer(
  * @property updated 按名称更新的服务器数量。
  * @property skipped 因传输方式或字段无效而跳过的条目数量。
  * @property affectedServerIds 成功新增或更新的服务器稳定 ID。
+ * @property credentialRequiredServerIds 已导入但仍需用户补充认证凭据的服务器 ID。
  * @property error 顶层输入无法处理时的错误；部分条目无效时使用 [skipped] 表达。
  */
 data class McpImportResult(
@@ -33,6 +34,7 @@ data class McpImportResult(
     val updated: Int = 0,
     val skipped: Int = 0,
     val affectedServerIds: Set<String> = emptySet(),
+    val credentialRequiredServerIds: Set<String> = emptySet(),
     val error: String? = null,
 ) {
     val imported: Int
@@ -48,4 +50,17 @@ data class McpImportResult(
 data class McpConversationImportResult(
     val importResult: McpImportResult,
     val conversationActivated: Boolean,
+)
+
+/**
+ * 当前会话待补 MCP 认证信息的更新结果。
+ *
+ * @property updated 认证信息是否已经写入 MCP server 配置。
+ * @property serverName 被更新的服务器名称；无法定位服务器时为空。
+ * @property error 无法更新或无法清理会话待补标记时的安全错误信息。
+ */
+data class McpCredentialUpdateResult(
+    val updated: Boolean,
+    val serverName: String? = null,
+    val error: String? = null,
 )

@@ -14,7 +14,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 允许 Agent 把用户明确提供的 MCP JSON 导入全局配置并绑定到当前会话。
+ * 允许 Agent 把用户明确提供的 MCP JSON 或 curl 导入全局配置并绑定到当前会话。
  *
  * 返回值只包含计数和服务器名称，避免把 URL、请求头或 token 再次暴露给模型。
  */
@@ -32,12 +32,12 @@ class McpConfigurationTool @Inject constructor(
         parameters = Schema(
             type = Type.OBJECT,
             properties = mapOf(
-                ARG_CONFIG_JSON to Schema(
+                ARG_CONFIG_CONTENT to Schema(
                     type = Type.STRING,
-                    description = "The complete raw MCP JSON configuration provided by the user.",
+                    description = "The complete raw MCP configuration provided by the user as JSON or curl.",
                 ),
             ),
-            required = listOf(ARG_CONFIG_JSON),
+            required = listOf(ARG_CONFIG_CONTENT),
         ),
     )
 
@@ -53,19 +53,20 @@ class McpConfigurationTool @Inject constructor(
         context: ToolContext,
         args: Map<String, Any?>,
     ): Any {
-        val json = args[ARG_CONFIG_JSON] as? String
-        if (json.isNullOrBlank()) {
-            return failure("config_json must contain an MCP JSON configuration.")
+        val content = args[ARG_CONFIG_CONTENT] as? String
+        if (content.isNullOrBlank()) {
+            return failure("config_content must contain an MCP JSON or curl configuration.")
         }
         val sessionId = context.context.session.key.id
         if (sessionId.isNullOrBlank()) {
             return failure("The current conversation has no persistent session id.")
         }
 
-        val result = importForConversation(sessionId, json)
+        val result = importForConversation(sessionId, content)
         val imported = result.importResult
         val namesById = repository.currentServers().associate { it.id to it.name }
         val serverNames = imported.affectedServerIds.mapNotNull(namesById::get)
+        val credentialServerNames = imported.credentialRequiredServerIds.mapNotNull(namesById::get)
         return buildMap {
             put(
                 "success",
@@ -76,6 +77,8 @@ class McpConfigurationTool @Inject constructor(
             put("skipped", imported.skipped)
             put("conversation_activated", result.conversationActivated)
             put("servers", serverNames)
+            put("credentials_required", credentialServerNames.isNotEmpty())
+            put("credential_servers", credentialServerNames)
             imported.error?.let { put("error", it) }
             if (imported.error == null && imported.imported > 0 && !result.conversationActivated) {
                 put("error", "MCP servers were imported but could not be enabled for this conversation.")
@@ -90,22 +93,28 @@ class McpConfigurationTool @Inject constructor(
         "skipped" to 0,
         "conversation_activated" to false,
         "servers" to emptyList<String>(),
+        "credentials_required" to false,
+        "credential_servers" to emptyList<String>(),
         "error" to message,
     )
 
     companion object {
         const val NAME: String = "import_mcp_servers"
-        private const val ARG_CONFIG_JSON: String = "config_json"
+        private const val ARG_CONFIG_CONTENT: String = "config_content"
         private const val DESCRIPTION: String =
-            "Imports or updates remote MCP server configurations from JSON explicitly pasted " +
+            "Imports or updates remote MCP server configurations from JSON or curl explicitly pasted " +
                 "by the user and enables them for the current conversation. Call this only when " +
                 "the content is clearly an MCP configuration. Supports SSE and Streamable HTTP; " +
                 "stdio entries are skipped."
         private const val MCP_IMPORT_INSTRUCTION: String =
             "When a user message clearly contains an MCP server configuration, call " +
-                "import_mcp_servers with the complete configuration JSON. Do not call it for " +
-                "unrelated JSON, and do not invent missing MCP fields. Sending a clear MCP " +
-                "configuration is authorization for that import, so do not ask for an " +
-                "additional confirmation."
+                "import_mcp_servers with the complete configuration content in JSON or curl " +
+                "format. Do not call it for unrelated JSON, curl commands, or secrets, and do " +
+                "not invent missing MCP endpoint fields. If that tool reports credentials_required " +
+                "and the user subsequently supplies a token or an Authorization value, call " +
+                "update_mcp_server_authorization with exactly that value; it targets only the " +
+                "current conversation's pending MCP server. Sending a clear MCP configuration " +
+                "or requested credential is authorization for that update, so do not ask for an " +
+                "additional confirmation and never repeat the credential in your response."
     }
 }

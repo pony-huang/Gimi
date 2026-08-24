@@ -67,11 +67,12 @@ class McpUseCasesTest {
     }
 
     @Test
-    fun importForConversationEnablesAffectedServersWithoutChangingOtherSelections() = runTest {
+    fun importForConversationEnablesReadyServersAndTracksCredentialTemplate() = runTest {
         repository.importResult = McpImportResult(
             created = 1,
             updated = 1,
             affectedServerIds = setOf("mcp-d", "mcp-e"),
+            credentialRequiredServerIds = setOf("mcp-e"),
         )
         val conversations = FakeConversationRepository(
             storedConfiguration = ConversationToolConfiguration(
@@ -82,7 +83,7 @@ class McpUseCasesTest {
 
         val result = ImportMcpServersForConversationUseCase(repository, conversations)(
             sessionId = "session-1",
-            json = "{}",
+            content = "{}",
         )
 
         assertEquals(true, result.conversationActivated)
@@ -90,10 +91,72 @@ class McpUseCasesTest {
         assertEquals(
             ConversationToolConfiguration(
                 enabledLocalToolIds = setOf("clock"),
-                enabledMcpServerIds = setOf("mcp-a", "mcp-b", "mcp-c", "mcp-d", "mcp-e"),
+                enabledMcpServerIds = setOf("mcp-a", "mcp-b", "mcp-c", "mcp-d"),
+                pendingMcpCredentialServerId = "mcp-e",
             ),
             conversations.savedConfiguration,
         )
+    }
+
+    @Test
+    fun updateAuthorizationUsesPendingServerAndClearsConversationMarker() = runTest {
+        repository.serverResult = McpServer(id = "mcp-e", name = "zhihu-global-search")
+        repository.updateAuthorizationResult = true
+        val conversations = FakeConversationRepository(
+            storedConfiguration = ConversationToolConfiguration(
+                enabledMcpServerIds = setOf("mcp-a"),
+                pendingMcpCredentialServerId = "mcp-e",
+            ),
+        )
+
+        val result = UpdateMcpAuthorizationForConversationUseCase(repository, conversations)(
+            sessionId = "session-1",
+            authorization = "actual-secret",
+        )
+
+        assertEquals(true, result.updated)
+        assertEquals("zhihu-global-search", result.serverName)
+        assertEquals(listOf("mcp-e" to "Bearer actual-secret"), repository.authorizationUpdates)
+        assertEquals(null, conversations.savedConfiguration?.pendingMcpCredentialServerId)
+        assertEquals(setOf("mcp-a", "mcp-e"), conversations.savedConfiguration?.enabledMcpServerIds)
+    }
+
+    @Test
+    fun updateAuthorizationRejectsBearerSchemeWithoutCredential() = runTest {
+        repository.serverResult = McpServer(id = "mcp-e", name = "zhihu-global-search")
+        repository.updateAuthorizationResult = true
+        val conversations = FakeConversationRepository(
+            storedConfiguration = ConversationToolConfiguration(
+                pendingMcpCredentialServerId = "mcp-e",
+            ),
+        )
+
+        val result = UpdateMcpAuthorizationForConversationUseCase(repository, conversations)(
+            sessionId = "session-1",
+            authorization = "Authorization: Bearer",
+        )
+
+        assertEquals(false, result.updated)
+        assertEquals(emptyList<Pair<String, String>>(), repository.authorizationUpdates)
+    }
+
+    @Test
+    fun updateAuthorizationAcceptsCompleteAuthorizationHeader() = runTest {
+        repository.serverResult = McpServer(id = "mcp-e", name = "zhihu-global-search")
+        repository.updateAuthorizationResult = true
+        val conversations = FakeConversationRepository(
+            storedConfiguration = ConversationToolConfiguration(
+                pendingMcpCredentialServerId = "mcp-e",
+            ),
+        )
+
+        val result = UpdateMcpAuthorizationForConversationUseCase(repository, conversations)(
+            sessionId = "session-1",
+            authorization = "Authorization: Bearer actual-secret",
+        )
+
+        assertEquals(true, result.updated)
+        assertEquals(listOf("mcp-e" to "Bearer actual-secret"), repository.authorizationUpdates)
     }
 
     @Test
@@ -151,6 +214,8 @@ class McpUseCasesTest {
         val savedServers = mutableListOf<McpServer>()
         val deletedIds = mutableListOf<String>()
         val importedJson = mutableListOf<String>()
+        val authorizationUpdates = mutableListOf<Pair<String, String>>()
+        var updateAuthorizationResult = false
 
         override val revision: StateFlow<Long> = MutableStateFlow(0L)
 
@@ -174,6 +239,11 @@ class McpUseCasesTest {
         override fun importJson(json: String): McpImportResult {
             importedJson += json
             return importResult
+        }
+
+        override fun updateAuthorization(serverId: String, authorization: String): Boolean {
+            authorizationUpdates += serverId to authorization
+            return updateAuthorizationResult
         }
     }
 

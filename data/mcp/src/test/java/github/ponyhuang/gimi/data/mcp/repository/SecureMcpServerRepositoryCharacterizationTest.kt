@@ -8,6 +8,79 @@ import org.junit.Test
 
 class SecureMcpServerRepositoryCharacterizationTest {
     @Test
+    fun importCurlCreatesSseServerAndMarksPlaceholderAuthorizationAsPending() {
+        val repository = SecureMcpServerRepository(FakeStorage())
+
+        val result = repository.importConfiguration(
+            """
+            curl -N 'https://developer.zhihu.com/api/mcp/global_search/v1/sse' \
+              -H 'Authorization: Bearer <your_access_secret>' \
+              -H 'Accept: text/event-stream'
+            """.trimIndent(),
+        )
+
+        val server = repository.currentServers().single()
+        assertEquals(1, result.created)
+        assertEquals(setOf(server.id), result.credentialRequiredServerIds)
+        assertEquals("zhihu-global-search", server.name)
+        assertEquals(McpTransport.SSE, server.transport)
+        assertEquals(
+            "https://developer.zhihu.com/api/mcp/global_search/v1/sse",
+            server.endpointUrl,
+        )
+        assertEquals("Accept=text/event-stream", server.headers)
+    }
+
+    @Test
+    fun updateAuthorizationReplacesOnlyAuthorizationAndPreservesOtherHeaders() {
+        val repository = SecureMcpServerRepository(FakeStorage())
+        val imported = repository.importConfiguration(
+            """
+            curl -N 'https://developer.zhihu.com/api/mcp/global_search/v1/sse' \
+              -H 'Authorization: Bearer <your_access_secret>' \
+              -H 'Accept: text/event-stream'
+            """.trimIndent(),
+        )
+        val serverId = imported.credentialRequiredServerIds.single()
+
+        val updated = repository.updateAuthorization(serverId, "Bearer actual-secret")
+
+        assertEquals(true, updated)
+        assertEquals(
+            "Accept=text/event-stream\nAuthorization=Bearer actual-secret",
+            repository.server(serverId)?.headers,
+        )
+    }
+
+    @Test
+    fun reimportingCredentialTemplateDoesNotEraseExistingAuthorization() {
+        val repository = SecureMcpServerRepository(FakeStorage())
+        repository.save(
+            McpServer(
+                id = "stable-id",
+                name = "zhihu-global-search",
+                endpointUrl = "https://old.example.com/sse",
+                transport = McpTransport.SSE,
+                headers = "Authorization=Bearer existing-secret\nX-Trace=keep-if-not-replaced",
+            ),
+        )
+
+        val result = repository.importConfiguration(
+            """
+            curl -N 'https://developer.zhihu.com/api/mcp/global_search/v1/sse' \
+              -H 'Authorization: Bearer <your_access_secret>' \
+              -H 'Accept: text/event-stream'
+            """.trimIndent(),
+        )
+
+        assertEquals(emptySet<String>(), result.credentialRequiredServerIds)
+        assertEquals(
+            "Accept=text/event-stream\nAuthorization=Bearer existing-secret",
+            repository.server("stable-id")?.headers,
+        )
+    }
+
+    @Test
     fun importPortableJsonUpdatesSameNameWithoutCreatingDuplicate() {
         val storage = FakeStorage()
         val repository = SecureMcpServerRepository(storage)

@@ -18,5 +18,9 @@ interface McpRepository {
 
     fun delete(id: String)
 
+    fun importConfiguration(content: String): McpImportResult = importJson(content)
+
     fun importJson(json: String): McpImportResult
+
+    fun updateAuthorization(serverId: String, authorization: String): Boolean
 }

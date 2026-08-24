@@ -8,6 +8,7 @@ import github.ponyhuang.gimi.domain.mcp.model.McpImportResult
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
+import java.net.URI
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,6 +44,50 @@ class SecureMcpServerRepository @Inject constructor(
     @Synchronized
     override fun delete(id: String) = persist(servers.value.filterNot { it.id == id })
 
+    /** 接受设置页 JSON 或文档中可直接复制的 curl MCP 配置。 */
+    override fun importConfiguration(content: String): McpImportResult {
+        val portableJson = if (content.trimStart().startsWith("curl", ignoreCase = true)) {
+            curlToPortableJson(content)
+                ?: return McpImportResult(error = "curl MCP 配置无效")
+        } else {
+            content
+        }
+        return importJson(portableJson)
+    }
+
+    @Synchronized
+    override fun updateAuthorization(serverId: String, authorization: String): Boolean {
+        val normalized = authorization.trim()
+        if (
+            normalized.isBlank() ||
+            normalized.length > MAX_FIELD_CHARACTERS ||
+            '\r' in normalized ||
+            '\n' in normalized ||
+            isCredentialPlaceholder(normalized)
+        ) {
+            return false
+        }
+        val index = servers.value.indexOfFirst { it.id == serverId }
+        if (index < 0) return false
+        val existing = servers.value[index]
+        val retainedHeaders = existing.headers.lineSequence()
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .filterNot { line ->
+                line.substringBefore('=', missingDelimiterValue = "")
+                    .trim()
+                    .equals("Authorization", ignoreCase = true)
+            }
+            .toMutableList()
+            .apply { add("Authorization=$normalized") }
+            .joinToString("\n")
+        val updated = servers.value.toMutableList().apply {
+            set(index, existing.copy(bearerToken = "", headers = retainedHeaders))
+        }
+        persist(updated)
+        return true
+    }
+
     @Synchronized
     override fun importJson(json: String): McpImportResult {
         if (json.length > MAX_IMPORT_CHARACTERS) {
@@ -58,6 +103,7 @@ class SecureMcpServerRepository @Inject constructor(
         }
         val updatedServers = servers.value.toMutableList()
         val affectedServerIds = linkedSetOf<String>()
+        val credentialRequiredServerIds = linkedSetOf<String>()
         var created = 0
         var updated = 0
         var skipped = 0
@@ -84,11 +130,12 @@ class SecureMcpServerRepository @Inject constructor(
                 skipped++
                 return@forEach
             }
-            val headers = config.get("headers")
+            val headerObject = config.get("headers")
                 ?.takeIf { it.isJsonObject }
                 ?.asJsonObject
-                ?.toHeaderLines()
-                .orEmpty()
+            // 占位认证值只建立“待补凭据”关联，绝不能作为真实 Header 落盘。
+            val credentialRequired = headerObject?.requiresAuthorizationCredential() == true
+            val headers = headerObject?.toHeaderLines().orEmpty()
             val existingIndex = updatedServers.indexOfFirst { it.name.trim() == normalizedName }
             if (existingIndex < 0) {
                 McpServer(
@@ -99,18 +146,32 @@ class SecureMcpServerRepository @Inject constructor(
                 ).also { server ->
                     updatedServers += server
                     affectedServerIds += server.id
+                    if (credentialRequired) credentialRequiredServerIds += server.id
                     created++
                 }
             } else {
                 val existing = updatedServers[existingIndex]
+                // 重复导入模板时保留已配置的真实认证，避免占位符反向擦除可用凭据。
+                val preservedAuthorizationHeader = if (credentialRequired) {
+                    existing.authorizationHeaderLine()
+                } else {
+                    null
+                }
+                val mergedHeaders = listOfNotNull(
+                    headers.takeIf(String::isNotBlank),
+                    preservedAuthorizationHeader,
+                ).joinToString("\n")
                 updatedServers[existingIndex] = existing.copy(
                     name = normalizedName,
                     endpointUrl = url,
                     transport = transport,
-                    bearerToken = "",
-                    headers = headers,
+                    bearerToken = existing.bearerToken.takeIf { credentialRequired }.orEmpty(),
+                    headers = mergedHeaders,
                 )
                 affectedServerIds += existing.id
+                if (credentialRequired && !existing.hasAuthorizationCredential()) {
+                    credentialRequiredServerIds += existing.id
+                }
                 updated++
             }
         }
@@ -121,6 +182,7 @@ class SecureMcpServerRepository @Inject constructor(
             updated = updated,
             skipped = skipped,
             affectedServerIds = affectedServerIds,
+            credentialRequiredServerIds = credentialRequiredServerIds,
         )
     }
 
@@ -147,7 +209,132 @@ private fun JsonObject.string(name: String): String? =
 
 private fun JsonObject.toHeaderLines(): String = entrySet()
     .mapNotNull { (name, value) ->
-        value.takeIf { it.isJsonPrimitive }?.asString?.let { "$name=$it" }
+        value.takeIf { it.isJsonPrimitive }
+            ?.asString
+            ?.takeUnless(::isCredentialPlaceholder)
+            ?.let { "$name=$it" }
     }
     .joinToString("\n")
     .take(8_192)
+
+private fun JsonObject.requiresAuthorizationCredential(): Boolean = entrySet().any { (name, value) ->
+    name.equals("Authorization", ignoreCase = true) &&
+        value.isJsonPrimitive &&
+        isCredentialPlaceholder(value.asString)
+}
+
+private fun McpServer.hasAuthorizationCredential(): Boolean =
+    bearerToken.isNotBlank() || headers.lineSequence().any { line ->
+        line.substringBefore('=', missingDelimiterValue = "")
+            .trim()
+            .equals("Authorization", ignoreCase = true) &&
+            line.substringAfter('=', missingDelimiterValue = "").isNotBlank()
+    }
+
+private fun McpServer.authorizationHeaderLine(): String? = headers.lineSequence()
+    .map(String::trim)
+    .firstOrNull { line ->
+        line.substringBefore('=', missingDelimiterValue = "")
+            .trim()
+            .equals("Authorization", ignoreCase = true) &&
+            line.substringAfter('=', missingDelimiterValue = "").isNotBlank()
+    }
+
+private fun isCredentialPlaceholder(value: String): Boolean {
+    val trimmed = value.trim()
+    val normalized = if (trimmed.startsWith("Bearer ", ignoreCase = true)) {
+        trimmed.substringAfter(' ').trim()
+    } else {
+        trimmed
+    }
+    return normalized.matches(Regex("<[^>]+>")) ||
+        normalized.matches(Regex("\\$\\{[^}]+}")) ||
+        normalized.equals("your_access_secret", ignoreCase = true) ||
+        normalized.equals("your_token", ignoreCase = true)
+}
+
+private fun curlToPortableJson(content: String): String? {
+    // 只做 shell 词法拆分，不执行命令；支持文档中常见的引号和反斜杠续行格式。
+    val tokens = shellTokens(content.replace(Regex("\\\\\\s*\\r?\\n"), " "))
+    if (tokens.firstOrNull()?.equals("curl", ignoreCase = true) != true) return null
+    val url = tokens.firstOrNull { token ->
+        token.startsWith("https://", ignoreCase = true) || token.startsWith("http://", ignoreCase = true)
+    } ?: return null
+    val headers = linkedMapOf<String, String>()
+    tokens.forEachIndexed { index, token ->
+        val rawHeader = when {
+            token == "-H" || token == "--header" -> tokens.getOrNull(index + 1)
+            token.startsWith("--header=") -> token.substringAfter('=')
+            token.startsWith("-H") && token.length > 2 -> token.substring(2)
+            else -> null
+        } ?: return@forEachIndexed
+        val name = rawHeader.substringBefore(':', missingDelimiterValue = "").trim()
+        val value = rawHeader.substringAfter(':', missingDelimiterValue = "").trim()
+        if (name.isNotBlank() && value.isNotBlank()) headers[name] = value
+    }
+    val transport = if (
+        url.trimEnd('/').endsWith("/sse", ignoreCase = true) ||
+        headers.entries.any { (name, value) ->
+            name.equals("Accept", ignoreCase = true) && value.equals("text/event-stream", ignoreCase = true)
+        }
+    ) {
+        "sse"
+    } else {
+        "streamable_http"
+    }
+    val server = JsonObject().apply {
+        addProperty("type", transport)
+        addProperty("url", url)
+        add("headers", JsonObject().apply { headers.forEach(::addProperty) })
+    }
+    return Gson().toJson(
+        JsonObject().apply {
+            add("mcpServers", JsonObject().apply { add(deriveServerName(url), server) })
+        },
+    )
+}
+
+private fun shellTokens(command: String): List<String> {
+    val tokens = mutableListOf<String>()
+    val current = StringBuilder()
+    var quote: Char? = null
+    var escaping = false
+    command.forEach { character ->
+        when {
+            escaping -> {
+                current.append(character)
+                escaping = false
+            }
+            character == '\\' && quote != '\'' -> escaping = true
+            quote != null && character == quote -> quote = null
+            quote == null && (character == '\'' || character == '"') -> quote = character
+            quote == null && character.isWhitespace() -> {
+                if (current.isNotEmpty()) tokens += current.toString().also { current.clear() }
+            }
+            else -> current.append(character)
+        }
+    }
+    if (current.isNotEmpty()) tokens += current.toString()
+    return tokens
+}
+
+private fun deriveServerName(url: String): String {
+    val uri = runCatching { URI(url) }.getOrNull()
+    val hostParts = uri?.host.orEmpty().split('.')
+        .dropLast(1)
+        .filterNot { it in setOf("www", "api", "developer", "mcp") }
+        .takeLast(2)
+    val pathParts = uri?.path.orEmpty().split('/')
+        .filter { it.isNotBlank() }
+        .filterNot { part ->
+            part.lowercase() in setOf("api", "mcp", "sse") ||
+                part.matches(Regex("v\\d+", RegexOption.IGNORE_CASE))
+        }
+        .takeLast(1)
+    return (hostParts + pathParts)
+        .joinToString("-")
+        .lowercase()
+        .replace(Regex("[^a-z0-9]+"), "-")
+        .trim('-')
+        .ifBlank { "mcp-server" }
+}

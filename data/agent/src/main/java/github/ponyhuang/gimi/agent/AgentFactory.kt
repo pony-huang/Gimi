@@ -7,15 +7,16 @@ import com.google.adk.kt.models.Model
 import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.SkillToolset
 import com.google.adk.kt.tools.Toolset
+import github.ponyhuang.gimi.agent.tools.mcp.ConversationMcpToolset
+import github.ponyhuang.gimi.agent.tools.mcp.McpAuthorizationTool
+import github.ponyhuang.gimi.agent.tools.mcp.McpConfigurationTool
+import github.ponyhuang.gimi.agent.tools.official.SearchOfficialToolset
+import github.ponyhuang.gimi.agent.tools.official.OfficialToolset
 import github.ponyhuang.gimi.agent.tools.search.LocalToolSource
 import github.ponyhuang.gimi.agent.tools.search.McpServerSource
 import github.ponyhuang.gimi.agent.tools.search.OfficialToolCandidateSource
 import github.ponyhuang.gimi.agent.tools.search.ToolSearchToolset
 import github.ponyhuang.gimi.agent.tools.search.ToolVectorSearch
-import github.ponyhuang.gimi.agent.tools.mcp.ConversationMcpToolset
-import github.ponyhuang.gimi.agent.tools.mcp.McpConfigurationTool
-import github.ponyhuang.gimi.agent.tools.official.SearchOfficialToolset
-import github.ponyhuang.gimi.agent.tools.official.OfficialToolset
 import github.ponyhuang.gimi.agent.tools.system.LocalToolset
 import github.ponyhuang.gimi.agent.tools.system.ToolsetConfirmationResumeTool
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
@@ -57,6 +58,7 @@ class AgentFactory @Inject constructor(
     private val officialToolsets: Set<@JvmSuppressWildcards OfficialToolset>,
     private val toolVectorSearch: ToolVectorSearch,
     private val mcpConfigurationTool: McpConfigurationTool,
+    private val mcpAuthorizationTool: McpAuthorizationTool,
 ) {
     /**
      * 按访问模式构建 [AgentRuntime]。
@@ -159,6 +161,7 @@ class AgentFactory @Inject constructor(
                     .map { tool -> ToolsetConfirmationResumeTool(localToolset, tool) },
             )
             add(mcpConfigurationTool)
+            add(mcpAuthorizationTool)
         },
         toolsets = toolsets,
     )

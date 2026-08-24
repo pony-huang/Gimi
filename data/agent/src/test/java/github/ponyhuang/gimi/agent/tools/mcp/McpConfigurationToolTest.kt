@@ -42,6 +42,7 @@ class McpConfigurationToolTest {
             importResult = McpImportResult(
                 created = 1,
                 affectedServerIds = setOf("mcp-d"),
+                credentialRequiredServerIds = setOf("mcp-d"),
             ),
             conversationActivated = true,
         )
@@ -51,26 +52,27 @@ class McpConfigurationToolTest {
                 SessionKey("gimi", "user", "session-1"),
             )
         }
-        val json = """{"mcpServers":{"maps":{"url":"https://secret.example.com/mcp"}}}"""
+        val content = "curl 'https://secret.example.com/mcp'"
 
-        val response = tool.run(context, mapOf("config_json" to json)) as Map<*, *>
+        val response = tool.run(context, mapOf("config_content" to content)) as Map<*, *>
 
-        coVerify(exactly = 1) { useCase("session-1", json) }
+        coVerify(exactly = 1) { useCase("session-1", content) }
         assertEquals(true, response["success"])
         assertEquals(1, response["created"])
+        assertEquals(true, response["credentials_required"])
         assertEquals(listOf("maps"), response["servers"])
         assertFalse(response.toString().contains("secret.example.com"))
         assertFalse(response.toString().contains("Bearer secret"))
     }
 
     @Test
-    fun declarationRequiresOnlyRawConfigurationJson() {
+    fun declarationRequiresOnlyRawConfigurationContent() {
         val tool = McpConfigurationTool(mockk(), mockk())
         val declaration = requireNotNull(tool.declaration())
 
         assertEquals("import_mcp_servers", declaration.name)
-        assertEquals(listOf("config_json"), declaration.parameters?.required)
-        assertEquals(setOf("config_json"), declaration.parameters?.properties?.keys)
+        assertEquals(listOf("config_content"), declaration.parameters?.required)
+        assertEquals(setOf("config_content"), declaration.parameters?.properties?.keys)
     }
 
     @Test
@@ -91,6 +93,8 @@ class McpConfigurationToolTest {
 
         assertTrue(systemText.contains("Base instruction"))
         assertTrue(systemText.contains("clearly contains an MCP server configuration"))
+        assertTrue(systemText.contains("JSON or curl"))
+        assertTrue(systemText.contains("update_mcp_server_authorization"))
         assertTrue(systemText.contains("Do not call it for unrelated JSON"))
         assertEquals(
             listOf("import_mcp_servers"),

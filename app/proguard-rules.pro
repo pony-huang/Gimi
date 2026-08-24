@@ -31,6 +31,24 @@
 -dontwarn reactor.blockhound.integration.BlockHoundIntegration
 
 # ---------------------------------------------------------------------------
+# Model Context Protocol Java SDK
+#
+# The SDK captures generic JSON types through anonymous TypeRef<T> subclasses.
+# Keeping Signature alone is insufficient: R8 may merge those subclasses into
+# their parent, so getGenericSuperclass() returns Class instead of
+# ParameterizedType and the SDK fails during static initialization. Preserve
+# the type carriers while still allowing unused instances to shrink and names
+# to be obfuscated.
+# ---------------------------------------------------------------------------
+-keep,allowobfuscation,allowshrinking class io.modelcontextprotocol.json.TypeRef
+-keep,allowobfuscation,allowshrinking class * extends io.modelcontextprotocol.json.TypeRef
+
+# Jackson serializes the SDK's nested protocol records through their bean
+# accessors. R8 cannot infer those reflective member reads and otherwise turns
+# request models such as ClientCapabilities into empty beans.
+-keep class io.modelcontextprotocol.spec.McpSchema$* { *; }
+
+# ---------------------------------------------------------------------------
 # App code: no obfuscation, no member stripping
 #
 # This is an open-source, exploration-stage project, so obfuscation buys

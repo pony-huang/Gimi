@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.data.voicewake
 
+import github.ponyhuang.gimi.core.network.HttpFileDownloader
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -37,7 +38,7 @@ class WakeModelDownloaderTest {
     fun setUp() {
         server = MockWebServer()
         server.start()
-        downloader = WakeModelDownloader(OkHttpClient())
+        downloader = WakeModelDownloader(HttpFileDownloader(OkHttpClient()))
     }
 
     @After

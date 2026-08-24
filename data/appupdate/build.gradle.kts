@@ -16,6 +16,7 @@ android {
 
 dependencies {
     implementation(project(":core:common"))
+    implementation(project(":core:network"))
     implementation(project(":domain:appupdate"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.gson)

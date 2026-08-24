@@ -2,7 +2,9 @@ package github.ponyhuang.gimi.data.voicewake
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.gimi.core.network.HttpFileDownloader
 import github.ponyhuang.gimi.data.voicewake.R
+import github.ponyhuang.gimi.data.voicewake.notification.WakeModelNotifier
 import github.ponyhuang.gimi.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.gimi.domain.speech.model.WakeModelInfo
 import github.ponyhuang.gimi.domain.speech.model.WakeModelSource
@@ -28,14 +30,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.job
-import okhttp3.OkHttpClient
 
 @Singleton
 class WakeModelRepository @Inject constructor(
     @ApplicationContext private val context: Context,
-    okHttpClient: OkHttpClient,
+    fileDownloader: HttpFileDownloader,
+    private val notifier: WakeModelNotifier,
 ) {
-    private val downloader = WakeModelDownloader(okHttpClient)
+    private val downloader = WakeModelDownloader(fileDownloader)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val rootDir = File(context.filesDir, "voice/wake-model")
     private val fileStore = WakeModelFileStore(rootDir)
@@ -54,6 +56,13 @@ class WakeModelRepository @Inject constructor(
     fun install(modelId: String) {
         val info = WakeModelCatalog.byId(modelId) ?: return
         if (_states.value[modelId]?.status == WakeModelStatus.Ready) return
+        val message = getString(R.string.wake_model_downloading)
+        updateState(modelId, WakeModelState(WakeModelStatus.Downloading, 0f, message))
+        notifier.showDownloading(
+            info = info,
+            progress = 0f,
+            totalBytes = (info.source as? WakeModelSource.Downloadable)?.sizeBytes ?: 0L,
+        )
         installJobs.compute(modelId) { _, existing ->
             existing?.also { it.cancel() }
             val job = scope.launch(start = CoroutineStart.LAZY) {
@@ -70,6 +79,7 @@ class WakeModelRepository @Inject constructor(
 
     fun cancelInstall(modelId: String) {
         installJobs.remove(modelId)?.cancel()
+        notifier.cancel(modelId)
         updateState(modelId, WakeModelState())
     }
 
@@ -114,6 +124,7 @@ class WakeModelRepository @Inject constructor(
                 is WakeModelSource.Downloadable -> downloadArchive(info, source, archive)
             }
             updateState(info.id, WakeModelState(WakeModelStatus.Extracting, 1f, getString(R.string.wake_model_installing)))
+            notifier.showInstalling(info)
             unzipSafely(archive, extracting)
             val extractedModel = findModelRoot(extracting)
                 ?: error(getString(R.string.wake_model_package_invalid))
@@ -135,6 +146,7 @@ class WakeModelRepository @Inject constructor(
             }
             backup.deleteRecursively()
             updateState(info.id, WakeModelState(WakeModelStatus.Ready, 1f))
+            notifier.showReady(info)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
@@ -145,6 +157,7 @@ class WakeModelRepository @Inject constructor(
                     message = error.message ?: getString(R.string.wake_model_install_failed),
                 ),
             )
+            notifier.showFailed(info)
         } finally {
             archive.delete()
             extracting.deleteRecursively()
@@ -176,6 +189,7 @@ class WakeModelRepository @Inject constructor(
                         info.id,
                         WakeModelState(WakeModelStatus.Downloading, progress.coerceIn(0f, 1f), message),
                     )
+                    notifier.showDownloading(info, progress, total)
                 }
             }
         }
@@ -191,6 +205,7 @@ class WakeModelRepository @Inject constructor(
         try {
             downloader.download(source.url, source.sizeBytes, info.sha256, archive) { progress ->
                 updateState(info.id, WakeModelState(WakeModelStatus.Downloading, progress, message))
+                notifier.showDownloading(info, progress, source.sizeBytes)
             }
         } catch (error: WakeModelDownloadException) {
             val messageRes = when (error.reason) {

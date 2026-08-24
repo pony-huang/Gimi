@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.core.common.coroutine.IoDispatcher
+import github.ponyhuang.gimi.core.network.HttpFileDownloader
 import github.ponyhuang.gimi.data.appupdate.apk.ApkAssetSelector
 import github.ponyhuang.gimi.data.appupdate.apk.ApkDownloadException
 import github.ponyhuang.gimi.data.appupdate.apk.ApkDownloader
@@ -37,11 +38,12 @@ import okhttp3.OkHttpClient
 class DefaultAppUpdateRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     okHttpClient: OkHttpClient,
+    fileDownloader: HttpFileDownloader,
     @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : AppUpdateRepository {
 
     private val gateway = GitHubReleaseGateway(okHttpClient)
-    private val downloader = ApkDownloader(okHttpClient)
+    private val downloader = ApkDownloader(fileDownloader)
     private val installer = ApkInstaller(context)
     private val notifier = UpdateNotifier(context)
     private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)

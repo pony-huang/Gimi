@@ -13,4 +13,11 @@
     <string name="wake_model_download_failed">唤醒模型下载失败</string>
     <string name="wake_model_removing">正在移除唤醒模型</string>
     <string name="wake_model_remove_failed">唤醒模型移除失败</string>
+    <string name="wake_model_notification_channel_name">语音唤醒模型</string>
+    <string name="wake_model_notification_downloading">正在下载“%1$s”唤醒模型</string>
+    <string name="wake_model_notification_preparing">正在准备下载</string>
+    <string name="wake_model_notification_progress">%1$d%% · %2$s / %3$s</string>
+    <string name="wake_model_notification_installing">正在安装语音唤醒模型</string>
+    <string name="wake_model_notification_ready">语音唤醒模型已就绪</string>
+    <string name="wake_model_notification_failed">语音唤醒模型下载失败</string>
 </resources>

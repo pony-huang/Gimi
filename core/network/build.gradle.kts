@@ -16,7 +16,9 @@ android {
 
 dependencies {
     implementation(libs.hilt.android)
+    implementation(libs.kotlinx.coroutines.core)
     implementation(libs.okhttp)
     ksp(libs.hilt.android.compiler)
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
 }

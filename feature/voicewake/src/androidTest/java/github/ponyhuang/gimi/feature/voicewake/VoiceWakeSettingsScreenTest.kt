@@ -1,6 +1,8 @@
 package github.ponyhuang.gimi.feature.voicewake
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -92,6 +94,31 @@ class VoiceWakeSettingsScreenTest {
             VoiceWakeSettingsAction.InstallModel(WakeModelCatalog.English.id),
             action,
         )
+    }
+
+    @Test
+    fun downloadingModelShowsIndeterminateBusyIndicator() {
+        composeRule.setContent {
+            AsssistantaiTheme {
+                VoiceWakeSettingsScreen(
+                    state = VoiceWakeSettingsUiState(
+                        voiceState = twoModelState().copy(
+                            modelStates = twoModelState().modelStates + (
+                                WakeModelCatalog.English.id to WakeModelState(
+                                    WakeModelStatus.Downloading,
+                                    0f,
+                                )
+                            ),
+                        ),
+                    ),
+                    onAction = {},
+                )
+            }
+        }
+
+        composeRule.onAllNodes(
+            hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate),
+        ).assertCountEquals(1)
     }
 
     @Test

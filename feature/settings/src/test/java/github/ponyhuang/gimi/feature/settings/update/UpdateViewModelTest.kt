@@ -113,6 +113,26 @@ class UpdateViewModelTest {
         }
 
     @Test
+    fun `checkNow reopens current progress without new request while downloading`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val repository = FakeAppUpdateRepository(
+                checkResult = UpdateCheckResult.UpdateAvailable(updateInfo),
+                resultState = AppUpdateState.Available(updateInfo, "0.1.1-alpha"),
+            )
+            repository.mutableState.value = AppUpdateState.Downloading(updateInfo, 0.37f)
+            val viewModel = UpdateViewModel(fakeContext(), repository)
+            backgroundScope.launch { viewModel.uiState.collect {} }
+            advanceUntilIdle()
+
+            viewModel.onAction(UpdateAction.CheckNow)
+            advanceUntilIdle()
+
+            assertTrue(viewModel.uiState.value.dialogVisible)
+            assertEquals(AppUpdateState.Downloading(updateInfo, 0.37f), viewModel.uiState.value.status)
+            assertEquals(0, repository.manualChecks)
+        }
+
+    @Test
     fun `confirmInstall launches unknown sources settings when permission missing`() =
         runTest(mainDispatcherRule.dispatcher) {
             val repository = FakeAppUpdateRepository(

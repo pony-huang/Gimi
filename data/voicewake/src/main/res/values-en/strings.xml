@@ -13,4 +13,11 @@
     <string name="wake_model_download_failed">Wake model download failed</string>
     <string name="wake_model_removing">Removing wake model</string>
     <string name="wake_model_remove_failed">Failed to remove wake model</string>
+    <string name="wake_model_notification_channel_name">Voice wake models</string>
+    <string name="wake_model_notification_downloading">Downloading “%1$s” wake model</string>
+    <string name="wake_model_notification_preparing">Preparing download</string>
+    <string name="wake_model_notification_progress">%1$d%% · %2$s / %3$s</string>
+    <string name="wake_model_notification_installing">Installing voice wake model</string>
+    <string name="wake_model_notification_ready">Voice wake model is ready</string>
+    <string name="wake_model_notification_failed">Voice wake model download failed</string>
 </resources>

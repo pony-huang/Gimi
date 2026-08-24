@@ -82,7 +82,11 @@ fun ChatFunctionCall.toView(): FunctionCallView = FunctionCallView(
 )
 
 fun ChatFunctionResponse.toView(): FunctionResponseView =
-    FunctionResponseView(id = id.orEmpty(), name = name)
+    FunctionResponseView(
+        id = id.orEmpty(),
+        name = name,
+        localFileSearchResult = localFileSearchResult,
+    )
 
 fun summarizeValue(value: Any?): String = when (value) {
     null -> "null"

@@ -2,6 +2,8 @@ package github.ponyhuang.gimi.feature.chat
 
 import github.ponyhuang.gimi.domain.conversation.model.FunctionCallView
 import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
+import github.ponyhuang.gimi.domain.conversation.model.LocalFileReference
+import github.ponyhuang.gimi.domain.conversation.model.LocalFileSearchResult
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
@@ -11,6 +13,33 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatMessageVisibilityTest {
+
+    @Test
+    fun `local file search results stay visible when tool activity is hidden`() {
+        val message = assistantMessage(
+            functionResponses = listOf(
+                FunctionResponseView(
+                    id = "search-1",
+                    name = "search_media_files",
+                    localFileSearchResult = LocalFileSearchResult(
+                        query = "photo",
+                        files = listOf(
+                            LocalFileReference(
+                                displayName = "photo.jpg",
+                                mimeType = "image/jpeg",
+                                sizeBytes = 1L,
+                                modifiedTimeMillis = 2L,
+                                category = "image",
+                                contentUri = "content://media/photo",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        assertTrue(message.isVisibleInChat(showToolActivity = false))
+    }
     @Test
     fun hidesToolOnlyMessageWhenToolActivityIsDisabled() {
         val message = assistantMessage(

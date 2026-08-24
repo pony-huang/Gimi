@@ -8,13 +8,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Row
@@ -26,14 +24,10 @@ import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -127,63 +121,23 @@ internal fun MessageAttachments(
     }
 }
 
-/** Displays a sent image at a screen-appropriate resolution. */
+/** Displays a sent image at a screen-appropriate resolution with zoom and pan gestures. */
 @Composable
 private fun ImagePreviewDialog(
     image: FileAttachment,
     onDismiss: () -> Unit,
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.scrim),
-        ) {
-            val density = LocalDensity.current
-            val targetSize = with(density) {
-                maxOf(maxWidth.toPx(), maxHeight.toPx()).toInt()
+    val description = stringResource(R.string.chat_attachment_sent_image_preview)
+    ZoomableImagePreviewDialog(
+        imageKey = image.id,
+        contentDescription = description,
+        loadBitmap = { targetSize ->
+            withContext(Dispatchers.Default) {
+                decodeSampledBitmap(image.data, targetSize = targetSize)
             }
-            var bitmap by remember(image.data, targetSize) { mutableStateOf<Bitmap?>(null) }
-
-            LaunchedEffect(image.data, targetSize) {
-                bitmap = withContext(Dispatchers.Default) {
-                    decodeSampledBitmap(image.data, targetSize = targetSize)
-                }
-            }
-            DisposableEffect(bitmap) {
-                val managedBitmap = bitmap
-                onDispose { managedBitmap?.recycle() }
-            }
-
-            bitmap?.let { currentBitmap ->
-                Image(
-                    bitmap = currentBitmap.asImageBitmap(),
-                    contentDescription = stringResource(R.string.chat_attachment_sent_image_preview),
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit,
-                )
-            }
-
-            FilledIconButton(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(16.dp),
-                onClick = onDismiss,
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
-                ),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = stringResource(R.string.chat_attachment_close_preview),
-                )
-            }
-        }
-    }
+        },
+        onDismiss = onDismiss,
+    )
 }
 
 @Composable

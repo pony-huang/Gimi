@@ -114,6 +114,8 @@ fun ChatScaffold(
     onTranscribeVoice: suspend (ByteArray) -> String,
     onToggleSpeechPlayback: (String, String) -> Unit,
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit,
+    onOpenLocalFile: (github.ponyhuang.gimi.domain.conversation.model.LocalFileReference) -> Unit,
+    onShowAllLocalFiles: (responseId: String) -> Unit,
     onToolConfirmation: (Boolean) -> Unit,
     onToolConfirmationAlwaysAllow: () -> Unit,
     onFullAccessChange: (Boolean) -> Unit,
@@ -374,8 +376,10 @@ fun ChatScaffold(
                             rejectedToolNames = state.rejectedToolNames,
                             awaitingConfirmationToolNames = awaitingConfirmationToolNames,
                             speechPlaybackState = speechPlaybackState,
-                        onToggleSpeechPlayback = onToggleSpeechPlayback,
-                        onOpenDocument = onOpenDocument,
+                            onToggleSpeechPlayback = onToggleSpeechPlayback,
+                            onOpenDocument = onOpenDocument,
+                            onOpenLocalFile = onOpenLocalFile,
+                            onShowAllLocalFiles = onShowAllLocalFiles,
                         )
                     }
                     pendingToolConfirmation?.let { request ->
@@ -578,6 +582,8 @@ private fun MessageRow(
     speechPlaybackState: github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState,
     onToggleSpeechPlayback: (messageId: String, text: String) -> Unit,
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit,
+    onOpenLocalFile: (github.ponyhuang.gimi.domain.conversation.model.LocalFileReference) -> Unit,
+    onShowAllLocalFiles: (responseId: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (message.error != null) {
@@ -593,6 +599,8 @@ private fun MessageRow(
             speechPlaybackState = speechPlaybackState,
             onToggleSpeechPlayback = onToggleSpeechPlayback,
             onOpenDocument = onOpenDocument,
+            onOpenLocalFile = onOpenLocalFile,
+            onShowAllLocalFiles = onShowAllLocalFiles,
             modifier = modifier
         )
     }

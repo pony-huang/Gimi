@@ -33,6 +33,7 @@ internal fun Message.isVisibleInChat(showToolActivity: Boolean): Boolean =
     error != null ||
         textParts.isNotEmpty() ||
         fileAttachments.isNotEmpty() ||
+        functionResponses.any { it.localFileSearchResult?.files?.isNotEmpty() == true } ||
         (showToolActivity && (visibleFunctionCalls().isNotEmpty() || visibleFunctionResponses().isNotEmpty()))
 
 /**

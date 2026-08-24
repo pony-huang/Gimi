@@ -5,6 +5,7 @@ import com.google.adk.kt.types.FunctionCall
 import github.ponyhuang.gimi.agent.AgentChatRunner
 import github.ponyhuang.gimi.domain.conversation.model.ChatFunctionCall
 import github.ponyhuang.gimi.domain.conversation.model.ChatFunctionResponse
+import github.ponyhuang.gimi.domain.conversation.model.parseLocalFileSearchResult
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunPart
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
@@ -87,7 +88,11 @@ class AdkChatAgentRepository @Inject constructor(
         },
         functionCalls = functionCalls().map { it.toDomain() },
         functionResponses = functionResponses().map {
-            ChatFunctionResponse(id = it.id, name = it.name)
+            ChatFunctionResponse(
+                id = it.id,
+                name = it.name,
+                localFileSearchResult = parseLocalFileSearchResult(it.name, it.response),
+            )
         },
         partial = partial,
         turnComplete = turnComplete,

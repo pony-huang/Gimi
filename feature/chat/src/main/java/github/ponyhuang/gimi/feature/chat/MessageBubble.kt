@@ -35,6 +35,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.conversation.model.FunctionCallView
 import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
+import github.ponyhuang.gimi.domain.conversation.model.LocalFileReference
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.Messages
@@ -113,6 +114,8 @@ fun MessageBubble(
     onToggleSpeechPlayback: (messageId: String, text: String) -> Unit = { _, _ -> },
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit =
         {},
+    onOpenLocalFile: (LocalFileReference) -> Unit = {},
+    onShowAllLocalFiles: (responseId: String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val role = message.role
@@ -163,6 +166,17 @@ fun MessageBubble(
                 attachments = message.fileAttachments,
                 onOpenDocument = onOpenDocument,
             )
+
+            message.functionResponses.forEach { response ->
+                response.localFileSearchResult?.takeIf { it.files.isNotEmpty() }?.let { result ->
+                    LocalFileSearchCarousel(
+                        responseId = response.id,
+                        result = result,
+                        onOpenFile = onOpenLocalFile,
+                        onShowAll = onShowAllLocalFiles,
+                    )
+                }
+            }
 
             if (message.textParts.isNotEmpty() ||
                 message.functionCalls.isNotEmpty() ||

@@ -27,9 +27,17 @@ data class ChatFunctionCall(
     val confirmationRequest: ToolConfirmationRequest? = null,
 )
 
+/**
+ * Tool response metadata and any structured local-file result needed by chat presentation.
+ *
+ * @property id Identifier paired with the originating tool call.
+ * @property name Tool function name.
+ * @property localFileSearchResult Validated local files for supported search tools.
+ */
 data class ChatFunctionResponse(
     val id: String?,
     val name: String,
+    val localFileSearchResult: LocalFileSearchResult? = null,
 )
 
 data class ToolConfirmationRequest(

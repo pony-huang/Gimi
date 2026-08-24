@@ -39,7 +39,13 @@ class AdkChatAgentRepositoryMappingTest {
         val event = adkEvent(
             parts = listOf(Part(text = "你好")),
             calls = listOf(FunctionCall(id = "call-1", name = "clock", args = mapOf("zone" to "UTC"))),
-            responses = listOf(FunctionResponse(id = "call-1", name = "clock", response = emptyMap())),
+            responses = listOf(
+                FunctionResponse(
+                    id = "call-1",
+                    name = "search_media_files",
+                    response = localFileResponse(),
+                ),
+            ),
             isPartial = false,
             isTurnComplete = true,
         )
@@ -69,7 +75,11 @@ class AdkChatAgentRepositoryMappingTest {
         assertEquals(mapOf("zone" to "UTC"), mapped.functionCalls.single().args)
         assertNull(mapped.functionCalls.single().confirmationRequest)
         assertEquals("call-1", mapped.functionResponses.single().id)
-        assertEquals("clock", mapped.functionResponses.single().name)
+        assertEquals("search_media_files", mapped.functionResponses.single().name)
+        assertEquals(
+            "photo.jpg",
+            mapped.functionResponses.single().localFileSearchResult?.files?.single()?.displayName,
+        )
         assertFalse(mapped.partial)
         assertTrue(mapped.turnComplete)
         assertNull(mapped.errorCode)
@@ -138,4 +148,19 @@ class AdkChatAgentRepositoryMappingTest {
         every { errorMessage } returns null
         every { timestamp } returns 123L
     }
+
+    private fun localFileResponse(): Map<String, Any?> = mapOf(
+        "success" to true,
+        "query" to "photo",
+        "results" to listOf(
+            mapOf(
+                "displayName" to "photo.jpg",
+                "mimeType" to "image/jpeg",
+                "sizeBytes" to 1L,
+                "modifiedTimeMillis" to 2L,
+                "category" to "image",
+                "contentUri" to "content://media/photo",
+            ),
+        ),
+    )
 }

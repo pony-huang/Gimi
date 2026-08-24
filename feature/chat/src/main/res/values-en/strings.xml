@@ -132,4 +132,10 @@
     <string name="chat_attachment_sent_image">Sent image</string>
     <string name="chat_attachment_sent_image_preview">Sent image preview</string>
     <string name="chat_attachment_close_preview">Close image preview</string>
+    <string name="chat_local_file_show_all">Show all (%1$d)</string>
+    <string name="chat_local_file_results_title">Search results</string>
+    <string name="chat_local_file_results_back">Back to chat</string>
+    <string name="chat_local_file_results_unavailable">Search results are no longer available</string>
+    <string name="chat_local_file_image">Image: %1$s</string>
+    <string name="chat_local_file_image_preview">Image preview: %1$s</string>
 </resources>

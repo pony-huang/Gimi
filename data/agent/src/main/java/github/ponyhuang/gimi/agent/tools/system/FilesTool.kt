@@ -61,7 +61,7 @@ class FilesTool @Inject constructor(
 
     @Tool(
         name = "search_media_files",
-        description = "Searches shared images, videos, and audio files by name on this device. Returns up to 50 newest matches. Requires permission to access the requested media type.",
+        description = "Searches shared images, videos, and audio files by name on this device. Returns up to 50 newest matches as structured results that the chat UI renders directly. Summarize the outcome without repeating the complete file-name list. Requires permission to access the requested media type.",
         requireConfirmation = true,
     )
     fun searchMediaFiles(
@@ -97,7 +97,7 @@ class FilesTool @Inject constructor(
 
     @Tool(
         name = "search_documents",
-        description = "Recursively searches file names in document directories the user has authorized in Settings. Returns up to 50 newest matching files and their content URIs.",
+        description = "Recursively searches file names in document directories the user has authorized in Settings. Returns up to 50 newest matching files as structured results that the chat UI renders directly. Summarize the outcome without repeating the complete file-name list.",
         requireConfirmation = true,
     )
     fun searchDocuments(@Param("A non-blank file-name query.") query: String): Map<String, Any> {

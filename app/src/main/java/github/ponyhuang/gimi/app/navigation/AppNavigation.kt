@@ -35,8 +35,10 @@ import github.ponyhuang.gimi.feature.chat.ChatEffect
 import github.ponyhuang.gimi.feature.chat.ChatNotice
 import github.ponyhuang.gimi.feature.chat.ChatScaffold
 import github.ponyhuang.gimi.feature.chat.ChatViewModel
+import github.ponyhuang.gimi.feature.chat.LocalFileSearchResultsScreen
 import github.ponyhuang.gimi.feature.chat.ViewModelStore
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
+import github.ponyhuang.gimi.domain.conversation.model.LocalFileReference
 import github.ponyhuang.gimi.feature.chat.R as ChatR
 import github.ponyhuang.gimi.feature.conversation.ChatDrawer
 import github.ponyhuang.gimi.feature.mcp.McpServerAddOptionsScreen
@@ -187,6 +189,17 @@ fun MainScreen(
                                 onOpenDocument = { attachment ->
                                     openDocumentAttachment(context, attachment)
                                 },
+                                onOpenLocalFile = { file ->
+                                    openLocalFile(context, file)
+                                },
+                                onShowAllLocalFiles = { responseId ->
+                                    backStack.add(
+                                        AppRoute.ChatSearchResults(
+                                            sessionId = currentSessionId,
+                                            responseId = responseId,
+                                        ),
+                                    )
+                                },
                                 onToolConfirmation = { confirmed ->
                                     viewModel.onAction(ChatAction.RespondToToolConfirmation(confirmed))
                                 },
@@ -248,6 +261,20 @@ fun MainScreen(
                                 onOfficialToolFunctionsRetry = { toolId ->
                                     viewModel.onAction(ChatAction.LoadOfficialToolFunctions(toolId))
                                 },
+                            )
+                        }
+
+                        is AppRoute.ChatSearchResults -> {
+                            val result = uiState.messages
+                                .asSequence()
+                                .flatMap { message -> message.functionResponses.asSequence() }
+                                .firstOrNull { response -> response.id == route.responseId }
+                                ?.localFileSearchResult
+                                .takeIf { currentSessionId == route.sessionId }
+                            LocalFileSearchResultsScreen(
+                                result = result,
+                                onBack = goBack,
+                                onOpenFile = { file -> openLocalFile(context, file) },
                             )
                         }
 
@@ -428,6 +455,22 @@ private fun openDocumentAttachment(context: Context, attachment: FileAttachment)
         context.startActivity(
             Intent(Intent.ACTION_VIEW)
                 .setDataAndType(uri, attachment.mimeType)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
+        )
+    }.onFailure {
+        Toast.makeText(
+            context,
+            context.getString(ChatR.string.chat_attachment_open_failed),
+            Toast.LENGTH_SHORT,
+        ).show()
+    }
+}
+
+private fun openLocalFile(context: Context, file: LocalFileReference) {
+    runCatching {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW)
+                .setDataAndType(android.net.Uri.parse(file.contentUri), file.mimeType)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
         )
     }.onFailure {

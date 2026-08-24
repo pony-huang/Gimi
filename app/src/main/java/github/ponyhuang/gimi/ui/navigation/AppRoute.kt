@@ -8,6 +8,18 @@ sealed interface AppRoute : NavKey {
     @Serializable
     data object Chat : AppRoute
 
+    /**
+     * Dedicated page for one structured local-file search response.
+     *
+     * @property sessionId Owning conversation used to prevent cross-session result display.
+     * @property responseId Tool-response identifier used to restore the result from message state.
+     */
+    @Serializable
+    data class ChatSearchResults(
+        val sessionId: String,
+        val responseId: String,
+    ) : AppRoute
+
     @Serializable
     data object Settings : AppRoute
 

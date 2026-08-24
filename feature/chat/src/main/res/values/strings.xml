@@ -142,4 +142,10 @@
     <string name="chat_attachment_sent_image">已发送的图片</string>
     <string name="chat_attachment_sent_image_preview">已发送图片预览</string>
     <string name="chat_attachment_close_preview">关闭图片预览</string>
+    <string name="chat_local_file_show_all">查看全部（%1$d）</string>
+    <string name="chat_local_file_results_title">搜索结果</string>
+    <string name="chat_local_file_results_back">返回聊天</string>
+    <string name="chat_local_file_results_unavailable">搜索结果已不可用</string>
+    <string name="chat_local_file_image">图片：%1$s</string>
+    <string name="chat_local_file_image_preview">图片预览：%1$s</string>
 </resources>

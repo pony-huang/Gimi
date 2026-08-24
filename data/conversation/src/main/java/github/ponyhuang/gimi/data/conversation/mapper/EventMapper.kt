@@ -10,6 +10,7 @@ import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
+import github.ponyhuang.gimi.domain.conversation.model.parseLocalFileSearchResult
 import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import java.io.File
@@ -215,7 +216,11 @@ object EventMapper {
     }
 
     private fun FunctionResponse.toView(): FunctionResponseView =
-        FunctionResponseView(id = id.orEmpty(), name = name)
+        FunctionResponseView(
+            id = id.orEmpty(),
+            name = name,
+            localFileSearchResult = parseLocalFileSearchResult(name, response),
+        )
 
     private fun summarizeValue(v: Any?): String = when (v) {
         null -> "null"

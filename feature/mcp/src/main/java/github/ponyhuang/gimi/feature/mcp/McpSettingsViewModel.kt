@@ -6,12 +6,14 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.conversation.runtime.isBusy
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import github.ponyhuang.gimi.domain.mcp.model.McpImportResult
+import github.ponyhuang.gimi.domain.mcp.model.McpProbeResult
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.usecase.FetchMcpServerCapabilitiesUseCase
 import github.ponyhuang.gimi.domain.mcp.usecase.ManageMcpServersUseCase
 import github.ponyhuang.gimi.domain.mcp.usecase.ObserveMcpServersUseCase
 import github.ponyhuang.gimi.domain.mcp.usecase.TestMcpConnectionUseCase
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -86,7 +88,13 @@ class McpSettingsViewModel @Inject constructor(
 
     private fun importServers() {
         mutate {
-            val result = manageServers.importJson(localState.value.importJson)
+            val result = try {
+                manageServers.importJson(localState.value.importJson)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                McpImportResult(error = DEFAULT_IMPORT_ERROR)
+            }
             localState.update { it.copy(importResult = result) }
             if (result.error == null && result.imported > 0) {
                 _effects.tryEmit(McpSettingsEffect.Close)
@@ -117,12 +125,20 @@ class McpSettingsViewModel @Inject constructor(
         if (localState.value.isTestingConnection) return
         viewModelScope.launch {
             localState.update { it.copy(isTestingConnection = true, connectionError = null) }
-            val result = testConnection(draft.toServer())
+            val result = probeSafely { testConnection(draft.toServer()) }
             if (result.reachable) {
-                runWhenAgentIdle {
-                    manageServers.save(draft.toServer())
-                    localState.update { it.copy(isTestingConnection = false) }
-                    _effects.tryEmit(McpSettingsEffect.Close)
+                try {
+                    runWhenAgentIdle {
+                        manageServers.save(draft.toServer())
+                        localState.update { it.copy(isTestingConnection = false) }
+                        _effects.tryEmit(McpSettingsEffect.Close)
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    localState.update {
+                        it.copy(isTestingConnection = false, connectionError = DEFAULT_SAVE_ERROR)
+                    }
                 }
             } else {
                 localState.update {
@@ -167,9 +183,8 @@ class McpSettingsViewModel @Inject constructor(
 
         localState.update { it.copy(capabilities = it.capabilities + (serverId to ServerCapabilityState.Loading)) }
         viewModelScope.launch {
-            val result = fetchCapabilities(serverId)
+            val result = probeSafely { fetchCapabilities(serverId) }
             val next = when {
-                result == null -> ServerCapabilityState.Failed(DEFAULT_CONNECTION_ERROR, server)
                 result.reachable -> ServerCapabilityState.Loaded(result, server)
                 else -> ServerCapabilityState.Failed(
                     result.errorMessage ?: DEFAULT_CONNECTION_ERROR,
@@ -178,6 +193,15 @@ class McpSettingsViewModel @Inject constructor(
             }
             localState.update { it.copy(capabilities = it.capabilities + (serverId to next)) }
         }
+    }
+
+    /** MCP 属于外部边界；任何非取消异常都转为可展示结果，避免逃出 ViewModel 协程。 */
+    private suspend fun probeSafely(block: suspend () -> McpProbeResult?): McpProbeResult = try {
+        block() ?: McpProbeResult(reachable = false, errorMessage = DEFAULT_CONNECTION_ERROR)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        McpProbeResult(reachable = false, errorMessage = DEFAULT_CONNECTION_ERROR)
     }
 
     private fun mutate(block: () -> Unit) {
@@ -197,5 +221,7 @@ class McpSettingsViewModel @Inject constructor(
 
     private companion object {
         const val DEFAULT_CONNECTION_ERROR = "无法连接到服务器，请检查配置"
+        const val DEFAULT_IMPORT_ERROR = "MCP 配置导入失败，请重试"
+        const val DEFAULT_SAVE_ERROR = "MCP 配置保存失败，请重试"
     }
 }

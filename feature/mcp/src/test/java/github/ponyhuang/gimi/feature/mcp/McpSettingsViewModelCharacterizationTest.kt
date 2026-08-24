@@ -141,6 +141,95 @@ class McpSettingsViewModelCharacterizationTest {
     }
 
     @Test
+    fun unexpectedImportFailureIsShownWithoutClosing() = runTest {
+        val repository = repository()
+        every { repository.importJson(any()) } throws IllegalStateException("storage unavailable")
+        val viewModel = viewModel(repository)
+
+        viewModel.effects.test {
+            viewModel.uiState.test {
+                awaitItem()
+                viewModel.onAction(McpSettingsAction.ImportJsonChanged("{}"))
+                var state = awaitItem()
+                while (state.importJson != "{}") state = awaitItem()
+
+                viewModel.onAction(McpSettingsAction.ImportServers)
+                do {
+                    state = awaitItem()
+                } while (state.importResult == null)
+
+                assertEquals("MCP 配置导入失败，请重试", state.importResult.error)
+                cancelAndIgnoreRemainingEvents()
+            }
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun editorSaveWithUnexpectedProbeFailureIsBlockedWithError() = runTest {
+        val repository = repository()
+        val tester = mockk<McpConnectionTester> {
+            coEvery { test(any()) } throws IllegalStateException("broken transport")
+        }
+        val viewModel = viewModel(repository, tester)
+
+        viewModel.uiState.test {
+            awaitItem()
+            viewModel.onAction(McpSettingsAction.LoadEditor(null))
+            var state = awaitItem()
+            while (state.editor == null) state = awaitItem()
+            viewModel.onAction(
+                McpSettingsAction.EditorChanged(
+                    requireNotNull(state.editor).copy(
+                        name = "Server",
+                        endpointUrl = "https://example.com/mcp",
+                    ),
+                ),
+            )
+
+            viewModel.onAction(McpSettingsAction.SaveEditor)
+            do {
+                state = awaitItem()
+            } while (state.isTestingConnection || state.connectionError == null)
+
+            assertEquals("无法连接到服务器，请检查配置", state.connectionError)
+            verify(exactly = 0) { repository.save(any()) }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun editorSaveWithPersistenceFailureIsBlockedWithError() = runTest {
+        val repository = repository()
+        every { repository.save(any()) } throws IllegalStateException("storage unavailable")
+        val viewModel = viewModel(repository)
+
+        viewModel.uiState.test {
+            awaitItem()
+            viewModel.onAction(McpSettingsAction.LoadEditor(null))
+            var state = awaitItem()
+            while (state.editor == null) state = awaitItem()
+            viewModel.onAction(
+                McpSettingsAction.EditorChanged(
+                    requireNotNull(state.editor).copy(
+                        name = "Server",
+                        endpointUrl = "https://example.com/mcp",
+                    ),
+                ),
+            )
+
+            viewModel.onAction(McpSettingsAction.SaveEditor)
+            do {
+                state = awaitItem()
+            } while (state.isTestingConnection || state.connectionError == null)
+
+            assertEquals("MCP 配置保存失败，请重试", state.connectionError)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun expandingServerCardFetchesCapabilitiesOnceAndCachesThem() = runTest {
         val server = McpServer(id = "server", name = "Server")
         val repository = repository(listOf(server))
@@ -176,6 +265,33 @@ class McpSettingsViewModelCharacterizationTest {
             } while (state.expandedServerId != "server")
             advanceUntilIdle()
             coVerify(exactly = 1) { tester.test(any()) }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun expandingServerCardWithUnexpectedProbeFailureShowsError() = runTest {
+        val server = McpServer(id = "server", name = "Server")
+        val repository = repository(listOf(server))
+        every { repository.server("server") } returns server
+        val tester = mockk<McpConnectionTester> {
+            coEvery { test(any()) } throws IllegalStateException("broken transport")
+        }
+        val viewModel = viewModel(repository, tester)
+
+        viewModel.uiState.test {
+            var state = awaitItem()
+            while (state.servers.isEmpty()) state = awaitItem()
+
+            viewModel.onAction(McpSettingsAction.ServerCardClicked("server"))
+            do {
+                state = awaitItem()
+            } while (state.capabilities["server"] !is ServerCapabilityState.Failed)
+
+            assertEquals(
+                "无法连接到服务器，请检查配置",
+                (state.capabilities["server"] as ServerCapabilityState.Failed).message,
+            )
             cancelAndIgnoreRemainingEvents()
         }
     }

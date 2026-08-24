@@ -1,26 +1,30 @@
 package github.ponyhuang.gimi.agent.tools.mcp
 
 import com.google.adk.kt.logging.LoggerFactory
-import io.modelcontextprotocol.client.McpAsyncClient
-import java.util.UUID
+import io.modelcontextprotocol.kotlin.sdk.client.Client
+import io.modelcontextprotocol.kotlin.sdk.shared.RequestOptions
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.reactor.awaitSingleOrNull
 
-/** One initialized Java SDK client; the client owns and closes its transport. */
-internal class McpSession(val client: McpAsyncClient) {
-  /** Runs the MCP initialization handshake. */
+/** One initialized Kotlin SDK client and the module-owned resources backing its transport. */
+internal class McpSession(
+  val client: Client,
+  private val transportHandle: McpTransportHandle,
+) {
+  /** Connects the client and performs the MCP initialization handshake. */
   suspend fun connect() {
-    client.initialize().awaitSingleOrNull()
+    client.connect(transportHandle.transport)
   }
 
-  /** Closes protocol and transport resources. Best-effort and cancellation-aware. */
+  /** Closes protocol, transport, and backing resources. Best-effort and cancellation-aware. */
   suspend fun close() {
     try {
-      client.closeGracefully().awaitSingleOrNull()
-    } catch (e: CancellationException) {
-      throw e
-    } catch (e: Exception) {
-      logger.warn(e) { "Failed to close MCP client: ${e.message}" }
+      client.close()
+    } catch (error: CancellationException) {
+      throw error
+    } catch (error: Exception) {
+      logger.warn(error) { "Failed to close MCP client: ${error.message}" }
+    } finally {
+      transportHandle.release()
     }
   }
 
@@ -29,7 +33,7 @@ internal class McpSession(val client: McpAsyncClient) {
   }
 }
 
-/** Owns pooled MCP sessions and request-scoped progress metadata. */
+/** Owns pooled MCP sessions and request-scoped progress callbacks. */
 internal interface SessionManager : AutoCloseable {
   suspend fun getSession(
     headers: Map<String, String> = emptyMap(),
@@ -40,18 +44,5 @@ internal interface SessionManager : AutoCloseable {
 
   val hasProgressConsumers: Boolean
 
-  /** Returns `_meta` fields for a request, or null when progress is not observed. */
-  fun requestMeta(progressToken: Any? = null): Map<String, Any>? =
-    requestMeta(hasProgressConsumers, progressToken)
+  fun requestOptions(): RequestOptions
 }
-
-/** Uses [progressToken] or creates one only when a consumer can observe notifications. */
-internal fun requestMeta(
-  hasProgressConsumers: Boolean,
-  progressToken: Any? = null,
-): Map<String, Any>? =
-  if (hasProgressConsumers) {
-    mapOf("progressToken" to (progressToken ?: UUID.randomUUID().toString()))
-  } else {
-    null
-  }

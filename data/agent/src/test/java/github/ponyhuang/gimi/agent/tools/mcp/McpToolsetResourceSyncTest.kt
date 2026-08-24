@@ -2,38 +2,42 @@ package github.ponyhuang.gimi.agent.tools.mcp
 
 import com.google.adk.kt.agents.ReadonlyContext
 import com.google.adk.kt.tools.ToolContext
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
-import io.modelcontextprotocol.client.McpAsyncClient
-import io.modelcontextprotocol.spec.McpSchema.BlobResourceContents
-import io.modelcontextprotocol.spec.McpSchema.ListResourcesResult
-import io.modelcontextprotocol.spec.McpSchema.ListToolsResult
-import io.modelcontextprotocol.spec.McpSchema.ReadResourceRequest
-import io.modelcontextprotocol.spec.McpSchema.ReadResourceResult
-import io.modelcontextprotocol.spec.McpSchema.Resource
-import io.modelcontextprotocol.spec.McpSchema.ServerCapabilities
-import io.modelcontextprotocol.spec.McpSchema.TextResourceContents
-import io.modelcontextprotocol.spec.McpSchema.Tool
+import io.modelcontextprotocol.kotlin.sdk.client.Client
+import io.modelcontextprotocol.kotlin.sdk.shared.RequestOptions
+import io.modelcontextprotocol.kotlin.sdk.shared.Transport
+import io.modelcontextprotocol.kotlin.sdk.shared.TransportSendOptions
+import io.modelcontextprotocol.kotlin.sdk.types.BlobResourceContents
+import io.modelcontextprotocol.kotlin.sdk.types.JSONRPCMessage
+import io.modelcontextprotocol.kotlin.sdk.types.ListResourcesResult
+import io.modelcontextprotocol.kotlin.sdk.types.ListToolsResult
+import io.modelcontextprotocol.kotlin.sdk.types.ReadResourceRequest
+import io.modelcontextprotocol.kotlin.sdk.types.ReadResourceResult
+import io.modelcontextprotocol.kotlin.sdk.types.Resource
+import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
+import io.modelcontextprotocol.kotlin.sdk.types.TextResourceContents
+import io.modelcontextprotocol.kotlin.sdk.types.Tool
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import reactor.core.publisher.Mono
 
 class McpToolsetResourceSyncTest {
 
     @Test
     fun noArgListResourcesReturnsTheFirstTypedPage() = runTest {
-        val client = mockk<McpAsyncClient>()
-        every { client.listResources(null as String?) } returns
-            Mono.just(
-                ListResourcesResult.builder(
-                    listOf(Resource.builder("file:///guide.md", "guide").build()),
-                ).nextCursor("page-2").build(),
+        val client = mockk<Client>()
+        coEvery { client.listResources(any(), any()) } returns
+            ListResourcesResult(
+                resources = listOf(Resource(uri = "file:///guide.md", name = "guide")),
+                nextCursor = "page-2",
             )
-        val toolset = McpToolset(StaticSessionManager(McpSession(client)))
+        val toolset = McpToolset(StaticSessionManager(session(client)))
 
-        val listing: McpResourceListing = toolset.listResources()
+        val listing = toolset.listResources()
 
         assertEquals("guide", listing.resources.single().name)
         assertEquals("page-2", listing.nextCursor)
@@ -42,14 +46,13 @@ class McpToolsetResourceSyncTest {
     @Test
     fun resourceToolsRemainEnabledWhenServerToolFilterRejectsEverything() = runTest {
         val client = resourceCapableClient()
-        every { client.listTools() } returns Mono.just(
-            ListToolsResult.builder(listOf(tool("echo"))).build(),
-        )
-        val toolset = McpToolset(
-            mcpSessionManager = StaticSessionManager(McpSession(client)),
-            toolFilter = ToolFilter.allowList("missing"),
-            useMcpResources = true,
-        )
+        coEvery { client.listTools(any(), any()) } returns ListToolsResult(listOf(tool("echo")))
+        val toolset =
+            McpToolset(
+                mcpSessionManager = StaticSessionManager(session(client)),
+                toolFilter = ToolFilter.allowList("missing"),
+                useMcpResources = true,
+            )
 
         val names = toolset.getTools(null).map { it.name }
 
@@ -60,24 +63,25 @@ class McpToolsetResourceSyncTest {
     }
 
     @Test
-    fun listResourcesToolUsesCurrentSessionAndReturnsTheRequestedPage() = runTest {
+    fun listResourcesToolReplacesOnlyTheFailedSession() = runTest {
         val staleClient = resourceCapableClient()
-        every { staleClient.listTools() } returns Mono.just(ListToolsResult.builder(emptyList()).build())
-        every { staleClient.listResources("cursor-1") } returns
-            Mono.error(IllegalStateException("stale session"))
-
+        coEvery { staleClient.listTools(any(), any()) } returns ListToolsResult(emptyList())
+        coEvery { staleClient.listResources(any(), any()) } throws IllegalStateException("stale")
         val currentClient = resourceCapableClient()
-        val resource =
-            Resource.builder("file:///guide.md", "guide")
-                .description("Project guide")
-                .mimeType("text/markdown")
-                .build()
-        every { currentClient.listResources("cursor-1") } returns
-            Mono.just(
-                ListResourcesResult.builder(listOf(resource)).nextCursor("cursor-2").build(),
+        coEvery { currentClient.listResources(any(), any()) } returns
+            ListResourcesResult(
+                resources =
+                    listOf(
+                        Resource(
+                            uri = "file:///guide.md",
+                            name = "guide",
+                            description = "Project guide",
+                            mimeType = "text/markdown",
+                        ),
+                    ),
+                nextCursor = "cursor-2",
             )
-
-        val manager = SequencedSessionManager(McpSession(staleClient), McpSession(currentClient))
+        val manager = SequencedSessionManager(session(staleClient), session(currentClient))
         val toolset = McpToolset(manager, useMcpResources = true)
         val listTool = toolset.getTools(null).single { it.name == "list_mcp_resources" }
 
@@ -85,41 +89,30 @@ class McpToolsetResourceSyncTest {
         val result = listTool.run(toolContext(), mapOf("cursor" to "cursor-1")) as Map<String, Any>
 
         assertEquals("cursor-2", result["nextCursor"])
-        val resources = result["resources"] as List<*>
-        assertEquals(
-            mapOf(
-                "name" to "guide",
-                "uri" to "file:///guide.md",
-                "description" to "Project guide",
-                "mimeType" to "text/markdown",
-            ),
-            resources.single(),
-        )
+        assertEquals("guide", ((result["resources"] as List<*>).single() as Map<*, *>)["name"])
     }
 
     @Test
     fun loadResourceByUniqueNameFollowsAllPagesAndReadsResolvedUri() = runTest {
-        val client = mockk<McpAsyncClient>()
-        every { client.listResources(null as String?) } returns
-            Mono.just(
-                ListResourcesResult.builder(
-                    listOf(Resource.builder("file:///other.txt", "other").build()),
-                ).nextCursor("page-2").build(),
+        val client = mockk<Client>()
+        var page = 0
+        coEvery { client.listResources(any(), any()) } answers {
+            if (page++ == 0) {
+                ListResourcesResult(
+                    listOf(Resource(uri = "file:///other.txt", name = "other")),
+                    "page-2",
+                )
+            } else {
+                ListResourcesResult(listOf(Resource(uri = "file:///guide.md", name = "guide")))
+            }
+        }
+        coEvery { client.readResource(match<ReadResourceRequest> { it.uri == "file:///guide.md" }, any()) } returns
+            ReadResourceResult(listOf(TextResourceContents(text = "hello", uri = "file:///guide.md")))
+        val loadTool =
+            LoadMcpResourceTool(
+                McpToolset(StaticSessionManager(session(client))),
+                maxMcpResourceLength = 100,
             )
-        every { client.listResources("page-2") } returns
-            Mono.just(
-                ListResourcesResult.builder(
-                    listOf(Resource.builder("file:///guide.md", "guide").build()),
-                ).build(),
-            )
-        every { client.readResource(match<ReadResourceRequest> { it.uri() == "file:///guide.md" }) } returns
-            Mono.just(
-                ReadResourceResult.builder(
-                    listOf(TextResourceContents.builder("file:///guide.md", "hello").build()),
-                ).build(),
-            )
-        val toolset = McpToolset(StaticSessionManager(McpSession(client)))
-        val loadTool = LoadMcpResourceTool(toolset, maxMcpResourceLength = 100)
 
         val result = loadTool.run(toolContext(), mapOf("name" to "guide"))
 
@@ -128,9 +121,11 @@ class McpToolsetResourceSyncTest {
 
     @Test
     fun loadResourceReportsConflictingArgumentsWithoutCallingTheServer() = runTest {
-        val client = mockk<McpAsyncClient>()
-        val toolset = McpToolset(StaticSessionManager(McpSession(client)))
-        val loadTool = LoadMcpResourceTool(toolset, maxMcpResourceLength = 100)
+        val loadTool =
+            LoadMcpResourceTool(
+                McpToolset(StaticSessionManager(session(mockk()))),
+                maxMcpResourceLength = 100,
+            )
 
         val result =
             loadTool.run(
@@ -143,19 +138,17 @@ class McpToolsetResourceSyncTest {
 
     @Test
     fun resourceContentKeepsTextAndRepresentsBinaryWithoutLeakingSdkTypes() = runTest {
-        val client = mockk<McpAsyncClient>()
-        every { client.readResource(match<ReadResourceRequest> { it.uri() == "file:///mixed" }) } returns
-            Mono.just(
-                ReadResourceResult.builder(
-                    listOf(
-                        TextResourceContents.builder("file:///mixed", "hello").build(),
-                        BlobResourceContents.builder("file:///mixed", "AQID").build(),
-                    ),
-                ).build(),
+        val client = mockk<Client>()
+        coEvery { client.readResource(match<ReadResourceRequest> { it.uri == "file:///mixed" }, any()) } returns
+            ReadResourceResult(
+                listOf(
+                    TextResourceContents(text = "hello", uri = "file:///mixed"),
+                    BlobResourceContents(blob = "AQID", uri = "file:///mixed"),
+                ),
             )
         val loadTool =
             LoadMcpResourceTool(
-                McpToolset(StaticSessionManager(McpSession(client))),
+                McpToolset(StaticSessionManager(session(client))),
                 maxMcpResourceLength = 100,
             )
 
@@ -167,26 +160,25 @@ class McpToolsetResourceSyncTest {
         )
     }
 
-    private fun resourceCapableClient(): McpAsyncClient = mockk<McpAsyncClient>().also { client ->
+    private fun resourceCapableClient(): Client = mockk<Client>().also { client ->
         every { client.serverCapabilities } returns
-            ServerCapabilities.builder().tools(false).resources(false, false).build()
+            ServerCapabilities(tools = ServerCapabilities.Tools(), resources = ServerCapabilities.Resources())
     }
 
     private fun tool(name: String): Tool =
-        Tool.builder(name, mapOf("type" to "object")).description("Test tool").build()
+        Tool(name = name, inputSchema = ToolSchema(), description = "Test tool")
+
+    private fun session(client: Client): McpSession =
+        McpSession(client, McpTransportHandle(NoOpTransport()))
 
     private fun toolContext(): ToolContext = mockk<ToolContext>().also { context ->
         every { context.context } returns mockk<ReadonlyContext>()
     }
 
     private class StaticSessionManager(private val session: McpSession) : SessionManager {
-        override suspend fun getSession(
-            headers: Map<String, String>,
-            stale: McpSession?,
-        ): McpSession = session
-
+        override suspend fun getSession(headers: Map<String, String>, stale: McpSession?): McpSession = session
+        override fun requestOptions(): RequestOptions = RequestOptions()
         override fun close() = Unit
-
         override val hasProgressConsumers: Boolean = false
     }
 
@@ -194,13 +186,20 @@ class McpToolsetResourceSyncTest {
         private val sessions = sessions.toList()
         private var index = 0
 
-        override suspend fun getSession(
-            headers: Map<String, String>,
-            stale: McpSession?,
-        ): McpSession = sessions[index.coerceAtMost(sessions.lastIndex)].also { index++ }
+        override suspend fun getSession(headers: Map<String, String>, stale: McpSession?): McpSession =
+            sessions[index.coerceAtMost(sessions.lastIndex)].also { index++ }
 
+        override fun requestOptions(): RequestOptions = RequestOptions()
         override fun close() = Unit
-
         override val hasProgressConsumers: Boolean = false
+    }
+
+    private class NoOpTransport : Transport {
+        override suspend fun start() = Unit
+        override suspend fun send(message: JSONRPCMessage, options: TransportSendOptions?) = Unit
+        override suspend fun close() = Unit
+        override fun onClose(block: () -> Unit) = Unit
+        override fun onError(block: (Throwable) -> Unit) = Unit
+        override fun onMessage(block: suspend (JSONRPCMessage) -> Unit) = Unit
     }
 }

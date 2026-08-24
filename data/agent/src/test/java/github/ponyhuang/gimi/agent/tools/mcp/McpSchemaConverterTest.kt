@@ -2,9 +2,13 @@ package github.ponyhuang.gimi.agent.tools.mcp
 
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.agent.tools.mcp.McpSchemaConverter.toAdkFunctionDeclaration
-import github.ponyhuang.gimi.agent.tools.mcp.McpSchemaConverter.toAdkSchema
-import io.modelcontextprotocol.spec.McpSchema.JsonSchema
-import io.modelcontextprotocol.spec.McpSchema.Tool
+import io.modelcontextprotocol.kotlin.sdk.types.Tool
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -12,26 +16,6 @@ import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class McpSchemaConverterTest {
-
-  @Test
-  @Suppress("DEPRECATION")
-  fun `converts the Java SDK JsonSchema API`() {
-    val inputSchema =
-      JsonSchema(
-        "object",
-        mapOf("query" to mapOf("type" to "string")),
-        listOf("query"),
-        false,
-        emptyMap(),
-        emptyMap(),
-      )
-
-    val converted = inputSchema.toAdkSchema()
-
-    assertEquals(Type.OBJECT, converted.type)
-    assertEquals(Type.STRING, converted.properties!!["query"]!!.type)
-    assertEquals(listOf("query"), converted.required)
-  }
 
   @Test
   fun `converts tool with primitive properties`() {
@@ -151,9 +135,9 @@ class McpSchemaConverterTest {
   @Test
   fun `preserves supported constraints and output schema`() {
     val tool =
-      Tool.builder(
-          "get_weather",
-          schema(
+      Tool(
+          name = "get_weather",
+          inputSchema = schema(
             properties =
               mapOf(
                 "city" to
@@ -166,15 +150,12 @@ class McpSchemaConverterTest {
                   ),
               ),
           ),
+          description = "Returns the weather.",
+          outputSchema =
+            schema(
+              properties = mapOf("temperature" to mapOf("type" to "number")),
+            ),
         )
-        .description("Returns the weather.")
-        .outputSchema(
-          mapOf(
-            "type" to "object",
-            "properties" to mapOf("temperature" to mapOf("type" to "number")),
-          ),
-        )
-        .build()
 
     val declaration = tool.toAdkFunctionDeclaration()
 
@@ -188,17 +169,31 @@ class McpSchemaConverterTest {
   }
 
   private fun tool(
-    inputSchema: Map<String, Any>,
+    inputSchema: ToolSchema,
     description: String? = "Returns the weather.",
-  ): Tool = Tool.builder("get_weather", inputSchema).description(description).build()
+  ): Tool = Tool(name = "get_weather", inputSchema = inputSchema, description = description)
 
   private fun schema(
     properties: Map<String, Any>? = null,
     required: List<String>? = null,
-  ): Map<String, Any> =
-    buildMap {
-      put("type", "object")
-      properties?.let { put("properties", it) }
-      required?.let { put("required", it) }
+  ): ToolSchema =
+    ToolSchema(
+      properties = properties?.let { values ->
+        JsonObject(values.mapValues { (_, value) -> value.toJsonElement() })
+      },
+      required = required,
+    )
+
+  private fun Any?.toJsonElement(): JsonElement =
+    when (this) {
+      null -> JsonNull
+      is Map<*, *> ->
+        JsonObject(
+          entries.associate { (key, value) -> key.toString() to value.toJsonElement() },
+        )
+      is List<*> -> JsonArray(map { it.toJsonElement() })
+      is Boolean -> JsonPrimitive(this)
+      is Number -> JsonPrimitive(this)
+      else -> JsonPrimitive(toString())
     }
 }

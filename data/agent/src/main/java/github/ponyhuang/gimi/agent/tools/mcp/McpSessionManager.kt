@@ -1,28 +1,40 @@
 package github.ponyhuang.gimi.agent.tools.mcp
 
 import com.google.adk.kt.logging.LoggerFactory
-import io.modelcontextprotocol.client.McpClient
-import io.modelcontextprotocol.spec.McpSchema.ClientCapabilities
-import io.modelcontextprotocol.spec.McpSchema.Implementation
-import io.modelcontextprotocol.spec.McpSchema.LoggingLevel
-import java.time.Duration as JavaDuration
+import io.modelcontextprotocol.kotlin.sdk.client.Client
+import io.modelcontextprotocol.kotlin.sdk.client.ClientOptions
+import io.modelcontextprotocol.kotlin.sdk.shared.RequestOptions
+import io.modelcontextprotocol.kotlin.sdk.types.ClientCapabilities
+import io.modelcontextprotocol.kotlin.sdk.types.Implementation
+import io.modelcontextprotocol.kotlin.sdk.types.LoggingLevel
+import io.modelcontextprotocol.kotlin.sdk.types.LoggingMessageNotification
+import io.modelcontextprotocol.kotlin.sdk.types.Method
+import io.modelcontextprotocol.kotlin.sdk.types.Progress
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
-import reactor.core.publisher.Mono
 
-/** Android MCP session pool backed by the official Java SDK client. */
+/** Android MCP session pool backed by the official Kotlin SDK client. */
 internal class McpSessionManager(
   private val connectionParams: McpConnectionParameters,
   private val transportBuilder: McpTransportBuilder = DefaultMcpTransportBuilder(),
-  private val progressConsumers: List<(McpProgressUpdate) -> Unit> = emptyList(),
+  private val progressConsumers: List<(Progress) -> Unit> = emptyList(),
   private val sessionOpener: (suspend (Map<String, String>) -> McpSession)? = null,
 ) : SessionManager {
   override val hasProgressConsumers: Boolean
     get() = progressConsumers.isNotEmpty()
+
+  override fun requestOptions(): RequestOptions =
+    RequestOptions(
+      onProgress =
+        if (progressConsumers.isEmpty()) null
+        else ({ progress -> progressConsumers.forEach { it(progress) } }),
+      timeout = requestTimeout(connectionParams),
+    )
 
   private val mutex = Mutex()
   private val sessions = mutableMapOf<String, McpSession>()
@@ -59,16 +71,16 @@ internal class McpSessionManager(
           connectionParams.copy(headers = connectionParams.headers + headers)
         else -> connectionParams
       }
-    return createSession(params, transportBuilder, progressConsumers)
+    return createSession(params, transportBuilder)
   }
 
   private suspend fun McpSession.initialize() {
     try {
       withTimeout(initializationTimeout(connectionParams)) { connect() }
-      logger.debug { "Initialized pooled MCP session: ${client.serverInfo}" }
-    } catch (e: Exception) {
+      logger.debug { "Initialized pooled MCP session: ${client.serverVersion}" }
+    } catch (error: Exception) {
       close()
-      throw e
+      throw error
     }
   }
 
@@ -87,44 +99,29 @@ internal class McpSessionManager(
     fun createSession(
       connectionParams: McpConnectionParameters,
       transportBuilder: McpTransportBuilder = DefaultMcpTransportBuilder(),
-      progressConsumers: List<(McpProgressUpdate) -> Unit> = emptyList(),
     ): McpSession {
-      val builder =
-        McpClient.async(transportBuilder.build(connectionParams))
-          .clientInfo(Implementation.builder(CLIENT_NAME, CLIENT_VERSION).build())
-          .capabilities(ClientCapabilities.builder().build())
-          .requestTimeout(requestTimeout(connectionParams).toJavaDuration())
-          .initializationTimeout(initializationTimeout(connectionParams).toJavaDuration())
-          .loggingConsumer { notification ->
-            val data = notification.data()
-            when (notification.level()) {
-              LoggingLevel.DEBUG -> logger.debug { data }
-              LoggingLevel.INFO,
-              LoggingLevel.NOTICE -> logger.info { data }
-              LoggingLevel.WARNING -> logger.warn { data }
-              LoggingLevel.ERROR,
-              LoggingLevel.CRITICAL,
-              LoggingLevel.ALERT,
-              LoggingLevel.EMERGENCY -> logger.error { data }
-              null -> logger.info { data }
-            }
-            Mono.empty()
-          }
-
-      if (progressConsumers.isNotEmpty()) {
-        builder.progressConsumer { notification ->
-          val update =
-            McpProgressUpdate(
-              progressToken = notification.progressToken(),
-              progress = notification.progress(),
-              total = notification.total(),
-              message = notification.message(),
-            )
-          progressConsumers.forEach { it(update) }
-          Mono.empty()
+      val handle = transportBuilder.build(connectionParams)
+      val client =
+        Client(
+          clientInfo = Implementation(name = CLIENT_NAME, version = CLIENT_VERSION),
+          options = ClientOptions(capabilities = ClientCapabilities()),
+        )
+      client.setNotificationHandler<LoggingMessageNotification>(Method.Defined.NotificationsMessage) {
+        notification ->
+        val data = notification.params.data
+        when (notification.params.level) {
+          LoggingLevel.Debug -> logger.debug { data.toString() }
+          LoggingLevel.Info,
+          LoggingLevel.Notice -> logger.info { data.toString() }
+          LoggingLevel.Warning -> logger.warn { data.toString() }
+          LoggingLevel.Error,
+          LoggingLevel.Critical,
+          LoggingLevel.Alert,
+          LoggingLevel.Emergency -> logger.error { data.toString() }
         }
+        CompletableDeferred(Unit)
       }
-      return McpSession(builder.build())
+      return McpSession(client, handle)
     }
 
     private const val CLIENT_NAME = "asssistantai-adk"
@@ -143,22 +140,5 @@ internal class McpSessionManager(
         is McpConnectionParameters.Sse -> connectionParams.sseReadTimeout
         is McpConnectionParameters.StreamableHttp -> connectionParams.readTimeout
       }
-
-    private fun Duration.toJavaDuration(): JavaDuration = JavaDuration.ofMillis(inWholeMilliseconds)
   }
 }
-
-/**
- * Progress notification exposed without leaking Java SDK records into callers.
- *
- * @property progressToken Correlates this update with its originating request.
- * @property progress Current progress value reported by the server.
- * @property total Optional total used to calculate completion percentage.
- * @property message Optional human-readable status supplied by the server.
- */
-data class McpProgressUpdate(
-  val progressToken: Any?,
-  val progress: Double,
-  val total: Double?,
-  val message: String?,
-)

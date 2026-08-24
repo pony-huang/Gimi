@@ -1,31 +1,47 @@
 package github.ponyhuang.gimi.agent.tools.mcp
 
-import io.modelcontextprotocol.json.McpJsonDefaults
-import io.modelcontextprotocol.spec.McpClientTransport
 import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 
 /** Creates MCP transports that rely only on Android and OkHttp runtime APIs. */
 internal class DefaultMcpTransportBuilder : McpTransportBuilder {
-  override fun build(connectionParams: McpConnectionParameters): McpClientTransport =
+  override fun build(connectionParams: McpConnectionParameters): McpTransportHandle =
     when (connectionParams) {
       is McpConnectionParameters.Stdio ->
-        AndroidStdioClientTransport(connectionParams.serverParameters, McpJsonDefaults.getMapper())
+        McpTransportHandle(AndroidStdioClientTransport(connectionParams.serverParameters))
       is McpConnectionParameters.Sse ->
-        OkHttpSseClientTransport(
-          baseUrl = connectionParams.url,
-          sseEndpoint = connectionParams.sseEndpoint,
-          headers = connectionParams.headers,
-          client = httpClient(connectionParams.timeout.inWholeMilliseconds, connectionParams.sseReadTimeout.inWholeMilliseconds),
-          jsonMapper = McpJsonDefaults.getMapper(),
-        )
+        httpClient(
+            connectionParams.timeout.inWholeMilliseconds,
+            connectionParams.sseReadTimeout.inWholeMilliseconds,
+          )
+          .let { client ->
+            McpTransportHandle(
+              transport =
+                OkHttpSseClientTransport(
+                  baseUrl = connectionParams.url,
+                  sseEndpoint = connectionParams.sseEndpoint,
+                  headers = connectionParams.headers,
+                  client = client,
+                ),
+              release = { shutdown(client) },
+            )
+          }
       is McpConnectionParameters.StreamableHttp ->
-        OkHttpStreamableHttpTransport(
-          url = connectionParams.url,
-          headers = connectionParams.headers,
-          client = httpClient(connectionParams.timeout.inWholeMilliseconds, connectionParams.readTimeout.inWholeMilliseconds),
-          jsonMapper = McpJsonDefaults.getMapper(),
-        )
+        httpClient(
+            connectionParams.timeout.inWholeMilliseconds,
+            connectionParams.readTimeout.inWholeMilliseconds,
+          )
+          .let { client ->
+            McpTransportHandle(
+              transport =
+                OkHttpStreamableHttpTransport(
+                  url = connectionParams.url,
+                  headers = connectionParams.headers,
+                  client = client,
+                ),
+              release = { shutdown(client) },
+            )
+          }
     }
 
   private fun httpClient(connectTimeoutMillis: Long, readTimeoutMillis: Long): OkHttpClient =
@@ -33,4 +49,10 @@ internal class DefaultMcpTransportBuilder : McpTransportBuilder {
       .connectTimeout(connectTimeoutMillis, TimeUnit.MILLISECONDS)
       .readTimeout(readTimeoutMillis, TimeUnit.MILLISECONDS)
       .build()
+
+  private fun shutdown(client: OkHttpClient) {
+    client.dispatcher.cancelAll()
+    client.connectionPool.evictAll()
+    client.dispatcher.executorService.shutdown()
+  }
 }

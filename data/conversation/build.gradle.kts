@@ -21,7 +21,9 @@ dependencies {
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    implementation(libs.google.adk.kotlin.core)
+    implementation(libs.google.adk.kotlin.core) {
+        exclude(group = "io.modelcontextprotocol.sdk")
+    }
     implementation(libs.gson)
     implementation(libs.hilt.android)
     implementation(libs.javax.inject)

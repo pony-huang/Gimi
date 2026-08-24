@@ -6,15 +6,12 @@ import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.FunctionDeclaration
 import github.ponyhuang.gimi.agent.tools.mcp.McpSchemaConverter.toAdkFunctionDeclaration
 import github.ponyhuang.gimi.agent.tools.mcp.McpToolException.McpToolDeclarationException
-import io.modelcontextprotocol.json.McpJsonDefaults
-import io.modelcontextprotocol.spec.McpSchema.CallToolRequest
-import io.modelcontextprotocol.spec.McpSchema.CallToolResult
-import io.modelcontextprotocol.spec.McpSchema.Tool as McpSchemaTool
-import io.modelcontextprotocol.spec.McpSchema.ToolAnnotations
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.McpJson
+import io.modelcontextprotocol.kotlin.sdk.types.Tool as McpSchemaTool
+import io.modelcontextprotocol.kotlin.sdk.types.ToolAnnotations
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.reactor.awaitSingleOrNull
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -48,7 +45,7 @@ internal constructor(
       mcpSchemaTool.toAdkFunctionDeclaration()
     } catch (e: RuntimeException) {
       throw McpToolDeclarationException(
-        "MCP tool:$name failed to get declaration, inputSchema:${mcpSchemaTool.inputSchema()}. outputSchema: ${mcpSchemaTool.outputSchema()}",
+        "MCP tool:$name failed to get declaration, inputSchema:${mcpSchemaTool.inputSchema}. outputSchema: ${mcpSchemaTool.outputSchema}",
         e,
       )
     }
@@ -68,12 +65,9 @@ internal constructor(
    */
   override suspend fun run(context: ToolContext, args: Map<String, Any?>): Any {
     val callResult = retrySessionCall {
-      client
-        .callTool(CallToolRequest(name, args, mcpSessionManager.requestMeta(context.functionCallId)))
-        .awaitSingleOrNull()
+      client.callTool(name = name, arguments = args, options = mcpSessionManager.requestOptions())
     }
-    return callResult?.toJsonNativeMap()
-      ?: mapOf("error" to "MCP framework error: CallToolResult was null")
+    return callResult.toJsonNativeMap()
   }
 
   private suspend fun <T> retrySessionCall(
@@ -100,10 +94,10 @@ internal constructor(
   }
 
   internal val annotations: ToolAnnotations?
-    get() = mcpSchemaTool.annotations()
+    get() = mcpSchemaTool.annotations
 
-  internal val meta: Map<String, Any>?
-    get() = mcpSchemaTool.meta()
+  internal val meta: Map<String, Any?>?
+    get() = mcpSchemaTool.meta?.mapValues { (_, value) -> value.toJsonNative() }
 
   companion object {
     private val logger = LoggerFactory.getLogger(McpTool::class)
@@ -117,13 +111,13 @@ internal constructor(
  * when a serializing [com.google.adk.kt.sessions.SessionService] persists the event.
  *
  * Mirrors Python ADK's `CallToolResult.model_dump(exclude_none=True, mode="json")`: it goes through
- * the SDK's own Jackson mapper, so polymorphic
+ * the Kotlin SDK's own kotlinx.serialization model, so polymorphic
  * `content` entries keep their `type` discriminator and absent fields are dropped, matching the
  * result's canonical on-the-wire JSON.
  */
 private fun CallToolResult.toJsonNativeMap(): Map<String, Any?> {
   @Suppress("UNCHECKED_CAST")
-  return Json.parseToJsonElement(McpJsonDefaults.getMapper().writeValueAsString(this)).toJsonNative()
+  return McpJson.encodeToJsonElement(CallToolResult.serializer(), this).toJsonNative()
     as Map<String, Any?>
 }
 

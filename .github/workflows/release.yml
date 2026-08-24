@@ -90,7 +90,7 @@ jobs:
           if [ -n "$KEYSTORE_PATH" ]; then
             SIGNING_ARGS="-PreleaseStoreFile=$KEYSTORE_PATH -PreleaseStorePassword=${{ secrets.RELEASE_KEYSTORE_PASSWORD }} -PreleaseKeyAlias=${{ secrets.RELEASE_KEY_ALIAS }} -PreleaseKeyPassword=${{ secrets.RELEASE_KEY_PASSWORD }}"
           fi
-          ./gradlew app:assembleRelease --stacktrace --max-workers=2 \
+          ./gradlew app:assembleRelease --stacktrace --no-parallel --max-workers=2 \
             -PreleaseVersionName="${{ steps.version.outputs.value }}" \
             -PreleaseVersionCode="${{ github.run_number }}" \
             $SIGNING_ARGS

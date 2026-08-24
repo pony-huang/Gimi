@@ -50,25 +50,31 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.anthropic.java)
-    implementation(libs.google.adk.kotlin.core)
+    implementation(libs.google.adk.kotlin.core) {
+        exclude(group = "io.modelcontextprotocol.sdk")
+    }
     implementation(libs.openai.java)
     implementation(libs.okhttp)
     implementation(libs.objectbox.android)
     implementation(libs.objectbox.kotlin)
     implementation(libs.sentence.embeddings)
-    implementation(libs.mcp.java.core)
-    implementation(libs.mcp.java.json.jackson2)
+    implementation(libs.mcp.kotlin.client) {
+        // ADK/Google GenAI still use Ktor 2.x. MCP uses the OkHttp transports in this module, so
+        // exclude the SDK's optional Ktor 3 transport implementation from the Android graph.
+        exclude(group = "io.ktor")
+    }
     implementation(libs.gson)
     implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.coroutines.reactor)
     ksp(libs.androidx.room.compiler)
     ksp(libs.google.adk.kotlin.processor)
     ksp(libs.hilt.android.compiler)
     kapt(libs.objectbox.processor)
 
     testImplementation(project(":core:testing"))
-    testImplementation(libs.google.adk.kotlin.webserver)
+    testImplementation(libs.google.adk.kotlin.webserver) {
+        exclude(group = "io.modelcontextprotocol.sdk")
+    }
     testImplementation(libs.androidx.room.testing)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

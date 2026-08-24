@@ -17,7 +17,7 @@ kotlin = "2.4.0"
 kotlinxCoroutines = "1.11.0"
 mockk = "1.14.9"
 turbine = "1.2.1"
-mcpJava = "2.0.0"
+mcpKotlin = "0.15.0"
 composeBom = "2026.02.01"
 openaiJava = "4.41.0"
 okhttp = "4.12.0"
@@ -35,7 +35,6 @@ exifinterface = "1.3.6"
 [libraries]
 javax-inject = { module = "javax.inject:javax.inject", version.ref = "javaxInject" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
-kotlinx-coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactor", version.ref = "kotlinxCoroutines" }
 androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-annotation = { group = "androidx.annotation", name = "annotation", version.ref = "androidxAnnotation" }
@@ -87,8 +86,7 @@ objectbox-processor = { module = "io.objectbox:objectbox-processor", version.ref
 objectbox-windows = { module = "io.objectbox:objectbox-windows", version.ref = "objectbox" }
 sentence-embeddings = { module = "io.gitlab.shubham0204:sentence-embeddings", version.ref = "sentenceEmbeddings" }
 multiplatform-markdown-renderer-m3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-m3", version.ref = "multiplatformMarkdownRenderer" }
-mcp-java-core = { module = "io.modelcontextprotocol.sdk:mcp-core", version.ref = "mcpJava" }
-mcp-java-json-jackson2 = { module = "io.modelcontextprotocol.sdk:mcp-json-jackson2", version.ref = "mcpJava" }
+mcp-kotlin-client = { module = "io.modelcontextprotocol:kotlin-sdk-client", version.ref = "mcpKotlin" }
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }

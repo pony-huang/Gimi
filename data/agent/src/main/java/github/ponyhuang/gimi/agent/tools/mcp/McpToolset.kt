@@ -6,11 +6,34 @@ import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.agent.tools.mcp.McpToolException.McpToolExecutionException
 import github.ponyhuang.gimi.agent.tools.mcp.McpToolException.McpToolLoadingException
-import io.modelcontextprotocol.spec.McpError
-import io.modelcontextprotocol.spec.McpSchema
+import io.modelcontextprotocol.kotlin.sdk.types.Annotations
+import io.modelcontextprotocol.kotlin.sdk.types.BlobResourceContents
+import io.modelcontextprotocol.kotlin.sdk.types.Icon
+import io.modelcontextprotocol.kotlin.sdk.types.ListResourceTemplatesRequest
+import io.modelcontextprotocol.kotlin.sdk.types.ListResourceTemplatesResult
+import io.modelcontextprotocol.kotlin.sdk.types.ListResourcesRequest
+import io.modelcontextprotocol.kotlin.sdk.types.ListResourcesResult
+import io.modelcontextprotocol.kotlin.sdk.types.McpException
+import io.modelcontextprotocol.kotlin.sdk.types.PaginatedRequestParams
+import io.modelcontextprotocol.kotlin.sdk.types.Progress
+import io.modelcontextprotocol.kotlin.sdk.types.RPCError
+import io.modelcontextprotocol.kotlin.sdk.types.ReadResourceRequest
+import io.modelcontextprotocol.kotlin.sdk.types.ReadResourceRequestParams
+import io.modelcontextprotocol.kotlin.sdk.types.ReadResourceResult
+import io.modelcontextprotocol.kotlin.sdk.types.Resource
+import io.modelcontextprotocol.kotlin.sdk.types.ResourceContents
+import io.modelcontextprotocol.kotlin.sdk.types.ResourceTemplate
+import io.modelcontextprotocol.kotlin.sdk.types.TextResourceContents
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.reactor.awaitSingle
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.longOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -83,15 +106,12 @@ internal constructor(
         session: McpSession,
         headers: Map<String, String>,
     ): LoadedTools {
-        val meta = mcpSessionManager.requestMeta()
-        val toolsResponse =
-            if (meta == null) session.client.listTools().awaitSingle()
-            else session.client.listTools(null, meta).awaitSingle()
+        val toolsResponse = session.client.listTools(options = mcpSessionManager.requestOptions())
         val serverTools =
-            toolsResponse.tools().map { tool ->
+            toolsResponse.tools.map { tool ->
                 McpTool(
-                    name = tool.name(),
-                    description = tool.description() ?: "",
+                    name = tool.name,
+                    description = tool.description ?: "",
                     mcpSchemaTool = tool,
                     mcpSessionManager = mcpSessionManager,
                     headers = headers,
@@ -106,7 +126,7 @@ internal constructor(
                 LoadMcpResourceTool(this, maxMcpResourceLength),
                 ListMcpResourceTemplatesTool(this),
             )
-        if (session.client.serverCapabilities?.resources() != null) {
+        if (session.client.serverCapabilities?.resources != null) {
             return LoadedTools(serverTools, resourceTools)
         }
 
@@ -131,8 +151,8 @@ internal constructor(
     ): McpResourceListing {
         val result = withSession(readonlyContext) { session -> session.listResourcesPage(cursor) }
         return McpResourceListing(
-            resources = result.resources().map { it.toResourceInfo() },
-            nextCursor = result.nextCursor(),
+            resources = result.resources.map { it.toResourceInfo() },
+            nextCursor = result.nextCursor,
         )
     }
 
@@ -144,8 +164,8 @@ internal constructor(
         var cursor: String? = null
         repeat(MAX_FULL_SCAN_PAGES) {
             val page = withSession(readonlyContext) { session -> session.listResourcesPage(cursor) }
-            all += page.resources().map { it.toResourceInfo() }
-            cursor = page.nextCursor() ?: return all
+            all += page.resources.map { it.toResourceInfo() }
+            cursor = page.nextCursor ?: return all
         }
         throw McpToolExecutionException(
             "MCP server kept paginating resources/list past $MAX_FULL_SCAN_PAGES pages; " +
@@ -160,8 +180,8 @@ internal constructor(
     ): McpResourceTemplateListing {
         val result = withSession(readonlyContext) { session -> session.listResourceTemplatesPage(cursor) }
         return McpResourceTemplateListing(
-            resourceTemplates = result.resourceTemplates().map { it.toResourceTemplateInfo() },
-            nextCursor = result.nextCursor(),
+            resourceTemplates = result.resourceTemplates.map { it.toResourceTemplateInfo() },
+            nextCursor = result.nextCursor,
         )
     }
 
@@ -171,7 +191,7 @@ internal constructor(
         readonlyContext: ReadonlyContext? = null,
     ): List<McpResourceContent> {
         val result = withSession(readonlyContext) { session -> session.readResource(uri) }
-        return result.contents().map { it.toResourceContent() }
+        return result.contents.map { it.toResourceContent() }
     }
 
     /**
@@ -194,8 +214,8 @@ internal constructor(
                 throw e
             } catch (e: IllegalArgumentException) {
                 throw e
-            } catch (e: McpError) {
-                if (e.jsonRpcError?.code() == McpSchema.ErrorCodes.RESOURCE_NOT_FOUND) throw e
+            } catch (e: McpException) {
+                if (e.code == RPCError.ErrorCode.RESOURCE_NOT_FOUND) throw e
                 if (attempt == DEFAULT_RETRY_TIMES) throw e
                 stale = session
                 logger.warn(e) { "Retrying MCP resource call, attempt $attempt: ${e.message}" }
@@ -212,24 +232,25 @@ internal constructor(
 
     private suspend fun McpSession.listResourcesPage(
         cursor: String?,
-    ): McpSchema.ListResourcesResult {
-        val meta = mcpSessionManager.requestMeta()
-        return if (meta == null) client.listResources(cursor).awaitSingle()
-        else client.listResources(cursor, meta).awaitSingle()
-    }
+    ): ListResourcesResult =
+        client.listResources(
+            request = ListResourcesRequest(PaginatedRequestParams(cursor)),
+            options = mcpSessionManager.requestOptions(),
+        )
 
     private suspend fun McpSession.listResourceTemplatesPage(
         cursor: String?,
-    ): McpSchema.ListResourceTemplatesResult {
-        val meta = mcpSessionManager.requestMeta()
-        return if (meta == null) client.listResourceTemplates(cursor).awaitSingle()
-        else client.listResourceTemplates(cursor, meta).awaitSingle()
-    }
+    ): ListResourceTemplatesResult =
+        client.listResourceTemplates(
+            request = ListResourceTemplatesRequest(PaginatedRequestParams(cursor)),
+            options = mcpSessionManager.requestOptions(),
+        )
 
-    private suspend fun McpSession.readResource(uri: String): McpSchema.ReadResourceResult {
-        val request = McpSchema.ReadResourceRequest(uri, mcpSessionManager.requestMeta())
-        return client.readResource(request).awaitSingle()
-    }
+    private suspend fun McpSession.readResource(uri: String): ReadResourceResult =
+        client.readResource(
+            request = ReadResourceRequest(ReadResourceRequestParams(uri)),
+            options = mcpSessionManager.requestOptions(),
+        )
 
     private fun handleLoadError(e: Exception, attempt: Int) {
         when (e) {
@@ -279,7 +300,7 @@ internal constructor(
         /** Creates the toolset and validates that exactly one transport was configured. */
         fun toToolset(
             headerProvider: (suspend (ReadonlyContext) -> Map<String, String>)? = null,
-            progressConsumers: List<(McpProgressUpdate) -> Unit> = emptyList(),
+            progressConsumers: List<(Progress) -> Unit> = emptyList(),
         ): McpToolset {
             val params =
                 listOfNotNull(
@@ -315,61 +336,74 @@ internal constructor(
     }
 }
 
-private fun McpSchema.Resource.toResourceInfo(): McpResourceInfo =
+private fun Resource.toResourceInfo(): McpResourceInfo =
     McpResourceInfo(
-        name = name().orEmpty(),
-        uri = uri().orEmpty(),
-        title = title(),
-        description = description(),
-        mimeType = mimeType(),
-        size = size(),
-        annotations = annotations()?.toAnnotations(),
-        meta = meta(),
-        icons = icons().orEmpty().map { it.toIcon() },
+        name = name,
+        uri = uri,
+        title = title,
+        description = description,
+        mimeType = mimeType,
+        size = size,
+        annotations = annotations?.toAnnotations(),
+        meta = meta?.toNativeMap(),
+        icons = icons.orEmpty().map { it.toIcon() },
     )
 
-private fun McpSchema.ResourceTemplate.toResourceTemplateInfo(): McpResourceTemplateInfo =
+private fun ResourceTemplate.toResourceTemplateInfo(): McpResourceTemplateInfo =
     McpResourceTemplateInfo(
-        name = name().orEmpty(),
-        uriTemplate = uriTemplate().orEmpty(),
-        title = title(),
-        description = description(),
-        mimeType = mimeType(),
-        annotations = annotations()?.toAnnotations(),
-        meta = meta(),
-        icons = icons().orEmpty().map { it.toIcon() },
+        name = name,
+        uriTemplate = uriTemplate,
+        title = title,
+        description = description,
+        mimeType = mimeType,
+        annotations = annotations?.toAnnotations(),
+        meta = meta?.toNativeMap(),
+        icons = icons.orEmpty().map { it.toIcon() },
     )
 
-private fun McpSchema.Annotations.toAnnotations(): McpAnnotations =
+private fun Annotations.toAnnotations(): McpAnnotations =
     McpAnnotations(
-        audience = audience().orEmpty().map { McpRole(it.name.lowercase()) },
-        priority = priority(),
-        lastModified = lastModified(),
+        audience = audience.orEmpty().map { McpRole(it.name.lowercase()) },
+        priority = priority,
+        lastModified = lastModified,
     )
 
-private fun McpSchema.Icon.toIcon(): McpIcon =
+private fun Icon.toIcon(): McpIcon =
     McpIcon(
-        src = src().orEmpty(),
-        mimeType = mimeType(),
-        sizes = sizes().orEmpty(),
-        theme = theme(),
+        src = src,
+        mimeType = mimeType,
+        sizes = sizes.orEmpty(),
+        theme = theme?.name?.lowercase(),
     )
 
-private fun McpSchema.ResourceContents.toResourceContent(): McpResourceContent =
+private fun ResourceContents.toResourceContent(): McpResourceContent =
     when (this) {
-        is McpSchema.TextResourceContents ->
+        is TextResourceContents ->
             McpResourceContent.Text(
-                uri = uri().orEmpty(),
-                mimeType = mimeType(),
-                text = text().orEmpty(),
-                meta = meta(),
+                uri = uri,
+                mimeType = mimeType,
+                text = text,
+                meta = meta?.toNativeMap(),
             )
-        is McpSchema.BlobResourceContents ->
+        is BlobResourceContents ->
             McpResourceContent.Blob(
-                uri = uri().orEmpty(),
-                mimeType = mimeType(),
-                blobBase64 = blob().orEmpty(),
-                meta = meta(),
+                uri = uri,
+                mimeType = mimeType,
+                blobBase64 = blob,
+                meta = meta?.toNativeMap(),
             )
         else -> error("Unsupported MCP resource content type: ${this::class.qualifiedName}")
+    }
+
+private fun JsonObject.toNativeMap(): Map<String, Any?> =
+    mapValues { (_, value) -> value.toNativeValue() }
+
+private fun JsonElement.toNativeValue(): Any? =
+    when (this) {
+        is JsonObject -> toNativeMap()
+        is JsonArray -> map { it.toNativeValue() }
+        is JsonNull -> null
+        is JsonPrimitive ->
+            if (isString) content
+            else booleanOrNull ?: longOrNull ?: doubleOrNull ?: content
     }

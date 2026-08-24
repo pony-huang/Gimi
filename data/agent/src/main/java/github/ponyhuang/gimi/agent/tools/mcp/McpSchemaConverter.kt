@@ -4,8 +4,16 @@ import com.google.adk.kt.logging.LoggerFactory
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
-import io.modelcontextprotocol.spec.McpSchema.JsonSchema
-import io.modelcontextprotocol.spec.McpSchema.Tool
+import io.modelcontextprotocol.kotlin.sdk.types.Tool
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.longOrNull
 
 /** Converts MCP JSON Schema maps into the ADK schema model without leaking MCP SDK types. */
 internal object McpSchemaConverter {
@@ -33,29 +41,11 @@ internal object McpSchemaConverter {
     /** Converts an MCP [Tool] into an ADK [FunctionDeclaration]. */
     fun Tool.toAdkFunctionDeclaration(): FunctionDeclaration =
         FunctionDeclaration(
-            name = name(),
-            description = description() ?: "",
-            parameters = inputSchema().toAdkRootSchema(),
-            response = outputSchema()?.let(::toResponseSchema),
+            name = name,
+            description = description ?: "",
+            parameters = inputSchema.toNativeMap().toAdkRootSchema(),
+            response = outputSchema?.toNativeMap()?.let(::toResponseSchema),
         )
-
-    /** Converts the Java MCP SDK's legacy typed schema record into the ADK schema model. */
-    @Suppress("DEPRECATION")
-    fun JsonSchema.toAdkSchema(): Schema {
-        val definitions = buildMap {
-            definitions()?.let(::putAll)
-            defs()?.let(::putAll)
-        }
-        val properties = properties().toAdkSchemaMap(depth = 1, scope = RefScope(definitions))
-        val type = parseTypeString(type())
-        return Schema(
-            type = type,
-            properties = properties,
-            items = defaultItems(type),
-            required = required().requiredIn(properties),
-            description = null,
-        )
-    }
 
     private fun Map<String, Any>.toAdkRootSchema(): Schema =
         parsePropertyMap(this, depth = 0, definitions = declaredDefinitions())
@@ -318,4 +308,23 @@ internal object McpSchemaConverter {
             }
         }
     }
+
+    /** Converts the SDK's serializable tool schema into the JSON-native shape consumed below. */
+    private fun ToolSchema.toNativeMap(): Map<String, Any> = buildMap {
+        put("type", type)
+        schema?.let { put("\$schema", it) }
+        properties?.let { put("properties", it.toNativeValue()) }
+        required?.let { put("required", it) }
+        defs?.let { put("\$defs", it.toNativeValue()) }
+    }
+
+    private fun JsonElement.toNativeValue(): Any =
+        when (this) {
+            is JsonObject -> mapValues { (_, value) -> value.toNativeValue() }
+            is JsonArray -> map { it.toNativeValue() }
+            is JsonNull -> "null"
+            is JsonPrimitive ->
+                if (isString) content
+                else booleanOrNull ?: longOrNull ?: doubleOrNull ?: content
+        }
 }

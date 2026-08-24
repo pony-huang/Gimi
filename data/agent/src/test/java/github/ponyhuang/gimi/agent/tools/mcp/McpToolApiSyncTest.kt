@@ -1,18 +1,23 @@
 package github.ponyhuang.gimi.agent.tools.mcp
 
 import com.google.adk.kt.tools.ToolContext
-import io.mockk.every
+import io.mockk.coEvery
 import io.mockk.mockk
 import io.mockk.slot
-import io.modelcontextprotocol.client.McpAsyncClient
-import io.modelcontextprotocol.spec.McpSchema.CallToolRequest
-import io.modelcontextprotocol.spec.McpSchema.CallToolResult
-import io.modelcontextprotocol.spec.McpSchema.Tool
+import io.modelcontextprotocol.kotlin.sdk.client.Client
+import io.modelcontextprotocol.kotlin.sdk.shared.RequestOptions
+import io.modelcontextprotocol.kotlin.sdk.shared.Transport
+import io.modelcontextprotocol.kotlin.sdk.shared.TransportSendOptions
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.JSONRPCMessage
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import io.modelcontextprotocol.kotlin.sdk.types.Tool
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
 import org.junit.Test
-import reactor.core.publisher.Mono
 
 class McpToolApiSyncTest {
 
@@ -27,45 +32,50 @@ class McpToolApiSyncTest {
     }
 
     @Test
-    fun progressUsesTheAdkFunctionCallId() = runTest {
-        val client = mockk<McpAsyncClient>()
-        val request = slot<CallToolRequest>()
-        every { client.callTool(capture(request)) } returns Mono.just(textResult("ok"))
+    fun progressConsumerIsForwardedThroughKotlinRequestOptions() = runTest {
+        val client = mockk<Client>()
+        val options = slot<RequestOptions>()
+        coEvery {
+            client.callTool(name = "echo", arguments = any(), options = capture(options))
+        } returns textResult("ok")
         val tool = mcpTool(client, hasProgressConsumers = true)
-        val context = mockk<ToolContext>()
-        every { context.functionCallId } returns "function-call-1"
 
-        tool.run(context, emptyMap())
+        tool.run(mockk<ToolContext>(), emptyMap())
 
-        assertEquals("function-call-1", request.captured.meta()["progressToken"])
+        assertNotNull(options.captured.onProgress)
     }
 
     @Test
-    fun emptySdkResultReturnsAnActionableErrorMap() = runTest {
-        val client = mockk<McpAsyncClient>()
-        every { client.callTool(any()) } returns Mono.empty()
+    fun sdkResultIsConvertedToJsonNativeContent() = runTest {
+        val client = mockk<Client>()
+        coEvery {
+            client.callTool(name = "echo", arguments = any(), options = any())
+        } returns textResult("ok")
         val tool = mcpTool(client)
-        val context = mockk<ToolContext>()
-        every { context.functionCallId } returns null
 
-        val result = tool.run(context, emptyMap()) as Map<*, *>
+        val result = tool.run(mockk<ToolContext>(), emptyMap()) as Map<*, *>
+        val content = result["content"] as List<*>
 
-        assertEquals("MCP framework error: CallToolResult was null", result["error"])
+        assertEquals("ok", (content.single() as Map<*, *>)["text"])
     }
 
     private fun mcpTool(
-        client: McpAsyncClient,
+        client: Client,
         hasProgressConsumers: Boolean = false,
     ): McpTool =
         McpTool(
             name = "echo",
             description = "Echoes input.",
-            mcpSchemaTool = Tool.builder("echo", mapOf("type" to "object")).build(),
-            mcpSessionManager = StaticSessionManager(McpSession(client), hasProgressConsumers),
+            mcpSchemaTool = Tool(name = "echo", inputSchema = ToolSchema()),
+            mcpSessionManager =
+                StaticSessionManager(
+                    McpSession(client, McpTransportHandle(NoOpTransport())),
+                    hasProgressConsumers,
+                ),
         )
 
     private fun textResult(text: String): CallToolResult =
-        CallToolResult.builder().addTextContent(text).build()
+        CallToolResult(content = listOf(TextContent(text)))
 
     private class StaticSessionManager(
         private val session: McpSession,
@@ -76,6 +86,18 @@ class McpToolApiSyncTest {
             stale: McpSession?,
         ): McpSession = session
 
+        override fun requestOptions(): RequestOptions =
+            RequestOptions(onProgress = if (hasProgressConsumers) ({}) else null)
+
         override fun close() = Unit
+    }
+
+    private class NoOpTransport : Transport {
+        override suspend fun start() = Unit
+        override suspend fun send(message: JSONRPCMessage, options: TransportSendOptions?) = Unit
+        override suspend fun close() = Unit
+        override fun onClose(block: () -> Unit) = Unit
+        override fun onError(block: (Throwable) -> Unit) = Unit
+        override fun onMessage(block: suspend (JSONRPCMessage) -> Unit) = Unit
     }
 }

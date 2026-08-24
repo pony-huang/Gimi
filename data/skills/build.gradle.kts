@@ -17,7 +17,9 @@ android {
 dependencies {
     implementation(project(":domain:skills"))
     implementation(libs.androidx.core.ktx)
-    implementation(libs.google.adk.kotlin.core)
+    implementation(libs.google.adk.kotlin.core) {
+        exclude(group = "io.modelcontextprotocol.sdk")
+    }
     implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.okhttp)

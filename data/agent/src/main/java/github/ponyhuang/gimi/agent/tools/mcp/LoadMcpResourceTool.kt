@@ -7,8 +7,8 @@ import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.agent.tools.mcp.McpToolException.McpToolExecutionException
-import io.modelcontextprotocol.spec.McpError
-import io.modelcontextprotocol.spec.McpSchema
+import io.modelcontextprotocol.kotlin.sdk.types.McpException
+import io.modelcontextprotocol.kotlin.sdk.types.RPCError
 import kotlinx.coroutines.CancellationException
 
 /**
@@ -44,8 +44,8 @@ internal class LoadMcpResourceTool(
       val contents =
         try {
           mcpToolset.readResource(uri, readonlyContext)
-        } catch (e: McpError) {
-          if (e.jsonRpcError?.code() != McpSchema.ErrorCodes.RESOURCE_NOT_FOUND) throw e
+        } catch (e: McpException) {
+          if (e.code != RPCError.ErrorCode.RESOURCE_NOT_FOUND) throw e
           logger.warn { "MCP server has no resource at uri \"$uri\"." }
           return uriNotFoundMessage(uri)
         }

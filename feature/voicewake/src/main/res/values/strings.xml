@@ -13,6 +13,7 @@
     <string name="voicewake_model_installing">正在安装模型</string>
     <string name="voicewake_model_ready">已就绪，仅在本机识别“%1$s”</string>
     <string name="voicewake_model_install_failed">安装失败</string>
+    <string name="voicewake_action_download">下载</string>
     <string name="voicewake_action_retry">重试</string>
     <string name="voicewake_action_cancel">取消</string>
 

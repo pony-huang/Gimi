@@ -13,6 +13,7 @@
     <string name="voicewake_model_installing">Installing model</string>
     <string name="voicewake_model_ready">Ready. “%1$s” is recognized on this device only.</string>
     <string name="voicewake_model_install_failed">Installation failed</string>
+    <string name="voicewake_action_download">Download</string>
     <string name="voicewake_action_retry">Retry</string>
     <string name="voicewake_action_cancel">Cancel</string>
 

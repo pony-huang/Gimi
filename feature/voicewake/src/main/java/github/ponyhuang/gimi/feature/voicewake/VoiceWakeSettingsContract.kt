@@ -2,10 +2,18 @@ package github.ponyhuang.gimi.feature.voicewake
 
 import github.ponyhuang.gimi.domain.speech.model.VoiceWakeState
 
-/** 语音唤醒设置页的完整展示状态。 */
+/**
+ * 语音唤醒设置页的完整展示状态。
+ *
+ * @property voiceState 语音唤醒服务与模型的实时状态。
+ * @property configurationReady 默认对话模型和语音识别模型是否可用。
+ * @property isStartPending 是否正在等待模型安装完成后继续启动监听。
+ * @property permissionRequestId 待 Route 消费的一次性权限请求标识。
+ */
 data class VoiceWakeSettingsUiState(
     val voiceState: VoiceWakeState = VoiceWakeState(),
     val configurationReady: Boolean = false,
+    val isStartPending: Boolean = false,
     val permissionRequestId: Int? = null,
 )
 

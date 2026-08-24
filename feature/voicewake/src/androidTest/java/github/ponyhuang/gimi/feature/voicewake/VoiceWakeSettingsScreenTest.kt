@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.feature.voicewake
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
@@ -64,6 +65,33 @@ class VoiceWakeSettingsScreenTest {
         ).assertExists()
         composeRule.onNodeWithText(context.getString(R.string.voicewake_keyword_en)).assertExists()
         composeRule.onAllNodes(hasSetTextAction()).assertCountEquals(0)
+    }
+
+    @Test
+    fun missingModelShowsDownloadButtonAndEmitsInstallAction() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val installLabel = if (context.resources.configuration.locales[0].language == "zh") {
+            "下载"
+        } else {
+            "Download"
+        }
+        var action: VoiceWakeSettingsAction? = null
+        composeRule.setContent {
+            AsssistantaiTheme {
+                VoiceWakeSettingsScreen(
+                    state = VoiceWakeSettingsUiState(voiceState = twoModelState()),
+                    onAction = { action = it },
+                )
+            }
+        }
+
+        composeRule.onAllNodesWithText(installLabel).assertCountEquals(1)
+        composeRule.onNodeWithText(installLabel).performClick()
+
+        assertEquals(
+            VoiceWakeSettingsAction.InstallModel(WakeModelCatalog.English.id),
+            action,
+        )
     }
 
     @Test

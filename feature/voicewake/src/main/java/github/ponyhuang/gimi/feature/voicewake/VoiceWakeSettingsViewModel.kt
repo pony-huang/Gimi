@@ -10,8 +10,10 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 @HiltViewModel
 class VoiceWakeSettingsViewModel @Inject constructor(
@@ -20,11 +22,13 @@ class VoiceWakeSettingsViewModel @Inject constructor(
 ) : ViewModel() {
     private val localState = MutableStateFlow(LocalState())
     private var nextPermissionRequestId = 0
+    private val settings = observeSettings()
 
-    val uiState = combine(observeSettings(), localState) { settings, local ->
+    val uiState = combine(settings, localState) { settings, local ->
         VoiceWakeSettingsUiState(
             voiceState = settings.voiceState,
             configurationReady = settings.configurationReady,
+            isStartPending = local.isStartPending,
             permissionRequestId = local.permissionRequestId,
         )
     }.stateIn(
@@ -33,12 +37,39 @@ class VoiceWakeSettingsViewModel @Inject constructor(
         initialValue = VoiceWakeSettingsUiState(),
     )
 
+    init {
+        viewModelScope.launch {
+            settings.collect { state ->
+                if (
+                    state.configurationReady &&
+                    state.voiceState.model.status == WakeModelStatus.Ready
+                ) {
+                    localState.update { local ->
+                        if (local.isStartPending) {
+                            local.copy(
+                                isStartPending = false,
+                                permissionRequestId = ++nextPermissionRequestId,
+                            )
+                        } else {
+                            local
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fun onAction(action: VoiceWakeSettingsAction) {
         when (action) {
             is VoiceWakeSettingsAction.ToggleListening -> toggleListening(action.enabled)
             is VoiceWakeSettingsAction.SelectModel -> selectModel(action.modelId)
             is VoiceWakeSettingsAction.InstallModel -> manageVoiceWake.installModel(action.modelId)
-            is VoiceWakeSettingsAction.CancelInstall -> manageVoiceWake.cancelInstall(action.modelId)
+            is VoiceWakeSettingsAction.CancelInstall -> {
+                if (action.modelId == uiState.value.voiceState.activeModelId) {
+                    localState.update { it.copy(isStartPending = false) }
+                }
+                manageVoiceWake.cancelInstall(action.modelId)
+            }
             is VoiceWakeSettingsAction.PermissionsResult -> {
                 val state = uiState.value
                 if (
@@ -69,7 +100,9 @@ class VoiceWakeSettingsViewModel @Inject constructor(
 
     private fun toggleListening(enabled: Boolean) {
         if (!enabled) {
-            manageVoiceWake.stop()
+            val wasRunning = uiState.value.voiceState.isRunning
+            localState.update { it.copy(isStartPending = false) }
+            if (wasRunning) manageVoiceWake.stop()
             return
         }
 
@@ -77,10 +110,13 @@ class VoiceWakeSettingsViewModel @Inject constructor(
         when (state.voiceState.model.status) {
             WakeModelStatus.Missing,
             WakeModelStatus.Error,
-            -> manageVoiceWake.installModel(state.voiceState.activeModelId)
+            -> {
+                localState.update { it.copy(isStartPending = true) }
+                manageVoiceWake.installModel(state.voiceState.activeModelId)
+            }
             WakeModelStatus.Downloading,
             WakeModelStatus.Extracting,
-            -> Unit
+            -> localState.update { it.copy(isStartPending = true) }
             WakeModelStatus.Ready -> if (state.configurationReady) localState.update {
                 it.copy(permissionRequestId = ++nextPermissionRequestId)
             }
@@ -89,6 +125,7 @@ class VoiceWakeSettingsViewModel @Inject constructor(
 
     /** 仅由设置页内部消费的一次性权限请求状态。 */
     private data class LocalState(
+        val isStartPending: Boolean = false,
         val permissionRequestId: Int? = null,
     )
 }

@@ -54,11 +54,15 @@ fun VoiceWakeSettingsScreen(
                     title = stringResource(R.string.voicewake_listening_title),
                     subtitle = listeningSubtitle(state.voiceState),
                     onClick = {
-                        onAction(VoiceWakeSettingsAction.ToggleListening(!state.voiceState.isRunning))
+                        onAction(
+                            VoiceWakeSettingsAction.ToggleListening(
+                                !state.voiceState.isRunning && !state.isStartPending,
+                            ),
+                        )
                     },
                     trailingContent = {
                         Switch(
-                            checked = state.voiceState.isRunning,
+                            checked = state.voiceState.isRunning || state.isStartPending,
                             onCheckedChange = {
                                 onAction(VoiceWakeSettingsAction.ToggleListening(it))
                             },
@@ -188,7 +192,11 @@ private fun WakeModelRow(
             RadioButton(selected = isActive, onClick = null)
         },
         trailingContent = {
-            if (modelState.status == WakeModelStatus.Error) {
+            if (modelState.status == WakeModelStatus.Missing) {
+                TextButton(onClick = onInstall) {
+                    Text(stringResource(R.string.voicewake_action_download))
+                }
+            } else if (modelState.status == WakeModelStatus.Error) {
                 TextButton(onClick = onInstall) {
                     Text(stringResource(R.string.voicewake_action_retry))
                 }

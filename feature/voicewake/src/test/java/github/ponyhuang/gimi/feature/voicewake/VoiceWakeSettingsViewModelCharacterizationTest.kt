@@ -76,6 +76,33 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
     }
 
     @Test
+    fun enablingMissingWakeModelRequestsPermissionAfterDownloadCompletes() = runTest {
+        val voiceState = voiceState(ready = false)
+        val voiceRepository = voiceRepository(voiceState)
+        val viewModel = viewModel(modelRepository(), voiceRepository)
+
+        viewModel.uiState.test {
+            var state = awaitItem()
+            while (!state.configurationReady) state = awaitItem()
+
+            viewModel.onAction(VoiceWakeSettingsAction.ToggleListening(enabled = true))
+            voiceState.value = voiceState.value.copy(
+                modelStates = voiceState.value.modelStates + (
+                    WakeModelCatalog.Chinese.id to WakeModelState(WakeModelStatus.Ready, 1f)
+                ),
+            )
+
+            do {
+                state = awaitItem()
+            } while (state.permissionRequestId == null)
+
+            assertEquals(1, state.permissionRequestId)
+            verify(exactly = 0) { voiceRepository.start() }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun selectingMissingModelStartsItsDownload() = runTest {
         val voiceRepository = voiceRepository(ready = true)
         val viewModel = viewModel(modelRepository(), voiceRepository)
@@ -137,18 +164,10 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
     }
 
     private fun voiceRepository(ready: Boolean): VoiceWakeRepository {
-        val flow = MutableStateFlow(
-            VoiceWakeState(
-                availableModels = WakeModelCatalog.models,
-                activeModelId = WakeModelCatalog.Chinese.id,
-                modelStates = mapOf(
-                    WakeModelCatalog.Chinese.id to WakeModelState(
-                        status = if (ready) WakeModelStatus.Ready else WakeModelStatus.Missing,
-                    ),
-                    WakeModelCatalog.English.id to WakeModelState(WakeModelStatus.Missing),
-                ),
-            ),
-        )
+        return voiceRepository(voiceState(ready))
+    }
+
+    private fun voiceRepository(flow: MutableStateFlow<VoiceWakeState>): VoiceWakeRepository {
         return mockk(relaxed = true) {
             every { state } returns flow
             every { selectModel(any()) } answers {
@@ -157,6 +176,19 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
             }
         }
     }
+
+    private fun voiceState(ready: Boolean) = MutableStateFlow(
+        VoiceWakeState(
+            availableModels = WakeModelCatalog.models,
+            activeModelId = WakeModelCatalog.Chinese.id,
+            modelStates = mapOf(
+                WakeModelCatalog.Chinese.id to WakeModelState(
+                    status = if (ready) WakeModelStatus.Ready else WakeModelStatus.Missing,
+                ),
+                WakeModelCatalog.English.id to WakeModelState(WakeModelStatus.Missing),
+            ),
+        ),
+    )
 
     private fun modelRepository(
         speechSelection: ModelSelection? = ModelSelection("service", "group", "stt"),

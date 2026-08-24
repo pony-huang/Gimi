@@ -10,11 +10,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BluetoothAudio
-import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -27,7 +25,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.speech.model.VoiceWakeState
-import github.ponyhuang.gimi.domain.speech.model.WakeKeywordError
 import github.ponyhuang.gimi.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.gimi.domain.speech.model.WakeModelInfo
 import github.ponyhuang.gimi.domain.speech.model.WakeModelSource
@@ -104,7 +101,19 @@ fun VoiceWakeSettingsScreen(
                     modifier = Modifier.padding(top = 12.dp),
                 )
             }
-            item { KeywordEditor(state = state, onAction = onAction) }
+            item {
+                Column {
+                    Text(
+                        text = stringResource(wakeWordRes(state.voiceState.activeModelId)),
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 24.dp),
+                    )
+                    Text(
+                        text = stringResource(R.string.voicewake_keyword_fixed_description),
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                    )
+                }
+            }
         }
     }
 }
@@ -164,7 +173,12 @@ private fun WakeModelRow(
                     )
                 }
                 WakeModelStatus.Extracting -> Text(stringResource(R.string.voicewake_model_installing))
-                WakeModelStatus.Ready -> Text(stringResource(R.string.voicewake_model_ready))
+                WakeModelStatus.Ready -> Text(
+                    stringResource(
+                        R.string.voicewake_model_ready,
+                        stringResource(wakeWordRes(model.id)),
+                    ),
+                )
                 WakeModelStatus.Error -> Text(
                     modelState.message ?: stringResource(R.string.voicewake_model_install_failed),
                 )
@@ -174,16 +188,9 @@ private fun WakeModelRow(
             RadioButton(selected = isActive, onClick = null)
         },
         trailingContent = {
-            if (modelState.status == WakeModelStatus.Missing ||
-                modelState.status == WakeModelStatus.Error
-            ) {
+            if (modelState.status == WakeModelStatus.Error) {
                 TextButton(onClick = onInstall) {
-                    Text(
-                        stringResource(
-                            if (modelState.status == WakeModelStatus.Error) R.string.voicewake_action_retry
-                            else R.string.voicewake_action_install,
-                        ),
-                    )
+                    Text(stringResource(R.string.voicewake_action_retry))
                 }
             } else if (modelState.status == WakeModelStatus.Downloading ||
                 modelState.status == WakeModelStatus.Extracting
@@ -201,57 +208,6 @@ private fun WakeModelRow(
     )
 }
 
-@Composable
-private fun KeywordEditor(
-    state: VoiceWakeSettingsUiState,
-    onAction: (VoiceWakeSettingsAction) -> Unit,
-) {
-    val isEnglish = state.voiceState.activeModel.languageTag.startsWith("en")
-    Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)) {
-        OutlinedTextField(
-            value = state.keywordDraft,
-            onValueChange = {
-                onAction(VoiceWakeSettingsAction.KeywordChanged(it))
-            },
-            // 组标题已是「唤醒词」，不再重复 label；规则说明交给 supportingText。
-            supportingText = {
-                val errorRes = keywordErrorRes(state.keywordError, isEnglish)
-                Text(
-                    if (errorRes != null) {
-                        stringResource(errorRes)
-                    } else {
-                        stringResource(
-                            if (isEnglish) R.string.voicewake_keyword_hint_en
-                            else R.string.voicewake_keyword_hint_zh,
-                        )
-                    },
-                )
-            },
-            isError = state.keywordError != null,
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Button(
-            onClick = { onAction(VoiceWakeSettingsAction.SaveKeyword) },
-            enabled = state.keywordDraft.trim() != state.voiceState.keyword,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 12.dp),
-        ) {
-            Text(stringResource(R.string.voicewake_save_keyword))
-        }
-    }
-}
-
-private fun keywordErrorRes(error: WakeKeywordError?, isEnglish: Boolean): Int? = when (error) {
-    WakeKeywordError.InvalidLength ->
-        if (isEnglish) R.string.voicewake_keyword_error_length_en
-        else R.string.voicewake_keyword_error_length_zh
-    WakeKeywordError.InvalidCharacters -> R.string.voicewake_keyword_error_characters
-    WakeKeywordError.InvalidWordFormat -> R.string.voicewake_keyword_error_format_en
-    null -> null
-}
-
 private fun modelNameRes(modelId: String): Int = when (modelId) {
     WakeModelCatalog.English.id -> R.string.voicewake_model_en_name
     else -> R.string.voicewake_model_cn_name
@@ -260,3 +216,8 @@ private fun modelNameRes(modelId: String): Int = when (modelId) {
 private fun languageNameRes(model: WakeModelInfo): Int =
     if (model.languageTag.startsWith("en")) R.string.voicewake_language_en
     else R.string.voicewake_language_zh
+
+private fun wakeWordRes(modelId: String): Int = when (modelId) {
+    WakeModelCatalog.English.id -> R.string.voicewake_keyword_en
+    else -> R.string.voicewake_keyword_zh
+}

@@ -6,9 +6,6 @@ import kotlinx.coroutines.flow.StateFlow
 interface VoiceWakeRepository {
     val state: StateFlow<VoiceWakeState>
 
-    /** 设置激活模型语言的唤醒词。 */
-    fun setKeyword(keyword: String): Result<Unit>
-
     /** 切换激活的唤醒模型。 */
     fun selectModel(modelId: String)
 

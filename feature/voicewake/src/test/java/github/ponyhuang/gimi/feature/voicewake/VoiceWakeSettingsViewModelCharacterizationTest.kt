@@ -10,8 +10,6 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.speech.model.VoiceWakeState
-import github.ponyhuang.gimi.domain.speech.model.WakeKeywordError
-import github.ponyhuang.gimi.domain.speech.model.WakeKeywordException
 import github.ponyhuang.gimi.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.gimi.domain.speech.model.WakeModelState
 import github.ponyhuang.gimi.domain.speech.model.WakeModelStatus
@@ -25,8 +23,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -62,7 +58,7 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
     }
 
     @Test
-    fun missingWakeModelPromptsForManualInstallWithoutDownloading() = runTest {
+    fun enablingMissingWakeModelStartsDownloadWithoutRequestingPermission() = runTest {
         val voiceRepository = voiceRepository(ready = false)
         val viewModel = viewModel(modelRepository(), voiceRepository)
 
@@ -70,17 +66,9 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
             var state = awaitItem()
             while (!state.configurationReady) state = awaitItem()
 
-            viewModel.effects.test {
-                viewModel.onAction(VoiceWakeSettingsAction.ToggleListening(enabled = true))
+            viewModel.onAction(VoiceWakeSettingsAction.ToggleListening(enabled = true))
 
-                assertEquals(
-                    VoiceWakeSettingsEffect.ShowToast(R.string.voicewake_model_download_prompt),
-                    awaitItem(),
-                )
-                cancelAndIgnoreRemainingEvents()
-            }
-
-            verify(exactly = 0) { voiceRepository.installModel(any()) }
+            verify(exactly = 1) { voiceRepository.installModel(WakeModelCatalog.Chinese.id) }
             assertEquals(null, viewModel.uiState.value.permissionRequestId)
             verify(exactly = 0) { voiceRepository.start() }
             cancelAndIgnoreRemainingEvents()
@@ -88,31 +76,7 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
     }
 
     @Test
-    fun invalidKeywordSurfacesTypedValidationError() = runTest {
-        val voiceRepository = voiceRepository(ready = true)
-        every { voiceRepository.setKeyword("x") } returns
-            Result.failure(WakeKeywordException(WakeKeywordError.InvalidLength))
-        val viewModel = viewModel(modelRepository(), voiceRepository)
-
-        viewModel.uiState.test {
-            awaitItem()
-            viewModel.onAction(VoiceWakeSettingsAction.KeywordChanged("x"))
-            var state = awaitItem()
-            while (state.keywordDraft != "x") state = awaitItem()
-
-            viewModel.onAction(VoiceWakeSettingsAction.SaveKeyword)
-            do {
-                state = awaitItem()
-            } while (state.keywordError == null)
-
-            assertEquals(WakeKeywordError.InvalidLength, state.keywordError)
-            verify(exactly = 1) { voiceRepository.setKeyword("x") }
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
-    fun selectingModelRestoresThatModelsSavedKeywordWithoutAutoInstalling() = runTest {
+    fun selectingMissingModelStartsItsDownload() = runTest {
         val voiceRepository = voiceRepository(ready = true)
         val viewModel = viewModel(modelRepository(), voiceRepository)
 
@@ -120,20 +84,9 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
             var state = awaitItem()
             while (!state.configurationReady) state = awaitItem()
 
-            viewModel.onAction(VoiceWakeSettingsAction.KeywordChanged("自定义唤醒词"))
-            state = awaitItem()
-            while (state.keywordDraft != "自定义唤醒词") state = awaitItem()
-
             viewModel.onAction(VoiceWakeSettingsAction.SelectModel(WakeModelCatalog.English.id))
-            do {
-                state = awaitItem()
-            } while (state.voiceState.activeModelId != WakeModelCatalog.English.id)
 
-            // 草稿丢弃，输入框回落为英语模型已保存（默认）的唤醒词。
-            assertEquals(WakeModelCatalog.English.defaultKeyword, state.keywordDraft)
-            assertNull(state.keywordError)
-            // 英语模型未安装，选中后不自动触发安装；仅点击安装按钮才下载。
-            verify(exactly = 0) { voiceRepository.installModel(any()) }
+            verify(exactly = 1) { voiceRepository.installModel(WakeModelCatalog.English.id) }
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -198,10 +151,9 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
         )
         return mockk(relaxed = true) {
             every { state } returns flow
-            every { setKeyword(any()) } returns Result.success(Unit)
             every { selectModel(any()) } answers {
                 val info = WakeModelCatalog.byId(firstArg()) ?: return@answers Unit
-                flow.value = flow.value.copy(activeModelId = info.id, keyword = info.defaultKeyword)
+                flow.value = flow.value.copy(activeModelId = info.id)
             }
         }
     }

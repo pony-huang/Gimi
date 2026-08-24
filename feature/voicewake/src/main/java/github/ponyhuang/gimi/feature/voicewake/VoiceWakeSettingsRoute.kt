@@ -1,9 +1,7 @@
 package github.ponyhuang.gimi.feature.voicewake
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.content.pm.PackageManager
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -15,8 +13,6 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
-// effect 携带动态 string res id，无法在组合期用 stringResource 解析，豁免该 lint。
-@SuppressLint("LocalContextGetResourceValueCall")
 @Composable
 fun VoiceWakeSettingsRoute(
     modifier: Modifier = Modifier,
@@ -42,18 +38,6 @@ fun VoiceWakeSettingsRoute(
             viewModel.onAction(VoiceWakeSettingsAction.PermissionsResult(granted = true))
         } else {
             permissionLauncher.launch(missing.toTypedArray())
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        viewModel.effects.collect { effect ->
-            when (effect) {
-                is VoiceWakeSettingsEffect.ShowToast -> Toast.makeText(
-                    context,
-                    context.getString(effect.messageRes),
-                    Toast.LENGTH_SHORT,
-                ).show()
-            }
         }
     }
 

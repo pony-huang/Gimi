@@ -3,17 +3,15 @@ package github.ponyhuang.gimi.data.voicewake
 import com.google.gson.JsonParser
 import github.ponyhuang.gimi.core.audio.VoiceAudioRecorder
 import github.ponyhuang.gimi.domain.speech.model.normalizeWakeText
-import github.ponyhuang.gimi.domain.speech.model.wakeKeywordGrammar
 import java.io.Closeable
 import org.vosk.Model
 import org.vosk.Recognizer
 
 class VoskWakeWordDetector(
     private val model: Model,
-    keyword: String,
+    private val recognitionPhrase: String,
 ) : Closeable {
-    private var keyword = keyword
-    private var recognizer = createRecognizer(keyword)
+    private var recognizer = createRecognizer()
 
     @Synchronized
     fun accept(pcm16: ByteArray): Boolean {
@@ -25,26 +23,18 @@ class VoskWakeWordDetector(
                 ?.asString
                 .orEmpty()
         }.getOrDefault("")
-        val normalizedKeyword = normalizeWakeText(keyword)
+        val normalizedKeyword = normalizeWakeText(recognitionPhrase)
         return normalizedKeyword.isNotEmpty() && normalizeWakeText(text).contains(normalizedKeyword)
-    }
-
-    @Synchronized
-    fun updateKeyword(value: String) {
-        if (value == keyword) return
-        recognizer.close()
-        keyword = value
-        recognizer = createRecognizer(value)
     }
 
     @Synchronized
     fun reset() {
         recognizer.close()
-        recognizer = createRecognizer(keyword)
+        recognizer = createRecognizer()
     }
 
-    private fun createRecognizer(value: String): Recognizer {
-        val escaped = wakeKeywordGrammar(value).replace("\\", "\\\\").replace("\"", "\\\"")
+    private fun createRecognizer(): Recognizer {
+        val escaped = recognitionPhrase.replace("\\", "\\\\").replace("\"", "\\\"")
         return Recognizer(model, VoiceAudioRecorder.SAMPLE_RATE_HZ.toFloat(), "[\"$escaped\", \"[unk]\"]")
     }
 

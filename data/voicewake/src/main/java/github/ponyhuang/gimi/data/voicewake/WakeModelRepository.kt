@@ -14,6 +14,7 @@ import java.util.zip.ZipInputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CoroutineStart
@@ -23,6 +24,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.job
 import okhttp3.OkHttpClient
 
 @Singleton
@@ -54,7 +58,7 @@ class WakeModelRepository @Inject constructor(
                 try {
                     installInternal(info)
                 } finally {
-                    installJobs.remove(modelId)
+                    installJobs.remove(modelId, currentCoroutineContext().job)
                 }
             }
             job.start()
@@ -67,10 +71,10 @@ class WakeModelRepository @Inject constructor(
         updateState(modelId, WakeModelState())
     }
 
-    private fun installInternal(info: WakeModelInfo) {
+    private suspend fun installInternal(info: WakeModelInfo) {
         val archive = File(context.cacheDir, "${info.id}.archive")
         val extracting = File(rootDir, "${info.id}.extracting")
-        runCatching {
+        try {
             rootDir.mkdirs()
             archive.delete()
             extracting.deleteRecursively()
@@ -100,7 +104,9 @@ class WakeModelRepository @Inject constructor(
             }
             backup.deleteRecursively()
             updateState(info.id, WakeModelState(WakeModelStatus.Ready, 1f))
-        }.onFailure { error ->
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
             updateState(
                 info.id,
                 WakeModelState(
@@ -108,12 +114,17 @@ class WakeModelRepository @Inject constructor(
                     message = error.message ?: getString(R.string.wake_model_install_failed),
                 ),
             )
+        } finally {
+            archive.delete()
+            extracting.deleteRecursively()
         }
-        archive.delete()
-        extracting.deleteRecursively()
     }
 
-    private fun copyBundledAsset(info: WakeModelInfo, source: WakeModelSource.Bundled, archive: File) {
+    private suspend fun copyBundledAsset(
+        info: WakeModelInfo,
+        source: WakeModelSource.Bundled,
+        archive: File,
+    ) {
         val message = getString(R.string.wake_model_reading_bundled)
         updateState(info.id, WakeModelState(WakeModelStatus.Downloading, 0f, message))
         val digest = MessageDigest.getInstance("SHA-256")
@@ -123,6 +134,7 @@ class WakeModelRepository @Inject constructor(
                 val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                 var copied = 0L
                 while (true) {
+                    currentCoroutineContext().ensureActive()
                     val read = input.read(buffer)
                     if (read < 0) break
                     digest.update(buffer, 0, read)
@@ -139,7 +151,11 @@ class WakeModelRepository @Inject constructor(
         verifyChecksum(info, digest)
     }
 
-    private fun downloadArchive(info: WakeModelInfo, source: WakeModelSource.Downloadable, archive: File) {
+    private suspend fun downloadArchive(
+        info: WakeModelInfo,
+        source: WakeModelSource.Downloadable,
+        archive: File,
+    ) {
         val message = getString(R.string.wake_model_downloading)
         try {
             downloader.download(source.url, source.sizeBytes, info.sha256, archive) { progress ->
@@ -178,11 +194,12 @@ class WakeModelRepository @Inject constructor(
         }
     }
 
-    private fun unzipSafely(archive: File, destination: File) {
+    private suspend fun unzipSafely(archive: File, destination: File) {
         destination.mkdirs()
         val destinationPath = destination.canonicalPath + File.separator
         ZipInputStream(archive.inputStream().buffered()).use { zip ->
             while (true) {
+                currentCoroutineContext().ensureActive()
                 val entry = zip.nextEntry ?: break
                 val output = File(destination, entry.name)
                 require(output.canonicalPath.startsWith(destinationPath)) {
@@ -192,7 +209,15 @@ class WakeModelRepository @Inject constructor(
                     output.mkdirs()
                 } else {
                     output.parentFile?.mkdirs()
-                    output.outputStream().buffered().use { zip.copyTo(it) }
+                    output.outputStream().buffered().use { outputStream ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        while (true) {
+                            currentCoroutineContext().ensureActive()
+                            val read = zip.read(buffer)
+                            if (read < 0) break
+                            outputStream.write(buffer, 0, read)
+                        }
+                    }
                 }
                 zip.closeEntry()
             }

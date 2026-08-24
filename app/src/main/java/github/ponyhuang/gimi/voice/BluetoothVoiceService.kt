@@ -27,7 +27,6 @@ import github.ponyhuang.gimi.data.voicewake.BluetoothAudioRouter
 import github.ponyhuang.gimi.data.voicewake.BluetoothPcmRecorder
 import github.ponyhuang.gimi.data.voicewake.BluetoothRecorderException
 import github.ponyhuang.gimi.data.voicewake.BluetoothVoiceController
-import github.ponyhuang.gimi.data.voicewake.BluetoothVoicePreferences
 import github.ponyhuang.gimi.data.voicewake.BluetoothVoiceStatus
 import github.ponyhuang.gimi.data.voicewake.VoskWakeWordDetector
 import github.ponyhuang.gimi.data.voicewake.VoiceSpeechPlayer
@@ -36,7 +35,6 @@ import github.ponyhuang.gimi.domain.speech.model.isVoiceConfirmationApproved
 import github.ponyhuang.gimi.domain.speech.model.stripWakeKeyword
 import github.ponyhuang.gimi.domain.speech.model.voiceConfirmationTarget
 import github.ponyhuang.gimi.R
-import github.ponyhuang.gimi.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.gimi.domain.speech.model.WakeModelInfo
 import github.ponyhuang.gimi.domain.speech.repository.SpeechRecognitionRepository
 import github.ponyhuang.gimi.domain.speech.usecase.markdownToSpeechText
@@ -57,7 +55,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 @AndroidEntryPoint
 class BluetoothVoiceService : Service() {
     @Inject lateinit var controller: BluetoothVoiceController
-    @Inject lateinit var preferences: BluetoothVoicePreferences
     @Inject lateinit var audioRouter: BluetoothAudioRouter
     @Inject lateinit var speechRecognition: SpeechRecognitionRepository
     @Inject lateinit var agentTasks: VoiceAgentTaskExecutor
@@ -100,11 +97,6 @@ class BluetoothVoiceService : Service() {
         cueToneGenerator = runCatching { ToneGenerator(AudioManager.STREAM_VOICE_CALL, TONE_VOLUME_PERCENT) }.getOrNull()
         audioManager.addOnModeChangedListener(ContextCompat.getMainExecutor(this), callModeListener)
         audioRouter.observe { scope.launch { reconcileBluetoothRoute() } }
-        scope.launch {
-            preferences.keyword.collect { keyword ->
-                withContext(Dispatchers.IO) { detector?.updateKeyword(keyword) }
-            }
-        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -183,7 +175,11 @@ class BluetoothVoiceService : Service() {
                 val model = withTimeout(ACQUIRE_MODEL_TIMEOUT_MS) {
                     wakeModels.acquire(modelPath)
                 }
-                VoskWakeWordDetector(model, preferences.keyword.value)
+                val activeModel = controller.state.value.activeModel
+                VoskWakeWordDetector(
+                    model = model,
+                    recognitionPhrase = activeModel.wakeWordGrammar,
+                )
             }
         }.getOrElse { error ->
             audioRouter.release()
@@ -216,7 +212,7 @@ class BluetoothVoiceService : Service() {
         recoveryAttempts = 0
         setStatus(
             BluetoothVoiceStatus.Listening,
-            getString(R.string.bluetooth_voice_status_listening, preferences.keyword.value),
+            getString(R.string.bluetooth_voice_status_listening, controller.state.value.wakeWord),
             deviceName = newRoute.name,
         )
     }
@@ -289,7 +285,11 @@ class BluetoothVoiceService : Service() {
                 cancellationAwareRunCatching {
                     setStatus(BluetoothVoiceStatus.Transcribing, getString(R.string.bluetooth_voice_status_transcribing))
                     val transcript = speechRecognition.transcribe(pcm16)
-                    val command = stripWakeKeyword(transcript, preferences.keyword.value)
+                    val activeModel = controller.state.value.activeModel
+                    val command = stripWakeKeyword(
+                        stripWakeKeyword(transcript, activeModel.wakeWord),
+                        activeModel.wakeWordGrammar,
+                    )
                     check(command.isNotBlank()) { getString(R.string.bluetooth_voice_status_no_task_content) }
                     setStatus(
                         BluetoothVoiceStatus.RunningAgent,
@@ -400,8 +400,7 @@ class BluetoothVoiceService : Service() {
         return isVoiceConfirmationApproved(transcript, wakeModel.confirmWords, wakeModel.rejectWords)
     }
 
-    private fun activeWakeModel(): WakeModelInfo =
-        WakeModelCatalog.byId(preferences.activeModelId.value) ?: WakeModelCatalog.default
+    private fun activeWakeModel(): WakeModelInfo = controller.state.value.activeModel
 
     private fun recoverFromAudioError(error: Throwable) {
         stopAudioCapture(releaseRoute = true)

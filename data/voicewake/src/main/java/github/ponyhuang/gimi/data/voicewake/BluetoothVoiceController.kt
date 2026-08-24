@@ -29,7 +29,6 @@ class BluetoothVoiceController @Inject constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val _state = MutableStateFlow(
         BluetoothVoiceUiState(
-            keyword = preferences.keyword.value,
             availableModels = WakeModelCatalog.models,
             activeModelId = preferences.activeModelId.value,
             modelStates = modelRepository.states.value,
@@ -42,7 +41,6 @@ class BluetoothVoiceController @Inject constructor(
         scope.launch {
             preferences.activeModelId.collect { modelId -> _state.update { it.copy(activeModelId = modelId) } }
         }
-        scope.launch { preferences.keyword.collect { keyword -> _state.update { it.copy(keyword = keyword) } } }
         scope.launch {
             modelRepository.states.collect { states -> _state.update { it.copy(modelStates = states) } }
         }
@@ -52,9 +50,6 @@ class BluetoothVoiceController @Inject constructor(
             }
         }
     }
-
-    override fun setKeyword(keyword: String): Result<Unit> =
-        runCatching { preferences.setKeyword(keyword) }
 
     override fun selectModel(modelId: String) {
         runCatching { preferences.setActiveModel(modelId) }.onFailure { return }

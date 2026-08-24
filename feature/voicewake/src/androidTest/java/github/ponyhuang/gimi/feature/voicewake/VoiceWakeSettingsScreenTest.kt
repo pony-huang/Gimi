@@ -1,11 +1,13 @@
 package github.ponyhuang.gimi.feature.voicewake
 
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.test.platform.app.InstrumentationRegistry
 import github.ponyhuang.gimi.domain.speech.model.VoiceWakeState
 import github.ponyhuang.gimi.domain.speech.model.VoiceWakeStatus
-import github.ponyhuang.gimi.domain.speech.model.WakeKeywordError
 import github.ponyhuang.gimi.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.gimi.domain.speech.model.WakeModelState
 import github.ponyhuang.gimi.domain.speech.model.WakeModelStatus
@@ -20,6 +22,7 @@ class VoiceWakeSettingsScreenTest {
 
     @Test
     fun rendersBothModelsAndClickingEnglishRowEmitsSelectModel() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
         var action: VoiceWakeSettingsAction? = null
         composeRule.setContent {
             AsssistantaiTheme {
@@ -30,8 +33,8 @@ class VoiceWakeSettingsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("中文唤醒模型").assertExists()
-        composeRule.onNodeWithText("英语唤醒模型").performClick()
+        composeRule.onNodeWithText(context.getString(R.string.voicewake_model_cn_name)).assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.voicewake_model_en_name)).performClick()
 
         assertEquals(
             VoiceWakeSettingsAction.SelectModel(WakeModelCatalog.English.id),
@@ -40,22 +43,27 @@ class VoiceWakeSettingsScreenTest {
     }
 
     @Test
-    fun englishModelErrorKeywordShowsEnglishFormatMessage() {
+    fun englishModelShowsFixedGimiWakeWordWithoutEditor() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
         composeRule.setContent {
             AsssistantaiTheme {
                 VoiceWakeSettingsScreen(
                     state = VoiceWakeSettingsUiState(
                         voiceState = twoModelState(activeModelId = WakeModelCatalog.English.id),
-                        keywordDraft = "Hey",
-                        keywordError = WakeKeywordError.InvalidWordFormat,
                     ),
                     onAction = {},
                 )
             }
         }
 
-        composeRule.onNodeWithText("唤醒词 · English").assertExists()
-        composeRule.onNodeWithText("请输入 2–4 个小写英文单词，用空格分隔").assertExists()
+        composeRule.onNodeWithText(
+            context.getString(
+                R.string.voicewake_section_keyword_with_language,
+                context.getString(R.string.voicewake_language_en),
+            ),
+        ).assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.voicewake_keyword_en)).assertExists()
+        composeRule.onAllNodes(hasSetTextAction()).assertCountEquals(0)
     }
 
     @Test
@@ -66,7 +74,7 @@ class VoiceWakeSettingsScreenTest {
                     state = VoiceWakeSettingsUiState(
                         voiceState = twoModelState().copy(
                             status = VoiceWakeStatus.Listening,
-                            message = "正在监听“你好助手”",
+                            message = "正在监听“吉米”",
                             deviceName = "EDIFIER W820NB",
                         ),
                     ),
@@ -75,7 +83,7 @@ class VoiceWakeSettingsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("正在监听“你好助手” · EDIFIER W820NB").assertExists()
+        composeRule.onNodeWithText("正在监听“吉米” · EDIFIER W820NB").assertExists()
         composeRule.onNodeWithText("监听中").assertDoesNotExist()
     }
 

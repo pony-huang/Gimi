@@ -2,34 +2,26 @@
     <!-- Voice wake screen title (consumed by :app SettingsScaffold) -->
     <string name="voicewake_screen_title">Voice wake</string>
     <string name="voicewake_listening_title">Background listening</string>
-    <string name="voicewake_listening_state_on">Listening</string>
-    <string name="voicewake_listening_state_off">Off</string>
     <string name="voicewake_listening_subtitle">After connecting a Bluetooth headset, use the wake word to run tasks in the background</string>
 
     <string name="voicewake_section_models">Wake models</string>
     <string name="voicewake_model_cn_name">Chinese wake-word model</string>
     <string name="voicewake_model_en_name">English wake-word model</string>
-    <string name="voicewake_model_status_bundled">Bundled in the app; installs when selected</string>
-    <string name="voicewake_model_status_download_required">Requires a ~%1$d MB download; recognition stays on-device</string>
+    <string name="voicewake_model_status_bundled">Prepared automatically when selected</string>
+    <string name="voicewake_model_status_download_required">Selecting downloads about %1$d MB; recognition stays on-device</string>
     <string name="voicewake_model_downloading_progress">Downloading %1$d%%</string>
     <string name="voicewake_model_installing">Installing model</string>
-    <string name="voicewake_model_ready">Installed. Wake word is recognized on this device only.</string>
+    <string name="voicewake_model_ready">Ready. “%1$s” is recognized on this device only.</string>
     <string name="voicewake_model_install_failed">Installation failed</string>
     <string name="voicewake_action_retry">Retry</string>
-    <string name="voicewake_action_install">Install</string>
     <string name="voicewake_action_cancel">Cancel</string>
 
     <string name="voicewake_section_keyword_with_language">Wake word · %1$s</string>
     <string name="voicewake_language_zh">Chinese</string>
     <string name="voicewake_language_en">English</string>
-    <string name="voicewake_keyword_hint_zh">2–20 characters, e.g. 你好助手</string>
-    <string name="voicewake_keyword_hint_en">2–4 lowercase words separated by spaces, e.g. hey assistant</string>
-    <string name="voicewake_keyword_error_length_zh">Wake word must be 2–20 characters</string>
-    <string name="voicewake_keyword_error_length_en">Wake word must be 2–40 characters</string>
-    <string name="voicewake_keyword_error_characters">Wake word cannot contain special characters</string>
-    <string name="voicewake_keyword_error_format_en">Use 2–4 lowercase words separated by spaces</string>
-    <string name="voicewake_save_keyword">Save wake word</string>
+    <string name="voicewake_keyword_zh">吉米</string>
+    <string name="voicewake_keyword_en">Gimi</string>
+    <string name="voicewake_keyword_fixed_description">The wake word is fixed for each language model</string>
 
     <string name="voicewake_offline_setup_required">Configure a default assistant model and a speech recognition model before enabling.</string>
-    <string name="voicewake_model_download_prompt">Install a wake model below first</string>
 </resources>

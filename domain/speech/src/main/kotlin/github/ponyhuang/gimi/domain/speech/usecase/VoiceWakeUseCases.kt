@@ -25,8 +25,6 @@ class ObserveVoiceWakeSettingsUseCase @Inject constructor(
 class ManageVoiceWakeUseCase @Inject constructor(
     private val repository: VoiceWakeRepository,
 ) {
-    fun setKeyword(keyword: String) = repository.setKeyword(keyword)
-
     fun selectModel(modelId: String) = repository.selectModel(modelId)
 
     fun installModel(modelId: String) = repository.installModel(modelId)

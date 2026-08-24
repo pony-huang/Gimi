@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.feature.voicewake
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import github.ponyhuang.gimi.domain.speech.model.VoiceWakeStatus
 import github.ponyhuang.gimi.domain.speech.model.WakeModelStatus
 import github.ponyhuang.gimi.domain.speech.usecase.ManageVoiceWakeUseCase
 import github.ponyhuang.gimi.domain.speech.usecase.ObserveVoiceWakeSettingsUseCase
@@ -41,13 +42,23 @@ class VoiceWakeSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             settings.collect { state ->
                 if (
+                    state.voiceState.isRunning ||
+                    state.voiceState.status == VoiceWakeStatus.Error
+                ) {
+                    localState.update { local ->
+                        if (local.isStartPending || local.permissionRequestId != null) {
+                            local.copy(isStartPending = false, permissionRequestId = null)
+                        } else {
+                            local
+                        }
+                    }
+                } else if (
                     state.configurationReady &&
                     state.voiceState.model.status == WakeModelStatus.Ready
                 ) {
                     localState.update { local ->
-                        if (local.isStartPending) {
+                        if (local.isStartPending && local.permissionRequestId == null) {
                             local.copy(
-                                isStartPending = false,
                                 permissionRequestId = ++nextPermissionRequestId,
                             )
                         } else {
@@ -82,6 +93,10 @@ class VoiceWakeSettingsViewModel @Inject constructor(
                     state.voiceState.model.status == WakeModelStatus.Ready
                 ) {
                     manageVoiceWake.start()
+                } else {
+                    localState.update {
+                        it.copy(isStartPending = false, permissionRequestId = null)
+                    }
                 }
             }
             is VoiceWakeSettingsAction.PermissionRequestHandled -> localState.update {
@@ -123,7 +138,10 @@ class VoiceWakeSettingsViewModel @Inject constructor(
             -> localState.update { it.copy(isStartPending = true) }
             WakeModelStatus.Removing -> Unit
             WakeModelStatus.Ready -> if (state.configurationReady) localState.update {
-                it.copy(permissionRequestId = ++nextPermissionRequestId)
+                it.copy(
+                    isStartPending = true,
+                    permissionRequestId = ++nextPermissionRequestId,
+                )
             }
         }
     }

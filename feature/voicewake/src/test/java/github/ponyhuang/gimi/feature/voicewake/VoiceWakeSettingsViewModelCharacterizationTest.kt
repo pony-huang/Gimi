@@ -23,8 +23,10 @@ import io.mockk.verify
 import io.mockk.verifyOrder
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -54,6 +56,122 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
             viewModel.onAction(VoiceWakeSettingsAction.PermissionRequestHandled(requestId))
             viewModel.onAction(VoiceWakeSettingsAction.PermissionsResult(granted = true))
 
+            verify(exactly = 1) { voiceRepository.start() }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun enablingReadyWakeModelKeepsSwitchPendingUntilListenerStarts() = runTest {
+        val voiceRepository = voiceRepository(ready = true)
+        val viewModel = viewModel(modelRepository(), voiceRepository)
+
+        viewModel.uiState.test {
+            var state = awaitItem()
+            while (!state.configurationReady || state.voiceState.model.status != WakeModelStatus.Ready) {
+                state = awaitItem()
+            }
+
+            viewModel.onAction(VoiceWakeSettingsAction.ToggleListening(enabled = true))
+            do {
+                state = awaitItem()
+            } while (state.permissionRequestId == null)
+
+            assertTrue(state.isStartPending)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun listenerStartingClearsPendingWithoutRequestingPermissionAgain() = runTest {
+        val voiceState = voiceState(ready = true)
+        val voiceRepository = voiceRepository(voiceState)
+        val viewModel = viewModel(modelRepository(), voiceRepository)
+
+        viewModel.uiState.test {
+            var state = awaitItem()
+            while (!state.configurationReady || state.voiceState.model.status != WakeModelStatus.Ready) {
+                state = awaitItem()
+            }
+
+            viewModel.onAction(VoiceWakeSettingsAction.ToggleListening(enabled = true))
+            do {
+                state = awaitItem()
+            } while (state.permissionRequestId == null)
+            val requestId = requireNotNull(state.permissionRequestId)
+
+            viewModel.onAction(VoiceWakeSettingsAction.PermissionRequestHandled(requestId))
+            viewModel.onAction(VoiceWakeSettingsAction.PermissionsResult(granted = true))
+            voiceState.value = voiceState.value.copy(status = VoiceWakeStatus.Starting)
+
+            do {
+                state = awaitItem()
+            } while (state.isStartPending)
+
+            assertEquals(null, state.permissionRequestId)
+            verify(exactly = 1) { voiceRepository.start() }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun deniedPermissionClearsPendingStart() = runTest {
+        val voiceRepository = voiceRepository(ready = true)
+        val viewModel = viewModel(modelRepository(), voiceRepository)
+
+        viewModel.uiState.test {
+            var state = awaitItem()
+            while (!state.configurationReady || state.voiceState.model.status != WakeModelStatus.Ready) {
+                state = awaitItem()
+            }
+
+            viewModel.onAction(VoiceWakeSettingsAction.ToggleListening(enabled = true))
+            do {
+                state = awaitItem()
+            } while (state.permissionRequestId == null)
+
+            viewModel.onAction(
+                VoiceWakeSettingsAction.PermissionRequestHandled(
+                    requireNotNull(state.permissionRequestId),
+                ),
+            )
+            viewModel.onAction(VoiceWakeSettingsAction.PermissionsResult(granted = false))
+
+            do {
+                state = awaitItem()
+            } while (state.isStartPending)
+
+            assertFalse(state.isStartPending)
+            verify(exactly = 0) { voiceRepository.start() }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun listenerErrorClearsPendingWithoutRequestingPermissionAgain() = runTest {
+        val voiceState = voiceState(ready = true)
+        val voiceRepository = voiceRepository(voiceState)
+        val viewModel = viewModel(modelRepository(), voiceRepository)
+
+        viewModel.uiState.test {
+            var state = awaitItem()
+            while (!state.configurationReady || state.voiceState.model.status != WakeModelStatus.Ready) {
+                state = awaitItem()
+            }
+
+            viewModel.onAction(VoiceWakeSettingsAction.ToggleListening(enabled = true))
+            do {
+                state = awaitItem()
+            } while (state.permissionRequestId == null)
+            val requestId = requireNotNull(state.permissionRequestId)
+
+            viewModel.onAction(VoiceWakeSettingsAction.PermissionRequestHandled(requestId))
+            viewModel.onAction(VoiceWakeSettingsAction.PermissionsResult(granted = true))
+            voiceState.value = voiceState.value.copy(status = VoiceWakeStatus.Error)
+            advanceUntilIdle()
+
+            assertFalse(viewModel.uiState.value.isStartPending)
+            assertEquals(null, viewModel.uiState.value.permissionRequestId)
             verify(exactly = 1) { voiceRepository.start() }
             cancelAndIgnoreRemainingEvents()
         }

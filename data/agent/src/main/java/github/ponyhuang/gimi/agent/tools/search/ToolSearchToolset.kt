@@ -5,16 +5,18 @@ import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.tools.Toolset
+import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionDeclaration
+import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.agent.tools.modelRuntimeMetadataOrNull
-import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
-import java.security.MessageDigest
+import github.ponyhuang.gimi.agent.tools.search.ToolSearchToolset.Companion.STATE_KEY_LOADED_TOOLS
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
+import java.security.MessageDigest
 
 internal const val TOOL_SEARCH_NAME: String = "tool_search"
 
@@ -45,7 +47,7 @@ internal interface ToolCandidateSource {
 }
 
 /**
- * Tool search 网关
+ * 按需 Tool search 网关
  * 大量业务工具推迟到模型调用 `tool_search` 后再注入。
  *
  * `LlmAgentTurn` 在每次模型调用前都会重新调用 [getTools]。`tool_search` 命中后
@@ -55,7 +57,6 @@ internal interface ToolCandidateSource {
  * 进程内状态。
  */
 internal class ToolSearchToolset(
-    private val mode: ToolAccessMode,
     private val sources: List<ToolCandidateSource>,
     private val vectorSearch: ToolVectorSearch,
     private val budget: ToolAccessBudget = ToolAccessBudget(),
@@ -69,18 +70,30 @@ internal class ToolSearchToolset(
         if (selectedNames != null) {
             return listOf(searchTool) + resolveSelectedTools(selectedNames, readonlyContext)
         }
-
-        return when (mode) {
-            ToolAccessMode.ON_DEMAND -> listOf(searchTool)
-            ToolAccessMode.ALWAYS_AVAILABLE ->
-                discoverEnabled(readonlyContext).uniqueCandidates.map(ToolCandidate::tool)
-        }
+        return listOf(searchTool)
     }
 
     override suspend fun processLlmRequest(
         toolContext: ToolContext,
         llmRequest: LlmRequest,
-    ): LlmRequest = llmRequest
+    ): LlmRequest = llmRequest.appendInstructions(
+        Content(
+            parts = listOf(
+                Part(
+                    text = """
+                        <tool_search>
+                        - When the user needs an action or current device information that the declared tools cannot
+                          provide, call `tool_search` first.
+                        - Matching tool definitions become available in the next model step; never guess or imitate
+                          an undeclared tool call.
+                        - When catalog descriptions are in English, search with concise English capability keywords.
+                        - After matching tools become available, continue the user's task with those declared tools.
+                        </tool_search>
+                    """.trimIndent(),
+                ),
+            ),
+        ),
+    )
 
     internal suspend fun search(
         rawQuery: String,
@@ -104,7 +117,12 @@ internal class ToolSearchToolset(
         val selected = selectWithinBudget(ranked)
         if (selected.isEmpty()) {
             return unchangedSearchResult(
-                ambiguous = allTools.ambiguousCandidates(matches.mapTo(hashSetOf(), ToolVectorMatch::key)),
+                ambiguous = allTools.ambiguousCandidates(
+                    matches.mapTo(
+                        hashSetOf(),
+                        ToolVectorMatch::key
+                    )
+                ),
                 sourceErrors = (allTools.sourceErrors + enabledTools.sourceErrors)
                     .distinctBy(SourceFailure::sourceId),
             )
@@ -319,7 +337,7 @@ internal class ToolSearchToolset(
         private const val MAX_DESCRIPTION_LENGTH = 240
         private const val TOOL_SEARCH_DESCRIPTION =
             "Searches enabled local, MCP, and formula tools by capability. Matching tool " +
-                "definitions become available in the next model step."
+                    "definitions become available in the next model step."
     }
 
     /**

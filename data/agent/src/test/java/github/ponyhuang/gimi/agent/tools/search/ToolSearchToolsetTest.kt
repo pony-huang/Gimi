@@ -6,6 +6,7 @@ import com.google.adk.kt.artifacts.ArtifactService
 import com.google.adk.kt.events.Event
 import com.google.adk.kt.events.EventActions
 import com.google.adk.kt.memory.MemoryService
+import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.sessions.Session
 import com.google.adk.kt.sessions.SessionKey
 import com.google.adk.kt.tools.BaseTool
@@ -13,11 +14,11 @@ import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.FunctionResponse
+import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
-import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -29,9 +30,32 @@ import org.junit.Test
 class ToolSearchToolsetTest {
 
     @Test
-    fun onDemandStartsWithOnlyToolSearch() = runTest {
+    fun appendsToolSearchInstructionsWhenProcessingLlmRequest() = runTest {
         val toolset = toolset(
-            mode = ToolAccessMode.ON_DEMAND,
+            tools = listOf(tool("set_alarm")),
+        )
+        val request = LlmRequest(
+            config = GenerateContentConfig(
+                systemInstruction = Content(parts = listOf(Part(text = "Base instruction"))),
+            ),
+        )
+
+        val processed = toolset.processLlmRequest(toolContext(context()), request)
+        val systemText = processed.config.systemInstruction
+            ?.parts
+            .orEmpty()
+            .mapNotNull(Part::text)
+            .joinToString("\n")
+
+        assertTrue(systemText.contains("Base instruction"))
+        assertTrue(systemText.contains("<tool_search>"))
+        assertTrue(systemText.contains("English capability keywords"))
+        assertTrue(systemText.contains("next model step"))
+    }
+
+    @Test
+    fun startsWithOnlyToolSearch() = runTest {
+        val toolset = toolset(
             tools = listOf(tool("set_alarm"), tool("get_location")),
         )
 
@@ -39,26 +63,8 @@ class ToolSearchToolsetTest {
     }
 
     @Test
-    fun alwaysAvailableExposesEveryUnambiguousToolWithoutSearch() = runTest {
-        val toolset = ToolSearchToolset(
-            mode = ToolAccessMode.ALWAYS_AVAILABLE,
-            sources = listOf(
-                source("local", tool("set_alarm"), tool("get_location")),
-                source("mcp", tool("create_issue")),
-            ),
-            vectorSearch = FakeToolVectorSearch(),
-        )
-
-        assertEquals(
-            listOf("set_alarm", "get_location", "create_issue"),
-            toolset.getTools(context()).map(BaseTool::name),
-        )
-    }
-
-    @Test
     fun searchRanksNamesBeforeDescriptionsAndAppliesTheBudget() = runTest {
         val toolset = ToolSearchToolset(
-            mode = ToolAccessMode.ON_DEMAND,
             sources = listOf(
                 source(
                     "local",
@@ -83,7 +89,6 @@ class ToolSearchToolsetTest {
     @Test
     fun searchMatchesToolsBySemanticMeaningInsteadOfSharedKeywords() = runTest {
         val toolset = toolset(
-            mode = ToolAccessMode.ON_DEMAND,
             tools = listOf(
                 tool("set_alarm", "Creates an alarm in the system clock."),
                 tool("get_location", "Gets the current device location."),
@@ -106,7 +111,6 @@ class ToolSearchToolsetTest {
             ),
         )
         val toolset = ToolSearchToolset(
-            mode = ToolAccessMode.ON_DEMAND,
             sources = listOf(
                 source(
                     id = "local",
@@ -131,7 +135,6 @@ class ToolSearchToolsetTest {
     @Test
     fun successfulSearchPersistsTheSelectionIntoSessionState() = runTest {
         val toolset = toolset(
-            mode = ToolAccessMode.ON_DEMAND,
             tools = listOf(tool("set_alarm"), tool("get_location")),
         )
         val actions = EventActions()
@@ -147,7 +150,6 @@ class ToolSearchToolsetTest {
     @Test
     fun persistedStateSelectionSurvivesIntoANewInvocation() = runTest {
         val toolset = toolset(
-            mode = ToolAccessMode.ON_DEMAND,
             tools = listOf(tool("set_alarm"), tool("get_location")),
         )
         // 模拟新一轮用户请求：无任何当前 invocation 事件，只有持久化的 session state。
@@ -170,7 +172,6 @@ class ToolSearchToolsetTest {
             description = "large ".repeat(200),
         )
         val toolset = ToolSearchToolset(
-            mode = ToolAccessMode.ON_DEMAND,
             sources = listOf(source("local", oversized, tool("large_backup"))),
             vectorSearch = FakeToolVectorSearch(),
             budget = ToolAccessBudget(maxTools = 8, maxSchemaBytes = 100),
@@ -185,7 +186,6 @@ class ToolSearchToolsetTest {
     @Test
     fun latestSuccessfulSearchEventReplacesThePreviousSelection() = runTest {
         val toolset = toolset(
-            mode = ToolAccessMode.ON_DEMAND,
             tools = listOf(tool("set_alarm"), tool("get_location")),
         )
         val context = context(
@@ -203,7 +203,6 @@ class ToolSearchToolsetTest {
     @Test
     fun unsuccessfulSearchDoesNotClearThePreviousSelection() = runTest {
         val toolset = toolset(
-            mode = ToolAccessMode.ON_DEMAND,
             tools = listOf(tool("set_alarm"), tool("get_location")),
         )
         val context = context(
@@ -221,7 +220,6 @@ class ToolSearchToolsetTest {
     fun persistedSearchSelectionSurvivesToolsetRecreationForConfirmationResume() = runTest {
         val persistedContext = context(searchEvent("set_alarm"))
         val resumedToolset = toolset(
-            mode = ToolAccessMode.ON_DEMAND,
             tools = listOf(tool("set_alarm"), tool("get_location")),
         )
 
@@ -234,7 +232,6 @@ class ToolSearchToolsetTest {
     @Test
     fun aNewInvocationDoesNotInheritThePreviousSelectionWithoutPersistedState() = runTest {
         val toolset = toolset(
-            mode = ToolAccessMode.ON_DEMAND,
             tools = listOf(tool("set_alarm"), tool("get_location")),
         )
 
@@ -252,7 +249,6 @@ class ToolSearchToolsetTest {
     @Test
     fun parallelConversationContextsRestoreIndependentSelections() = runTest {
         val toolset = toolset(
-            mode = ToolAccessMode.ON_DEMAND,
             tools = listOf(tool("set_alarm"), tool("get_location")),
         )
 
@@ -269,7 +265,6 @@ class ToolSearchToolsetTest {
     @Test
     fun duplicateCallableNamesAreNeverLoaded() = runTest {
         val toolset = ToolSearchToolset(
-            mode = ToolAccessMode.ON_DEMAND,
             sources = listOf(
                 source("local", tool("duplicate"), tool("unique")),
                 source("mcp", tool("duplicate")),
@@ -286,7 +281,6 @@ class ToolSearchToolsetTest {
     @Test
     fun sourceFailuresAreSanitizedInSearchResults() = runTest {
         val toolset = ToolSearchToolset(
-            mode = ToolAccessMode.ON_DEMAND,
             sources = listOf(failingSource("private-server")),
             vectorSearch = FakeToolVectorSearch(),
         )
@@ -300,11 +294,9 @@ class ToolSearchToolsetTest {
     }
 
     private fun toolset(
-        mode: ToolAccessMode,
         tools: List<BaseTool>,
         semanticMatches: Map<String, List<String>> = emptyMap(),
     ): ToolSearchToolset = ToolSearchToolset(
-        mode = mode,
         sources = listOf(source("local", *tools.toTypedArray())),
         vectorSearch = FakeToolVectorSearch(semanticMatches),
     )

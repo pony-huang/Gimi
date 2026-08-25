@@ -76,7 +76,7 @@ class AgentFactory @Inject constructor(
             ToolAccessMode.ALWAYS_AVAILABLE ->
                 createAlwaysAvailableAgent(model)
             ToolAccessMode.ON_DEMAND ->
-                createSearchAgent(model, ToolAccessMode.ON_DEMAND)
+                createSearchAgent(model)
         }
         return AgentRuntime(
             agent = agent,
@@ -84,13 +84,12 @@ class AgentFactory @Inject constructor(
         )
     }
 
-    /** 全量直出：所有启用工具从首个请求起直接声明。 */
+    /** 所有启用工具从首个请求起直接声明。 */
     private fun createAlwaysAvailableAgent(
         model: Model,
     ): BaseAgent =
         baseAgent(
             model = model,
-            toolSearchEnabled = false,
             toolsets = buildList {
                 add(localToolset)
                 add(conversationMcpToolset)
@@ -100,8 +99,6 @@ class AgentFactory @Inject constructor(
         )
 
     /**
-     * 检索网关：核心工具（厂商原生官方工具 + 技能）固定声明。
-     *
      * 业务工具拆分为多个 source 后注册到 [ToolSearchToolset]：
      * - 全部本地工具构成一个扁平 source；
      * - 每个 MCP server 单独一个 source（基于当前 [McpToolsetRegistry] 的解析结果），
@@ -110,7 +107,6 @@ class AgentFactory @Inject constructor(
      */
     private suspend fun createSearchAgent(
         model: Model,
-        mode: ToolAccessMode,
     ): BaseAgent {
         val (officialToolsets, directOfficialToolsets) =
             officialToolsets.partition { it is SearchOfficialToolset }
@@ -127,12 +123,10 @@ class AgentFactory @Inject constructor(
         }
         return baseAgent(
             model = model,
-            toolSearchEnabled = true,
             toolsets = buildList {
                 addAll(directOfficialToolsets)
                 add(
                     ToolSearchToolset(
-                        mode = mode,
                         sources = sources,
                         vectorSearch = toolVectorSearch,
                     ),
@@ -144,16 +138,11 @@ class AgentFactory @Inject constructor(
 
     private fun baseAgent(
         model: Model,
-        toolSearchEnabled: Boolean,
         toolsets: List<Toolset>,
     ): BaseAgent = LlmAgent(
         name = "Assistant",
         model = model,
-        instruction = Instruction(
-            AgentPrompts.defaultAssistantInstruction(
-                toolSearchEnabled = toolSearchEnabled,
-            ),
-        ),
+        instruction = Instruction(AgentPrompts.defaultAssistantInstruction()),
         tools = buildList {
             addAll(
                 localToolCatalog.tools()

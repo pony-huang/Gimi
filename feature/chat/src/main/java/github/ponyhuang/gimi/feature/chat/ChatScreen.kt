@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.feature.chat
 
 import android.annotation.SuppressLint
+import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -131,6 +132,8 @@ fun ChatScaffold(
     onOfficialToolOpened: (String) -> Unit,
     onOfficialToolFunctionEnabledChange: (String, String, Boolean) -> Unit,
     onOfficialToolFunctionsRetry: (String) -> Unit,
+    sharedMediaUris: List<Uri> = emptyList(),
+    onSharedMediaConsumed: () -> Unit = {},
 ) {
 
     val listState = rememberLazyListState()
@@ -291,6 +294,8 @@ fun ChatScaffold(
                     onOfficialToolOpened = onOfficialToolOpened,
                     onOfficialToolFunctionEnabledChange = onOfficialToolFunctionEnabledChange,
                     onOfficialToolFunctionsRetry = onOfficialToolFunctionsRetry,
+                    sharedMediaUris = sharedMediaUris,
+                    onSharedMediaConsumed = onSharedMediaConsumed,
                     modelSelectorContent = {
                         ModelTitleAndPicker(
                             services = state.availableLLMModelSettings,

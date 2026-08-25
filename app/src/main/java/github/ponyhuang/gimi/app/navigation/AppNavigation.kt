@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.app.navigation
 import android.content.Context
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -82,6 +83,8 @@ fun MainScreen(
     viewModel: ChatViewModel = hiltViewModel(),
     requestedSessionId: String? = null,
     onRequestedSessionHandled: () -> Unit = {},
+    sharedMediaUris: List<Uri> = emptyList(),
+    onSharedMediaConsumed: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val currentSessionId = uiState.sessionId
@@ -106,6 +109,10 @@ fun MainScreen(
     val returnToChat = {
         // 不用 removeLast：minSdk 34 下 lint 会报 NewApi（API 35 的 java.util.List#removeLast）。
         while (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+    }
+
+    LaunchedEffect(sharedMediaUris) {
+        if (sharedMediaUris.isNotEmpty()) returnToChat()
     }
 
     LaunchedEffect(requestedSessionId) {
@@ -261,6 +268,10 @@ fun MainScreen(
                                 onOfficialToolFunctionsRetry = { toolId ->
                                     viewModel.onAction(ChatAction.LoadOfficialToolFunctions(toolId))
                                 },
+                                sharedMediaUris = sharedMediaUris.takeIf {
+                                    currentSessionId.isNotBlank() && !uiState.isInitializing
+                                }.orEmpty(),
+                                onSharedMediaConsumed = onSharedMediaConsumed,
                             )
                         }
 

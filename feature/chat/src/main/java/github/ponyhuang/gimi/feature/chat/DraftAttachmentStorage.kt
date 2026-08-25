@@ -10,15 +10,19 @@ import java.util.UUID
 
 internal fun importDraftAttachment(context: Context, uri: Uri): DraftAttachment {
     val resolver = context.contentResolver
-    val displayName = resolver.query(
-        uri,
-        arrayOf(OpenableColumns.DISPLAY_NAME),
-        null,
-        null,
-        null,
-    )?.use { cursor ->
-        cursor.takeIf { it.moveToFirst() }?.getString(0)
-    }?.takeIf(String::isNotBlank) ?: "attachment"
+    val displayName = if (uri.scheme == "file") {
+        File(uri.path ?: "").name.takeIf(String::isNotBlank) ?: "attachment"
+    } else {
+        resolver.query(
+            uri,
+            arrayOf(OpenableColumns.DISPLAY_NAME),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            cursor.takeIf { it.moveToFirst() }?.getString(0)
+        }?.takeIf(String::isNotBlank) ?: "attachment"
+    }
     val mimeType = resolver.getType(uri)
         ?: AttachmentCategory.inferMimeType(displayName)
         ?: throw IllegalArgumentException("Unsupported attachment type")
@@ -27,9 +31,15 @@ internal fun importDraftAttachment(context: Context, uri: Uri): DraftAttachment 
     val directory = File(context.cacheDir, DRAFT_DIRECTORY).apply { mkdirs() }
     val target = File(directory, UUID.randomUUID().toString())
     try {
-        resolver.openInputStream(uri)?.use { input ->
-            target.outputStream().use(input::copyTo)
-        } ?: throw IllegalArgumentException("Cannot read selected attachment")
+        val input = if (uri.scheme == "file") {
+            File(uri.path ?: throw IllegalArgumentException("Invalid file URI")).inputStream()
+        } else {
+            resolver.openInputStream(uri)
+                ?: throw IllegalArgumentException("Cannot read selected attachment")
+        }
+        input.use { source ->
+            target.outputStream().use(source::copyTo)
+        }
         return DraftAttachment(
             reference = target.absolutePath,
             displayName = displayName,

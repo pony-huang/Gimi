@@ -111,6 +111,8 @@ public fun ChatComposer(
     onOfficialToolFunctionEnabledChange: (String, String, Boolean) -> Unit = { _, _, _ -> },
     onOfficialToolFunctionsRetry: (String) -> Unit = { _ -> },
     attachmentCapabilities: MultimodalCapabilities = MultimodalCapabilities(),
+    sharedMediaUris: List<Uri> = emptyList(),
+    onSharedMediaConsumed: () -> Unit = {},
 ) {
     var messageData by rememberSaveable(stateSaver = MessageData.Saver) {
         mutableStateOf(messageData)
@@ -279,6 +281,13 @@ public fun ChatComposer(
             voiceAudio.reset()
             deletePendingCameraAttachment(pendingCameraPath)
             deleteManagedDrafts(messageData.attachments)
+        }
+    }
+
+    LaunchedEffect(sharedMediaUris) {
+        if (sharedMediaUris.isNotEmpty()) {
+            acceptSelection(sharedMediaUris)
+            onSharedMediaConsumed()
         }
     }
 

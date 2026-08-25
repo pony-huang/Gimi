@@ -39,6 +39,17 @@ class McpReleaseR8RulesTest {
     }
 
     @Test
+    fun releaseRulesProtectJacksonDeserializersFromR8Optimization() {
+        val rules = File("proguard-rules.pro").readText()
+
+        assertTrue(
+            "Jackson deserializers must not be optimized because release-only R8 rewriting can null their value deserializer",
+            rules.contains("-keep,allowobfuscation class com.fasterxml.jackson.databind.JsonDeserializer { *; }") &&
+                rules.contains("-keep,allowobfuscation class com.fasterxml.jackson.databind.deser.** { *; }"),
+        )
+    }
+
+    @Test
     fun releaseBuildProvidesEnoughHeapForR8() {
         val gradleProperties = File("../gradle.properties").readText()
         val releaseWorkflow = File("../.github/workflows/release.yml").readText()

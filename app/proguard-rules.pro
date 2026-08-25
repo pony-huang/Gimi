@@ -80,6 +80,20 @@
 -keepclassmembers class com.openai.** { *; }
 -dontwarn com.openai.**
 
+# ---------------------------------------------------------------------------
+# Jackson Databind
+#
+# OpenAI-compatible providers may return vendor extension objects nested inside
+# tool-call payloads. R8 optimization of Jackson 2.19's container deserializers
+# can clear MapDeserializer's contextual value deserializer in release builds;
+# the next nested object then crashes in JsonDeserializer.getObjectIdReader().
+# Keep the deserializer implementation from being rewritten while still
+# allowing class-name obfuscation. The screenshot-visible failure path is:
+# Map["lineList"] -> List[0] -> Map["pointInfoList"].
+# ---------------------------------------------------------------------------
+-keep,allowobfuscation class com.fasterxml.jackson.databind.JsonDeserializer { *; }
+-keep,allowobfuscation class com.fasterxml.jackson.databind.deser.** { *; }
+
 # Victools jsonschema-generator (transitive via google-genai / anthropic-java)
 # references these on types that don't exist on Android. Suppress the warning
 # so R8 doesn't treat them as missing classes.

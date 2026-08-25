@@ -11,6 +11,14 @@ data class PluginSettingsUiState(
 sealed interface PluginSettingsAction {
     /** 切换插件启用状态。 */
     data class SetEnabled(val pluginId: String, val enabled: Boolean) : PluginSettingsAction
+
+    /** 重新发现已安装插件（无需重启）。 */
+    data object Refresh : PluginSettingsAction
+}
+
+sealed interface PluginSettingsEffect {
+    /** 发现新安装的插件。 */
+    data class ShowPluginAdded(val pluginIds: List<String>) : PluginSettingsEffect
 }
 
 /** 插件配置页状态。 */
@@ -19,11 +27,26 @@ data class PluginConfigUiState(
     val fields: List<PluginConfigFieldUiState> = emptyList(),
     val actions: List<PluginActionUiState> = emptyList(),
     val notice: PluginNotice? = null,
+    val browser: PluginBrowserUiState? = null,
 ) {
     val hasFields: Boolean get() = fields.isNotEmpty()
     val hasActions: Boolean get() = actions.isNotEmpty()
     val isAnyActionRunning: Boolean get() = actions.any { it.running }
 }
+
+/**
+ * 内置浏览器授权弹窗状态。
+ *
+ * @property actionId 触发弹窗的配置页动作。
+ * @property authorizeUrl WebView 加载的授权 URL。
+ * @property redirectBase WebView 应拦截的重定向前缀，截获后交给
+ *   [PluginConfigAction.CompleteAction]。
+ */
+data class PluginBrowserUiState(
+    val actionId: String,
+    val authorizeUrl: String,
+    val redirectBase: String,
+)
 
 /**
  * 配置页动作的可点击状态。
@@ -70,4 +93,10 @@ sealed interface PluginConfigAction {
     data object Save : PluginConfigAction
     data class RunAction(val actionId: String) : PluginConfigAction
     data object DismissNotice : PluginConfigAction
+
+    /** 内置浏览器截获重定向后，把完整重定向 URL 交给插件完成动作。 */
+    data class CompleteAction(val actionId: String, val redirectUrl: String) : PluginConfigAction
+
+    /** 关闭内置浏览器弹窗（用户取消）。 */
+    data object CloseBrowser : PluginConfigAction
 }

@@ -31,12 +31,32 @@ class InstalledApkPluginLoader @Inject constructor(
 ) : PluginLoader {
 
     /**
-     * 加载并缓存结果（单例由 Hilt 保证，`providePlugins` 与 `providePluginTools` 共享同一实例，
-     * 避免重复反射实例化插件）。
+     * 加载并缓存结果。缓存为「包名 → 插件」映射，[refresh] 只增删不改实例：
+     * 已加载插件保持同一实例（避免重复实例化与类加载器冲突）。
      */
-    override fun load(): List<LoadedPlugin> = loadedPlugins
+    override fun load(): List<LoadedPlugin> = synchronized(lock) {
+        if (cache == null) {
+            cache = discover().associateBy { it.packageName }
+        }
+        cache.orEmpty().values.toList()
+    }
 
-    private val loadedPlugins: List<LoadedPlugin> by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+    /**
+     * 重新发现已安装插件 APK。已加载的包保留原实例，仅对新增包做 [loadPlugin]，
+     * 已卸载的包从缓存移除。
+     *
+     * @return 本次新增的插件。
+     */
+    override fun refresh(): List<LoadedPlugin> = synchronized(lock) {
+        val discovered = discover()
+        val current = cache.orEmpty()
+        val added = discovered.filter { it.packageName !in current }
+        cache = discovered.associateBy { it.packageName }
+        added
+    }
+
+    /** 全量发现并实例化（不读缓存）。 */
+    private fun discover(): List<LoadedPlugin> {
         val services = runCatching {
             context.packageManager.queryIntentServices(
                 Intent(PluginApi.DISCOVERY_ACTION),
@@ -44,14 +64,16 @@ class InstalledApkPluginLoader @Inject constructor(
             )
         }.getOrElse { error ->
             Log.w(TAG, "Plugin discovery failed", error)
-            return@lazy emptyList()
+            return emptyList()
         }
         Log.d(TAG, "Discovered ${services.size} plugin package(s)")
-
-        services.mapNotNull { resolveInfo ->
+        return services.mapNotNull { resolveInfo ->
             loadPlugin(resolveInfo.serviceInfo?.packageName)
         }
     }
+
+    private val lock = Any()
+    private var cache: Map<String, LoadedPlugin>? = null
 
     private fun loadPlugin(packageName: String?): LoadedPlugin? {
         if (packageName == null) return null

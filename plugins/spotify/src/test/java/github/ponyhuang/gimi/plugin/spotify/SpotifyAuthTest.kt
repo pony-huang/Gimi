@@ -1,5 +1,8 @@
 package github.ponyhuang.gimi.plugin.spotify
 
+import java.net.Socket
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -86,7 +89,7 @@ class SpotifyAuthTest {
         )
 
         assertTrue(result is RedirectResult.Error)
-        assertTrue((result as RedirectResult.Error).message.contains("state"))
+        assertTrue((result as RedirectResult.Error).message.contains("State"))
     }
 
     @Test
@@ -107,6 +110,35 @@ class SpotifyAuthTest {
             val state = SpotifyAuth.newState()
             assertEquals(16, state.length)
             assertTrue(state.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' })
+        }
+    }
+
+    /**
+     * 真实 socket 回归测试：模拟浏览器请求回调，验证服务器能返回成功页且不因
+     * 提前关闭流而失败（此前 `.use` 关闭 reader 连带关闭 socket，浏览器报「无法访问页面」）。
+     */
+    @Test
+    fun callbackServerServesSuccessPageAndReturnsCode() {
+        val port = 43218
+        val server = startCallbackServer("http://127.0.0.1:$port/callback", "st-1")
+        val codeFuture = CompletableFuture<String>()
+        val serverThread = Thread { codeFuture.complete(server.await()) }
+        try {
+            serverThread.start()
+            val socket = Socket("127.0.0.1", port)
+            socket.getOutputStream().write(
+                "GET /callback?code=abc123&state=st-1 HTTP/1.1\r\nHost: localhost\r\n\r\n".toByteArray(),
+            )
+            socket.getOutputStream().flush()
+            val response = socket.getInputStream().bufferedReader().use { it.readText() }
+            socket.close()
+            serverThread.join(5_000)
+
+            assertEquals("abc123", codeFuture.get(5, TimeUnit.SECONDS))
+            assertTrue(response.contains("HTTP/1.1 200"))
+            assertTrue(response.contains("Spotify sign-in succeeded"))
+        } finally {
+            server.close()
         }
     }
 

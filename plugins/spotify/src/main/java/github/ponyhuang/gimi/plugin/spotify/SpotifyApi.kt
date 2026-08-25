@@ -37,7 +37,7 @@ internal class SpotifyApi(
     fun ensureActiveDevice(preferred: String?): String {
         val devices = get("/me/player/devices")?.optJSONArray("devices") ?: JSONArray()
         if (devices.length() == 0) {
-            throw IllegalStateException("未找到 Spotify 设备，请先在任一设备打开 Spotify")
+            throw IllegalStateException("No Spotify device found, open Spotify on a device first")
         }
         preferred?.let { preferredId ->
             for (i in 0 until devices.length()) {
@@ -61,7 +61,7 @@ internal class SpotifyApi(
             if (device?.optBoolean("is_active", false) == true) return device.optString("id")
         }
         val target = devices.optJSONObject(0)?.optString("id")
-            ?: throw IllegalStateException("无可用 Spotify 设备")
+            ?: throw IllegalStateException("No available Spotify device")
         put(
             "/me/player",
             body = JSONObject()

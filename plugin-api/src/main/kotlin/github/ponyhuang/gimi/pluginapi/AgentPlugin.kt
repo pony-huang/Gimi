@@ -61,11 +61,37 @@ interface AgentPlugin : Plugin {
      * 执行配置页动作（对应 [PluginConfig.actions] 里的 [PluginConfigAction]），如「授权登录」。
      *
      * 宿主在配置页点按按钮后经 [PluginManager.runConfigAction] 转调；可挂起（如等待 OAuth 回调）。
-     * 默认返回不支持。
+     * 需要内置浏览器授权时见 [configActionBrowserRequest]。默认返回不支持。
      */
     suspend fun runConfigAction(actionId: String): PluginActionResult =
-        PluginActionResult(message = "插件不支持动作: $actionId", success = false)
+        PluginActionResult(message = "Plugin does not support action: $actionId", success = false)
+
+    /**
+     * 配置页动作若需宿主用内置浏览器（WebView）完成授权，返回浏览器请求；
+     * 宿主据此打开 WebView 加载 [BrowserAuthRequest.authorizeUrl]，并在导航到
+     * [BrowserAuthRequest.redirectBase] 前缀时截获完整重定向 URL 交给 [completeConfigAction]。
+     * 返回 null 表示无需浏览器。
+     */
+    fun configActionBrowserRequest(actionId: String): BrowserAuthRequest? = null
+
+    /**
+     * 内置浏览器授权回调：宿主把截获的重定向 URL（含 code/state）交给插件完成动作（如换 token）。
+     * 默认返回不支持。
+     */
+    suspend fun completeConfigAction(actionId: String, redirectUrl: String): PluginActionResult =
+        PluginActionResult(message = "Plugin does not support in-app browser callback: $actionId", success = false)
 }
+
+/**
+ * 内置浏览器授权请求。
+ *
+ * @property authorizeUrl WebView 加载的授权 URL。
+ * @property redirectBase WebView 应拦截的重定向 URL 前缀（如 `http://127.0.0.1:8888/callback`）。
+ */
+data class BrowserAuthRequest(
+    val authorizeUrl: String,
+    val redirectBase: String,
+)
 
 /** 配置页动作的执行结果。 */
 data class PluginActionResult(

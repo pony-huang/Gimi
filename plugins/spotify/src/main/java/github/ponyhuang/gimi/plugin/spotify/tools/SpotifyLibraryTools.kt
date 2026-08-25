@@ -22,7 +22,7 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
     SpotifyTopArtistsTool(api),
 )
 
-/** spotify_now_playing — 当前播放内容。 */
+/** spotify_now_playing — currently playing content. */
 private class SpotifyNowPlayingTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
@@ -34,7 +34,7 @@ private class SpotifyNowPlayingTool(private val api: SpotifyApi) : SpotifyTool(N
     override suspend fun executeSafe(args: Map<String, Any?>): Map<String, Any?> {
         val json = api.get("/me/player/currently-playing")
         return if (json == null) {
-            mapOf(SpotifyTool.RESULT_KEY to "当前没有正在播放的内容")
+            mapOf(SpotifyTool.RESULT_KEY to "Nothing is currently playing")
         } else {
             mapOf(SpotifyTool.RESULT_KEY to json.toJsonNative())
         }
@@ -42,11 +42,12 @@ private class SpotifyNowPlayingTool(private val api: SpotifyApi) : SpotifyTool(N
 
     companion object {
         const val NAME: String = "spotify_now_playing"
-        const val DESCRIPTION: String = "查看当前正在播放的曲目及播放进度、设备、音量等信息。"
+        const val DESCRIPTION: String =
+            "Show the currently playing track with progress, device, and volume info."
     }
 }
 
-/** spotify_get_my_playlists — 当前用户的歌单列表。 */
+/** spotify_get_my_playlists — the user's playlists. */
 private class SpotifyMyPlaylistsTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
@@ -55,8 +56,8 @@ private class SpotifyMyPlaylistsTool(private val api: SpotifyApi) : SpotifyTool(
         parameters = Schema(
             type = Type.OBJECT,
             properties = mapOf(
-                "limit" to Schema(type = Type.INTEGER, description = "返回条数，默认 20，最大 50"),
-                "offset" to Schema(type = Type.INTEGER, description = "分页偏移，默认 0"),
+                "limit" to Schema(type = Type.INTEGER, description = "Number of results to return (default 20, max 50)"),
+                "offset" to Schema(type = Type.INTEGER, description = "Pagination offset (default 0)"),
             ),
         ),
     )
@@ -71,11 +72,12 @@ private class SpotifyMyPlaylistsTool(private val api: SpotifyApi) : SpotifyTool(
 
     companion object {
         const val NAME: String = "spotify_get_my_playlists"
-        const val DESCRIPTION: String = "获取当前用户的歌单列表（含名称、曲目数、ID）。"
+        const val DESCRIPTION: String =
+            "List the current user's playlists (name, track count, ID)."
     }
 }
 
-/** spotify_get_playlist — 单个歌单详情。 */
+/** spotify_get_playlist — single playlist details. */
 private class SpotifyGetPlaylistTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
@@ -83,24 +85,25 @@ private class SpotifyGetPlaylistTool(private val api: SpotifyApi) : SpotifyTool(
         description = description,
         parameters = Schema(
             type = Type.OBJECT,
-            properties = mapOf("playlist_id" to Schema(type = Type.STRING, description = "Spotify 歌单 ID")),
+            properties = mapOf("playlist_id" to Schema(type = Type.STRING, description = "Spotify playlist ID")),
             required = listOf("playlist_id"),
         ),
     )
 
     override suspend fun executeSafe(args: Map<String, Any?>): Map<String, Any?> {
-        val id = strArg(args, "playlist_id") ?: throw IllegalStateException("缺少参数 playlist_id")
-        val json = api.get("/playlists/$id") ?: throw IllegalStateException("未找到该歌单")
+        val id = strArg(args, "playlist_id") ?: throw IllegalStateException("Missing parameter playlist_id")
+        val json = api.get("/playlists/$id") ?: throw IllegalStateException("Playlist not found")
         return mapOf(SpotifyTool.RESULT_KEY to json.toJsonNative())
     }
 
     companion object {
         const val NAME: String = "spotify_get_playlist"
-        const val DESCRIPTION: String = "获取歌单详情（名称、所有者、曲目数、公开状态、描述）。"
+        const val DESCRIPTION: String =
+            "Get a playlist's details (name, owner, track count, visibility, description)."
     }
 }
 
-/** spotify_get_playlist_tracks — 歌单内曲目列表（2026 迁移后用 /items 端点）。 */
+/** spotify_get_playlist_tracks — tracks in a playlist (post-2026 /items endpoint). */
 private class SpotifyGetPlaylistTracksTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
@@ -109,16 +112,16 @@ private class SpotifyGetPlaylistTracksTool(private val api: SpotifyApi) : Spotif
         parameters = Schema(
             type = Type.OBJECT,
             properties = mapOf(
-                "playlist_id" to Schema(type = Type.STRING, description = "Spotify 歌单 ID"),
-                "limit" to Schema(type = Type.INTEGER, description = "返回条数，默认 50，最大 50"),
-                "offset" to Schema(type = Type.INTEGER, description = "分页偏移，默认 0"),
+                "playlist_id" to Schema(type = Type.STRING, description = "Spotify playlist ID"),
+                "limit" to Schema(type = Type.INTEGER, description = "Number of results to return (default 50, max 50)"),
+                "offset" to Schema(type = Type.INTEGER, description = "Pagination offset (default 0)"),
             ),
             required = listOf("playlist_id"),
         ),
     )
 
     override suspend fun executeSafe(args: Map<String, Any?>): Map<String, Any?> {
-        val id = strArg(args, "playlist_id") ?: throw IllegalStateException("缺少参数 playlist_id")
+        val id = strArg(args, "playlist_id") ?: throw IllegalStateException("Missing parameter playlist_id")
         val json = api.get(
             "/playlists/$id/items",
             mapOf(
@@ -140,11 +143,11 @@ private class SpotifyGetPlaylistTracksTool(private val api: SpotifyApi) : Spotif
 
     companion object {
         const val NAME: String = "spotify_get_playlist_tracks"
-        const val DESCRIPTION: String = "获取歌单内的曲目列表（含曲目 ID）。"
+        const val DESCRIPTION: String = "List the tracks inside a playlist (with track IDs)."
     }
 }
 
-/** spotify_get_saved_tracks — 当前用户收藏的歌曲（Liked Songs）。 */
+/** spotify_get_saved_tracks — the user's Liked Songs. */
 private class SpotifySavedTracksTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
@@ -153,8 +156,8 @@ private class SpotifySavedTracksTool(private val api: SpotifyApi) : SpotifyTool(
         parameters = Schema(
             type = Type.OBJECT,
             properties = mapOf(
-                "limit" to Schema(type = Type.INTEGER, description = "返回条数，默认 20，最大 50"),
-                "offset" to Schema(type = Type.INTEGER, description = "分页偏移，默认 0"),
+                "limit" to Schema(type = Type.INTEGER, description = "Number of results to return (default 20, max 50)"),
+                "offset" to Schema(type = Type.INTEGER, description = "Pagination offset (default 0)"),
             ),
         ),
     )
@@ -169,11 +172,11 @@ private class SpotifySavedTracksTool(private val api: SpotifyApi) : SpotifyTool(
 
     companion object {
         const val NAME: String = "spotify_get_saved_tracks"
-        const val DESCRIPTION: String = "获取当前用户收藏（Liked Songs）的歌曲列表。"
+        const val DESCRIPTION: String = "List the tracks saved in the user's Liked Songs library."
     }
 }
 
-/** spotify_get_recently_played — 最近播放记录。 */
+/** spotify_get_recently_played — recent playback history. */
 private class SpotifyRecentlyPlayedTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
@@ -181,7 +184,7 @@ private class SpotifyRecentlyPlayedTool(private val api: SpotifyApi) : SpotifyTo
         description = description,
         parameters = Schema(
             type = Type.OBJECT,
-            properties = mapOf("limit" to Schema(type = Type.INTEGER, description = "返回条数，默认 20，最大 50")),
+            properties = mapOf("limit" to Schema(type = Type.INTEGER, description = "Number of results to return (default 20, max 50)")),
         ),
     )
 
@@ -192,11 +195,11 @@ private class SpotifyRecentlyPlayedTool(private val api: SpotifyApi) : SpotifyTo
 
     companion object {
         const val NAME: String = "spotify_get_recently_played"
-        const val DESCRIPTION: String = "获取最近播放过的歌曲记录（含播放时间）。"
+        const val DESCRIPTION: String = "List recently played tracks (with play times)."
     }
 }
 
-/** spotify_get_queue — 当前播放队列。 */
+/** spotify_get_queue — the current playback queue. */
 private class SpotifyQueueTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
@@ -206,18 +209,17 @@ private class SpotifyQueueTool(private val api: SpotifyApi) : SpotifyTool(NAME, 
     )
 
     override suspend fun executeSafe(args: Map<String, Any?>): Map<String, Any?> {
-        val json = api.get("/me/player/queue")
-            ?: throw IllegalStateException("获取队列失败")
+        val json = api.get("/me/player/queue") ?: throw IllegalStateException("Failed to fetch the queue")
         return mapOf(SpotifyTool.RESULT_KEY to json.toJsonNative())
     }
 
     companion object {
         const val NAME: String = "spotify_get_queue"
-        const val DESCRIPTION: String = "查看当前播放队列（正在播放 + 接下来）。"
+        const val DESCRIPTION: String = "Show the current playback queue (playing item + upcoming)."
     }
 }
 
-/** spotify_get_devices — 可用的 Spotify Connect 设备。 */
+/** spotify_get_devices — available Spotify Connect devices. */
 private class SpotifyDevicesTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
@@ -227,18 +229,18 @@ private class SpotifyDevicesTool(private val api: SpotifyApi) : SpotifyTool(NAME
     )
 
     override suspend fun executeSafe(args: Map<String, Any?>): Map<String, Any?> {
-        val json = api.get("/me/player/devices")
-            ?: throw IllegalStateException("获取设备列表失败")
+        val json = api.get("/me/player/devices") ?: throw IllegalStateException("Failed to fetch devices")
         return mapOf(SpotifyTool.RESULT_KEY to json.toJsonNative())
     }
 
     companion object {
         const val NAME: String = "spotify_get_devices"
-        const val DESCRIPTION: String = "列出当前用户的 Spotify Connect 设备（名称、类型、是否活动、音量）。"
+        const val DESCRIPTION: String =
+            "List the user's Spotify Connect devices (name, type, active, volume)."
     }
 }
 
-/** spotify_get_top_tracks — 用户常听的歌曲（收听统计）。 */
+/** spotify_get_top_tracks — the user's most-played tracks. */
 private class SpotifyTopTracksTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
@@ -249,10 +251,10 @@ private class SpotifyTopTracksTool(private val api: SpotifyApi) : SpotifyTool(NA
             properties = mapOf(
                 "time_range" to Schema(
                     type = Type.STRING,
-                    description = "时间范围：short_term(近4周) / medium_term(近6月) / long_term(近1年)，默认 medium_term",
+                    description = "Time range: short_term (~4 weeks) / medium_term (~6 months) / long_term (~1 year). Default: medium_term",
                     enum = listOf("short_term", "medium_term", "long_term"),
                 ),
-                "limit" to Schema(type = Type.INTEGER, description = "返回条数，默认 20，最大 50"),
+                "limit" to Schema(type = Type.INTEGER, description = "Number of results to return (default 20, max 50)"),
             ),
         ),
     )
@@ -270,11 +272,11 @@ private class SpotifyTopTracksTool(private val api: SpotifyApi) : SpotifyTool(NA
 
     companion object {
         const val NAME: String = "spotify_get_top_tracks"
-        const val DESCRIPTION: String = "获取当前用户常听的歌曲排名（收听统计）。"
+        const val DESCRIPTION: String = "Get the current user's most-played tracks (listening statistics)."
     }
 }
 
-/** spotify_get_top_artists — 用户常听的歌手（收听统计）。 */
+/** spotify_get_top_artists — the user's most-played artists. */
 private class SpotifyTopArtistsTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
@@ -285,10 +287,10 @@ private class SpotifyTopArtistsTool(private val api: SpotifyApi) : SpotifyTool(N
             properties = mapOf(
                 "time_range" to Schema(
                     type = Type.STRING,
-                    description = "时间范围：short_term(近4周) / medium_term(近6月) / long_term(近1年)，默认 medium_term",
+                    description = "Time range: short_term (~4 weeks) / medium_term (~6 months) / long_term (~1 year). Default: medium_term",
                     enum = listOf("short_term", "medium_term", "long_term"),
                 ),
-                "limit" to Schema(type = Type.INTEGER, description = "返回条数，默认 20，最大 50"),
+                "limit" to Schema(type = Type.INTEGER, description = "Number of results to return (default 20, max 50)"),
             ),
         ),
     )
@@ -306,6 +308,6 @@ private class SpotifyTopArtistsTool(private val api: SpotifyApi) : SpotifyTool(N
 
     companion object {
         const val NAME: String = "spotify_get_top_artists"
-        const val DESCRIPTION: String = "获取当前用户常听的歌手排名（收听统计）。"
+        const val DESCRIPTION: String = "Get the current user's most-played artists (listening statistics)."
     }
 }

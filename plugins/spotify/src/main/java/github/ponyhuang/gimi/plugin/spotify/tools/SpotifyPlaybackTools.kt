@@ -17,7 +17,7 @@ internal fun playbackTools(api: SpotifyApi): List<BaseTool> = listOf(
     SpotifyAddToQueueTool(api),
 )
 
-/** spotify_play — 开始播放（歌曲/专辑/歌单/歌手）。需 Spotify Premium。 */
+/** spotify_play — start playback. Requires Spotify Premium. */
 private class SpotifyPlayTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
@@ -28,10 +28,10 @@ private class SpotifyPlayTool(private val api: SpotifyApi) : SpotifyTool(NAME, D
             properties = mapOf(
                 "uri" to Schema(
                     type = Type.STRING,
-                    description = "要播放的 Spotify URI（spotify:track:xxx / spotify:album:xxx / spotify:playlist:xxx / spotify:artist:xxx）；省略则恢复当前播放",
+                    description = "Spotify URI to play (spotify:track:xxx / spotify:album:xxx / spotify:playlist:xxx / spotify:artist:xxx); omit to resume current playback",
                 ),
-                "device_id" to Schema(type = Type.STRING, description = "目标设备 ID，缺省自动选择可用设备"),
-                "offset" to Schema(type = Type.INTEGER, description = "专辑/歌单内从第几首开始播放（0 起）"),
+                "device_id" to Schema(type = Type.STRING, description = "Target device ID; auto-selected if omitted"),
+                "offset" to Schema(type = Type.INTEGER, description = "Start position within an album/playlist (0-based)"),
             ),
         ),
     )
@@ -50,16 +50,17 @@ private class SpotifyPlayTool(private val api: SpotifyApi) : SpotifyTool(NAME, D
             }
         }
         api.put("/me/player/play", mapOf("device_id" to deviceId), body)
-        return mapOf(SpotifyTool.RESULT_KEY to ("已开始播放" + (uri?.let { ": $it" } ?: "")))
+        return mapOf(SpotifyTool.RESULT_KEY to ("Playback started" + (uri?.let { ": $it" } ?: "")))
     }
 
     companion object {
         const val NAME: String = "spotify_play"
-        const val DESCRIPTION: String = "开始播放 Spotify 内容（歌曲/专辑/歌单/歌手），需 Spotify Premium。"
+        const val DESCRIPTION: String =
+            "Start playing Spotify content (track/album/playlist/artist). Requires Spotify Premium."
     }
 }
 
-/** spotify_pause — 暂停播放。 */
+/** spotify_pause — pause playback. */
 private class SpotifyPauseTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
@@ -67,22 +68,22 @@ private class SpotifyPauseTool(private val api: SpotifyApi) : SpotifyTool(NAME, 
         description = description,
         parameters = Schema(
             type = Type.OBJECT,
-            properties = mapOf("device_id" to Schema(type = Type.STRING, description = "目标设备 ID，缺省自动")),
+            properties = mapOf("device_id" to Schema(type = Type.STRING, description = "Target device ID; auto-selected if omitted")),
         ),
     )
 
     override suspend fun executeSafe(args: Map<String, Any?>): Map<String, Any?> {
         api.put("/me/player/pause", mapOf("device_id" to (strArg(args, "device_id") ?: "")))
-        return mapOf(SpotifyTool.RESULT_KEY to "已暂停播放")
+        return mapOf(SpotifyTool.RESULT_KEY to "Playback paused")
     }
 
     companion object {
         const val NAME: String = "spotify_pause"
-        const val DESCRIPTION: String = "暂停当前 Spotify 播放（需 Premium）。"
+        const val DESCRIPTION: String = "Pause current Spotify playback. Requires Premium."
     }
 }
 
-/** spotify_next — 切到下一首。 */
+/** spotify_next — skip to the next track. */
 private class SpotifyNextTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
@@ -90,22 +91,22 @@ private class SpotifyNextTool(private val api: SpotifyApi) : SpotifyTool(NAME, D
         description = description,
         parameters = Schema(
             type = Type.OBJECT,
-            properties = mapOf("device_id" to Schema(type = Type.STRING, description = "目标设备 ID，缺省自动")),
+            properties = mapOf("device_id" to Schema(type = Type.STRING, description = "Target device ID; auto-selected if omitted")),
         ),
     )
 
     override suspend fun executeSafe(args: Map<String, Any?>): Map<String, Any?> {
         api.post("/me/player/next", mapOf("device_id" to (strArg(args, "device_id") ?: "")))
-        return mapOf(SpotifyTool.RESULT_KEY to "已切到下一首")
+        return mapOf(SpotifyTool.RESULT_KEY to "Skipped to next track")
     }
 
     companion object {
         const val NAME: String = "spotify_next"
-        const val DESCRIPTION: String = "跳到下一首（需 Premium）。"
+        const val DESCRIPTION: String = "Skip to the next track. Requires Premium."
     }
 }
 
-/** spotify_previous — 切回上一首。 */
+/** spotify_previous — skip back to the previous track. */
 private class SpotifyPreviousTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
@@ -113,22 +114,22 @@ private class SpotifyPreviousTool(private val api: SpotifyApi) : SpotifyTool(NAM
         description = description,
         parameters = Schema(
             type = Type.OBJECT,
-            properties = mapOf("device_id" to Schema(type = Type.STRING, description = "目标设备 ID，缺省自动")),
+            properties = mapOf("device_id" to Schema(type = Type.STRING, description = "Target device ID; auto-selected if omitted")),
         ),
     )
 
     override suspend fun executeSafe(args: Map<String, Any?>): Map<String, Any?> {
         api.post("/me/player/previous", mapOf("device_id" to (strArg(args, "device_id") ?: "")))
-        return mapOf(SpotifyTool.RESULT_KEY to "已切到上一首")
+        return mapOf(SpotifyTool.RESULT_KEY to "Skipped to previous track")
     }
 
     companion object {
         const val NAME: String = "spotify_previous"
-        const val DESCRIPTION: String = "跳到上一首（需 Premium）。"
+        const val DESCRIPTION: String = "Skip to the previous track. Requires Premium."
     }
 }
 
-/** spotify_set_volume — 设置音量。 */
+/** spotify_set_volume — set playback volume. */
 private class SpotifySetVolumeTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
@@ -137,8 +138,8 @@ private class SpotifySetVolumeTool(private val api: SpotifyApi) : SpotifyTool(NA
         parameters = Schema(
             type = Type.OBJECT,
             properties = mapOf(
-                "volume_percent" to Schema(type = Type.INTEGER, description = "音量百分比 0-100"),
-                "device_id" to Schema(type = Type.STRING, description = "目标设备 ID，缺省自动"),
+                "volume_percent" to Schema(type = Type.INTEGER, description = "Volume percentage 0-100"),
+                "device_id" to Schema(type = Type.STRING, description = "Target device ID; auto-selected if omitted"),
             ),
             required = listOf("volume_percent"),
         ),
@@ -150,16 +151,16 @@ private class SpotifySetVolumeTool(private val api: SpotifyApi) : SpotifyTool(NA
             "/me/player/volume",
             mapOf("volume_percent" to volume, "device_id" to (strArg(args, "device_id") ?: "")),
         )
-        return mapOf(SpotifyTool.RESULT_KEY to "音量已设为 $volume%")
+        return mapOf(SpotifyTool.RESULT_KEY to "Volume set to $volume%")
     }
 
     companion object {
         const val NAME: String = "spotify_set_volume"
-        const val DESCRIPTION: String = "设置播放音量（0-100，需 Premium）。"
+        const val DESCRIPTION: String = "Set the playback volume (0-100). Requires Premium."
     }
 }
 
-/** spotify_add_to_queue — 加入播放队列。 */
+/** spotify_add_to_queue — add an item to the playback queue. */
 private class SpotifyAddToQueueTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
@@ -168,21 +169,21 @@ private class SpotifyAddToQueueTool(private val api: SpotifyApi) : SpotifyTool(N
         parameters = Schema(
             type = Type.OBJECT,
             properties = mapOf(
-                "uri" to Schema(type = Type.STRING, description = "要加入队列的 Spotify URI（spotify:track:xxx 等），不能为空"),
-                "device_id" to Schema(type = Type.STRING, description = "目标设备 ID，缺省自动"),
+                "uri" to Schema(type = Type.STRING, description = "Spotify URI to enqueue (spotify:track:xxx etc.), required"),
+                "device_id" to Schema(type = Type.STRING, description = "Target device ID; auto-selected if omitted"),
             ),
             required = listOf("uri"),
         ),
     )
 
     override suspend fun executeSafe(args: Map<String, Any?>): Map<String, Any?> {
-        val uri = strArg(args, "uri") ?: throw IllegalStateException("缺少参数 uri")
+        val uri = strArg(args, "uri") ?: throw IllegalStateException("Missing parameter uri")
         api.post("/me/player/queue", mapOf("uri" to uri, "device_id" to (strArg(args, "device_id") ?: "")))
-        return mapOf(SpotifyTool.RESULT_KEY to "已加入队列: $uri")
+        return mapOf(SpotifyTool.RESULT_KEY to "Added to queue: $uri")
     }
 
     companion object {
         const val NAME: String = "spotify_add_to_queue"
-        const val DESCRIPTION: String = "把歌曲加入当前播放队列（需 Premium）。"
+        const val DESCRIPTION: String = "Add a track to the current playback queue. Requires Premium."
     }
 }

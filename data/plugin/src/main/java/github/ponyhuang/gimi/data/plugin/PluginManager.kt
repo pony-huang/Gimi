@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.adk.kt.tools.BaseTool
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionOutcome
+import github.ponyhuang.gimi.domain.plugin.model.PluginBrowserRequest
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
 import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
@@ -35,7 +36,7 @@ class PluginManager @Inject constructor(
 ) : PluginRepository {
 
     private val preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    private val loaded: List<LoadedPlugin> = loader.load()
+    private var loaded: List<LoadedPlugin> = loader.load()
     private val disabledIds: MutableSet<String> =
         preferences.getStringSet(DISABLED_IDS_KEY, emptySet()).orEmpty().toMutableSet()
 
@@ -64,6 +65,16 @@ class PluginManager @Inject constructor(
     /** 当前启用插件注入 Agent 的工具。 */
     fun enabledPluginTools(): List<BaseTool> = enabledPlugins().flatMap { it.tools() }
 
+    override suspend fun refresh(): List<String> = withContext(Dispatchers.IO) {
+        val added = loader.refresh()
+        if (added.isEmpty()) return@withContext emptyList()
+        loaded = loader.load()
+        _plugins.value = descriptors()
+        // 递增 revision → Agent 运行时缓存失效，下次消息重建并带上新插件的工具/回调。
+        _revision.update { it + 1 }
+        added.map { it.plugin.pluginId }
+    }
+
     override fun configDescriptor(pluginId: String): PluginConfigDescriptor? =
         loaded.firstOrNull { it.plugin.pluginId == pluginId }
             ?.plugin
@@ -81,7 +92,26 @@ class PluginManager @Inject constructor(
         return withContext(Dispatchers.IO) {
             runCatching { plugin.runConfigAction(actionId) }
                 .map { outcome -> PluginActionOutcome(outcome.message, outcome.success) }
-                .getOrElse { error -> PluginActionOutcome(error.message ?: "执行失败", success = false) }
+                .getOrElse { error -> PluginActionOutcome(error.message ?: "Action failed", success = false) }
+        }
+    }
+
+    override fun configActionBrowserRequest(pluginId: String, actionId: String): PluginBrowserRequest? =
+        loaded.firstOrNull { it.plugin.pluginId == pluginId }
+            ?.plugin
+            ?.configActionBrowserRequest(actionId)
+            ?.let { request -> PluginBrowserRequest(request.authorizeUrl, request.redirectBase) }
+
+    override suspend fun completeAction(
+        pluginId: String,
+        actionId: String,
+        redirectUrl: String,
+    ): PluginActionOutcome? {
+        val plugin = loaded.firstOrNull { it.plugin.pluginId == pluginId }?.plugin ?: return null
+        return withContext(Dispatchers.IO) {
+            runCatching { plugin.completeConfigAction(actionId, redirectUrl) }
+                .map { outcome -> PluginActionOutcome(outcome.message, outcome.success) }
+                .getOrElse { error -> PluginActionOutcome(error.message ?: "Action failed", success = false) }
         }
     }
 

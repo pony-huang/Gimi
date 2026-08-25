@@ -61,16 +61,25 @@ class PluginConfigViewModel @Inject constructor(
                 _state.update { it.copy(notice = PluginNotice(messageRes = R.string.plugin_config_saved)) }
             }
             is PluginConfigAction.RunAction -> runAction(action.actionId)
+            is PluginConfigAction.CompleteAction -> completeAction(action.actionId, action.redirectUrl)
+            PluginConfigAction.CloseBrowser -> _state.update { it.copy(browser = null) }
             PluginConfigAction.DismissNotice -> _state.update { it.copy(notice = null) }
         }
     }
 
     /**
-     * 执行配置页动作（实现方负责 IO/挂起，如 OAuth 等待回调）；执行中禁用其它动作。
-     * 动作可长时间运行，结果的 notice 由回调时写入。
+     * 执行配置页动作。需要内置浏览器授权的动作（[PluginRepository.configActionBrowserRequest]
+     * 非空）弹出 WebView，等截获回调后走 [completeAction]；否则走阻塞路径
+     * [PluginRepository.runAction]（实现方负责 IO/挂起）。
      */
     private fun runAction(actionId: String) {
         if (_state.value.isAnyActionRunning) return
+        repository.configActionBrowserRequest(_state.value.pluginId, actionId)?.let { request ->
+            _state.update {
+                it.copy(browser = PluginBrowserUiState(actionId, request.authorizeUrl, request.redirectBase))
+            }
+            return
+        }
         viewModelScope.launch {
             _state.update { state ->
                 state.copy(
@@ -88,6 +97,17 @@ class PluginConfigViewModel @Inject constructor(
                     },
                     notice = outcome?.let { PluginNotice(it.message, isError = !it.success) },
                 )
+            }
+        }
+    }
+
+    /** 内置浏览器截获重定向后，把授权码交给插件完成（如换 token）。 */
+    private fun completeAction(actionId: String, redirectUrl: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(browser = null) }
+            val outcome = repository.completeAction(_state.value.pluginId, actionId, redirectUrl)
+            _state.update { state ->
+                state.copy(notice = outcome?.let { PluginNotice(it.message, isError = !it.success) })
             }
         }
     }

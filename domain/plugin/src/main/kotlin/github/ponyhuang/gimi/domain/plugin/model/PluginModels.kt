@@ -70,3 +70,14 @@ data class PluginActionOutcome(
     val message: String,
     val success: Boolean = true,
 )
+
+/**
+ * 内置浏览器（WebView）授权请求。
+ *
+ * @property authorizeUrl WebView 加载的授权 URL。
+ * @property redirectBase WebView 应拦截的重定向 URL 前缀。
+ */
+data class PluginBrowserRequest(
+    val authorizeUrl: String,
+    val redirectBase: String,
+)

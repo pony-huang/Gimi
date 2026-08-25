@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -67,6 +69,19 @@ fun PluginSettingsRoute(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    // 进入页面自动重新发现插件，装完新插件 APK 后无需重启即可出现。
+    LaunchedEffect(Unit) { viewModel.onAction(PluginSettingsAction.Refresh) }
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                is PluginSettingsEffect.ShowPluginAdded -> Toast.makeText(
+                    context,
+                    context.getString(R.string.plugin_added_notice, effect.pluginIds.joinToString()),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+    }
     // 读取每个插件 APK 的应用图标；插件自带图标，宿主无需硬编码品牌资源。
     val icons = remember(state.plugins) {
         state.plugins.associate { plugin ->
@@ -102,6 +117,14 @@ fun PluginSettingsScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
+            item {
+                PreferenceListItem(
+                    icon = Icons.Default.Refresh,
+                    title = stringResource(R.string.plugin_refresh),
+                    subtitle = stringResource(R.string.plugin_refresh_subtitle),
+                    onClick = { onAction(PluginSettingsAction.Refresh) },
+                )
+            }
             items(state.plugins, key = { it.id }) { plugin ->
                 PluginRow(
                     plugin = plugin,
@@ -296,6 +319,13 @@ fun PluginConfigScreen(
                 }
             }
         }
+    }
+    state.browser?.let { browser ->
+        PluginBrowserDialog(
+            browser = browser,
+            onComplete = { url -> onAction(PluginConfigAction.CompleteAction(browser.actionId, url)) },
+            onClose = { onAction(PluginConfigAction.CloseBrowser) },
+        )
     }
 }
 

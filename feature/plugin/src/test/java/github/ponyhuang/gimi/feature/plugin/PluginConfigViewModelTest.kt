@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.feature.plugin
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionOutcome
+import github.ponyhuang.gimi.domain.plugin.model.PluginBrowserRequest
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigFieldDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
@@ -121,7 +122,7 @@ class PluginConfigViewModelTest {
         val viewModel = PluginConfigViewModel(
             FakePluginRepository(
                 descriptor = PluginConfigDescriptor(
-                    actions = listOf(PluginActionDescriptor(id = "login", label = "授权登录")),
+                    actions = listOf(PluginActionDescriptor(id = "login", label = "Authorize")),
                 ),
             ),
         )
@@ -129,16 +130,16 @@ class PluginConfigViewModelTest {
         viewModel.load("spotify")
 
         assertEquals(listOf("login"), viewModel.state.value.actions.map { it.id })
-        assertEquals("授权登录", viewModel.state.value.actions.single().label)
+        assertEquals("Authorize", viewModel.state.value.actions.single().label)
     }
 
     @Test
     fun runActionDelegatesAndSetsNotice() = runTest {
         val repository = FakePluginRepository(
             descriptor = PluginConfigDescriptor(
-                actions = listOf(PluginActionDescriptor(id = "login", label = "授权登录")),
+                actions = listOf(PluginActionDescriptor(id = "login", label = "Authorize")),
             ),
-            runOutcome = PluginActionOutcome(message = "已授权", success = true),
+            runOutcome = PluginActionOutcome(message = "Authorized", success = true),
         )
         val viewModel = PluginConfigViewModel(repository)
         viewModel.load("spotify")
@@ -149,22 +150,68 @@ class PluginConfigViewModelTest {
         assertEquals(listOf("spotify" to "login"), repository.runActionCalls)
         val notice = viewModel.state.value.notice
         assertNotNull(notice)
-        assertEquals("已授权", notice?.message)
+        assertEquals("Authorized", notice?.message)
         assertEquals(false, notice?.isError)
         // 执行结束后 running 复位。
         assertEquals(false, viewModel.state.value.actions.single().running)
+    }
+
+    @Test
+    fun runActionWithBrowserRequestShowsBrowserInsteadOfBlocking() = runTest {
+        val repository = FakePluginRepository(
+            descriptor = PluginConfigDescriptor(
+                actions = listOf(PluginActionDescriptor(id = "login", label = "Authorize")),
+            ),
+            browserRequest = PluginBrowserRequest(
+                authorizeUrl = "https://accounts.spotify.com/authorize?x",
+                redirectBase = "http://127.0.0.1:8888/callback",
+            ),
+        )
+        val viewModel = PluginConfigViewModel(repository)
+        viewModel.load("spotify")
+
+        viewModel.onAction(PluginConfigAction.RunAction("login"))
+
+        // 有浏览器请求 → 弹出 WebView，且不进入阻塞 runAction。
+        assertEquals("login", viewModel.state.value.browser?.actionId)
+        assertEquals("https://accounts.spotify.com/authorize?x", viewModel.state.value.browser?.authorizeUrl)
+        assertEquals(0, repository.runActionCalls.size)
+    }
+
+    @Test
+    fun completeActionDelegatesAndSetsNotice() = runTest {
+        val redirectUrl = "http://127.0.0.1:8888/callback?code=abc&state=st"
+        val repository = FakePluginRepository(
+            descriptor = PluginConfigDescriptor(
+                actions = listOf(PluginActionDescriptor(id = "login", label = "Authorize")),
+            ),
+            completeOutcome = PluginActionOutcome(message = "Spotify authorization succeeded", success = true),
+        )
+        val viewModel = PluginConfigViewModel(repository)
+        viewModel.load("spotify")
+
+        viewModel.onAction(PluginConfigAction.CompleteAction("login", redirectUrl))
+        advanceUntilIdle()
+
+        assertEquals(listOf(Triple("spotify", "login", redirectUrl)), repository.completeActionCalls)
+        assertEquals("Spotify authorization succeeded", viewModel.state.value.notice?.message)
+        // 弹窗已关闭。
+        assertEquals(null, viewModel.state.value.browser)
     }
 
     private class FakePluginRepository(
         private val descriptor: PluginConfigDescriptor = PluginConfigDescriptor(),
         private val stored: Map<String, String> = emptyMap(),
         private val runOutcome: PluginActionOutcome? = null,
+        private val browserRequest: PluginBrowserRequest? = null,
+        private val completeOutcome: PluginActionOutcome? = null,
     ) : PluginRepository {
         val pluginsFlow = MutableStateFlow<List<PluginDescriptor>>(emptyList())
         override val plugins: StateFlow<List<PluginDescriptor>> = pluginsFlow
         override val revision: StateFlow<Long> = MutableStateFlow(0L)
         var updatedConfig: Pair<String, Map<String, String>>? = null
         val runActionCalls = mutableListOf<Pair<String, String>>()
+        val completeActionCalls = mutableListOf<Triple<String, String, String>>()
 
         override fun setEnabled(pluginId: String, enabled: Boolean) = Unit
         override fun configDescriptor(pluginId: String): PluginConfigDescriptor? = descriptor
@@ -176,6 +223,20 @@ class PluginConfigViewModelTest {
         override suspend fun runAction(pluginId: String, actionId: String): PluginActionOutcome? {
             runActionCalls += pluginId to actionId
             return runOutcome
+        }
+
+        override suspend fun refresh(): List<String> = emptyList()
+
+        override fun configActionBrowserRequest(pluginId: String, actionId: String): PluginBrowserRequest? =
+            browserRequest
+
+        override suspend fun completeAction(
+            pluginId: String,
+            actionId: String,
+            redirectUrl: String,
+        ): PluginActionOutcome? {
+            completeActionCalls += Triple(pluginId, actionId, redirectUrl)
+            return completeOutcome
         }
     }
 }

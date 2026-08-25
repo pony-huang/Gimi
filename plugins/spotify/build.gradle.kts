@@ -24,6 +24,8 @@ dependencies {
     compileOnly(project(":plugin-api"))
     compileOnly(libs.google.adk.kotlin.core)
     compileOnly(libs.kotlinx.coroutines.core)
+    // androidx.core.net.toUri 运行时由宿主提供。
+    compileOnly(libs.androidx.core.ktx)
 
     // 单测里用 JVM 版 org.json（Android 的 org.json 在 JVM 单测里是抛 not mocked 的桩）。
     testImplementation(libs.junit)

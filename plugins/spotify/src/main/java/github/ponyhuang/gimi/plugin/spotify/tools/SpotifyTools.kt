@@ -30,7 +30,7 @@ internal abstract class SpotifyTool(
 internal suspend fun spotifyCall(block: suspend () -> Map<String, Any?>): Map<String, Any?> =
     withContext(Dispatchers.IO) {
         runCatching { block() }
-            .getOrElse { mapOf(SpotifyTool.ERROR_KEY to (it.message ?: "Spotify API 调用失败")) }
+            .getOrElse { mapOf(SpotifyTool.ERROR_KEY to (it.message ?: "Spotify API call failed")) }
     }
 
 internal fun strArg(args: Map<String, Any?>, key: String): String? =

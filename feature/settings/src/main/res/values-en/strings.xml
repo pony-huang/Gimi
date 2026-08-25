@@ -15,7 +15,7 @@
     <string name="settings_voice_wake_title">Voice wake</string>
     <string name="settings_voice_wake_subtitle">Bluetooth headset · Wake word · Offline model</string>
 
-    <string name="settings_mcp_title">MCP servers</string>
+    <string name="settings_mcp_title">MCP</string>
     <string name="settings_mcp_subtitle">Remote tool services · Connection &amp; authorization</string>
 
     <string name="settings_plugins_title">Plugins</string>
@@ -30,7 +30,7 @@
     <string name="settings_work_files_title">Working files</string>
     <string name="settings_work_files_subtitle">Authorize folders the assistant can search</string>
 
-    <string name="settings_tool_authorization_title">Tool authorization</string>
+    <string name="settings_tool_authorization_title">Tools</string>
     <string name="settings_tool_authorization_subtitle">Choose which local tools the assistant may use</string>
     <string name="settings_permissions_title">Permissions</string>
     <string name="settings_permissions_subtitle">Pre-grant permissions needed for chat and voice features</string>

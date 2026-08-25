@@ -17,9 +17,39 @@ sealed interface PluginSettingsAction {
 data class PluginConfigUiState(
     val pluginId: String = "",
     val fields: List<PluginConfigFieldUiState> = emptyList(),
+    val actions: List<PluginActionUiState> = emptyList(),
+    val notice: PluginNotice? = null,
 ) {
     val hasFields: Boolean get() = fields.isNotEmpty()
+    val hasActions: Boolean get() = actions.isNotEmpty()
+    val isAnyActionRunning: Boolean get() = actions.any { it.running }
 }
+
+/**
+ * 配置页动作的可点击状态。
+ *
+ * @property id 动作标识。
+ * @property label 按钮文案。
+ * @property running 是否正在执行（执行中按钮禁用）。
+ */
+data class PluginActionUiState(
+    val id: String,
+    val label: String,
+    val running: Boolean = false,
+)
+
+/**
+ * 配置页一次性提示。
+ *
+ * @property message 插件返回的文本（动作结果，可能非本地化）。
+ * @property messageRes 本地化文案资源 ID（如「配置已保存」）；与 [message] 二选一。
+ * @property isError 是否为错误提示。
+ */
+data class PluginNotice(
+    val message: String? = null,
+    val messageRes: Int? = null,
+    val isError: Boolean = false,
+)
 
 /**
  * 配置页单个字段的可编辑状态。
@@ -38,4 +68,6 @@ data class PluginConfigFieldUiState(
 sealed interface PluginConfigAction {
     data class SetValue(val key: String, val value: String) : PluginConfigAction
     data object Save : PluginConfigAction
+    data class RunAction(val actionId: String) : PluginConfigAction
+    data object DismissNotice : PluginConfigAction
 }

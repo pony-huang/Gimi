@@ -229,11 +229,20 @@ fun PluginConfigScreen(
 ) {
     PreferencePageContainer(modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (!state.hasFields) {
+            if (!state.hasFields && !state.hasActions) {
                 PreferenceBanner(
                     text = stringResource(R.string.plugin_config_no_fields),
                     tone = PreferenceBannerTone.Info,
                     modifier = Modifier.padding(top = 12.dp),
+                )
+            }
+            state.notice?.let { notice ->
+                PreferenceBanner(
+                    text = notice.message ?: notice.messageRes?.let { stringResource(it) }.orEmpty(),
+                    tone = if (notice.isError) PreferenceBannerTone.Error else PreferenceBannerTone.Info,
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                        .clickable { onAction(PluginConfigAction.DismissNotice) },
                 )
             }
             LazyColumn(
@@ -254,6 +263,25 @@ fun PluginConfigScreen(
                             field = field,
                             onSelect = { onAction(PluginConfigAction.SetValue(field.key, it)) },
                         )
+                    }
+                }
+                state.actions.forEach { action ->
+                    item(key = "action-${action.id}") {
+                        Button(
+                            onClick = { onAction(PluginConfigAction.RunAction(action.id)) },
+                            enabled = !action.running,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                if (action.running) {
+                                    stringResource(R.string.plugin_action_running)
+                                } else {
+                                    action.label
+                                },
+                            )
+                        }
                     }
                 }
             }

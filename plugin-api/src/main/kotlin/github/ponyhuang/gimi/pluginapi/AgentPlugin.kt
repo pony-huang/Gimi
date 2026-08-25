@@ -56,4 +56,19 @@ interface AgentPlugin : Plugin {
      * context 供 [tools] 使用。默认无操作。
      */
     fun onAttach(context: android.content.Context) {}
+
+    /**
+     * 执行配置页动作（对应 [PluginConfig.actions] 里的 [PluginConfigAction]），如「授权登录」。
+     *
+     * 宿主在配置页点按按钮后经 [PluginManager.runConfigAction] 转调；可挂起（如等待 OAuth 回调）。
+     * 默认返回不支持。
+     */
+    suspend fun runConfigAction(actionId: String): PluginActionResult =
+        PluginActionResult(message = "插件不支持动作: $actionId", success = false)
 }
+
+/** 配置页动作的执行结果。 */
+data class PluginActionResult(
+    val message: String,
+    val success: Boolean = true,
+)

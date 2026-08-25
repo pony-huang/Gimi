@@ -4,5 +4,7 @@
     <string name="plugin_item_subtitle">v%1$d · %2$d tools</string>
     <string name="plugin_config_title">Plugin configuration</string>
     <string name="plugin_config_save">Save</string>
+    <string name="plugin_config_saved">Configuration saved</string>
+    <string name="plugin_action_running">Working…</string>
     <string name="plugin_config_no_fields">This plugin has no configurable fields.</string>
 </resources>

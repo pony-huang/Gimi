@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.domain.plugin.repository
 
+import github.ponyhuang.gimi.domain.plugin.model.PluginActionOutcome
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
 import kotlinx.coroutines.flow.StateFlow
@@ -25,4 +26,11 @@ interface PluginRepository {
 
     /** 保存配置并回填到插件实例。 */
     fun updateConfig(pluginId: String, values: Map<String, String>)
+
+    /**
+     * 执行插件配置页动作（如「授权登录」），返回结果消息。
+     *
+     * @return 插件不存在或动作未知时返回 null。
+     */
+    suspend fun runAction(pluginId: String, actionId: String): PluginActionOutcome?
 }

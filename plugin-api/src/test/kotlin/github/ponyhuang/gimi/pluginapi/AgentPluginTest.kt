@@ -1,6 +1,8 @@
 package github.ponyhuang.gimi.pluginapi
 
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -32,5 +34,13 @@ class AgentPluginTest {
         val token = config.fields[0] as PluginConfigField.Text
         assertTrue(token.secret)
         assertEquals("token", token.key)
+    }
+
+    @Test
+    fun runConfigActionDefaultsToUnsupported() = runTest {
+        val result = plugin().runConfigAction("whatever")
+
+        assertFalse(result.success)
+        assertTrue(result.message.contains("whatever"))
     }
 }

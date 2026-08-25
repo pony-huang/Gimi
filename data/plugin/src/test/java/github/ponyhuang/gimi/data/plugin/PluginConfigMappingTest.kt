@@ -1,6 +1,8 @@
 package github.ponyhuang.gimi.data.plugin
 
+import github.ponyhuang.gimi.domain.plugin.model.PluginActionDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigFieldDescriptor
+import github.ponyhuang.gimi.pluginapi.PluginConfigAction
 import github.ponyhuang.gimi.pluginapi.PluginConfigField
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -45,5 +47,12 @@ class PluginConfigMappingTest {
         assertEquals(PluginConfigFieldDescriptor.Kind.SELECT, descriptor.kind)
         assertEquals(listOf("fast", "thinking"), descriptor.options)
         assertEquals("thinking", descriptor.defaultValue)
+    }
+
+    @Test
+    fun actionMapsIdAndLabel() {
+        val descriptor = PluginConfigAction(id = "login", label = "授权登录").toActionDescriptor()
+
+        assertEquals(PluginActionDescriptor(id = "login", label = "授权登录"), descriptor)
     }
 }

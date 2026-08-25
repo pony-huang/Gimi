@@ -43,7 +43,30 @@ data class PluginConfigFieldDescriptor(
     enum class Kind { TEXT, TOGGLE, SELECT }
 }
 
-/** 一个插件的配置描述（字段集合）。 */
+/**
+ * 一个插件的配置描述（字段 + 可执行动作）。
+ *
+ * @property fields 需要用户填写的字段。
+ * @property actions 配置页上可点击执行的动作（如「授权登录」）。
+ */
 data class PluginConfigDescriptor(
     val fields: List<PluginConfigFieldDescriptor> = emptyList(),
+    val actions: List<PluginActionDescriptor> = emptyList(),
+)
+
+/**
+ * 配置页上的一个可执行动作。
+ *
+ * @property id 动作唯一标识，宿主执行时传给插件。
+ * @property label 按钮文案。
+ */
+data class PluginActionDescriptor(
+    val id: String,
+    val label: String,
+)
+
+/** 配置页动作的执行结果。 */
+data class PluginActionOutcome(
+    val message: String,
+    val success: Boolean = true,
 )

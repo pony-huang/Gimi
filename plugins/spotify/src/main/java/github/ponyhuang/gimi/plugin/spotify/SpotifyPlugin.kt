@@ -4,11 +4,14 @@ import android.content.Context
 import com.google.adk.kt.tools.BaseTool
 import github.ponyhuang.gimi.plugin.spotify.tools.authTools
 import github.ponyhuang.gimi.plugin.spotify.tools.libraryTools
+import github.ponyhuang.gimi.plugin.spotify.tools.performLogin
 import github.ponyhuang.gimi.plugin.spotify.tools.playbackTools
 import github.ponyhuang.gimi.plugin.spotify.tools.playlistTools
 import github.ponyhuang.gimi.plugin.spotify.tools.searchTools
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
+import github.ponyhuang.gimi.pluginapi.PluginActionResult
 import github.ponyhuang.gimi.pluginapi.PluginConfig
+import github.ponyhuang.gimi.pluginapi.PluginConfigAction
 import github.ponyhuang.gimi.pluginapi.PluginConfigField
 
 /**
@@ -35,6 +38,9 @@ class SpotifyPlugin : AgentPlugin {
                 label = "Redirect URI",
                 defaultValue = DEFAULT_REDIRECT_URI,
             ),
+        ),
+        actions = listOf(
+            PluginConfigAction(id = ACTION_LOGIN, label = "Spotify 授权登录"),
         ),
     )
 
@@ -71,7 +77,18 @@ class SpotifyPlugin : AgentPlugin {
         addAll(playlistTools(api))
     }
 
+    override suspend fun runConfigAction(actionId: String): PluginActionResult = when (actionId) {
+        ACTION_LOGIN -> runCatching {
+            performLogin(auth, { clientId }, { clientSecret }, { redirectUri }) { appContext }
+        }.fold(
+            onSuccess = { message -> PluginActionResult(message = message) },
+            onFailure = { error -> PluginActionResult(message = error.message ?: "授权失败", success = false) },
+        )
+        else -> PluginActionResult(message = "未知动作: $actionId", success = false)
+    }
+
     companion object {
+        const val ACTION_LOGIN: String = "login"
         const val KEY_CLIENT_ID: String = "client_id"
         const val KEY_CLIENT_SECRET: String = "client_secret"
         const val KEY_REDIRECT_URI: String = "redirect_uri"

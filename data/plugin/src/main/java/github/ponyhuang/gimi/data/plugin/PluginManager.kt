@@ -3,16 +3,19 @@ package github.ponyhuang.gimi.data.plugin
 import android.content.Context
 import com.google.adk.kt.tools.BaseTool
 import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.gimi.domain.plugin.model.PluginActionOutcome
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
 import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
 
 /**
  * 动态插件管理器 — 宿主侧唯一入口。
@@ -65,7 +68,22 @@ class PluginManager @Inject constructor(
         loaded.firstOrNull { it.plugin.pluginId == pluginId }
             ?.plugin
             ?.config
-            ?.let { config -> PluginConfigDescriptor(config.fields.map { field -> field.toDescriptor() }) }
+            ?.let { config ->
+                PluginConfigDescriptor(
+                    fields = config.fields.map { field -> field.toDescriptor() },
+                    actions = config.actions.map { action -> action.toActionDescriptor() },
+                )
+            }
+
+    override suspend fun runAction(pluginId: String, actionId: String): PluginActionOutcome? {
+        val plugin = loaded.firstOrNull { it.plugin.pluginId == pluginId }?.plugin ?: return null
+        // 动作可能长时间挂起（如等待 OAuth 回调），切到 IO 执行。
+        return withContext(Dispatchers.IO) {
+            runCatching { plugin.runConfigAction(actionId) }
+                .map { outcome -> PluginActionOutcome(outcome.message, outcome.success) }
+                .getOrElse { error -> PluginActionOutcome(error.message ?: "执行失败", success = false) }
+        }
+    }
 
     override fun configValues(pluginId: String): Map<String, String> = configStore.valuesFor(pluginId)
 

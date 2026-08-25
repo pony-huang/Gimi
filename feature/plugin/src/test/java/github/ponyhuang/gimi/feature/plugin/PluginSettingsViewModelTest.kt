@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.feature.plugin
 
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
+import github.ponyhuang.gimi.domain.plugin.model.PluginActionOutcome
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
 import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
@@ -40,5 +41,6 @@ class PluginSettingsViewModelTest {
         override fun configDescriptor(pluginId: String): PluginConfigDescriptor? = null
         override fun configValues(pluginId: String): Map<String, String> = emptyMap()
         override fun updateConfig(pluginId: String, values: Map<String, String>) = Unit
+        override suspend fun runAction(pluginId: String, actionId: String): PluginActionOutcome? = null
     }
 }

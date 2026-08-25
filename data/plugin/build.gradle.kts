@@ -20,6 +20,7 @@ dependencies {
     implementation(project(":domain:plugin"))
     implementation(libs.hilt.android)
     implementation(libs.javax.inject)
+    implementation(libs.kotlinx.coroutines.core)
     ksp(libs.hilt.android.compiler)
 
     testImplementation(libs.junit)

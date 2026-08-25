@@ -78,6 +78,7 @@ class PluginManager @Inject constructor(
         val plugin = loadedPlugin.plugin
         PluginDescriptor(
             id = plugin.pluginId,
+            name = plugin.displayName,
             packageName = loadedPlugin.packageName,
             version = plugin.version,
             toolCount = plugin.tools().size,

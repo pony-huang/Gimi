@@ -4,6 +4,7 @@ package github.ponyhuang.gimi.domain.plugin.model
  * 一个已加载动态插件的宿主侧只读描述，供设置页展示与启停。
  *
  * @property id 插件稳定唯一 id（如 `"zhihu"`）。
+ * @property name 展示给用户的名称（如 `"知乎"`）。
  * @property packageName 来源插件 APK 的包名。
  * @property version 插件自身版本。
  * @property toolCount 插件注入 Agent 的工具数量。
@@ -11,6 +12,7 @@ package github.ponyhuang.gimi.domain.plugin.model
  */
 data class PluginDescriptor(
     val id: String,
+    val name: String,
     val packageName: String,
     val version: Int,
     val toolCount: Int,

@@ -18,6 +18,8 @@ class ZhihuPlugin(
 
     override val name: String = "zhihu_plugin"
 
+    override val displayName: String = "知乎"
+
     override val config: PluginConfig = PluginConfig(
         fields = listOf(
             PluginConfigField.Text(key = KEY_ACCESS_SECRET, label = "access_secret", secret = true),

@@ -75,6 +75,9 @@ class InstalledApkPluginLoader @Inject constructor(
             val pluginClass = Class.forName(className, false, dexClassLoader)
             val plugin = pluginClass.getDeclaredConstructor().newInstance() as AgentPlugin
 
+            // 注入 applicationContext：需 Android 能力的插件（开浏览器/起本地服务/存 token）据此初始化。
+            plugin.onAttach(context.applicationContext)
+
             // 回填宿主持久化的配置值（未来配置页写入 PluginConfigStore）。
             plugin.configure(configStore.valuesFor(plugin.pluginId))
 

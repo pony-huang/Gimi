@@ -18,6 +18,9 @@ interface AgentPlugin : Plugin {
     /** 稳定唯一 id，如 `"example"`。 */
     val pluginId: String
 
+    /** 展示给用户的名称（如 `"知乎"`）；默认取 [pluginId]，作者可按需覆盖。 */
+    val displayName: String get() = pluginId
+
     /** 插件自身版本，供宿主做启用/升级判断。 */
     val version: Int
 
@@ -45,4 +48,12 @@ interface AgentPlugin : Plugin {
      * 插件据此更新自身状态（如保存 access_token）；默认无操作。
      */
     fun configure(values: Map<String, String>) {}
+
+    /**
+     * 宿主加载实例后注入 Android [android.content.Context]（applicationContext）。
+     *
+     * 需要 Android 能力的插件（开浏览器、起本地回调服务、持久化 token 等）在此保存
+     * context 供 [tools] 使用。默认无操作。
+     */
+    fun onAttach(context: android.content.Context) {}
 }

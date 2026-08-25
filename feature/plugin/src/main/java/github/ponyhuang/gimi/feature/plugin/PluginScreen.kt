@@ -167,7 +167,7 @@ private fun PluginRow(
                 .padding(start = 28.dp, end = 12.dp),
         ) {
             Text(
-                text = plugin.id,
+                text = plugin.name,
                 style = MaterialTheme.typography.titleLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

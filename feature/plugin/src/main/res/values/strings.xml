@@ -1,0 +1,8 @@
+<resources>
+    <string name="plugin_screen_title">插件</string>
+    <string name="plugin_empty">未安装插件。安装插件 APK 后重启应用即可在此管理。</string>
+    <string name="plugin_item_subtitle">v%1$d · %2$d 个工具</string>
+    <string name="plugin_config_title">插件配置</string>
+    <string name="plugin_config_save">保存</string>
+    <string name="plugin_config_no_fields">该插件无需配置。</string>
+</resources>

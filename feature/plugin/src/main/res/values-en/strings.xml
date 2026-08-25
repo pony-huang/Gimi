@@ -1,0 +1,8 @@
+<resources>
+    <string name="plugin_screen_title">Plugins</string>
+    <string name="plugin_empty">No plugins installed. Install a plugin APK and restart the app to manage it here.</string>
+    <string name="plugin_item_subtitle">v%1$d · %2$d tools</string>
+    <string name="plugin_config_title">Plugin configuration</string>
+    <string name="plugin_config_save">Save</string>
+    <string name="plugin_config_no_fields">This plugin has no configurable fields.</string>
+</resources>

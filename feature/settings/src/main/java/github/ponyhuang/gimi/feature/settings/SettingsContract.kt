@@ -14,6 +14,7 @@ sealed interface SettingsAction {
     data object OpenDefaultModels : SettingsAction
     data object OpenVoiceWake : SettingsAction
     data object OpenMcpServers : SettingsAction
+    data object OpenPlugins : SettingsAction
     data object OpenSkills : SettingsAction
     data object OpenWorkFiles : SettingsAction
     data object OpenPermissions : SettingsAction
@@ -28,6 +29,7 @@ sealed interface SettingsEffect {
     data object NavigateToDefaultModels : SettingsEffect
     data object NavigateToVoiceWake : SettingsEffect
     data object NavigateToMcpServers : SettingsEffect
+    data object NavigateToPlugins : SettingsEffect
     data object NavigateToSkills : SettingsEffect
     data object NavigateToWorkFiles : SettingsEffect
     data object NavigateToPermissions : SettingsEffect

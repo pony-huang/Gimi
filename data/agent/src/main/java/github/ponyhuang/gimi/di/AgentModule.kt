@@ -26,6 +26,7 @@ import github.ponyhuang.gimi.agent.tools.search.ObjectBoxToolVectorSearch
 import github.ponyhuang.gimi.agent.tools.search.ToolEmbeddingModel
 import github.ponyhuang.gimi.agent.tools.search.ToolVectorEntity
 import github.ponyhuang.gimi.agent.tools.search.ToolVectorSearch
+import github.ponyhuang.gimi.data.plugin.PluginManager
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.mcp.repository.McpConnectionTester
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
@@ -126,16 +127,6 @@ object AgentModule {
 
     @Provides
     @Singleton
-    fun providePlugins(
-        agentLLMModelFactory: AgentLLMModelFactory
-    ): List<@JvmSuppressWildcards Plugin> {
-        return listOf(
-            ConversationGenerateTitlePlugin(agentLLMModelFactory)
-        )
-    }
-
-    @Provides
-    @Singleton
     fun provideAgentChatRunner(
         sessionService: SessionService,
         artifactService: ArtifactService,
@@ -143,7 +134,8 @@ object AgentModule {
         modelServices: AgentModelConfigurationSource,
         toolAuthorization: ToolAuthorizationRepository,
         mcpRepository: McpRepository,
-        plugins: List<@JvmSuppressWildcards Plugin>,
+        agentLLMModelFactory: AgentLLMModelFactory,
+        pluginManager: PluginManager,
     ): AgentChatRunner = AgentChatRunner(
         factory = { selection, toolAccessMode ->
             modelServices.awaitReady()
@@ -159,9 +151,15 @@ object AgentModule {
                 toolAuthorization.revision.value,
                 mcpRepository.revision.value,
                 modelServices.configurationRevision.value,
+                pluginManager.revision.value,
             )
         },
-        plugins = plugins,
+        plugins = {
+            buildList<Plugin> {
+                add(ConversationGenerateTitlePlugin(agentLLMModelFactory))
+                addAll(pluginManager.enabledPlugins())
+            }
+        },
     )
 
     /**

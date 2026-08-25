@@ -18,6 +18,9 @@
     <string name="settings_mcp_title">MCP 服务器</string>
     <string name="settings_mcp_subtitle">远程工具服务 · 连接与授权</string>
 
+    <string name="settings_plugins_title">插件</string>
+    <string name="settings_plugins_subtitle">动态加载的插件 · 启用与管理</string>
+
     <string name="settings_skills_title">Skills</string>
     <string name="settings_skills_subtitle">安装可复用的说明与资源</string>
 

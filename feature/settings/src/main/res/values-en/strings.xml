@@ -18,6 +18,9 @@
     <string name="settings_mcp_title">MCP servers</string>
     <string name="settings_mcp_subtitle">Remote tool services · Connection &amp; authorization</string>
 
+    <string name="settings_plugins_title">Plugins</string>
+    <string name="settings_plugins_subtitle">Dynamically loaded plugins · enable &amp; manage</string>
+
     <string name="settings_skills_title">Skills</string>
     <string name="settings_skills_subtitle">Install reusable instructions and resources</string>
 

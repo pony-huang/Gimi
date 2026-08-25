@@ -42,7 +42,9 @@ dependencies {
     implementation(project(":domain:mcp"))
     implementation(project(":domain:modelcatalog"))
     implementation(project(":domain:toolauthorization"))
+    implementation(project(":domain:plugin"))
     implementation(project(":domain:workfiles"))
+    implementation(project(":data:plugin"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity)

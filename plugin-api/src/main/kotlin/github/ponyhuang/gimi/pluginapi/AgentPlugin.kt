@@ -1,0 +1,48 @@
+package github.ponyhuang.gimi.pluginapi
+
+import com.google.adk.kt.plugins.Plugin
+import com.google.adk.kt.tools.BaseTool
+
+/**
+ * 第一方插件契约 — 在 ADK [Plugin] 之上封装的一层，是宿主运行时动态加载的对象。
+ *
+ * 插件作者实现本接口（[pluginId] / [version] / [config] + 需要的 ADK 回调），宿主经
+ * DexClassLoader 实例化后直接当作 ADK [Plugin] 注入 Agent 运行。
+ *
+ * 预留扩展点（后续填充默认实现）：
+ * - MCP 注入：插件声明要注入会话的 MCP 服务器；
+ * - 工具注入配置：插件声明要注册的工具。
+ */
+interface AgentPlugin : Plugin {
+
+    /** 稳定唯一 id，如 `"example"`。 */
+    val pluginId: String
+
+    /** 插件自身版本，供宿主做启用/升级判断。 */
+    val version: Int
+
+    /**
+     * 插件编译时固化的协议版本，默认取 [PluginApi.VERSION]。
+     *
+     * 未来协议破坏性变更递增 [PluginApi.VERSION] 后，旧插件（编译时固化的旧值）
+     * 会被宿主识别并跳过，避免 ABI 不匹配。作者通常无需覆写。
+     */
+    val apiVersion: Int get() = PluginApi.VERSION
+
+    /** 配置描述，宿主未来据此动态渲染配置页（如 token 认证）。 */
+    val config: PluginConfig
+
+    /**
+     * 插件注入到 Agent 的工具；默认无。
+     *
+     * 宿主在构建 Agent 时，把每个插件返回的工具一并挂到 `LlmAgent.tools`。
+     */
+    fun tools(): List<BaseTool> = emptyList()
+
+    /**
+     * 接收宿主持久化的配置值（未来配置页回填，键对应 [PluginConfig.fields] 的 key）。
+     *
+     * 插件据此更新自身状态（如保存 access_token）；默认无操作。
+     */
+    fun configure(values: Map<String, String>) {}
+}

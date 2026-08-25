@@ -19,6 +19,7 @@ import github.ponyhuang.gimi.agent.tools.search.ToolSearchToolset
 import github.ponyhuang.gimi.agent.tools.search.ToolVectorSearch
 import github.ponyhuang.gimi.agent.tools.system.LocalToolset
 import github.ponyhuang.gimi.agent.tools.system.ToolsetConfirmationResumeTool
+import github.ponyhuang.gimi.data.plugin.PluginManager
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import javax.inject.Inject
@@ -59,6 +60,7 @@ class AgentFactory @Inject constructor(
     private val toolVectorSearch: ToolVectorSearch,
     private val mcpConfigurationTool: McpConfigurationTool,
     private val mcpAuthorizationTool: McpAuthorizationTool,
+    private val pluginManager: PluginManager,
 ) {
     /**
      * 按访问模式构建 [AgentRuntime]。
@@ -151,6 +153,8 @@ class AgentFactory @Inject constructor(
             )
             add(mcpConfigurationTool)
             add(mcpAuthorizationTool)
+            // 每次构建 Agent 时读取当前启用的插件工具，使开关/配置在下次请求立即生效。
+            addAll(pluginManager.enabledPluginTools())
         },
         toolsets = toolsets,
     )

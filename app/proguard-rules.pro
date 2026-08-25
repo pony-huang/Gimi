@@ -112,3 +112,20 @@
 # obfuscation and shrinking inside the packages are unaffected.
 # ---------------------------------------------------------------------------
 -keeppackagenames org.yaml.snakeyaml.**
+
+# ---------------------------------------------------------------------------
+# ADK plugin ABI (dynamic plugin loading)
+#
+# Plugins are loaded at runtime via DexClassLoader and resolve ADK types through
+# the host classloader. The plugin APK is compiled against the original ADK
+# class/member names, so the host's R8 must not strip or rename the ADK types
+# reachable from com.google.adk.kt.plugins.Plugin (the plugin author contract),
+# even when the host itself does not call every member.
+# ---------------------------------------------------------------------------
+-keep class com.google.adk.kt.plugins.** { *; }
+-keep class com.google.adk.kt.callbacks.** { *; }
+-keep class com.google.adk.kt.agents.** { *; }
+-keep class com.google.adk.kt.events.** { *; }
+-keep class com.google.adk.kt.models.** { *; }
+-keep class com.google.adk.kt.tools.** { *; }
+-keep class com.google.adk.kt.types.** { *; }

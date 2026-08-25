@@ -42,6 +42,17 @@ sealed interface AppRoute : NavKey {
     data object ToolAuthorizationConfiguration : AppRoute
 
     @Serializable
+    data object PluginSettings : AppRoute
+
+    /**
+     * 单个插件的配置页。
+     *
+     * @property pluginId 目标插件的稳定唯一 id。
+     */
+    @Serializable
+    data class PluginConfig(val pluginId: String) : AppRoute
+
+    @Serializable
     data object SkillsSettings : AppRoute
 
     @Serializable

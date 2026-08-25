@@ -28,6 +28,9 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <intent>
+            <action android:name="github.ponyhuang.gimi.plugin.DISCOVERY" />
+        </intent>
     </queries>
 
     <application

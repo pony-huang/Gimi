@@ -83,6 +83,14 @@ fun SettingsScreen(
             }
             item {
                 PreferenceNavigationCard(
+                    icon = Icons.Default.Extension,
+                    title = stringResource(R.string.settings_plugins_title),
+                    subtitle = stringResource(R.string.settings_plugins_subtitle),
+                    onClick = { onAction(SettingsAction.OpenPlugins) },
+                )
+            }
+            item {
+                PreferenceNavigationCard(
                     icon = Icons.Default.Build,
                     title = stringResource(R.string.settings_tool_authorization_title),
                     subtitle = stringResource(R.string.settings_tool_authorization_subtitle),

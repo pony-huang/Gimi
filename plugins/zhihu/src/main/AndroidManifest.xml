@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:label="Gimi Zhihu Plugin">
+
+        <!-- 声明实现类全名，值须与 PluginApi.CLASS_META_DATA_KEY 一致 -->
+        <meta-data
+            android:name="github.ponyhuang.gimi.plugin.CLASS"
+            android:value="github.ponyhuang.gimi.plugin.zhihu.ZhihuPlugin" />
+
+        <!-- 无功能发现标记：宿主通过 queryIntentServices 发现本插件。 -->
+        <service
+            android:name="github.ponyhuang.gimi.plugin.zhihu.DiscoveryService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="github.ponyhuang.gimi.plugin.DISCOVERY" />
+            </intent-filter>
+        </service>
+    </application>
+
+</manifest>

@@ -24,6 +24,7 @@ fun SettingsRoute(
     onNavigateToDefaultModels: () -> Unit,
     onNavigateToVoiceWake: () -> Unit,
     onNavigateToMcpServers: () -> Unit,
+    onNavigateToPlugins: () -> Unit,
     onNavigateToSkills: () -> Unit,
     onNavigateToWorkFiles: () -> Unit,
     onNavigateToPermissions: () -> Unit,
@@ -43,6 +44,7 @@ fun SettingsRoute(
                 SettingsEffect.NavigateToDefaultModels -> onNavigateToDefaultModels()
                 SettingsEffect.NavigateToVoiceWake -> onNavigateToVoiceWake()
                 SettingsEffect.NavigateToMcpServers -> onNavigateToMcpServers()
+                SettingsEffect.NavigateToPlugins -> onNavigateToPlugins()
                 SettingsEffect.NavigateToSkills -> onNavigateToSkills()
                 SettingsEffect.NavigateToWorkFiles -> onNavigateToWorkFiles()
                 SettingsEffect.NavigateToPermissions -> onNavigateToPermissions()

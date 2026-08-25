@@ -64,7 +64,7 @@ class AgentChatRunner(
     private val sessionService: SessionService,
     private val artifactService: ArtifactService?,
     private val configurationRevision: () -> Any = { Unit },
-    private val plugins: List<Plugin> = emptyList()
+    private val plugins: () -> List<Plugin> = { emptyList() }
 ) {
     /**
      * Agent 构建的唯一缓存键。
@@ -114,7 +114,7 @@ class AgentChatRunner(
     private fun buildRunner(agent: BaseAgent): InMemoryRunner = InMemoryRunner(
         app = App(
             appName = APP_NAME,
-            plugins = mutableListOf(LoggingPlugin()) + plugins,
+            plugins = mutableListOf(LoggingPlugin()) + plugins(),
             rootAgent = agent,
             resumabilityConfig = ResumabilityConfig(isResumable = true),
             // 对话摘要压缩

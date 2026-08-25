@@ -60,6 +60,9 @@ import github.ponyhuang.gimi.feature.skills.R as SkillsR
 import github.ponyhuang.gimi.feature.toolauthorization.ToolAuthorizationConfigurationRoute
 import github.ponyhuang.gimi.feature.toolauthorization.ToolAuthorizationRoute
 import github.ponyhuang.gimi.feature.toolauthorization.R as ToolauthR
+import github.ponyhuang.gimi.feature.plugin.PluginConfigRoute
+import github.ponyhuang.gimi.feature.plugin.PluginSettingsRoute
+import github.ponyhuang.gimi.feature.plugin.R as PluginR
 import github.ponyhuang.gimi.feature.voicewake.VoiceWakeSettingsRoute
 import github.ponyhuang.gimi.feature.voicewake.R as VoicewakeR
 import github.ponyhuang.gimi.feature.workfiles.WorkFilesSettingsRoute
@@ -299,6 +302,7 @@ fun MainScreen(
                                 onNavigateToDefaultModels = { backStack.add(AppRoute.DefaultModelSettings) },
                                 onNavigateToVoiceWake = { backStack.add(AppRoute.VoiceWakeSettings) },
                                 onNavigateToMcpServers = { backStack.add(AppRoute.McpServerList) },
+                                onNavigateToPlugins = { backStack.add(AppRoute.PluginSettings) },
                                 onNavigateToSkills = { backStack.add(AppRoute.SkillsSettings) },
                                 onNavigateToWorkFiles = { backStack.add(AppRoute.WorkFilesSettings) },
                                 onNavigateToPermissions = { backStack.add(AppRoute.PermissionSettings) },
@@ -354,6 +358,25 @@ fun MainScreen(
                             goBack,
                         ) {
                             ToolAuthorizationConfigurationRoute(modifier = it)
+                        }
+
+                        AppRoute.PluginSettings -> PreferenceScaffold(
+                            stringResource(PluginR.string.plugin_screen_title),
+                            goBack,
+                        ) { modifier ->
+                            PluginSettingsRoute(
+                                onNavigateToConfig = { pluginId ->
+                                    backStack.add(AppRoute.PluginConfig(pluginId))
+                                },
+                                modifier = modifier,
+                            )
+                        }
+
+                        is AppRoute.PluginConfig -> PreferenceScaffold(
+                            stringResource(PluginR.string.plugin_config_title),
+                            goBack,
+                        ) { modifier ->
+                            PluginConfigRoute(pluginId = route.pluginId, modifier = modifier)
                         }
 
                         AppRoute.SkillsSettings -> PreferenceScaffold(

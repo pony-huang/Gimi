@@ -1,0 +1,47 @@
+package github.ponyhuang.gimi.domain.plugin.model
+
+/**
+ * 一个已加载动态插件的宿主侧只读描述，供设置页展示与启停。
+ *
+ * @property id 插件稳定唯一 id（如 `"zhihu"`）。
+ * @property packageName 来源插件 APK 的包名。
+ * @property version 插件自身版本。
+ * @property toolCount 插件注入 Agent 的工具数量。
+ * @property isEnabled 是否启用（关闭后其工具不再注入 Agent）。
+ */
+data class PluginDescriptor(
+    val id: String,
+    val packageName: String,
+    val version: Int,
+    val toolCount: Int,
+    val isEnabled: Boolean,
+)
+
+/**
+ * 单个配置字段的类型化描述，宿主据此渲染配置页控件。
+ *
+ * 这是 [github.ponyhuang.gimi.pluginapi.PluginConfigField] 在 domain 层的纯 Kotlin 投影，
+ * 避免 domain 依赖 ADK/plugin-api。
+ *
+ * @property key 配置键，保存时回传给插件。
+ * @property label 展示给用户的标签。
+ * @property kind 控件类型。
+ * @property secret 文本字段是否按密码/令牌隐藏输入。
+ * @property defaultValue 字段默认值（TOGGLE 为 `"true"`/`"false"` 字符串）。
+ * @property options SELECT 的候选项。
+ */
+data class PluginConfigFieldDescriptor(
+    val key: String,
+    val label: String,
+    val kind: Kind,
+    val secret: Boolean = false,
+    val defaultValue: String = "",
+    val options: List<String> = emptyList(),
+) {
+    enum class Kind { TEXT, TOGGLE, SELECT }
+}
+
+/** 一个插件的配置描述（字段集合）。 */
+data class PluginConfigDescriptor(
+    val fields: List<PluginConfigFieldDescriptor> = emptyList(),
+)

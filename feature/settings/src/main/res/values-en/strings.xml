@@ -24,10 +24,10 @@
     <string name="settings_skills_title">Skills</string>
     <string name="settings_skills_subtitle">Install reusable instructions and resources</string>
 
-    <string name="settings_chat_display_title">Chat display</string>
+    <string name="settings_chat_display_title">Tool activity</string>
     <string name="settings_chat_display_subtitle">Show tool calls and their results</string>
 
-    <string name="settings_work_files_title">Working files</string>
+    <string name="settings_work_files_title">Folders</string>
     <string name="settings_work_files_subtitle">Authorize folders the assistant can search</string>
 
     <string name="settings_tool_authorization_title">Tools</string>

@@ -150,16 +150,18 @@ class AdkChatAgentRepositoryMappingTest {
     }
 
     private fun localFileResponse(): Map<String, Any?> = mapOf(
-        "success" to true,
-        "query" to "photo",
-        "results" to listOf(
-            mapOf(
-                "displayName" to "photo.jpg",
-                "mimeType" to "image/jpeg",
-                "sizeBytes" to 1L,
-                "modifiedTimeMillis" to 2L,
-                "category" to "image",
-                "contentUri" to "content://media/photo",
+        "result" to mapOf(
+            "success" to true,
+            "query" to "photo",
+            "results" to listOf(
+                mapOf(
+                    "displayName" to "photo.jpg",
+                    "mimeType" to "image/jpeg",
+                    "sizeBytes" to 1L,
+                    "modifiedTimeMillis" to 2L,
+                    "category" to "image",
+                    "contentUri" to "content://media/photo",
+                ),
             ),
         ),
     )

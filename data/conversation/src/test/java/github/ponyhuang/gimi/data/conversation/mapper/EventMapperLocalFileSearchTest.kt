@@ -24,16 +24,18 @@ class EventMapperLocalFileSearchTest {
                     id = "call-1",
                     name = "search_documents",
                     response = mapOf(
-                        "success" to true,
-                        "query" to "report",
-                        "results" to listOf(
-                            mapOf(
-                                "displayName" to "report.pdf",
-                                "mimeType" to "application/pdf",
-                                "sizeBytes" to 10L,
-                                "modifiedTimeMillis" to 20L,
-                                "category" to "document",
-                                "contentUri" to "content://documents/report",
+                        "result" to mapOf(
+                            "success" to true,
+                            "query" to "report",
+                            "results" to listOf(
+                                mapOf(
+                                    "displayName" to "report.pdf",
+                                    "mimeType" to "application/pdf",
+                                    "sizeBytes" to 10L,
+                                    "modifiedTimeMillis" to 20L,
+                                    "category" to "document",
+                                    "contentUri" to "content://documents/report",
+                                ),
                             ),
                         ),
                     ),

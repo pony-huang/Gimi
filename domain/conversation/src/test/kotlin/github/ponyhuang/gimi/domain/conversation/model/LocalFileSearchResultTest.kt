@@ -40,6 +40,31 @@ class LocalFileSearchResultTest {
     }
 
     @Test
+    fun `parses generated tool result wrapper`() {
+        val parsed = parseLocalFileSearchResult(
+            toolName = "search_media_files",
+            response = mapOf(
+                "result" to mapOf(
+                    "success" to true,
+                    "query" to "",
+                    "results" to listOf(
+                        mapOf(
+                            "displayName" to "recent.jpg",
+                            "mimeType" to "image/jpeg",
+                            "sizeBytes" to 12L,
+                            "modifiedTimeMillis" to 34L,
+                            "category" to "image",
+                            "contentUri" to "content://media/recent",
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(listOf("recent.jpg"), parsed?.files?.map { it.displayName })
+    }
+
+    @Test
     fun `drops malformed and non content uri entries`() {
         val parsed = parseLocalFileSearchResult(
             toolName = "search_media_files",

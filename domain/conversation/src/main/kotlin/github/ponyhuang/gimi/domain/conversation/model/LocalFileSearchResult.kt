@@ -41,8 +41,10 @@ fun parseLocalFileSearchResult(
     toolName: String,
     response: Map<String, Any?>,
 ): LocalFileSearchResult? {
-    if (toolName !in LocalFileSearchToolNames || response["success"] != true) return null
-    val rawResults = response["results"] as? List<*> ?: return null
+    if (toolName !in LocalFileSearchToolNames) return null
+    val payload = (response["result"] as? Map<*, *>) ?: response
+    if (payload["success"] != true) return null
+    val rawResults = payload["results"] as? List<*> ?: return null
     val files = rawResults.mapNotNull { raw ->
         val fields = raw as? Map<*, *> ?: return@mapNotNull null
         val displayName = fields["displayName"] as? String ?: return@mapNotNull null
@@ -60,7 +62,7 @@ fun parseLocalFileSearchResult(
         )
     }
     return LocalFileSearchResult(
-        query = response["query"] as? String ?: "",
+        query = payload["query"] as? String ?: "",
         files = files,
     )
 }

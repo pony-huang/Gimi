@@ -60,6 +60,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
+import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 
 @Composable
 fun PluginSettingsRoute(
@@ -232,6 +233,7 @@ private fun Drawable.toBitmap(): Bitmap {
 @Composable
 fun PluginConfigRoute(
     pluginId: String,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: PluginConfigViewModel = hiltViewModel(),
 ) {
@@ -240,12 +242,49 @@ fun PluginConfigRoute(
     PluginConfigScreen(
         state = state,
         onAction = viewModel::onAction,
+        onBack = onBack,
         modifier = modifier,
     )
 }
 
 @Composable
 fun PluginConfigScreen(
+    state: PluginConfigUiState,
+    onAction: (PluginConfigAction) -> Unit,
+    onBack: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    val browser = state.browser
+    PreferenceScaffold(
+        title = stringResource(
+            if (browser == null) R.string.plugin_config_title else R.string.plugin_browser_title,
+        ),
+        onBack = if (browser == null) {
+            onBack
+        } else {
+            { onAction(PluginConfigAction.CloseBrowser) }
+        },
+    ) { contentModifier ->
+        if (browser != null) {
+            PluginBrowserScreen(
+                browser = browser,
+                onComplete = { url ->
+                    onAction(PluginConfigAction.CompleteAction(browser.actionId, url))
+                },
+                modifier = contentModifier,
+            )
+            return@PreferenceScaffold
+        }
+        PluginConfigContent(
+            state = state,
+            onAction = onAction,
+            modifier = contentModifier.then(modifier),
+        )
+    }
+}
+
+@Composable
+private fun PluginConfigContent(
     state: PluginConfigUiState,
     onAction: (PluginConfigAction) -> Unit,
     modifier: Modifier = Modifier,
@@ -319,13 +358,6 @@ fun PluginConfigScreen(
                 }
             }
         }
-    }
-    state.browser?.let { browser ->
-        PluginBrowserDialog(
-            browser = browser,
-            onComplete = { url -> onAction(PluginConfigAction.CompleteAction(browser.actionId, url)) },
-            onClose = { onAction(PluginConfigAction.CloseBrowser) },
-        )
     }
 }
 

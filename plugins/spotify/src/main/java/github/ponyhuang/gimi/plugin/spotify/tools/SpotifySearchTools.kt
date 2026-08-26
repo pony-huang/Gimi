@@ -14,13 +14,9 @@ internal fun searchTools(api: SpotifyApi): List<BaseTool> = listOf(
     SpotifyGetAlbumTool(api),
     SpotifyGetArtistTool(api),
     SpotifyGetAlbumTracksTool(api),
-    SpotifyGetTracksBatchTool(api),
-    SpotifyGetAlbumsBatchTool(api),
-    SpotifyGetArtistsBatchTool(api),
-    SpotifyRecommendationsTool(api),
 )
 
-/** spotify_search — full-text search across tracks/albums/artists/playlists. */
+/** spotify_search — 针对具体曲名、专辑或艺人关键词的全文搜索。 */
 private class SpotifySearchTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
 
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
@@ -32,8 +28,8 @@ private class SpotifySearchTool(private val api: SpotifyApi) : SpotifyTool(NAME,
                 "query" to Schema(type = Type.STRING, description = "Search term, required"),
                 "type" to Schema(
                     type = Type.STRING,
-                    description = "Item type to search: track / album / artist / playlist. Default: track",
-                    enum = listOf("track", "album", "artist", "playlist"),
+                    description = "Item type to search: track / album / artist. Default: track",
+                    enum = SUPPORTED_TYPES,
                 ),
                 "limit" to Schema(type = Type.INTEGER, description = "Number of results to return (default 10, max 50)"),
                 "offset" to Schema(type = Type.INTEGER, description = "Pagination offset (default 0)"),
@@ -44,7 +40,7 @@ private class SpotifySearchTool(private val api: SpotifyApi) : SpotifyTool(NAME,
 
     override suspend fun executeSafe(args: Map<String, Any?>): Map<String, Any?> {
         val query = strArg(args, "query") ?: throw IllegalStateException("Missing parameter query")
-        val type = strArg(args, "type") ?: "track"
+        val type = strArg(args, "type")?.takeIf { it in SUPPORTED_TYPES } ?: "track"
         val json = api.get(
             "/search",
             mapOf(
@@ -56,13 +52,24 @@ private class SpotifySearchTool(private val api: SpotifyApi) : SpotifyTool(NAME,
             ),
         )
         val items = json?.optJSONObject(type)?.optJSONArray("items") ?: JSONArray()
-        return mapOf(SpotifyTool.RESULT_KEY to items.toJsonNative())
+        return if (items.length() == 0) {
+            mapOf(
+                SpotifyTool.RESULT_KEY to emptyList<Any>(),
+                "guidance" to "No matches. Do not repeat broad chart or popularity searches; " +
+                    "use spotify_get_top_tracks for the user's popular music, or ask for a concrete song or artist.",
+            )
+        } else {
+            mapOf(SpotifyTool.RESULT_KEY to items.toJsonNative())
+        }
     }
 
     companion object {
         const val NAME: String = "spotify_search"
         const val DESCRIPTION: String =
-            "Search tracks, albums, artists, or playlists on Spotify and return matching items (with IDs)."
+            "Search Spotify for a concrete song, album, or artist name and return matching items with IDs. " +
+                "Do not use for charts, popularity, recommendations, or listening history; " +
+                "use spotify_get_top_tracks or spotify_get_recently_played for those requests."
+        val SUPPORTED_TYPES: List<String> = listOf("track", "album", "artist")
     }
 }
 
@@ -179,149 +186,5 @@ private class SpotifyGetAlbumTracksTool(private val api: SpotifyApi) : SpotifyTo
     companion object {
         const val NAME: String = "spotify_get_album_tracks"
         const val DESCRIPTION: String = "List the tracks of a single album."
-    }
-}
-
-/** spotify_get_tracks — batch track lookup. */
-private class SpotifyGetTracksBatchTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
-
-    override fun declaration(): FunctionDeclaration = FunctionDeclaration(
-        name = name,
-        description = description,
-        parameters = Schema(
-            type = Type.OBJECT,
-            properties = mapOf(
-                "track_ids" to Schema(
-                    type = Type.ARRAY,
-                    description = "Spotify track IDs (max 50)",
-                    items = Schema(type = Type.STRING),
-                ),
-            ),
-            required = listOf("track_ids"),
-        ),
-    )
-
-    override suspend fun executeSafe(args: Map<String, Any?>): Map<String, Any?> {
-        val ids = listArg(args, "track_ids")
-        if (ids.isEmpty()) throw IllegalStateException("Missing parameter track_ids")
-        val json = api.get("/tracks", mapOf("ids" to ids.take(50).joinToString(","), "market" to "from_token"))
-        return mapOf(SpotifyTool.RESULT_KEY to (json?.optJSONArray("tracks") ?: JSONArray()).toJsonNative())
-    }
-
-    companion object {
-        const val NAME: String = "spotify_get_tracks"
-        const val DESCRIPTION: String = "Batch-fetch multiple tracks' details (up to 50 IDs)."
-    }
-}
-
-/** spotify_get_albums — batch album lookup. */
-private class SpotifyGetAlbumsBatchTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
-
-    override fun declaration(): FunctionDeclaration = FunctionDeclaration(
-        name = name,
-        description = description,
-        parameters = Schema(
-            type = Type.OBJECT,
-            properties = mapOf(
-                "album_ids" to Schema(
-                    type = Type.ARRAY,
-                    description = "Spotify album IDs (max 20)",
-                    items = Schema(type = Type.STRING),
-                ),
-            ),
-            required = listOf("album_ids"),
-        ),
-    )
-
-    override suspend fun executeSafe(args: Map<String, Any?>): Map<String, Any?> {
-        val ids = listArg(args, "album_ids")
-        if (ids.isEmpty()) throw IllegalStateException("Missing parameter album_ids")
-        val json = api.get("/albums", mapOf("ids" to ids.take(20).joinToString(","), "market" to "from_token"))
-        return mapOf(SpotifyTool.RESULT_KEY to (json?.optJSONArray("albums") ?: JSONArray()).toJsonNative())
-    }
-
-    companion object {
-        const val NAME: String = "spotify_get_albums"
-        const val DESCRIPTION: String = "Batch-fetch multiple albums' details (up to 20 IDs)."
-    }
-}
-
-/** spotify_get_artists — batch artist lookup. */
-private class SpotifyGetArtistsBatchTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
-
-    override fun declaration(): FunctionDeclaration = FunctionDeclaration(
-        name = name,
-        description = description,
-        parameters = Schema(
-            type = Type.OBJECT,
-            properties = mapOf(
-                "artist_ids" to Schema(
-                    type = Type.ARRAY,
-                    description = "Spotify artist IDs (max 50)",
-                    items = Schema(type = Type.STRING),
-                ),
-            ),
-            required = listOf("artist_ids"),
-        ),
-    )
-
-    override suspend fun executeSafe(args: Map<String, Any?>): Map<String, Any?> {
-        val ids = listArg(args, "artist_ids")
-        if (ids.isEmpty()) throw IllegalStateException("Missing parameter artist_ids")
-        val json = api.get("/artists", mapOf("ids" to ids.take(50).joinToString(",")))
-        return mapOf(SpotifyTool.RESULT_KEY to (json?.optJSONArray("artists") ?: JSONArray()).toJsonNative())
-    }
-
-    companion object {
-        const val NAME: String = "spotify_get_artists"
-        const val DESCRIPTION: String = "Batch-fetch multiple artists' details (up to 50 IDs)."
-    }
-}
-
-/** spotify_recommendations — recommendations based on seeds. */
-private class SpotifyRecommendationsTool(private val api: SpotifyApi) : SpotifyTool(NAME, DESCRIPTION) {
-
-    override fun declaration(): FunctionDeclaration = FunctionDeclaration(
-        name = name,
-        description = description,
-        parameters = Schema(
-            type = Type.OBJECT,
-            properties = mapOf(
-                "seed_tracks" to Schema(
-                    type = Type.ARRAY,
-                    description = "Seed track IDs (max 5; provide at least one of tracks/artists/genres)",
-                    items = Schema(type = Type.STRING),
-                ),
-                "seed_artists" to Schema(
-                    type = Type.ARRAY,
-                    description = "Seed artist IDs (max 5)",
-                    items = Schema(type = Type.STRING),
-                ),
-                "seed_genres" to Schema(
-                    type = Type.ARRAY,
-                    description = "Seed genres (max 5, e.g. pop / rock / electronic)",
-                    items = Schema(type = Type.STRING),
-                ),
-                "limit" to Schema(type = Type.INTEGER, description = "Number of results to return (default 10, max 50)"),
-            ),
-        ),
-    )
-
-    override suspend fun executeSafe(args: Map<String, Any?>): Map<String, Any?> {
-        val query = mutableMapOf<String, Any?>("limit" to intArg(args, "limit", 10), "market" to "from_token")
-        listArg(args, "seed_tracks").take(5).takeIf { it.isNotEmpty() }
-            ?.let { query["seed_tracks"] = it.joinToString(",") }
-        listArg(args, "seed_artists").take(5).takeIf { it.isNotEmpty() }
-            ?.let { query["seed_artists"] = it.joinToString(",") }
-        listArg(args, "seed_genres").take(5).takeIf { it.isNotEmpty() }
-            ?.let { query["seed_genres"] = it.joinToString(",") }
-        val json = api.get("/recommendations", query)
-        return mapOf(SpotifyTool.RESULT_KEY to (json?.optJSONArray("tracks") ?: JSONArray()).toJsonNative())
-    }
-
-    companion object {
-        const val NAME: String = "spotify_recommendations"
-        const val DESCRIPTION: String =
-            "Generate Spotify recommendations based on seed tracks, artists, or genres."
     }
 }

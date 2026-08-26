@@ -35,7 +35,7 @@ data class PluginConfigUiState(
 }
 
 /**
- * 内置浏览器授权弹窗状态。
+ * 内置浏览器授权页状态。
  *
  * @property actionId 触发弹窗的配置页动作。
  * @property authorizeUrl WebView 加载的授权 URL。
@@ -97,6 +97,6 @@ sealed interface PluginConfigAction {
     /** 内置浏览器截获重定向后，把完整重定向 URL 交给插件完成动作。 */
     data class CompleteAction(val actionId: String, val redirectUrl: String) : PluginConfigAction
 
-    /** 关闭内置浏览器弹窗（用户取消）。 */
+    /** 关闭内置浏览器授权页（用户取消）。 */
     data object CloseBrowser : PluginConfigAction
 }

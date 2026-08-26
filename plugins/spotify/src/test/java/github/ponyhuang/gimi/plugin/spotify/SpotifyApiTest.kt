@@ -24,6 +24,26 @@ class SpotifyApiTest {
     }
 
     @Test
+    fun spotifyForbiddenMessageGuidesAgentToUserOwnedContent() {
+        val body = """{"error":{"status":403,"message":"Forbidden."}}"""
+
+        val message = spotifyErrorMessage(403, body)
+
+        assertTrue(message.contains("spotify_get_my_playlists"))
+        assertTrue(message.contains("spotify_get_top_tracks"))
+    }
+
+    @Test
+    fun spotifyNotFoundMessageAvoidsRetryingRemovedOrInaccessibleContent() {
+        val body = """{"error":{"status":404,"message":"Resource not found"}}"""
+
+        val message = spotifyErrorMessage(404, body)
+
+        assertTrue(message.contains("Do not retry"))
+        assertTrue(message.contains("Spotify Web API"))
+    }
+
+    @Test
     fun toJsonNativeRecursivelyConverts() {
         val json = JSONObject()
             .put("a", "x")

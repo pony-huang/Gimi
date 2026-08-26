@@ -28,6 +28,9 @@ dependencies {
     compileOnly(libs.androidx.core.ktx)
 
     // 单测里用 JVM 版 org.json（Android 的 org.json 在 JVM 单测里是抛 not mocked 的桩）。
+    testImplementation(project(":plugin-api"))
+    testImplementation(libs.google.adk.kotlin.core)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.org.json)
 }

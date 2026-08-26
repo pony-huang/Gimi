@@ -120,7 +120,18 @@ internal fun spotifyErrorMessage(statusCode: Int, body: String): String {
     val message = runCatching {
         JSONObject(body).optJSONObject("error")?.optString("message")?.takeIf(String::isNotBlank)
     }.getOrNull()
-    return message ?: "Spotify API HTTP $statusCode: ${body.take(200)}"
+    val detail = message ?: "Spotify API HTTP $statusCode: ${body.take(200)}"
+    return when (statusCode) {
+        403 -> if (detail.contains("forbidden", ignoreCase = true)) {
+            "$detail Spotify denied this content or operation. " +
+                "Use spotify_get_my_playlists for accessible playlists, or spotify_get_top_tracks for personal popular tracks."
+        } else {
+            detail
+        }
+        404 -> "$detail This Spotify Web API endpoint or content is unavailable. " +
+            "Do not retry the same request; use a currently supported personal-library or search tool instead."
+        else -> detail
+    }
 }
 
 /** 递归把 org.json 转成 ADK 工具可返回的 JSON-native 类型（Map/List/String/Number/Boolean/null）。 */

@@ -69,7 +69,7 @@ class PluginConfigViewModel @Inject constructor(
 
     /**
      * 执行配置页动作。需要内置浏览器授权的动作（[PluginRepository.configActionBrowserRequest]
-     * 非空）弹出 WebView，等截获回调后走 [completeAction]；否则走阻塞路径
+     * 非空）进入 WebView 授权页，等截获回调后走 [completeAction]；否则走阻塞路径
      * [PluginRepository.runAction]（实现方负责 IO/挂起）。
      */
     private fun runAction(actionId: String) {

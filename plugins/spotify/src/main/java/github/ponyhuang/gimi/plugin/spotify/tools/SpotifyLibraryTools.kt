@@ -73,7 +73,8 @@ private class SpotifyMyPlaylistsTool(private val api: SpotifyApi) : SpotifyTool(
     companion object {
         const val NAME: String = "spotify_get_my_playlists"
         const val DESCRIPTION: String =
-            "List the current user's playlists (name, track count, ID)."
+            "List playlists owned by or shared with the current user. " +
+                "Use IDs from this tool with spotify_get_playlist or spotify_get_playlist_tracks."
     }
 }
 
@@ -99,7 +100,8 @@ private class SpotifyGetPlaylistTool(private val api: SpotifyApi) : SpotifyTool(
     companion object {
         const val NAME: String = "spotify_get_playlist"
         const val DESCRIPTION: String =
-            "Get a playlist's details (name, owner, track count, visibility, description)."
+            "Get details for a playlist owned by or shared with the current user. " +
+                "Only use playlist IDs returned by spotify_get_my_playlists; public chart playlist IDs may be inaccessible."
     }
 }
 
@@ -143,7 +145,9 @@ private class SpotifyGetPlaylistTracksTool(private val api: SpotifyApi) : Spotif
 
     companion object {
         const val NAME: String = "spotify_get_playlist_tracks"
-        const val DESCRIPTION: String = "List the tracks inside a playlist (with track IDs)."
+        const val DESCRIPTION: String =
+            "List items in a playlist owned by or shared with the current user. " +
+                "Only use playlist IDs returned by spotify_get_my_playlists, not public chart search results."
     }
 }
 
@@ -195,7 +199,9 @@ private class SpotifyRecentlyPlayedTool(private val api: SpotifyApi) : SpotifyTo
 
     companion object {
         const val NAME: String = "spotify_get_recently_played"
-        const val DESCRIPTION: String = "List recently played tracks (with play times)."
+        const val DESCRIPTION: String =
+            "List the current user's recently played tracks with play times. " +
+                "Use as a personal fallback when top tracks are unavailable; never describe these as global charts."
     }
 }
 
@@ -272,7 +278,9 @@ private class SpotifyTopTracksTool(private val api: SpotifyApi) : SpotifyTool(NA
 
     companion object {
         const val NAME: String = "spotify_get_top_tracks"
-        const val DESCRIPTION: String = "Get the current user's most-played tracks (listening statistics)."
+        const val DESCRIPTION: String =
+            "Preferred tool for requests such as popular songs, favorites, or personalized recommendations. " +
+                "Returns the current user's most-played tracks, not global Spotify charts."
     }
 }
 

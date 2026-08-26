@@ -372,12 +372,10 @@ fun MainScreen(
                             )
                         }
 
-                        is AppRoute.PluginConfig -> PreferenceScaffold(
-                            stringResource(PluginR.string.plugin_config_title),
-                            goBack,
-                        ) { modifier ->
-                            PluginConfigRoute(pluginId = route.pluginId, modifier = modifier)
-                        }
+                        is AppRoute.PluginConfig -> PluginConfigRoute(
+                            pluginId = route.pluginId,
+                            onBack = goBack,
+                        )
 
                         AppRoute.SkillsSettings -> PreferenceScaffold(
                             stringResource(SkillsR.string.skills_screen_title),

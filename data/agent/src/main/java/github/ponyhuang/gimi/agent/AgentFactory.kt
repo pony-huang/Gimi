@@ -156,6 +156,11 @@ class AgentFactory @Inject constructor(
             // 每次构建 Agent 时读取当前启用的插件工具，使开关/配置在下次请求立即生效。
             addAll(pluginManager.enabledPluginTools())
         },
-        toolsets = toolsets,
+        toolsets = buildList {
+            addAll(toolsets)
+            // 插件 Toolset 按请求期上下文动态出工具；与 tools 一样每次构建时读取，
+            // 插件启停/重装经 revision 使 Agent 重建后即时生效。
+            addAll(pluginManager.enabledPluginToolsets())
+        },
     )
 }

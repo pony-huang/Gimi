@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.data.plugin
 
 import android.content.Context
 import com.google.adk.kt.tools.BaseTool
+import com.google.adk.kt.tools.Toolset
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionOutcome
 import github.ponyhuang.gimi.domain.plugin.model.PluginBrowserRequest
@@ -25,8 +26,9 @@ import kotlinx.coroutines.withContext
  * - 经 [PluginLoader] 加载一次插件并持有；
  * - 按 pluginId 持久化「已关闭」集合（默认全部启用，新装插件自动启用）；
  * - 暴露启停状态（[plugins]）与配置版本（[revision]），供 Agent 运行时缓存失效重建；
- * - 提供启用的插件实例（[enabledPlugins]）与工具（[enabledPluginTools]），
- *   以及配置读写（[configDescriptor]/[configValues]/[updateConfig]）。
+ * - 提供启用的插件实例（[enabledPlugins]）、工具（[enabledPluginTools]）与
+ *   动态工具集（[enabledPluginToolsets]），以及配置读写
+ *   （[configDescriptor]/[configValues]/[updateConfig]）。
  */
 @Singleton
 class PluginManager @Inject constructor(
@@ -64,6 +66,9 @@ class PluginManager @Inject constructor(
 
     /** 当前启用插件注入 Agent 的工具。 */
     fun enabledPluginTools(): List<BaseTool> = enabledPlugins().flatMap { it.tools() }
+
+    /** 当前启用插件注入 Agent 的 Toolset（动态工具源，构建 Agent 时挂到 LlmAgent.toolsets）。 */
+    fun enabledPluginToolsets(): List<Toolset> = enabledPlugins().flatMap { it.toolSets() }
 
     override suspend fun refresh(): List<String> = withContext(Dispatchers.IO) {
         val added = loader.refresh()

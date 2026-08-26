@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.pluginapi
 
 import com.google.adk.kt.plugins.Plugin
 import com.google.adk.kt.tools.BaseTool
+import com.google.adk.kt.tools.Toolset
 
 /**
  * 第一方插件契约 — 在 ADK [Plugin] 之上封装的一层，是宿主运行时动态加载的对象。
@@ -46,6 +47,16 @@ interface AgentPlugin : Plugin {
      * 宿主在构建 Agent 时，把每个插件返回的工具一并挂到 `LlmAgent.tools`。
      */
     fun tools(): List<BaseTool> = emptyList()
+
+    /**
+     * 插件注入 Agent 的 Toolset（动态工具集）；默认无。
+     *
+     * 与 [tools] 的区别：ADK 会在每次模型请求时调用
+     * [com.google.adk.kt.tools.Toolset.getTools]，并按请求期上下文（ReadonlyContext）
+     * 返回工具，适合需要按会话或授权状态动态裁剪的工具组。宿主构建 Agent 时把每个
+     * 插件返回的 Toolset 一并挂到 `LlmAgent.toolsets`。
+     */
+    fun toolSets(): List<Toolset> = emptyList()
 
     /**
      * 接收宿主持久化的配置值（未来配置页回填，键对应 [PluginConfig.fields] 的 key）。

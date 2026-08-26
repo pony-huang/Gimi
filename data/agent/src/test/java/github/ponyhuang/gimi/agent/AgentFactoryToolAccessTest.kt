@@ -1,10 +1,12 @@
 package github.ponyhuang.gimi.agent
 
 import com.google.adk.kt.agents.LlmAgent
+import com.google.adk.kt.agents.ReadonlyContext
 import com.google.adk.kt.models.Model
 import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.ToolContext
+import com.google.adk.kt.tools.Toolset
 import com.google.adk.kt.types.FunctionDeclaration
 import github.ponyhuang.gimi.agent.tools.search.TOOL_SEARCH_NAME
 import github.ponyhuang.gimi.agent.tools.search.ToolSearchToolset
@@ -15,6 +17,7 @@ import github.ponyhuang.gimi.agent.tools.mcp.McpConfigurationTool
 import github.ponyhuang.gimi.agent.tools.official.SearchOfficialToolset
 import github.ponyhuang.gimi.agent.tools.official.OfficialToolset
 import github.ponyhuang.gimi.agent.tools.system.LocalToolset
+import github.ponyhuang.gimi.data.plugin.PluginManager
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
@@ -132,10 +135,23 @@ class AgentFactoryToolAccessTest {
         )
     }
 
+    @Test
+    fun pluginToolsetsAreAttachedInBothAccessModes() = runTest {
+        val pluginToolset = FakePluginToolset("playback_control")
+        val factory = factory(pluginToolsets = listOf(pluginToolset))
+
+        val always = factory.create(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE).agent as LlmAgent
+        val onDemand = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
+
+        assertTrue("always-available 模式应挂载插件 Toolset", pluginToolset in always.toolsets)
+        assertTrue("on-demand 模式应挂载插件 Toolset", pluginToolset in onDemand.toolsets)
+    }
+
     private fun factory(
         localTools: List<BaseTool> = emptyList(),
         confirmationRequiredToolIds: Set<String> = emptySet(),
         officialToolsets: Set<OfficialToolset> = emptySet(),
+        pluginToolsets: List<Toolset> = emptyList(),
         mcpConfigurationTool: McpConfigurationTool = mockk(relaxed = true) {
             every { name } returns McpConfigurationTool.NAME
         },
@@ -154,6 +170,9 @@ class AgentFactoryToolAccessTest {
         val modelFactory = mockk<AgentLLMModelFactory>()
         every { modelFactory.selectModelConfig(any()) } returns modelConfig()
         every { modelFactory.createModel(any()) } returns mockk<Model>(relaxed = true)
+        val pluginManager = mockk<PluginManager>(relaxed = true) {
+            every { enabledPluginToolsets() } returns pluginToolsets
+        }
         return AgentFactory(
             localToolCatalog = localToolCatalog,
             localToolset = localToolset,
@@ -165,6 +184,7 @@ class AgentFactoryToolAccessTest {
             toolVectorSearch = mockk<ToolVectorSearch>(relaxed = true),
             mcpConfigurationTool = mcpConfigurationTool,
             mcpAuthorizationTool = mcpAuthorizationTool,
+            pluginManager = pluginManager,
         )
     }
 
@@ -195,6 +215,14 @@ class AgentFactoryToolAccessTest {
             config: ModelRuntimeMetadata,
             selection: ConversationToolConfiguration?,
         ): List<BaseTool> = listOf(declarationTool(toolName))
+    }
+
+    /** 模拟插件返回的 ADK [Toolset]：忽略请求期上下文，恒定出一个工具。 */
+    private class FakePluginToolset(
+        private val toolName: String,
+    ) : Toolset {
+        override suspend fun getTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
+            listOf(declarationTool(toolName))
     }
 
     private companion object {

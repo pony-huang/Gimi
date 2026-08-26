@@ -6,7 +6,14 @@
 # Everything else is handled by consumer-rules.pro embedded in each AAR
 # (Compose, Hilt, Room, openai-java, anthropic-java, google-adk,
 # vosk-android, ktor) — those are merged automatically.
+#
+# 发版策略：只收缩、不混淆。历史上多次发版被 R8 改名坑（插件 ABI 的
+# DefaultConstructorMarker/Continuation/coroutines 被改短名、反射/序列化改名），
+# 而本项目已整树 keep github.ponyhuang.** / com.openai.** / com.anthropic.** /
+# com.google.adk.kt.**，混淆本就不省多少。禁用改名后这些「改名类」问题彻底消失，
+# 死代码收缩与资源收缩仍保留。缺失类告警（如 java.beans）仍靠下方 -dontwarn 处理。
 # ---------------------------------------------------------------------------
+-dontobfuscate
 
 # Preserve Kotlin metadata + annotation attributes used by reflection.
 -keepattributes Signature, InnerClasses, EnclosingMethod, RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations, AnnotationDefault
@@ -144,15 +151,14 @@
 -keepclassmembers class github.ponyhuang.gimi.pluginapi.** { <init>(...); }
 
 # ---------------------------------------------------------------------------
-# Kotlin / coroutines ABI 桥接（插件编译期 compileOnly，运行时从 host 解析）
+# Kotlin / coroutines ABI 桥接（插件运行时从 host 解析）
 #
-# 插件 APK 自带 kotlin-stdlib，但 kotlinx-coroutines 是 compileOnly、不打包；且
-# plugin-api / ADK 的合成构造函数、挂起方法描述符里引用的 DefaultConstructorMarker、
-# Continuation、CoroutineContext 也必须在 host 侧保持原名。R8 默认会把它们混淆成
-# hz0/ht0 之类短名，导致插件按原名链接时 NoSuchMethodError / ClassNotFoundException。
-# 这里显式保持这些运行时桥接类型的类名与成员名不变（即不让 R8 改名/收缩）。
+# 插件 APK 自带 kotlin-stdlib，但 DexClassLoader 是 parent-first：只要 host 里同名
+# 类存在，插件引用就解析到 host 副本。所以 host 必须完整保留 kotlin-stdlib 的类名
+# 与成员（lazy / Intrinsics.checkNotNullParameter 等都可能被 R8 收缩掉）；否则插件
+# 加载即 NoSuchMethodError（lazy/Intrinsics）或 NoSuchMethodError（合成构造器描述符
+# 里的 DefaultConstructorMarker/Continuation 被改名）。kotlinx-coroutines 是 compileOnly、
+# 插件不打包，同样需完整保留。全局已 -dontobfuscate，这两条主要防收缩。
 # ---------------------------------------------------------------------------
--keep class kotlin.jvm.internal.DefaultConstructorMarker { *; }
--keep class kotlin.jvm.functions.** { *; }
--keep class kotlin.coroutines.** { *; }
+-keep class kotlin.** { *; }
 -keep class kotlinx.coroutines.** { *; }

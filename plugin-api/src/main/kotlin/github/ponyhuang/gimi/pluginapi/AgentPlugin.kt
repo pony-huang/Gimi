@@ -9,6 +9,11 @@ import com.google.adk.kt.tools.BaseTool
  * 插件作者实现本接口（[pluginId] / [version] / [config] + 需要的 ADK 回调），宿主经
  * DexClassLoader 实例化后直接当作 ADK [Plugin] 注入 Agent 运行。
  *
+ * 内置浏览器（WebView）是面向**所有**插件的通用授权/抓包通道，不限于某个插件（如
+ * Spotify、知乎）：当前用于配置页 OAuth 授权（[configActionBrowserRequest] /
+ * [completeConfigAction]）；后续扩展为「抓包」式拦截 —— 截获浏览器内用户以身份访问
+ * Web 服务时产生的 token/session/cookie，供插件凭此调用对应的 Web API。
+ *
  * 预留扩展点（后续填充默认实现）：
  * - MCP 注入：插件声明要注入会话的 MCP 服务器；
  * - 工具注入配置：插件声明要注册的工具。
@@ -71,11 +76,18 @@ interface AgentPlugin : Plugin {
      * 宿主据此打开 WebView 加载 [BrowserAuthRequest.authorizeUrl]，并在导航到
      * [BrowserAuthRequest.redirectBase] 前缀时截获完整重定向 URL 交给 [completeConfigAction]。
      * 返回 null 表示无需浏览器。
+     *
+     * 该通道是通用能力：任何需要以用户身份调 Web API 的插件（Spotify、知乎等）都可复用；
+     * 后续在此基础上扩展为抓包式拦截 —— 直接把浏览器内访问产生的 token/session/cookie
+     * 捕获下来，供插件调用对应 Web API。
      */
     fun configActionBrowserRequest(actionId: String): BrowserAuthRequest? = null
 
     /**
      * 内置浏览器授权回调：宿主把截获的重定向 URL（含 code/state）交给插件完成动作（如换 token）。
+     *
+     * 这是抓包式取凭证的基础：宿主只负责把浏览器里截获的 URL/请求交给插件，插件自行解析出
+     * token/session/cookie 并保存（如 [configure]），之后据此调用 Web API。通用机制，不限插件。
      * 默认返回不支持。
      */
     suspend fun completeConfigAction(actionId: String, redirectUrl: String): PluginActionResult =
@@ -84,6 +96,10 @@ interface AgentPlugin : Plugin {
 
 /**
  * 内置浏览器授权请求。
+ *
+ * 浏览器通道不只服务 OAuth：后续用作通用抓包入口 —— 插件通过 WebView 以用户身份访问服务，
+ * 宿主截获其中的 token/session/cookie 交还插件，据此调用对应 Web API（对 Spotify、知乎等
+ * 所有插件通用）。
  *
  * @property authorizeUrl WebView 加载的授权 URL。
  * @property redirectBase WebView 应拦截的重定向 URL 前缀（如 `http://127.0.0.1:8888/callback`）。

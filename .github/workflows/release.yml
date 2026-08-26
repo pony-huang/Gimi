@@ -74,7 +74,7 @@ jobs:
           java-version: 21
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       # 可选签名：配置了 RELEASE_KEYSTORE_BASE64 等 secret 时用正式密钥库签名，
       # 否则构建脚本回退到 debug 签名（见 app/build.gradle.kts）。SIGNING_ARGS 供

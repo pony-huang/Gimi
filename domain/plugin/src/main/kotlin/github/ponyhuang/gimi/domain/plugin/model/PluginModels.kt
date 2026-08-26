@@ -76,8 +76,14 @@ data class PluginActionOutcome(
  *
  * @property authorizeUrl WebView 加载的授权 URL。
  * @property redirectBase WebView 应拦截的重定向 URL 前缀。
+ * @property completionScript 页面完成条件脚本；返回 true 时结束浏览器动作。
+ * @property captureCookiesForUrl 完成时读取 Cookie 的站点。
+ * @property desktopMode 是否使用桌面浏览器 UA 与宽视口加载网页。
  */
 data class PluginBrowserRequest(
     val authorizeUrl: String,
     val redirectBase: String,
+    val completionScript: String? = null,
+    val captureCookiesForUrl: String? = null,
+    val desktopMode: Boolean = false,
 )

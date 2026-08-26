@@ -41,11 +41,17 @@ data class PluginConfigUiState(
  * @property authorizeUrl WebView 加载的授权 URL。
  * @property redirectBase WebView 应拦截的重定向前缀，截获后交给
  *   [PluginConfigAction.CompleteAction]。
+ * @property completionScript 页面完成条件脚本。
+ * @property captureCookiesForUrl 完成时读取 Cookie 的站点。
+ * @property desktopMode 是否使用桌面浏览器 UA 与宽视口加载网页。
  */
 data class PluginBrowserUiState(
     val actionId: String,
     val authorizeUrl: String,
     val redirectBase: String,
+    val completionScript: String? = null,
+    val captureCookiesForUrl: String? = null,
+    val desktopMode: Boolean = false,
 )
 
 /**

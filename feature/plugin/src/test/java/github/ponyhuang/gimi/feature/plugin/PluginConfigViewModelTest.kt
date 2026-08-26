@@ -165,6 +165,7 @@ class PluginConfigViewModelTest {
             browserRequest = PluginBrowserRequest(
                 authorizeUrl = "https://accounts.spotify.com/authorize?x",
                 redirectBase = "http://127.0.0.1:8888/callback",
+                desktopMode = true,
             ),
         )
         val viewModel = PluginConfigViewModel(repository)
@@ -175,6 +176,7 @@ class PluginConfigViewModelTest {
         // 有浏览器请求 → 弹出 WebView，且不进入阻塞 runAction。
         assertEquals("login", viewModel.state.value.browser?.actionId)
         assertEquals("https://accounts.spotify.com/authorize?x", viewModel.state.value.browser?.authorizeUrl)
+        assertEquals(true, viewModel.state.value.browser?.desktopMode)
         assertEquals(0, repository.runActionCalls.size)
     }
 

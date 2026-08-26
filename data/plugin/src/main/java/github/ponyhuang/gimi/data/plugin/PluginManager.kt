@@ -100,7 +100,15 @@ class PluginManager @Inject constructor(
         loaded.firstOrNull { it.plugin.pluginId == pluginId }
             ?.plugin
             ?.configActionBrowserRequest(actionId)
-            ?.let { request -> PluginBrowserRequest(request.authorizeUrl, request.redirectBase) }
+            ?.let { request ->
+                PluginBrowserRequest(
+                    authorizeUrl = request.authorizeUrl,
+                    redirectBase = request.redirectBase,
+                    completionScript = request.completionScript,
+                    captureCookiesForUrl = request.captureCookiesForUrl,
+                    desktopMode = request.desktopMode,
+                )
+            }
 
     override suspend fun completeAction(
         pluginId: String,

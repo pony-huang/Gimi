@@ -8,6 +8,25 @@ import org.junit.Test
 
 class AgentPluginTest {
 
+    @Test
+    fun pageStateBrowserCaptureBumpsPluginApiVersion() {
+        assertEquals(2, PluginApi.VERSION)
+    }
+
+    @Test
+    fun browserRequestCanCompleteFromPageStateAndCaptureCookies() {
+        val request = BrowserAuthRequest(
+            authorizeUrl = "https://example.com/login",
+            redirectBase = "gimi://unused",
+            completionScript = "document.querySelector('.account') !== null",
+            captureCookiesForUrl = "https://example.com",
+        )
+
+        assertEquals("document.querySelector('.account') !== null", request.completionScript)
+        assertEquals("https://example.com", request.captureCookiesForUrl)
+        assertFalse(request.desktopMode)
+    }
+
     private fun plugin(): AgentPlugin = object : AgentPlugin {
         override val pluginId: String = "test"
         override val version: Int = 1

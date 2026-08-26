@@ -76,7 +76,16 @@ class PluginConfigViewModel @Inject constructor(
         if (_state.value.isAnyActionRunning) return
         repository.configActionBrowserRequest(_state.value.pluginId, actionId)?.let { request ->
             _state.update {
-                it.copy(browser = PluginBrowserUiState(actionId, request.authorizeUrl, request.redirectBase))
+                it.copy(
+                    browser = PluginBrowserUiState(
+                        actionId = actionId,
+                        authorizeUrl = request.authorizeUrl,
+                        redirectBase = request.redirectBase,
+                        completionScript = request.completionScript,
+                        captureCookiesForUrl = request.captureCookiesForUrl,
+                        desktopMode = request.desktopMode,
+                    ),
+                )
             }
             return
         }

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application android:label="Gimi 小红书插件">
+        <meta-data
+            android:name="github.ponyhuang.gimi.plugin.CLASS"
+            android:value="github.ponyhuang.gimi.plugin.xiaohongshu.XiaohongshuPlugin" />
+
+        <service
+            android:name="github.ponyhuang.gimi.plugin.xiaohongshu.DiscoveryService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="github.ponyhuang.gimi.plugin.DISCOVERY" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

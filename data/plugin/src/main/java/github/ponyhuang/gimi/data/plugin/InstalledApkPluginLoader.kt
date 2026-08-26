@@ -42,17 +42,20 @@ class InstalledApkPluginLoader @Inject constructor(
     }
 
     /**
-     * 重新发现已安装插件 APK。已加载的包保留原实例，仅对新增包做 [loadPlugin]，
-     * 已卸载的包从缓存移除。
+     * 重新发现已安装插件 APK。已加载且未更新的包保留原实例（避免重复实例化与类加载器冲突）；
+     * 新增的包与**安装更新时间变化**（同包名升级）的包重新实例化，已卸载的包从缓存移除。
      *
-     * @return 本次新增的插件。
+     * @return 本次新增或更新的插件。
      */
     override fun refresh(): List<LoadedPlugin> = synchronized(lock) {
         val discovered = discover()
         val current = cache.orEmpty()
-        val added = discovered.filter { it.packageName !in current }
+        val fresh = discovered.filter { candidate ->
+            val old = current[candidate.packageName]
+            old == null || candidate.lastUpdateTime != old.lastUpdateTime
+        }
         cache = discovered.associateBy { it.packageName }
-        added
+        fresh
     }
 
     /** 全量发现并实例化（不读缓存）。 */
@@ -74,6 +77,11 @@ class InstalledApkPluginLoader @Inject constructor(
 
     private val lock = Any()
     private var cache: Map<String, LoadedPlugin>? = null
+
+    /** 插件 APK 的安装更新时间；拿不到时回退 0（等同不检测更新）。 */
+    private fun lastUpdateTime(packageName: String): Long = runCatching {
+        context.packageManager.getPackageInfo(packageName, 0).lastUpdateTime
+    }.getOrDefault(0L)
 
     private fun loadPlugin(packageName: String?): LoadedPlugin? {
         if (packageName == null) return null
@@ -111,7 +119,7 @@ class InstalledApkPluginLoader @Inject constructor(
             }
 
             Log.i(TAG, "Loaded plugin '${plugin.pluginId}' from $packageName")
-            LoadedPlugin(packageName, plugin)
+            LoadedPlugin(packageName, plugin, lastUpdateTime = lastUpdateTime(packageName))
         }.getOrElse { error ->
             Log.w(TAG, "Failed to load plugin '$packageName'", error)
             null

@@ -5,6 +5,7 @@ import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
+import github.ponyhuang.gimi.pluginapi.PluginJson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -60,7 +61,7 @@ internal class ZhihuSearchTool(api: ZhihuApi, secretProvider: () -> String) :
         call { secret ->
             val query = strArg(args, "query")
                 ?: throw IllegalStateException("缺少参数 query")
-            mapOf(RESULT_KEY to api.zhihuSearch(secret, query, intArg(args, "count", 10)).toJsonNative())
+            mapOf(RESULT_KEY to PluginJson.toNative(api.zhihuSearch(secret, query, intArg(args, "count", 10))))
         }
 
     companion object {
@@ -107,7 +108,7 @@ internal class ZhihuGlobalSearchTool(api: ZhihuApi, secretProvider: () -> String
                 filter = strArg(args, "filter"),
                 searchDb = strArg(args, "search_db"),
             )
-            mapOf(RESULT_KEY to result.toJsonNative())
+            mapOf(RESULT_KEY to PluginJson.toNative(result))
         }
 
     companion object {
@@ -134,7 +135,7 @@ internal class ZhihuHotListTool(api: ZhihuApi, secretProvider: () -> String) :
 
     override suspend fun execute(context: ToolContext, args: Map<String, Any?>): Any =
         call { secret ->
-            mapOf(RESULT_KEY to api.hotList(secret, intArg(args, "limit", 30)).toJsonNative())
+            mapOf(RESULT_KEY to PluginJson.toNative(api.hotList(secret, intArg(args, "limit", 30))))
         }
 
     companion object {

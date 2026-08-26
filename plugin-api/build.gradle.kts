@@ -22,4 +22,6 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // JVM 单测里 Android 的 org.json 是 not mocked 的桩，需用 JVM 版。
+    testImplementation(libs.org.json)
 }

@@ -16,8 +16,6 @@ class ZhihuPlugin(
     override val version: Int = 1,
 ) : AgentPlugin {
 
-    override val name: String = "zhihu_plugin"
-
     override val displayName: String = "知乎"
 
     override val config: PluginConfig = PluginConfig(
@@ -34,12 +32,17 @@ class ZhihuPlugin(
         accessSecret = values[KEY_ACCESS_SECRET].orEmpty()
     }
 
-    override fun tools(): List<BaseTool> = listOf(
-        ZhihuSearchTool(api) { accessSecret },
-        ZhihuGlobalSearchTool(api) { accessSecret },
-        ZhihuHotListTool(api) { accessSecret },
-        ZhihuAskTool(api) { accessSecret },
-    )
+    /** 工具列表一次构建并缓存；工具内的 accessSecret 经闭包按调用时读取，配置变更无需重建。 */
+    override fun tools(): List<BaseTool> = toolList
+
+    private val toolList: List<BaseTool> by lazy {
+        listOf(
+            ZhihuSearchTool(api) { accessSecret },
+            ZhihuGlobalSearchTool(api) { accessSecret },
+            ZhihuHotListTool(api) { accessSecret },
+            ZhihuAskTool(api) { accessSecret },
+        )
+    }
 
     companion object {
         const val KEY_ACCESS_SECRET: String = "access_secret"

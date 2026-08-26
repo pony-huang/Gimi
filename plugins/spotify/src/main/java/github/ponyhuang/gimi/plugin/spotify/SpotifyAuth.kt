@@ -78,6 +78,8 @@ internal class SpotifyAuth(
     private fun tokenRequest(clientId: String, clientSecret: String, formBody: String): TokenBundle {
         val connection = URL("$accountsBase/api/token").openConnection() as HttpURLConnection
         connection.requestMethod = "POST"
+        connection.connectTimeout = CONNECT_TIMEOUT_MS
+        connection.readTimeout = READ_TIMEOUT_MS
         connection.doOutput = true
         connection.setRequestProperty("Authorization", "Basic ${base64("$clientId:$clientSecret")}")
         connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
@@ -116,6 +118,10 @@ internal class SpotifyAuth(
 
         /** 登录等待回调超时。 */
         const val LOGIN_TIMEOUT_MS: Long = 180_000L
+
+        /** token 交换/刷新请求超时。 */
+        const val CONNECT_TIMEOUT_MS: Int = 10_000
+        const val READ_TIMEOUT_MS: Int = 30_000
 
         /** 回调成功/失败页面的 HTML。 */
         const val SUCCESS_HTML: String =

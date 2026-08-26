@@ -20,8 +20,6 @@ class ExamplePlugin(
     override val version: Int = 1,
 ) : AgentPlugin {
 
-    override val name: String = "example_plugin"
-
     override val config: PluginConfig = PluginConfig(
         fields = listOf(
             PluginConfigField.Text(

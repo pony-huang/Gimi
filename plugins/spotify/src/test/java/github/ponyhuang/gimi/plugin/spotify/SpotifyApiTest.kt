@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.plugin.spotify
 
+import github.ponyhuang.gimi.pluginapi.PluginJson
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -51,7 +52,7 @@ class SpotifyApiTest {
             .put("c", JSONArray().put("y").put(JSONObject().put("d", true)))
             .put("e", JSONObject.NULL)
 
-        val native = json.toJsonNative() as Map<String, Any?>
+        val native = PluginJson.toNative(json) as Map<String, Any?>
 
         assertEquals("x", native["a"])
         assertEquals(1, native["b"])

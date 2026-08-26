@@ -4,7 +4,7 @@ import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.plugin.spotify.SpotifyApi
-import github.ponyhuang.gimi.plugin.spotify.toJsonNative
+import github.ponyhuang.gimi.pluginapi.PluginJson
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -34,7 +34,7 @@ internal fun playlistTools(api: SpotifyApi): List<BaseTool> = listOf(
             .put("collaborative", boolArg(args, "collaborative", false))
         strArg(args, "description")?.let { body.put("description", it) }
         val json = api.post("/me/playlists", body = body) ?: throw IllegalStateException("Failed to create playlist")
-        mapOf(SpotifyTool.RESULT_KEY to json.toJsonNative())
+        mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json))
     },
     spotifyTool(
         name = "spotify_add_tracks_to_playlist",

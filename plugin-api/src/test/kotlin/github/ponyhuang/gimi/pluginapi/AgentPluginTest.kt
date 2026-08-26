@@ -30,13 +30,17 @@ class AgentPluginTest {
     private fun plugin(): AgentPlugin = object : AgentPlugin {
         override val pluginId: String = "test"
         override val version: Int = 1
-        override val name: String = "test_plugin"
         override val config: PluginConfig = PluginConfig()
     }
 
     @Test
     fun apiVersionDefaultsToPluginApiVersion() {
         assertEquals(PluginApi.VERSION, plugin().apiVersion)
+    }
+
+    @Test
+    fun adkNameDefaultsToPluginId() {
+        assertEquals("test", plugin().name)
     }
 
     @Test

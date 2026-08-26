@@ -89,6 +89,8 @@ internal class ZhihuApi(
     }
 
     private fun HttpURLConnection.readJson(secret: String): JSONObject {
+        connectTimeout = CONNECT_TIMEOUT_MS
+        readTimeout = READ_TIMEOUT_MS
         setRequestProperty("Authorization", "Bearer $secret")
         setRequestProperty("X-Request-Timestamp", (System.currentTimeMillis() / 1000).toString())
         setRequestProperty("Content-Type", "application/json")
@@ -103,12 +105,12 @@ internal class ZhihuApi(
     }
 
     private fun enc(value: String): String = URLEncoder.encode(value, "UTF-8")
-}
 
-/** 递归把 org.json 转成 ADK 工具可返回的 JSON-native 类型（Map/List/String/Number/Boolean/null）。 */
-internal fun Any?.toJsonNative(): Any? = when (this) {
-    is JSONObject -> keys().asSequence().associate { key -> key to opt(key).toJsonNative() }
-    is JSONArray -> (0 until length()).map { opt(it).toJsonNative() }
-    JSONObject.NULL -> null
-    else -> this
+    private companion object {
+        /** 建立连接超时；服务无响应时快速失败，避免阻塞 Agent 轮次。 */
+        const val CONNECT_TIMEOUT_MS: Int = 10_000
+
+        /** 读取响应超时。 */
+        const val READ_TIMEOUT_MS: Int = 30_000
+    }
 }

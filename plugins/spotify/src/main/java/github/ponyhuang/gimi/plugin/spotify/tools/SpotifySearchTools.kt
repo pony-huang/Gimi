@@ -2,7 +2,7 @@ package github.ponyhuang.gimi.plugin.spotify.tools
 
 import com.google.adk.kt.tools.BaseTool
 import github.ponyhuang.gimi.plugin.spotify.SpotifyApi
-import github.ponyhuang.gimi.plugin.spotify.toJsonNative
+import github.ponyhuang.gimi.pluginapi.PluginJson
 import org.json.JSONArray
 
 /**
@@ -57,7 +57,7 @@ internal fun searchTools(api: SpotifyApi): List<BaseTool> = listOf(
                     "use spotify_get_top_tracks for the user's popular music, or ask for a concrete song or artist.",
             )
         } else {
-            mapOf(SpotifyTool.RESULT_KEY to items.toJsonNative())
+            mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(items))
         }
     },
     spotifyTool(
@@ -71,7 +71,7 @@ internal fun searchTools(api: SpotifyApi): List<BaseTool> = listOf(
         val id = strArg(args, "track_id") ?: throw IllegalStateException("Missing parameter track_id")
         val json = api.get("/tracks/$id", mapOf("market" to "from_token"))
             ?: throw IllegalStateException("Track not found")
-        mapOf(SpotifyTool.RESULT_KEY to json.toJsonNative())
+        mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json))
     },
     spotifyTool(
         name = "spotify_get_album",
@@ -84,7 +84,7 @@ internal fun searchTools(api: SpotifyApi): List<BaseTool> = listOf(
         val id = strArg(args, "album_id") ?: throw IllegalStateException("Missing parameter album_id")
         val json = api.get("/albums/$id", mapOf("market" to "from_token"))
             ?: throw IllegalStateException("Album not found")
-        mapOf(SpotifyTool.RESULT_KEY to json.toJsonNative())
+        mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json))
     },
     spotifyTool(
         name = "spotify_get_artist",
@@ -96,7 +96,7 @@ internal fun searchTools(api: SpotifyApi): List<BaseTool> = listOf(
     ) { args ->
         val id = strArg(args, "artist_id") ?: throw IllegalStateException("Missing parameter artist_id")
         val json = api.get("/artists/$id") ?: throw IllegalStateException("Artist not found")
-        mapOf(SpotifyTool.RESULT_KEY to json.toJsonNative())
+        mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json))
     },
     spotifyTool(
         name = "spotify_get_album_tracks",
@@ -121,6 +121,6 @@ internal fun searchTools(api: SpotifyApi): List<BaseTool> = listOf(
                 "market" to "from_token",
             ),
         )
-        mapOf(SpotifyTool.RESULT_KEY to (json?.optJSONArray("items") ?: JSONArray()).toJsonNative())
+        mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json?.optJSONArray("items") ?: JSONArray()))
     },
 )

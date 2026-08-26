@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.plugin.xiaohongshu
 
+import github.ponyhuang.gimi.pluginapi.PluginJson
 import java.net.URLEncoder
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
@@ -641,14 +642,7 @@ internal class DirectXiaohongshuService(
 
     private fun parseJson(raw: String?): Any? {
         if (raw.isNullOrBlank()) return null
-        return JSONTokener(raw).nextValue().toJsonNative()
-    }
-
-    private fun Any?.toJsonNative(): Any? = when (this) {
-        is JSONObject -> keys().asSequence().associate { key -> key to opt(key).toJsonNative() }
-        is JSONArray -> (0 until length()).map { opt(it).toJsonNative() }
-        JSONObject.NULL -> null
-        else -> this
+        return PluginJson.toNative(JSONTokener(raw).nextValue())
     }
 
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())

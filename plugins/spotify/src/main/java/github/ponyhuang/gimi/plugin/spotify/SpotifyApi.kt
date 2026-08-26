@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.plugin.spotify
 
+import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -34,7 +35,7 @@ internal class SpotifyApi(
      * 确保有一个可用的播放设备：优先指定设备，其次已在活动的设备，否则把播放转移到第一个设备
      * （参考 spotify-mcp-server 的 ensureActiveDevice）。返回 device_id。
      */
-    fun ensureActiveDevice(preferred: String?): String {
+    suspend fun ensureActiveDevice(preferred: String?): String {
         val devices = get("/me/player/devices")?.optJSONArray("devices") ?: JSONArray()
         if (devices.length() == 0) {
             throw IllegalStateException("No Spotify device found, open Spotify on a device first")
@@ -50,7 +51,7 @@ internal class SpotifyApi(
                                 .put("device_ids", JSONArray().put(preferredId))
                                 .put("play", false),
                         )
-                        Thread.sleep(500)
+                        delay(DEVICE_TRANSFER_SETTLE_MS)
                     }
                     return preferredId
                 }
@@ -68,7 +69,7 @@ internal class SpotifyApi(
                 .put("device_ids", JSONArray().put(target))
                 .put("play", false),
         )
-        Thread.sleep(600)
+        delay(DEVICE_TRANSFER_SETTLE_MS)
         return target
     }
 
@@ -90,6 +91,8 @@ internal class SpotifyApi(
         }
         val connection = URL(url).openConnection() as HttpURLConnection
         connection.requestMethod = method
+        connection.connectTimeout = CONNECT_TIMEOUT_MS
+        connection.readTimeout = READ_TIMEOUT_MS
         connection.setRequestProperty("Authorization", "Bearer $token")
         if (body != null) {
             connection.doOutput = true
@@ -110,6 +113,17 @@ internal class SpotifyApi(
     }
 
     private fun enc(value: String): String = URLEncoder.encode(value, "UTF-8")
+
+    private companion object {
+        /** 建立连接超时；服务无响应时快速失败，避免阻塞 Agent 轮次。 */
+        const val CONNECT_TIMEOUT_MS: Int = 10_000
+
+        /** 读取响应超时（如播放控制的空响应也很快返回）。 */
+        const val READ_TIMEOUT_MS: Int = 30_000
+
+        /** 把播放转移到目标设备后的等待时间，等 Spotify 完成设备切换。 */
+        const val DEVICE_TRANSFER_SETTLE_MS: Long = 600L
+    }
 }
 
 /** Spotify API 错误：含 HTTP 状态与响应体（便于映射成对模型友好的错误消息）。 */
@@ -133,12 +147,4 @@ internal fun spotifyErrorMessage(statusCode: Int, body: String): String {
             "Do not retry the same request; use a currently supported personal-library or search tool instead."
         else -> detail
     }
-}
-
-/** 递归把 org.json 转成 ADK 工具可返回的 JSON-native 类型（Map/List/String/Number/Boolean/null）。 */
-internal fun Any?.toJsonNative(): Any? = when (this) {
-    is JSONObject -> keys().asSequence().associate { key -> key to opt(key).toJsonNative() }
-    is JSONArray -> (0 until length()).map { opt(it).toJsonNative() }
-    JSONObject.NULL -> null
-    else -> this
 }

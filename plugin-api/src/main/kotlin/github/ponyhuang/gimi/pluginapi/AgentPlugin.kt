@@ -27,6 +27,9 @@ interface AgentPlugin : Plugin {
     /** 展示给用户的名称（如 `"知乎"`）；默认取 [pluginId]，作者可按需覆盖。 */
     val displayName: String get() = pluginId
 
+    /** ADK [Plugin] 要求的唯一名称；默认取 [pluginId]，作者通常无需覆写。 */
+    override val name: String get() = pluginId
+
     /** 插件自身版本，供宿主做启用/升级判断。 */
     val version: Int
 

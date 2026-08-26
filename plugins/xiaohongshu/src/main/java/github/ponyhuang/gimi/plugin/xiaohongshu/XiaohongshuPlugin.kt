@@ -18,7 +18,6 @@ class XiaohongshuPlugin internal constructor(
     override val pluginId: String = "xiaohongshu"
     override val displayName: String = "小红书"
     override val version: Int = 1
-    override val name: String = "xiaohongshu_plugin"
     override val config: PluginConfig = PluginConfig(
         actions = listOf(
             PluginConfigAction(id = ACTION_LOGIN, label = "登录小红书"),
@@ -30,7 +29,10 @@ class XiaohongshuPlugin internal constructor(
     private var service: XiaohongshuService = injectedService ?: object : XiaohongshuService {}
     private val hasInjectedService: Boolean = injectedService != null
 
-    override fun tools(): List<BaseTool> = XiaohongshuToolCatalog.create { service }
+    /** 工具目录一次构建并缓存；service 经闭包按调用时读取，onAttach 注入后无需重建。 */
+    override fun tools(): List<BaseTool> = toolList
+
+    private val toolList: List<BaseTool> by lazy { XiaohongshuToolCatalog.create { service } }
 
     override fun onAttach(context: Context) {
         if (!hasInjectedService) {

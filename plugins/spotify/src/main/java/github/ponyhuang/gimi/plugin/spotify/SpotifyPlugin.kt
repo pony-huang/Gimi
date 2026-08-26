@@ -30,7 +30,6 @@ class SpotifyPlugin : AgentPlugin {
     override val pluginId: String = "spotify"
     override val displayName: String = "Spotify"
     override val version: Int = 1
-    override val name: String = "spotify_plugin"
 
     override val config: PluginConfig = PluginConfig(
         fields = listOf(
@@ -75,12 +74,21 @@ class SpotifyPlugin : AgentPlugin {
         SpotifyApi(tokenStore, auth)
     }
 
-    override fun tools(): List<BaseTool> = buildList {
-        addAll(authTools(auth, { clientId }, { clientSecret }, { redirectUri }) { appContext })
-        addAll(searchTools(api))
-        addAll(libraryTools(api))
-        addAll(playbackTools(api))
-        addAll(playlistTools(api))
+    /**
+     * 工具列表一次构建并缓存；工具内的 clientId/clientSecret/redirectUri/appContext 均通过
+     * 闭包按调用时读取，配置变更无需重建。宿主会在每次描述与 Agent 构建时调用 [tools]，
+     * 复用同一批实例避免反复构造 29 个工具。
+     */
+    override fun tools(): List<BaseTool> = toolList
+
+    private val toolList: List<BaseTool> by lazy {
+        buildList {
+            addAll(authTools(auth, { clientId }, { clientSecret }, { redirectUri }) { appContext })
+            addAll(searchTools(api))
+            addAll(libraryTools(api))
+            addAll(playbackTools(api))
+            addAll(playlistTools(api))
+        }
     }
 
     override suspend fun runConfigAction(actionId: String): PluginActionResult = when (actionId) {

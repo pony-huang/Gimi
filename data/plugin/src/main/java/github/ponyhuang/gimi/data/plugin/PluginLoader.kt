@@ -7,10 +7,12 @@ import github.ponyhuang.gimi.pluginapi.AgentPlugin
  *
  * @property packageName 来源插件 APK 的包名。
  * @property plugin 经 DexClassLoader 实例化的插件。
+ * @property lastUpdateTime 插件 APK 的安装更新时间（毫秒），用于检测同包名插件是否更新。
  */
 data class LoadedPlugin(
     val packageName: String,
     val plugin: AgentPlugin,
+    val lastUpdateTime: Long = 0L,
 )
 
 /**

@@ -48,7 +48,11 @@ private class XiaohongshuFunctionTool(
 
     override suspend fun execute(context: ToolContext, args: Map<String, Any?>): Any =
         runCatching { service().invoke(name, args) }
-            .getOrElse { mapOf("error" to (it.message ?: "小红书操作失败")) }
+            .getOrElse { mapOf(ERROR_KEY to (it.message ?: "小红书操作失败")) }
+
+    companion object {
+        const val ERROR_KEY: String = "error"
+    }
 }
 
 private fun schemaOf(name: String): Schema = when (name) {

@@ -4,7 +4,7 @@ import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.plugin.spotify.SpotifyApi
-import github.ponyhuang.gimi.plugin.spotify.toJsonNative
+import github.ponyhuang.gimi.pluginapi.PluginJson
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -19,7 +19,7 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
         if (json == null) {
             mapOf(SpotifyTool.RESULT_KEY to "Nothing is currently playing")
         } else {
-            mapOf(SpotifyTool.RESULT_KEY to json.toJsonNative())
+            mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json))
         }
     },
     spotifyTool(
@@ -36,7 +36,7 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
                 "offset" to intArg(args, "offset", 0),
             ),
         )
-        mapOf(SpotifyTool.RESULT_KEY to (json?.optJSONArray("items") ?: JSONArray()).toJsonNative())
+        mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json?.optJSONArray("items") ?: JSONArray()))
     },
     spotifyTool(
         name = "spotify_get_playlist",
@@ -50,7 +50,7 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
     ) { args ->
         val id = strArg(args, "playlist_id") ?: throw IllegalStateException("Missing parameter playlist_id")
         val json = api.get("/playlists/$id") ?: throw IllegalStateException("Playlist not found")
-        mapOf(SpotifyTool.RESULT_KEY to json.toJsonNative())
+        mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json))
     },
     spotifyTool(
         name = "spotify_get_playlist_tracks",
@@ -80,7 +80,7 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
             val track = entry?.optJSONObject("item") ?: entry?.optJSONObject("track")
             projected.put(track ?: JSONObject.NULL)
         }
-        mapOf(SpotifyTool.RESULT_KEY to projected.toJsonNative())
+        mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(projected))
     },
     spotifyTool(
         name = "spotify_get_saved_tracks",
@@ -94,7 +94,7 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
                 "offset" to intArg(args, "offset", 0),
             ),
         )
-        mapOf(SpotifyTool.RESULT_KEY to (json?.optJSONArray("items") ?: JSONArray()).toJsonNative())
+        mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json?.optJSONArray("items") ?: JSONArray()))
     },
     spotifyTool(
         name = "spotify_get_recently_played",
@@ -110,7 +110,7 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
         ),
     ) { args ->
         val json = api.get("/me/player/recently-played", mapOf("limit" to intArg(args, "limit", 50)))
-        mapOf(SpotifyTool.RESULT_KEY to (json?.optJSONArray("items") ?: JSONArray()).toJsonNative())
+        mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json?.optJSONArray("items") ?: JSONArray()))
     },
     spotifyTool(
         name = "spotify_get_queue",
@@ -118,7 +118,7 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
         parameters = Schema(type = Type.OBJECT),
     ) {
         val json = api.get("/me/player/queue") ?: throw IllegalStateException("Failed to fetch the queue")
-        mapOf(SpotifyTool.RESULT_KEY to json.toJsonNative())
+        mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json))
     },
     spotifyTool(
         name = "spotify_get_devices",
@@ -126,7 +126,7 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
         parameters = Schema(type = Type.OBJECT),
     ) {
         val json = api.get("/me/player/devices") ?: throw IllegalStateException("Failed to fetch devices")
-        mapOf(SpotifyTool.RESULT_KEY to json.toJsonNative())
+        mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json))
     },
     spotifyTool(
         name = "spotify_get_top_tracks",
@@ -149,7 +149,7 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
                 "offset" to intArg(args, "offset", 0),
             ),
         )
-        mapOf(SpotifyTool.RESULT_KEY to (json?.optJSONArray("items") ?: JSONArray()).toJsonNative())
+        mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json?.optJSONArray("items") ?: JSONArray()))
     },
     spotifyTool(
         name = "spotify_get_top_artists",
@@ -170,7 +170,7 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
                 "offset" to intArg(args, "offset", 0),
             ),
         )
-        mapOf(SpotifyTool.RESULT_KEY to (json?.optJSONArray("items") ?: JSONArray()).toJsonNative())
+        mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json?.optJSONArray("items") ?: JSONArray()))
     },
 )
 

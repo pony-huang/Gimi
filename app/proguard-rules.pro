@@ -110,8 +110,16 @@
 # ExceptionInInitializerError(NPE) and the class stays poisoned for the process.
 # Keep snakeyaml's package names so getPackage() stays non-null; class-name
 # obfuscation and shrinking inside the packages are unaffected.
+#
+# java.beans.* (Introspector/BeanInfo/PropertyDescriptor) 是桌面 JVM 的类，Android
+# 上没有；snakeyaml 2.x 的 PropertyUtils.getPropertiesMap 在 DEFAULT bean access 分支
+# 里引用它们，R8 因此报 Missing class（由 ADK plugin ABI 的 -keep 规则把该代码路径
+# 拖成可达后触发）。运行时可安全忽略：snakeyaml 的 PlatformFeatureDetector 在 ART 上
+# 会把 beanAccess 自动切到 FIELD，永不执行 Introspector 分支（SKILL.md 只做 map/list
+# 解析，不做类型化 bean 构造）。
 # ---------------------------------------------------------------------------
 -keeppackagenames org.yaml.snakeyaml.**
+-dontwarn java.beans.**
 
 # ---------------------------------------------------------------------------
 # ADK plugin ABI (dynamic plugin loading)

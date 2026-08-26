@@ -87,7 +87,8 @@ internal class DirectXiaohongshuService(
         browser.navigate(HOME_URL)
         // 等 feed.feeds 数据节点注水就绪，而非只等 __INITIAL_STATE__ 根对象存在——
         // 根对象在首屏即存在，但 feeds 数据要稍后才填充，只等根对象会读到空列表。
-        require(browser.waitUntil(FEEDS_READY_SCRIPT, PAGE_TIMEOUT_MS)) { "小红书首页加载超时" }
+        // 参考实现轮询 8s 后即报错，避免把 60s 等满造成超时。
+        require(browser.waitUntil(FEEDS_READY_SCRIPT, DATA_READY_TIMEOUT_MS)) { "小红书首页加载超时" }
         return feedsResult(browser.evaluate(FEED_LIST_SCRIPT))
     }
 
@@ -105,7 +106,9 @@ internal class DirectXiaohongshuService(
         ).also(SearchFilters::validate)
         val url = "$SEARCH_URL?keyword=${encode(keyword)}&source=web_explore_feed"
         browser.navigate(url)
-        require(browser.waitUntil(SEARCH_FEEDS_READY_SCRIPT, PAGE_TIMEOUT_MS)) { "小红书搜索页加载超时" }
+        // 与参考实现一致：搜索只等 __INITIAL_STATE__ 根对象（首屏即在），不再等
+        // search.feeds 数据数组就绪——该条件部分页面不满足，会把 60s 等满造成超时。
+        require(browser.waitUntil(INITIAL_STATE_SCRIPT, PAGE_TIMEOUT_MS)) { "小红书搜索页加载超时" }
         if (filters.hasAny) {
             // 记下筛选前的结果 ID；点完筛选项后站点会先清空再灌入新数据，
             // 需等到结果集变化后再读，否则读到的是空或筛选前的旧数据（对齐参考实现）。
@@ -709,6 +712,8 @@ internal class DirectXiaohongshuService(
         private const val QUICK_TIMEOUT_MS = 30_000L
         private const val PAGE_SETTLE_TIMEOUT_MS = 2_000L
         private const val PAGE_TIMEOUT_MS = 60_000L
+        /** 首页 feed 数据注水的等待上限（对齐参考实现 8s 轮询）；超时快速失败而非挂满 60s。 */
+        private const val DATA_READY_TIMEOUT_MS = 8_000L
         private const val INTERACTION_TIMEOUT_MS = 8_000L
         private const val MAX_INTERACT_ATTEMPTS = 2
         private const val FILTER_REFRESH_TIMEOUT_MS = 15_000L
@@ -816,10 +821,6 @@ internal class DirectXiaohongshuService(
             "window.__INITIAL_STATE__?.feed?.feeds && " +
                 "(Array.isArray(window.__INITIAL_STATE__.feed.feeds.value) || " +
                 "Array.isArray(window.__INITIAL_STATE__.feed.feeds._value))"
-        private const val SEARCH_FEEDS_READY_SCRIPT =
-            "window.__INITIAL_STATE__?.search?.feeds && " +
-                "(Array.isArray(window.__INITIAL_STATE__.search.feeds.value) || " +
-                "Array.isArray(window.__INITIAL_STATE__.search.feeds._value))"
         private const val SEARCH_FEED_IDS_SCRIPT = """
             (() => {
               const f = window.__INITIAL_STATE__?.search?.feeds;

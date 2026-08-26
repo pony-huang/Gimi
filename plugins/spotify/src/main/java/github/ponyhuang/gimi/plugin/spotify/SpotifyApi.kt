@@ -81,7 +81,8 @@ internal class SpotifyApi(
         val token = auth.requireAccessToken()
         val url = buildString {
             append(baseUrl).append(path)
-            val present = query.filterValues { it != null }
+            // 丢弃 null 与空字符串值（如未指定的 device_id），避免发多余的 `device_id=` 参数。
+            val present = query.filterValues { it != null && (it !is String || it.isNotEmpty()) }
             if (present.isNotEmpty()) {
                 append('?')
                 append(present.entries.joinToString("&") { "${enc(it.key)}=${enc(it.value.toString())}" })

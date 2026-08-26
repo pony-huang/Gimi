@@ -39,6 +39,38 @@ class DirectXiaohongshuServiceTest {
     }
 
     @Test
+    fun listFeedsWaitsForHydratedFeedData() = runTest {
+        val browser = FakeBrowserGateway(evaluations = ArrayDeque(listOf("""[{"id":"f1"}]""")))
+        val service = DirectXiaohongshuService(browser)
+
+        service.invoke("list_feeds", emptyMap())
+
+        // 等待条件必须是 feed.feeds 数据节点，而非仅 __INITIAL_STATE__ 根对象。
+        assertTrue(browser.waitScripts.single().contains("feed.feeds"))
+    }
+
+    @Test
+    fun searchFeedsWaitsForResultRefreshAfterFilters() = runTest {
+        val browser = FakeBrowserGateway(
+            evaluations = ArrayDeque(
+                listOf("id1,id2", "true", "id3", """[{"id":"id3"}]"""),
+            ),
+        )
+        val service = DirectXiaohongshuService(browser)
+
+        val result = service.invoke(
+            "search_feeds",
+            mapOf("keyword" to "测试", "sort_by" to "最新"),
+        ) as Map<*, *>
+
+        // 应用筛选后轮询等结果集 ID 变化（SEARCH_FEED_IDS_SCRIPT 至少求值两次），
+        // 避免读到筛选前的旧数据。ID 脚本独有 `x.id`，用它识别。
+        val idScriptCount = browser.evaluationScripts.count { it.contains("x.id") }
+        assertTrue(idScriptCount >= 2)
+        assertEquals("id3", ((result["feeds"] as List<*>).single() as Map<*, *>)["id"])
+    }
+
+    @Test
     fun invalidSearchFilterFailsBeforeNavigation() = runTest {
         val browser = FakeBrowserGateway()
         val service = DirectXiaohongshuService(browser)
@@ -69,6 +101,26 @@ class DirectXiaohongshuServiceTest {
         assertEquals(true, result["success"])
         assertEquals(true, result["liked"])
         assertEquals(1, browser.evaluationScripts.size)
+    }
+
+    @Test
+    fun likeFeedRetriesClickWhenStateNotConfirmed() = runTest {
+        val browser = FakeBrowserGateway(
+            evaluations = ArrayDeque(listOf("""{"liked":false,"collected":false}""", "true", "true")),
+            // NOTE_DETAIL 导航等待、第一次点击后状态未确认、第二次点击后确认。
+            waitResults = ArrayDeque(listOf(true, false, true)),
+        )
+        val service = DirectXiaohongshuService(browser)
+
+        val result = service.invoke(
+            "like_feed",
+            mapOf("feed_id" to "feed-1", "xsec_token" to "token"),
+        ) as Map<*, *>
+
+        assertEquals(true, result["success"])
+        assertEquals(true, result["liked"])
+        assertEquals(3, browser.evaluationScripts.size) // 状态读 + 2 次点击
+        assertTrue(browser.waitScripts.last().contains("feed-1"))
     }
 
     @Test
@@ -267,6 +319,7 @@ class DirectXiaohongshuServiceTest {
 
 private class FakeBrowserGateway(
     private val waitResult: Boolean = true,
+    private val waitResults: ArrayDeque<Boolean> = ArrayDeque(),
     private val evaluations: ArrayDeque<String?> = ArrayDeque(),
     private val fileSelectionResult: Boolean = false,
 ) : XiaohongshuBrowserGateway {
@@ -281,7 +334,7 @@ private class FakeBrowserGateway(
 
     override suspend fun waitUntil(script: String, timeoutMillis: Long): Boolean {
         waitScripts += script
-        return waitResult
+        return waitResults.removeFirstOrNull() ?: waitResult
     }
 
     override suspend fun evaluate(script: String): String? {

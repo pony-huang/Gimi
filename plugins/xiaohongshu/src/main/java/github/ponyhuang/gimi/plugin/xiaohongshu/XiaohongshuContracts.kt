@@ -33,6 +33,11 @@ internal data class SearchFilters(
     val searchScope: String? = null,
     val location: String? = null,
 ) {
+    /** 是否携带了任一筛选条件（决定是否展开筛选面板、并在点选后等待结果刷新）。 */
+    val hasAny: Boolean
+        get() = sortBy != null || noteType != null || publishTime != null ||
+            searchScope != null || location != null
+
     fun validate() {
         requireAllowed("排序依据", sortBy, setOf("综合", "最新", "最多点赞", "最多评论", "最多收藏"))
         requireAllowed("笔记类型", noteType, setOf("不限", "视频", "图文"))

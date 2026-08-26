@@ -2,12 +2,14 @@ package github.ponyhuang.gimi.plugin.xiaohongshu
 
 import github.ponyhuang.gimi.pluginapi.PluginJson
 import java.net.URLEncoder
+import kotlin.random.Random
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import org.json.JSONTokener
+import kotlin.time.Duration.Companion.milliseconds
 
 /** 隔离 Android WebView 细节的最小浏览器执行契约，便于验证页面行为。 */
 internal interface XiaohongshuBrowserGateway {
@@ -83,7 +85,9 @@ internal class DirectXiaohongshuService(
 
     private suspend fun listFeeds(): Map<String, Any?> {
         browser.navigate(HOME_URL)
-        require(browser.waitUntil(INITIAL_STATE_SCRIPT, PAGE_TIMEOUT_MS)) { "小红书首页加载超时" }
+        // 等 feed.feeds 数据节点注水就绪，而非只等 __INITIAL_STATE__ 根对象存在——
+        // 根对象在首屏即存在，但 feeds 数据要稍后才填充，只等根对象会读到空列表。
+        require(browser.waitUntil(FEEDS_READY_SCRIPT, PAGE_TIMEOUT_MS)) { "小红书首页加载超时" }
         return feedsResult(browser.evaluate(FEED_LIST_SCRIPT))
     }
 
@@ -101,8 +105,14 @@ internal class DirectXiaohongshuService(
         ).also(SearchFilters::validate)
         val url = "$SEARCH_URL?keyword=${encode(keyword)}&source=web_explore_feed"
         browser.navigate(url)
-        require(browser.waitUntil(INITIAL_STATE_SCRIPT, PAGE_TIMEOUT_MS)) { "小红书搜索页加载超时" }
-        applyFilters(filters)
+        require(browser.waitUntil(SEARCH_FEEDS_READY_SCRIPT, PAGE_TIMEOUT_MS)) { "小红书搜索页加载超时" }
+        if (filters.hasAny) {
+            // 记下筛选前的结果 ID；点完筛选项后站点会先清空再灌入新数据，
+            // 需等到结果集变化后再读，否则读到的是空或筛选前的旧数据（对齐参考实现）。
+            val before = browser.evaluate(SEARCH_FEED_IDS_SCRIPT).orEmpty()
+            applyFilters(filters)
+            waitFeedsChanged(before)
+        }
         return feedsResult(browser.evaluate(SEARCH_FEEDS_SCRIPT))
     }
 
@@ -167,9 +177,10 @@ internal class DirectXiaohongshuService(
         val tab = ProfileTab.parse(args.optionalString("tab"))
         browser.navigate(EXPLORE_URL)
         require(browser.waitUntil(INITIAL_STATE_SCRIPT, PAGE_TIMEOUT_MS)) { "小红书首页加载超时" }
-        val current = jsonObject(browser.evaluate(CURRENT_USER_SCRIPT))
+        val raw = browser.evaluate(CURRENT_USER_SCRIPT)
+        val current = if (raw.isNullOrBlank()) emptyMap() else jsonObject(raw)
         val userId = current["userId"]?.toString().orEmpty()
-        require(userId.isNotBlank()) { "当前未登录小红书" }
+        require(userId.isNotBlank()) { "当前未登录小红书，请先登录" }
         return loadProfile(userId, "", tab)
     }
 
@@ -196,22 +207,46 @@ internal class DirectXiaohongshuService(
         val feedId = args.string("feed_id")
         navigateFeed(feedId, args.string("xsec_token"))
         val want = args[undoKey] != true
-        val state = jsonObject(browser.evaluate(INTERACT_STATE_SCRIPT))
-        if (state[kind] != want) {
-            val clicked = browser.evaluate(
-                "(() => { const e = document.querySelector(${JSONObject.quote(selector)}); " +
-                    "if (!e) return false; e.click(); return true; })()",
-            )
-            require(clicked == "true") { "未找到小红书交互按钮" }
-            val changed = browser.waitUntil(
-                "(() => { const m = window.__INITIAL_STATE__?.note?.noteDetailMap || {}; " +
-                    "const d = Object.values(m)[0]?.note?.interactInfo; return d?.$kind === $want; })()",
-                INTERACTION_TIMEOUT_MS,
-            )
-            require(changed) { "点击后未确认小红书交互状态" }
+
+        // 幂等：已处于目标状态则跳过（避免无谓点击）。
+        val state = readInteractState(feedId)
+        if (state[kind] == want) {
+            return mapOf("feed_id" to feedId, "success" to true, kind to want)
         }
-        return mapOf("feed_id" to feedId, "success" to true, kind to want)
+
+        // 对齐参考实现：最多点击 2 次，每次点击后轮询确认状态真正到位，
+        // 消除"点了但状态没变"的假阳性（页面点击偶发不生效）。
+        repeat(MAX_INTERACT_ATTEMPTS) {
+            humanizeBeforeClick()
+            require(clickButton(selector)) { "未找到小红书交互按钮" }
+            if (browser.waitUntil(interactStateCondition(feedId, kind, want), INTERACTION_TIMEOUT_MS)) {
+                humanizeAfterInteract()
+                return mapOf("feed_id" to feedId, "success" to true, kind to want)
+            }
+        }
+        error("点击后未确认小红书交互状态")
     }
+
+    /** 读目标笔记的点赞/收藏状态，按 feed_id 精读（页面详情 map 可能含多条笔记，不能取第一条）。 */
+    private suspend fun readInteractState(feedId: String): Map<String, Any?> =
+        jsonObject(
+            browser.evaluate(
+                "(() => { const m = window.__INITIAL_STATE__?.note?.noteDetailMap || {}; " +
+                    "const d = m[${JSONObject.quote(feedId)}]?.note?.interactInfo || {}; " +
+                    "return JSON.stringify({liked: Boolean(d.liked), collected: Boolean(d.collected)}); })()",
+            ),
+        )
+
+    /** 等待条件：目标笔记的指定交互字段已变为 [want]。 */
+    private fun interactStateCondition(feedId: String, kind: String, want: Boolean): String =
+        "(() => { const d = (window.__INITIAL_STATE__?.note?.noteDetailMap || {})" +
+            "[${JSONObject.quote(feedId)}]?.note?.interactInfo; return d?.$kind === $want; })()"
+
+    private suspend fun clickButton(selector: String): Boolean =
+        browser.evaluate(
+            "(() => { const e = document.querySelector(${JSONObject.quote(selector)}); " +
+                "if (!e) return false; e.click(); return true; })()",
+        ) == "true"
 
     private suspend fun unreadCount(): Map<String, Any?> {
         browser.navigate(EXPLORE_URL)
@@ -610,6 +645,21 @@ internal class DirectXiaohongshuService(
         require(result == "true") { "无法应用小红书搜索筛选条件" }
     }
 
+    /** 点完筛选项后轮询，直到结果集 ID 变化（站点先清空再灌新数据）。超时不报错：筛选已点上去，宁可返回偏旧数据。 */
+    private suspend fun waitFeedsChanged(before: String) {
+        val deadline = System.currentTimeMillis() + FILTER_REFRESH_TIMEOUT_MS
+        while (System.currentTimeMillis() < deadline) {
+            val now = browser.evaluate(SEARCH_FEED_IDS_SCRIPT).orEmpty()
+            if (now.isNotBlank() && now != before) return
+            delay(FILTER_REFRESH_POLL_MS.milliseconds)
+        }
+    }
+
+    // 人化延迟（对齐参考实现的 humanize）：点击前留出人眼定位/移鼠的间隔，
+    // 交互成功后停留片刻再继续，降低被风控识别的概率。读路径不加，保持 Agent 响应速度。
+    private suspend fun humanizeBeforeClick() = delay(Random.nextLong(BEFORE_CLICK_MIN_MS, BEFORE_CLICK_MAX_MS).milliseconds)
+    private suspend fun humanizeAfterInteract() = delay(Random.nextLong(AFTER_INTERACT_MIN_MS, AFTER_INTERACT_MAX_MS).milliseconds)
+
     private fun feedsResult(raw: String?): Map<String, Any?> {
         val feeds = jsonArray(raw)
         return mapOf("feeds" to feeds, "count" to feeds.size)
@@ -660,6 +710,13 @@ internal class DirectXiaohongshuService(
         private const val PAGE_SETTLE_TIMEOUT_MS = 2_000L
         private const val PAGE_TIMEOUT_MS = 60_000L
         private const val INTERACTION_TIMEOUT_MS = 8_000L
+        private const val MAX_INTERACT_ATTEMPTS = 2
+        private const val FILTER_REFRESH_TIMEOUT_MS = 15_000L
+        private const val FILTER_REFRESH_POLL_MS = 300L
+        private const val BEFORE_CLICK_MIN_MS = 80L
+        private const val BEFORE_CLICK_MAX_MS = 1_000L
+        private const val AFTER_INTERACT_MIN_MS = 500L
+        private const val AFTER_INTERACT_MAX_MS = 1_500L
         private const val COMMENT_CONFIRM_TIMEOUT_MS = 8_000L
         private const val MAX_COMMENT_SCROLL_ROUNDS = 40
         private const val UPLOAD_TIMEOUT_MS = 10 * 60_000L
@@ -755,11 +812,19 @@ internal class DirectXiaohongshuService(
         """
         private const val FEED_DETAIL_SCRIPT =
             "JSON.stringify(window.__INITIAL_STATE__?.note?.noteDetailMap || {})"
-        private const val INTERACT_STATE_SCRIPT = """
+        private const val FEEDS_READY_SCRIPT =
+            "window.__INITIAL_STATE__?.feed?.feeds && " +
+                "(Array.isArray(window.__INITIAL_STATE__.feed.feeds.value) || " +
+                "Array.isArray(window.__INITIAL_STATE__.feed.feeds._value))"
+        private const val SEARCH_FEEDS_READY_SCRIPT =
+            "window.__INITIAL_STATE__?.search?.feeds && " +
+                "(Array.isArray(window.__INITIAL_STATE__.search.feeds.value) || " +
+                "Array.isArray(window.__INITIAL_STATE__.search.feeds._value))"
+        private const val SEARCH_FEED_IDS_SCRIPT = """
             (() => {
-              const m = window.__INITIAL_STATE__?.note?.noteDetailMap || {};
-              const d = Object.values(m)[0]?.note?.interactInfo || {};
-              return JSON.stringify({liked: Boolean(d.liked), collected: Boolean(d.collected)});
+              const f = window.__INITIAL_STATE__?.search?.feeds;
+              const v = f ? (f.value !== undefined ? f.value : f._value) : null;
+              return v ? v.map(x => x.id).join(",") : "";
             })()
         """
         private const val UNREAD_COUNT_SCRIPT = """
@@ -772,7 +837,8 @@ internal class DirectXiaohongshuService(
             (() => {
               const u = window.__INITIAL_STATE__?.user;
               const v = u?.userInfo?.value !== undefined ? u.userInfo.value : u?.userInfo;
-              return JSON.stringify(v || {});
+              if (!v || v.guest) return "";
+              return JSON.stringify(v);
             })()
         """
         private const val PROFILE_DATA_SCRIPT = """

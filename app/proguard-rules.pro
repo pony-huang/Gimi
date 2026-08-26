@@ -137,3 +137,22 @@
 -keep class com.google.adk.kt.models.** { *; }
 -keep class com.google.adk.kt.tools.** { *; }
 -keep class com.google.adk.kt.types.** { *; }
+# 上面的 `{ *; }` 只保字段/方法，不含构造函数。插件构造这些 Kotlin 数据类时走带
+# DefaultConstructorMarker 的合成默认参构造函数；host 自身可能不调用同一变体，R8 会把它
+# 剥掉，插件加载即抛 NoSuchMethodError。这里显式保留所有 <init>，补齐插件 ABI。
+-keepclassmembers class com.google.adk.kt.** { <init>(...); }
+-keepclassmembers class github.ponyhuang.gimi.pluginapi.** { <init>(...); }
+
+# ---------------------------------------------------------------------------
+# Kotlin / coroutines ABI 桥接（插件编译期 compileOnly，运行时从 host 解析）
+#
+# 插件 APK 自带 kotlin-stdlib，但 kotlinx-coroutines 是 compileOnly、不打包；且
+# plugin-api / ADK 的合成构造函数、挂起方法描述符里引用的 DefaultConstructorMarker、
+# Continuation、CoroutineContext 也必须在 host 侧保持原名。R8 默认会把它们混淆成
+# hz0/ht0 之类短名，导致插件按原名链接时 NoSuchMethodError / ClassNotFoundException。
+# 这里显式保持这些运行时桥接类型的类名与成员名不变（即不让 R8 改名/收缩）。
+# ---------------------------------------------------------------------------
+-keep class kotlin.jvm.internal.DefaultConstructorMarker { *; }
+-keep class kotlin.jvm.functions.** { *; }
+-keep class kotlin.coroutines.** { *; }
+-keep class kotlinx.coroutines.** { *; }

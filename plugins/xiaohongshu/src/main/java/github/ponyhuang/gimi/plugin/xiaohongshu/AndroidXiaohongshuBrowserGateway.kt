@@ -20,6 +20,7 @@ import android.webkit.WebViewClient
 import java.io.IOException
 import java.io.File
 import java.io.FileInputStream
+import java.net.URI
 import java.net.URL
 import java.net.URLConnection
 import java.util.UUID
@@ -47,7 +48,28 @@ internal class AndroidXiaohongshuBrowserGateway(
                 var completed = false
                 view.webViewClient = object : WebViewClient() {
                     override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+                        val upgraded = url?.let(::upgradeToHttps)
+                        if (upgraded != url) {
+                            // 站点在个别流程会 http:// 重定向；强制升级 https 再加载，
+                            // 避免被宿主默认的明文拦截（net::ERR_CLEARTEXT_NOT_PERMITTED）。
+                            view.stopLoading()
+                            view.loadUrl(upgraded!!)
+                            return
+                        }
                         completed = false
+                    }
+
+                    override fun shouldOverrideUrlLoading(
+                        view: WebView,
+                        request: WebResourceRequest,
+                    ): Boolean {
+                        val target = request.url.toString()
+                        val upgraded = upgradeToHttps(target)
+                        if (upgraded != target) {
+                            view.loadUrl(upgraded)
+                            return true
+                        }
+                        return false
                     }
 
                     override fun onPageFinished(view: WebView, loadedUrl: String?) {
@@ -62,13 +84,21 @@ internal class AndroidXiaohongshuBrowserGateway(
                         request: WebResourceRequest,
                         error: WebResourceError,
                     ) {
-                        if (request.isForMainFrame && !completed && continuation.isActive) {
-                            completed = true
-                            continuation.resumeWithException(IOException(error.description.toString()))
+                        if (!request.isForMainFrame || completed || !continuation.isActive) return
+                        val target = request.url.toString()
+                        val upgraded = upgradeToHttps(target)
+                        if (upgraded != target) {
+                            // 站点 http:// 重定向没走 shouldOverrideUrlLoading/onPageStarted 拦截
+                            // （如 meta refresh 或资源级加载）已到达错误回调：升级后重载而非报错。
+                            view.loadUrl(upgraded)
+                            return
                         }
+                        completed = true
+                        // 带出具体 URL，便于定位被拦的是哪个地址。
+                        continuation.resumeWithException(IOException("${error.description} @ $target"))
                     }
                 }
-                view.loadUrl(url)
+                view.loadUrl(upgradeToHttps(url))
             }
         }
     }
@@ -206,6 +236,20 @@ internal class AndroidXiaohongshuBrowserGateway(
  * @property temporary 是否由插件临时写入 MediaStore、稍后需清理。
  */
 private data class PreparedUpload(val uri: Uri, val temporary: Boolean)
+
+/** 已知小红书域名；这些域在个别流程会走 http:// 重定向，需升级为 https。 */
+internal val XHS_CLEARTEXT_HOSTS: Set<String> = setOf("xiaohongshu.com", "xhscdn.com", "xhslink.com")
+
+/** 已知域名上的明文 URL 升级为 https（主站全 https）；其他域名原样返回，不做盲目升级。 */
+internal fun upgradeToHttps(url: String): String {
+    if (!url.startsWith("http://")) return url
+    // 用 java.net.URI 而非 android.net.Uri：宿主进程可用，且本地单测（android.jar 桩）下也能解析。
+    val host = runCatching { URI(url).host }.getOrNull() ?: return url
+    if (XHS_CLEARTEXT_HOSTS.any { host == it || host.endsWith(".$it") }) {
+        return url.replaceFirst("http://", "https://")
+    }
+    return url
+}
 
 /** 解开 WebView `evaluateJavascript` 对字符串结果额外添加的一层 JSON 引号。 */
 internal fun decodeWebViewResult(raw: String?): String? {

@@ -26,14 +26,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Extension
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -98,6 +99,7 @@ fun PluginSettingsRoute(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PluginSettingsScreen(
     state: PluginSettingsUiState,
@@ -114,32 +116,26 @@ fun PluginSettingsScreen(
                 modifier = Modifier.padding(top = 12.dp),
             )
         }
-        LazyColumn(
+        // 下拉刷新替代列表顶部的按钮刷新；isRefreshing 由 ViewModel 在 refresh() 期间置位。
+        PullToRefreshBox(
+            isRefreshing = state.isRefreshing,
+            onRefresh = { onAction(PluginSettingsAction.Refresh) },
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(vertical = 12.dp),
         ) {
-            item {
-                PreferenceListItem(
-                    icon = Icons.Default.Refresh,
-                    title = stringResource(R.string.plugin_refresh),
-                    subtitle = stringResource(R.string.plugin_refresh_subtitle),
-                    onClick = { onAction(PluginSettingsAction.Refresh) },
-                )
-            }
-            items(state.plugins, key = { it.id }) { plugin ->
-                PluginRow(
-                    plugin = plugin,
-                    icon = icons[plugin.id],
-                    subtitle = stringResource(
-                        R.string.plugin_item_subtitle,
-                        plugin.version,
-                        plugin.toolCount,
-                    ),
-                    onToggle = { enabled ->
-                        onAction(PluginSettingsAction.SetEnabled(plugin.id, enabled))
-                    },
-                    onClick = { onNavigateToConfig(plugin.id) },
-                )
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(vertical = 12.dp),
+            ) {
+                items(state.plugins, key = { it.id }) { plugin ->
+                    PluginRow(
+                        plugin = plugin,
+                        icon = icons[plugin.id],
+                        onToggle = { enabled ->
+                            onAction(PluginSettingsAction.SetEnabled(plugin.id, enabled))
+                        },
+                        onClick = { onNavigateToConfig(plugin.id) },
+                    )
+                }
             }
         }
     }
@@ -149,7 +145,6 @@ fun PluginSettingsScreen(
 private fun PluginRow(
     plugin: PluginDescriptor,
     icon: ImageBitmap?,
-    subtitle: String,
     onToggle: (Boolean) -> Unit,
     onClick: () -> Unit,
 ) {
@@ -195,14 +190,6 @@ private fun PluginRow(
                 style = MaterialTheme.typography.titleLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp),
             )
         }
         Switch(

@@ -7,12 +7,18 @@ import github.ponyhuang.gimi.domain.plugin.model.PluginBrowserRequest
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
 import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -59,6 +65,28 @@ class PluginSettingsViewModelTest {
         assertEquals(1, repository.refreshCalls)
     }
 
+    @Test
+    fun refreshTogglesRefreshingIndicator() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val repository = FakePluginRepository().apply { refreshGate = gate }
+        val viewModel = PluginSettingsViewModel(repository)
+
+        // uiState 是 WhileSubscribed 的 stateIn，需要订阅才会上游收集并 emit。
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect { }
+        }
+
+        viewModel.onAction(PluginSettingsAction.Refresh)
+        runCurrent()
+
+        assertTrue("刷新进行中应显示下拉刷新指示器", viewModel.uiState.value.isRefreshing)
+
+        gate.complete(Unit)
+        advanceUntilIdle()
+
+        assertFalse("刷新结束后应关闭刷新指示器", viewModel.uiState.value.isRefreshing)
+    }
+
     private class FakePluginRepository : PluginRepository {
         val pluginsFlow = MutableStateFlow<List<PluginDescriptor>>(emptyList())
         override val plugins: StateFlow<List<PluginDescriptor>> = pluginsFlow
@@ -66,6 +94,7 @@ class PluginSettingsViewModelTest {
         val enabledCalls = mutableListOf<Pair<String, Boolean>>()
         var refreshResult: List<String> = emptyList()
         var refreshCalls: Int = 0
+        var refreshGate: CompletableDeferred<Unit>? = null
 
         override fun setEnabled(pluginId: String, enabled: Boolean) {
             enabledCalls += pluginId to enabled
@@ -78,6 +107,7 @@ class PluginSettingsViewModelTest {
 
         override suspend fun refresh(): List<String> {
             refreshCalls += 1
+            refreshGate?.await()
             return refreshResult
         }
 

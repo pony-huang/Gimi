@@ -6,6 +6,8 @@ import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
 /** 插件列表页状态。 */
 data class PluginSettingsUiState(
     val plugins: List<PluginDescriptor> = emptyList(),
+    /** 是否正在重新发现插件，驱动下拉刷新指示器。 */
+    val isRefreshing: Boolean = false,
 )
 
 sealed interface PluginSettingsAction {

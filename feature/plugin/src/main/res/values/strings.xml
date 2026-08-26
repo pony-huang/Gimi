@@ -1,13 +1,10 @@
 <resources>
     <string name="plugin_screen_title">插件</string>
     <string name="plugin_empty">未安装插件。安装插件 APK 后重启应用即可在此管理。</string>
-    <string name="plugin_item_subtitle">v%1$d · %2$d 个工具</string>
     <string name="plugin_config_title">插件配置</string>
     <string name="plugin_config_save">保存</string>
     <string name="plugin_config_saved">配置已保存</string>
     <string name="plugin_action_running">处理中…</string>
-    <string name="plugin_refresh">刷新插件列表</string>
-    <string name="plugin_refresh_subtitle">检测新安装的插件，无需重启</string>
     <string name="plugin_added_notice">已发现新插件：%1$s</string>
     <string name="plugin_browser_title">授权</string>
     <string name="plugin_browser_close">关闭</string>

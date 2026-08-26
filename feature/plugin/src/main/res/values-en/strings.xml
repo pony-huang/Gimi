@@ -1,13 +1,10 @@
 <resources>
     <string name="plugin_screen_title">Plugins</string>
     <string name="plugin_empty">No plugins installed. Install a plugin APK and restart the app to manage it here.</string>
-    <string name="plugin_item_subtitle">v%1$d · %2$d tools</string>
     <string name="plugin_config_title">Plugin configuration</string>
     <string name="plugin_config_save">Save</string>
     <string name="plugin_config_saved">Configuration saved</string>
     <string name="plugin_action_running">Working…</string>
-    <string name="plugin_refresh">Refresh plugin list</string>
-    <string name="plugin_refresh_subtitle">Detect newly installed plugins without restarting</string>
     <string name="plugin_added_notice">Discovered new plugins: %1$s</string>
     <string name="plugin_browser_title">Authorization</string>
     <string name="plugin_browser_close">Close</string>

@@ -375,7 +375,7 @@ private fun AddToChatHome(
         item {
             GroupedCard {
                 NavigationRow(
-                    icon = ImageVector.vectorResource(R.drawable.stream_ai_compose_ic_mcp),
+                    icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
                     title = stringResource(R.string.chat_session_mcp_title),
                     subtitle = when {
                         state.mcpServers.isEmpty() ->
@@ -936,7 +936,7 @@ private fun McpServersPage(
                 verticalArrangement = Arrangement.Center,
             ) {
                 Icon(
-                    ImageVector.vectorResource(R.drawable.stream_ai_compose_ic_mcp),
+                    ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(48.dp),
@@ -997,7 +997,7 @@ private fun McpServerRow(
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconBubble(ImageVector.vectorResource(R.drawable.stream_ai_compose_ic_mcp))
+        IconBubble(ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp))
         Column(
             modifier = Modifier
                 .weight(1f)

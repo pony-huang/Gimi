@@ -17,7 +17,9 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -75,7 +77,7 @@ fun SettingsScreen(
             item { PreferenceSectionTitle(stringResource(R.string.settings_group_tools)) }
             item {
                 PreferenceNavigationCard(
-                    icon = Icons.Default.Extension,
+                    icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
                     title = stringResource(R.string.settings_mcp_title),
                     subtitle = stringResource(R.string.settings_mcp_subtitle),
                     onClick = { onAction(SettingsAction.OpenMcpServers) },

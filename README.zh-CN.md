@@ -126,6 +126,7 @@
 - [GetStream/chat-ai-samples](https://github.com/GetStream/chat-ai-samples)
 - [mikepenz/multiplatform-markdown-renderer](https://github.com/mikepenz/multiplatform-markdown-renderer)
 - [google/adk-kotlin](https://github.com/google/adk-kotlin)
+- [xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp)
 
 ## 开源协议
 

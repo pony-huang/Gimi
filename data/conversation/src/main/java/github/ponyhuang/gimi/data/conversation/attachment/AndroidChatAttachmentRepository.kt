@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
+import android.webkit.MimeTypeMap
 import androidx.exifinterface.media.ExifInterface
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
@@ -59,20 +60,50 @@ class AndroidChatAttachmentRepository @Inject constructor(
         }
     }
 
-    private fun persist(sessionId: String, attachment: FileAttachment): FileAttachment {
+    /**
+     * Writes the payload into session-owned storage and returns a reference-only attachment.
+     *
+     * The bytes stay local to this call so that a long conversation holds paths rather than
+     * every original payload. The file is named `<id>.<ext>`: the id keeps identical payloads
+     * deduplicating onto the same file, while the extension lets consumers that infer a type
+     * from the file name — such as the Xiaohongshu plugin's upload bridge — see the real MIME
+     * type instead of `application/octet-stream`.
+     */
+    private fun persist(sessionId: String, payload: PreparedPayload): FileAttachment {
         val directory = File(
             File(context.filesDir, ATTACHMENT_DIRECTORY),
             safeSessionId(sessionId),
         ).apply { mkdirs() }
-        val target = File(directory, attachment.id)
-        if (!target.exists()) target.writeBytes(attachment.data)
-        return attachment.copy(payloadReference = target.absolutePath)
+        val id = FileAttachment.stableAttachmentId(
+            payload.mimeType,
+            payload.displayName,
+            payload.bytes,
+        )
+        val extension = extensionFor(payload.displayName, payload.mimeType)
+        val target = File(directory, if (extension == null) id else "$id.$extension")
+        if (!target.exists()) target.writeBytes(payload.bytes)
+        return FileAttachment(
+            mimeType = payload.mimeType,
+            id = id,
+            sizeBytes = payload.bytes.size.toLong(),
+            displayName = payload.displayName,
+            payloadReference = target.absolutePath,
+            category = payload.category,
+        )
+    }
+
+    private fun extensionFor(displayName: String, mimeType: String): String? {
+        val fromName = displayName.substringAfterLast('.', "")
+        if (fromName.isNotEmpty() && fromName.all(Char::isLetterOrDigit)) return fromName.lowercase()
+        return MimeTypeMap.getSingleton()
+            .getExtensionFromMimeType(mimeType.lowercase().substringBefore(';'))
+            ?.takeIf(String::isNotEmpty)
     }
 
     private fun safeSessionId(sessionId: String): String =
         sessionId.replace(Regex("""[^A-Za-z0-9._-]"""), "_")
 
-    private fun prepareImage(attachment: DraftAttachment): FileAttachment {
+    private fun prepareImage(attachment: DraftAttachment): PreparedPayload {
         val file = File(attachment.reference)
         val uri = Uri.fromFile(file)
         var bitmap = decode(resolver, uri)
@@ -80,10 +111,10 @@ class AndroidChatAttachmentRepository @Inject constructor(
         try {
             repeat(MAX_RESIZE_ATTEMPTS) {
                 compress(bitmap)?.let { bytes ->
-                    return FileAttachment(
+                    return PreparedPayload(
                         mimeType = "image/jpeg",
-                        data = bytes,
                         displayName = attachment.displayName.substringBeforeLast('.') + ".jpg",
+                        bytes = bytes,
                         category = AttachmentCategory.IMAGE,
                     )
                 }
@@ -102,19 +133,26 @@ class AndroidChatAttachmentRepository @Inject constructor(
         throw IllegalArgumentException("The selected image is too large after compression")
     }
 
-    private fun prepareOriginal(attachment: DraftAttachment): FileAttachment {
+    private fun prepareOriginal(attachment: DraftAttachment): PreparedPayload {
         val bytes = File(attachment.reference).readBytes()
         check(bytes.size.toLong() == attachment.sizeBytes) {
             "The selected attachment changed before it could be sent"
         }
-        return FileAttachment(
+        return PreparedPayload(
             mimeType = attachment.mimeType,
-            data = bytes,
             displayName = attachment.displayName,
-            sizeBytes = attachment.sizeBytes,
+            bytes = bytes,
             category = attachment.category,
         )
     }
+
+    /** A payload that has been normalised but not yet written to session storage. */
+    private class PreparedPayload(
+        val mimeType: String,
+        val displayName: String,
+        val bytes: ByteArray,
+        val category: AttachmentCategory,
+    )
 
     private fun decode(contentResolver: ContentResolver, uri: Uri): Bitmap? {
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }

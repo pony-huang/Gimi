@@ -30,18 +30,6 @@ internal fun decodeSampledBitmap(
     return rotateBitmap(bitmap, orientation)
 }
 
-/** Decodes in-memory image bytes into a thumbnail without retaining the full bitmap. */
-internal fun decodeSampledBitmap(
-    data: ByteArray,
-    targetSize: Int,
-): Bitmap? {
-    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeByteArray(data, 0, data.size, options)
-    options.inSampleSize = calculateInSampleSize(options, targetSize, targetSize)
-    options.inJustDecodeBounds = false
-    return BitmapFactory.decodeByteArray(data, 0, data.size, options)
-}
-
 private fun rotateBitmap(bitmap: Bitmap, orientation: Int): Bitmap {
     val matrix = Matrix()
     when (orientation) {

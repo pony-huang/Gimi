@@ -67,7 +67,7 @@ class AdkChatAgentRepository @Inject constructor(
                     val mimeType = blob.mimeType ?: return@let null
                     val data = blob.data ?: return@let null
                     val displayName = blob.displayName.orEmpty()
-                    FileAttachment(
+                    FileAttachment.fromBytes(
                         mimeType = mimeType,
                         data = data,
                         displayName = displayName,
@@ -77,12 +77,10 @@ class AdkChatAgentRepository @Inject constructor(
                     val reference = file.fileUri ?: return@let null
                     val payload = File(reference.removePrefix("file://"))
                     require(payload.isFile) { "Attachment payload is unavailable: $reference" }
-                    FileAttachment(
+                    FileAttachment.fromFile(
+                        file = payload,
                         mimeType = mimeType,
-                        data = payload.readBytes(),
                         displayName = file.displayName.orEmpty(),
-                        sizeBytes = payload.length(),
-                        payloadReference = payload.absolutePath,
                     )
                 },
             )

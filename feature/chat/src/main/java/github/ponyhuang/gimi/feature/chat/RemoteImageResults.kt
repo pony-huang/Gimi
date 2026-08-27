@@ -90,8 +90,9 @@ internal fun RemoteImageCarousel(
     }
 
     preview?.let { selected ->
-        ZoomableRemoteImagePreviewDialog(
-            url = selected.value.url,
+        ZoomableCoilImagePreviewDialog(
+            model = selected.value.url,
+            imageKey = selected.value.url,
             contentDescription = stringResource(R.string.chat_remote_image, selected.index + 1),
             onDismiss = { preview = null },
         )

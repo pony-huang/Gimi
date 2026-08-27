@@ -119,7 +119,7 @@ object EventMapper {
         inlineData?.let { blob ->
             val mimeType = requireNotNull(blob.mimeType) { "Attachment MIME type is missing" }
             val data = requireNotNull(blob.data) { "Attachment payload is missing" }
-            return FileAttachment(
+            return FileAttachment.fromBytes(
                 mimeType = mimeType,
                 data = data,
                 displayName = blob.displayName.orEmpty(),
@@ -130,12 +130,10 @@ object EventMapper {
             val reference = requireNotNull(file.fileUri) { "Attachment reference is missing" }
             val payload = File(reference.removePrefix("file://"))
             require(payload.isFile) { "Attachment payload is unavailable: $reference" }
-            return FileAttachment(
+            return FileAttachment.fromFile(
+                file = payload,
                 mimeType = mimeType,
-                data = payload.readBytes(),
                 displayName = file.displayName.orEmpty(),
-                sizeBytes = payload.length(),
-                payloadReference = payload.absolutePath,
             )
         }
         return null

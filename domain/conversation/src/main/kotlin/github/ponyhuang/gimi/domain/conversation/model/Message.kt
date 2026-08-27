@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.domain.conversation.model
 
+import java.io.File
 import java.util.UUID
 import java.security.MessageDigest
 import kotlin.time.Clock
@@ -49,20 +50,29 @@ data class Message(
 /**
  * A validated image, audio, or document attached to a chat message.
  *
- * The original bytes are deliberately retained: ADK serializes inline data with the
- * session event, allowing a restored conversation to show the same attachment.
+ * [payloadReference] — the absolute path of the app-owned copy — is the primary source of
+ * truth: it is what the runner hands to ADK as `FileData.fileUri` and what the UI renders
+ * from. [inlineData] is only populated for attachments that have no backing file, i.e. those
+ * restored from an ADK `inlineData` part; keeping bytes off the model lets a long
+ * conversation hold thumbnails rather than every original payload.
  */
 data class FileAttachment(
     val mimeType: String,
-    val data: ByteArray,
+    val id: String,
+    val sizeBytes: Long,
     val displayName: String = "",
-    val sizeBytes: Long = data.size.toLong(),
     val payloadReference: String? = null,
+    val inlineData: ByteArray? = null,
     val category: AttachmentCategory = requireNotNull(
         AttachmentCategory.from(mimeType, displayName),
     ) { "Unsupported attachment type: $mimeType ($displayName)" },
-    val id: String = stableAttachmentId(mimeType, displayName, data),
 ) {
+    init {
+        require(payloadReference != null || inlineData != null) {
+            "Attachment $displayName has neither a payload reference nor inline data"
+        }
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
@@ -70,39 +80,79 @@ data class FileAttachment(
         other as FileAttachment
 
         if (mimeType != other.mimeType) return false
-        if (!data.contentEquals(other.data)) return false
         if (id != other.id) return false
         if (displayName != other.displayName) return false
         if (sizeBytes != other.sizeBytes) return false
         if (payloadReference != other.payloadReference) return false
         if (category != other.category) return false
+        // Usually null, so the full-payload comparison is skipped outright.
+        if (!inlineData.contentEquals(other.inlineData)) return false
 
         return true
     }
 
     override fun hashCode(): Int {
         var result = mimeType.hashCode()
-        result = 31 * result + data.contentHashCode()
         result = 31 * result + id.hashCode()
         result = 31 * result + displayName.hashCode()
         result = 31 * result + sizeBytes.hashCode()
         result = 31 * result + (payloadReference?.hashCode() ?: 0)
         result = 31 * result + category.hashCode()
+        result = 31 * result + (inlineData?.contentHashCode() ?: 0)
         return result
     }
-}
 
-private fun stableAttachmentId(
-    mimeType: String,
-    displayName: String,
-    data: ByteArray,
-): String {
-    val digest = MessageDigest.getInstance("SHA-256")
-    digest.update(mimeType.toByteArray())
-    digest.update(0)
-    digest.update(displayName.toByteArray())
-    digest.update(0)
-    return digest.digest(data).joinToString("") { byte -> "%02x".format(byte) }
+    companion object {
+        /**
+         * Describes an attachment already persisted at [file] **without reading its bytes**.
+         *
+         * The persisted file is named after the attachment id (plus an extension, when the
+         * type is known), so the id stays stable across a session restore.
+         */
+        fun fromFile(
+            file: File,
+            mimeType: String,
+            displayName: String = "",
+        ): FileAttachment = FileAttachment(
+            mimeType = mimeType,
+            id = file.nameWithoutExtension,
+            sizeBytes = file.length(),
+            displayName = displayName,
+            payloadReference = file.absolutePath,
+        )
+
+        /** Wraps bytes that have no backing file, deriving a content-addressed id. */
+        fun fromBytes(
+            mimeType: String,
+            data: ByteArray,
+            displayName: String = "",
+        ): FileAttachment = FileAttachment(
+            mimeType = mimeType,
+            id = stableAttachmentId(mimeType, displayName, data),
+            sizeBytes = data.size.toLong(),
+            displayName = displayName,
+            inlineData = data,
+        )
+
+        /**
+         * SHA-256 over the payload and its identifying metadata.
+         *
+         * Doubles as the on-disk file name, which makes identical payloads deduplicate against
+         * the same file — so this algorithm must stay byte-for-byte stable.
+         */
+        fun stableAttachmentId(
+            mimeType: String,
+            displayName: String,
+            data: ByteArray,
+        ): String {
+            val digest = MessageDigest.getInstance("SHA-256")
+            digest.update(mimeType.toByteArray())
+            digest.update(0)
+            digest.update(displayName.toByteArray())
+            digest.update(0)
+            return digest.digest(data).joinToString("") { byte -> "%02x".format(byte) }
+        }
+    }
 }
 
 /**

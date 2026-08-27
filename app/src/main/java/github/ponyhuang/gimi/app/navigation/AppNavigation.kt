@@ -478,7 +478,18 @@ private fun openDocumentAttachment(context: Context, attachment: FileAttachment)
         val directory = File(context.cacheDir, "message-attachments").apply { mkdirs() }
         val safeName = attachment.displayName.replace(Regex("""[^\w.\-]"""), "_")
         val file = File(directory, "${attachment.id}-$safeName")
-        if (!file.exists()) file.writeBytes(attachment.data)
+        // Copied under the original name so external viewers still see a real extension. The
+        // bytes stream from the persisted payload rather than being held in memory.
+        if (!file.exists()) {
+            val source = attachment.payloadReference?.let(::File)
+            if (source != null && source.isFile) {
+                source.copyTo(file, overwrite = true)
+            } else {
+                file.writeBytes(
+                    requireNotNull(attachment.inlineData) { "Attachment payload is unavailable" },
+                )
+            }
+        }
         val uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",

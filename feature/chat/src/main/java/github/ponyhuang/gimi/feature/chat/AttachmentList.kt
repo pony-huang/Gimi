@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.chat
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.media.MediaPlayer
 import android.net.Uri
@@ -48,6 +49,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
+import coil3.compose.AsyncImage
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
@@ -121,21 +123,24 @@ internal fun MessageAttachments(
     }
 }
 
+/**
+ * The Coil model for a sent image: the persisted file when there is one, otherwise the inline
+ * bytes carried by attachments restored from an ADK `inlineData` part. Preferring the file
+ * keeps whole payloads out of the heap and lets Coil own downsampling and caching.
+ */
+private val FileAttachment.imageModel: Any?
+    get() = payloadReference?.let(::File) ?: inlineData
+
 /** Displays a sent image at a screen-appropriate resolution with zoom and pan gestures. */
 @Composable
 private fun ImagePreviewDialog(
     image: FileAttachment,
     onDismiss: () -> Unit,
 ) {
-    val description = stringResource(R.string.chat_attachment_sent_image_preview)
-    ZoomableImagePreviewDialog(
+    ZoomableCoilImagePreviewDialog(
+        model = image.imageModel,
         imageKey = image.id,
-        contentDescription = description,
-        loadBitmap = { targetSize ->
-            withContext(Dispatchers.Default) {
-                decodeSampledBitmap(image.data, targetSize = targetSize)
-            }
-        },
+        contentDescription = stringResource(R.string.chat_attachment_sent_image_preview),
         onDismiss = onDismiss,
     )
 }
@@ -145,35 +150,21 @@ private fun InlineImage(
     image: FileAttachment,
     onClick: () -> Unit,
 ) {
-    var bitmap by remember(image.data) { mutableStateOf<Bitmap?>(null) }
-    LaunchedEffect(image.data) {
-        bitmap = withContext(Dispatchers.Default) {
-            decodeSampledBitmap(image.data, targetSize = 240)
-        }
-    }
-    DisposableEffect(bitmap) {
-        val managedBitmap = bitmap
-        onDispose { managedBitmap?.recycle() }
-    }
     AttachmentTile(
         modifier = Modifier.clickable(onClick = onClick),
         size = 88.dp,
     ) {
-        val currentBitmap = bitmap
-        if (currentBitmap != null) {
-            Image(
-                bitmap = currentBitmap.asImageBitmap(),
-                contentDescription = stringResource(R.string.chat_attachment_sent_image),
-                modifier = Modifier.matchParentSize(),
-                contentScale = ContentScale.Crop,
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .background(MaterialTheme.colorScheme.surfaceDim),
-            )
-        }
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(MaterialTheme.colorScheme.surfaceDim),
+        )
+        AsyncImage(
+            model = image.imageModel,
+            contentDescription = stringResource(R.string.chat_attachment_sent_image),
+            modifier = Modifier.matchParentSize(),
+            contentScale = ContentScale.Crop,
+        )
     }
 }
 
@@ -259,18 +250,15 @@ private fun PersistedFileAttachment(
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .clickable {
                 if (attachment.category == AttachmentCategory.AUDIO) {
-                    val directory = File(context.cacheDir, "message-attachments").apply { mkdirs() }
-                    val safeName = attachment.displayName.replace(Regex("""[^\w.\-]"""), "_")
-                    val file = File(directory, "${attachment.id}-$safeName")
-                    if (!file.exists()) file.writeBytes(attachment.data)
                     val player = mediaPlayer ?: return@clickable
                     if (player.isPlaying) {
                         player.pause()
                         isPlaying = false
                     } else {
                         if (player.currentPosition == 0) {
+                            val source = attachment.playbackPath(context) ?: return@clickable
                             player.reset()
-                            player.setDataSource(file.absolutePath)
+                            player.setDataSource(source)
                             player.prepare()
                             player.setOnCompletionListener { isPlaying = false }
                         }
@@ -297,6 +285,20 @@ private fun PersistedFileAttachment(
             maxLines = 1,
         )
     }
+}
+
+/**
+ * A filesystem path MediaPlayer can open. The persisted payload is used directly; only
+ * attachments that carry inline bytes need a cache copy.
+ */
+private fun FileAttachment.playbackPath(context: Context): String? {
+    payloadReference?.let { return it }
+    val bytes = inlineData ?: return null
+    val directory = File(context.cacheDir, "message-attachments").apply { mkdirs() }
+    val safeName = displayName.replace(Regex("""[^\w.\-]"""), "_")
+    val file = File(directory, "$id-$safeName")
+    if (!file.exists()) file.writeBytes(bytes)
+    return file.absolutePath
 }
 
 @Composable

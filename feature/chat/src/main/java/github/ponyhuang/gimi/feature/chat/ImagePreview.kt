@@ -100,19 +100,23 @@ internal fun ZoomableImagePreviewDialog(
     }
 }
 
-/** Full-screen zoomable preview for a structured HTTPS image. */
+/**
+ * Full-screen zoomable preview for anything Coil can load — a remote URL, or a persisted
+ * attachment addressed by [java.io.File] or by its raw bytes.
+ */
 @Composable
-internal fun ZoomableRemoteImagePreviewDialog(
-    url: String,
+internal fun ZoomableCoilImagePreviewDialog(
+    model: Any?,
+    imageKey: Any,
     contentDescription: String,
     onDismiss: () -> Unit,
 ) {
     ZoomableImagePreviewFrame(
-        imageKey = url,
+        imageKey = imageKey,
         onDismiss = onDismiss,
     ) { imageModifier, _ ->
         AsyncImage(
-            model = url,
+            model = model,
             contentDescription = contentDescription,
             modifier = imageModifier,
             contentScale = ContentScale.Fit,

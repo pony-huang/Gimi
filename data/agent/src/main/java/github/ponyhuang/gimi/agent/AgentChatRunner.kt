@@ -204,6 +204,7 @@ class AgentChatRunner(
                     ),
                 )
             }
+            attachmentPathManifest(fileAttachments)?.let { add(Part(text = it)) }
         }
         val newMessage = Content(
             role = Role.USER,
@@ -312,5 +313,30 @@ class AgentChatRunner(
 
         /** 会话绑定的 LRU 上限；绑定很轻量，保留比运行时更长的历史以支持确认恢复。 */
         const val MAX_SESSION_BINDINGS: Int = 50
+    }
+}
+
+/**
+ * 列出每个附件在磁盘上的位置，供模型转填给吃路径的工具。
+ *
+ * 模型适配层把附件转成 image/document content part 时会丢掉路径（见 `Openai.buildFilePart`），
+ * 于是像小红书 `publish_content.images` 这种要"本地绝对路径"的参数就无从填写。这里补一段清单
+ * 把路径带进上下文。没有可描述的附件时返回 null。
+ */
+internal fun attachmentPathManifest(attachments: List<FileAttachment>): String? {
+    val referenced = attachments.mapNotNull { attachment ->
+        attachment.payloadReference?.let { path -> attachment.displayName to path }
+    }
+    if (referenced.isEmpty()) return null
+    return buildString {
+        append("<attachments>\n")
+        append("The user attached ${referenced.size} file(s). ")
+        append("Tools that take a local file path can use these paths as-is.")
+        referenced.forEachIndexed { index, (displayName, path) ->
+            append("\n${index + 1}. ")
+            if (displayName.isNotBlank()) append("$displayName — ")
+            append(path)
+        }
+        append("\n</attachments>")
     }
 }

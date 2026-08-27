@@ -226,6 +226,18 @@ fun PluginConfigRoute(
 ) {
     LaunchedEffect(pluginId) { viewModel.load(pluginId) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collect { effect ->
+            when (effect) {
+                is PluginConfigEffect.ShowToast -> Toast.makeText(
+                    context,
+                    effect.message ?: effect.messageRes?.let(context::getString).orEmpty(),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+    }
     PluginConfigScreen(
         state = state,
         onAction = viewModel::onAction,
@@ -283,15 +295,6 @@ private fun PluginConfigContent(
                     text = stringResource(R.string.plugin_config_no_fields),
                     tone = PreferenceBannerTone.Info,
                     modifier = Modifier.padding(top = 12.dp),
-                )
-            }
-            state.notice?.let { notice ->
-                PreferenceBanner(
-                    text = notice.message ?: notice.messageRes?.let { stringResource(it) }.orEmpty(),
-                    tone = if (notice.isError) PreferenceBannerTone.Error else PreferenceBannerTone.Info,
-                    modifier = Modifier
-                        .padding(top = 12.dp)
-                        .clickable { onAction(PluginConfigAction.DismissNotice) },
                 )
             }
             LazyColumn(

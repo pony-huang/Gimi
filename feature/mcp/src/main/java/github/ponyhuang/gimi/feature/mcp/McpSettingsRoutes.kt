@@ -1,9 +1,11 @@
 package github.ponyhuang.gimi.feature.mcp
 
+import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -65,10 +67,15 @@ private fun CloseEffect(
     viewModel: McpSettingsViewModel,
     onBack: () -> Unit,
 ) {
+    val context = LocalContext.current
     LaunchedEffect(Unit) {
         viewModel.effects.collect { effect ->
             when (effect) {
                 McpSettingsEffect.Close -> onBack()
+                McpSettingsEffect.Saved -> {
+                    Toast.makeText(context, R.string.mcp_save_success, Toast.LENGTH_SHORT).show()
+                    onBack()
+                }
             }
         }
     }

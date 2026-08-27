@@ -6,8 +6,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
 import github.ponyhuang.gimi.feature.plugin.R
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -18,6 +21,8 @@ class PluginConfigViewModel @Inject constructor(
 ) : ViewModel() {
     private val _state = MutableStateFlow(PluginConfigUiState())
     val state: StateFlow<PluginConfigUiState> = _state.asStateFlow()
+    private val mutableEffects = MutableSharedFlow<PluginConfigEffect>()
+    val effects: SharedFlow<PluginConfigEffect> = mutableEffects.asSharedFlow()
 
     private var loadedPluginId: String? = null
 
@@ -57,13 +62,13 @@ class PluginConfigViewModel @Inject constructor(
             PluginConfigAction.Save -> {
                 val values = _state.value.fields.associate { field -> field.key to field.value }
                 repository.updateConfig(_state.value.pluginId, values)
-                // 保存成功提示，避免无反馈。
-                _state.update { it.copy(notice = PluginNotice(messageRes = R.string.plugin_config_saved)) }
+                viewModelScope.launch {
+                    mutableEffects.emit(PluginConfigEffect.ShowToast(messageRes = R.string.plugin_config_saved))
+                }
             }
             is PluginConfigAction.RunAction -> runAction(action.actionId)
             is PluginConfigAction.CompleteAction -> completeAction(action.actionId, action.redirectUrl)
             PluginConfigAction.CloseBrowser -> _state.update { it.copy(browser = null) }
-            PluginConfigAction.DismissNotice -> _state.update { it.copy(notice = null) }
         }
     }
 
@@ -92,7 +97,6 @@ class PluginConfigViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { state ->
                 state.copy(
-                    notice = null,
                     actions = state.actions.map { action ->
                         if (action.id == actionId) action.copy(running = true) else action
                     },
@@ -104,9 +108,9 @@ class PluginConfigViewModel @Inject constructor(
                     actions = state.actions.map { action ->
                         if (action.id == actionId) action.copy(running = false) else action
                     },
-                    notice = outcome?.let { PluginNotice(it.message, isError = !it.success) },
                 )
             }
+            outcome?.let { mutableEffects.emit(PluginConfigEffect.ShowToast(message = it.message)) }
         }
     }
 
@@ -115,9 +119,7 @@ class PluginConfigViewModel @Inject constructor(
         viewModelScope.launch {
             _state.update { it.copy(browser = null) }
             val outcome = repository.completeAction(_state.value.pluginId, actionId, redirectUrl)
-            _state.update { state ->
-                state.copy(notice = outcome?.let { PluginNotice(it.message, isError = !it.success) })
-            }
+            outcome?.let { mutableEffects.emit(PluginConfigEffect.ShowToast(message = it.message)) }
         }
     }
 }

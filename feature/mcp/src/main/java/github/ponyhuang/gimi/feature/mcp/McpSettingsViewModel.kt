@@ -131,7 +131,7 @@ class McpSettingsViewModel @Inject constructor(
                     runWhenAgentIdle {
                         manageServers.save(draft.toServer())
                         localState.update { it.copy(isTestingConnection = false) }
-                        _effects.tryEmit(McpSettingsEffect.Close)
+                        _effects.tryEmit(McpSettingsEffect.Saved)
                     }
                 } catch (e: CancellationException) {
                     throw e

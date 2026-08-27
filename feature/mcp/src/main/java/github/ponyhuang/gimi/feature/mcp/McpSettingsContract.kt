@@ -55,6 +55,9 @@ sealed interface McpSettingsAction {
 sealed interface McpSettingsEffect {
     /** 保存 / 删除 / 导入成功，请求关闭当前页。 */
     data object Close : McpSettingsEffect
+
+    /** 保存成功，提示用户后关闭编辑页。 */
+    data object Saved : McpSettingsEffect
 }
 
 internal fun McpServer.toDraft(isNew: Boolean) = McpEditorDraft(

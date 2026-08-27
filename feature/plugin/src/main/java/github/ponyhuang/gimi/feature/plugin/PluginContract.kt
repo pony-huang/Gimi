@@ -28,7 +28,6 @@ data class PluginConfigUiState(
     val pluginId: String = "",
     val fields: List<PluginConfigFieldUiState> = emptyList(),
     val actions: List<PluginActionUiState> = emptyList(),
-    val notice: PluginNotice? = null,
     val browser: PluginBrowserUiState? = null,
 ) {
     val hasFields: Boolean get() = fields.isNotEmpty()
@@ -70,19 +69,6 @@ data class PluginActionUiState(
 )
 
 /**
- * 配置页一次性提示。
- *
- * @property message 插件返回的文本（动作结果，可能非本地化）。
- * @property messageRes 本地化文案资源 ID（如「配置已保存」）；与 [message] 二选一。
- * @property isError 是否为错误提示。
- */
-data class PluginNotice(
-    val message: String? = null,
-    val messageRes: Int? = null,
-    val isError: Boolean = false,
-)
-
-/**
  * 配置页单个字段的可编辑状态。
  *
  * @property value 当前字符串值（TOGGLE 为 `"true"`/`"false"`）。
@@ -100,11 +86,23 @@ sealed interface PluginConfigAction {
     data class SetValue(val key: String, val value: String) : PluginConfigAction
     data object Save : PluginConfigAction
     data class RunAction(val actionId: String) : PluginConfigAction
-    data object DismissNotice : PluginConfigAction
 
     /** 内置浏览器截获重定向后，把完整重定向 URL 交给插件完成动作。 */
     data class CompleteAction(val actionId: String, val redirectUrl: String) : PluginConfigAction
 
     /** 关闭内置浏览器授权页（用户取消）。 */
     data object CloseBrowser : PluginConfigAction
+}
+
+sealed interface PluginConfigEffect {
+    /**
+     * 通过宿主 Toast 展示插件动作或保存结果。
+     *
+     * @property message 插件返回的文本；与 [messageRes] 二选一。
+     * @property messageRes 本地化文案资源 ID；与 [message] 二选一。
+     */
+    data class ShowToast(
+        val message: String? = null,
+        val messageRes: Int? = null,
+    ) : PluginConfigEffect
 }

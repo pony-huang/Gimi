@@ -34,6 +34,7 @@
     <string name="mcp_field_enable_server">Enable this server</string>
     <string name="mcp_field_enable_subtitle">When off, the assistant won’t connect to this server</string>
     <string name="mcp_save">Save</string>
+    <string name="mcp_save_success">MCP configuration saved</string>
     <string name="mcp_connection_testing">Verifying connection…</string>
     <string name="mcp_capabilities_tools">Tools (%1$d)</string>
     <string name="mcp_capabilities_resources">Resources (%1$d)</string>

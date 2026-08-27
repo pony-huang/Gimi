@@ -78,7 +78,7 @@ class McpSettingsViewModelCharacterizationTest {
     }
 
     @Test
-    fun editorSaveTrimsFieldsAndRequestsClose() = runTest {
+    fun editorSaveTrimsFieldsAndRequestsSuccessToast() = runTest {
         val repository = repository()
         val viewModel = viewModel(repository)
 
@@ -96,7 +96,7 @@ class McpSettingsViewModelCharacterizationTest {
                 viewModel.onAction(McpSettingsAction.SaveEditor)
                 cancelAndIgnoreRemainingEvents()
             }
-            assertEquals(McpSettingsEffect.Close, awaitItem())
+            assertEquals(McpSettingsEffect.Saved, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
         verify { repository.save(match { it.name == "Server" && it.endpointUrl == "https://example.com/mcp" }) }

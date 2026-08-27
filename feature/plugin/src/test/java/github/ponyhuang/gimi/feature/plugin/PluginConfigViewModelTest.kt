@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.plugin
 
+import app.cash.turbine.test
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionOutcome
@@ -11,10 +12,8 @@ import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -96,7 +95,7 @@ class PluginConfigViewModelTest {
     }
 
     @Test
-    fun saveShowsConfirmationNotice() = runTest {
+    fun saveShowsConfirmationToast() = runTest {
         val viewModel = PluginConfigViewModel(
             FakePluginRepository(
                 descriptor = PluginConfigDescriptor(
@@ -112,9 +111,14 @@ class PluginConfigViewModelTest {
         )
         viewModel.load("zhihu")
 
-        viewModel.onAction(PluginConfigAction.Save)
+        viewModel.effects.test {
+            viewModel.onAction(PluginConfigAction.Save)
 
-        assertEquals(R.string.plugin_config_saved, viewModel.state.value.notice?.messageRes)
+            assertEquals(
+                PluginConfigEffect.ShowToast(messageRes = R.string.plugin_config_saved),
+                awaitItem(),
+            )
+        }
     }
 
     @Test
@@ -134,7 +138,7 @@ class PluginConfigViewModelTest {
     }
 
     @Test
-    fun runActionDelegatesAndSetsNotice() = runTest {
+    fun runActionDelegatesAndEmitsResultToast() = runTest {
         val repository = FakePluginRepository(
             descriptor = PluginConfigDescriptor(
                 actions = listOf(PluginActionDescriptor(id = "login", label = "Authorize")),
@@ -144,14 +148,12 @@ class PluginConfigViewModelTest {
         val viewModel = PluginConfigViewModel(repository)
         viewModel.load("spotify")
 
-        viewModel.onAction(PluginConfigAction.RunAction("login"))
-        advanceUntilIdle()
+        viewModel.effects.test {
+            viewModel.onAction(PluginConfigAction.RunAction("login"))
 
+            assertEquals(PluginConfigEffect.ShowToast(message = "Authorized"), awaitItem())
+        }
         assertEquals(listOf("spotify" to "login"), repository.runActionCalls)
-        val notice = viewModel.state.value.notice
-        assertNotNull(notice)
-        assertEquals("Authorized", notice?.message)
-        assertEquals(false, notice?.isError)
         // 执行结束后 running 复位。
         assertEquals(false, viewModel.state.value.actions.single().running)
     }
@@ -181,7 +183,7 @@ class PluginConfigViewModelTest {
     }
 
     @Test
-    fun completeActionDelegatesAndSetsNotice() = runTest {
+    fun completeActionDelegatesAndEmitsResultToast() = runTest {
         val redirectUrl = "http://127.0.0.1:8888/callback?code=abc&state=st"
         val repository = FakePluginRepository(
             descriptor = PluginConfigDescriptor(
@@ -192,11 +194,15 @@ class PluginConfigViewModelTest {
         val viewModel = PluginConfigViewModel(repository)
         viewModel.load("spotify")
 
-        viewModel.onAction(PluginConfigAction.CompleteAction("login", redirectUrl))
-        advanceUntilIdle()
+        viewModel.effects.test {
+            viewModel.onAction(PluginConfigAction.CompleteAction("login", redirectUrl))
 
+            assertEquals(
+                PluginConfigEffect.ShowToast(message = "Spotify authorization succeeded"),
+                awaitItem(),
+            )
+        }
         assertEquals(listOf(Triple("spotify", "login", redirectUrl)), repository.completeActionCalls)
-        assertEquals("Spotify authorization succeeded", viewModel.state.value.notice?.message)
         // 弹窗已关闭。
         assertEquals(null, viewModel.state.value.browser)
     }

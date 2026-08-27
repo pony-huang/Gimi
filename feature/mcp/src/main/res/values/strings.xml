@@ -43,6 +43,7 @@
     <string name="mcp_field_enable_server">启用此服务器</string>
     <string name="mcp_field_enable_subtitle">停用后，助手不会连接此服务器</string>
     <string name="mcp_save">保存</string>
+    <string name="mcp_save_success">MCP 配置已保存</string>
     <string name="mcp_connection_testing">正在验证连接…</string>
     <string name="mcp_capabilities_tools">工具（%1$d）</string>
     <string name="mcp_capabilities_resources">资源（%1$d）</string>

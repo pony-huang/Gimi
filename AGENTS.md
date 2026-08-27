@@ -128,6 +128,7 @@ Testing rules:
 - Place any temporary working files, scratch artifacts, downloaded assets, or intermediate caches in the repository-root `temp/` directory (e.g. `temp/<purpose>/...`), not in scattered locations inside modules or the repo root.
 - `temp/` is git-ignored; treat its contents as ephemeral and safe to delete at any time. Do not commit anything under `temp/`.
 - When a tool needs a default cache directory (Gradle, IDE, SDK downloads, etc.), redirect it to a subdirectory of `temp/` or keep it under an already-ignored top-level path such as `.gradle`, `.idea`, or `.kotlin`; do not introduce new top-level cache directories.
+- `temp/` is shared across git worktrees: Claude Code's native `worktree.symlinkDirectories` setting (`.claude/settings.json`, set to `["temp"]`) symlinks the main checkout's `temp/` into every worktree it creates (`claude --worktree` and `EnterWorktree`). Put reusable reference resources (downloaded docs, extracted SDK API sources, vendor pins) in `temp/` so every worktree sees them without re-downloading. Because `temp/` is a link to a shared target, never `rm -rf` it from a worktree (that would recurse into the shared directory); remove only the link with `rmdir`/`os.rmdir`, or run `git worktree remove --force` after deleting the link.
 
 ## Android Tooling and Physical Device Verification
 

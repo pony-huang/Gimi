@@ -39,6 +39,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.takeOrElse
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -119,7 +127,23 @@ internal fun DefaultComposerInputContent(
             BasicTextField(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .defaultMinSize(minHeight = LocalMinimumInteractiveComponentSize.current),
+                    .defaultMinSize(minHeight = LocalMinimumInteractiveComponentSize.current)
+                    .onPreviewKeyEvent { event ->
+                        // 物理键盘回车（无 Shift/Ctrl/Alt）触发发送；Shift+Enter 留给换行。
+                        // 与"发送"按钮显隐规则一致：仅在有内容可发时触发。
+                        val isBareEnter = event.type == KeyEventType.KeyDown &&
+                            (event.key == Key.Enter || event.key == Key.NumPadEnter) &&
+                            !event.isShiftPressed && !event.isCtrlPressed && !event.isAltPressed
+                        val canSend = !params.isGenerating &&
+                            (params.messageData.text.isNotBlank() || params.messageData.attachments.isNotEmpty())
+                        if (isBareEnter && canSend) {
+                            params.onSendClick()
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    .testTag("chat_composer_text_field"),
                 value = params.messageData.text,
                 onValueChange = params.onTextChange,
                 enabled = !params.isGenerating,

@@ -34,11 +34,39 @@ internal abstract class ZhihuTool(
     }
 }
 
-private fun intArg(args: Map<String, Any?>, key: String, default: Int): Int =
+internal fun intArg(args: Map<String, Any?>, key: String, default: Int): Int =
     (args[key] as? Number)?.toInt() ?: default
 
-private fun strArg(args: Map<String, Any?>, key: String): String? =
+internal fun strArg(args: Map<String, Any?>, key: String): String? =
     (args[key] as? String)?.takeIf(String::isNotBlank)
+
+/** 数组参数读取；ADK 把 JSON 数组转成 Kotlin List。 */
+internal fun arrayArg(args: Map<String, Any?>, key: String): List<String> =
+    (args[key] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+
+/** 构造 OBJECT Schema；required 为空时不输出。 */
+internal fun objectSchema(
+    vararg properties: Pair<String, Schema>,
+    required: List<String> = emptyList(),
+): Schema = Schema(
+    type = Type.OBJECT,
+    properties = properties.toMap(),
+    required = required.takeIf { it.isNotEmpty() },
+)
+
+internal fun stringParam(description: String, enum: List<String>? = null): Schema =
+    Schema(type = Type.STRING, description = description, enum = enum)
+
+internal fun intParam(description: String, min: Int? = null, max: Int? = null): Schema =
+    Schema(
+        type = Type.INTEGER,
+        description = description,
+        minimum = min?.toDouble(),
+        maximum = max?.toDouble(),
+    )
+
+internal fun arrayParam(description: String): Schema =
+    Schema(type = Type.ARRAY, description = description, items = Schema(type = Type.STRING))
 
 /** 站内搜索。 */
 internal class ZhihuSearchTool(api: ZhihuApi, secretProvider: () -> String) :

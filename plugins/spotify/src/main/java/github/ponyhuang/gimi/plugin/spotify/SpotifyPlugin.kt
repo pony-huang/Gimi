@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.plugin.spotify
 
 import android.content.Context
 import com.google.adk.kt.tools.BaseTool
+import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.plugin.spotify.tools.authTools
 import github.ponyhuang.gimi.plugin.spotify.tools.libraryTools
 import github.ponyhuang.gimi.plugin.spotify.tools.performLogin
@@ -30,6 +31,7 @@ class SpotifyPlugin : AgentPlugin {
     override val pluginId: String = "spotify"
     override val displayName: String = "Spotify"
     override val version: Int = 1
+    override val toolCount: Int = 29
 
     override val config: PluginConfig = PluginConfig(
         fields = listOf(
@@ -74,12 +76,10 @@ class SpotifyPlugin : AgentPlugin {
         SpotifyApi(tokenStore, auth)
     }
 
-    /**
-     * 工具列表一次构建并缓存；工具内的 clientId/clientSecret/redirectUri/appContext 均通过
-     * 闭包按调用时读取，配置变更无需重建。宿主会在每次描述与 Agent 构建时调用 [tools]，
-     * 复用同一批实例避免反复构造 29 个工具。
-     */
-    override fun tools(): List<BaseTool> = toolList
+    /** 工具集与工具列表均复用实例，配置值仍由各工具在调用时通过闭包读取。 */
+    override fun toolSets(): List<Toolset> = toolSets
+
+    private val toolSets: List<Toolset> by lazy { listOf(SpotifyToolset { toolList }) }
 
     private val toolList: List<BaseTool> by lazy {
         buildList {

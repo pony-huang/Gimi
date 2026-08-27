@@ -1,20 +1,30 @@
 package github.ponyhuang.gimi.plugin.xiaohongshu
 
+import com.google.adk.kt.models.LlmRequest
+import com.google.adk.kt.tools.ToolContext
+import com.google.adk.kt.types.Content
+import com.google.adk.kt.types.GenerateContentConfig
+import com.google.adk.kt.types.Part
 import github.ponyhuang.gimi.pluginapi.PluginConfigAction
-import org.junit.Assert.assertNotNull
+import io.mockk.mockk
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class XiaohongshuPluginTest {
 
     @Test
-    fun pluginExposesReferenceProjectCapabilitiesWithoutServerConfiguration() {
+    fun pluginExposesReferenceProjectCapabilitiesThroughToolset() = runTest {
         val plugin = XiaohongshuPlugin(injectedService = FakeXiaohongshuService())
 
         assertEquals("xiaohongshu", plugin.pluginId)
         assertEquals("小红书", plugin.displayName)
         assertTrue(plugin.config.fields.isEmpty())
+        assertTrue(plugin.tools().isEmpty())
+        assertEquals(18, plugin.toolCount)
+        val toolset = plugin.toolSets().single()
         assertEquals(
             listOf(
                 PluginConfigAction(id = "login", label = "登录小红书"),
@@ -43,8 +53,26 @@ class XiaohongshuPluginTest {
                 "reply_notification",
                 "like_notification",
             ),
-            plugin.tools().map { it.name },
+            toolset.getTools(null).map { it.name },
         )
+
+        val request = LlmRequest(
+            config = GenerateContentConfig(
+                systemInstruction = Content(parts = listOf(Part(text = "Base instruction"))),
+            ),
+        )
+        val processed = toolset.processLlmRequest(mockk<ToolContext>(), request)
+        val instructions = processed.config.systemInstruction
+            ?.parts
+            .orEmpty()
+            .mapNotNull(Part::text)
+            .joinToString("\n")
+
+        assertTrue(instructions.contains("Base instruction"))
+        assertTrue(instructions.contains("<xiaohongshu>"))
+        assertTrue(instructions.contains("feed_id"))
+        assertTrue(instructions.contains("xsec_token"))
+        assertTrue(instructions.contains("publish_content"))
     }
 
     @Test

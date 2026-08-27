@@ -44,6 +44,11 @@ class AgentPluginTest {
     }
 
     @Test
+    fun declaredToolCountDefaultsToDirectTools() {
+        assertEquals(0, plugin().toolCount)
+    }
+
+    @Test
     fun configDescriptorPreservesFieldMetadata() {
         val config = PluginConfig(
             fields = listOf(

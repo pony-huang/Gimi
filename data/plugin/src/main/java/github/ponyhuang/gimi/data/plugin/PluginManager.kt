@@ -142,7 +142,7 @@ class PluginManager @Inject constructor(
             name = plugin.displayName,
             packageName = loadedPlugin.packageName,
             version = plugin.version,
-            toolCount = plugin.tools().size,
+            toolCount = plugin.toolCount,
             isEnabled = plugin.pluginId !in disabledIds,
         )
     }

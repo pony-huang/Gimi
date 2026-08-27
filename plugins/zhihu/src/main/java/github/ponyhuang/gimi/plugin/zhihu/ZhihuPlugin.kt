@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.plugin.zhihu
 
 import com.google.adk.kt.tools.BaseTool
+import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import github.ponyhuang.gimi.pluginapi.PluginConfig
 import github.ponyhuang.gimi.pluginapi.PluginConfigField
@@ -17,6 +18,7 @@ class ZhihuPlugin(
 ) : AgentPlugin {
 
     override val displayName: String = "知乎"
+    override val toolCount: Int = 4
 
     override val config: PluginConfig = PluginConfig(
         fields = listOf(
@@ -32,8 +34,10 @@ class ZhihuPlugin(
         accessSecret = values[KEY_ACCESS_SECRET].orEmpty()
     }
 
-    /** 工具列表一次构建并缓存；工具内的 accessSecret 经闭包按调用时读取，配置变更无需重建。 */
-    override fun tools(): List<BaseTool> = toolList
+    /** 工具集与工具列表均复用实例；accessSecret 仍由工具在调用时通过闭包读取。 */
+    override fun toolSets(): List<Toolset> = toolSets
+
+    private val toolSets: List<Toolset> by lazy { listOf(ZhihuToolset { toolList }) }
 
     private val toolList: List<BaseTool> by lazy {
         listOf(

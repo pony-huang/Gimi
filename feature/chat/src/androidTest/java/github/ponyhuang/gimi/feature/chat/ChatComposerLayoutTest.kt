@@ -2,14 +2,20 @@ package github.ponyhuang.gimi.feature.chat
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextContains
@@ -36,13 +42,98 @@ class ChatComposerLayoutTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun emptyComposerShowsLeftToolsAndMicrophoneWithoutSend() {
+    fun unfocusedEmptyComposerUsesCompactControls() {
         setComposer()
 
         composeRule.onNodeWithTag("chat_composer_add").assertIsDisplayed()
-        composeRule.onNodeWithTag("chat_composer_model_picker").assertIsDisplayed()
+        composeRule.onNodeWithTag("chat_composer_model_picker").assertDoesNotExist()
         composeRule.onNodeWithTag("chat_composer_microphone").assertIsDisplayed()
         composeRule.onNodeWithTag("chat_composer_send").assertDoesNotExist()
+    }
+
+    @Test
+    fun focusedEmptyComposerExpandsAndShowsModelSelector() {
+        setComposer()
+
+        composeRule.onNodeWithTag("chat_composer_text_field").performClick()
+
+        composeRule.onNodeWithTag("chat_composer_model_picker").assertIsDisplayed()
+    }
+
+    @Test
+    fun focusedComposerIsWiderThanUnfocusedComposer() {
+        setComposer()
+        val compactWidth = composeRule.onNodeWithTag("chat_composer_surface")
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .width
+
+        composeRule.onNodeWithTag("chat_composer_text_field").performClick()
+        composeRule.waitForIdle()
+
+        val expandedWidth = composeRule.onNodeWithTag("chat_composer_surface")
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .width
+        assert(expandedWidth > compactWidth)
+    }
+
+    @Test
+    fun focusedComposerIsTallerThanUnfocusedComposer() {
+        setComposer()
+        val compactHeight = composeRule.onNodeWithTag("chat_composer_surface")
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .height
+
+        composeRule.onNodeWithTag("chat_composer_text_field").performClick()
+        composeRule.waitForIdle()
+
+        val expandedHeight = composeRule.onNodeWithTag("chat_composer_surface")
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .height
+        assert(expandedHeight > compactHeight)
+    }
+
+    @Test
+    fun retainedComposerKeepsModelSelectorVisibleWithoutTextFocus() {
+        setComposer(retainExpanded = true)
+
+        composeRule.onNodeWithTag("chat_composer_model_picker").assertIsDisplayed()
+    }
+
+    @Test
+    fun releasingRetainedComposerRestoresTextInputFocus() {
+        lateinit var retainExpanded: MutableState<Boolean>
+        lateinit var focusManager: FocusManager
+        composeRule.setContent {
+            retainExpanded = remember { mutableStateOf(false) }
+            focusManager = LocalFocusManager.current
+            MaterialTheme {
+                ChatComposer(
+                    onSendClick = { true },
+                    onStopClick = { },
+                    isGenerating = false,
+                    isVoiceInputAvailable = true,
+                    retainExpanded = retainExpanded.value,
+                    modelSelectorContent = {
+                        Text(
+                            text = "Test model",
+                            modifier = Modifier.testTag("chat_composer_model_picker"),
+                        )
+                    },
+                )
+            }
+        }
+        composeRule.onNodeWithTag("chat_composer_text_field").performClick()
+        composeRule.runOnIdle {
+            retainExpanded.value = true
+            focusManager.clearFocus()
+        }
+        composeRule.runOnIdle { retainExpanded.value = false }
+
+        composeRule.onNodeWithTag("chat_composer_text_field").assertIsFocused()
     }
 
     @Test
@@ -192,6 +283,7 @@ class ChatComposerLayoutTest {
         messageData: MessageData = MessageData(),
         isGenerating: Boolean = false,
         addToChatState: ChatAddToChatState = ChatAddToChatState(),
+        retainExpanded: Boolean = false,
         onToolAccessModeChange: (ToolAccessMode) -> Unit = {},
         onSendClick: (MessageData) -> Boolean = { true },
     ) {
@@ -203,6 +295,7 @@ class ChatComposerLayoutTest {
                     isGenerating = isGenerating,
                     messageData = messageData,
                     isVoiceInputAvailable = true,
+                    retainExpanded = retainExpanded,
                     addToChatState = addToChatState,
                     onToolAccessModeChange = onToolAccessModeChange,
                     modelSelectorContent = {

@@ -167,6 +167,7 @@ fun ChatScaffold(
     }
     // 只要用户仍停留在底部，就让流式内容增长持续跟随；用户向上浏览历史时则停止抢占滚动。
     var shouldFollowLatest by remember { mutableStateOf(true) }
+    var isModelPickerVisible by remember { mutableStateOf(false) }
     val latestItemIndex by rememberUpdatedState(visibleMessages.size)
 
     LaunchedEffect(visibleMessages.size, pendingToolConfirmation?.confirmationCallId) {
@@ -296,6 +297,7 @@ fun ChatScaffold(
                     onOfficialToolFunctionsRetry = onOfficialToolFunctionsRetry,
                     sharedMediaUris = sharedMediaUris,
                     onSharedMediaConsumed = onSharedMediaConsumed,
+                    retainExpanded = isModelPickerVisible,
                     modelSelectorContent = {
                         ModelTitleAndPicker(
                             services = state.availableLLMModelSettings,
@@ -305,6 +307,7 @@ fun ChatScaffold(
                             onConfigureModels = onConfigureModels,
                             onSelectModel = onSelectModel,
                             onModelSwitchBlocked = onModelSwitchBlocked,
+                            onPickerVisibilityChange = { isModelPickerVisible = it },
                         )
                     },
                 )

@@ -13,7 +13,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -126,16 +125,18 @@ public fun SpeechToTextButton(
 
 @Composable
 internal fun DefaultIdleContent(onClick: () -> Unit, enabled: Boolean = true) {
-    FilledIconButton(
+    val colorScheme = MaterialTheme.colorScheme
+    IconButton(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier
             .size(48.dp)
             .testTag("chat_composer_microphone"),
-        colors = IconButtonDefaults.filledIconButtonColors(
-            // 输入栏背景已是 surfaceContainer，按钮再抬一级形成清晰层级
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        colors = IconButtonDefaults.iconButtonColors(
+            containerColor = composerActionContainerColor(),
+            contentColor = composerActionIconColor(colorScheme, enabled = true),
+            disabledContainerColor = composerActionContainerColor(),
+            disabledContentColor = composerActionIconColor(colorScheme, enabled = false),
         ),
     ) {
         Icon(
@@ -145,6 +146,7 @@ internal fun DefaultIdleContent(onClick: () -> Unit, enabled: Boolean = true) {
             } else {
                 stringResource(R.string.chat_stt_configure_default_first)
             },
+            tint = composerActionIconColor(colorScheme, enabled),
         )
     }
 }

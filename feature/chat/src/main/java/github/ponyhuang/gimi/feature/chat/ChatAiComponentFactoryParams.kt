@@ -26,7 +26,8 @@ public data class ComposerLeadingContentParams(
  * @param onSendClick Called when the user sends the message.
  * @param onStopClick Called when the user stops AI generation.
  * @param onVoiceInputStart Called when the user starts voice input.
- * @param onVoiceInputStart Called when microphone permission has been granted and capture should begin.
+ * @param retainExpanded Whether an active child surface requires the composer to stay expanded.
+ * @param onExpandedChange Called when the default input switches between compact and expanded layouts.
  */
 public data class ComposerInputContentParams(
     val messageData: MessageData,
@@ -40,6 +41,8 @@ public data class ComposerInputContentParams(
     val onSendClick: () -> Unit,
     val onStopClick: () -> Unit,
     val onVoiceInputStart: () -> Unit,
+    val retainExpanded: Boolean = false,
+    val onExpandedChange: (Boolean) -> Unit = { },
     val onAttachmentsClick: () -> Unit = { },
     val modelSelectorContent: @Composable () -> Unit = { },
 )

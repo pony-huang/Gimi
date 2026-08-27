@@ -8,6 +8,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia
 import github.ponyhuang.gimi.core.audio.VoiceAudioRecorder
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -87,6 +91,7 @@ import kotlinx.coroutines.launch
  * @param modifier The modifier to be applied to the composer.
  * @param messageData The initial message data to be displayed in the input field.
  * @param modelSelectorContent Model selection control rendered beside the attachment button.
+ * @param retainExpanded Whether an active child surface requires the composer to stay expanded.
  */
 @Composable
 public fun ChatComposer(
@@ -101,6 +106,7 @@ public fun ChatComposer(
     onVoiceInputError: (Throwable) -> Unit = { },
     isVoiceInputAvailable: Boolean = false,
     onTranscribeVoice: suspend (ByteArray) -> String = { error("transcription not configured") },
+    retainExpanded: Boolean = false,
     modelSelectorContent: @Composable () -> Unit = { },
     addToChatState: ChatAddToChatState = ChatAddToChatState(),
     onLocalToolEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
@@ -120,6 +126,7 @@ public fun ChatComposer(
     var showAttachmentOptions by rememberSaveable { mutableStateOf(false) }
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCameraPath by rememberSaveable { mutableStateOf<String?>(null) }
+    var isComposerExpanded by remember { mutableStateOf(messageData.attachments.isNotEmpty()) }
     var voiceInputState: VoiceInputUiState by remember { mutableStateOf(VoiceInputUiState.Idle) }
     var voiceErrorMessage by remember { mutableStateOf<String?>(null) }
     val voiceAudio = remember { VoicePcmBuffer() }
@@ -350,15 +357,30 @@ public fun ChatComposer(
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .fillMaxWidth(),
     ) {
+        val recordingState = voiceInputState as? VoiceInputUiState.Recording
+        val composerHorizontalInset by animateDpAsState(
+            targetValue = if (isComposerExpanded || retainExpanded || recordingState != null) {
+                0.dp
+            } else {
+                20.dp
+            },
+            animationSpec = tween(
+                durationMillis = 260,
+                easing = FastOutSlowInEasing,
+            ),
+            label = "composerHorizontalInset",
+        )
         Surface(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .padding(horizontal = composerHorizontalInset)
+                .fillMaxWidth()
+                .testTag("chat_composer_surface"),
             shape = RoundedCornerShape(28.dp),
             // 用中性容器色而非 surface+tonalElevation：后者会叠加 primary 色偏蓝，
             // 浅色下与白色背景拉不开、深色下过亮。
             color = MaterialTheme.colorScheme.surfaceContainer,
             tonalElevation = 0.dp,
         ) {
-            val recordingState = voiceInputState as? VoiceInputUiState.Recording
             if (recordingState != null) {
                 with(componentFactory) {
                     VoiceRecordingContent(
@@ -391,6 +413,8 @@ public fun ChatComposer(
                                 onSendClick = handleSendClick,
                                 onStopClick = onStopClick,
                                 onVoiceInputStart = ::startVoiceInput,
+                                retainExpanded = retainExpanded,
+                                onExpandedChange = { isComposerExpanded = it },
                                 onAttachmentsClick = { showAttachmentOptions = true },
                                 modelSelectorContent = modelSelectorContent,
                             ),

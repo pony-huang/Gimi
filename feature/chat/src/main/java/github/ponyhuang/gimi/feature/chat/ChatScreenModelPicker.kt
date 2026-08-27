@@ -146,6 +146,7 @@ fun ModelStatusDisplay(
  *
  * @param viewModel    [ChatViewModel]；选中新模型后持久化会话配置。
  * @param isAgentRunning 当前 Agent turn 是否仍在进行。
+ * @param onPickerVisibilityChange 模型选择弹窗显示状态变化回调。
  * @param modifier     修饰符，会透传给根 `Box`（用于在 TopAppBar 内做居中布局）。
  */
 @Composable
@@ -157,6 +158,7 @@ fun ModelTitleAndPicker(
     onConfigureModels: () -> Unit,
     onSelectModel: (ModelSelection) -> Unit,
     onModelSwitchBlocked: () -> Unit,
+    onPickerVisibilityChange: (Boolean) -> Unit = { },
     modifier: Modifier = Modifier,
 ) {
     // 解析后用于 TopAppBar 中央显示的模型。显式选择命中走 resolveSelection，
@@ -217,6 +219,7 @@ fun ModelTitleAndPicker(
                             onModelSwitchBlocked()
                         } else {
                             showModelPicker = true
+                            onPickerVisibilityChange(true)
                         }
                     }
                 }
@@ -259,8 +262,12 @@ fun ModelTitleAndPicker(
                     )
                 )
                 showModelPicker = false
+                onPickerVisibilityChange(false)
             },
-            onDismiss = { showModelPicker = false },
+            onDismiss = {
+                showModelPicker = false
+                onPickerVisibilityChange(false)
+            },
         )
     }
 }

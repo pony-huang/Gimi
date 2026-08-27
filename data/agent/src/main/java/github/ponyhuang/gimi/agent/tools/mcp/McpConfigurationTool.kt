@@ -110,11 +110,14 @@ class McpConfigurationTool @Inject constructor(
             "When a user message clearly contains an MCP server configuration, call " +
                 "import_mcp_servers with the complete configuration content in JSON or curl " +
                 "format. Do not call it for unrelated JSON, curl commands, or secrets, and do " +
-                "not invent missing MCP endpoint fields. If that tool reports credentials_required " +
-                "and the user subsequently supplies a token or an Authorization value, call " +
-                "update_mcp_server_authorization with exactly that value; it targets only the " +
-                "current conversation's pending MCP server. Sending a clear MCP configuration " +
-                "or requested credential is authorization for that update, so do not ask for an " +
-                "additional confirmation and never repeat the credential in your response."
+                "not invent missing MCP endpoint fields. When the user instead describes an MCP " +
+                "server with individual fields such as a name, endpoint, transport, or token, " +
+                "call configure_mcp_server instead of import_mcp_servers. If import_mcp_servers " +
+                "reports credentials_required and the user subsequently supplies a token or an " +
+                "Authorization value, call update_mcp_server_authorization with exactly that " +
+                "value; it targets only the current conversation's pending MCP server. Sending " +
+                "a clear MCP configuration or requested credential is authorization for that " +
+                "update, so do not ask for an additional confirmation and never repeat the " +
+                "credential in your response."
     }
 }

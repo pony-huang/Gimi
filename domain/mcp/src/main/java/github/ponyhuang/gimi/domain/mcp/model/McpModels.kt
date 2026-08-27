@@ -64,3 +64,29 @@ data class McpCredentialUpdateResult(
     val serverName: String? = null,
     val error: String? = null,
 )
+
+/**
+ * Agent 手动配置单个 MCP server 并尝试同步当前会话选择的结果。
+ *
+ * 与批量导入一样按名称定位：同名已存在则更新，否则新建。会话选择是否写入取决于
+ * [enabled]：启用时把 server 加入当前会话工具选择，停用时从选择中移除。
+ *
+ * @property serverId 被创建或更新的服务器稳定 ID。
+ * @property serverName 安全展示给模型的服务器名称（不包含端点或凭据）。
+ * @property created 是否新建了服务器。
+ * @property updated 是否更新了已有服务器。
+ * @property conversationActivated 会话选择是否已反映本次请求（启用为加入、停用为移除）。
+ * @property error 字段无效或持久化失败时的安全错误信息。
+ */
+data class McpManualConfigurationResult(
+    val serverId: String,
+    val serverName: String,
+    val created: Boolean,
+    val updated: Boolean,
+    val conversationActivated: Boolean,
+    val error: String? = null,
+) {
+    /** 配置本身是否成功落盘；与会话激活状态无关，避免停用场景误报失败。 */
+    val configured: Boolean
+        get() = error == null && (created || updated)
+}

@@ -3,8 +3,10 @@ package github.ponyhuang.gimi.domain.mcp.usecase
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.mcp.model.McpConversationImportResult
 import github.ponyhuang.gimi.domain.mcp.model.McpCredentialUpdateResult
+import github.ponyhuang.gimi.domain.mcp.model.McpManualConfigurationResult
 import github.ponyhuang.gimi.domain.mcp.model.McpProbeResult
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
+import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 import github.ponyhuang.gimi.domain.mcp.repository.McpConnectionTester
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import javax.inject.Inject
@@ -60,6 +62,107 @@ class ImportMcpServersForConversationUseCase @Inject constructor(
             updated,
         )
         return McpConversationImportResult(importResult, conversationActivated = activated)
+    }
+}
+
+/**
+ * 从 Agent 手动配置单个 MCP server（名称、端点、传输、认证、请求头），
+ * 并按名称新建或更新后同步到当前会话工具选择。
+ *
+ * 与 [ImportMcpServersForConversationUseCase] 的批量导入互补：用户用自然语言描述
+ * 服务器字段（而非粘贴完整 JSON/curl）时使用本用例。字段校验在用例内完成，
+ * 返回结果不包含端点 URL 或任何凭据，避免再次暴露给模型。
+ */
+class ConfigureMcpServerForConversationUseCase @Inject constructor(
+    private val mcpRepository: McpRepository,
+    private val conversationRepository: ConversationRepository,
+) {
+    suspend operator fun invoke(
+        sessionId: String,
+        name: String,
+        endpointUrl: String,
+        transport: McpTransport,
+        description: String = "",
+        bearerToken: String = "",
+        headers: String = "",
+        enabled: Boolean = true,
+    ): McpManualConfigurationResult {
+        val normalizedName = name.trim()
+        val normalizedEndpoint = endpointUrl.trim()
+        val validationError = when {
+            normalizedName.isEmpty() -> "MCP server name is required."
+            normalizedEndpoint.isEmpty() -> "MCP server endpoint URL is required."
+            normalizedName.length > MAX_FIELD_CHARACTERS ||
+                normalizedEndpoint.length > MAX_FIELD_CHARACTERS -> {
+                "MCP server fields are too long."
+            }
+            normalizedEndpoint.startsWith("http://", ignoreCase = true).not() &&
+                normalizedEndpoint.startsWith("https://", ignoreCase = true).not() -> {
+                "MCP server endpoint must be an http or https URL."
+            }
+            else -> null
+        }
+        if (validationError != null) {
+            return McpManualConfigurationResult(
+                serverId = "",
+                serverName = normalizedName,
+                created = false,
+                updated = false,
+                conversationActivated = false,
+                error = validationError,
+            )
+        }
+
+        val existing = mcpRepository.currentServers().firstOrNull {
+            it.name.trim().equals(normalizedName, ignoreCase = true)
+        }
+        val server = if (existing == null) {
+            McpServer(
+                name = normalizedName,
+                description = description.trim(),
+                endpointUrl = normalizedEndpoint,
+                transport = transport,
+                bearerToken = bearerToken.trim(),
+                headers = headers.trim(),
+                isEnabled = enabled,
+            )
+        } else {
+            existing.copy(
+                name = normalizedName,
+                description = description.trim(),
+                endpointUrl = normalizedEndpoint,
+                transport = transport,
+                bearerToken = bearerToken.trim(),
+                headers = headers.trim(),
+                isEnabled = enabled,
+            )
+        }
+        mcpRepository.save(server)
+
+        val current = conversationRepository.conversationToolConfiguration(sessionId)
+        val conversationActivated = if (current == null) {
+            false
+        } else {
+            val nextIds = if (enabled) {
+                current.enabledMcpServerIds + server.id
+            } else {
+                current.enabledMcpServerIds - server.id
+            }
+            val updated = current.copy(enabledMcpServerIds = nextIds)
+            updated == current ||
+                conversationRepository.setConversationToolConfiguration(sessionId, updated)
+        }
+        return McpManualConfigurationResult(
+            serverId = server.id,
+            serverName = server.name.ifBlank { server.id },
+            created = existing == null,
+            updated = existing != null,
+            conversationActivated = conversationActivated,
+        )
+    }
+
+    private companion object {
+        const val MAX_FIELD_CHARACTERS = 2_048
     }
 }
 

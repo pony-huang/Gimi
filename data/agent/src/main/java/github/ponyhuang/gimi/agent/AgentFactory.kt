@@ -10,6 +10,7 @@ import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.agent.tools.mcp.ConversationMcpToolset
 import github.ponyhuang.gimi.agent.tools.mcp.McpAuthorizationTool
 import github.ponyhuang.gimi.agent.tools.mcp.McpConfigurationTool
+import github.ponyhuang.gimi.agent.tools.mcp.McpManualConfigurationTool
 import github.ponyhuang.gimi.agent.tools.official.SearchOfficialToolset
 import github.ponyhuang.gimi.agent.tools.official.OfficialToolset
 import github.ponyhuang.gimi.agent.tools.search.LocalToolSource
@@ -60,6 +61,7 @@ class AgentFactory @Inject constructor(
     private val toolVectorSearch: ToolVectorSearch,
     private val mcpConfigurationTool: McpConfigurationTool,
     private val mcpAuthorizationTool: McpAuthorizationTool,
+    private val mcpManualConfigurationTool: McpManualConfigurationTool,
     private val pluginManager: PluginManager,
 ) {
     /**
@@ -153,6 +155,7 @@ class AgentFactory @Inject constructor(
             )
             add(mcpConfigurationTool)
             add(mcpAuthorizationTool)
+            add(mcpManualConfigurationTool)
             // 每次构建 Agent 时读取当前启用的插件工具，使开关/配置在下次请求立即生效。
             addAll(pluginManager.enabledPluginTools())
         },

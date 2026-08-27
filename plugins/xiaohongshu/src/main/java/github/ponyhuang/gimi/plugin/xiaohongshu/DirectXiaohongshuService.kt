@@ -106,9 +106,9 @@ internal class DirectXiaohongshuService(
         ).also(SearchFilters::validate)
         val url = "$SEARCH_URL?keyword=${encode(keyword)}&source=web_explore_feed"
         browser.navigate(url)
-        // 与参考实现一致：搜索只等 __INITIAL_STATE__ 根对象（首屏即在），不再等
-        // search.feeds 数据数组就绪——该条件部分页面不满足，会把 60s 等满造成超时。
-        require(browser.waitUntil(INITIAL_STATE_SCRIPT, PAGE_TIMEOUT_MS)) { "小红书搜索页加载超时" }
+        // 根状态在首屏就存在，搜索结果稍后才注水；给结果一个短等待窗口，
+        // 但不把真正的零结果误报成超时。
+        browser.waitUntil(SEARCH_FEEDS_READY_SCRIPT, DATA_READY_TIMEOUT_MS)
         if (filters.hasAny) {
             // 记下筛选前的结果 ID；点完筛选项后站点会先清空再灌入新数据，
             // 需等到结果集变化后再读，否则读到的是空或筛选前的旧数据（对齐参考实现）。
@@ -123,7 +123,8 @@ internal class DirectXiaohongshuService(
         val feedId = args.string("feed_id")
         val token = args.string("xsec_token")
         browser.navigate("$EXPLORE_URL/${encodePath(feedId)}?xsec_token=${encode(token)}&xsec_source=pc_feed")
-        require(browser.waitUntil(NOTE_DETAIL_SCRIPT, PAGE_TIMEOUT_MS)) { "小红书笔记详情加载超时" }
+        // 连续跳转时旧页面也可能已有空的 noteDetailMap；必须等目标笔记本身出现。
+        browser.waitUntil(noteDetailReadyScript(feedId), DATA_READY_TIMEOUT_MS)
         if (args["load_all_comments"] == true) loadComments(args)
         val map = jsonObject(browser.evaluate(FEED_DETAIL_SCRIPT))
         val detail = map[feedId] ?: throw IllegalStateException("详情中未找到笔记 $feedId")
@@ -701,6 +702,10 @@ internal class DirectXiaohongshuService(
     private fun encode(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
     private fun encodePath(value: String): String = encode(value).replace("+", "%20")
 
+    private fun noteDetailReadyScript(feedId: String): String =
+        "Object.prototype.hasOwnProperty.call(" +
+            "window.__INITIAL_STATE__?.note?.noteDetailMap || {}, ${JSONObject.quote(feedId)})"
+
     companion object {
         private const val HOME_URL = "https://www.xiaohongshu.com"
         private const val EXPLORE_URL = "$HOME_URL/explore"
@@ -815,6 +820,10 @@ internal class DirectXiaohongshuService(
               return JSON.stringify(f ? (f.value !== undefined ? f.value : f._value) : []);
             })()
         """
+        private const val SEARCH_FEEDS_READY_SCRIPT =
+            "(() => { const f = window.__INITIAL_STATE__?.search?.feeds; " +
+                "const v = f ? (f.value !== undefined ? f.value : f._value) : null; " +
+                "return Array.isArray(v) && v.length > 0; })()"
         private const val FEED_DETAIL_SCRIPT =
             "JSON.stringify(window.__INITIAL_STATE__?.note?.noteDetailMap || {})"
         private const val FEEDS_READY_SCRIPT =

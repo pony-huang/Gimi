@@ -33,6 +33,8 @@ class DirectXiaohongshuServiceTest {
             "https://www.xiaohongshu.com/search_result?keyword=%E4%B8%8A%E6%B5%B7+%E5%92%96%E5%95%A1&source=web_explore_feed",
             browser.navigations.single(),
         )
+        assertTrue(browser.waitScripts.single().contains("search?.feeds"))
+        assertTrue(browser.waitScripts.single().contains("length > 0"))
         assertTrue(browser.evaluationScripts.single().contains("__INITIAL_STATE__.search.feeds"))
         assertEquals(1, result["count"])
         assertEquals("feed-1", ((result["feeds"] as List<*>).single() as Map<*, *>)["id"])
@@ -311,6 +313,7 @@ class DirectXiaohongshuServiceTest {
             ),
         )
 
+        assertTrue(browser.waitScripts.first().contains("feed-1"))
         assertTrue(browser.evaluationScripts.first().contains(".parent-comment"))
         assertTrue(browser.evaluationScripts.first().contains("more"))
         assertEquals(3, browser.evaluationScripts.size)

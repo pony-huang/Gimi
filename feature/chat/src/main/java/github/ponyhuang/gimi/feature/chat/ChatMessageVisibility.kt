@@ -34,6 +34,7 @@ internal fun Message.isVisibleInChat(showToolActivity: Boolean): Boolean =
         textParts.isNotEmpty() ||
         fileAttachments.isNotEmpty() ||
         functionResponses.any { it.localFileSearchResult?.files?.isNotEmpty() == true } ||
+        functionResponses.any { it.remoteImageResult?.images?.isNotEmpty() == true } ||
         (showToolActivity && (visibleFunctionCalls().isNotEmpty() || visibleFunctionResponses().isNotEmpty()))
 
 /**

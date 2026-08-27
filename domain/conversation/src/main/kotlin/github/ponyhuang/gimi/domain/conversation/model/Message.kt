@@ -138,11 +138,13 @@ data class FunctionCallView(
  * @param id 工具调用 id（与 FunctionCall 配对）
  * @param name 工具名
  * @param localFileSearchResult 本地文件搜索工具返回的结构化结果
+ * @param remoteImageResult 工具响应中可直接展示的远程图片集合
  */
 data class FunctionResponseView(
     val id: String,
     val name: String,
     val localFileSearchResult: LocalFileSearchResult? = null,
+    val remoteImageResult: RemoteImageResult? = null,
 )
 
 /**

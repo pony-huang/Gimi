@@ -38,6 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil3.compose.AsyncImage
 import kotlin.math.max
 
 /** Current zoom and pan values for the full-screen image preview. */
@@ -74,6 +75,57 @@ internal fun ZoomableImagePreviewDialog(
     loadBitmap: suspend (targetSize: Int) -> Bitmap?,
     onDismiss: () -> Unit,
 ) {
+    ZoomableImagePreviewFrame(
+        imageKey = imageKey,
+        onDismiss = onDismiss,
+    ) { imageModifier, targetSize ->
+        var bitmap by remember(imageKey, targetSize) { mutableStateOf<Bitmap?>(null) }
+
+        LaunchedEffect(imageKey, targetSize) {
+            bitmap = loadBitmap(targetSize)
+        }
+        DisposableEffect(bitmap) {
+            val managedBitmap = bitmap
+            onDispose { managedBitmap?.recycle() }
+        }
+
+        bitmap?.let { currentBitmap ->
+            Image(
+                bitmap = currentBitmap.asImageBitmap(),
+                contentDescription = contentDescription,
+                modifier = imageModifier,
+                contentScale = ContentScale.Fit,
+            )
+        }
+    }
+}
+
+/** Full-screen zoomable preview for a structured HTTPS image. */
+@Composable
+internal fun ZoomableRemoteImagePreviewDialog(
+    url: String,
+    contentDescription: String,
+    onDismiss: () -> Unit,
+) {
+    ZoomableImagePreviewFrame(
+        imageKey = url,
+        onDismiss = onDismiss,
+    ) { imageModifier, _ ->
+        AsyncImage(
+            model = url,
+            contentDescription = contentDescription,
+            modifier = imageModifier,
+            contentScale = ContentScale.Fit,
+        )
+    }
+}
+
+@Composable
+private fun ZoomableImagePreviewFrame(
+    imageKey: Any,
+    onDismiss: () -> Unit,
+    image: @Composable (modifier: Modifier, targetSize: Int) -> Unit,
+) {
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
@@ -87,7 +139,6 @@ internal fun ZoomableImagePreviewDialog(
             val density = LocalDensity.current
             val viewportSize = with(density) { Size(maxWidth.toPx(), maxHeight.toPx()) }
             val targetSize = max(viewportSize.width, viewportSize.height).toInt()
-            var bitmap by remember(imageKey, targetSize) { mutableStateOf<Bitmap?>(null) }
             var transform by remember(imageKey) { mutableStateOf(ImagePreviewTransform()) }
             val transformableState = rememberTransformableState { zoomChange, panChange, _ ->
                 transform = updateImagePreviewTransform(
@@ -96,14 +147,6 @@ internal fun ZoomableImagePreviewDialog(
                     panChange = panChange,
                     viewportSize = viewportSize,
                 )
-            }
-
-            LaunchedEffect(imageKey, targetSize) {
-                bitmap = loadBitmap(targetSize)
-            }
-            DisposableEffect(bitmap) {
-                val managedBitmap = bitmap
-                onDispose { managedBitmap?.recycle() }
             }
 
             Box(
@@ -123,21 +166,17 @@ internal fun ZoomableImagePreviewDialog(
                     .transformable(transformableState),
                 contentAlignment = Alignment.Center,
             ) {
-                bitmap?.let { currentBitmap ->
-                    Image(
-                        bitmap = currentBitmap.asImageBitmap(),
-                        contentDescription = contentDescription,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                scaleX = transform.scale
-                                scaleY = transform.scale
-                                translationX = transform.offset.x
-                                translationY = transform.offset.y
-                            },
-                        contentScale = ContentScale.Fit,
-                    )
-                }
+                image(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = transform.scale
+                            scaleY = transform.scale
+                            translationX = transform.offset.x
+                            translationY = transform.offset.y
+                        },
+                    targetSize,
+                )
             }
 
             FilledIconButton(

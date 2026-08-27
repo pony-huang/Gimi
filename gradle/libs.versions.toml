@@ -32,6 +32,7 @@ androidxAnnotation = "1.9.1"
 androidxActivity = "1.13.0"
 kotlinxSerialization = "1.9.0"
 exifinterface = "1.3.6"
+coil = "3.5.0"
 
 [libraries]
 javax-inject = { module = "javax.inject:javax.inject", version.ref = "javaxInject" }
@@ -92,6 +93,8 @@ mcp-kotlin-client = { module = "io.modelcontextprotocol:kotlin-sdk-client", vers
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

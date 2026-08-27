@@ -6,6 +6,8 @@ import github.ponyhuang.gimi.domain.conversation.model.LocalFileReference
 import github.ponyhuang.gimi.domain.conversation.model.LocalFileSearchResult
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
+import github.ponyhuang.gimi.domain.conversation.model.RemoteImageReference
+import github.ponyhuang.gimi.domain.conversation.model.RemoteImageResult
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -13,6 +15,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatMessageVisibilityTest {
+
+    @Test
+    fun `remote image results stay visible when tool activity is hidden`() {
+        val message = assistantMessage(
+            functionResponses = listOf(
+                FunctionResponseView(
+                    id = "images-1",
+                    name = "image_tool",
+                    remoteImageResult = RemoteImageResult(
+                        images = listOf(RemoteImageReference("https://example.com/photo")),
+                    ),
+                ),
+            ),
+        )
+
+        assertTrue(message.isVisibleInChat(showToolActivity = false))
+    }
 
     @Test
     fun `local file search results stay visible when tool activity is hidden`() {

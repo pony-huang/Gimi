@@ -138,4 +138,5 @@
     <string name="chat_local_file_results_unavailable">Search results are no longer available</string>
     <string name="chat_local_file_image">Image: %1$s</string>
     <string name="chat_local_file_image_preview">Image preview: %1$s</string>
+    <string name="chat_remote_image">Remote image %1$d</string>
 </resources>

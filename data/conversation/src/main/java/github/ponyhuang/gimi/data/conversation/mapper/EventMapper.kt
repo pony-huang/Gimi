@@ -11,6 +11,7 @@ import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.parseLocalFileSearchResult
+import github.ponyhuang.gimi.domain.conversation.model.parseRemoteImageResult
 import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import java.io.File
@@ -220,6 +221,7 @@ object EventMapper {
             id = id.orEmpty(),
             name = name,
             localFileSearchResult = parseLocalFileSearchResult(name, response),
+            remoteImageResult = parseRemoteImageResult(response),
         )
 
     private fun summarizeValue(v: Any?): String = when (v) {

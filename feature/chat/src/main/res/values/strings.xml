@@ -148,4 +148,5 @@
     <string name="chat_local_file_results_unavailable">搜索结果已不可用</string>
     <string name="chat_local_file_image">图片：%1$s</string>
     <string name="chat_local_file_image_preview">图片预览：%1$s</string>
+    <string name="chat_remote_image">远程图片 %1$d</string>
 </resources>

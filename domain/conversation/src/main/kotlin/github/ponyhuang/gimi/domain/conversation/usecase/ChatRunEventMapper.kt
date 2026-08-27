@@ -86,6 +86,7 @@ fun ChatFunctionResponse.toView(): FunctionResponseView =
         id = id.orEmpty(),
         name = name,
         localFileSearchResult = localFileSearchResult,
+        remoteImageResult = remoteImageResult,
     )
 
 fun summarizeValue(value: Any?): String = when (value) {

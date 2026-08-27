@@ -33,6 +33,9 @@ interface AgentPlugin : Plugin {
     /** 插件自身版本，供宿主做启用/升级判断。 */
     val version: Int
 
+    /** 插件向 Agent 声明的工具总数；动态 Toolset 插件应覆盖此值供宿主展示。 */
+    val toolCount: Int get() = tools().size
+
     /**
      * 插件编译时固化的协议版本，默认取 [PluginApi.VERSION]。
      *

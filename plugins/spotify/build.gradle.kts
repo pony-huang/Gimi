@@ -53,5 +53,7 @@ dependencies {
     testImplementation(libs.google.adk.kotlin.core)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.core)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockk)
     testImplementation(libs.org.json)
 }

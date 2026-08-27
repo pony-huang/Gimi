@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.plugin.xiaohongshu
 
 import com.google.adk.kt.tools.FunctionTool
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -9,7 +10,9 @@ import org.junit.Test
 class XiaohongshuToolSchemaTest {
 
     private val tools = XiaohongshuPlugin(injectedService = object : XiaohongshuService {})
-        .tools()
+        .toolSets()
+        .single()
+        .let { toolset -> runBlocking { toolset.getTools(null) } }
         .associateBy { it.name }
 
     @Test

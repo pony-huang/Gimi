@@ -49,6 +49,7 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.multiplatform.markdown.renderer.m3)
+    implementation(libs.multiplatform.markdown.renderer.coil3)
     ksp(libs.hilt.android.compiler)
 
     testImplementation(project(":core:testing"))

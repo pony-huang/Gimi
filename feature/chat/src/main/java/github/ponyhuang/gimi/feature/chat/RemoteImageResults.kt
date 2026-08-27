@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.carousel.HorizontalMultiBrowseCarousel
 import androidx.compose.material3.carousel.rememberCarouselState
 import androidx.compose.runtime.Composable
@@ -67,6 +69,22 @@ internal fun RemoteImageCarousel(
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop,
                 )
+                if (images.size > 1 && index == 0) {
+                    Surface(
+                        modifier = Modifier
+                            .align(androidx.compose.ui.Alignment.BottomCenter)
+                            .padding(bottom = 8.dp),
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.68f),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.chat_remote_image_swipe_hint),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            color = MaterialTheme.colorScheme.inverseOnSurface,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
+                }
             }
         }
     }

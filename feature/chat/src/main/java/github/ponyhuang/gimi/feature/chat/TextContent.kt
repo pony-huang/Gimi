@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownTypography
+import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import com.mikepenz.markdown.model.rememberStreamingMarkdownState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -99,12 +100,14 @@ internal fun TextContent(
         if (useStreamingState) {
             Markdown(
                 streamingMarkdownState = streamingState,
+                imageTransformer = Coil3ImageTransformerImpl,
                 modifier = markdownModifier,
                 typography = chatMarkdownTypography(),
             )
         } else {
             Markdown(
                 content = text,
+                imageTransformer = Coil3ImageTransformerImpl,
                 modifier = markdownModifier,
                 typography = chatMarkdownTypography(),
             )

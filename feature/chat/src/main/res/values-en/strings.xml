@@ -139,4 +139,5 @@
     <string name="chat_local_file_image">Image: %1$s</string>
     <string name="chat_local_file_image_preview">Image preview: %1$s</string>
     <string name="chat_remote_image">Remote image %1$d</string>
+    <string name="chat_remote_image_swipe_hint">Swipe horizontally to view images</string>
 </resources>

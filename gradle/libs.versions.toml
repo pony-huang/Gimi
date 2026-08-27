@@ -89,6 +89,7 @@ objectbox-processor = { module = "io.objectbox:objectbox-processor", version.ref
 objectbox-windows = { module = "io.objectbox:objectbox-windows", version.ref = "objectbox" }
 sentence-embeddings = { module = "io.gitlab.shubham0204:sentence-embeddings", version.ref = "sentenceEmbeddings" }
 multiplatform-markdown-renderer-m3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-m3", version.ref = "multiplatformMarkdownRenderer" }
+multiplatform-markdown-renderer-coil3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-coil3", version.ref = "multiplatformMarkdownRenderer" }
 mcp-kotlin-client = { module = "io.modelcontextprotocol:kotlin-sdk-client", version.ref = "mcpKotlin" }
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }

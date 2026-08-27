@@ -7,6 +7,7 @@ import github.ponyhuang.gimi.domain.conversation.repository.ConversationReposito
 import github.ponyhuang.gimi.domain.mcp.model.McpImportResult
 import github.ponyhuang.gimi.domain.mcp.model.McpProbeResult
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
+import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 import github.ponyhuang.gimi.domain.mcp.repository.McpConnectionTester
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import kotlinx.coroutines.flow.Flow
@@ -157,6 +158,143 @@ class McpUseCasesTest {
 
         assertEquals(true, result.updated)
         assertEquals(listOf("mcp-e" to "Bearer actual-secret"), repository.authorizationUpdates)
+    }
+
+    @Test
+    fun configureServerCreatesNewServerAndActivatesForConversation() = runTest {
+        val conversations = FakeConversationRepository(
+            storedConfiguration = ConversationToolConfiguration(
+                enabledLocalToolIds = setOf("clock"),
+                enabledMcpServerIds = setOf("mcp-a"),
+            ),
+        )
+
+        val result = ConfigureMcpServerForConversationUseCase(repository, conversations)(
+            sessionId = "session-1",
+            name = "maps",
+            endpointUrl = "https://example.com/mcp",
+            transport = McpTransport.SSE,
+            description = "Maps server",
+            bearerToken = "secret-token",
+            headers = "X-Client=assistant",
+        )
+
+        assertEquals(true, result.created)
+        assertEquals(false, result.updated)
+        assertEquals(true, result.conversationActivated)
+        assertEquals("maps", result.serverName)
+        val saved = repository.savedServers.single()
+        assertEquals("maps", saved.name)
+        assertEquals("https://example.com/mcp", saved.endpointUrl)
+        assertEquals(McpTransport.SSE, saved.transport)
+        assertEquals("secret-token", saved.bearerToken)
+        assertEquals("X-Client=assistant", saved.headers)
+        assertEquals(setOf("mcp-a", saved.id), conversations.savedConfiguration?.enabledMcpServerIds)
+    }
+
+    @Test
+    fun configureServerUpdatesExistingServerByNameKeepingId() = runTest {
+        repository.servers.value = listOf(
+            McpServer(id = "mcp-d", name = "maps", endpointUrl = "https://old.example.com/mcp"),
+        )
+        val conversations = FakeConversationRepository(
+            storedConfiguration = ConversationToolConfiguration(
+                enabledMcpServerIds = setOf("mcp-d"),
+            ),
+        )
+
+        val result = ConfigureMcpServerForConversationUseCase(repository, conversations)(
+            sessionId = "session-1",
+            name = "maps",
+            endpointUrl = "https://new.example.com/mcp",
+            transport = McpTransport.STREAMABLE_HTTP,
+        )
+
+        assertEquals(false, result.created)
+        assertEquals(true, result.updated)
+        assertEquals("mcp-d", result.serverId)
+        assertEquals(true, result.conversationActivated)
+        val saved = repository.savedServers.single()
+        assertEquals("mcp-d", saved.id)
+        assertEquals("https://new.example.com/mcp", saved.endpointUrl)
+    }
+
+    @Test
+    fun configureServerWithEnabledFalseRemovesFromConversation() = runTest {
+        repository.servers.value = listOf(
+            McpServer(id = "mcp-d", name = "maps", endpointUrl = "https://example.com/mcp"),
+        )
+        val conversations = FakeConversationRepository(
+            storedConfiguration = ConversationToolConfiguration(
+                enabledMcpServerIds = setOf("mcp-a", "mcp-d"),
+            ),
+        )
+
+        val result = ConfigureMcpServerForConversationUseCase(repository, conversations)(
+            sessionId = "session-1",
+            name = "maps",
+            endpointUrl = "https://example.com/mcp",
+            transport = McpTransport.STREAMABLE_HTTP,
+            enabled = false,
+        )
+
+        assertEquals(true, result.configured)
+        assertEquals(true, result.conversationActivated)
+        assertEquals(setOf("mcp-a"), conversations.savedConfiguration?.enabledMcpServerIds)
+        assertEquals(false, repository.savedServers.single().isEnabled)
+    }
+
+    @Test
+    fun configureServerWithoutConversationConfigSavesButDoesNotActivate() = runTest {
+        val conversations = FakeConversationRepository(storedConfiguration = null)
+
+        val result = ConfigureMcpServerForConversationUseCase(repository, conversations)(
+            sessionId = "session-1",
+            name = "maps",
+            endpointUrl = "https://example.com/mcp",
+            transport = McpTransport.STREAMABLE_HTTP,
+        )
+
+        assertEquals(true, result.created)
+        assertEquals(false, result.conversationActivated)
+        assertEquals(null, result.error)
+        assertEquals(1, repository.savedServers.size)
+    }
+
+    @Test
+    fun configureServerRejectsBlankName() = runTest {
+        val conversations = FakeConversationRepository(
+            storedConfiguration = ConversationToolConfiguration(),
+        )
+
+        val result = ConfigureMcpServerForConversationUseCase(repository, conversations)(
+            sessionId = "session-1",
+            name = "   ",
+            endpointUrl = "https://example.com/mcp",
+            transport = McpTransport.STREAMABLE_HTTP,
+        )
+
+        assertEquals(false, result.configured)
+        assertEquals(true, result.error?.contains("name") == true)
+        assertEquals(emptyList<McpServer>(), repository.savedServers)
+    }
+
+    @Test
+    fun configureServerRejectsNonHttpEndpoint() = runTest {
+        val conversations = FakeConversationRepository(
+            storedConfiguration = ConversationToolConfiguration(),
+        )
+
+        val result = ConfigureMcpServerForConversationUseCase(repository, conversations)(
+            sessionId = "session-1",
+            name = "maps",
+            endpointUrl = "ftp://example.com/mcp",
+            transport = McpTransport.STREAMABLE_HTTP,
+        )
+
+        assertEquals(false, result.configured)
+        assertEquals(true, result.error?.contains("http") == true)
+        assertEquals(emptyList<McpServer>(), repository.savedServers)
     }
 
     @Test

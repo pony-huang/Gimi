@@ -26,7 +26,7 @@ class BluetoothPcmRecorder {
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     @Synchronized
     fun start(
-        route: BluetoothAudioRoute,
+        route: VoiceAudioRoute,
         onChunk: (ByteArray) -> Unit,
         onError: (Throwable) -> Unit,
     ): Boolean {
@@ -42,8 +42,7 @@ class BluetoothPcmRecorder {
             return false
         }
         val audioRecord = runCatching {
-            AudioRecord.Builder()
-                .setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
+            val builder = AudioRecord.Builder()
                 .setAudioFormat(
                     AudioFormat.Builder()
                         .setSampleRate(VoiceAudioRecorder.SAMPLE_RATE_HZ)
@@ -52,12 +51,20 @@ class BluetoothPcmRecorder {
                         .build(),
                 )
                 .setBufferSizeInBytes(maxOf(minBuffer * 2, FRAME_BYTES * 2))
-                .build()
+            // 蓝牙 SCO 走 VOICE_COMMUNICATION 才能采集到耳机麦克风；外放走 VOICE_RECOGNITION
+            // 使用手机主麦克风并保留识别降噪。
+            when (route) {
+                is BluetoothAudioRoute -> builder.setAudioSource(MediaRecorder.AudioSource.VOICE_COMMUNICATION)
+                is SpeakerAudioRoute -> builder.setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
+            }
+            builder.build()
         }.getOrElse {
             onError(it)
             return false
         }
-        if (audioRecord.state != AudioRecord.STATE_INITIALIZED || !audioRecord.setPreferredDevice(route.input)) {
+        val preferredDeviceReady = audioRecord.state == AudioRecord.STATE_INITIALIZED &&
+            (route !is BluetoothAudioRoute || audioRecord.setPreferredDevice(route.input))
+        if (!preferredDeviceReady) {
             audioRecord.release()
             onError(BluetoothRecorderException(BluetoothRecorderException.Reason.MicrophoneRouteFailed))
             return false

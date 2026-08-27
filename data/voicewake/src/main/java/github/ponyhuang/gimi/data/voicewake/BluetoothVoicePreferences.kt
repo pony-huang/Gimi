@@ -22,14 +22,26 @@ class BluetoothVoicePreferences @Inject constructor(
     )
     val activeModelId: StateFlow<String> = _activeModelId.asStateFlow()
 
+    /** 是否仅在蓝牙耳机（SCO）连接时才监听；默认 true 保持历史行为。 */
+    private val _bluetoothOnly = MutableStateFlow(
+        preferences.getBoolean(BLUETOOTH_ONLY_KEY, true),
+    )
+    val bluetoothOnly: StateFlow<Boolean> = _bluetoothOnly.asStateFlow()
+
     fun setActiveModel(modelId: String) {
         val info = requireNotNull(WakeModelCatalog.byId(modelId)) { "Unknown wake model: $modelId" }
         _activeModelId.value = info.id
         preferences.edit { putString(ACTIVE_MODEL_KEY, info.id) }
     }
 
+    fun setBluetoothOnly(enabled: Boolean) {
+        _bluetoothOnly.value = enabled
+        preferences.edit { putBoolean(BLUETOOTH_ONLY_KEY, enabled) }
+    }
+
     private companion object {
         const val PREFERENCES_NAME = "bluetooth_voice_preferences"
         const val ACTIVE_MODEL_KEY = "active_model_id"
+        const val BLUETOOTH_ONLY_KEY = "bluetooth_only"
     }
 }

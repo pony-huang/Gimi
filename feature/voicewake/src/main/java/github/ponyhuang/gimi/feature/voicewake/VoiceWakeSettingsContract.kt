@@ -21,6 +21,9 @@ sealed interface VoiceWakeSettingsAction {
     /** 切换后台监听开关。 */
     data class ToggleListening(val enabled: Boolean) : VoiceWakeSettingsAction
 
+    /** 切换是否仅在蓝牙耳机连接时才触发监听。 */
+    data class SetBluetoothOnly(val enabled: Boolean) : VoiceWakeSettingsAction
+
     /** 选择并准备指定语言的唤醒模型。 */
     data class SelectModel(val modelId: String) : VoiceWakeSettingsAction
 

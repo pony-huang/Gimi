@@ -42,6 +42,8 @@ class ManageVoiceWakeUseCase @Inject constructor(
     fun start() = repository.start()
 
     fun stop() = repository.stop()
+
+    fun setBluetoothOnly(bluetoothOnly: Boolean) = repository.setBluetoothOnly(bluetoothOnly)
 }
 
 private fun DefaultModelSettings.isVoiceWakeConfigurationReady(): Boolean {

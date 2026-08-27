@@ -2,6 +2,7 @@
     <string name="bluetooth_voice_model_required">请先下载唤醒模型</string>
     <string name="bluetooth_voice_starting_listener">正在启动蓝牙语音监听</string>
     <string name="bluetooth_voice_default_device_name">蓝牙耳机</string>
+    <string name="bluetooth_voice_speaker_device_name">手机外放</string>
     <string name="bluetooth_voice_playback_failed">蓝牙语音播放失败：%1$d</string>
     <string name="wake_model_reading_bundled">正在读取内置唤醒模型</string>
     <string name="wake_model_downloading">正在下载唤醒模型</string>

@@ -27,4 +27,7 @@
     <string name="voicewake_keyword_fixed_description">The wake word is fixed for each language model</string>
 
     <string name="voicewake_offline_setup_required">Configure a default assistant model and a speech recognition model before enabling.</string>
+
+    <string name="voicewake_bluetooth_only_title">Trigger with Bluetooth headset only</string>
+    <string name="voicewake_bluetooth_only_subtitle">When off, fall back to the phone speaker if no Bluetooth headset is connected</string>
 </resources>

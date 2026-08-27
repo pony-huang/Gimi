@@ -33,6 +33,7 @@ class BluetoothVoiceController @Inject constructor(
             activeModelId = preferences.activeModelId.value,
             modelStates = modelRepository.states.value,
             voiceSessionId = voiceSessionStore.voiceSessionId.value,
+            bluetoothOnly = preferences.bluetoothOnly.value,
         ),
     )
     override val state: StateFlow<BluetoothVoiceUiState> = _state.asStateFlow()
@@ -40,6 +41,9 @@ class BluetoothVoiceController @Inject constructor(
     init {
         scope.launch {
             preferences.activeModelId.collect { modelId -> _state.update { it.copy(activeModelId = modelId) } }
+        }
+        scope.launch {
+            preferences.bluetoothOnly.collect { enabled -> _state.update { it.copy(bluetoothOnly = enabled) } }
         }
         scope.launch {
             modelRepository.states.collect { states -> _state.update { it.copy(modelStates = states) } }
@@ -87,6 +91,16 @@ class BluetoothVoiceController @Inject constructor(
         context.startService(
             Intent(BLUETOOTH_VOICE_ACTION_STOP).setClassName(context, BLUETOOTH_VOICE_SERVICE_CLASS),
         )
+    }
+
+    override fun setBluetoothOnly(bluetoothOnly: Boolean) {
+        if (preferences.bluetoothOnly.value == bluetoothOnly) return
+        preferences.setBluetoothOnly(bluetoothOnly)
+        // 运行中切换监听模式时，重启服务以按新模式重新选择音频路由。
+        if (_state.value.isRunning) {
+            stop()
+            start()
+        }
     }
 
     fun pauseOrResume() {

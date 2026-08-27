@@ -296,6 +296,16 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
         }
     }
 
+    @Test
+    fun settingBluetoothOnlyDelegatesToRepository() = runTest {
+        val voiceRepository = voiceRepository(ready = true)
+        val viewModel = viewModel(modelRepository(), voiceRepository)
+
+        viewModel.onAction(VoiceWakeSettingsAction.SetBluetoothOnly(enabled = false))
+
+        verify(exactly = 1) { voiceRepository.setBluetoothOnly(false) }
+    }
+
     private fun viewModel(
         models: ModelCatalogRepository,
         voice: VoiceWakeRepository,

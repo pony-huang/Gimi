@@ -22,8 +22,8 @@ import github.ponyhuang.gimi.core.audio.CaptureDecision
 import github.ponyhuang.gimi.core.audio.PcmPreRollBuffer
 import github.ponyhuang.gimi.core.audio.VoiceCommandCapture
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
-import github.ponyhuang.gimi.data.voicewake.BluetoothAudioRoute
 import github.ponyhuang.gimi.data.voicewake.BluetoothAudioRouter
+import github.ponyhuang.gimi.data.voicewake.VoiceAudioRoute
 import github.ponyhuang.gimi.data.voicewake.BluetoothPcmRecorder
 import github.ponyhuang.gimi.data.voicewake.BluetoothRecorderException
 import github.ponyhuang.gimi.data.voicewake.BluetoothVoiceController
@@ -63,7 +63,7 @@ class BluetoothVoiceService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val audioLock = Any()
-    private var route: BluetoothAudioRoute? = null
+    private var route: VoiceAudioRoute? = null
     private var recorder: BluetoothPcmRecorder? = null
     private var detector: VoskWakeWordDetector? = null
     private var preRoll = PcmPreRollBuffer()
@@ -137,7 +137,9 @@ class BluetoothVoiceService : Service() {
             setStatus(BluetoothVoiceStatus.Error, getString(R.string.bluetooth_voice_status_permission_missing))
             return
         }
-        val available = runCatching { audioRouter.findRoute() }.getOrNull()
+        val available = runCatching {
+            audioRouter.findRoute(controller.state.value.bluetoothOnly)
+        }.getOrNull()
         if (available == null) {
             stopAudioCapture(releaseRoute = true)
             setStatus(
@@ -147,13 +149,13 @@ class BluetoothVoiceService : Service() {
             return
         }
         val current = route
-        if (current?.input?.id == available.input.id && recorder != null &&
+        if (current?.id == available.id && recorder != null &&
             controller.state.value.status == BluetoothVoiceStatus.Listening
         ) return
         startListening(available)
     }
 
-    private suspend fun startListening(newRoute: BluetoothAudioRoute) {
+    private suspend fun startListening(newRoute: VoiceAudioRoute) {
         stopAudioCapture(releaseRoute = false)
         val modelPath = controller.modelPath()
         if (modelPath == null) {
@@ -300,7 +302,9 @@ class BluetoothVoiceService : Service() {
                         lastCommand = command,
                     )
                     val result = agentTasks.execute(command, ::confirmVoiceTool)
-                    val activeRoute = runCatching { audioRouter.findRoute() }.getOrNull()
+                    val activeRoute = runCatching {
+                        audioRouter.findRoute(controller.state.value.bluetoothOnly)
+                    }.getOrNull()
                     if (activeRoute != null && speechPlayer.isAvailable()) {
                         setStatus(
                             BluetoothVoiceStatus.Speaking,
@@ -332,7 +336,9 @@ class BluetoothVoiceService : Service() {
     }
 
     private suspend fun confirmVoiceTool(request: VoiceToolConfirmation): Boolean {
-        val activeRoute = runCatching { audioRouter.findRoute() }.getOrNull() ?: return false
+        val activeRoute = runCatching {
+            audioRouter.findRoute(controller.state.value.bluetoothOnly)
+        }.getOrNull() ?: return false
         if (!speechPlayer.isAvailable()) return false
         val wakeModel = activeWakeModel()
         setStatus(

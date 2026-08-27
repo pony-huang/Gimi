@@ -73,6 +73,7 @@ class VoiceWakeSettingsViewModel @Inject constructor(
     fun onAction(action: VoiceWakeSettingsAction) {
         when (action) {
             is VoiceWakeSettingsAction.ToggleListening -> toggleListening(action.enabled)
+            is VoiceWakeSettingsAction.SetBluetoothOnly -> manageVoiceWake.setBluetoothOnly(action.enabled)
             is VoiceWakeSettingsAction.SelectModel -> selectModel(action.modelId)
             is VoiceWakeSettingsAction.InstallModel -> manageVoiceWake.installModel(action.modelId)
             is VoiceWakeSettingsAction.CancelInstall -> {

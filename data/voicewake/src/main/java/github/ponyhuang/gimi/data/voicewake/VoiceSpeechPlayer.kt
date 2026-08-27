@@ -22,19 +22,26 @@ class VoiceSpeechPlayer @Inject constructor(
     private val synthesis: SpeechSynthesisRepository,
 ) {
     private val audioManager = context.getSystemService(AudioManager::class.java)
-    private val attributes = AudioAttributes.Builder()
-        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-        .build()
-    private val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-        .setAudioAttributes(attributes)
-        .setOnAudioFocusChangeListener { }
-        .build()
 
     fun isAvailable(): Boolean = synthesis.isAvailable()
 
-    suspend fun play(text: String, route: BluetoothAudioRoute): Boolean = withContext(Dispatchers.IO) {
+    suspend fun play(text: String, route: VoiceAudioRoute): Boolean = withContext(Dispatchers.IO) {
         if (!isAvailable() || text.isBlank()) return@withContext false
+        // 蓝牙走 VOICE_COMMUNICATION 路由到耳机；外放走 MEDIA 路由到手机扬声器。
+        val attributes = when (route) {
+            is BluetoothAudioRoute -> AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build()
+            is SpeakerAudioRoute -> AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build()
+        }
+        val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            .setAudioAttributes(attributes)
+            .setOnAudioFocusChangeListener { }
+            .build()
         if (audioManager.requestAudioFocus(focusRequest) == AudioManager.AUDIOFOCUS_REQUEST_FAILED) {
             return@withContext false
         }
@@ -56,7 +63,9 @@ class VoiceSpeechPlayer @Inject constructor(
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
         try {
-            if (!track.setPreferredDevice(route.communication)) return@withContext false
+            if (route is BluetoothAudioRoute && !track.setPreferredDevice(route.communication)) {
+                return@withContext false
+            }
             var frames = 0L
             track.play()
             synthesis.synthesize(text).collect { bytes ->

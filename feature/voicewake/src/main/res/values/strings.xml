@@ -27,4 +27,7 @@
     <string name="voicewake_keyword_fixed_description">唤醒词由语言模型固定，不可修改</string>
 
     <string name="voicewake_offline_setup_required">启用前请配置可用的默认模型和语音识别模型。</string>
+
+    <string name="voicewake_bluetooth_only_title">仅蓝牙耳机时触发</string>
+    <string name="voicewake_bluetooth_only_subtitle">关闭后，未连接蓝牙耳机时改用手机外放监听</string>
 </resources>

@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothAudio
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
@@ -70,6 +71,28 @@ fun VoiceWakeSettingsScreen(
                             checked = state.voiceState.isRunning || state.isStartPending,
                             onCheckedChange = {
                                 onAction(VoiceWakeSettingsAction.ToggleListening(it))
+                            },
+                        )
+                    },
+                )
+            }
+            item {
+                PreferenceListItem(
+                    icon = Icons.Default.Bluetooth,
+                    title = stringResource(R.string.voicewake_bluetooth_only_title),
+                    subtitle = stringResource(R.string.voicewake_bluetooth_only_subtitle),
+                    onClick = {
+                        onAction(
+                            VoiceWakeSettingsAction.SetBluetoothOnly(
+                                !state.voiceState.bluetoothOnly,
+                            ),
+                        )
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = state.voiceState.bluetoothOnly,
+                            onCheckedChange = {
+                                onAction(VoiceWakeSettingsAction.SetBluetoothOnly(it))
                             },
                         )
                     },

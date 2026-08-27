@@ -102,6 +102,8 @@ data class VoiceWakeState(
     val lastCommand: String? = null,
     val message: String? = null,
     val voiceSessionId: String? = null,
+    /** 是否仅在蓝牙耳机（SCO）连接时才监听；false 时允许回退到手机外放。 */
+    val bluetoothOnly: Boolean = true,
 ) {
     /** 激活模型的安装状态（派生自 modelStates）。 */
     val model: WakeModelState

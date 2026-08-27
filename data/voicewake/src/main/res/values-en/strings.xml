@@ -2,6 +2,7 @@
     <string name="bluetooth_voice_model_required">Install a wake model first</string>
     <string name="bluetooth_voice_starting_listener">Starting Bluetooth voice listener</string>
     <string name="bluetooth_voice_default_device_name">Bluetooth headset</string>
+    <string name="bluetooth_voice_speaker_device_name">Phone speaker</string>
     <string name="bluetooth_voice_playback_failed">Bluetooth playback failed: %1$d</string>
     <string name="wake_model_reading_bundled">Reading bundled wake model</string>
     <string name="wake_model_downloading">Downloading wake model</string>

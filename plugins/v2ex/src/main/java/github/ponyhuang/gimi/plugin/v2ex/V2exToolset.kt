@@ -29,8 +29,13 @@ private val V2EX_INSTRUCTIONS: String = """
     <v2ex>
     - All V2EX tools call the v2 API with the configured Personal Access Token. If a tool reports a missing or
       invalid token, tell the user to configure the plugin; never retry with invented credentials.
-    - Node names are the URL slugs from v2ex.com/go/<slug> (e.g. "python", "job", "v2ex"); resolve an unfamiliar
-      node with `v2ex_node` before querying `v2ex_node_topics`. Both accept a `page` param.
+    - Node names are the URL slugs from v2ex.com/go/<slug> (e.g. "python", "job"). Common nodes (slug — title;
+      aliases in parentheses, also accepted as node_name): qna — 问与答; all4all — 二手交易 (flea);
+      programmer — 程序员 (developer); jobs — 酷工作; share — 分享发现; create — 分享创造; apple — Apple;
+      career — 职场话题; macos — macOS (macosx, osx); pointless — 无要点; bb — 宽带症候群 (wifi);
+      python — Python; flamewar — 水深火热; flood — 水; promotions — 推广 (promotion); libido — 情感问题.
+      For any other node, resolve the slug with `v2ex_node` before querying `v2ex_node_topics`. Both accept a
+      `page` param.
     - `v2ex_topic` returns the full raw body of one topic; `v2ex_topic_replies` returns at most the configured number
       of replies for one page with a `total` count — if a thread has more pages, say so instead of implying
       completeness.

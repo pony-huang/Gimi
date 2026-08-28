@@ -79,7 +79,7 @@ internal fun projectReplies(array: JSONArray, max: Int = 100): Map<String, Any?>
     )
 }
 
-/** 节点信息投影。 */
+/** 节点信息投影；真实 API 的节点对象没有 created 字段，故不投影相对时间。 */
 internal fun projectNode(node: JSONObject): Map<String, Any?> = mapOf(
     "id" to node.optInt("id"),
     "name" to node.optString("name"),
@@ -87,8 +87,7 @@ internal fun projectNode(node: JSONObject): Map<String, Any?> = mapOf(
     "title_alternative" to node.optString("title_alternative"),
     "header" to node.optString("header"),
     "topics" to node.optInt("topics"),
-    "created" to node.optLong("created"),
-    "created_human" to timeAgo(node.optLong("created")),
+    "url" to node.optString("url"),
 )
 
 /** 自己的 Profile 投影（字段与 v1 member 同构）。 */

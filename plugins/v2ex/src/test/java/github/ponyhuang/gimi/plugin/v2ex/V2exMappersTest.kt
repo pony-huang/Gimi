@@ -107,6 +107,8 @@ class V2exMappersTest {
         assertEquals("python", node["name"])
         assertEquals("Python 编程语言节点", node["header"])
         assertEquals(1234, node["topics"])
+        // 真实 API 的节点对象没有 created 字段，不应投影出误导性的相对时间。
+        assertNull(node["created_human"])
     }
 
     @Test

@@ -2,7 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <application android:label="Gimi 小红书插件">
+    <application
+        android:label="Gimi 小红书插件"
+        android:icon="@drawable/ic_xiaohongshu">
         <meta-data
             android:name="github.ponyhuang.gimi.plugin.CLASS"
             android:value="github.ponyhuang.gimi.plugin.xiaohongshu.XiaohongshuPlugin" />

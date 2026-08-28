@@ -26,9 +26,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.core.content.FileProvider
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import github.ponyhuang.gimi.BuildConfig
 import github.ponyhuang.gimi.feature.chat.ChatAction
@@ -188,6 +190,12 @@ fun MainScreen(
         NavDisplay(
             backStack = backStack,
             onBack = goBack,
+            // 将 hiltViewModel() 绑定到单个 NavEntry。否则插件配置页会回退到 Activity
+            // 级 store，切换插件时复用同一 ViewModel，可能把当前表单保存到错误插件。
+            entryDecorators = listOf(
+                rememberSaveableStateHolderNavEntryDecorator(),
+                rememberViewModelStoreNavEntryDecorator(),
+            ),
             entryProvider = { route ->
                 NavEntry(route) {
                     when (route) {

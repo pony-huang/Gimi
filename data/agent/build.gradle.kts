@@ -38,7 +38,6 @@ android {
 
 dependencies {
     implementation(project(":domain:recommendation"))
-    implementation(libs.org.json)
     implementation(project(":core:common"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:mcp"))
@@ -81,6 +80,7 @@ dependencies {
     }
     testImplementation(libs.androidx.room.testing)
     testImplementation(libs.junit)
+    testImplementation(libs.org.json)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
     testImplementation(libs.okhttp.mockwebserver)

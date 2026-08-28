@@ -10,24 +10,29 @@ import com.google.adk.kt.types.FunctionCallingConfig
 import com.google.adk.kt.types.ToolConfig
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
+import com.google.adk.kt.tools.BaseTool
 import github.ponyhuang.gimi.agent.AgentLLMModelFactory
 import github.ponyhuang.gimi.agent.AgentPrompts
 import github.ponyhuang.gimi.agent.LocalToolCatalog
-import github.ponyhuang.gimi.agent.ModelConfig
 import github.ponyhuang.gimi.agent.McpToolsetRegistry
+import github.ponyhuang.gimi.agent.ModelConfig
 import github.ponyhuang.gimi.agent.toRuntimeMetadata
-import github.ponyhuang.gimi.data.plugin.PluginManager
 import github.ponyhuang.gimi.agent.tools.official.OfficialToolset
+import github.ponyhuang.gimi.data.plugin.PluginManager
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationGenerationInput
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationSnapshot
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationGenerator
+import github.ponyhuang.gimi.pluginapi.PluginJson
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.toList
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /** 构建不含凭据与工具参数 schema 的推荐生成提示。 */
 object RecommendationPromptBuilder {
@@ -88,26 +93,30 @@ object RecommendationOutputParser {
             .removePrefix("```")
             .removeSuffix("```")
             .trim()
-        val array = when (normalized.firstOrNull()) {
-            '[' -> JSONArray(normalized)
-            '{' -> JSONObject(normalized).getJSONArray("recommendations")
-            else -> throw IllegalArgumentException("Recommendation model returned invalid JSON.")
+        val root = runCatching { Json.parseToJsonElement(normalized) }
+            .getOrElse { throw IllegalArgumentException("Recommendation model returned invalid JSON.", it) }
+        val array = when (root) {
+            is JsonArray -> root
+            else -> root.jsonObject["recommendations"]?.jsonArray
+                ?: throw IllegalArgumentException("Recommendation model returned no recommendations.")
         }
-        require(array.length() == RecommendationSnapshot.RECOMMENDATION_COUNT) {
+        require(array.size == RecommendationSnapshot.RECOMMENDATION_COUNT) {
             "The recommendation model must return exactly ${RecommendationSnapshot.RECOMMENDATION_COUNT} items."
         }
         val items = buildList {
-            repeat(array.length()) { index ->
-                val item = array.getJSONObject(index)
+            array.forEachIndexed { index, element ->
+                val item = element.jsonObject
                 // 兼容部分模型忽略 responseSchema 后返回的 task/suggestion 数组。
-                val prompt = item.optString("prompt").trim()
-                    .ifEmpty { item.optString("task").trim() }
+                val prompt = item["prompt"]?.jsonPrimitive?.content.orEmpty().trim()
+                    .ifEmpty { item["task"]?.jsonPrimitive?.content.orEmpty().trim() }
                 require(prompt.isNotEmpty() && prompt.length <= MAX_PROMPT_LENGTH) {
                     "Recommendation prompts must contain 1..$MAX_PROMPT_LENGTH characters."
                 }
                 val category = runCatching {
                     RecommendationCategory.valueOf(
-                        item.optString("category", RecommendationCategory.GENERAL.name).uppercase(),
+                        item["category"]?.jsonPrimitive?.content
+                            ?.uppercase()
+                            ?: RecommendationCategory.GENERAL.name,
                     )
                 }.getOrElse { throw IllegalArgumentException("Unknown recommendation category.", it) }
                 add(AgentRecommendation("recommendation-${index + 1}", prompt, category))
@@ -118,6 +127,28 @@ object RecommendationOutputParser {
     }
 
     private const val MAX_PROMPT_LENGTH: Int = 160
+}
+
+/** 推荐生成只依据能力摘要，不执行能力工具，避免工具结果污染推荐会话。 */
+object RecommendationToolResultSanitizer {
+    fun sanitize(value: Any?): Any? = when (value) {
+        is Map<*, *> -> value.entries.associate { (key, nested) ->
+            key.toString() to sanitize(nested)
+        }
+        is Iterable<*> -> value.map(::sanitize)
+        else -> PluginJson.toNative(value)
+    }
+}
+
+private class JsonNativeTool(
+    private val delegate: BaseTool,
+) : BaseTool(delegate.name, delegate.description) {
+    override fun declaration() = delegate.declaration()
+
+    override suspend fun run(
+        context: com.google.adk.kt.tools.ToolContext,
+        args: Map<String, Any?>,
+    ): Any = RecommendationToolResultSanitizer.sanitize(delegate.run(context, args)) ?: emptyMap<String, Any>()
 }
 
 /** 使用快速模型优先策略执行无工具、无会话的推荐生成请求。 */
@@ -180,7 +211,7 @@ class AgentRecommendationGenerator @Inject constructor(
         return RecommendationOutputParser.parse(raw)
     }
 
-    private suspend fun allRecommendationTools(config: ModelConfig) =
+    private suspend fun allRecommendationTools(config: ModelConfig): List<BaseTool> =
         buildList {
             addAll(localToolCatalog.tools())
             addAll(pluginManager.enabledPluginTools())
@@ -199,6 +230,7 @@ class AgentRecommendationGenerator @Inject constructor(
                 }
             }
         }.distinctBy { it.name }
+            .map(::JsonNativeTool)
 
     private companion object {
         val RECOMMENDATION_INSTRUCTION = """

@@ -1,8 +1,13 @@
 package github.ponyhuang.gimi.data.plugin
 
 import android.content.Context
+import androidx.core.content.edit
+import android.util.Log
+import android.util.JsonReader
+import android.util.JsonWriter
 import dagger.hilt.android.qualifiers.ApplicationContext
-import org.json.JSONObject
+import java.io.StringReader
+import java.io.StringWriter
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,20 +26,46 @@ class PluginConfigStore @Inject constructor(
     fun valuesFor(pluginId: String): Map<String, String> {
         val raw = prefs.getString(pluginId, null) ?: return emptyMap()
         return runCatching {
-            val json = JSONObject(raw)
-            json.keys().asSequence().associateWith { key -> json.optString(key) }
-        }.getOrDefault(emptyMap())
+            decodeValues(raw)
+        }.getOrElse { error ->
+            Log.e(TAG, "Failed to read configuration for plugin '$pluginId'", error)
+            emptyMap()
+        }
     }
 
     fun save(pluginId: String, values: Map<String, String>) {
-        // 用 Map 构造器而非 json.put(key, value)：R8 在 release 会内联 forEach lambda 并把
-        // JSONObject.put(String, Object) 臆造为不存在的 put(Object, String)，设备运行时抛
-        // NoSuchMethodError（v2ex/spotify/zhihu 保存即闪退）。构造器签名唯一，R8 无从弄错。
-        val json = JSONObject(values)
-        prefs.edit().putString(pluginId, json.toString()).apply()
+        prefs.edit { putString(pluginId, encodeValues(values)) }
+    }
+
+    /**
+     * 使用平台稳定的流式 JSON API，避免 R8 将 org.json 的实现细节错误内联到应用中。
+     */
+    private fun decodeValues(raw: String): Map<String, String> = buildMap {
+        JsonReader(StringReader(raw)).use { reader ->
+            reader.beginObject()
+            while (reader.hasNext()) {
+                put(reader.nextName(), reader.nextString())
+            }
+            reader.endObject()
+        }
+    }
+
+    private fun encodeValues(values: Map<String, String>): String {
+        val output = StringWriter()
+        JsonWriter(output).use { writer ->
+            writer.beginObject()
+            val entries = values.entries.iterator()
+            while (entries.hasNext()) {
+                val entry = entries.next()
+                writer.name(entry.key).value(entry.value)
+            }
+            writer.endObject()
+        }
+        return output.toString()
     }
 
     private companion object {
+        const val TAG: String = "PluginConfigStore"
         const val PREFS_NAME: String = "plugin_config"
     }
 }

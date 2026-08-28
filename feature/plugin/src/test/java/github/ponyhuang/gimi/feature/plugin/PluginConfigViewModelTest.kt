@@ -50,6 +50,32 @@ class PluginConfigViewModelTest {
     }
 
     @Test
+    fun loadReloadsFromRepositoryOnRepeatedOpenOfSamePlugin() = runTest {
+        val repository = FakePluginRepository(
+            descriptor = PluginConfigDescriptor(
+                fields = listOf(
+                    PluginConfigFieldDescriptor(
+                        key = "token",
+                        label = "API Token",
+                        kind = PluginConfigFieldDescriptor.Kind.TEXT,
+                    ),
+                ),
+            ),
+            stored = mapOf("token" to "first"),
+        )
+        val viewModel = PluginConfigViewModel(repository)
+        viewModel.load("v2ex")
+        assertEquals("first", viewModel.state.value.fields.single().value)
+
+        // 模拟返回列表后重进同一插件：ViewModel 被跨页复用，必须重读 store，
+        // 不能命中幂等缓存显示旧值（否则看起来像配置被清空）。
+        repository.stored = mapOf("token" to "second")
+        viewModel.load("v2ex")
+
+        assertEquals("second", viewModel.state.value.fields.single().value)
+    }
+
+    @Test
     fun loadFallsBackToDefaultWhenNoStoredValue() = runTest {
         val repository = FakePluginRepository(
             descriptor = PluginConfigDescriptor(
@@ -209,7 +235,7 @@ class PluginConfigViewModelTest {
 
     private class FakePluginRepository(
         private val descriptor: PluginConfigDescriptor = PluginConfigDescriptor(),
-        private val stored: Map<String, String> = emptyMap(),
+        var stored: Map<String, String> = emptyMap(),
         private val runOutcome: PluginActionOutcome? = null,
         private val browserRequest: PluginBrowserRequest? = null,
         private val completeOutcome: PluginActionOutcome? = null,

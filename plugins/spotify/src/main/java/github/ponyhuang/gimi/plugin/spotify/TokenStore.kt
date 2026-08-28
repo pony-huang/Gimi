@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.plugin.spotify
 
 import android.content.Context
+import androidx.core.content.edit
 
 /**
  * Spotify token 持久化（插件私有 SharedPreferences，与宿主的 PluginConfigStore 分离；
@@ -12,27 +13,27 @@ internal class TokenStore(context: Context) {
     var accessToken: String?
         get() = prefs.getString(KEY_ACCESS, null)
         set(value) {
-            prefs.edit().putString(KEY_ACCESS, value).apply()
+            prefs.edit { putString(KEY_ACCESS, value) }
         }
 
     var refreshToken: String?
         get() = prefs.getString(KEY_REFRESH, null)
         set(value) {
-            prefs.edit().putString(KEY_REFRESH, value).apply()
+            prefs.edit { putString(KEY_REFRESH, value) }
         }
 
     /** access token 过期时刻（毫秒时间戳）。 */
     var expiresAt: Long
         get() = prefs.getLong(KEY_EXPIRES_AT, 0L)
         set(value) {
-            prefs.edit().putLong(KEY_EXPIRES_AT, value).apply()
+            prefs.edit { putLong(KEY_EXPIRES_AT, value) }
         }
 
     val isAuthorized: Boolean
         get() = !accessToken.isNullOrBlank() || !refreshToken.isNullOrBlank()
 
     fun clear() {
-        prefs.edit().clear().apply()
+        prefs.edit { clear() }
     }
 
     private companion object {

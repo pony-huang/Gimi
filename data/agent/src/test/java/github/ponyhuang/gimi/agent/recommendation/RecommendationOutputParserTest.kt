@@ -10,6 +10,8 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.google.adk.kt.types.Type
+import org.json.JSONArray
+import org.json.JSONObject
 
 class RecommendationOutputParserTest {
     @Test
@@ -118,5 +120,14 @@ class RecommendationOutputParserTest {
         assertEquals(Type.OBJECT, schema?.type)
         assertEquals(Type.ARRAY, schema?.properties?.get("recommendations")?.type)
         assertEquals(2, schema?.properties?.get("recommendations")?.items?.properties?.size)
+    }
+
+    @Test
+    fun recommendationToolResultsAreConvertedToJsonNativeValues() {
+        val result = RecommendationToolResultSanitizer.sanitize(
+            mapOf("items" to JSONArray().put(JSONObject().put("name", "item"))),
+        ) as Map<*, *>
+
+        assertEquals(listOf(mapOf("name" to "item")), result["items"])
     }
 }

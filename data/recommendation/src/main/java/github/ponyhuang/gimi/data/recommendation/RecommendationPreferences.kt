@@ -16,8 +16,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 
 /** 推荐后台工作的最小调度边界，便于设置存储保持平台实现可替换。 */
 interface RecommendationWorkScheduler {
@@ -70,7 +77,7 @@ class RecommendationPreferences @Inject constructor(
 
     /** 提交一次完整成功结果；验证由 [RecommendationSnapshot] 保证。 */
     fun saveSnapshot(snapshot: RecommendationSnapshot) {
-        preferences.edit { putString(SNAPSHOT_KEY, snapshot.toJson().toString()) }
+        preferences.edit { putString(SNAPSHOT_KEY, encodeSnapshot(snapshot)) }
         mutableState.update {
             it.copy(
                 snapshot = snapshot,
@@ -123,35 +130,48 @@ class RecommendationPreferences @Inject constructor(
         return RecommendationState(settings = settings, snapshot = snapshot)
     }
 
-    private fun RecommendationSnapshot.toJson(): JSONObject = JSONObject().apply {
-        put("generatedAtEpochMillis", generatedAtEpochMillis)
-        put("items", JSONArray().apply {
-            items.forEach { item ->
-                put(JSONObject().apply {
-                    put("id", item.id)
-                    put("prompt", item.prompt)
-                    put("category", item.category.name)
-                })
-            }
-        })
-    }
+    private fun encodeSnapshot(snapshot: RecommendationSnapshot): String = Json.encodeToString(
+        JsonObject(
+            mapOf(
+                "generatedAtEpochMillis" to JsonPrimitive(snapshot.generatedAtEpochMillis),
+                "items" to JsonArray(
+                    snapshot.items.map { item ->
+                        JsonObject(
+                            mapOf(
+                                "id" to JsonPrimitive(item.id),
+                                "prompt" to JsonPrimitive(item.prompt),
+                                "category" to JsonPrimitive(item.category.name),
+                            ),
+                        )
+                    },
+                ),
+            ),
+        ),
+    )
 
     private fun decodeSnapshot(raw: String): RecommendationSnapshot? = runCatching {
-        val json = JSONObject(raw)
-        val array = json.getJSONArray("items")
+        val json = Json.parseToJsonElement(raw).jsonObject
+        val array = json["items"]?.jsonArray ?: error("Missing recommendation items.")
         val items = buildList {
-            repeat(array.length()) { index ->
-                val item = array.getJSONObject(index)
+            array.forEach { element ->
+                val item = element.jsonObject
                 add(
                     AgentRecommendation(
-                        id = item.getString("id"),
-                        prompt = item.getString("prompt"),
-                        category = RecommendationCategory.valueOf(item.getString("category")),
+                        id = item["id"]?.jsonPrimitive?.content ?: error("Missing recommendation id."),
+                        prompt = item["prompt"]?.jsonPrimitive?.content ?: error("Missing recommendation prompt."),
+                        category = RecommendationCategory.valueOf(
+                            item["category"]?.jsonPrimitive?.content
+                                ?: error("Missing recommendation category."),
+                        ),
                     ),
                 )
             }
         }
-        RecommendationSnapshot(items, json.getLong("generatedAtEpochMillis"))
+        RecommendationSnapshot(
+            items,
+            json["generatedAtEpochMillis"]?.jsonPrimitive?.long
+                ?: error("Missing recommendation generation time."),
+        )
     }.getOrNull()
 
     private companion object {
@@ -161,4 +181,3 @@ class RecommendationPreferences @Inject constructor(
         const val SNAPSHOT_KEY = "snapshot_json"
     }
 }
-

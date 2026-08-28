@@ -22,7 +22,7 @@ dependencies {
     implementation(libs.androidx.hilt.work)
     implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.org.json)
+    implementation(libs.kotlinx.serialization.json)
     ksp(libs.hilt.android.compiler)
     ksp(libs.androidx.hilt.compiler)
     testImplementation(libs.junit)

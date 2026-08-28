@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
+import androidx.core.content.edit
 
 /**
  * 动态插件管理器 — 宿主侧唯一入口。
@@ -52,7 +53,7 @@ class PluginManager @Inject constructor(
         if (loaded.none { it.plugin.pluginId == pluginId }) return
         val changed = if (enabled) disabledIds.remove(pluginId) else disabledIds.add(pluginId)
         if (!changed) return
-        preferences.edit().putStringSet(DISABLED_IDS_KEY, disabledIds.toMutableSet()).apply()
+        preferences.edit { putStringSet(DISABLED_IDS_KEY, disabledIds.toMutableSet()) }
         _plugins.value = descriptors()
         _revision.update { it + 1 }
     }

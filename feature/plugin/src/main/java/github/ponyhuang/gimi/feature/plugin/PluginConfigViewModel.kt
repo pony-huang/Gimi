@@ -24,12 +24,13 @@ class PluginConfigViewModel @Inject constructor(
     private val mutableEffects = MutableSharedFlow<PluginConfigEffect>()
     val effects: SharedFlow<PluginConfigEffect> = mutableEffects.asSharedFlow()
 
-    private var loadedPluginId: String? = null
-
-    /** 按 pluginId 载入配置描述、已存值与动作；同一插件幂等，避免重复加载覆盖编辑中的状态。 */
+    /**
+     * 按 pluginId 载入配置描述、已存值与动作。每次进入配置页都从 repository 重新读，
+     * 不做幂等跳过：ViewModel 被跨配置页复用（非 per-entry 作用域），若用 loadedPluginId
+     * 守卫跳过重载，连续重开同一插件会显示未保存的旧值，看起来像配置被清空。
+     * 编辑中的覆盖问题由 LaunchedEffect(pluginId) 只在 pluginId 变化时触发来兜底。
+     */
     fun load(pluginId: String) {
-        if (loadedPluginId == pluginId) return
-        loadedPluginId = pluginId
         val descriptor = repository.configDescriptor(pluginId)
         val stored = repository.configValues(pluginId)
         _state.value = PluginConfigUiState(

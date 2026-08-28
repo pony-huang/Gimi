@@ -5,6 +5,7 @@ import com.google.gson.JsonObject
 import com.google.gson.stream.JsonReader
 import java.io.IOException
 import java.io.Reader
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
@@ -40,6 +41,12 @@ class MinimaxTtsGateway(
     private val httpClient: OkHttpClient,
     private val gson: Gson = Gson(),
     private val endpoint: String = DEFAULT_ENDPOINT,
+    /**
+     * Dispatcher that runs the streaming response parser. Injectable so tests that assert
+     * emit-before-error ordering can pin the flow to a same-thread dispatcher instead of
+     * racing across the real IO thread pool under load.
+     */
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : SpeechSynthesisGateway {
 
     override fun synthesize(config: SpeechSynthesisConfig, text: String): Flow<ByteArray> = flow {
@@ -66,7 +73,7 @@ class MinimaxTtsGateway(
         } finally {
             cancellation.dispose()
         }
-    }.flowOn(Dispatchers.IO)
+    }.flowOn(dispatcher)
 
     /**
      * Reads the streaming response one [JsonObject] at a time. The first non-whitespace

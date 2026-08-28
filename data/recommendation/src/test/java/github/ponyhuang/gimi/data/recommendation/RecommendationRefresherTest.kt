@@ -50,7 +50,7 @@ class RecommendationRefresherTest {
         verify { preferences.saveSnapshot(match { it.generatedAtEpochMillis == 123L }) }
     }
 
-    private fun items() = (1..5).map { index ->
+    private fun items() = (1..6).map { index ->
         AgentRecommendation("id-$index", "task-$index", RecommendationCategory.GENERAL)
     }
 

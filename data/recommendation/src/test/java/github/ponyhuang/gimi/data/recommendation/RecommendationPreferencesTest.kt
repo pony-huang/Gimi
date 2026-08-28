@@ -38,7 +38,7 @@ class RecommendationPreferencesTest {
         repository.setEnabled(false)
 
         assertFalse(repository.state.value.settings.enabled)
-        assertEquals(5, repository.state.value.snapshot?.items?.size)
+        assertEquals(6, repository.state.value.snapshot?.items?.size)
         verify { scheduler.cancel() }
     }
 
@@ -63,7 +63,7 @@ class RecommendationPreferencesTest {
     }
 
     private fun snapshot() = RecommendationSnapshot(
-        items = (1..5).map { index ->
+        items = (1..6).map { index ->
             AgentRecommendation("id-$index", "task-$index", RecommendationCategory.GENERAL)
         },
         generatedAtEpochMillis = 123L,

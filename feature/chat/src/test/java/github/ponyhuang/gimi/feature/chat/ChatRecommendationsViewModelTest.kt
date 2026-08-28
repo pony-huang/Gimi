@@ -14,7 +14,7 @@ import org.junit.Test
 class ChatRecommendationsViewModelTest {
     @Test
     fun exposesEnabledGlobalSnapshotItems() {
-        val items = (1..5).map { index ->
+        val items = (1..6).map { index ->
             AgentRecommendation("id-$index", "task-$index", RecommendationCategory.GENERAL)
         }
         val repository = mockk<RecommendationRepository> {

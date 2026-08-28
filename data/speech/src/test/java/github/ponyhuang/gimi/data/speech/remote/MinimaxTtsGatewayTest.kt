@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.data.speech.remote
 import com.google.gson.JsonParser
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
@@ -268,6 +269,13 @@ class MinimaxTtsGatewayTest {
                         "\"base_resp\":{\"status_code\":1002,\"status_msg\":\"rate limited\"}}" +
                         "]",
                 ),
+        )
+        // 把解析器钉在与收集器同线程，emit-先于-error 的断言不再受真实 IO 线程池
+        // 在整套测试并行跑时调度竞争的影响（历史 flaky 根因）。
+        val gateway = MinimaxTtsGateway(
+            httpClient = OkHttpClient(),
+            endpoint = baseUrl(),
+            dispatcher = Dispatchers.Unconfined,
         )
 
         var emittedFirst = false

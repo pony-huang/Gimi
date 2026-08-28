@@ -16,18 +16,21 @@ class RecommendationModelsTest {
     }
 
     @Test
-    fun snapshotRequiresExactlyFiveUniqueNonBlankRecommendations() {
-        val items = (1..5).map { index -> recommendation("task-$index") }
+    fun snapshotRequiresExactlySixUniqueNonBlankRecommendations() {
+        val items = (1..6).map { index -> recommendation("task-$index") }
 
         val snapshot = RecommendationSnapshot(items, generatedAtEpochMillis = 100L)
 
         assertEquals(items, snapshot.items)
+        // 数量不足触发 size require。
         assertThrows(IllegalArgumentException::class.java) {
-            RecommendationSnapshot(items.take(4), generatedAtEpochMillis = 100L)
+            RecommendationSnapshot(items.take(5), generatedAtEpochMillis = 100L)
         }
+        // 6 条但文案重复触发 unique require。
         assertThrows(IllegalArgumentException::class.java) {
             RecommendationSnapshot(items.dropLast(1) + recommendation("task-1"), 100L)
         }
+        // 6 条但含空白文案触发 non-blank require。
         assertThrows(IllegalArgumentException::class.java) {
             RecommendationSnapshot(items.dropLast(1) + recommendation("  "), 100L)
         }

@@ -7,43 +7,73 @@ import java.net.URL
 import java.net.URLEncoder
 
 /**
- * V2EX 公开 API（v1，匿名只读）客户端。
+ * V2EX API 2.0（Beta）客户端 — 所有接口经 Personal Access Token 认证。
  *
- * 基址 [baseUrl] 默认 [DEFAULT_BASE_URL]，可经插件配置覆盖为镜像（如
- * `https://global.v2ex.co/api`）以适配受限网络。HTTP 用 JDK 自带 HttpURLConnection，
- * JSON 用 Android 自带 org.json，插件零第三方依赖。
+ * 基址 [baseUrl] 默认 [DEFAULT_BASE_URL]（`/api/v2` 前缀），可经插件配置覆盖为镜像。
+ * 响应包裹 `{success, message, result}` 由 [parseEnvelope] 校验，调用方再取 result。
+ * HTTP 用 JDK 自带 HttpURLConnection，JSON 用 Android 自带 org.json，插件零第三方依赖。
  */
-internal class V2exApi(var baseUrl: String = DEFAULT_BASE_URL) {
+internal class V2exApi(
+    baseUrl: String = DEFAULT_BASE_URL,
+    token: String = "",
+) {
 
-    /** 热门主题。 */
-    fun hotTopics(): JSONArray = topicArray(get("/topics/hot.json"))
+    /** 配置后由 [V2exPlugin.configure] 写入；工具每次执行读取当前值。 */
+    @Volatile var baseUrl: String = baseUrl
+    @Volatile var token: String = token
 
-    /** 最新主题（接口返回最近约 20 条）。 */
-    fun latestTopics(): JSONArray = topicArray(get("/topics/latest.json"))
+    /** 最新提醒。 */
+    fun notifications(page: Int): JSONArray =
+        resultArray(request("/notifications", "GET", query = mapOf("p" to page.toString())))
 
-    /** 指定节点下的主题；show.json 对单条返回对象、对多条返回数组，统一成数组。 */
-    fun nodeTopics(nodeName: String): JSONArray =
-        topicArray(parseResponse(get("/topics/show.json", mapOf("node_name" to nodeName))))
+    /** 删除指定提醒。 */
+    fun deleteNotification(notificationId: Long): JSONObject =
+        envelope(request("/notifications/$notificationId", "DELETE"))
 
-    /** 单主题详情（含正文）；接口按 id 查询时返回单对象，取第一条。 */
-    fun topic(topicId: Int): JSONObject =
-        topicArray(parseResponse(get("/topics/show.json", mapOf("id" to topicId.toString()))))
-            .optJSONObject(0) ?: JSONObject()
+    /** 自己的 Profile。 */
+    fun member(): JSONObject = resultObject(request("/member", "GET"))
 
-    /** 主题回复。 */
-    fun replies(topicId: Int): JSONArray = topicArray(get("/replies/show.json", mapOf("topic_id" to topicId.toString())))
+    /** 当前使用的令牌。 */
+    fun tokenInfo(): JSONObject = resultObject(request("/token", "GET"))
 
-    /** 节点信息。 */
-    fun node(name: String): JSONObject = single(get("/nodes/show.json", mapOf("name" to name)))
+    /** 创建新令牌（最多 10 个；regular scope 不能继续建令牌）。 */
+    fun createToken(scope: String, expiration: Long): JSONObject =
+        envelope(
+            request(
+                "/tokens",
+                "POST",
+                body = JSONObject().put("scope", scope).put("expiration", expiration).toString(),
+            ),
+        )
 
-    /** 用户信息。 */
-    fun member(username: String): JSONObject = single(get("/members/show.json", mapOf("username" to username)))
+    /** 指定节点。 */
+    fun node(nodeName: String): JSONObject = resultObject(request("/nodes/$nodeName", "GET"))
 
-    private fun topicArray(json: Any): JSONArray = toTopicArray(json)
+    /** 指定节点下的主题（分页）。 */
+    fun nodeTopics(nodeName: String, page: Int): JSONArray =
+        resultArray(request("/nodes/$nodeName/topics", "GET", query = mapOf("p" to page.toString())))
 
-    private fun single(body: String): JSONObject = (parseResponse(body) as? JSONObject) ?: JSONObject()
+    /** 指定主题详情。 */
+    fun topic(topicId: Long): JSONObject = resultObject(request("/topics/$topicId", "GET"))
 
-    private fun get(path: String, query: Map<String, String> = emptyMap()): String {
+    /** 指定主题下的回复（分页）。 */
+    fun replies(topicId: Long, page: Int): JSONArray =
+        resultArray(request("/topics/$topicId/replies", "GET", query = mapOf("p" to page.toString())))
+
+    /** 置顶自己的主题。 */
+    fun setSticky(topicId: Long, duration: String): JSONObject =
+        envelope(request("/topics/$topicId/set-sticky", "POST", query = mapOf("duration" to duration)))
+
+    /** 放置自己的主题到首页（需较高等级/持有量，费用 100 铜币起）。 */
+    fun boost(topicId: Long): JSONObject = envelope(request("/topics/$topicId/boost", "POST"))
+
+    private fun resultArray(body: String): JSONArray = toTopicArray(envelope(body).opt("result"))
+
+    private fun resultObject(body: String): JSONObject = (envelope(body).opt("result") as? JSONObject) ?: JSONObject()
+
+    private fun envelope(body: String): JSONObject = parseEnvelope(body)
+
+    private fun request(path: String, method: String, query: Map<String, String> = emptyMap(), body: String? = null): String {
         val url = buildString {
             append(baseUrl).append(path)
             if (query.isNotEmpty()) {
@@ -52,28 +82,34 @@ internal class V2exApi(var baseUrl: String = DEFAULT_BASE_URL) {
             }
         }
         val connection = URL(url).openConnection() as HttpURLConnection
-        connection.requestMethod = "GET"
+        connection.requestMethod = method
         connection.connectTimeout = CONNECT_TIMEOUT_MS
         connection.readTimeout = READ_TIMEOUT_MS
+        connection.setRequestProperty("Authorization", "Bearer $token")
+        if (body != null) {
+            connection.doOutput = true
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+        }
         val code = connection.responseCode
         val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-        val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+        val responseBody = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
         connection.disconnect()
         if (code !in 200..299) {
-            throw IllegalStateException("V2EX API HTTP $code: $body")
+            throw IllegalStateException("V2EX API HTTP $code: $responseBody")
         }
-        return body
+        return responseBody
     }
 
     private fun enc(value: String): String = URLEncoder.encode(value, "UTF-8")
 
     companion object {
-        const val DEFAULT_BASE_URL: String = "https://www.v2ex.com/api"
+        const val DEFAULT_BASE_URL: String = "https://www.v2ex.com/api/v2"
 
         /** 建立连接超时；服务无响应时快速失败，避免阻塞 Agent 轮次。 */
         const val CONNECT_TIMEOUT_MS: Int = 10_000
 
-        /** 读取响应超时；V2EX 公开接口按 IP 限流，可能较慢。 */
+        /** 读取响应超时；V2EX 按 IP 限流（600 次/小时），可能较慢。 */
         const val READ_TIMEOUT_MS: Int = 30_000
     }
 }

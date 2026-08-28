@@ -4,6 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -116,18 +117,86 @@ class V2exMappersTest {
                 .put("username", "Livid")
                 .put("location", "深圳")
                 .put("tagline", "Make a dent")
-                .put("created", 1_300_000_000L),
+                .put("created", System.currentTimeMillis() / 1000 - 100 * 86400),
         )
 
         assertEquals("Livid", member["username"])
         assertEquals("深圳", member["location"])
         assertEquals("Make a dent", member["tagline"])
+        assertEquals("3 个月前", member["created_human"])
     }
 
     @Test
-    fun parseResponseDistinguishesObjectFromArray() {
-        assertTrue(parseResponse("""{"a":1}""") is JSONObject)
-        assertTrue(parseResponse("""[{"a":1}]""") is JSONArray)
+    fun projectTokenExtractsScopeAndExpiration() {
+        val token = projectToken(
+            JSONObject()
+                .put("id", 1)
+                .put("scope", "everything")
+                .put("expiration", 2592000)
+                .put("created", System.currentTimeMillis() / 1000 - 5 * 86400),
+        )
+
+        assertEquals(1, token["id"])
+        assertEquals("everything", token["scope"])
+        assertEquals(2592000, token["expiration"])
+        assertEquals("5 天前", token["created_human"])
+    }
+
+    @Test
+    fun projectNotificationExtractsIdTypeAndPayload() {
+        val notification = projectNotification(
+            JSONObject()
+                .put("id", 9)
+                .put("type", "reply")
+                .put("created", System.currentTimeMillis() / 1000 - 3600)
+                .put("payload", JSONObject().put("topic_id", 42).put("title", "标题")),
+        )
+
+        assertEquals(9, notification["id"])
+        assertEquals("reply", notification["type"])
+        assertEquals("1 小时前", notification["created_human"])
+        val payload = notification["payload"] as Map<*, *>
+        assertEquals(42, payload["topic_id"])
+    }
+
+    @Test
+    fun projectNotificationsCapsAndReportsTruncation() {
+        val array = JSONArray()
+            .put(JSONObject().put("id", 1))
+            .put(JSONObject().put("id", 2))
+            .put(JSONObject().put("id", 3))
+
+        val result = projectNotifications(array, max = 2)
+
+        assertEquals(3, result["total"])
+        assertEquals(2, result["shown"])
+        assertEquals(true, result["truncated"])
+        assertEquals(2, (result["notifications"] as List<*>).size)
+    }
+
+    @Test
+    fun parseEnvelopeReturnsEnvelopeOnSuccess() {
+        val envelope = parseEnvelope("""{"success":true,"message":"ok","result":{"id":1}}""")
+
+        assertTrue(envelope.optBoolean("success"))
+        assertEquals(1, envelope.optJSONObject("result").optInt("id"))
+    }
+
+    @Test
+    fun parseEnvelopeAcceptsMissingSuccessFlag() {
+        // 个别成功响应可能省略 success 字段；不显式 false 即视为成功。
+        val envelope = parseEnvelope("""{"result":[{"id":1}]}""")
+
+        assertEquals(1, envelope.optJSONArray("result").length())
+    }
+
+    @Test
+    fun parseEnvelopeThrowsWithMessageOnFailure() {
+        val e = assertThrows(IllegalStateException::class.java) {
+            parseEnvelope("""{"success":false,"message":"Not Found"}""")
+        }
+
+        assertTrue(e.message!!.contains("Not Found"))
     }
 
     @Test
@@ -150,7 +219,7 @@ class V2exMappersTest {
         .put("title", "今天你在听什么歌")
         .put("content", "今天的正文内容")
         .put("created", System.currentTimeMillis() / 1000 - 3 * 86400)
-        .put("last_modified", 1_599_900_000L)
+        .put("last_modified", System.currentTimeMillis() / 1000 - 2 * 86400)
         .put("replies", 12)
         .put("node", JSONObject().put("name", "music").put("title", "音乐"))
         .put("member", JSONObject().put("username", "Livid"))

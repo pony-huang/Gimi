@@ -27,18 +27,19 @@ internal class V2exToolset(
 
 private val V2EX_INSTRUCTIONS: String = """
     <v2ex>
-    - V2EX public API is anonymous and read-only: hot/latest/node topics, topic detail, replies, node and member
-      info need no credentials. An optional `base_url` config overrides the API base (default
-      https://www.v2ex.com/api) for mirror usage; if a tool reports a network error, mention this config to the user.
-    - Use `v2ex_hot_topics` for current hot discussions and `v2ex_latest_topics` for newly created topics; never
-      present one as the other.
-    - Node names are the URL slugs from v2ex.com/go/<slug> (e.g. "python", "job", "v2ex"). Resolve an unfamiliar
-      node with `v2ex_node_info` before querying `v2ex_node_topics`.
+    - All V2EX tools call the v2 API with the configured Personal Access Token. If a tool reports a missing or
+      invalid token, tell the user to configure the plugin; never retry with invented credentials.
+    - Node names are the URL slugs from v2ex.com/go/<slug> (e.g. "python", "job", "v2ex"); resolve an unfamiliar
+      node with `v2ex_node` before querying `v2ex_node_topics`. Both accept a `page` param.
     - `v2ex_topic` returns the full raw body of one topic; `v2ex_topic_replies` returns at most the configured number
-      of replies with a `total` count — if a thread has more, say so instead of implying completeness.
-    - Preserve authors, node names, reply counts, timestamps, and raw content returned by tools. Never fabricate
-      V2EX content, authors, node names, or URLs.
-    - The public API throttles by IP; avoid rapid-fire repeated calls to the same endpoint, and expect some endpoints
-      to be slow.
+      of replies for one page with a `total` count — if a thread has more pages, say so instead of implying
+      completeness.
+    - `v2ex_notifications` lists the account's notifications; `v2ex_notification_delete` removes one by id.
+    - Write actions have real effects and cost resources: `v2ex_topic_set_sticky` pins the user's own topic,
+      `v2ex_topic_boost` promotes it to the homepage and charges coins, `v2ex_token_create` issues a new token
+      (max 10). Only run them when the user explicitly asks, and never fabricate confirmation of success.
+    - Preserve titles, authors, node names, reply counts, timestamps, and raw content returned by tools. Never
+      fabricate V2EX content, authors, node names, or URLs.
+    - The API is rate-limited to 600 requests/hour per IP; avoid rapid-fire repeated calls to the same endpoint.
     </v2ex>
 """.trimIndent()

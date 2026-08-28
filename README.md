@@ -85,7 +85,8 @@ above.
 Install APK plugins for extra capabilities, then refresh the list — no restart needed. Plugins bring
 their own tools and can run an in-app authorization flow. Bundled plugins include **Spotify**
 (search, playback, playlists, your library), **知乎 Zhihu** (search, hot lists, Q&A), **V2EX**
-(hot/latest topics, node browsing, topic replies), and **小红书 Xiaohongshu** (login, feeds, search, profiles,
+(notifications, node/topic/reply browsing, own account — via Personal Access Token), and
+**小红书 Xiaohongshu** (login, feeds, search, profiles,
 comments, notifications, interactions, and
 image/video publishing). The Xiaohongshu plugin operates the website directly with an on-device
 WebView and does not require an MCP server or relay URL. Third parties can build their own with the

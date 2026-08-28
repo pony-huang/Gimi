@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- V2EX 插件应用图标：深色 wordmark + 橙色下划线，双色填充。
+     单色矢量图标在魅族深色滤镜下会被压黑，故用双色规避（见 memory: meizu-flyme-dark-mode）。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="48dp"
+    android:viewportWidth="96"
+    android:viewportHeight="48">
+
+    <!-- "V" -->
+    <path
+        android:fillColor="#263238"
+        android:pathData="M6 8 H13 L21 42 H14 Z M23 8 H30 L22 42 H15 Z" />
+    <!-- "2" -->
+    <path
+        android:fillColor="#263238"
+        android:pathData="M34 8 H58 V14 L46 30 Q44 32 44 35 V42 H34 V38 L40 32 L50 22 Q52 20 52 17 V14 H34 Z" />
+    <!-- "E" -->
+    <path
+        android:fillColor="#263238"
+        android:pathData="M62 8 H69 V42 H62 Z M65 8 H82 V14 H65 Z M65 23 H78 V29 H65 Z M65 37 H82 V42 H65 Z" />
+    <!-- "X" -->
+    <path
+        android:fillColor="#263238"
+        android:pathData="M84 8 H90 L96 42 H90 Z M90 8 H96 L90 42 H84 Z" />
+    <!-- 橙色下划线 -->
+    <path
+        android:fillColor="#F4511E"
+        android:pathData="M6 44 H96 V48 H6 Z" />
+</vector>

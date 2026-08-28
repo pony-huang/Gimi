@@ -96,7 +96,7 @@ jobs:
       - name: Build plugin APKs
         run: |
           ./gradlew :plugins:spotify:assembleRelease :plugins:zhihu:assembleRelease \
-            :plugins:xiaohongshu:assembleRelease \
+            :plugins:xiaohongshu:assembleRelease :plugins:v2ex:assembleRelease \
             --stacktrace --no-parallel --max-workers=2 \
             -PreleaseVersionName="${{ steps.version.outputs.value }}" \
             -PreleaseVersionCode="${{ github.run_number }}" \
@@ -114,7 +114,7 @@ jobs:
             cp "$apk" "dist/${REPO_NAME}-v${VERSION}-${abi}.apk"
           done
           # 正式插件 APK 随 Release 一并发布，供用户与主 App 配套安装。
-          for mod in spotify zhihu xiaohongshu; do
+          for mod in spotify zhihu xiaohongshu v2ex; do
             cp "plugins/$mod/build/outputs/apk/release/$mod-release.apk" \
                "dist/${REPO_NAME}-plugin-${mod}-v${VERSION}.apk"
           done

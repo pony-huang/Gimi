@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.feature.plugin
 
 import android.annotation.SuppressLint
+import android.util.Log
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -50,6 +51,8 @@ private fun BrowserWebView(
                 }
                 CookieManager.getInstance().setAcceptCookie(true)
                 CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+                // 由 onPageStarted 置位：作为「导航真正开始」的信号，供下方重试加载判断。
+                var navigationStarted = false
                 webViewClient = object : WebViewClient() {
                     private var completed = false
                     private var polling = false
@@ -116,6 +119,7 @@ private fun BrowserWebView(
                         url: String?,
                         favicon: android.graphics.Bitmap?,
                     ) {
+                        navigationStarted = true
                         if (tryComplete(view, url)) {
                             view.stopLoading()
                         } else {
@@ -127,13 +131,35 @@ private fun BrowserWebView(
                         super.onPageFinished(view, url)
                         startCompletionPolling(view)
                     }
-                }
-                var initialUrlLoaded = false
-                addOnLayoutChangeListener { view, left, top, right, bottom, _, _, _, _ ->
-                    if (!initialUrlLoaded && right > left && bottom > top) {
-                        initialUrlLoaded = true
-                        (view as WebView).loadUrl(browser.authorizeUrl)
+
+                    override fun onReceivedError(
+                        view: WebView,
+                        request: WebResourceRequest,
+                        error: android.webkit.WebResourceError,
+                    ) {
+                        Log.w(
+                            TAG,
+                            "WebView error ${error.errorCode} on ${request.url}: ${error.description}",
+                        )
+                        super.onReceivedError(view, request, error)
                     }
+                }
+                // 加载授权 URL。必须在 WebView 原生侧就绪后再 loadUrl：部分 ROM 的 WebView
+                // （如魅族 Flyme 上的 140 版）在 factory/post 里立即 loadUrl 时渲染进程还没
+                // 起来，导航会被静默丢弃，表现为整页黑屏（spotify 授权页复现，onPageStarted
+                // 永不回调、无任何网络请求）。以 onPageStarted 作为「导航真正开始」的信号，
+                // 未开始就延迟重试，直到 WebView 就绪或超过次数上限。原 addOnLayoutChangeListener
+                // 门控同样不可靠（部分设备不触发，URL 从未加载）。
+                if (browser.authorizeUrl.isBlank()) {
+                    Log.w(TAG, "Empty authorize URL for ${browser.actionId}")
+                } else {
+                    fun retryLoad(attempt: Int) {
+                        if (navigationStarted || attempt > LOAD_MAX_ATTEMPTS) return
+                        Log.w(TAG, "Loading plugin authorize URL (attempt $attempt): ${browser.authorizeUrl}")
+                        loadUrl(browser.authorizeUrl)
+                        postDelayed({ retryLoad(attempt + 1) }, LOAD_RETRY_DELAY_MS)
+                    }
+                    post { retryLoad(1) }
                 }
             }
         },
@@ -141,6 +167,12 @@ private fun BrowserWebView(
         onRelease = { it.destroy() },
     )
 }
+
+private const val TAG: String = "PluginBrowser"
+
+/** 授权 URL 加载重试上限与间隔：WebView 未就绪时导航会被静默丢弃，需要重试到渲染进程就绪。 */
+private const val LOAD_MAX_ATTEMPTS: Int = 6
+private const val LOAD_RETRY_DELAY_MS: Long = 1_000L
 
 private const val COMPLETION_POLL_INTERVAL_MS: Long = 500L
 private const val DESKTOP_USER_AGENT: String =

@@ -40,11 +40,9 @@ class McpReleaseR8RulesTest {
             "The plugin ABI must stay full keep roots for parent-first plugin resolution",
             rules.contains("-keep class github.ponyhuang.gimi.pluginapi.** { *; }"),
         )
-        assertTrue(
-            "Gson-reflected conversation tool config must not shrink",
-            rules.contains(
-                "-keep class github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration { *; }",
-            ),
+        assertFalse(
+            "Gson-migrated data classes are @Serializable and must not need reflection keep rules",
+            rules.contains("-keep class github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration { *; }"),
         )
     }
 

@@ -1,32 +1,29 @@
 package github.ponyhuang.gimi.data.conversation.local
 
-import com.google.gson.Gson
-import com.google.gson.JsonParser
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
-import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
+import kotlinx.serialization.json.Json
 
 internal object ConversationToolConfigurationCodec {
-    private val gson = Gson()
+    /**
+     * 兼容 Gson 旧持久化格式：字段名 = Kotlin 属性名、枚举按 name、null 字段省略、
+     * 默认值全量写出。kotlinx 默认会省略等于默认值的字段并把 null 写成字面量，这里显式对齐旧格式。
+     */
+    private val json = Json {
+        encodeDefaults = true
+        explicitNulls = false
+        ignoreUnknownKeys = true
+        coerceInputValues = true
+    }
 
     fun encode(configuration: ConversationToolConfiguration): String =
-        gson.toJson(configuration)
+        json.encodeToString(configuration)
 
     fun decode(payload: String?): ConversationToolConfiguration? {
         if (payload.isNullOrBlank()) return null
+        // ToolAccessMode 的 "AUTO"/未知历史值由 ToolAccessModeSerializer 收敛到 ALWAYS_AVAILABLE；
+        // 真正 malformed 的 JSON 在此被兜底为未初始化。
         return runCatching {
-            val json = JsonParser.parseString(payload).asJsonObject
-            val storedMode = json.get("toolAccessMode")
-                ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
-                ?.asString
-            val supportedModes = setOf(
-                ToolAccessMode.ON_DEMAND.name,
-                ToolAccessMode.ALWAYS_AVAILABLE.name,
-            )
-            if (storedMode !in supportedModes) {
-                // AUTO 已从当前产品语义移除；旧值和未知值统一收敛到明确的默认策略。
-                json.addProperty("toolAccessMode", ToolAccessMode.ALWAYS_AVAILABLE.name)
-            }
-            gson.fromJson(json, ConversationToolConfiguration::class.java)
+            json.decodeFromString<ConversationToolConfiguration>(payload)
         }.getOrNull()
     }
 }

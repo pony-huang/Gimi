@@ -1,14 +1,42 @@
 package github.ponyhuang.gimi.domain.conversation.model
 
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+
 /**
  * 会话把已启用工具暴露给模型的方式。
  *
  * [ON_DEMAND] 始终先检索；[ALWAYS_AVAILABLE] 从当前用户轮次的第一次模型请求起
  * 加载全部已启用工具。
  */
+@Serializable(with = ToolAccessModeSerializer::class)
 enum class ToolAccessMode {
     ON_DEMAND,
     ALWAYS_AVAILABLE,
+}
+
+/**
+ * 兼容历史持久化数据：旧版本曾把该字段写成 `"AUTO"`，未知值回退到 [ToolAccessMode.ALWAYS_AVAILABLE]。
+ * kotlinx 默认对未知枚举名抛异常，这里用自定义 serializer 保留 codec 的归一化语义。
+ */
+object ToolAccessModeSerializer : KSerializer<ToolAccessMode> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ToolAccessMode", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: ToolAccessMode) {
+        encoder.encodeString(value.name)
+    }
+
+    override fun deserialize(decoder: Decoder): ToolAccessMode {
+        val name = decoder.decodeString()
+        return ToolAccessMode.entries.firstOrNull { it.name == name }
+            ?: ToolAccessMode.ALWAYS_AVAILABLE
+    }
 }
 
 /**
@@ -28,6 +56,7 @@ enum class ToolAccessMode {
  * @property enabledOfficialFunctionIdsByService 按模型服务和官方工具分组的函数选择。
  * @property toolAccessMode 当前会话采用的工具声明加载模式。
  */
+@Serializable
 data class ConversationToolConfiguration(
     val enabledLocalToolIds: Set<String> = emptySet(),
     val enabledMcpServerIds: Set<String> = emptySet(),

@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.data.modelcatalog
 
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
+import kotlinx.serialization.Serializable
 
 private const val WEB_SEARCH_TOOL_ID: String = "web_search"
 private const val KIMI_FORMULAS_TOOL_ID: String = "kimi_formulas"
@@ -107,6 +108,7 @@ val LLMModelProvider.isConfiguredForChat: Boolean
 /**
  * API 地址接口标准。
  */
+@Serializable
 enum class ApiBaseType() {
     Standard,
     Anthropic,

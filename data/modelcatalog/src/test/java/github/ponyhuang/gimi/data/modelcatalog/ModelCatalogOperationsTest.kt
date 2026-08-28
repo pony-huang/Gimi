@@ -1,6 +1,5 @@
 package github.ponyhuang.gimi.data.modelcatalog
 
-import com.google.gson.Gson
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -53,9 +52,9 @@ class ModelCatalogOperationsTest {
 
     @Test
     fun legacyStoredModelDefaultsToNonStt() {
-        val stored = Gson().fromJson(
+        // 旧持久化 blob（缺 isStt / capabilities / source 之外的字段）应被兼容 Json 正常读回。
+        val stored = modelCatalogJson.decodeFromString<StoredModel>(
             """{"modelId":"chat","modelName":"Chat","source":"REMOTE"}""",
-            StoredModel::class.java,
         )
 
         assertFalse(stored.isStt)

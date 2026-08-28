@@ -1,5 +1,7 @@
 package github.ponyhuang.gimi.domain.modelcatalog.model
 
+import kotlinx.serialization.Serializable
+
 data class LLMModelSetting(
     val id: String,
     val name: String,
@@ -43,10 +45,12 @@ data class Model(
     val capabilities: MultimodalCapabilities = MultimodalCapabilities(),
 )
 
+@Serializable
 data class ModelSelection(
-    val serviceId: String,
-    val groupId: String,
-    val modelId: String,
+    // 默认空串容忍旧版本遗漏字段的持久化数据（kotlinx 对缺失必需字段抛异常，Gson 静默留 null）。
+    val serviceId: String = "",
+    val groupId: String = "",
+    val modelId: String = "",
 )
 
 data class DefaultModelSettings(

@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.ksp)
 }
@@ -24,10 +25,10 @@ dependencies {
     implementation(libs.google.adk.kotlin.core) {
         exclude(group = "io.modelcontextprotocol.sdk")
     }
-    implementation(libs.gson)
     implementation(libs.hilt.android)
     implementation(libs.javax.inject)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.json)
     ksp(libs.androidx.room.compiler)
     ksp(libs.hilt.android.compiler)
 

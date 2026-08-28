@@ -7,8 +7,6 @@ import android.util.Base64
 import android.util.Log
 import androidx.core.content.edit
 import androidx.room.withTransaction
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.data.modelcatalog.toData
@@ -43,6 +41,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.Serializable
 
 sealed interface ModelCatalogLoadState {
     data object Loading : ModelCatalogLoadState
@@ -51,12 +50,14 @@ sealed interface ModelCatalogLoadState {
 }
 
 /** Sensitive, user-editable provider settings stored outside the public Room catalog. */
+@Serializable
 private data class ModelServiceSettings(
-    val isEnabled: Boolean,
-    val apiKey: String,
-    val apiBaseUrl: String,
-    val baseType: ApiBaseType,
-    val anthropicBaseUrl: String,
+    // 补默认值容忍旧版本稀疏 blob（Gson 静默留 null / 缺字段，kotlinx 默认抛异常）。
+    val isEnabled: Boolean = false,
+    val apiKey: String = "",
+    val apiBaseUrl: String = "",
+    val baseType: ApiBaseType = ApiBaseType.Standard,
+    val anthropicBaseUrl: String = "",
     val disabledOfficialTools: Set<String> = emptySet(),
 )
 
@@ -69,7 +70,6 @@ class ModelServiceRepository @Inject constructor(
     @ApplicationContext private val applicationContext: Context,
     private val database: LLMModelRoomDatabase,
 ) : ModelCatalogRepository, AgentModelConfigurationSource {
-    private val gson = Gson()
     private val dao = database.lLMModelConfigDao()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val catalogWriteMutex = Mutex()
@@ -79,9 +79,6 @@ class ModelServiceRepository @Inject constructor(
         PREFERENCES_NAME,
         Context.MODE_PRIVATE,
     )
-    private val settingsType = object : TypeToken<Map<String, ModelServiceSettings>>() {}.type
-    private val groupsType = object : TypeToken<List<StoredModelGroup>>() {}.type
-    private val selectionType = object : TypeToken<ModelSelection>() {}.type
     private val defaultSettings = LLMModelConfigs.services.associate { provider ->
         provider.serviceId to provider.toSettings()
     }
@@ -403,13 +400,13 @@ class ModelServiceRepository @Inject constructor(
     private suspend fun seedCatalogIfEmpty() {
         // Insert providers that are missing from the Room snapshot so newly built-in
         // vendors appear on a fresh install without losing prior user data.
-        seedMissingModelCatalog(database, gson)
+        seedMissingModelCatalog(database)
         // Merge newly built-in model groups / items into providers the user already
         // has, so adding a model to an existing DefaultModelServices.services entry in
         // an app update surfaces in the running app's settings without clearing the
         // user's selections. Both helpers are idempotent and only write when the
         // snapshot actually changes.
-        upgradeDefaultModelMetadata(database, gson)
+        upgradeDefaultModelMetadata(database)
     }
 
     private suspend fun mutateCatalog(
@@ -421,7 +418,7 @@ class ModelServiceRepository @Inject constructor(
             database.withTransaction {
                 val entity = dao.get(serviceId) ?: return@withTransaction
                 val groups = decodeGroups(entity.modelGroupsJson)
-                dao.upsert(entity.copy(modelGroupsJson = gson.toJson(transform(groups))))
+                dao.upsert(entity.copy(modelGroupsJson = modelCatalogJson.encodeToString(transform(groups))))
             }
         }
     }
@@ -476,7 +473,8 @@ class ModelServiceRepository @Inject constructor(
     }
 
     private fun decodeGroups(json: String): List<StoredModelGroup> =
-        gson.fromJson<List<StoredModelGroup>>(json, groupsType).orEmpty()
+        runCatching { modelCatalogJson.decodeFromString<List<StoredModelGroup>>(json) }
+            .getOrDefault(emptyList())
 
     private fun LLMModelProvider.toSettings(): ModelServiceSettings = ModelServiceSettings(
         isEnabled = isEnabled,
@@ -497,7 +495,7 @@ class ModelServiceRepository @Inject constructor(
     private fun readSettings(): Map<String, ModelServiceSettings>? {
         val encrypted = preferences.getString(SETTINGS_KEY, null) ?: return null
         return runCatching {
-            gson.fromJson<Map<String, ModelServiceSettings>>(decrypt(encrypted), settingsType)
+            modelCatalogJson.decodeFromString<Map<String, ModelServiceSettings>>(decrypt(encrypted))
         }.onFailure { Log.w(TAG, "Unable to restore model service settings.", it) }.getOrNull()
     }
 
@@ -512,17 +510,19 @@ class ModelServiceRepository @Inject constructor(
     private fun persistSettings(value: Map<String, ModelServiceSettings>): Boolean =
         cancellationAwareRunCatching {
             preferences.edit()
-                .putString(SETTINGS_KEY, encrypt(gson.toJson(value)))
+                .putString(SETTINGS_KEY, encrypt(modelCatalogJson.encodeToString(value)))
                 .commit()
         }.onFailure { Log.w(TAG, "Unable to persist model service settings.", it) }
             .getOrDefault(false)
 
     private fun readSelection(key: String): ModelSelection? = preferences.getString(key, null)
-        ?.let { encoded -> runCatching { gson.fromJson<ModelSelection>(encoded, selectionType) }.getOrNull() }
+        ?.let { encoded ->
+            runCatching { modelCatalogJson.decodeFromString<ModelSelection>(encoded) }.getOrNull()
+        }
 
     private fun persistSelection(key: String, selection: ModelSelection?) {
         preferences.edit {
-            if (selection == null) remove(key) else putString(key, gson.toJson(selection))
+            if (selection == null) remove(key) else putString(key, modelCatalogJson.encodeToString(selection))
         }
     }
 

@@ -1,12 +1,15 @@
 package github.ponyhuang.gimi.domain.mcp.model
 
 import java.util.UUID
+import kotlinx.serialization.Serializable
 
+@Serializable
 enum class McpTransport {
     SSE,
     STREAMABLE_HTTP,
 }
 
+@Serializable
 data class McpServer(
     val id: String = UUID.randomUUID().toString(),
     // 新建时留空，由编辑器 placeholder 引导用户命名；避免所有服务器同叫一个默认名。

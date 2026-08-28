@@ -1,6 +1,9 @@
 package github.ponyhuang.gimi.domain.modelcatalog.model
 
+import kotlinx.serialization.Serializable
+
 /** How a model accepts files of a given media type. */
+@Serializable
 enum class FileIngestMode {
     /** This media type is not supported by the model. */
     NOT_SUPPORTED,
@@ -15,14 +18,17 @@ interface HasIngestMode {
     val maxInlineBytes: Long?
 }
 
+@Serializable
 data class VisionCapability(
     val supportedMimeTypes: List<String> = listOf("image/jpeg", "image/png", "image/gif", "image/webp"),
     override val ingestMode: FileIngestMode = FileIngestMode.INLINE,
     val supportsVideo: Boolean = false,
 ) : HasIngestMode {
+    // 计算属性，无 backing field，Gson/kotlinx 都不会序列化——与 Audio/Document 的 maxInlineBytes 不对称保持一致。
     override val maxInlineBytes: Long? get() = null
 }
 
+@Serializable
 data class AudioInputCapability(
     val supportedMimeTypes: List<String> = listOf("audio/wav", "audio/x-wav", "audio/mpeg", "audio/mp3"),
     override val ingestMode: FileIngestMode = FileIngestMode.INLINE,
@@ -30,6 +36,7 @@ data class AudioInputCapability(
     val maxUploadBytes: Long = 512 * 1024 * 1024,
 ) : HasIngestMode
 
+@Serializable
 data class DocumentInputCapability(
     val supportedMimeTypes: List<String> = listOf(
         "application/pdf",
@@ -49,6 +56,7 @@ data class DocumentInputCapability(
     val maxUploadBytes: Long = 512 * 1024 * 1024,
 ) : HasIngestMode
 
+@Serializable
 data class MultimodalCapabilities(
     val vision: VisionCapability? = VisionCapability(),
     val audioInput: AudioInputCapability? = AudioInputCapability(),

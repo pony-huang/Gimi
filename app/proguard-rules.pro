@@ -44,29 +44,10 @@
 # ---------------------------------------------------------------------------
 -keep,allowshrinking class github.ponyhuang.gimi.** { *; }
 
-# Classes whose members are read only via Gson field reflection / kotlinx
-# serializer lookup / ObjectBox metadata and would otherwise be stripped as
-# "unused".
--keep class github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration { *; }
--keep class github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode { *; }
--keep class github.ponyhuang.gimi.data.modelcatalog.ModelServiceSettings { *; }
--keep class github.ponyhuang.gimi.data.modelcatalog.StoredModelGroup { *; }
--keep class github.ponyhuang.gimi.data.modelcatalog.StoredModel { *; }
--keep class github.ponyhuang.gimi.data.modelcatalog.StoredModelSource { *; }
--keep class github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection { *; }
--keep class github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities { *; }
--keep class github.ponyhuang.gimi.domain.modelcatalog.model.VisionCapability { *; }
--keep class github.ponyhuang.gimi.domain.modelcatalog.model.AudioInputCapability { *; }
--keep class github.ponyhuang.gimi.domain.modelcatalog.model.DocumentInputCapability { *; }
--keep class github.ponyhuang.gimi.domain.mcp.model.McpServer { *; }
--keep class github.ponyhuang.gimi.domain.mcp.model.McpTransport { *; }
--keep class github.ponyhuang.gimi.data.modelcatalog.remote.OpenAiModelsResponse { *; }
--keep class github.ponyhuang.gimi.data.modelcatalog.remote.OpenAiModelEntry { *; }
--keep class github.ponyhuang.gimi.data.appupdate.remote.GitHubReleaseDto { *; }
--keep class github.ponyhuang.gimi.data.appupdate.remote.GitHubAssetDto { *; }
-
-# Navigation3 resolves AppRoute serializers reflectively (route names derive
-# from the fully-qualified class names).
+# App-route serializers are resolved reflectively by Navigation3; the ObjectBox
+# entity + generated box are native metadata bindings. All former Gson-migrated
+# data classes are now @Serializable (compile-time serializers referencing their
+# fields directly), so they need no keep rules — R8 sees the field accesses.
 -keep class github.ponyhuang.gimi.ui.navigation.AppRoute$* { *; }
 
 # ObjectBox entity + generated box (native metadata binding).

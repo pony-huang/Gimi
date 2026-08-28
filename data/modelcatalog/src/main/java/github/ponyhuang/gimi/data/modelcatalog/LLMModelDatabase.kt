@@ -9,8 +9,21 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
 import androidx.room.withTransaction
-import com.google.gson.Gson
+import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import kotlinx.coroutines.flow.Flow
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+
+/**
+ * 兼容 Gson 旧持久化格式的 kotlinx Json：字段名 = Kotlin 属性名、枚举按 name、
+ * 默认值全量写出、null 省略、忽略未知键、容忍类型不匹配。
+ */
+internal val modelCatalogJson: Json = Json {
+    encodeDefaults = true
+    explicitNulls = false
+    ignoreUnknownKeys = true
+    coerceInputValues = true
+}
 
 @Entity(tableName = "model_config")
 data class LLMModelConfigEntity(
@@ -57,13 +70,13 @@ abstract class LLMModelRoomDatabase : RoomDatabase() {
     }
 }
 
-internal fun lLMModelConfigEntities(gson: Gson = Gson()): List<LLMModelConfigEntity> =
+internal fun lLMModelConfigEntities(): List<LLMModelConfigEntity> =
     LLMModelConfigs.services.mapIndexed { index, provider ->
         LLMModelConfigEntity(
             serviceId = provider.serviceId,
             serviceName = provider.serviceName,
             displayOrder = index,
-            modelGroupsJson = gson.toJson(
+            modelGroupsJson = modelCatalogJson.encodeToString(
                 provider.lLMModelGroups.map { group ->
                     StoredModelGroup(
                         groupId = group.groupId,
@@ -96,12 +109,11 @@ internal fun lLMModelConfigEntities(gson: Gson = Gson()): List<LLMModelConfigEnt
  */
 internal suspend fun seedMissingModelCatalog(
     database: LLMModelRoomDatabase,
-    gson: Gson = Gson(),
 ) {
     database.withTransaction {
         val dao = database.lLMModelConfigDao()
         val existingIds = dao.getAll().mapTo(HashSet()) { it.serviceId }
-        val missing = lLMModelConfigEntities(gson)
+        val missing = lLMModelConfigEntities()
             .filterNot { it.serviceId in existingIds }
         if (missing.isNotEmpty()) dao.upsertAll(missing)
     }
@@ -113,35 +125,32 @@ internal suspend fun seedMissingModelCatalog(
  */
 internal suspend fun upgradeDefaultModelMetadata(
     database: LLMModelRoomDatabase,
-    gson: Gson = Gson(),
 ) {
     database.withTransaction {
         val dao = database.lLMModelConfigDao()
-        val defaultsById = lLMModelConfigEntities(gson).associateBy { it.serviceId }
+        val defaultsById = lLMModelConfigEntities().associateBy { it.serviceId }
         dao.getAll().forEach { entity ->
             val defaultEntity = defaultsById[entity.serviceId] ?: return@forEach
-            val existingGroups = gson.fromJson<Array<StoredModelGroup>>(
-                entity.modelGroupsJson,
-                Array<StoredModelGroup>::class.java,
-            ).orEmpty().toList()
-            val defaultGroups = gson.fromJson<Array<StoredModelGroup>>(
-                defaultEntity.modelGroupsJson,
-                Array<StoredModelGroup>::class.java,
-            ).orEmpty().toList()
+            val existingGroups = modelCatalogJson
+                .decodeFromString<List<StoredModelGroup>>(entity.modelGroupsJson)
+            val defaultGroups = modelCatalogJson
+                .decodeFromString<List<StoredModelGroup>>(defaultEntity.modelGroupsJson)
             val upgraded = mergeDefaultModelMetadata(existingGroups, defaultGroups)
             if (upgraded != existingGroups) {
-                dao.upsert(entity.copy(modelGroupsJson = gson.toJson(upgraded)))
+                dao.upsert(entity.copy(modelGroupsJson = modelCatalogJson.encodeToString(upgraded)))
             }
         }
     }
 }
 
 /** Persistence-only model origin used to reconcile remote and manually entered models. */
+@Serializable
 internal enum class StoredModelSource {
     REMOTE,
     USER,
 }
 
+@Serializable
 internal data class StoredModelGroup(
     val groupId: String,
     val groupName: String,
@@ -149,11 +158,13 @@ internal data class StoredModelGroup(
     val models: List<StoredModel> = emptyList(),
 )
 
+@Serializable
 internal data class StoredModel(
     val modelId: String,
     val modelName: String,
-    val source: StoredModelSource,
+    // 旧版本 blob 可能缺 source 字段（Gson 静默留 null），给默认值以免 kotlinx 抛缺字段异常。
+    val source: StoredModelSource = StoredModelSource.REMOTE,
     val isStt: Boolean = false,
     val isTts: Boolean = false,
-    val capabilities: github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities = github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities(),
+    val capabilities: MultimodalCapabilities = MultimodalCapabilities(),
 )

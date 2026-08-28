@@ -1,7 +1,7 @@
 package github.ponyhuang.gimi.data.appupdate.remote
 
-import com.google.gson.Gson
 import java.io.IOException
+import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
@@ -15,7 +15,8 @@ internal class GitHubReleaseGateway(
     private val okHttpClient: OkHttpClient,
     private val latestReleaseUrl: String = LATEST_RELEASE_URL,
 ) {
-    private val gson = Gson()
+    // GitHub 响应含大量未声明的顶层/嵌套字段，Gson 静默忽略、kotlinx 默认抛异常，这里显式忽略。
+    private val json = Json { ignoreUnknownKeys = true }
 
     /** 获取最新正式版 release。 */
     fun fetchLatestRelease(): GitHubReleaseDto {
@@ -30,7 +31,7 @@ internal class GitHubReleaseGateway(
             }
             if (!response.isSuccessful) throw IOException("GitHub API HTTP ${response.code}")
             val body = response.body?.string() ?: throw IOException("Empty response body")
-            return gson.fromJson(body, GitHubReleaseDto::class.java)
+            return json.decodeFromString<GitHubReleaseDto>(body)
         }
     }
 

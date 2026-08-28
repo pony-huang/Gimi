@@ -1,9 +1,7 @@
 package github.ponyhuang.gimi.data.mcp.repository
 
-import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
-import com.google.gson.reflect.TypeToken
 import github.ponyhuang.gimi.domain.mcp.model.McpImportResult
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
@@ -14,13 +12,19 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.json.Json
 
 @Singleton
 class SecureMcpServerRepository @Inject constructor(
     private val storage: McpServerStorage,
 ) : McpRepository {
-    private val gson = Gson()
-    private val type = object : TypeToken<List<McpServer>>() {}.type
+    /** 兼容 Gson 旧持久化格式：字段名 = Kotlin 属性名、默认值全量写出、null 省略、忽略未知键。 */
+    private val json = Json {
+        encodeDefaults = true
+        explicitNulls = false
+        ignoreUnknownKeys = true
+        coerceInputValues = true
+    }
     private val servers = MutableStateFlow(load())
     private val _revision = MutableStateFlow(0L)
 
@@ -187,12 +191,12 @@ class SecureMcpServerRepository @Inject constructor(
     }
 
     private fun load(): List<McpServer> = runCatching {
-        gson.fromJson<List<McpServer>>(storage.read() ?: "[]", type)
+        json.decodeFromString<List<McpServer>>(storage.read() ?: "[]")
     }.getOrDefault(emptyList())
 
     private fun persist(value: List<McpServer>) {
         if (value == servers.value) return
-        storage.write(gson.toJson(value, type))
+        storage.write(json.encodeToString(value))
         servers.value = value
         _revision.update { it + 1 }
     }
@@ -287,11 +291,10 @@ private fun curlToPortableJson(content: String): String? {
         addProperty("url", url)
         add("headers", JsonObject().apply { headers.forEach(::addProperty) })
     }
-    return Gson().toJson(
-        JsonObject().apply {
-            add("mcpServers", JsonObject().apply { add(deriveServerName(url), server) })
-        },
-    )
+    // JsonObject.toString() 与 Gson().toJson(jsonObject) 等价；树操作为保留 Gson 依赖的唯一用途。
+    return JsonObject().apply {
+        add("mcpServers", JsonObject().apply { add(deriveServerName(url), server) })
+    }.toString()
 }
 
 private fun shellTokens(command: String): List<String> {

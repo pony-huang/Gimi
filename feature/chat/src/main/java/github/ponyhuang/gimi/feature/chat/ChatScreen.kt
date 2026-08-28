@@ -73,6 +73,7 @@ import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
+import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -134,6 +135,8 @@ fun ChatScaffold(
     onOfficialToolFunctionsRetry: (String) -> Unit,
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
+    recommendations: List<AgentRecommendation> = emptyList(),
+    onRecommendationClick: (String) -> Unit = {},
 ) {
 
     val listState = rememberLazyListState()
@@ -364,6 +367,17 @@ fun ChatScaffold(
                         .consumeWindowInsets(innerPadding),
                     contentPadding = listContentPadding,
                 ) {
+                    if (visibleMessages.isEmpty() && recommendations.isNotEmpty()) {
+                        item(
+                            key = "chat-recommendations",
+                            contentType = "recommendations",
+                        ) {
+                            RecommendationPanel(
+                                recommendations = recommendations,
+                                onRecommendationClick = onRecommendationClick,
+                            )
+                        }
+                    }
                     items(
                         items = visibleMessages,
                         key = { it.id },

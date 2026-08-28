@@ -1,7 +1,9 @@
 package github.ponyhuang.gimi.data.permissions.repository
 
 import android.Manifest
+import android.app.AppOpsManager
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
@@ -23,6 +25,7 @@ import org.junit.Test
 class AndroidPermissionRepositoryTest {
 
     private lateinit var context: Context
+    private lateinit var appOpsManager: AppOpsManager
     private lateinit var preferences: InMemorySharedPreferences
     private lateinit var repository: AndroidPermissionRepository
 
@@ -34,6 +37,17 @@ class AndroidPermissionRepositoryTest {
             context.getSharedPreferences("permission_settings", Context.MODE_PRIVATE)
         } returns preferences
         every { context.packageName } returns PACKAGE_NAME
+        val applicationInfo = ApplicationInfo().apply { uid = UID }
+        every { context.applicationInfo } returns applicationInfo
+        appOpsManager = mockk()
+        every { context.getSystemService(AppOpsManager::class.java) } returns appOpsManager
+        every {
+            appOpsManager.checkOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                UID,
+                PACKAGE_NAME,
+            )
+        } returns AppOpsManager.MODE_IGNORED
 
         mockkStatic(
             ContextCompat::class,
@@ -96,6 +110,27 @@ class AndroidPermissionRepositoryTest {
             NotificationManagerCompat.getEnabledListenerPackages(context)
         } returns setOf("other.package")
         assertFalse(AppPermission.NotificationListener in repository.snapshot().granted)
+    }
+
+    @Test
+    fun snapshotIncludesUsageStatsOnlyWhenAppOpsAllowsAccess() {
+        every {
+            appOpsManager.checkOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                UID,
+                PACKAGE_NAME,
+            )
+        } returns AppOpsManager.MODE_ALLOWED
+        assertTrue(AppPermission.UsageStats in repository.snapshot().granted)
+
+        every {
+            appOpsManager.checkOpNoThrow(
+                AppOpsManager.OPSTR_GET_USAGE_STATS,
+                UID,
+                PACKAGE_NAME,
+            )
+        } returns AppOpsManager.MODE_IGNORED
+        assertFalse(AppPermission.UsageStats in repository.snapshot().granted)
     }
 
     @Test
@@ -204,10 +239,12 @@ class AndroidPermissionRepositoryTest {
         AppPermission.PostNotifications -> Manifest.permission.POST_NOTIFICATIONS
         AppPermission.WriteSystemSettings,
         AppPermission.NotificationListener,
+        AppPermission.UsageStats,
         -> error("Special permissions do not have runtime permission names.")
     }
 
     private companion object {
+        const val UID = 10_001
         const val PACKAGE_NAME = "github.ponyhuang.gimi.test"
         const val PERMANENTLY_DENIED_KEY = "permanently_denied_v2"
     }

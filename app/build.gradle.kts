@@ -101,6 +101,7 @@ dependencies {
     implementation(project(":core:audio"))
     implementation(project(":data:assistant"))
     implementation(project(":domain:assistant"))
+    implementation(project(":domain:recommendation"))
     implementation(project(":core:common"))
     implementation(project(":data:modelcatalog"))
     implementation(project(":data:speech"))
@@ -118,6 +119,7 @@ dependencies {
     implementation(project(":data:skills"))
     implementation(project(":data:appupdate"))
     implementation(project(":data:plugin"))
+    implementation(project(":data:recommendation"))
     implementation(project(":core:designsystem"))
     implementation(project(":feature:modelsettings"))
     implementation(project(":feature:mcp"))
@@ -129,6 +131,7 @@ dependencies {
     implementation(project(":feature:plugin"))
     implementation(project(":feature:skills"))
     implementation(project(":feature:chat"))
+    implementation(project(":feature:recommendation"))
     testImplementation(project(":core:testing"))
     // Drop kxml2 from the release runtime configurations only. Android's
     // framework already provides android.content.res.XmlResourceParser which
@@ -165,6 +168,8 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.hilt.work)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

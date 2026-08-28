@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -129,6 +130,21 @@ fun PermissionSettingsScreen(
                     },
                     trailingContent = {
                         PermissionStatusText(granted = state.notificationAccessGranted)
+                    },
+                )
+            }
+            item {
+                PreferenceListItem(
+                    icon = Icons.Default.Apps,
+                    title = stringResource(R.string.permissions_special_usage_access_title),
+                    subtitle = stringResource(R.string.permissions_special_usage_access_subtitle),
+                    onClick = if (state.usageAccessGranted) {
+                        null
+                    } else {
+                        { onAction(PermissionSettingsAction.OpenUsageAccess) }
+                    },
+                    trailingContent = {
+                        PermissionStatusText(granted = state.usageAccessGranted)
                     },
                 )
             }

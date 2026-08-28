@@ -94,6 +94,26 @@ class PermissionSettingsViewModelTest {
         verify { repository.recordRequested(setOf(AppPermission.RecordAudio)) }
     }
 
+    @Test
+    fun usageAccessStateAndSettingsDestinationFollowSpecialPermission() {
+        val repository = repository(
+            PermissionSnapshot(
+                granted = setOf(AppPermission.UsageStats),
+                permanentlyDenied = emptySet(),
+            ),
+        )
+        val viewModel = viewModel(repository)
+
+        assertTrue(viewModel.uiState.value.usageAccessGranted)
+
+        viewModel.onAction(PermissionSettingsAction.OpenUsageAccess)
+
+        assertEquals(
+            PermissionSettingsDestination.UsageAccess,
+            viewModel.uiState.value.settingsRequest?.destination,
+        )
+    }
+
     private fun viewModel(repository: PermissionRepository) = PermissionSettingsViewModel(
         getSnapshot = GetPermissionSnapshotUseCase(repository),
         recordPermanentlyDenied = RecordPermanentlyDeniedPermissionsUseCase(repository),

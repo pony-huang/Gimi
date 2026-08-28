@@ -36,6 +36,7 @@ import github.ponyhuang.gimi.feature.chat.ChatEffect
 import github.ponyhuang.gimi.feature.chat.ChatNotice
 import github.ponyhuang.gimi.feature.chat.ChatScaffold
 import github.ponyhuang.gimi.feature.chat.ChatViewModel
+import github.ponyhuang.gimi.feature.chat.ChatRecommendationsViewModel
 import github.ponyhuang.gimi.feature.chat.LocalFileSearchResultsScreen
 import github.ponyhuang.gimi.feature.chat.ViewModelStore
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
@@ -53,6 +54,8 @@ import github.ponyhuang.gimi.feature.modelsettings.list.ModelServiceListRoute
 import github.ponyhuang.gimi.feature.modelsettings.R as ModelsettingsR
 import github.ponyhuang.gimi.feature.permissions.PermissionSettingsRoute
 import github.ponyhuang.gimi.feature.permissions.R as PermissionsR
+import github.ponyhuang.gimi.feature.recommendation.RecommendationSettingsRoute
+import github.ponyhuang.gimi.feature.recommendation.R as RecommendationR
 import github.ponyhuang.gimi.feature.settings.R as SettingsR
 import github.ponyhuang.gimi.feature.settings.SettingsRoute
 import github.ponyhuang.gimi.feature.skills.SkillsSettingsRoute
@@ -84,12 +87,14 @@ import java.io.File
 @Composable
 fun MainScreen(
     viewModel: ChatViewModel = hiltViewModel(),
+    recommendationViewModel: ChatRecommendationsViewModel = hiltViewModel(),
     requestedSessionId: String? = null,
     onRequestedSessionHandled: () -> Unit = {},
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val recommendations by recommendationViewModel.recommendations.collectAsStateWithLifecycle()
     val currentSessionId = uiState.sessionId
     val context = LocalContext.current
     val chatNoticeConfigureChatModel = stringResource(ChatR.string.chat_notice_configure_chat_model)
@@ -189,6 +194,10 @@ fun MainScreen(
                         AppRoute.Chat -> ViewModelStore(route) {
                             ChatScaffold(
                                 state = uiState,
+                                recommendations = recommendations,
+                                onRecommendationClick = { prompt ->
+                                    viewModel.send(prompt, emptyList())
+                                },
                                 partChannelProvider = viewModel::partChannelFor,
                                 onSend = viewModel::send,
                                 onStop = { viewModel.onAction(ChatAction.StopStreaming) },
@@ -309,6 +318,19 @@ fun MainScreen(
                                 onNavigateToToolAuthorization = {
                                     backStack.add(AppRoute.ToolAuthorizationSettings)
                                 },
+                                onNavigateToRecommendations = {
+                                    backStack.add(AppRoute.RecommendationSettings)
+                                },
+                                modifier = modifier,
+                            )
+                        }
+
+                        AppRoute.RecommendationSettings -> PreferenceScaffold(
+                            stringResource(RecommendationR.string.recommendation_settings_title),
+                            goBack,
+                        ) { modifier ->
+                            RecommendationSettingsRoute(
+                                onOpenPermissions = { backStack.add(AppRoute.PermissionSettings) },
                                 modifier = modifier,
                             )
                         }

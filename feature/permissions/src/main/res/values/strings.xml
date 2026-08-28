@@ -30,4 +30,6 @@
     <string name="permission_desc_bluetooth">用于连接耳机并执行语音唤醒任务</string>
     <string name="permission_name_notifications">通知</string>
     <string name="permission_desc_notifications">用于显示后台语音任务的运行状态</string>
+    <string name="permissions_special_usage_access_title">应用使用情况</string>
+    <string name="permissions_special_usage_access_subtitle">允许智能推荐读取最近使用的应用；不会保存应用使用记录</string>
 </resources>

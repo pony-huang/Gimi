@@ -140,4 +140,12 @@
     <string name="chat_local_file_image_preview">Image preview: %1$s</string>
     <string name="chat_remote_image">Remote image %1$d</string>
     <string name="chat_remote_image_swipe_hint">Swipe horizontally to view images</string>
+    <string name="chat_recommendations_title">Recommended for you</string>
+    <string name="chat_recommendation_category_reasoning">Reason</string>
+    <string name="chat_recommendation_category_vision">Vision</string>
+    <string name="chat_recommendation_category_research">Research</string>
+    <string name="chat_recommendation_category_writing">Write</string>
+    <string name="chat_recommendation_category_device">Device</string>
+    <string name="chat_recommendation_category_productivity">Productivity</string>
+    <string name="chat_recommendation_category_general">Idea</string>
 </resources>

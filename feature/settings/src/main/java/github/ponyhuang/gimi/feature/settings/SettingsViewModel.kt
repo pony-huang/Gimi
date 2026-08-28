@@ -40,6 +40,8 @@ class SettingsViewModel @Inject constructor(
             SettingsAction.OpenPermissions -> emitEffect(SettingsEffect.NavigateToPermissions)
             SettingsAction.OpenToolAuthorization ->
                 emitEffect(SettingsEffect.NavigateToToolAuthorization)
+            SettingsAction.OpenRecommendations ->
+                emitEffect(SettingsEffect.NavigateToRecommendations)
             SettingsAction.OpenProjectPage ->
                 emitEffect(SettingsEffect.OpenProjectPage)
             is SettingsAction.SetToolActivityVisible ->

@@ -27,6 +27,8 @@
     <string name="permission_desc_bluetooth">Used to connect to a headset and run voice wake tasks</string>
     <string name="permission_name_notifications">Notifications</string>
     <string name="permission_desc_notifications">Used to display the running state of background voice tasks</string>
+    <string name="permissions_special_usage_access_title">App usage access</string>
+    <string name="permissions_special_usage_access_subtitle">Lets recommendations use the most recent app; usage history is not stored</string>
 
     <!-- Permission screen title (consumed by :app SettingsScaffold) -->
     <string name="permissions_screen_title">Permissions</string>

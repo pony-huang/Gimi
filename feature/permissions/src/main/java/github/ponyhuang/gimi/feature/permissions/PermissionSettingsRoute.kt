@@ -93,6 +93,8 @@ fun PermissionSettingsRoute(
             )
             PermissionSettingsDestination.NotificationListener ->
                 Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+            PermissionSettingsDestination.UsageAccess ->
+                Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
         }
         settingsLauncher.launch(intent)
     }
@@ -117,5 +119,6 @@ private fun AppPermission.androidName(): String = when (this) {
     AppPermission.PostNotifications -> Manifest.permission.POST_NOTIFICATIONS
     AppPermission.WriteSystemSettings,
     AppPermission.NotificationListener,
+    AppPermission.UsageStats,
     -> error("Special permissions cannot be requested at runtime.")
 }

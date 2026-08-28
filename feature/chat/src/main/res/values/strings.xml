@@ -150,4 +150,12 @@
     <string name="chat_local_file_image_preview">图片预览：%1$s</string>
     <string name="chat_remote_image">远程图片 %1$d</string>
     <string name="chat_remote_image_swipe_hint">左右滑动查看图片</string>
+    <string name="chat_recommendations_title">为你推荐</string>
+    <string name="chat_recommendation_category_reasoning">推理</string>
+    <string name="chat_recommendation_category_vision">识图</string>
+    <string name="chat_recommendation_category_research">研究</string>
+    <string name="chat_recommendation_category_writing">写作</string>
+    <string name="chat_recommendation_category_device">设备</string>
+    <string name="chat_recommendation_category_productivity">效率</string>
+    <string name="chat_recommendation_category_general">建议</string>
 </resources>

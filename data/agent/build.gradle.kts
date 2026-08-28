@@ -37,6 +37,8 @@ android {
 }
 
 dependencies {
+    implementation(project(":domain:recommendation"))
+    implementation(libs.org.json)
     implementation(project(":core:common"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:mcp"))

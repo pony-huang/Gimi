@@ -36,6 +36,7 @@ enum class PermissionSettingsDestination {
     ApplicationDetails,
     WriteSystemSettings,
     NotificationListener,
+    UsageAccess,
 }
 
 data class PermissionSettingsRequest(
@@ -50,6 +51,7 @@ data class PermissionSettingsUiState(
     val allRuntimeGranted: Boolean = false,
     val writeSettingsGranted: Boolean = false,
     val notificationAccessGranted: Boolean = false,
+    val usageAccessGranted: Boolean = false,
     val runtimeRequest: RuntimePermissionRequest? = null,
     val settingsRequest: PermissionSettingsRequest? = null,
 )
@@ -64,6 +66,7 @@ sealed interface PermissionSettingsAction {
     data object OpenApplicationSettings : PermissionSettingsAction
     data object OpenWriteSettings : PermissionSettingsAction
     data object OpenNotificationAccess : PermissionSettingsAction
+    data object OpenUsageAccess : PermissionSettingsAction
     data class RuntimeRequestHandled(val requestId: Int) : PermissionSettingsAction
     data class SettingsRequestHandled(val requestId: Int) : PermissionSettingsAction
 }

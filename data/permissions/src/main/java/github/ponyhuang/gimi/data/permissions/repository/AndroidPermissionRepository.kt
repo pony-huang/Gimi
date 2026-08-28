@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.provider.Settings
+import android.app.AppOpsManager
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
@@ -35,6 +36,16 @@ class AndroidPermissionRepository @Inject constructor(
                     .contains(context.packageName)
             ) {
                 add(AppPermission.NotificationListener)
+            }
+            val appOps = context.getSystemService(AppOpsManager::class.java)
+            if (
+                appOps?.checkOpNoThrow(
+                    AppOpsManager.OPSTR_GET_USAGE_STATS,
+                    context.applicationInfo.uid,
+                    context.packageName,
+                ) == AppOpsManager.MODE_ALLOWED
+            ) {
+                add(AppPermission.UsageStats)
             }
         }
         val denied = readPermanentlyDenied().filterTo(mutableSetOf()) { it !in granted }
@@ -86,6 +97,7 @@ class AndroidPermissionRepository @Inject constructor(
         AppPermission.PostNotifications -> Manifest.permission.POST_NOTIFICATIONS
         AppPermission.WriteSystemSettings,
         AppPermission.NotificationListener,
+        AppPermission.UsageStats,
         -> error("Special permissions do not have runtime permission names.")
     }
 

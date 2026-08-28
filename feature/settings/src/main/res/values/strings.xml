@@ -63,4 +63,6 @@
     <string name="update_open_app_details">打开应用详情</string>
     <string name="update_failed_title">更新失败</string>
     <string name="update_retry">重试</string>
+    <string name="settings_recommendations_title">智能推荐</string>
+    <string name="settings_recommendations_subtitle">配置空会话任务建议与后台更新</string>
 </resources>

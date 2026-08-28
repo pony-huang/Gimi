@@ -55,6 +55,8 @@ class SettingsViewModelTest {
             assertEquals(SettingsEffect.NavigateToWorkFiles, awaitItem())
             viewModel.onAction(SettingsAction.OpenPermissions)
             assertEquals(SettingsEffect.NavigateToPermissions, awaitItem())
+            viewModel.onAction(SettingsAction.OpenRecommendations)
+            assertEquals(SettingsEffect.NavigateToRecommendations, awaitItem())
             viewModel.onAction(SettingsAction.OpenToolAuthorization)
             assertEquals(SettingsEffect.NavigateToToolAuthorization, awaitItem())
             cancelAndIgnoreRemainingEvents()

@@ -1,0 +1,18 @@
+<resources>
+    <string name="recommendation_settings_title">Smart recommendations</string>
+    <string name="recommendation_settings_section">Recommendation updates</string>
+    <string name="recommendation_enabled_title">Enable smart recommendations</string>
+    <string name="recommendation_enabled_subtitle">Show Agent-generated tasks in empty conversations</string>
+    <string name="recommendation_interval_title">Update interval</string>
+    <string name="recommendation_interval_value">About %1$d hours</string>
+    <string name="recommendation_refresh_now">Update now</string>
+    <string name="recommendation_status_refreshing">Generating recommendations…</string>
+    <string name="recommendation_status_scheduled">Update scheduled; waiting for network and Agent availability</string>
+    <string name="recommendation_status_never">No recommendations generated yet</string>
+    <string name="recommendation_status_updated">Last updated: %1$s</string>
+    <string name="recommendation_status_error">Update failed: %1$s</string>
+    <string name="recommendation_privacy_section">Privacy</string>
+    <string name="recommendation_permissions_title">Context permissions</string>
+    <string name="recommendation_permissions_subtitle">Manage location and app usage; unavailable context is skipped</string>
+    <string name="recommendation_close">Close</string>
+</resources>

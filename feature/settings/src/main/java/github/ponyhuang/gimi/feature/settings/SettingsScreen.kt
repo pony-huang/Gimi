@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -116,6 +117,14 @@ fun SettingsScreen(
                 )
             }
             item { PreferenceSectionTitle(stringResource(R.string.settings_group_general)) }
+            item {
+                PreferenceNavigationCard(
+                    icon = Icons.Default.AutoAwesome,
+                    title = stringResource(R.string.settings_recommendations_title),
+                    subtitle = stringResource(R.string.settings_recommendations_subtitle),
+                    onClick = { onAction(SettingsAction.OpenRecommendations) },
+                )
+            }
             item {
                 PreferenceListItem(
                     icon = Icons.Default.Visibility,

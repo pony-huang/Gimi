@@ -63,4 +63,6 @@
     <string name="update_open_app_details">Open app details</string>
     <string name="update_failed_title">Update failed</string>
     <string name="update_retry">Retry</string>
+    <string name="settings_recommendations_title">Smart recommendations</string>
+    <string name="settings_recommendations_subtitle">Configure empty-chat suggestions and background updates</string>
 </resources>

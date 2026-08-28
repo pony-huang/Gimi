@@ -52,6 +52,8 @@ class PermissionSettingsViewModel @Inject constructor(
                 requestSettings(PermissionSettingsDestination.WriteSystemSettings)
             PermissionSettingsAction.OpenNotificationAccess ->
                 requestSettings(PermissionSettingsDestination.NotificationListener)
+            PermissionSettingsAction.OpenUsageAccess ->
+                requestSettings(PermissionSettingsDestination.UsageAccess)
             is PermissionSettingsAction.RuntimeRequestHandled -> _uiState.update {
                 if (it.runtimeRequest?.id == action.requestId) {
                     it.copy(runtimeRequest = null)
@@ -141,6 +143,7 @@ private fun PermissionSnapshot.toUiState(): PermissionSettingsUiState {
         allRuntimeGranted = RuntimeAppPermissions.all(::isGranted),
         writeSettingsGranted = isGranted(AppPermission.WriteSystemSettings),
         notificationAccessGranted = isGranted(AppPermission.NotificationListener),
+        usageAccessGranted = isGranted(AppPermission.UsageStats),
     )
 }
 

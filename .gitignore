@@ -24,3 +24,4 @@ local.properties
 /.firecrawl/
 /temp/
 /app/release/
+/ .orca/

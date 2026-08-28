@@ -7,6 +7,7 @@ import android.util.Base64
 import androidx.core.content.edit
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.nio.charset.StandardCharsets
+import java.security.InvalidKeyException
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -32,7 +33,12 @@ class KeystoreMcpServerStorage @Inject constructor(
     }
 
     override fun write(value: String) {
-        preferences.edit(commit = true) { putString(SERVERS_KEY, encrypt(value)) }
+        val encrypted = retryWithFreshKeyAfterInvalidKey(
+            resetKey = ::deleteSecretKey,
+        ) {
+            encrypt(value)
+        }
+        preferences.edit(commit = true) { putString(SERVERS_KEY, encrypted) }
     }
 
     private fun encrypt(plainText: String): String {
@@ -74,6 +80,13 @@ class KeystoreMcpServerStorage @Inject constructor(
             .generateKey()
     }
 
+    private fun deleteSecretKey() {
+        KeyStore.getInstance(ANDROID_KEY_STORE).apply {
+            load(null)
+            if (containsAlias(KEY_ALIAS)) deleteEntry(KEY_ALIAS)
+        }
+    }
+
     private companion object {
         const val PREFERENCES_NAME = "mcp_servers_secure_v2"
         const val SERVERS_KEY = "encrypted_servers"
@@ -82,4 +95,19 @@ class KeystoreMcpServerStorage @Inject constructor(
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val GCM_TAG_LENGTH_BITS = 128
     }
+}
+
+/**
+ * Android 系统升级或锁屏凭据变更可能使已有 Keystore 密钥失效。
+ *
+ * 仅针对该可恢复情形重建密钥并重试一次；其余存储故障必须继续抛出，避免把凭据降级为明文。
+ */
+internal inline fun <T> retryWithFreshKeyAfterInvalidKey(
+    resetKey: () -> Unit,
+    operation: () -> T,
+): T = try {
+    operation()
+} catch (_: InvalidKeyException) {
+    resetKey()
+    operation()
 }

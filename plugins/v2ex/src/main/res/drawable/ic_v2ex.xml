@@ -1,30 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- V2EX 插件应用图标：深色 wordmark + 橙色下划线，双色填充。
-     单色矢量图标在魅族深色滤镜下会被压黑，故用双色规避（见 memory: meizu-flyme-dark-mode）。 -->
+<!-- V2EX 官方 mark（Simple Icons 版）：深色 V 字 + 内凹槽。
+     单色 #1F1F1F 填充，无下划线；魅族深色滤镜下深色单色图标会被压黑，
+     但这是用户指定的官方 logo，与旧版双色 wordmark 不同。 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="96dp"
-    android:height="48dp"
-    android:viewportWidth="96"
-    android:viewportHeight="48">
-
-    <!-- "V" -->
+    android:height="96dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
     <path
-        android:fillColor="#263238"
-        android:pathData="M6 8 H13 L21 42 H14 Z M23 8 H30 L22 42 H15 Z" />
-    <!-- "2" -->
-    <path
-        android:fillColor="#263238"
-        android:pathData="M34 8 H58 V14 L46 30 Q44 32 44 35 V42 H34 V38 L40 32 L50 22 Q52 20 52 17 V14 H34 Z" />
-    <!-- "E" -->
-    <path
-        android:fillColor="#263238"
-        android:pathData="M62 8 H69 V42 H62 Z M65 8 H82 V14 H65 Z M65 23 H78 V29 H65 Z M65 37 H82 V42 H65 Z" />
-    <!-- "X" -->
-    <path
-        android:fillColor="#263238"
-        android:pathData="M84 8 H90 L96 42 H90 Z M90 8 H96 L90 42 H84 Z" />
-    <!-- 橙色下划线 -->
-    <path
-        android:fillColor="#F4511E"
-        android:pathData="M6 44 H96 V48 H6 Z" />
+        android:fillColor="#1F1F1F"
+        android:pathData="M.671 1.933h13.821a1.342 1.342 0 0 1 .98.425l8.166 8.725a1.342 1.342 0 0 1 0 1.834l-8.166 8.724a1.342 1.342 0 0 1-.98.426L.673 21.395A.671.671 0 0 1 0 20.725v-6.878h13.19l2.276-2.28a.336.336 0 0 0 0-.474l-2.276-2.28H0V2.604a.671.671 0 0 1 .671-.671Z" />
 </vector>

@@ -10,12 +10,10 @@ import github.ponyhuang.gimi.plugin.spotify.tools.playbackTools
 import github.ponyhuang.gimi.plugin.spotify.tools.playlistTools
 import github.ponyhuang.gimi.plugin.spotify.tools.searchTools
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
-import github.ponyhuang.gimi.pluginapi.BrowserAuthRequest
 import github.ponyhuang.gimi.pluginapi.PluginActionResult
 import github.ponyhuang.gimi.pluginapi.PluginConfig
 import github.ponyhuang.gimi.pluginapi.PluginConfigAction
 import github.ponyhuang.gimi.pluginapi.PluginConfigField
-import java.net.URI
 
 /**
  * Spotify plugin — connects the official Web API and injects content tools into the agent:
@@ -52,9 +50,6 @@ class SpotifyPlugin : AgentPlugin {
     @Volatile private var clientSecret: String = ""
     @Volatile private var redirectUri: String = DEFAULT_REDIRECT_URI
     @Volatile private var appContext: Context? = null
-
-    /** 内置浏览器登录待校验的 OAuth state（授权 URL 生成 → 回调校验）。 */
-    @Volatile private var pendingState: String? = null
 
     override fun onAttach(context: Context) {
         appContext = context.applicationContext
@@ -102,53 +97,6 @@ class SpotifyPlugin : AgentPlugin {
         )
         else -> PluginActionResult(message = "Unknown action: $actionId", success = false)
     }
-
-    override fun configActionBrowserRequest(actionId: String): BrowserAuthRequest? = when (actionId) {
-        ACTION_LOGIN -> {
-            if (clientId.isBlank() || clientSecret.isBlank()) {
-                // 未配置凭据时返回 null → 宿主回退到 runConfigAction 的阻塞路径，其给出配置提示。
-                null
-            } else {
-                val state = SpotifyAuth.newState()
-                pendingState = state
-                BrowserAuthRequest(
-                    authorizeUrl = auth.authorizeUrl(clientId, redirectUri, state),
-                    redirectBase = redirectUri,
-                )
-            }
-        }
-        else -> null
-    }
-
-    override suspend fun completeConfigAction(actionId: String, redirectUrl: String): PluginActionResult =
-        when (actionId) {
-            ACTION_LOGIN -> runCatching {
-                val expectedState = pendingState
-                    ?: throw IllegalStateException("Authorization session expired, please start login again")
-                val uri = URI(redirectUrl)
-                val pathAndQuery = uri.rawPath + (uri.rawQuery?.let { "?$it" } ?: "")
-                when (
-                    val result = parseRedirectRequest(
-                        "GET $pathAndQuery HTTP/1.1",
-                        parseRedirectUri(redirectUri).path,
-                        expectedState,
-                    )
-                ) {
-                    is RedirectResult.Success -> {
-                        pendingState = null
-                        auth.exchangeCode(result.code, redirectUri)
-                        "Spotify authorization succeeded"
-                    }
-                    is RedirectResult.Error -> throw IllegalStateException(result.message)
-                }
-            }.fold(
-                onSuccess = { message -> PluginActionResult(message = message) },
-                onFailure = { error ->
-                    PluginActionResult(message = error.message ?: "Authorization failed", success = false)
-                },
-            )
-            else -> PluginActionResult(message = "Unknown action: $actionId", success = false)
-        }
 
     companion object {
         const val ACTION_LOGIN: String = "login"

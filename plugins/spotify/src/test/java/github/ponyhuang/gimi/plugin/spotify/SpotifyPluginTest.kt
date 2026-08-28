@@ -11,10 +11,31 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SpotifyPluginTest {
+
+    @Test
+    fun spotifyAuthorizationUsesSystemBrowserInsteadOfEmbeddedWebView() {
+        val context = mockk<Context>()
+        every { context.applicationContext } returns context
+        every { context.getSharedPreferences(any(), any()) } returns mockk<SharedPreferences>(relaxed = true)
+        val plugin = SpotifyPlugin().apply {
+            onAttach(context)
+            configure(
+                mapOf(
+                    SpotifyPlugin.KEY_CLIENT_ID to "client-id",
+                    SpotifyPlugin.KEY_CLIENT_SECRET to "client-secret",
+                ),
+            )
+        }
+
+        val request = plugin.configActionBrowserRequest(SpotifyPlugin.ACTION_LOGIN)
+
+        assertNull(request)
+    }
 
     @Test
     fun pluginPublishesToolsThroughToolsetAndAppendsUsageInstructions() = runTest {

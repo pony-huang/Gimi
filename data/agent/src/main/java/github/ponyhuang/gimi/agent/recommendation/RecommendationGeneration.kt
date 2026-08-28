@@ -44,7 +44,7 @@ object RecommendationPromptBuilder {
             appendLine("- $key: $value")
         }
         appendLine()
-        appendLine("Generate exactly 5 distinct tasks the user can send directly to this assistant.")
+        appendLine("Generate exactly 6 distinct tasks the user can send directly to this assistant.")
         appendLine("Use the user's locale and only capabilities supported by the information above.")
         appendLine("Prefer meaningful tasks that produce a useful result, save effort, or support a decision.")
         appendLine("Do not recommend querying directly visible status such as battery level, current time, or network state.")

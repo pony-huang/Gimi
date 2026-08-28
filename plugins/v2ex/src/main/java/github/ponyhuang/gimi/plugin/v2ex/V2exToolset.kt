@@ -27,24 +27,16 @@ internal class V2exToolset(
 
 private val V2EX_INSTRUCTIONS: String = """
     <v2ex>
-    - All V2EX tools call the v2 API with the configured Personal Access Token. If a tool reports a missing or
-      invalid token, tell the user to configure the plugin; never retry with invented credentials.
-    - Node names are the URL slugs from v2ex.com/go/<slug> (e.g. "python", "job"). Common nodes (slug — title;
-      aliases in parentheses, also accepted as node_name): qna — 问与答; all4all — 二手交易 (flea);
-      programmer — 程序员 (developer); jobs — 酷工作; share — 分享发现; create — 分享创造; apple — Apple;
-      career — 职场话题; macos — macOS (macosx, osx); pointless — 无要点; bb — 宽带症候群 (wifi);
-      python — Python; flamewar — 水深火热; flood — 水; promotions — 推广 (promotion); libido — 情感问题.
-      For any other node, resolve the slug with `v2ex_node` before querying `v2ex_node_topics`. Both accept a
-      `page` param.
-    - `v2ex_topic` returns the full raw body of one topic; `v2ex_topic_replies` returns at most the configured number
-      of replies for one page with a `total` count — if a thread has more pages, say so instead of implying
-      completeness.
-    - `v2ex_notifications` lists the account's notifications; `v2ex_notification_delete` removes one by id.
-    - Write actions have real effects and cost resources: `v2ex_topic_set_sticky` pins the user's own topic,
-      `v2ex_topic_boost` promotes it to the homepage and charges coins, `v2ex_token_create` issues a new token
-      (max 10). Only run them when the user explicitly asks, and never fabricate confirmation of success.
-    - Preserve titles, authors, node names, reply counts, timestamps, and raw content returned by tools. Never
-      fabricate V2EX content, authors, node names, or URLs.
-    - The API is rate-limited to 600 requests/hour per IP; avoid rapid-fire repeated calls to the same endpoint.
+    - All tools need the configured Personal Access Token; on missing/invalid, tell the user to configure it —
+      never invent credentials.
+    - Node slugs come from v2ex.com/go/<slug>; common ones (alias in parens): qna·问与答, all4all(flea)·二手交易,
+      programmer(developer)·程序员, jobs·酷工作, share·分享发现, create·分享创造, apple, career·职场话题,
+      macos(macosx,osx), pointless·无要点, bb(wifi)·宽带症候群, python, flamewar·水深火热, flood·水,
+      promotions(promotion)·推广, libido·情感问题. For others, resolve with `v2ex_node`.
+    - `v2ex_topic_replies` returns one page up to `max` plus a `total`; say when a thread has more pages.
+    - `v2ex_notifications` lists them; `v2ex_notification_delete` removes one by id.
+    - set_sticky/boost/token_create change real state and cost resources: run only when asked, never claim success
+      you didn't receive.
+    - Preserve returned titles/authors/counts/timestamps/content; never fabricate V2EX data.
     </v2ex>
 """.trimIndent()

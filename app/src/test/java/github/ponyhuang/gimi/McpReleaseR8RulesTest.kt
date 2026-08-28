@@ -33,8 +33,18 @@ class McpReleaseR8RulesTest {
         assertFalse(rules.contains("io.modelcontextprotocol.json.TypeRef"))
         assertFalse(rules.contains("io.modelcontextprotocol.spec.McpSchema"))
         assertTrue(
-            "App code must remain protected from reflection-related R8 regressions",
-            rules.contains("-keep class github.ponyhuang.gimi.** { *; }"),
+            "App code must stay shrinkable but optimization-free (R8 inlining crashed plugin config saving)",
+            rules.contains("-keep,allowshrinking class github.ponyhuang.gimi.** { *; }"),
+        )
+        assertTrue(
+            "The plugin ABI must stay full keep roots for parent-first plugin resolution",
+            rules.contains("-keep class github.ponyhuang.gimi.pluginapi.** { *; }"),
+        )
+        assertTrue(
+            "Gson-reflected conversation tool config must not shrink",
+            rules.contains(
+                "-keep class github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration { *; }",
+            ),
         )
     }
 

@@ -16,10 +16,9 @@
 -dontobfuscate
 
 # Preserve Kotlin metadata + annotation attributes used by reflection.
--keepattributes Signature, InnerClasses, EnclosingMethod, RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations, AnnotationDefault
+-keepattributes Signature, InnerClasses, EnclosingMethod
 
-# Preserve generic type information — kotlinx.serialization and Gson need it.
--keepattributes Signature
+# Preserve generic type information + annotations — kotlinx.serialization and Gson need them.
 -keepattributes *Annotation*
 
 # Don't warn about optional Kotlin coroutines internals — referenced reflectively
@@ -27,19 +26,52 @@
 -dontwarn kotlinx.coroutines.debug.**
 
 # ---------------------------------------------------------------------------
-# App code: no obfuscation, no member stripping
+# App code: allow shrinking, block optimization, keep names
 #
 # This is an open-source, exploration-stage project, so obfuscation buys
-# nothing here — but a missing keep rule repeatedly breaks reflection-based
-# serialization (Gson fields + generic signatures, kotlinx.serializer lookup,
-# enum names). Example: R8 renamed ConversationToolConfiguration's fields and
-# stripped the Map<String, Map<String, Set<String>>> signature, so Gson decoded
-# the nested function-id sets as ArrayList and the Set checkcast in
-# enabledOfficialFunctionIds crashed with ClassCastException on session restore.
-# Keeping the whole app package also keeps release stack traces readable
-# without a mapping file. R8 still shrinks and obfuscates third-party code.
+# nothing here — names are preserved by -dontobfuscate. The rule below lets R8
+# remove genuinely-unused first-party classes/members (shrinking) while still
+# blocking R8 *optimization* of app code: a documented release inlining bug
+# (JSONObject.put overload fabricated by a forEach inlining) crashed
+# plugin-config saving, so app code is kept optimization-free. The
+# reflection-serialization surfaces that must NOT shrink are protected
+# individually below (Gson fields + generic signatures, kotlinx.serializer
+# lookup, enum names). Example: R8 renamed ConversationToolConfiguration's
+# fields and stripped the Map<String, Map<String, Set<String>>> signature, so
+# Gson decoded the nested function-id sets as ArrayList and the Set checkcast
+# in enabledOfficialFunctionIds crashed with ClassCastException on session
+# restore.
 # ---------------------------------------------------------------------------
--keep class github.ponyhuang.gimi.** { *; }
+-keep,allowshrinking class github.ponyhuang.gimi.** { *; }
+
+# Classes whose members are read only via Gson field reflection / kotlinx
+# serializer lookup / ObjectBox metadata and would otherwise be stripped as
+# "unused".
+-keep class github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration { *; }
+-keep class github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode { *; }
+-keep class github.ponyhuang.gimi.data.modelcatalog.ModelServiceSettings { *; }
+-keep class github.ponyhuang.gimi.data.modelcatalog.StoredModelGroup { *; }
+-keep class github.ponyhuang.gimi.data.modelcatalog.StoredModel { *; }
+-keep class github.ponyhuang.gimi.data.modelcatalog.StoredModelSource { *; }
+-keep class github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection { *; }
+-keep class github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities { *; }
+-keep class github.ponyhuang.gimi.domain.modelcatalog.model.VisionCapability { *; }
+-keep class github.ponyhuang.gimi.domain.modelcatalog.model.AudioInputCapability { *; }
+-keep class github.ponyhuang.gimi.domain.modelcatalog.model.DocumentInputCapability { *; }
+-keep class github.ponyhuang.gimi.domain.mcp.model.McpServer { *; }
+-keep class github.ponyhuang.gimi.domain.mcp.model.McpTransport { *; }
+-keep class github.ponyhuang.gimi.data.modelcatalog.remote.OpenAiModelsResponse { *; }
+-keep class github.ponyhuang.gimi.data.modelcatalog.remote.OpenAiModelEntry { *; }
+-keep class github.ponyhuang.gimi.data.appupdate.remote.GitHubReleaseDto { *; }
+-keep class github.ponyhuang.gimi.data.appupdate.remote.GitHubAssetDto { *; }
+
+# Navigation3 resolves AppRoute serializers reflectively (route names derive
+# from the fully-qualified class names).
+-keep class github.ponyhuang.gimi.ui.navigation.AppRoute$* { *; }
+
+# ObjectBox entity + generated box (native metadata binding).
+-keep class github.ponyhuang.gimi.agent.tools.search.ToolVectorEntity { *; }
+-keep class github.ponyhuang.gimi.agent.tools.search.MyObjectBox { *; }
 
 # ---------------------------------------------------------------------------
 # kxml2 / XmlPullParser
@@ -66,7 +98,6 @@
 # classes; obfuscation saves almost nothing here anyway).
 # ---------------------------------------------------------------------------
 -keep class com.anthropic.** { *; }
--keepclassmembers class com.anthropic.** { *; }
 -dontwarn com.anthropic.**
 
 # ---------------------------------------------------------------------------
@@ -84,7 +115,6 @@
 # already ships ~20 970 schema classes; obfuscation savings are minimal).
 # ---------------------------------------------------------------------------
 -keep class com.openai.** { *; }
--keepclassmembers class com.openai.** { *; }
 -dontwarn com.openai.**
 
 # ---------------------------------------------------------------------------
@@ -148,7 +178,10 @@
 # DefaultConstructorMarker 的合成默认参构造函数；host 自身可能不调用同一变体，R8 会把它
 # 剥掉，插件加载即抛 NoSuchMethodError。这里显式保留所有 <init>，补齐插件 ABI。
 -keepclassmembers class com.google.adk.kt.** { <init>(...); }
--keepclassmembers class github.ponyhuang.gimi.pluginapi.** { <init>(...); }
+# plugin-api ABI classes must be full shrink roots in the host APK: plugins
+# compile against the original names and resolve them parent-first via the host
+# classloader. (Previously this was implicit via the whole-app `{ *; }` keep.)
+-keep class github.ponyhuang.gimi.pluginapi.** { *; }
 
 # ---------------------------------------------------------------------------
 # Kotlin / coroutines ABI 桥接（插件运行时从 host 解析）
@@ -178,3 +211,15 @@
 -keepclassmembers class * extends com.sun.jna.** { public *; }
 -dontwarn com.sun.jna.**
 -dontwarn org.vosk.**
+
+# ---------------------------------------------------------------------------
+# sentence-embeddings (MiniLM) + ONNX Runtime native binding
+#
+# com.ml.shubham0204:sentence-embeddings loads libonnxruntime.so via the
+# ai.onnxruntime JNI binding. Neither AAR ships consumer keep rules
+# (sentence-embeddings' proguard.txt is empty; onnxruntime-android has none).
+# Local file search (MiniLmToolEmbeddingModel) constructs SentenceEmbedding,
+# which JNI-binds onnxruntime — shrink/rename would break the native link.
+# ---------------------------------------------------------------------------
+-keep class com.ml.shubham0204.sentence_embeddings.** { *; }
+-keep class ai.onnxruntime.** { *; }

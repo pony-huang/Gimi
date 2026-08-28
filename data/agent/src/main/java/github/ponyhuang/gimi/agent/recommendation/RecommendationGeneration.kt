@@ -26,6 +26,7 @@ import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationGene
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.toList
+import org.json.JSONArray
 import org.json.JSONObject
 
 /** 构建不含凭据与工具参数 schema 的推荐生成提示。 */
@@ -87,19 +88,27 @@ object RecommendationOutputParser {
             .removePrefix("```")
             .removeSuffix("```")
             .trim()
-        val array = JSONObject(normalized).getJSONArray("recommendations")
+        val array = when (normalized.firstOrNull()) {
+            '[' -> JSONArray(normalized)
+            '{' -> JSONObject(normalized).getJSONArray("recommendations")
+            else -> throw IllegalArgumentException("Recommendation model returned invalid JSON.")
+        }
         require(array.length() == RecommendationSnapshot.RECOMMENDATION_COUNT) {
             "The recommendation model must return exactly ${RecommendationSnapshot.RECOMMENDATION_COUNT} items."
         }
         val items = buildList {
             repeat(array.length()) { index ->
                 val item = array.getJSONObject(index)
-                val prompt = item.getString("prompt").trim()
+                // 兼容部分模型忽略 responseSchema 后返回的 task/suggestion 数组。
+                val prompt = item.optString("prompt").trim()
+                    .ifEmpty { item.optString("task").trim() }
                 require(prompt.isNotEmpty() && prompt.length <= MAX_PROMPT_LENGTH) {
                     "Recommendation prompts must contain 1..$MAX_PROMPT_LENGTH characters."
                 }
                 val category = runCatching {
-                    RecommendationCategory.valueOf(item.getString("category").uppercase())
+                    RecommendationCategory.valueOf(
+                        item.optString("category", RecommendationCategory.GENERAL.name).uppercase(),
+                    )
                 }.getOrElse { throw IllegalArgumentException("Unknown recommendation category.", it) }
                 add(AgentRecommendation("recommendation-${index + 1}", prompt, category))
             }

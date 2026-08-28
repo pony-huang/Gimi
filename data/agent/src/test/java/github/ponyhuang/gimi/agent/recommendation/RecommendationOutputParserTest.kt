@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.agent.recommendation
 
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCapability
+import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationContext
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationGenerationInput
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationSnapshot
@@ -32,6 +33,26 @@ class RecommendationOutputParserTest {
         assertEquals("任务1", result.first().prompt)
         assertEquals("recommendation-1", result.first().id)
         assertEquals("recommendation-6", result.last().id)
+    }
+
+    @Test
+    fun parsesTopLevelTaskSuggestionArrayWithoutCategories() {
+        val raw = """
+            [
+              {"task":"任务1","suggestion":"建议1"},
+              {"task":"任务2","suggestion":"建议2"},
+              {"task":"任务3","suggestion":"建议3"},
+              {"task":"任务4","suggestion":"建议4"},
+              {"task":"任务5","suggestion":"建议5"},
+              {"task":"任务6","suggestion":"建议6"}
+            ]
+        """.trimIndent()
+
+        val result = RecommendationOutputParser.parse(raw)
+
+        assertEquals(RecommendationSnapshot.RECOMMENDATION_COUNT, result.size)
+        assertEquals("任务1", result.first().prompt)
+        assertEquals(RecommendationCategory.GENERAL, result.first().category)
     }
 
     @Test

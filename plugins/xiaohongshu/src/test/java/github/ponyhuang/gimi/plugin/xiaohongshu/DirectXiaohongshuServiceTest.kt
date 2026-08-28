@@ -245,6 +245,68 @@ class DirectXiaohongshuServiceTest {
     }
 
     @Test
+    fun publishContentRecognizesTheModernCustomElementPublishButton() = runTest {
+        val browser = FakeBrowserGateway(
+            evaluations = ArrayDeque(listOf("true", "true")),
+            fileSelectionResult = true,
+        )
+
+        DirectXiaohongshuService(browser).invoke(
+            "publish_with_video",
+            mapOf(
+                "title" to "新版按钮",
+                "content" to "正文",
+                "video" to "https://example.com/a.mp4",
+            ),
+        )
+
+        assertTrue(
+            browser.waitScripts.any { it.contains("document.querySelector('xhs-publish-btn") },
+        )
+        assertTrue(
+            browser.evaluationScripts.last().contains("document.querySelector('xhs-publish-btn"),
+        )
+    }
+
+    @Test
+    fun publishContentUsesTheImageUploadInput() = runTest {
+        val browser = FakeBrowserGateway(
+            evaluations = ArrayDeque(listOf("true", "true")),
+            fileSelectionResult = true,
+        )
+
+        DirectXiaohongshuService(browser).invoke(
+            "publish_content",
+            mapOf(
+                "title" to "图片上传",
+                "content" to "正文",
+                "images" to listOf("https://example.com/a.jpg"),
+            ),
+        )
+
+        assertEquals("input[type='file'][accept*='image']", browser.fileSelectors.single())
+    }
+
+    @Test
+    fun publishVideoUsesTheVideoUploadInput() = runTest {
+        val browser = FakeBrowserGateway(
+            evaluations = ArrayDeque(listOf("true", "true")),
+            fileSelectionResult = true,
+        )
+
+        DirectXiaohongshuService(browser).invoke(
+            "publish_with_video",
+            mapOf(
+                "title" to "视频上传",
+                "content" to "正文",
+                "video" to "https://example.com/a.mp4",
+            ),
+        )
+
+        assertEquals("input[type='file'][accept*='video']", browser.fileSelectors.single())
+    }
+
+    @Test
     fun publishContentBindsRequestedProductsInsteadOfSilentlyIgnoringThem() = runTest {
         val browser = FakeBrowserGateway(
             evaluations = ArrayDeque(listOf("true", "true", "true", "true", "true", "true")),
@@ -330,6 +392,7 @@ private class FakeBrowserGateway(
     val waitScripts = mutableListOf<String>()
     val evaluationScripts = mutableListOf<String>()
     val selectedFiles = mutableListOf<List<String>>()
+    val fileSelectors = mutableListOf<String>()
 
     override suspend fun navigate(url: String) {
         navigations += url
@@ -348,6 +411,7 @@ private class FakeBrowserGateway(
     override suspend fun clearCookies() = Unit
 
     override suspend fun selectFiles(selector: String, sources: List<String>): Boolean {
+        fileSelectors += selector
         selectedFiles += sources
         return fileSelectionResult
     }

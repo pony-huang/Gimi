@@ -352,7 +352,12 @@ internal class DirectXiaohongshuService(
         }
         val tab = if (video) "上传视频" else "上传图文"
         require(browser.evaluate(publishTabScript(tab)) == "true") { "未找到发布页签：$tab" }
-        require(browser.selectFiles("input[type='file']", sources)) { "未能选择要上传的文件" }
+        val uploadInput = if (video) {
+            "input[type='file'][accept*='video']"
+        } else {
+            "input[type='file'][accept*='image']"
+        }
+        require(browser.selectFiles(uploadInput, sources)) { "未能选择要上传的文件" }
         val uploadReady = if (video) PUBLISH_BUTTON_READY_SCRIPT else
             "document.querySelectorAll('.img-preview-area .pr').length >= ${sources.size}"
         require(browser.waitUntil(uploadReady, UPLOAD_TIMEOUT_MS)) { "小红书文件上传或处理超时" }
@@ -572,7 +577,7 @@ internal class DirectXiaohongshuService(
                 if (!toggle.querySelector('input')?.checked) toggle.click();
               }
 
-              const button = document.querySelector('div.xhs-publish-btn:not([submit-disabled]), ' +
+              const button = document.querySelector('xhs-publish-btn:not([submit-disabled]), ' +
                 '.publish-page-publish-btn button.bg-red:not([disabled])');
               if (!button) return false;
               button.click();
@@ -736,7 +741,7 @@ internal class DirectXiaohongshuService(
         private val VISIBILITY_VALUES = setOf("公开可见", "仅自己可见", "仅互关好友可见")
         private const val PUBLISH_BUTTON_READY_SCRIPT = """
             (() => {
-              const modern = document.querySelector('div.xhs-publish-btn');
+              const modern = document.querySelector('xhs-publish-btn');
               if (modern && !modern.hasAttribute('submit-disabled') && modern.getAttribute('is-publish') !== 'false') return true;
               const old = document.querySelector('.publish-page-publish-btn button.bg-red');
               return Boolean(old && !old.disabled && old.getAttribute('aria-disabled') !== 'true');

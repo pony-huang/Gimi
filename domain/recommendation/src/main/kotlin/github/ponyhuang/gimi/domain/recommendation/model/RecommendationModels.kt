@@ -27,7 +27,7 @@ data class AgentRecommendation(
 /**
  * 最近一次成功生成的全局推荐快照。
  *
- * @property items 固定五条、文案唯一且非空的推荐。
+ * @property items 固定 [RECOMMENDATION_COUNT] 条、文案唯一且非空的推荐。
  * @property generatedAtEpochMillis 成功提交快照的 Unix 毫秒时间。
  */
 data class RecommendationSnapshot(
@@ -35,7 +35,7 @@ data class RecommendationSnapshot(
     val generatedAtEpochMillis: Long,
 ) {
     init {
-        require(items.size == RECOMMENDATION_COUNT) { "A snapshot must contain exactly five recommendations." }
+        require(items.size == RECOMMENDATION_COUNT) { "A snapshot must contain exactly $RECOMMENDATION_COUNT recommendations." }
         val normalizedPrompts = items.map { item -> item.prompt.trim() }
         require(normalizedPrompts.all(String::isNotEmpty)) { "Recommendation prompts must not be blank." }
         require(normalizedPrompts.distinct().size == normalizedPrompts.size) {
@@ -44,7 +44,8 @@ data class RecommendationSnapshot(
     }
 
     companion object {
-        const val RECOMMENDATION_COUNT: Int = 5
+        /** 每次生成并展示的全局推荐条数；调整这里即可全局生效。 */
+        const val RECOMMENDATION_COUNT: Int = 6
     }
 }
 

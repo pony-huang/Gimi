@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -171,7 +172,15 @@ fun ChatScaffold(
     // 只要用户仍停留在底部，就让流式内容增长持续跟随；用户向上浏览历史时则停止抢占滚动。
     var shouldFollowLatest by remember { mutableStateOf(true) }
     var isModelPickerVisible by remember { mutableStateOf(false) }
+    var isComposerExpanded by remember { mutableStateOf(false) }
     val latestItemIndex by rememberUpdatedState(visibleMessages.size)
+    val showsRecommendations = visibleMessages.isEmpty() && recommendations.isNotEmpty()
+    // 推荐卡片跟着胶囊一起收放，聚焦放大后两者左右边缘刚好对齐。
+    val recommendationHorizontalInset by animateDpAsState(
+        targetValue = if (isComposerExpanded) 0.dp else ComposerCollapsedHorizontalInset,
+        animationSpec = ComposerInsetAnimationSpec,
+        label = "recommendationHorizontalInset",
+    )
 
     LaunchedEffect(visibleMessages.size, pendingToolConfirmation?.confirmationCallId) {
         if (state.getCurrentUserMessage() != null) {
@@ -301,6 +310,7 @@ fun ChatScaffold(
                     sharedMediaUris = sharedMediaUris,
                     onSharedMediaConsumed = onSharedMediaConsumed,
                     retainExpanded = isModelPickerVisible,
+                    onExpandedChange = { isComposerExpanded = it },
                     modelSelectorContent = {
                         ModelTitleAndPicker(
                             services = state.availableLLMModelSettings,
@@ -318,7 +328,9 @@ fun ChatScaffold(
         },
         floatingActionButton = {
             AnimatedVisibility(
-                visible = listState.canScrollForward,
+                // 推荐面板被键盘挤到可滚动时也会触发 canScrollForward，
+                // 但空会话里没有"最新消息"可回，这时不该冒出这个按钮。
+                visible = listState.canScrollForward && !showsRecommendations,
             ) {
                 SmallFloatingActionButton(
                     onClick = {
@@ -341,7 +353,9 @@ fun ChatScaffold(
             start = innerPadding.calculateStartPadding(layoutDirection) + 12.dp,
             top = innerPadding.calculateTopPadding() + 8.dp,
             end = innerPadding.calculateEndPadding(layoutDirection) + 12.dp,
-            bottom = innerPadding.calculateBottomPadding() + 8.dp,
+            // 推荐面板要紧贴胶囊，省掉消息流才需要的那点呼吸位。
+            bottom = innerPadding.calculateBottomPadding() +
+                if (showsRecommendations) 0.dp else 8.dp,
         )
 
         AnimatedContent(
@@ -361,13 +375,18 @@ fun ChatScaffold(
                 // 消息列表
                 LazyColumn(
                     state = listState,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    // 推荐面板从底部往上堆叠，紧贴胶囊；内容溢出时退化成普通的顶部对齐滚动。
+                    verticalArrangement = if (showsRecommendations) {
+                        Arrangement.spacedBy(8.dp, Alignment.Bottom)
+                    } else {
+                        Arrangement.spacedBy(8.dp)
+                    },
                     modifier = Modifier
                         .fillMaxSize()
                         .consumeWindowInsets(innerPadding),
                     contentPadding = listContentPadding,
                 ) {
-                    if (visibleMessages.isEmpty() && recommendations.isNotEmpty()) {
+                    if (showsRecommendations) {
                         item(
                             key = "chat-recommendations",
                             contentType = "recommendations",
@@ -375,6 +394,9 @@ fun ChatScaffold(
                             RecommendationPanel(
                                 recommendations = recommendations,
                                 onRecommendationClick = onRecommendationClick,
+                                modifier = Modifier.padding(
+                                    horizontal = recommendationHorizontalInset,
+                                ),
                             )
                         }
                     }

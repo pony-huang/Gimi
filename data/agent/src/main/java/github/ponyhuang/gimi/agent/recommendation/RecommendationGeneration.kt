@@ -44,13 +44,11 @@ object RecommendationPromptBuilder {
             appendLine("- $key: $value")
         }
         appendLine()
-        appendLine("Generate exactly 6 distinct tasks the user can send directly to this assistant.")
+        appendLine("Generate exactly ${RecommendationSnapshot.RECOMMENDATION_COUNT} distinct tasks the user can send directly to this assistant.")
         appendLine("Use the user's locale and only capabilities supported by the information above.")
         appendLine("Prefer meaningful tasks that produce a useful result, save effort, or support a decision.")
         appendLine("Do not recommend querying directly visible status such as battery level, current time, or network state.")
         appendLine("Prefer concrete multi-step assistance over trivial lookups, generic greetings, or redundant actions.")
-        appendLine("Return JSON only: {\"recommendations\":[{\"prompt\":\"...\",\"category\":\"general\"}]}.")
-        appendLine("Allowed categories: reasoning, vision, research, writing, device, productivity, general.")
     }
 }
 
@@ -91,7 +89,7 @@ object RecommendationOutputParser {
             .trim()
         val array = JSONObject(normalized).getJSONArray("recommendations")
         require(array.length() == RecommendationSnapshot.RECOMMENDATION_COUNT) {
-            "The recommendation model must return exactly five items."
+            "The recommendation model must return exactly ${RecommendationSnapshot.RECOMMENDATION_COUNT} items."
         }
         val items = buildList {
             repeat(array.length()) { index ->

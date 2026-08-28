@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.agent.recommendation
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCapability
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationContext
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationGenerationInput
+import github.ponyhuang.gimi.domain.recommendation.model.RecommendationSnapshot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -11,7 +12,7 @@ import com.google.adk.kt.types.Type
 
 class RecommendationOutputParserTest {
     @Test
-    fun parsesFiveRecommendationsFromFencedJson() {
+    fun parsesRecommendationsFromFencedJson() {
         val raw = """
             ```json
             {"recommendations":[
@@ -19,16 +20,18 @@ class RecommendationOutputParserTest {
               {"prompt":"任务2","category":"vision"},
               {"prompt":"任务3","category":"research"},
               {"prompt":"任务4","category":"writing"},
-              {"prompt":"任务5","category":"device"}
+              {"prompt":"任务5","category":"device"},
+              {"prompt":"任务6","category":"productivity"}
             ]}
             ```
         """.trimIndent()
 
         val result = RecommendationOutputParser.parse(raw)
 
-        assertEquals(5, result.size)
+        assertEquals(RecommendationSnapshot.RECOMMENDATION_COUNT, result.size)
         assertEquals("任务1", result.first().prompt)
         assertEquals("recommendation-1", result.first().id)
+        assertEquals("recommendation-6", result.last().id)
     }
 
     @Test
@@ -68,7 +71,7 @@ class RecommendationOutputParserTest {
         assertTrue(prompt.contains("mcp:research"))
         assertTrue(prompt.contains("Search MCP catalog"))
         assertTrue(prompt.contains("zh-CN"))
-        assertTrue(prompt.contains("exactly 5"))
+        assertTrue(prompt.contains("exactly ${RecommendationSnapshot.RECOMMENDATION_COUNT}"))
     }
 
     @Test

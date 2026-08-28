@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia
 import github.ponyhuang.gimi.core.audio.VoiceAudioRecorder
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -54,6 +55,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
@@ -92,6 +94,8 @@ import kotlinx.coroutines.launch
  * @param messageData The initial message data to be displayed in the input field.
  * @param modelSelectorContent Model selection control rendered beside the attachment button.
  * @param retainExpanded Whether an active child surface requires the composer to stay expanded.
+ * @param onExpandedChange Callback reporting whether the capsule is currently in its enlarged
+ * state, so surrounding content can align with it.
  */
 @Composable
 public fun ChatComposer(
@@ -107,6 +111,7 @@ public fun ChatComposer(
     isVoiceInputAvailable: Boolean = false,
     onTranscribeVoice: suspend (ByteArray) -> String = { error("transcription not configured") },
     retainExpanded: Boolean = false,
+    onExpandedChange: (Boolean) -> Unit = { },
     modelSelectorContent: @Composable () -> Unit = { },
     addToChatState: ChatAddToChatState = ChatAddToChatState(),
     onLocalToolEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
@@ -349,6 +354,12 @@ public fun ChatComposer(
     }
 
     val componentFactory = LocalChatAiComponentFactory.current
+    val recordingState = voiceInputState as? VoiceInputUiState.Recording
+    val isCapsuleExpanded = isComposerExpanded || retainExpanded || recordingState != null
+
+    LaunchedEffect(isCapsuleExpanded) {
+        onExpandedChange(isCapsuleExpanded)
+    }
 
     Box(
         modifier = modifier
@@ -357,17 +368,9 @@ public fun ChatComposer(
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .fillMaxWidth(),
     ) {
-        val recordingState = voiceInputState as? VoiceInputUiState.Recording
         val composerHorizontalInset by animateDpAsState(
-            targetValue = if (isComposerExpanded || retainExpanded || recordingState != null) {
-                0.dp
-            } else {
-                20.dp
-            },
-            animationSpec = tween(
-                durationMillis = 260,
-                easing = FastOutSlowInEasing,
-            ),
+            targetValue = if (isCapsuleExpanded) 0.dp else ComposerCollapsedHorizontalInset,
+            animationSpec = ComposerInsetAnimationSpec,
             label = "composerHorizontalInset",
         )
         Surface(
@@ -485,6 +488,15 @@ internal fun consumeDraftForSend(
     draft: MessageData,
     onSend: (MessageData) -> Boolean,
 ): MessageData = if (onSend(draft)) MessageData() else draft
+
+/** 胶囊收起时的横向内缩。聚焦放大后归零，推荐列表复用同一数值保持边缘对齐。 */
+internal val ComposerCollapsedHorizontalInset = 20.dp
+
+/** 胶囊收放的动画规格；跟随胶囊移动的外部内容共用它，避免两段动画错拍。 */
+internal val ComposerInsetAnimationSpec: AnimationSpec<Dp> = tween(
+    durationMillis = 260,
+    easing = FastOutSlowInEasing,
+)
 
 private const val MAX_WAVEFORM_SAMPLES = 96
 

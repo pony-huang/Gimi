@@ -1,4 +1,4 @@
-package github.ponyhuang.gimi.core.testing
+package github.ponyhuang.gimi.domain.conversation.testing
 
 import github.ponyhuang.gimi.domain.conversation.runtime.ActiveAgentTask
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentMutationResult
@@ -19,6 +19,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
  *   [releaseCount]; set [acquireException] to make it throw instead.
  * - [runMutation] returns [AgentMutationResult.BlockedByActiveAgent] while the current
  *   state is busy, otherwise applies the block.
+ *
+ * 测试夹具由 `domain:conversation` 提供；feature 测试需要
+ * `testImplementation(project(":domain:conversation"))` 来使用。
  */
 class FakeAgentRuntimeGate(
     initialState: AgentRuntimeState = AgentRuntimeState.Idle,

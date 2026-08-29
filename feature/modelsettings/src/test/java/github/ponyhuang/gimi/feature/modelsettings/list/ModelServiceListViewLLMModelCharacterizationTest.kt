@@ -1,7 +1,7 @@
 package github.ponyhuang.gimi.feature.modelsettings.list
 
 import app.cash.turbine.test
-import github.ponyhuang.gimi.core.testing.FakeAgentRuntimeGate
+import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState

@@ -1,7 +1,7 @@
 package github.ponyhuang.gimi.feature.mcp
 
 import app.cash.turbine.test
-import github.ponyhuang.gimi.core.testing.FakeAgentRuntimeGate
+import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.mcp.model.McpImportResult
 import github.ponyhuang.gimi.domain.mcp.model.McpProbeResult

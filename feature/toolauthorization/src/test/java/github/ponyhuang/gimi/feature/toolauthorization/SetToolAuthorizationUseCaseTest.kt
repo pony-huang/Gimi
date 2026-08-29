@@ -1,6 +1,6 @@
 package github.ponyhuang.gimi.feature.toolauthorization
 
-import github.ponyhuang.gimi.core.testing.FakeAgentRuntimeGate
+import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.runtime.isBusy
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor

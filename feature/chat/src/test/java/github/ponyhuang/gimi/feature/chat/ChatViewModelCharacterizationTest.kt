@@ -2,7 +2,7 @@ package github.ponyhuang.gimi.feature.chat
 
 import android.util.Log
 import app.cash.turbine.test
-import github.ponyhuang.gimi.core.testing.FakeAgentRuntimeGate
+import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunPart

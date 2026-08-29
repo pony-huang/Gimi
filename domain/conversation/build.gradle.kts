@@ -3,9 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-kotlin {
-    jvmToolchain(11)
-}
+kotlin { jvmToolchain(11) }
 
 dependencies {
     api(project(":domain:modelcatalog"))

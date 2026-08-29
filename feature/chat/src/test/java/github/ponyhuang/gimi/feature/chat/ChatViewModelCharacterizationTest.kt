@@ -13,6 +13,7 @@ import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.ToolConfirmationRequest
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
+import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
@@ -201,7 +202,7 @@ class ChatViewModelCharacterizationTest {
         fixture.viewModel.onAction(ChatAction.SetDarkTheme(true))
         advanceUntilIdle()
 
-        verify { fixture.display.setDarkThemeOverride(true) }
+        verify { fixture.appearance.setDarkThemeOverride(true) }
     }
 
     @Test
@@ -657,6 +658,8 @@ class ChatViewModelCharacterizationTest {
         }
         val display = mockk<ChatDisplayRepository> {
             every { showToolActivity } returns MutableStateFlow(true)
+        }
+        val appearance = mockk<AppearanceRepository> {
             every { darkThemeOverride } returns MutableStateFlow(null)
             every { setDarkThemeOverride(any()) } returns Unit
         }
@@ -709,6 +712,7 @@ class ChatViewModelCharacterizationTest {
                 repository = conversations,
                 modelServices = catalog,
                 chatDisplayPreferences = display,
+                appearanceRepository = appearance,
                 toolApproval = toolApproval,
                 speechRecognitionRepository = recognition,
                 speechPlaybackController = playback,
@@ -726,6 +730,7 @@ class ChatViewModelCharacterizationTest {
             conversations = conversations,
             agent = agent,
             display = display,
+            appearance = appearance,
             toolApproval = toolApproval,
             mcpRepository = mcpRepository,
         )
@@ -794,6 +799,7 @@ class ChatViewModelCharacterizationTest {
         val conversations: ConversationRepository,
         val agent: ChatAgentRepository,
         val display: ChatDisplayRepository,
+        val appearance: AppearanceRepository,
         val toolApproval: FakeToolApprovalRepository,
         val mcpRepository: McpRepository,
     )

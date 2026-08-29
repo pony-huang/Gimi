@@ -14,6 +14,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.feature.modelsettings.R
+import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import androidx.core.net.toUri
 
 // ModelsSynchronized 的 count 为运行时参数，文案只能在 effect 消费时解析，豁免该 lint。
@@ -62,12 +63,17 @@ fun LLMModelSettingDetailRoute(
         }
     }
 
-    LLMModelSettingDetailScreen(
-        state = state,
-        onAction = viewModel::onAction,
-        onOpenUrl = { url, missingMessage -> context.openUrl(url, missingMessage, noBrowserMessage) },
-        modifier = modifier,
-    )
+    PreferenceScaffold(
+        title = stringResource(R.string.modelsettings_detail_title),
+        onBack = onBack,
+    ) { scaffoldModifier ->
+        LLMModelSettingDetailScreen(
+            state = state,
+            onAction = viewModel::onAction,
+            onOpenUrl = { url, missingMessage -> context.openUrl(url, missingMessage, noBrowserMessage) },
+            modifier = scaffoldModifier,
+        )
+    }
 }
 
 private fun Context.openUrl(url: String, missingMessage: String, noBrowserMessage: String) {

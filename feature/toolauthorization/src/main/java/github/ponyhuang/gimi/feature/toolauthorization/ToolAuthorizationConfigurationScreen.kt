@@ -36,19 +36,26 @@ import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
+import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 
 @Composable
 fun ToolAuthorizationConfigurationRoute(
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ToolAuthorizationConfigurationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     ToolAuthorizationEffects(viewModel.effects)
-    ToolAuthorizationConfigurationScreen(
-        state = state,
-        onAction = viewModel::onAction,
-        modifier = modifier,
-    )
+    PreferenceScaffold(
+        title = stringResource(R.string.toolauth_configuration_title),
+        onBack = onBack,
+    ) { scaffoldModifier ->
+        ToolAuthorizationConfigurationScreen(
+            state = state,
+            onAction = viewModel::onAction,
+            modifier = scaffoldModifier,
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

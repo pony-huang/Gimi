@@ -6,11 +6,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 
 @Composable
 fun MemorySettingsRoute(
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: MemorySettingsViewModel = hiltViewModel(),
 ) {
@@ -25,9 +28,14 @@ fun MemorySettingsRoute(
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
     }
-    MemorySettingsScreen(
-        state = state,
-        onAction = viewModel::onAction,
-        modifier = modifier,
-    )
+    PreferenceScaffold(
+        title = stringResource(R.string.memory_screen_title),
+        onBack = onBack,
+    ) { scaffoldModifier ->
+        MemorySettingsScreen(
+            state = state,
+            onAction = viewModel::onAction,
+            modifier = scaffoldModifier,
+        )
+    }
 }

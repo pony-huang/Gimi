@@ -12,6 +12,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.core.app.ActivityCompat
 import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -20,9 +21,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.domain.permissions.model.AppPermission
+import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 
 @Composable
 fun PermissionSettingsRoute(
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: PermissionSettingsViewModel = hiltViewModel(),
 ) {
@@ -99,11 +102,16 @@ fun PermissionSettingsRoute(
         settingsLauncher.launch(intent)
     }
 
-    PermissionSettingsScreen(
-        state = state,
-        onAction = viewModel::onAction,
-        modifier = modifier,
-    )
+    PreferenceScaffold(
+        title = stringResource(R.string.permissions_screen_title),
+        onBack = onBack,
+    ) { scaffoldModifier ->
+        PermissionSettingsScreen(
+            state = state,
+            onAction = viewModel::onAction,
+            modifier = scaffoldModifier,
+        )
+    }
 }
 
 private fun AppPermission.androidName(): String = when (this) {

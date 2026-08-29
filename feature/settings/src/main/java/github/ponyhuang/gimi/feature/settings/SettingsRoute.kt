@@ -7,6 +7,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -14,12 +15,14 @@ import github.ponyhuang.gimi.feature.settings.update.UpdateAction
 import github.ponyhuang.gimi.feature.settings.update.UpdateDialog
 import github.ponyhuang.gimi.feature.settings.update.UpdateEffect
 import github.ponyhuang.gimi.feature.settings.update.UpdateViewModel
+import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 
 private const val PROJECT_URL = "https://github.com/pony-huang/Gimi"
 
 @Composable
 fun SettingsRoute(
     appVersionName: String,
+    onBack: () -> Unit,
     onNavigateToModelService: () -> Unit,
     onNavigateToDefaultModels: () -> Unit,
     onNavigateToVoiceWake: () -> Unit,
@@ -71,17 +74,22 @@ fun SettingsRoute(
         }
     }
 
-    SettingsScreen(
-        state = state,
-        appVersionName = appVersionName,
-        onAction = viewModel::onAction,
-        modifier = modifier,
-        updateState = updateState,
-        onUpdateAction = updateViewModel::onAction,
-    )
+    PreferenceScaffold(
+        title = stringResource(R.string.settings_title),
+        onBack = onBack,
+    ) { scaffoldModifier ->
+        SettingsScreen(
+            state = state,
+            appVersionName = appVersionName,
+            onAction = viewModel::onAction,
+            modifier = scaffoldModifier,
+            updateState = updateState,
+            onUpdateAction = updateViewModel::onAction,
+        )
 
-    UpdateDialog(
-        state = updateState,
-        onAction = updateViewModel::onAction,
-    )
+        UpdateDialog(
+            state = updateState,
+            onAction = updateViewModel::onAction,
+        )
+    }
 }

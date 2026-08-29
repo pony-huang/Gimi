@@ -45,35 +45,24 @@ import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.LocalFileReference
 import github.ponyhuang.gimi.feature.chat.R as ChatR
 import github.ponyhuang.gimi.feature.conversation.ChatDrawer
-import github.ponyhuang.gimi.feature.mcp.McpServerAddOptionsScreen
+import github.ponyhuang.gimi.feature.mcp.McpServerAddOptionsRoute
 import github.ponyhuang.gimi.feature.mcp.McpServerEditorRoute
 import github.ponyhuang.gimi.feature.mcp.McpServerImportRoute
 import github.ponyhuang.gimi.feature.mcp.McpServerListRoute
-import github.ponyhuang.gimi.feature.mcp.R as McpR
 import github.ponyhuang.gimi.feature.modelsettings.defaults.DefaultModelSettingsRoute
 import github.ponyhuang.gimi.feature.modelsettings.detail.LLMModelSettingDetailRoute
 import github.ponyhuang.gimi.feature.modelsettings.list.ModelServiceListRoute
-import github.ponyhuang.gimi.feature.modelsettings.R as ModelsettingsR
 import github.ponyhuang.gimi.feature.permissions.PermissionSettingsRoute
-import github.ponyhuang.gimi.feature.permissions.R as PermissionsR
 import github.ponyhuang.gimi.feature.recommendation.RecommendationSettingsRoute
-import github.ponyhuang.gimi.feature.recommendation.R as RecommendationR
 import github.ponyhuang.gimi.feature.memory.MemorySettingsRoute
-import github.ponyhuang.gimi.feature.memory.R as MemoryR
-import github.ponyhuang.gimi.feature.settings.R as SettingsR
 import github.ponyhuang.gimi.feature.settings.SettingsRoute
 import github.ponyhuang.gimi.feature.skills.SkillsSettingsRoute
-import github.ponyhuang.gimi.feature.skills.R as SkillsR
 import github.ponyhuang.gimi.feature.toolauthorization.ToolAuthorizationConfigurationRoute
 import github.ponyhuang.gimi.feature.toolauthorization.ToolAuthorizationRoute
-import github.ponyhuang.gimi.feature.toolauthorization.R as ToolauthR
 import github.ponyhuang.gimi.feature.plugin.PluginConfigRoute
 import github.ponyhuang.gimi.feature.plugin.PluginSettingsRoute
-import github.ponyhuang.gimi.feature.plugin.R as PluginR
 import github.ponyhuang.gimi.feature.voicewake.VoiceWakeSettingsRoute
-import github.ponyhuang.gimi.feature.voicewake.R as VoicewakeR
 import github.ponyhuang.gimi.feature.workfiles.WorkFilesSettingsRoute
-import github.ponyhuang.gimi.feature.workfiles.R as WorkfilesR
 import github.ponyhuang.gimi.ui.navigation.AppRoute
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import kotlinx.coroutines.launch
@@ -315,189 +304,104 @@ fun MainScreen(
                             )
                         }
 
-                        AppRoute.Settings -> PreferenceScaffold(
-                            stringResource(SettingsR.string.settings_title),
-                            goBack,
-                        ) { modifier ->
-                            SettingsRoute(
-                                appVersionName = BuildConfig.VERSION_NAME,
-                                onNavigateToModelService = { backStack.add(AppRoute.ModelServiceList) },
-                                onNavigateToDefaultModels = { backStack.add(AppRoute.DefaultModelSettings) },
-                                onNavigateToVoiceWake = { backStack.add(AppRoute.VoiceWakeSettings) },
-                                onNavigateToMcpServers = { backStack.add(AppRoute.McpServerList) },
-                                onNavigateToPlugins = { backStack.add(AppRoute.PluginSettings) },
-                                onNavigateToSkills = { backStack.add(AppRoute.SkillsSettings) },
-                                onNavigateToWorkFiles = { backStack.add(AppRoute.WorkFilesSettings) },
-                                onNavigateToPermissions = { backStack.add(AppRoute.PermissionSettings) },
-                                onNavigateToToolAuthorization = {
-                                    backStack.add(AppRoute.ToolAuthorizationSettings)
-                                },
-                                onNavigateToRecommendations = {
-                                    backStack.add(AppRoute.RecommendationSettings)
-                                },
-                                onNavigateToMemory = { backStack.add(AppRoute.MemorySettings) },
-                                modifier = modifier,
-                            )
-                        }
+                        AppRoute.Settings -> SettingsRoute(
+                            appVersionName = BuildConfig.VERSION_NAME,
+                            onBack = goBack,
+                            onNavigateToModelService = { backStack.add(AppRoute.ModelServiceList) },
+                            onNavigateToDefaultModels = { backStack.add(AppRoute.DefaultModelSettings) },
+                            onNavigateToVoiceWake = { backStack.add(AppRoute.VoiceWakeSettings) },
+                            onNavigateToMcpServers = { backStack.add(AppRoute.McpServerList) },
+                            onNavigateToPlugins = { backStack.add(AppRoute.PluginSettings) },
+                            onNavigateToSkills = { backStack.add(AppRoute.SkillsSettings) },
+                            onNavigateToWorkFiles = { backStack.add(AppRoute.WorkFilesSettings) },
+                            onNavigateToPermissions = { backStack.add(AppRoute.PermissionSettings) },
+                            onNavigateToToolAuthorization = {
+                                backStack.add(AppRoute.ToolAuthorizationSettings)
+                            },
+                            onNavigateToRecommendations = {
+                                backStack.add(AppRoute.RecommendationSettings)
+                            },
+                            onNavigateToMemory = { backStack.add(AppRoute.MemorySettings) },
+                        )
 
-                        AppRoute.MemorySettings -> PreferenceScaffold(
-                            stringResource(MemoryR.string.memory_screen_title),
-                            goBack,
-                        ) {
-                            MemorySettingsRoute(modifier = it)
-                        }
+                        AppRoute.MemorySettings -> MemorySettingsRoute(
+                            onBack = goBack,
+                        )
 
-                        AppRoute.RecommendationSettings -> PreferenceScaffold(
-                            stringResource(RecommendationR.string.recommendation_settings_title),
-                            goBack,
-                        ) { modifier ->
-                            RecommendationSettingsRoute(
-                                onOpenPermissions = { backStack.add(AppRoute.PermissionSettings) },
-                                modifier = modifier,
-                            )
-                        }
+                        AppRoute.RecommendationSettings -> RecommendationSettingsRoute(
+                            onBack = goBack,
+                            onOpenPermissions = { backStack.add(AppRoute.PermissionSettings) },
+                        )
 
-                        AppRoute.DefaultModelSettings -> PreferenceScaffold(
-                            stringResource(ModelsettingsR.string.modelsettings_defaults_screen_title),
-                            goBack,
-                        ) {
-                            DefaultModelSettingsRoute(modifier = it)
-                        }
+                        AppRoute.DefaultModelSettings -> DefaultModelSettingsRoute(onBack = goBack)
 
-                        AppRoute.VoiceWakeSettings -> PreferenceScaffold(
-                            stringResource(VoicewakeR.string.voicewake_screen_title),
-                            goBack,
-                        ) {
-                            VoiceWakeSettingsRoute(modifier = it)
-                        }
+                        AppRoute.VoiceWakeSettings -> VoiceWakeSettingsRoute(onBack = goBack)
 
-                        AppRoute.WorkFilesSettings -> PreferenceScaffold(
-                            stringResource(WorkfilesR.string.workfiles_screen_title),
-                            goBack,
-                        ) {
-                            WorkFilesSettingsRoute(modifier = it)
-                        }
+                        AppRoute.WorkFilesSettings -> WorkFilesSettingsRoute(onBack = goBack)
 
-                        AppRoute.PermissionSettings -> PreferenceScaffold(
-                            stringResource(PermissionsR.string.permissions_screen_title),
-                            goBack,
-                        ) {
-                            PermissionSettingsRoute(modifier = it)
-                        }
+                        AppRoute.PermissionSettings -> PermissionSettingsRoute(onBack = goBack)
 
-                        AppRoute.ToolAuthorizationSettings -> PreferenceScaffold(
-                            stringResource(ToolauthR.string.toolauth_screen_title),
-                            goBack,
-                        ) {
-                            ToolAuthorizationRoute(
-                                onNavigateToConfiguration = {
-                                    backStack.add(AppRoute.ToolAuthorizationConfiguration)
-                                },
-                                modifier = it,
-                            )
-                        }
+                        AppRoute.ToolAuthorizationSettings -> ToolAuthorizationRoute(
+                            onBack = goBack,
+                            onNavigateToConfiguration = {
+                                backStack.add(AppRoute.ToolAuthorizationConfiguration)
+                            },
+                        )
 
-                        AppRoute.ToolAuthorizationConfiguration -> PreferenceScaffold(
-                            stringResource(ToolauthR.string.toolauth_configuration_title),
-                            goBack,
-                        ) {
-                            ToolAuthorizationConfigurationRoute(modifier = it)
-                        }
+                        AppRoute.ToolAuthorizationConfiguration -> ToolAuthorizationConfigurationRoute(
+                            onBack = goBack,
+                        )
 
-                        AppRoute.PluginSettings -> PreferenceScaffold(
-                            stringResource(PluginR.string.plugin_screen_title),
-                            goBack,
-                        ) { modifier ->
-                            PluginSettingsRoute(
-                                onNavigateToConfig = { pluginId ->
-                                    backStack.add(AppRoute.PluginConfig(pluginId))
-                                },
-                                modifier = modifier,
-                            )
-                        }
+                        AppRoute.PluginSettings -> PluginSettingsRoute(
+                            onBack = goBack,
+                            onNavigateToConfig = { pluginId ->
+                                backStack.add(AppRoute.PluginConfig(pluginId))
+                            },
+                        )
 
                         is AppRoute.PluginConfig -> PluginConfigRoute(
                             pluginId = route.pluginId,
                             onBack = goBack,
                         )
 
-                        AppRoute.SkillsSettings -> PreferenceScaffold(
-                            stringResource(SkillsR.string.skills_screen_title),
-                            goBack,
-                        ) {
-                            SkillsSettingsRoute(modifier = it)
-                        }
+                        AppRoute.SkillsSettings -> SkillsSettingsRoute(onBack = goBack)
 
-                        AppRoute.McpServerList -> PreferenceScaffold(
-                            title = stringResource(McpR.string.mcp_list_title),
+                        AppRoute.McpServerList -> McpServerListRoute(
                             onBack = goBack,
-                            actions = {
-                                IconButton(onClick = { backStack.add(AppRoute.McpServerAddOptions) }) {
-                                    Icon(
-                                        Icons.Default.Add,
-                                        contentDescription = stringResource(McpR.string.mcp_add_server),
-                                    )
-                                }
+                            onAddServer = { backStack.add(AppRoute.McpServerAddOptions) },
+                            onNavigateToEditor = { backStack.add(AppRoute.McpServerEditor(it)) },
+                            onCreateServer = { backStack.add(AppRoute.McpServerEditor()) },
+                            onImportServers = { backStack.add(AppRoute.McpServerImport) },
+                        )
+
+                        AppRoute.McpServerAddOptions -> McpServerAddOptionsRoute(
+                            onBack = goBack,
+                            onCreate = {
+                                backStack.removeLastOrNull()
+                                backStack.add(AppRoute.McpServerEditor())
                             },
-                        ) { modifier ->
-                            McpServerListRoute(
-                                onNavigateToEditor = { backStack.add(AppRoute.McpServerEditor(it)) },
-                                onCreateServer = { backStack.add(AppRoute.McpServerEditor()) },
-                                onImportServers = { backStack.add(AppRoute.McpServerImport) },
-                                modifier = modifier,
-                            )
-                        }
+                            onImport = {
+                                backStack.removeLastOrNull()
+                                backStack.add(AppRoute.McpServerImport)
+                            },
+                        )
 
-                        AppRoute.McpServerAddOptions -> PreferenceScaffold(
-                            stringResource(McpR.string.mcp_add_options_title),
-                            goBack,
-                        ) {
-                            McpServerAddOptionsScreen(
-                                onCreate = {
-                                    backStack.removeLastOrNull()
-                                    backStack.add(AppRoute.McpServerEditor())
-                                },
-                                onImport = {
-                                    backStack.removeLastOrNull()
-                                    backStack.add(AppRoute.McpServerImport)
-                                },
-                                modifier = it,
-                            )
-                        }
+                        AppRoute.McpServerImport -> McpServerImportRoute(onBack = goBack)
 
-                        AppRoute.McpServerImport -> PreferenceScaffold(
-                            stringResource(McpR.string.mcp_import_title),
-                            goBack,
-                        ) {
-                            McpServerImportRoute(goBack, it)
-                        }
+                        is AppRoute.McpServerEditor -> McpServerEditorRoute(
+                            serverId = route.serverId,
+                            onBack = goBack,
+                        )
 
-                        is AppRoute.McpServerEditor -> PreferenceScaffold(
-                            stringResource(
-                                if (route.serverId == null) McpR.string.mcp_add_server
-                                else McpR.string.mcp_edit_server,
-                            ),
-                            goBack,
-                        ) {
-                            McpServerEditorRoute(route.serverId, goBack, modifier = it)
-                        }
+                        AppRoute.ModelServiceList -> ModelServiceListRoute(
+                            onBack = goBack,
+                            onNavigateToDetail = { id -> backStack.add(AppRoute.ModelServiceDetail(id)) },
+                        )
 
-                        AppRoute.ModelServiceList -> PreferenceScaffold(
-                            stringResource(ModelsettingsR.string.modelsettings_list_title),
-                            goBack,
-                        ) {
-                            ModelServiceListRoute(
-                                onNavigateToDetail = { id -> backStack.add(AppRoute.ModelServiceDetail(id)) },
-                                modifier = it,
-                            )
-                        }
-
-                        is AppRoute.ModelServiceDetail -> PreferenceScaffold(
-                            stringResource(ModelsettingsR.string.modelsettings_detail_title),
-                            goBack,
-                        ) {
-                            LLMModelSettingDetailRoute(route.serviceId, goBack, modifier = it)
-                        }
+                        is AppRoute.ModelServiceDetail -> LLMModelSettingDetailRoute(
+                            serviceId = route.serviceId,
+                            onBack = goBack,
+                        )
                     }
                 }
             },

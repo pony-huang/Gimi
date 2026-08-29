@@ -17,9 +17,11 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.domain.skills.model.SkillImportFailure
 import github.ponyhuang.gimi.feature.skills.R
+import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 
 @Composable
 fun SkillsSettingsRoute(
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SkillsSettingsViewModel = hiltViewModel(),
 ) {
@@ -54,16 +56,21 @@ fun SkillsSettingsRoute(
         viewModel.onAction(SkillsSettingsAction.ConsumeNotice)
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        SkillsSettingsScreen(
-            state = state,
-            onAction = viewModel::onAction,
-            modifier = Modifier.fillMaxSize(),
-        )
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
+    PreferenceScaffold(
+        title = stringResource(R.string.skills_screen_title),
+        onBack = onBack,
+    ) { scaffoldModifier ->
+        Box(modifier = scaffoldModifier.fillMaxSize()) {
+            SkillsSettingsScreen(
+                state = state,
+                onAction = viewModel::onAction,
+                modifier = Modifier.fillMaxSize(),
+            )
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
     }
 }
 

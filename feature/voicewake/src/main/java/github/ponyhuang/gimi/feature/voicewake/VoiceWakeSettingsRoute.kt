@@ -9,12 +9,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 
 @Composable
 fun VoiceWakeSettingsRoute(
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: VoiceWakeSettingsViewModel = hiltViewModel(),
 ) {
@@ -41,11 +44,16 @@ fun VoiceWakeSettingsRoute(
         }
     }
 
-    VoiceWakeSettingsScreen(
-        state = state,
-        onAction = viewModel::onAction,
-        modifier = modifier,
-    )
+    PreferenceScaffold(
+        title = stringResource(R.string.voicewake_screen_title),
+        onBack = onBack,
+    ) { scaffoldModifier ->
+        VoiceWakeSettingsScreen(
+            state = state,
+            onAction = viewModel::onAction,
+            modifier = scaffoldModifier,
+        )
+    }
 }
 
 private val REQUIRED_PERMISSIONS = arrayOf(

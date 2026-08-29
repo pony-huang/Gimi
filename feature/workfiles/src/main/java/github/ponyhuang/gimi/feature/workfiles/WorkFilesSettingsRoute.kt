@@ -6,11 +6,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 
 @Composable
 fun WorkFilesSettingsRoute(
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: WorkFilesSettingsViewModel = hiltViewModel(),
 ) {
@@ -29,9 +32,14 @@ fun WorkFilesSettingsRoute(
         documentTreeLauncher.launch(null)
     }
 
-    WorkFilesSettingsScreen(
-        state = state,
-        onAction = viewModel::onAction,
-        modifier = modifier,
-    )
+    PreferenceScaffold(
+        title = stringResource(R.string.workfiles_screen_title),
+        onBack = onBack,
+    ) { scaffoldModifier ->
+        WorkFilesSettingsScreen(
+            state = state,
+            onAction = viewModel::onAction,
+            modifier = scaffoldModifier,
+        )
+    }
 }

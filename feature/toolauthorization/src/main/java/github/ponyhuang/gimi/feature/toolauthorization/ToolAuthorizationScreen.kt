@@ -26,22 +26,29 @@ import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
+import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import kotlinx.coroutines.flow.SharedFlow
 
 @Composable
 fun ToolAuthorizationRoute(
+    onBack: () -> Unit,
     onNavigateToConfiguration: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ToolAuthorizationViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     ToolAuthorizationEffects(viewModel.effects)
-    ToolAuthorizationScreen(
-        state = state,
-        onAction = viewModel::onAction,
-        onNavigateToConfiguration = onNavigateToConfiguration,
-        modifier = modifier,
-    )
+    PreferenceScaffold(
+        title = stringResource(R.string.toolauth_screen_title),
+        onBack = onBack,
+    ) { scaffoldModifier ->
+        ToolAuthorizationScreen(
+            state = state,
+            onAction = viewModel::onAction,
+            onNavigateToConfiguration = onNavigateToConfiguration,
+            modifier = scaffoldModifier,
+        )
+    }
 }
 
 @Composable

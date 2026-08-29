@@ -65,6 +65,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 
 @Composable
 fun PluginSettingsRoute(
+    onBack: () -> Unit,
     onNavigateToConfig: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: PluginSettingsViewModel = hiltViewModel(),
@@ -90,13 +91,18 @@ fun PluginSettingsRoute(
             plugin.id to loadPluginIcon(context, plugin.packageName)?.toBitmap()?.asImageBitmap()
         }
     }
-    PluginSettingsScreen(
-        state = state,
-        icons = icons,
-        onAction = viewModel::onAction,
-        onNavigateToConfig = onNavigateToConfig,
-        modifier = modifier,
-    )
+    PreferenceScaffold(
+        title = stringResource(R.string.plugin_screen_title),
+        onBack = onBack,
+    ) { scaffoldModifier ->
+        PluginSettingsScreen(
+            state = state,
+            icons = icons,
+            onAction = viewModel::onAction,
+            onNavigateToConfig = onNavigateToConfig,
+            modifier = scaffoldModifier,
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -1,4 +1,4 @@
-package github.ponyhuang.gimi.feature.conversation
+package github.ponyhuang.gimi.feature.chat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable

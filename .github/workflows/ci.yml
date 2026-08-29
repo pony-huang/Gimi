@@ -31,6 +31,9 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Module boundary guard
+        run: bash scripts/check-module-boundaries.sh
+
       - name: Unit tests
         run: ./gradlew testDebugUnitTest --stacktrace
 

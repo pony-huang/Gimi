@@ -1,0 +1,17 @@
+<resources>
+    <string name="memory_screen_title">Memory</string>
+    <string name="memory_enabled_title">Enable memory</string>
+    <string name="memory_enabled_subtitle">When off, conversations are no longer saved to or recalled from memory</string>
+    <string name="memory_section_provider">Memory service</string>
+    <string name="memory_mem0_enabled_title">Enable Mem0</string>
+    <string name="memory_mem0_enabled_subtitle">Uses on-device memory when disabled</string>
+    <string name="memory_token_label">Mem0 API Token</string>
+    <string name="memory_token_stored_placeholder">Stored securely; leave blank to keep it</string>
+    <string name="memory_token_required">Mem0 API Token is required</string>
+    <string name="memory_show_token">Show token</string>
+    <string name="memory_hide_token">Hide token</string>
+    <string name="memory_save">Save</string>
+    <string name="memory_saving">Saving</string>
+    <string name="memory_saved">Memory settings saved</string>
+    <string name="memory_save_failed">Could not save memory settings</string>
+</resources>

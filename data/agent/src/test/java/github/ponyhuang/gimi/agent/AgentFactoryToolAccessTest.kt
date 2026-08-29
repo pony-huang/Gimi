@@ -7,6 +7,7 @@ import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.tools.Toolset
+import com.google.adk.kt.tools.PreloadMemoryTool
 import com.google.adk.kt.types.FunctionDeclaration
 import github.ponyhuang.gimi.agent.tools.search.TOOL_SEARCH_NAME
 import github.ponyhuang.gimi.agent.tools.search.ToolSearchToolset
@@ -81,6 +82,18 @@ class AgentFactoryToolAccessTest {
     }
 
     @Test
+    fun preloadMemoryRunsInBothAccessModesWithoutModelDeclaration() = runTest {
+        val factory = factory()
+
+        val always = factory.create(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE).agent as LlmAgent
+        val onDemand = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
+
+        assertTrue(always.tools.any { it is PreloadMemoryTool })
+        assertTrue(onDemand.tools.any { it is PreloadMemoryTool })
+        assertEquals(null, always.tools.filterIsInstance<PreloadMemoryTool>().single().declaration())
+    }
+
+    @Test
     fun mcpConfigurationAndManualToolsAreDirectlyAvailableInBothAccessModes() = runTest {
         val configurationTool = mockk<McpConfigurationTool>(relaxed = true) {
             every { name } returns McpConfigurationTool.NAME
@@ -119,6 +132,7 @@ class AgentFactoryToolAccessTest {
 
         assertEquals(
             listOf(
+                "preload_memory",
                 "adjust_media_volume",
                 McpConfigurationTool.NAME,
                 McpAuthorizationTool.NAME,
@@ -139,6 +153,7 @@ class AgentFactoryToolAccessTest {
 
         assertEquals(
             listOf(
+                "preload_memory",
                 McpConfigurationTool.NAME,
                 McpAuthorizationTool.NAME,
                 McpManualConfigurationTool.NAME,

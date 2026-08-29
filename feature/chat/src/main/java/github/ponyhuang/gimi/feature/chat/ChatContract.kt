@@ -122,6 +122,12 @@ sealed interface ChatNotice {
     /** 会话勾选的 MCP 服务器连接失败，本轮已跳过。 */
     data class McpServerSkipped(val serverName: String) : ChatNotice
 
+    /** Mem0 记忆搜索失败，本轮继续但不注入云记忆。 */
+    data object MemorySearchFailed : ChatNotice
+
+    /** Mem0 会话写入失败，本轮回答仍然保留。 */
+    data object MemoryWriteFailed : ChatNotice
+
     /** 上游（语音播放等）给出的动态文本，不经资源映射。 */
     data class Message(val text: String) : ChatNotice
 }

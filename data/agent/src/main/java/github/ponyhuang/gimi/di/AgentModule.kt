@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.google.adk.kt.artifacts.ArtifactService
 import com.google.adk.kt.artifacts.FileArtifactService
+import com.google.adk.kt.memory.MemoryService
 import com.google.adk.kt.plugins.Plugin
 import com.google.adk.kt.sessions.SessionService
 import com.google.adk.kt.sessions.room.RoomSessionService
@@ -20,6 +21,7 @@ import github.ponyhuang.gimi.agent.AgentLLMModelFactory
 import github.ponyhuang.gimi.agent.LocalToolCatalog
 import github.ponyhuang.gimi.agent.conversation.AdkChatAgentRepository
 import github.ponyhuang.gimi.agent.plugins.ConversationGenerateTitlePlugin
+import github.ponyhuang.gimi.agent.plugins.MemoryPersistencePlugin
 import github.ponyhuang.gimi.agent.tools.search.MiniLmToolEmbeddingModel
 import github.ponyhuang.gimi.agent.tools.search.MyObjectBox
 import github.ponyhuang.gimi.agent.tools.search.ObjectBoxToolVectorSearch
@@ -130,6 +132,7 @@ object AgentModule {
     fun provideAgentChatRunner(
         sessionService: SessionService,
         artifactService: ArtifactService,
+        memoryService: MemoryService,
         agentFactory: AgentFactory,
         modelServices: AgentModelConfigurationSource,
         toolAuthorization: ToolAuthorizationRepository,
@@ -146,6 +149,7 @@ object AgentModule {
         },
         sessionService = sessionService,
         artifactService = artifactService,
+        memoryService = memoryService,
         configurationRevision = {
             listOf(
                 toolAuthorization.revision.value,
@@ -157,6 +161,7 @@ object AgentModule {
         plugins = {
             buildList<Plugin> {
                 add(ConversationGenerateTitlePlugin(agentLLMModelFactory))
+                add(MemoryPersistencePlugin())
                 addAll(pluginManager.enabledPlugins())
             }
         },

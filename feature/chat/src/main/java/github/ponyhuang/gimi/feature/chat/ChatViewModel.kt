@@ -33,6 +33,8 @@ import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogReposito
 import github.ponyhuang.gimi.domain.mcp.model.McpSkippedServer
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import github.ponyhuang.gimi.domain.mcp.repository.McpSkipReporter
+import github.ponyhuang.gimi.domain.memory.model.MemoryOperation
+import github.ponyhuang.gimi.domain.memory.repository.MemoryRuntimeStatus
 import github.ponyhuang.gimi.domain.speech.repository.SpeechRecognitionRepository
 import github.ponyhuang.gimi.domain.speech.repository.SpeechPlaybackRepository
 import github.ponyhuang.gimi.domain.speech.usecase.markdownToSpeechText
@@ -82,6 +84,7 @@ class ChatViewModel @Inject constructor(
     private val speechPlaybackController: SpeechPlaybackRepository,
     private val attachments: ChatAttachmentRepository,
     private val officialFunctionCatalog: OfficialToolFunctionCatalog,
+    private val memoryRuntimeStatus: MemoryRuntimeStatus,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -262,6 +265,16 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             mcpSkipReporter.skipped.collect { skipped ->
                 notifySkippedMcpServers(skipped)
+            }
+        }
+        viewModelScope.launch {
+            memoryRuntimeStatus.failures.collect { failure ->
+                emitNotice(
+                    when (failure.operation) {
+                        MemoryOperation.SEARCH -> ChatNotice.MemorySearchFailed
+                        MemoryOperation.WRITE -> ChatNotice.MemoryWriteFailed
+                    },
+                )
             }
         }
     }

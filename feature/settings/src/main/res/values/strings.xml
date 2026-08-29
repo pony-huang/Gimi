@@ -5,6 +5,8 @@
     <string name="settings_group_voice">语音</string>
     <string name="settings_group_tools">工具</string>
     <string name="settings_group_general">通用</string>
+    <string name="settings_memory_title">记忆</string>
+    <string name="settings_memory_subtitle">配置本地记忆或 Mem0 长期记忆</string>
 
     <string name="settings_model_service_title">模型服务</string>
     <string name="settings_model_service_subtitle">API 密钥 · 服务地址 · 模型列表</string>

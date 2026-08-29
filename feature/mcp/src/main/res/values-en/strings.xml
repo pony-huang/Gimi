@@ -16,7 +16,7 @@
     <string name="mcp_import_result_with_skipped">Created %1$d and updated %2$d MCP servers; skipped %3$d unsupported or invalid entries</string>
     <string name="mcp_paste">Paste</string>
     <string name="mcp_field_json_label">MCP JSON</string>
-    <string name="mcp_field_json_placeholder">{\n  \"mcpServers\": { ... }\n}</string>
+    <string name="mcp_field_json_placeholder">{\n  \"mcpServers\": { … }\n}</string>
     <string name="mcp_stdio_skip_notice">stdio entries containing command / args will be skipped because Android apps cannot safely spawn local processes.</string>
     <string name="mcp_transport_sse">SSE</string>
     <string name="mcp_transport_streamable_http">Streamable HTTP</string>

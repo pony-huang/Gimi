@@ -7,6 +7,7 @@ import com.google.adk.kt.models.Model
 import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.SkillToolset
 import com.google.adk.kt.tools.Toolset
+import com.google.adk.kt.tools.PreloadMemoryTool
 import github.ponyhuang.gimi.agent.tools.mcp.ConversationMcpToolset
 import github.ponyhuang.gimi.agent.tools.mcp.McpAuthorizationTool
 import github.ponyhuang.gimi.agent.tools.mcp.McpConfigurationTool
@@ -148,6 +149,8 @@ class AgentFactory @Inject constructor(
         model = model,
         instruction = Instruction(AgentPrompts.defaultAssistantInstruction()),
         tools = buildList {
+            // ADK 内置请求处理器：每轮模型调用前自动从当前 MemoryService 召回相关记忆。
+            add(PreloadMemoryTool())
             addAll(
                 localToolCatalog.tools()
                     .filter { tool -> tool.name in localToolCatalog.confirmationRequiredToolIds }

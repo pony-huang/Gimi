@@ -7,6 +7,7 @@ import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import android.util.Log
+import com.google.adk.kt.memory.InMemoryMemoryService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -49,6 +50,7 @@ class AgentChatRunnerCacheTest {
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
+            memoryService = InMemoryMemoryService(),
         )
         val selection = ModelSelection("service", "group", "model")
 
@@ -79,6 +81,7 @@ class AgentChatRunnerCacheTest {
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
+            memoryService = InMemoryMemoryService(),
             configurationRevision = { revision },
         )
         val first = ModelSelection("service", "group", "first")
@@ -105,6 +108,7 @@ class AgentChatRunnerCacheTest {
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
+            memoryService = InMemoryMemoryService(),
         )
 
         fun selection(index: Int) = ModelSelection("service", "group", "model-$index")
@@ -127,6 +131,7 @@ class AgentChatRunnerCacheTest {
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
+            memoryService = InMemoryMemoryService(),
         )
         val selection = ModelSelection("service", "group", "model")
         val clockOnly = ConversationToolConfiguration(enabledLocalToolIds = setOf("clock"))
@@ -152,6 +157,7 @@ class AgentChatRunnerCacheTest {
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
+            memoryService = InMemoryMemoryService(),
         )
         val selection = ModelSelection("service", "group", "model")
 
@@ -187,6 +193,7 @@ class AgentChatRunnerCacheTest {
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
+            memoryService = InMemoryMemoryService(),
         )
         val selection = ModelSelection("service", "group", "model")
 

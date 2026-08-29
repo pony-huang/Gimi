@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -117,6 +118,14 @@ fun SettingsScreen(
                 )
             }
             item { PreferenceSectionTitle(stringResource(R.string.settings_group_general)) }
+            item {
+                PreferenceNavigationCard(
+                    icon = Icons.Default.Cloud,
+                    title = stringResource(R.string.settings_memory_title),
+                    subtitle = stringResource(R.string.settings_memory_subtitle),
+                    onClick = { onAction(SettingsAction.OpenMemory) },
+                )
+            }
             item {
                 PreferenceNavigationCard(
                     icon = Icons.Default.AutoAwesome,

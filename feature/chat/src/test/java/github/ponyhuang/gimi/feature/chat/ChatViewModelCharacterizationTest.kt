@@ -27,6 +27,9 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatal
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
+import github.ponyhuang.gimi.domain.memory.model.MemoryOperation
+import github.ponyhuang.gimi.domain.memory.model.MemoryRuntimeFailure
+import github.ponyhuang.gimi.domain.memory.repository.MemoryRuntimeStatus
 import github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState
 import github.ponyhuang.gimi.domain.speech.repository.SpeechPlaybackRepository
 import github.ponyhuang.gimi.domain.speech.repository.SpeechRecognitionRepository
@@ -92,6 +95,21 @@ class ChatViewModelCharacterizationTest {
         assertFalse(state.messages[1].partial)
         assertFalse(state.isAgentRunning)
         coVerify { fixture.conversations.refreshConversation("session-1") }
+    }
+
+    @Test
+    fun memoryFailuresEmitLocalizedNoticeTypes() = runTest {
+        val failures = MutableSharedFlow<MemoryRuntimeFailure>(extraBufferCapacity = 2)
+        val fixture = fixture(configured = true, memoryFailures = failures)
+
+        fixture.viewModel.effects.test {
+            runCurrent()
+            failures.emit(MemoryRuntimeFailure(MemoryOperation.SEARCH))
+            assertEquals(ChatEffect.ShowNotice(ChatNotice.MemorySearchFailed), awaitItem())
+            failures.emit(MemoryRuntimeFailure(MemoryOperation.WRITE))
+            assertEquals(ChatEffect.ShowNotice(ChatNotice.MemoryWriteFailed), awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test
@@ -614,6 +632,7 @@ class ChatViewModelCharacterizationTest {
         agentOverride: ChatAgentRepository? = null,
         sessionIds: List<String> = listOf("session-1"),
         officialCatalogOverride: OfficialToolFunctionCatalog? = null,
+        memoryFailures: MutableSharedFlow<MemoryRuntimeFailure> = MutableSharedFlow(),
     ): Fixture {
         val selection = ModelSelection("service", "chat", "model")
         val services = if (configured) listOf(service()) else emptyList()
@@ -700,6 +719,9 @@ class ChatViewModelCharacterizationTest {
                     every { skipped } returns MutableStateFlow(emptyList())
                 },
                 officialFunctionCatalog = officialFunctionCatalog,
+                memoryRuntimeStatus = mockk<MemoryRuntimeStatus>(relaxed = true) {
+                    every { failures } returns memoryFailures
+                },
             ),
             conversations = conversations,
             agent = agent,

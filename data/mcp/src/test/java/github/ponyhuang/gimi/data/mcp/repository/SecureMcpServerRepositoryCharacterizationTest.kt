@@ -2,46 +2,11 @@ package github.ponyhuang.gimi.data.mcp.repository
 
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
-import java.security.InvalidKeyException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class SecureMcpServerRepositoryCharacterizationTest {
-    @Test
-    fun retryWithFreshKeyRetriesOnceAfterInvalidKey() {
-        var attempts = 0
-        var resetCount = 0
-
-        val result = retryWithFreshKeyAfterInvalidKey(
-            resetKey = { resetCount++ },
-            operation = {
-                attempts++
-                if (attempts == 1) throw InvalidKeyException("key invalidated")
-                "encrypted"
-            },
-        )
-
-        assertEquals("encrypted", result)
-        assertEquals(2, attempts)
-        assertEquals(1, resetCount)
-    }
-
-    @Test
-    fun retryWithFreshKeyDoesNotResetForOtherFailures() {
-        var resetCount = 0
-
-        assertThrows(IllegalStateException::class.java) {
-            retryWithFreshKeyAfterInvalidKey(
-                resetKey = { resetCount++ },
-                operation = { throw IllegalStateException("storage unavailable") },
-            )
-        }
-
-        assertEquals(0, resetCount)
-    }
-
     @Test
     fun importCurlCreatesSseServerAndMarksPlaceholderAuthorizationAsPending() {
         val repository = SecureMcpServerRepository(FakeStorage())

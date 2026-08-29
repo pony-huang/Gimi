@@ -16,6 +16,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:security"))
     implementation(project(":domain:mcp"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.gson)

@@ -20,6 +20,7 @@ sealed interface SettingsAction {
     data object OpenPermissions : SettingsAction
     data object OpenToolAuthorization : SettingsAction
     data object OpenRecommendations : SettingsAction
+    data object OpenMemory : SettingsAction
     /** 在浏览器中打开 GitHub 项目页。 */
     data object OpenProjectPage : SettingsAction
     data class SetToolActivityVisible(val visible: Boolean) : SettingsAction
@@ -36,6 +37,7 @@ sealed interface SettingsEffect {
     data object NavigateToPermissions : SettingsEffect
     data object NavigateToToolAuthorization : SettingsEffect
     data object NavigateToRecommendations : SettingsEffect
+    data object NavigateToMemory : SettingsEffect
     /** 打开 GitHub 项目页（https://github.com/pony-huang/Gimi）。 */
     data object OpenProjectPage : SettingsEffect
 }

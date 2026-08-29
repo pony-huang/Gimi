@@ -1,14 +1,12 @@
 package github.ponyhuang.gimi.data.modelcatalog
 
 import android.content.Context
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
-import android.util.Base64
 import android.util.Log
 import androidx.core.content.edit
 import androidx.room.withTransaction
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
+import github.ponyhuang.gimi.core.security.KeystoreAesGcmStringCipher
 import github.ponyhuang.gimi.data.modelcatalog.toData
 import github.ponyhuang.gimi.data.modelcatalog.toDomain
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
@@ -19,12 +17,6 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedAgentModel
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
-import java.nio.charset.StandardCharsets
-import java.security.KeyStore
-import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
-import javax.crypto.spec.GCMParameterSpec
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CompletableDeferred
@@ -79,6 +71,7 @@ class ModelServiceRepository @Inject constructor(
         PREFERENCES_NAME,
         Context.MODE_PRIVATE,
     )
+    private val cipher = KeystoreAesGcmStringCipher(KEY_ALIAS)
     private val defaultSettings = LLMModelConfigs.services.associate { provider ->
         provider.serviceId to provider.toSettings()
     }
@@ -494,8 +487,9 @@ class ModelServiceRepository @Inject constructor(
 
     private fun readSettings(): Map<String, ModelServiceSettings>? {
         val encrypted = preferences.getString(SETTINGS_KEY, null) ?: return null
+        val plainText = cipher.decryptHealing(encrypted) ?: return null
         return runCatching {
-            modelCatalogJson.decodeFromString<Map<String, ModelServiceSettings>>(decrypt(encrypted))
+            modelCatalogJson.decodeFromString<Map<String, ModelServiceSettings>>(plainText)
         }.onFailure { Log.w(TAG, "Unable to restore model service settings.", it) }.getOrNull()
     }
 
@@ -510,7 +504,7 @@ class ModelServiceRepository @Inject constructor(
     private fun persistSettings(value: Map<String, ModelServiceSettings>): Boolean =
         cancellationAwareRunCatching {
             preferences.edit()
-                .putString(SETTINGS_KEY, encrypt(modelCatalogJson.encodeToString(value)))
+                .putString(SETTINGS_KEY, cipher.encryptOrThrow(modelCatalogJson.encodeToString(value)))
                 .commit()
         }.onFailure { Log.w(TAG, "Unable to persist model service settings.", it) }
             .getOrDefault(false)
@@ -526,45 +520,6 @@ class ModelServiceRepository @Inject constructor(
         }
     }
 
-    private fun encrypt(plainText: String): String {
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateSecretKey())
-        val encrypted = cipher.doFinal(plainText.toByteArray(StandardCharsets.UTF_8))
-        return Base64.encodeToString(cipher.iv, Base64.NO_WRAP) + ":" +
-            Base64.encodeToString(encrypted, Base64.NO_WRAP)
-    }
-
-    private fun decrypt(payload: String): String {
-        val parts = payload.split(":", limit = 2)
-        require(parts.size == 2) { "Invalid encrypted model service settings." }
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(
-            Cipher.DECRYPT_MODE,
-            getOrCreateSecretKey(),
-            GCMParameterSpec(GCM_TAG_LENGTH_BITS, Base64.decode(parts[0], Base64.NO_WRAP)),
-        )
-        return cipher.doFinal(Base64.decode(parts[1], Base64.NO_WRAP))
-            .toString(StandardCharsets.UTF_8)
-    }
-
-    private fun getOrCreateSecretKey(): SecretKey {
-        val keyStore = KeyStore.getInstance(ANDROID_KEY_STORE).apply { load(null) }
-        (keyStore.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
-        return KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEY_STORE)
-            .apply {
-                init(
-                    KeyGenParameterSpec.Builder(
-                        KEY_ALIAS,
-                        KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
-                    )
-                        .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                        .build(),
-                )
-            }
-            .generateKey()
-    }
-
     private companion object {
         const val TAG = "ModelServiceRepository"
         const val PREFERENCES_NAME = "model_service_settings_v2"
@@ -576,8 +531,5 @@ class ModelServiceRepository @Inject constructor(
         const val DEFAULT_TTS_VOICE_KEY = "default_tts_voice"
         const val DEFAULT_TTS_VOICE = "mimo_default"
         const val KEY_ALIAS = "model_service_settings_key_v2"
-        const val ANDROID_KEY_STORE = "AndroidKeyStore"
-        const val TRANSFORMATION = "AES/GCM/NoPadding"
-        const val GCM_TAG_LENGTH_BITS = 128
     }
 }

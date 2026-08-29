@@ -27,6 +27,9 @@ sealed interface AppRoute : NavKey {
     data object RecommendationSettings : AppRoute
 
     @Serializable
+    data object MemorySettings : AppRoute
+
+    @Serializable
     data object DefaultModelSettings : AppRoute
 
     @Serializable

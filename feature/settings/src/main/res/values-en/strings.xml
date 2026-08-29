@@ -5,6 +5,8 @@
     <string name="settings_group_voice">Voice</string>
     <string name="settings_group_tools">Tools</string>
     <string name="settings_group_general">General</string>
+    <string name="settings_memory_title">Memory</string>
+    <string name="settings_memory_subtitle">Configure on-device or Mem0 long-term memory</string>
 
     <string name="settings_model_service_title">Model services</string>
     <string name="settings_model_service_subtitle">API keys · Endpoints · Models</string>

@@ -30,6 +30,7 @@ dependencies {
     implementation(project(":domain:conversation"))
     implementation(project(":domain:modelcatalog"))
     implementation(project(":domain:mcp"))
+    implementation(project(":domain:memory"))
     implementation(project(":domain:speech"))
     implementation(project(":domain:toolauthorization"))
     implementation(project(":domain:recommendation"))

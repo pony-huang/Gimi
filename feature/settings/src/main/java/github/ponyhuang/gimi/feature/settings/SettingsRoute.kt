@@ -30,6 +30,7 @@ fun SettingsRoute(
     onNavigateToPermissions: () -> Unit,
     onNavigateToToolAuthorization: () -> Unit,
     onNavigateToRecommendations: () -> Unit,
+    onNavigateToMemory: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
     updateViewModel: UpdateViewModel = hiltViewModel(),
@@ -51,6 +52,7 @@ fun SettingsRoute(
                 SettingsEffect.NavigateToPermissions -> onNavigateToPermissions()
                 SettingsEffect.NavigateToToolAuthorization -> onNavigateToToolAuthorization()
                 SettingsEffect.NavigateToRecommendations -> onNavigateToRecommendations()
+                SettingsEffect.NavigateToMemory -> onNavigateToMemory()
                 SettingsEffect.OpenProjectPage -> context.startActivity(
                     Intent(Intent.ACTION_VIEW, PROJECT_URL.toUri()),
                 )

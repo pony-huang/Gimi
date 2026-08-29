@@ -7,6 +7,7 @@ import com.google.adk.kt.agents.StreamingMode
 import com.google.adk.kt.apps.App
 import com.google.adk.kt.artifacts.ArtifactService
 import com.google.adk.kt.events.Event
+import com.google.adk.kt.memory.MemoryService
 import com.google.adk.kt.plugins.LoggingPlugin
 import com.google.adk.kt.plugins.Plugin
 import com.google.adk.kt.runners.InMemoryRunner
@@ -63,6 +64,7 @@ class AgentChatRunner(
     ) -> AgentRuntime,
     private val sessionService: SessionService,
     private val artifactService: ArtifactService?,
+    private val memoryService: MemoryService ?,
     private val configurationRevision: () -> Any = { Unit },
     private val plugins: () -> List<Plugin> = { emptyList() }
 ) {
@@ -122,6 +124,7 @@ class AgentChatRunner(
         ),
         sessionService = sessionService,
         artifactService = artifactService,
+        memoryService = memoryService
     )
 
     /**

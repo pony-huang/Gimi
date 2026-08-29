@@ -58,6 +58,8 @@ import github.ponyhuang.gimi.feature.permissions.PermissionSettingsRoute
 import github.ponyhuang.gimi.feature.permissions.R as PermissionsR
 import github.ponyhuang.gimi.feature.recommendation.RecommendationSettingsRoute
 import github.ponyhuang.gimi.feature.recommendation.R as RecommendationR
+import github.ponyhuang.gimi.feature.memory.MemorySettingsRoute
+import github.ponyhuang.gimi.feature.memory.R as MemoryR
 import github.ponyhuang.gimi.feature.settings.R as SettingsR
 import github.ponyhuang.gimi.feature.settings.SettingsRoute
 import github.ponyhuang.gimi.feature.skills.SkillsSettingsRoute
@@ -110,6 +112,8 @@ fun MainScreen(
         stringResource(ChatR.string.chat_notice_attachment_category_unsupported)
     val chatNoticeDocumentTotalSizeLimit =
         stringResource(ChatR.string.chat_notice_document_total_size_limit)
+    val chatNoticeMemorySearchFailed = stringResource(ChatR.string.chat_notice_memory_search_failed)
+    val chatNoticeMemoryWriteFailed = stringResource(ChatR.string.chat_notice_memory_write_failed)
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val backStack = rememberNavBackStack(AppRoute.Chat)
@@ -155,6 +159,8 @@ fun MainScreen(
                         ChatR.string.chat_notice_mcp_server_skipped,
                         notice.serverName,
                     )
+                    ChatNotice.MemorySearchFailed -> chatNoticeMemorySearchFailed
+                    ChatNotice.MemoryWriteFailed -> chatNoticeMemoryWriteFailed
                     is ChatNotice.Message -> notice.text
                 }
             }
@@ -329,8 +335,16 @@ fun MainScreen(
                                 onNavigateToRecommendations = {
                                     backStack.add(AppRoute.RecommendationSettings)
                                 },
+                                onNavigateToMemory = { backStack.add(AppRoute.MemorySettings) },
                                 modifier = modifier,
                             )
+                        }
+
+                        AppRoute.MemorySettings -> PreferenceScaffold(
+                            stringResource(MemoryR.string.memory_screen_title),
+                            goBack,
+                        ) {
+                            MemorySettingsRoute(modifier = it)
                         }
 
                         AppRoute.RecommendationSettings -> PreferenceScaffold(

@@ -102,6 +102,7 @@ dependencies {
     implementation(project(":data:assistant"))
     implementation(project(":domain:assistant"))
     implementation(project(":domain:recommendation"))
+    implementation(project(":domain:memory"))
     implementation(project(":core:common"))
     implementation(project(":data:modelcatalog"))
     implementation(project(":data:speech"))
@@ -120,6 +121,7 @@ dependencies {
     implementation(project(":data:appupdate"))
     implementation(project(":data:plugin"))
     implementation(project(":data:recommendation"))
+    implementation(project(":data:memory"))
     implementation(project(":core:designsystem"))
     implementation(project(":feature:modelsettings"))
     implementation(project(":feature:mcp"))
@@ -132,6 +134,7 @@ dependencies {
     implementation(project(":feature:skills"))
     implementation(project(":feature:chat"))
     implementation(project(":feature:recommendation"))
+    implementation(project(":feature:memory"))
     testImplementation(project(":core:testing"))
     // Drop kxml2 from the release runtime configurations only. Android's
     // framework already provides android.content.res.XmlResourceParser which

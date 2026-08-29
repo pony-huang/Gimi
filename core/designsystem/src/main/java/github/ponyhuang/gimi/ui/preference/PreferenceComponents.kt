@@ -162,121 +162,6 @@ fun PreferenceNavigationCard(
     )
 }
 
-/**
- * 设置页顶部的状态锚点：用户进入页面第一眼即可确认功能开关状态。
- * 激活时使用 primaryContainer 底色与实心圆形图标，关闭时退化为 surfaceVariant。
- */
-@Composable
-fun PreferenceStatusHero(
-    icon: ImageVector,
-    title: String,
-    statusText: String,
-    active: Boolean,
-    modifier: Modifier = Modifier,
-    subtitle: String? = null,
-    onClick: (() -> Unit)? = null,
-    trailingContent: (@Composable RowScope.() -> Unit)? = null,
-) {
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = if (active) {
-            MaterialTheme.colorScheme.primaryContainer
-        } else {
-            MaterialTheme.colorScheme.surfaceVariant
-        },
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 4.dp)
-            .then(
-                if (onClick != null) {
-                    Modifier.clickable(role = Role.Button, onClick = onClick)
-                } else {
-                    Modifier
-                },
-            ),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        // 激活=实心 primary，关闭=色调 primaryContainer。
-                        color = if (active) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.primaryContainer
-                        },
-                        shape = CircleShape,
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (active) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(24.dp),
-                    )
-                } else {
-                    GradientGlyph(
-                        icon = icon,
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primary,
-                            MaterialTheme.colorScheme.inversePrimary,
-                        ),
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-            }
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 16.dp, end = if (trailingContent == null) 0.dp else 12.dp),
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = statusText,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (active) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    modifier = Modifier.padding(top = 2.dp),
-                )
-                if (!subtitle.isNullOrBlank()) {
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 2.dp),
-                    )
-                }
-            }
-            trailingContent?.invoke(this)
-        }
-    }
-}
-
-/** 横幅语义：Info 为中性提示，Error 为需要用户处理的阻断或失败。 */
-enum class PreferenceBannerTone { Info, Error }
-
-/**
- * 以渐变填充绘制的矢量图标。
- * 魅族等 ROM 的深色滤镜会把单色矢量图标一律压黑（文字与同色控件不受影响），
- * 多色渐变填充可规避该后处理；双色取 primary -> inversePrimary，视觉上仍是一个色系。
- */
 @Composable
 private fun GradientGlyph(
     icon: ImageVector,
@@ -299,6 +184,8 @@ private fun GradientGlyph(
 /**
  * 带图标的状态横幅，替代裸色文字提示，使信息与错误在设置页中有一致的容器语言。
  */
+enum class PreferenceBannerTone { Info, Error }
+
 @Composable
 fun PreferenceBanner(
     text: String,

@@ -36,7 +36,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
-import github.ponyhuang.gimi.ui.common.PickerSingleChoiceDialog
+import github.ponyhuang.gimi.ui.components.PickerSingleChoiceDialog
 import github.ponyhuang.gimi.ui.settings.llmmodel.LLMModelServiceIcon
 
 /**

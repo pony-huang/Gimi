@@ -1,4 +1,4 @@
-package github.ponyhuang.gimi.ui.common
+package github.ponyhuang.gimi.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues

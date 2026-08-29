@@ -1,8 +1,5 @@
 package github.ponyhuang.gimi.ui.theme
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
@@ -17,8 +14,8 @@ import androidx.compose.ui.graphics.Color
  *    一眼分辨说话方，无需看对齐方向。
  * 3. **可读性**：暖杏/焦糖的明度经过挑选 —— 不刺眼、不发灰，长时间对话不疲倦。
  *
- * 通过 [LocalUserBubbleColors] 在 [AsssistantaiTheme] 中按 dark/light 模式注入，
- * 调用方用 `UserBubbleTheme.colors.container` / `.onContainer` 取色。
+ * 通过 [LocalUserBubbleColors] 在 [AsssistantaiTheme] 中按 dark/light 模式注入；
+ * 调用方直接读取 [LocalUserBubbleColors.current]，无需中间 wrapper。
  */
 data class UserBubbleColors(
     val container: Color,
@@ -44,11 +41,3 @@ val DarkUserBubbleColors = UserBubbleColors(
  * 这样 Preview / 单测场景不会拿到 `Color.Unspecified` 导致渲染失败。
  */
 val LocalUserBubbleColors = staticCompositionLocalOf { LightUserBubbleColors }
-
-/** 便捷取色入口。 */
-object UserBubbleTheme {
-    val colors: UserBubbleColors
-        @Composable
-        @ReadOnlyComposable
-        get() = LocalUserBubbleColors.current
-}

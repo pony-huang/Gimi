@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.speech.model.TtsVoice
 import github.ponyhuang.gimi.feature.modelsettings.R
-import github.ponyhuang.gimi.ui.common.PickerSingleChoiceDialog
+import github.ponyhuang.gimi.ui.components.PickerSingleChoiceDialog
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle

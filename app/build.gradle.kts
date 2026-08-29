@@ -114,6 +114,7 @@ dependencies {
     implementation(libs.vosk.android)
     implementation(project(":data:conversation"))
     implementation(project(":data:agent"))
+    implementation(project(":data:appearance"))
     implementation(project(":data:mcp"))
     implementation(project(":data:workfiles"))
     implementation(project(":data:permissions"))

@@ -1,17 +1,10 @@
 plugins {
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.compose)
+    id("gimi.android.library")
+    id("gimi.android.compose")
 }
 
 android {
     namespace = "github.ponyhuang.gimi.core.designsystem"
-    compileSdk { version = release(37) }
-    defaultConfig { minSdk = 34 }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-    buildFeatures { compose = true }
 }
 
 dependencies {

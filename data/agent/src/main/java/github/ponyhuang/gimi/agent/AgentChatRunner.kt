@@ -27,6 +27,8 @@ import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
+import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
@@ -49,7 +51,7 @@ import kotlinx.coroutines.sync.withLock
  * - 每个会话仅保存轻量 [SessionBinding]（最近使用的 key + metadata），供
  *   [respondToToolConfirmation] 恢复暂停的调用时复用。
  * - 构造期由 [AgentModule] 通过 Hilt 注入 [sessionService]、[artifactService]、[plugins]
- *   及 [configurationRevision]；不持有 in-memory 默认实现。
+ *   及 [configuration]；不持有 in-memory 默认实现。
  * - [factory] 仅在缓存未命中时按需调用，保证模型/访问模式切换立即生效。当前正在
  *   `runAsync` 中的会话不受影响（[send] 入口处已快照 runner 引用）。
  * - 不对 `Event` 做任何加工；Event → UI 渲染的合并工作由 `ChatViewModel` 的 reducer 完成。
@@ -61,12 +63,18 @@ class AgentChatRunner(
     private val factory: suspend (
         ModelSelection?,
         ToolAccessMode,
+        PluginRuntimeSnapshot<AgentPlugin>,
     ) -> AgentRuntime,
     private val sessionService: SessionService,
     private val artifactService: ArtifactService?,
     private val memoryService: MemoryService ?,
-    private val configurationRevision: () -> Any = { Unit },
-    private val plugins: () -> List<Plugin> = { emptyList() }
+    private val configuration: () -> AgentBuildConfigurationSnapshot = {
+        AgentBuildConfigurationSnapshot(
+            revision = Unit,
+            pluginRuntime = PluginRuntimeSnapshot(0L, emptyList()),
+        )
+    },
+    private val plugins: (PluginRuntimeSnapshot<AgentPlugin>) -> List<Plugin> = { emptyList() },
 ) {
     /**
      * Agent 构建的唯一缓存键。
@@ -113,10 +121,13 @@ class AgentChatRunner(
     private val sessionBindings = LinkedHashMap<String, SessionBinding>(16, 0.75f, true)
     private val runnerMutex = Mutex()
 
-    private fun buildRunner(agent: BaseAgent): InMemoryRunner = InMemoryRunner(
+    private fun buildRunner(
+        agent: BaseAgent,
+        pluginRuntime: PluginRuntimeSnapshot<AgentPlugin>,
+    ): InMemoryRunner = InMemoryRunner(
         app = App(
             appName = APP_NAME,
-            plugins = mutableListOf(LoggingPlugin()) + plugins(),
+            plugins = mutableListOf(LoggingPlugin()) + plugins(pluginRuntime),
             rootAgent = agent,
             resumabilityConfig = ResumabilityConfig(isResumable = true),
             // 对话摘要压缩
@@ -275,12 +286,17 @@ class AgentChatRunner(
         allowConfirmationRequiredTools: Boolean,
         toolConfiguration: ConversationToolConfiguration?,
     ): ActiveTurn {
-        val key = AgentKey(selection, toolAccessMode, configurationRevision())
+        val buildConfiguration = configuration()
+        val key = AgentKey(selection, toolAccessMode, buildConfiguration.revision)
         return runnerMutex.withLock {
-            val runtime = runtimes[key] ?: factory(selection, toolAccessMode).let { agentRuntime ->
+            val runtime = runtimes[key] ?: factory(
+                selection,
+                toolAccessMode,
+                buildConfiguration.pluginRuntime,
+            ).let { agentRuntime ->
                 SharedRuntime(
                     modelRuntime = agentRuntime.modelRuntime,
-                    runner = buildRunner(agentRuntime.agent),
+                    runner = buildRunner(agentRuntime.agent, buildConfiguration.pluginRuntime),
                 ).also { runtimes[key] = it }
             }
             while (runtimes.size > MAX_CACHED_RUNTIMES) {

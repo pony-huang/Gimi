@@ -9,6 +9,8 @@ import github.ponyhuang.gimi.domain.plugin.model.PluginBrowserRequest
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
 import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
+import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
+import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -16,7 +18,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import androidx.core.content.edit
 
@@ -36,12 +37,19 @@ class PluginManager @Inject constructor(
     private val loader: PluginLoader,
     @ApplicationContext private val context: Context,
     private val configStore: PluginConfigStore,
-) : PluginRepository {
+) : PluginRepository, PluginRuntimeProvider<AgentPlugin> {
 
     private val preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private var loaded: List<LoadedPlugin> = loader.load()
     private val disabledIds: MutableSet<String> =
         preferences.getStringSet(DISABLED_IDS_KEY, emptySet()).orEmpty().toMutableSet()
+    private val runtimeState = PluginRuntimeState(
+        initialPlugins = loaded.map { it.plugin },
+        initialDisabledPluginIds = disabledIds,
+        pluginId = AgentPlugin::pluginId,
+    )
+
+    override val runtime: StateFlow<PluginRuntimeSnapshot<AgentPlugin>> = runtimeState.runtime
 
     private val _revision = MutableStateFlow(0L)
     override val revision: StateFlow<Long> = _revision.asStateFlow()
@@ -50,20 +58,17 @@ class PluginManager @Inject constructor(
     override val plugins: StateFlow<List<PluginDescriptor>> = _plugins.asStateFlow()
 
     override fun setEnabled(pluginId: String, enabled: Boolean) {
-        if (loaded.none { it.plugin.pluginId == pluginId }) return
-        val changed = if (enabled) disabledIds.remove(pluginId) else disabledIds.add(pluginId)
+        val changed = runtimeState.setEnabled(pluginId, enabled)
         if (!changed) return
+        disabledIds.clear()
+        disabledIds.addAll(runtimeState.disabledPluginIds())
         preferences.edit { putStringSet(DISABLED_IDS_KEY, disabledIds.toMutableSet()) }
         _plugins.value = descriptors()
-        _revision.update { it + 1 }
+        synchronizeRevision()
     }
 
     /** 当前启用的插件实例，直接可作为 ADK [com.google.adk.kt.plugins.Plugin] 列表注入。 */
-    fun enabledPlugins(): List<AgentPlugin> =
-        loaded.asSequence()
-            .filter { it.plugin.pluginId !in disabledIds }
-            .map { it.plugin }
-            .toList()
+    fun enabledPlugins(): List<AgentPlugin> = runtime.value.enabledPlugins
 
     /** 当前启用插件注入 Agent 的工具。 */
     fun enabledPluginTools(): List<BaseTool> = enabledPlugins().flatMap { it.tools() }
@@ -75,9 +80,10 @@ class PluginManager @Inject constructor(
         val added = loader.refresh()
         if (added.isEmpty()) return@withContext emptyList()
         loaded = loader.load()
+        runtimeState.replacePlugins(loaded.map { it.plugin })
         _plugins.value = descriptors()
         // 递增 revision → Agent 运行时缓存失效，下次消息重建并带上新插件的工具/回调。
-        _revision.update { it + 1 }
+        synchronizeRevision()
         added.map { it.plugin.pluginId }
     }
 
@@ -132,8 +138,14 @@ class PluginManager @Inject constructor(
     override fun configValues(pluginId: String): Map<String, String> = configStore.valuesFor(pluginId)
 
     override fun updateConfig(pluginId: String, values: Map<String, String>) {
+        val previousValues = configStore.valuesFor(pluginId)
         configStore.save(pluginId, values)
-        loaded.firstOrNull { it.plugin.pluginId == pluginId }?.plugin?.configure(values)
+        val plugin = loaded.firstOrNull { it.plugin.pluginId == pluginId }?.plugin
+        plugin?.configure(values)
+        if (plugin != null && previousValues != values) {
+            runtimeState.markConfigurationChanged(pluginId)
+            synchronizeRevision()
+        }
     }
 
     private fun descriptors(): List<PluginDescriptor> = loaded.map { loadedPlugin ->
@@ -144,8 +156,12 @@ class PluginManager @Inject constructor(
             packageName = loadedPlugin.packageName,
             version = plugin.version,
             toolCount = plugin.toolCount,
-            isEnabled = plugin.pluginId !in disabledIds,
+            isEnabled = runtimeState.isEnabled(plugin.pluginId),
         )
+    }
+
+    private fun synchronizeRevision() {
+        _revision.value = runtime.value.revision
     }
 
     private companion object {

@@ -16,6 +16,7 @@ import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.gimi.agent.AdkMcpConnectionTester
 import github.ponyhuang.gimi.agent.AdkMcpSkipReporter
 import github.ponyhuang.gimi.agent.AgentChatRunner
+import github.ponyhuang.gimi.agent.AgentBuildConfigurationSnapshot
 import github.ponyhuang.gimi.agent.AgentFactory
 import github.ponyhuang.gimi.agent.AgentLLMModelFactory
 import github.ponyhuang.gimi.agent.LocalToolCatalog
@@ -28,12 +29,13 @@ import github.ponyhuang.gimi.agent.tools.search.ObjectBoxToolVectorSearch
 import github.ponyhuang.gimi.agent.tools.search.ToolEmbeddingModel
 import github.ponyhuang.gimi.agent.tools.search.ToolVectorEntity
 import github.ponyhuang.gimi.agent.tools.search.ToolVectorSearch
-import github.ponyhuang.gimi.data.plugin.PluginManager
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.mcp.repository.McpConnectionTester
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import github.ponyhuang.gimi.domain.mcp.repository.McpSkipReporter
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
+import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
+import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import github.ponyhuang.gimi.domain.toolauthorization.repository.LocalToolDefinitionSource
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 import io.objectbox.Box
@@ -138,31 +140,36 @@ object AgentModule {
         toolAuthorization: ToolAuthorizationRepository,
         mcpRepository: McpRepository,
         agentLLMModelFactory: AgentLLMModelFactory,
-        pluginManager: PluginManager,
+        pluginRuntimeProvider: PluginRuntimeProvider<AgentPlugin>,
     ): AgentChatRunner = AgentChatRunner(
-        factory = { selection, toolAccessMode ->
+        factory = { selection, toolAccessMode, pluginRuntime ->
             modelServices.awaitReady()
             agentFactory.create(
                 selection = selection,
                 toolAccessMode = toolAccessMode,
+                pluginRuntime = pluginRuntime,
             )
         },
         sessionService = sessionService,
         artifactService = artifactService,
         memoryService = memoryService,
-        configurationRevision = {
-            listOf(
-                toolAuthorization.revision.value,
-                mcpRepository.revision.value,
-                modelServices.configurationRevision.value,
-                pluginManager.revision.value,
+        configuration = {
+            val pluginRuntime = pluginRuntimeProvider.runtime.value
+            AgentBuildConfigurationSnapshot(
+                revision = listOf(
+                    toolAuthorization.revision.value,
+                    mcpRepository.revision.value,
+                    modelServices.configurationRevision.value,
+                    pluginRuntime.revision,
+                ),
+                pluginRuntime = pluginRuntime,
             )
         },
-        plugins = {
+        plugins = { pluginRuntime ->
             buildList<Plugin> {
                 add(ConversationGenerateTitlePlugin(agentLLMModelFactory))
                 add(MemoryPersistencePlugin())
-                addAll(pluginManager.enabledPlugins())
+                addAll(pluginRuntime.enabledPlugins)
             }
         },
     )

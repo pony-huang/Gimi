@@ -4,7 +4,7 @@ import github.ponyhuang.gimi.agent.AgentLLMModelFactory
 import github.ponyhuang.gimi.agent.LocalToolCatalog
 import github.ponyhuang.gimi.agent.McpToolsetRegistry
 import github.ponyhuang.gimi.agent.McpToolsetResolution
-import github.ponyhuang.gimi.data.plugin.PluginManager
+import github.ponyhuang.gimi.agent.FakePluginRuntimeProvider
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -25,7 +25,7 @@ class AgentRecommendationCapabilitySourceTest {
         val source = AgentRecommendationCapabilitySource(
             localTools = mockk<LocalToolCatalog>(relaxed = true),
             toolAuthorization = mockk<ToolAuthorizationRepository>(relaxed = true),
-            plugins = mockk<PluginManager>(relaxed = true),
+            pluginRuntimeProvider = FakePluginRuntimeProvider(),
             mcpRegistry = mcpRegistry,
             officialToolsets = emptySet(),
             modelFactory = modelFactory,

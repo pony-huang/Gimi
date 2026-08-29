@@ -21,9 +21,11 @@ import github.ponyhuang.gimi.agent.tools.search.ToolSearchToolset
 import github.ponyhuang.gimi.agent.tools.search.ToolVectorSearch
 import github.ponyhuang.gimi.agent.tools.system.LocalToolset
 import github.ponyhuang.gimi.agent.tools.system.ToolsetConfirmationResumeTool
-import github.ponyhuang.gimi.data.plugin.PluginManager
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
+import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
+import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -63,7 +65,7 @@ class AgentFactory @Inject constructor(
     private val mcpConfigurationTool: McpConfigurationTool,
     private val mcpAuthorizationTool: McpAuthorizationTool,
     private val mcpManualConfigurationTool: McpManualConfigurationTool,
-    private val pluginManager: PluginManager,
+    private val pluginRuntimeProvider: PluginRuntimeProvider<AgentPlugin>,
 ) {
     /**
      * 按访问模式构建 [AgentRuntime]。
@@ -74,14 +76,15 @@ class AgentFactory @Inject constructor(
     suspend fun create(
         selection: ModelSelection? = null,
         toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
+        pluginRuntime: PluginRuntimeSnapshot<AgentPlugin> = pluginRuntimeProvider.runtime.value,
     ): AgentRuntime {
         val modelConfig = agentLLMModelFactory.selectModelConfig(selection)
         val model = agentLLMModelFactory.createModel(modelConfig)
         val agent = when (toolAccessMode) {
             ToolAccessMode.ALWAYS_AVAILABLE ->
-                createAlwaysAvailableAgent(model)
+                createAlwaysAvailableAgent(model, pluginRuntime)
             ToolAccessMode.ON_DEMAND ->
-                createSearchAgent(model)
+                createSearchAgent(model, pluginRuntime)
         }
         return AgentRuntime(
             agent = agent,
@@ -92,9 +95,11 @@ class AgentFactory @Inject constructor(
     /** 所有启用工具从首个请求起直接声明。 */
     private fun createAlwaysAvailableAgent(
         model: Model,
+        pluginRuntime: PluginRuntimeSnapshot<AgentPlugin>,
     ): BaseAgent =
         baseAgent(
             model = model,
+            pluginRuntime = pluginRuntime,
             toolsets = buildList {
                 add(localToolset)
                 add(conversationMcpToolset)
@@ -112,6 +117,7 @@ class AgentFactory @Inject constructor(
      */
     private suspend fun createSearchAgent(
         model: Model,
+        pluginRuntime: PluginRuntimeSnapshot<AgentPlugin>,
     ): BaseAgent {
         val (officialToolsets, directOfficialToolsets) =
             officialToolsets.partition { it is SearchOfficialToolset }
@@ -128,6 +134,7 @@ class AgentFactory @Inject constructor(
         }
         return baseAgent(
             model = model,
+            pluginRuntime = pluginRuntime,
             toolsets = buildList {
                 addAll(directOfficialToolsets)
                 add(
@@ -144,6 +151,7 @@ class AgentFactory @Inject constructor(
     private fun baseAgent(
         model: Model,
         toolsets: List<Toolset>,
+        pluginRuntime: PluginRuntimeSnapshot<AgentPlugin>,
     ): BaseAgent = LlmAgent(
         name = "Assistant",
         model = model,
@@ -160,13 +168,13 @@ class AgentFactory @Inject constructor(
             add(mcpAuthorizationTool)
             add(mcpManualConfigurationTool)
             // 每次构建 Agent 时读取当前启用的插件工具，使开关/配置在下次请求立即生效。
-            addAll(pluginManager.enabledPluginTools())
+            addAll(pluginRuntime.enabledPlugins.flatMap { plugin -> plugin.tools() })
         },
         toolsets = buildList {
             addAll(toolsets)
             // 插件 Toolset 按请求期上下文动态出工具；与 tools 一样每次构建时读取，
             // 插件启停/重装经 revision 使 Agent 重建后即时生效。
-            addAll(pluginManager.enabledPluginToolsets())
+            addAll(pluginRuntime.enabledPlugins.flatMap { plugin -> plugin.toolSets() })
         },
     )
 }

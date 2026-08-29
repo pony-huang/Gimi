@@ -18,13 +18,15 @@ import github.ponyhuang.gimi.agent.McpToolsetRegistry
 import github.ponyhuang.gimi.agent.ModelConfig
 import github.ponyhuang.gimi.agent.toRuntimeMetadata
 import github.ponyhuang.gimi.agent.tools.official.OfficialToolset
-import github.ponyhuang.gimi.data.plugin.PluginManager
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationGenerationInput
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationSnapshot
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationGenerator
+import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
+import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
 import github.ponyhuang.gimi.pluginapi.PluginJson
+import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.toList
@@ -156,12 +158,13 @@ private class JsonNativeTool(
 class AgentRecommendationGenerator @Inject constructor(
     private val modelFactory: AgentLLMModelFactory,
     private val localToolCatalog: LocalToolCatalog,
-    private val pluginManager: PluginManager,
+    private val pluginRuntimeProvider: PluginRuntimeProvider<AgentPlugin>,
     private val mcpToolsetRegistry: McpToolsetRegistry,
     private val officialToolsets: Set<@JvmSuppressWildcards OfficialToolset>,
 ) : RecommendationGenerator {
     override suspend fun generate(input: RecommendationGenerationInput): List<AgentRecommendation> {
         val resolvedInput = input.copy(systemInstruction = AgentPrompts.defaultAssistantInstruction())
+        val pluginRuntime = pluginRuntimeProvider.runtime.value
         val config = modelFactory.selectFastModelConfig() ?: modelFactory.selectModelConfig(null)
         val model = modelFactory.createModel(config)
         val request = LlmRequest(
@@ -190,7 +193,7 @@ class AgentRecommendationGenerator @Inject constructor(
                         ),
                     ),
                 ),
-            ).appendTools(allRecommendationTools(config))
+            ).appendTools(allRecommendationTools(config, pluginRuntime))
         val responses = model.generateContent(request).toList()
         responses.firstOrNull { !it.errorMessage.isNullOrBlank() }?.errorMessage?.let { message ->
             error("Recommendation model request failed: $message")
@@ -211,11 +214,14 @@ class AgentRecommendationGenerator @Inject constructor(
         return RecommendationOutputParser.parse(raw)
     }
 
-    private suspend fun allRecommendationTools(config: ModelConfig): List<BaseTool> =
+    private suspend fun allRecommendationTools(
+        config: ModelConfig,
+        pluginRuntime: PluginRuntimeSnapshot<AgentPlugin>,
+    ): List<BaseTool> =
         buildList {
             addAll(localToolCatalog.tools())
-            addAll(pluginManager.enabledPluginTools())
-            pluginManager.enabledPluginToolsets().forEach { toolset ->
+            addAll(pluginRuntime.enabledPlugins.flatMap { plugin -> plugin.tools() })
+            pluginRuntime.enabledPlugins.flatMap { plugin -> plugin.toolSets() }.forEach { toolset ->
                 runCatching { addAll(toolset.getTools(null)) }
             }
             runCatching {

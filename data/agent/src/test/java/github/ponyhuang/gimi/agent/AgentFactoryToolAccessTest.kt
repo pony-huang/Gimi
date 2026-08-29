@@ -19,10 +19,10 @@ import github.ponyhuang.gimi.agent.tools.mcp.McpManualConfigurationTool
 import github.ponyhuang.gimi.agent.tools.official.SearchOfficialToolset
 import github.ponyhuang.gimi.agent.tools.official.OfficialToolset
 import github.ponyhuang.gimi.agent.tools.system.LocalToolset
-import github.ponyhuang.gimi.data.plugin.PluginManager
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -200,9 +200,8 @@ class AgentFactoryToolAccessTest {
         val modelFactory = mockk<AgentLLMModelFactory>()
         every { modelFactory.selectModelConfig(any()) } returns modelConfig()
         every { modelFactory.createModel(any()) } returns mockk<Model>(relaxed = true)
-        val pluginManager = mockk<PluginManager>(relaxed = true) {
-            every { enabledPluginToolsets() } returns pluginToolsets
-        }
+        val plugin = FakeAgentPlugin("test", pluginToolsets = pluginToolsets)
+        val pluginRuntimeProvider = FakePluginRuntimeProvider(plugins = listOf(plugin))
         return AgentFactory(
             localToolCatalog = localToolCatalog,
             localToolset = localToolset,
@@ -215,7 +214,7 @@ class AgentFactoryToolAccessTest {
             mcpConfigurationTool = mcpConfigurationTool,
             mcpAuthorizationTool = mcpAuthorizationTool,
             mcpManualConfigurationTool = mcpManualConfigurationTool,
-            pluginManager = pluginManager,
+            pluginRuntimeProvider = pluginRuntimeProvider,
         )
     }
 

@@ -8,6 +8,8 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import android.util.Log
 import com.google.adk.kt.memory.InMemoryMemoryService
+import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
+import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -15,6 +17,7 @@ import io.mockk.unmockkStatic
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Before
 import org.junit.Test
 
@@ -44,7 +47,7 @@ class AgentChatRunnerCacheTest {
     fun sessionsWithSameConfigurationShareOneRuntimeAndConfirmationReusesIt() = runTest {
         val createdSelections = mutableListOf<ModelSelection?>()
         val runner = AgentChatRunner(
-            factory = { selection, _ ->
+            factory = { selection, _, _ ->
                 createdSelections += selection
                 runtime(selection)
             },
@@ -75,14 +78,19 @@ class AgentChatRunnerCacheTest {
         var revision = 0
         var creations = 0
         val runner = AgentChatRunner(
-            factory = { selection, _ ->
+            factory = { selection, _, _ ->
                 creations += 1
                 runtime(selection)
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
             memoryService = InMemoryMemoryService(),
-            configurationRevision = { revision },
+            configuration = {
+                AgentBuildConfigurationSnapshot(
+                    revision = revision,
+                    pluginRuntime = PluginRuntimeSnapshot(0L, emptyList()),
+                )
+            },
         )
         val first = ModelSelection("service", "group", "first")
         val second = ModelSelection("service", "group", "second")
@@ -99,10 +107,43 @@ class AgentChatRunnerCacheTest {
     }
 
     @Test
+    fun onePluginSnapshotIsSharedByRuntimeFactoryAndAdkPlugins() = runTest {
+        val plugin = FakeAgentPlugin("shared")
+        val snapshot: PluginRuntimeSnapshot<AgentPlugin> =
+            PluginRuntimeSnapshot(7L, listOf(plugin))
+        var factorySnapshot: PluginRuntimeSnapshot<*>? = null
+        var pluginSnapshot: PluginRuntimeSnapshot<*>? = null
+        val runner = AgentChatRunner(
+            factory = { selection, _, runtimeSnapshot ->
+                factorySnapshot = runtimeSnapshot
+                runtime(selection)
+            },
+            sessionService = mockk<SessionService>(relaxed = true),
+            artifactService = null,
+            memoryService = InMemoryMemoryService(),
+            configuration = {
+                AgentBuildConfigurationSnapshot(
+                    revision = listOf(7L),
+                    pluginRuntime = snapshot,
+                )
+            },
+            plugins = { runtimeSnapshot ->
+                pluginSnapshot = runtimeSnapshot
+                emptyList()
+            },
+        )
+
+        runner.send("user", "session", ModelSelection("service", "group", "model"), "message")
+
+        assertSame(snapshot, factorySnapshot)
+        assertSame(snapshot, pluginSnapshot)
+    }
+
+    @Test
     fun runtimeCacheEvictsLeastRecentlyUsedConfiguration() = runTest {
         var creations = 0
         val runner = AgentChatRunner(
-            factory = { selection, _ ->
+            factory = { selection, _, _ ->
                 creations += 1
                 runtime(selection)
             },
@@ -125,7 +166,7 @@ class AgentChatRunnerCacheTest {
     fun conversationToolSelectionChangeDoesNotRebuildRuntime() = runTest {
         var creations = 0
         val runner = AgentChatRunner(
-            factory = { selection, _ ->
+            factory = { selection, _, _ ->
                 creations += 1
                 runtime(selection)
             },
@@ -151,7 +192,7 @@ class AgentChatRunnerCacheTest {
     fun toolAccessModeChangeCreatesNewSharedRuntime() = runTest {
         var creations = 0
         val runner = AgentChatRunner(
-            factory = { selection, _ ->
+            factory = { selection, _, _ ->
                 creations += 1
                 runtime(selection)
             },
@@ -187,7 +228,7 @@ class AgentChatRunnerCacheTest {
     fun confirmationToolsToggleDoesNotRebuildRuntime() = runTest {
         var creations = 0
         val runner = AgentChatRunner(
-            factory = { selection, _ ->
+            factory = { selection, _, _ ->
                 creations += 1
                 runtime(selection)
             },

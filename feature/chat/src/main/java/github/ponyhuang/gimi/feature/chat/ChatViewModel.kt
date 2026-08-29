@@ -11,6 +11,7 @@ import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
+import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
@@ -76,6 +77,7 @@ class ChatViewModel @Inject constructor(
     private val repository: ConversationRepository,
     private val modelServices: ModelCatalogRepository,
     private val chatDisplayPreferences: ChatDisplayRepository,
+    private val appearanceRepository: AppearanceRepository,
     private val toolApproval: ToolApprovalRepository,
     private val toolAuthorization: ToolAuthorizationRepository,
     private val mcpRepository: McpRepository,
@@ -128,7 +130,7 @@ class ChatViewModel @Inject constructor(
             is ChatAction.LoadOfficialToolFunctions -> loadOfficialToolFunctions(action.toolId)
             ChatAction.ClearToolConfigurationError -> clearToolConfigurationError()
             is ChatAction.SetDarkTheme ->
-                chatDisplayPreferences.setDarkThemeOverride(action.enabled)
+                appearanceRepository.setDarkThemeOverride(action.enabled)
         }
     }
 
@@ -233,7 +235,7 @@ class ChatViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            chatDisplayPreferences.darkThemeOverride.collect { override ->
+            appearanceRepository.darkThemeOverride.collect { override ->
                 _uiState.update { it.copy(darkThemeOverride = override) }
             }
         }

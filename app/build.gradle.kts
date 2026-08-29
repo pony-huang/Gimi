@@ -96,6 +96,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":domain:appearance"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:speech"))
     implementation(project(":core:audio"))

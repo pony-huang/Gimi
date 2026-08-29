@@ -27,6 +27,7 @@ dependencies {
     implementation(project(":core:audio"))
     implementation(project(":core:common"))
     implementation(project(":core:designsystem"))
+    implementation(project(":domain:appearance"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:modelcatalog"))
     implementation(project(":domain:mcp"))

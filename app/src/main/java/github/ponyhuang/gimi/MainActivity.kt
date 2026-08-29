@@ -12,7 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import github.ponyhuang.gimi.app.navigation.MainScreen
-import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
+import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.feature.chat.sharedImageUris
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.data.voicewake.BluetoothVoiceController
@@ -21,7 +21,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @Inject
-    lateinit var chatDisplayRepository: ChatDisplayRepository
+    lateinit var appearanceRepository: AppearanceRepository
 
     private val requestedVoiceSessionId = mutableStateOf<String?>(null)
     private val sharedMediaUris = mutableStateOf<List<Uri>>(emptyList())
@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             // 用户未显式切换时（null）跟随系统深色模式，切换后锁定为所选模式。
-            val darkThemeOverride by chatDisplayRepository.darkThemeOverride
+            val darkThemeOverride by appearanceRepository.darkThemeOverride
                 .collectAsStateWithLifecycle()
             AsssistantaiTheme(darkTheme = darkThemeOverride ?: isSystemInDarkTheme()) {
                 MainScreen(

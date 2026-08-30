@@ -58,6 +58,10 @@ android {
         baseline = file("lint-baseline.xml")
     }
     packaging {
+        jniLibs {
+            // tasks-text 1.0.0 同时打包 TextGenAI；工具搜索仅使用 TextEmbedder。
+            excludes += "**/libmediapipe_tasks_textgenai_jni.so"
+        }
         resources {
             excludes += setOf(
                 "META-INF/INDEX.LIST",

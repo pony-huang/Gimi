@@ -23,7 +23,7 @@ import github.ponyhuang.gimi.data.agent.LocalToolCatalog
 import github.ponyhuang.gimi.data.agent.conversation.AdkChatAgentRepository
 import github.ponyhuang.gimi.data.agent.plugins.ConversationGenerateTitlePlugin
 import github.ponyhuang.gimi.data.agent.plugins.MemoryPersistencePlugin
-import github.ponyhuang.gimi.data.agent.tools.search.MiniLmToolEmbeddingModel
+import github.ponyhuang.gimi.data.agent.tools.search.MediaPipeToolEmbeddingModel
 import github.ponyhuang.gimi.data.agent.tools.search.MyObjectBox
 import github.ponyhuang.gimi.data.agent.tools.search.ObjectBoxToolVectorSearch
 import github.ponyhuang.gimi.data.agent.tools.search.ToolEmbeddingModel
@@ -61,6 +61,8 @@ import javax.inject.Singleton
 object AgentModule {
 
     private const val TAG: String = "AgentModule"
+    private const val LEGACY_TOOL_VECTOR_STORE_NAME: String = "tool-vector-search"
+    private const val TOOL_VECTOR_STORE_NAME: String = "tool-vector-search-use-v1"
 
     @Provides
     @Singleton
@@ -83,7 +85,7 @@ object AgentModule {
     @Provides
     @Singleton
     fun provideToolEmbeddingModel(
-        implementation: MiniLmToolEmbeddingModel,
+        implementation: MediaPipeToolEmbeddingModel,
     ): ToolEmbeddingModel = implementation
 
     @Provides
@@ -96,10 +98,14 @@ object AgentModule {
     @Singleton
     fun provideToolVectorBoxStore(
         @ApplicationContext context: Context,
-    ): BoxStore = MyObjectBox.builder()
-        .androidContext(context)
-        .name("tool-vector-search")
-        .build()
+    ): BoxStore {
+        // 工具向量是可重建缓存；模型维度变化时直接清理旧库，避免兼容无效索引。
+        BoxStore.deleteAllFiles(context, LEGACY_TOOL_VECTOR_STORE_NAME)
+        return MyObjectBox.builder()
+            .androidContext(context)
+            .name(TOOL_VECTOR_STORE_NAME)
+            .build()
+    }
 
     @Provides
     @Singleton

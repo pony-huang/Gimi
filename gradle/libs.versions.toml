@@ -25,7 +25,7 @@ okhttp = "4.12.0"
 objectbox = "6.0.0-beta"
 multiplatformMarkdownRenderer = "0.43.0"
 room = "2.8.4"
-sentenceEmbeddings = "0.0.6"
+mediaPipeTasks = "1.0.0"
 voskAndroid = "0.3.75"
 javaxInject = "1"
 androidxAnnotation = "1.9.1"
@@ -89,7 +89,7 @@ objectbox-linux = { module = "io.objectbox:objectbox-linux", version.ref = "obje
 objectbox-macos = { module = "io.objectbox:objectbox-macos", version.ref = "objectbox" }
 objectbox-processor = { module = "io.objectbox:objectbox-processor", version.ref = "objectbox" }
 objectbox-windows = { module = "io.objectbox:objectbox-windows", version.ref = "objectbox" }
-sentence-embeddings = { module = "io.gitlab.shubham0204:sentence-embeddings", version.ref = "sentenceEmbeddings" }
+mediapipe-tasks-text = { module = "com.google.mediapipe:tasks-text", version.ref = "mediaPipeTasks" }
 multiplatform-markdown-renderer-m3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-m3", version.ref = "multiplatformMarkdownRenderer" }
 multiplatform-markdown-renderer-coil3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-coil3", version.ref = "multiplatformMarkdownRenderer" }
 mcp-kotlin-client = { module = "io.modelcontextprotocol:kotlin-sdk-client", version.ref = "mcpKotlin" }

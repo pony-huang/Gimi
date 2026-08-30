@@ -75,7 +75,10 @@ fun MainScreen(
             rememberViewModelStoreNavEntryDecorator(),
         ),
         entryProvider = { destination ->
-            NavEntry(destination) {
+            NavEntry(
+                key = destination,
+                contentKey = destination.navigationContentKey(),
+            ) {
                 val handled = ChatEntryProvider(
                     destination = destination,
                     callbacks = ChatNavigationCallbacks(
@@ -147,4 +150,9 @@ fun MainScreen(
                 slideOutHorizontally(targetOffsetX = { it })
         },
     )
+}
+
+private fun NavKey.navigationContentKey(): String {
+    // Navigation 3 默认使用 toString()；跨 feature 的多个 Settings data object 会因此共享 Scene key。
+    return "${this::class.qualifiedName}:$this"
 }

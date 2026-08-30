@@ -54,4 +54,22 @@ class AppNavigationOwnershipTest {
             content.contains("EntryProvider"),
         )
     }
+
+    @Test
+    fun appNavigationDistinguishesSameNamedFeatureDestinationsForTransitions() {
+        val navigation = File(
+            "src/main/java/github/ponyhuang/gimi/app/navigation/AppNavigation.kt",
+        )
+
+        assertTrue("AppNavigation.kt should exist", navigation.isFile)
+        val content = navigation.readText()
+        assertTrue(
+            "NavEntry needs an explicit content key because multiple feature destinations stringify to Settings",
+            content.contains("contentKey = destination.navigationContentKey()"),
+        )
+        assertTrue(
+            "The navigation content key must include the destination type to avoid cross-feature collisions",
+            content.contains("this::class.qualifiedName"),
+        )
+    }
 }

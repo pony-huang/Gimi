@@ -1415,11 +1415,21 @@ class ChatViewModel @Inject constructor(
         }
         if (mergeIndex >= 0) {
             // 流式收尾:就地翻 partial 标志位,保留原 Message.id / TextPart.id / channel 订阅。
+            // 完整事件携带的 functionCalls / functionResponses（SSE 下调用经 partial 增量合入,
+            // 工具结果只随完整事件到达）不能像文本那样丢弃——本地文件轮播、远程图片轮播
+            // 都渲染在 functionResponses 上,丢了响应事件 = 找到文件也不出图。按 (id, name)
+            // 去重并入,避免 partial 阶段已合入的调用被重复追加。
             runtime.messages = runtime.messages.toMutableList().also {
                 val old = it[mergeIndex]
                 it[mergeIndex] = old.copy(
                     partial = false,
                     turnComplete = message.turnComplete,
+                    functionCalls = old.functionCalls + message.functionCalls.filter { call ->
+                        old.functionCalls.none { it.id == call.id && it.name == call.name }
+                    },
+                    functionResponses = old.functionResponses + message.functionResponses.filter { response ->
+                        old.functionResponses.none { it.id == response.id && it.name == response.name }
+                    },
                 )
             }
         } else {

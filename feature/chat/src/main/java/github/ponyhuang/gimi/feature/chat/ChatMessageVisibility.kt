@@ -53,17 +53,49 @@ internal fun List<Message>.foldToolResponses(): List<Message> {
     for (message in this) {
         val target = result.lastOrNull()
         if (message.isFunctionResponseOnly() && target != null && target.role == MessageRole.Assistant) {
-            val seen = target.functionResponses.mapTo(HashSet()) { it.id to it.name }
-            val fresh = message.functionResponses.filter { seen.add(it.id to it.name) }
-            result[result.lastIndex] = target.copy(
-                functionResponses = target.functionResponses + fresh,
-            )
+            var merged: Message = target
+            val seen = merged.functionResponses.mapTo(HashSet()) { it.id to it.name }
+            val fresh = mutableListOf<FunctionResponseView>()
+            message.functionResponses.forEach { response ->
+                val key = response.id to response.name
+                if (seen.add(key)) {
+                    fresh += response
+                } else if (hasStructuredResult(response)) {
+                    // 确认流程下占位响应（confirmation-required 的 error 占位）与真实结果
+                    // 共用同一 call id；占位先到会被上面的去重保留。真实结构化结果
+                    // （本地文件轮播/远程图片轮播的数据源）到达时必须反向替换占位，
+                    // 否则用户只看得到 ✓ chip，永远等不到图片。
+                    val responses = merged.functionResponses.toMutableList()
+                    val index = responses.indexOfFirst {
+                        (it.id to it.name) == key && !hasStructuredResult(it)
+                    }
+                    if (index >= 0) {
+                        responses[index] = response
+                        merged = merged.copy(functionResponses = responses)
+                    } else {
+                        // 占位与真实结果落在同一条消息里时，占位还停在 fresh 中未并入。
+                        val freshIndex = fresh.indexOfFirst {
+                            (it.id to it.name) == key && !hasStructuredResult(it)
+                        }
+                        if (freshIndex >= 0) fresh[freshIndex] = response else fresh += response
+                    }
+                }
+            }
+            if (fresh.isNotEmpty()) {
+                merged = merged.copy(functionResponses = merged.functionResponses + fresh)
+            }
+            result[result.lastIndex] = merged
         } else {
             result += message
         }
     }
     return result
 }
+
+/** 该响应是否携带可渲染的结构化内容（本地文件列表或远程图片列表）。 */
+private fun hasStructuredResult(response: FunctionResponseView): Boolean =
+    response.localFileSearchResult?.files?.isNotEmpty() == true ||
+        response.remoteImageResult?.images?.isNotEmpty() == true
 
 /** 除工具响应外没有任何可渲染内容（折叠候选）。 */
 private fun Message.isFunctionResponseOnly(): Boolean =

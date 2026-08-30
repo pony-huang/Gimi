@@ -149,6 +149,73 @@ class ChatMessageVisibilityTest {
     }
 
     @Test
+    fun confirmationPlaceholderResponseIsReplacedByRealLocalFileResult() {
+        // 确认流程下占位响应与真实结果共用同一 call id；占位先到后，真实文件结果必须替换它，
+        // 否则本地文件轮播永远不渲染（真机复现的"搜到文件却不出图"根因）。
+        val call = assistantMessage(
+            functionCalls = listOf(FunctionCallView("c1", "search_media_files", "(query=\"screen\")")),
+        )
+        val placeholder = assistantMessage(
+            functionResponses = listOf(FunctionResponseView("c1", "search_media_files")),
+        )
+        val realResult = assistantMessage(
+            functionResponses = listOf(
+                FunctionResponseView(
+                    id = "c1",
+                    name = "search_media_files",
+                    localFileSearchResult = LocalFileSearchResult(
+                        query = "screen",
+                        files = listOf(
+                            LocalFileReference(
+                                displayName = "screen.png",
+                                mimeType = "image/png",
+                                sizeBytes = 1L,
+                                modifiedTimeMillis = 2L,
+                                category = "image",
+                                contentUri = "content://media/screen",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val folded = listOf(call, placeholder, realResult).foldToolResponses()
+
+        assertEquals(1, folded.size)
+        val responses = folded[0].functionResponses
+        assertEquals(1, responses.size)
+        assertEquals("screen.png", responses.single().localFileSearchResult?.files?.single()?.displayName)
+    }
+
+    @Test
+    fun realResultKeepsPlaceholderDroppedEvenWhenArrivingInSameMessage() {
+        // 占位与真实结果落在同一条响应消息里（合并事件场景）时同样只保留真实结果。
+        val call = assistantMessage(
+            functionCalls = listOf(FunctionCallView("c1", "search_media_files", "()")),
+        )
+        val combined = assistantMessage(
+            functionResponses = listOf(
+                FunctionResponseView("c1", "search_media_files"),
+                FunctionResponseView(
+                    id = "c1",
+                    name = "search_media_files",
+                    remoteImageResult = RemoteImageResult(
+                        images = listOf(RemoteImageReference("https://example.com/a.png")),
+                    ),
+                ),
+            ),
+        )
+
+        val folded = listOf(call, combined).foldToolResponses()
+
+        assertEquals(1, folded.size)
+        val responses = folded[0].functionResponses
+        assertEquals(1, responses.size)
+        assertEquals("https://example.com/a.png", responses.single().remoteImageResult?.images?.single()?.url)
+    }
+
+    @Test
     fun keepsResponseOnlyMessageWhenPreviousMessageIsNotAssistant() {
         val userMessage = Message(
             author = "user",
@@ -175,6 +242,42 @@ class ChatMessageVisibilityTest {
         val folded = listOf(first, second).foldToolResponses()
 
         assertEquals(2, folded.size)
+    }
+
+    @Test
+    fun findLocalFileSearchResultPrefersNonEmptyFilesOverPlaceholder() {
+        // “查看全部”页按 responseId 回查结果：占位响应与真实结果同 id，必须优先取非空列表。
+        val placeholder = assistantMessage(
+            functionResponses = listOf(
+                FunctionResponseView("c1", "search_media_files", localFileSearchResult = LocalFileSearchResult(query = "screen", files = emptyList())),
+            ),
+        )
+        val realResult = assistantMessage(
+            functionResponses = listOf(
+                FunctionResponseView(
+                    id = "c1",
+                    name = "search_media_files",
+                    localFileSearchResult = LocalFileSearchResult(
+                        query = "screen",
+                        files = listOf(
+                            LocalFileReference(
+                                displayName = "screen.png",
+                                mimeType = "image/png",
+                                sizeBytes = 1L,
+                                modifiedTimeMillis = 2L,
+                                category = "image",
+                                contentUri = "content://media/screen",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val found = findLocalFileSearchResult(listOf(placeholder, realResult), "c1")
+        assertEquals("screen.png", found?.files?.single()?.displayName)
+        // 只有占位时也不能崩，返回空列表结果。
+        assertEquals(0, findLocalFileSearchResult(listOf(placeholder), "c1")?.files?.size)
     }
 
     private fun assistantMessage(

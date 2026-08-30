@@ -7,7 +7,10 @@ import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunPart
 import github.ponyhuang.gimi.domain.conversation.model.ChatFunctionCall
+import github.ponyhuang.gimi.domain.conversation.model.ChatFunctionResponse
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.gimi.domain.conversation.model.LocalFileReference
+import github.ponyhuang.gimi.domain.conversation.model.LocalFileSearchResult
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.ToolConfirmationRequest
@@ -96,6 +99,68 @@ class ChatViewModelCharacterizationTest {
         assertFalse(state.messages[1].partial)
         assertFalse(state.isAgentRunning)
         coVerify { fixture.conversations.refreshConversation("session-1") }
+    }
+
+    @Test
+    fun completeEventFunctionResponsesMergeIntoStreamingMessage() = runTest {
+        // 复刻真机丢失轮播的时序：SSE 下工具调用经 partial 增量合入仍在流式中的消息，
+        // 工具结果只随随后的完整事件（partial=false）到达。收尾合并不得丢弃该响应，
+        // 否则 MessageBubble 的本地文件轮播/远程图片轮播永远没有数据。
+        val streamedCall = ChatFunctionCall(id = "call-1", name = "search_media_files", args = emptyMap())
+        val response = ChatFunctionResponse(
+            id = "call-1",
+            name = "search_media_files",
+            localFileSearchResult = LocalFileSearchResult(
+                query = "screen",
+                files = listOf(
+                    LocalFileReference(
+                        displayName = "screen.png",
+                        mimeType = "image/png",
+                        sizeBytes = 1L,
+                        modifiedTimeMillis = 2L,
+                        category = "image",
+                        contentUri = "content://media/screen",
+                    ),
+                ),
+            ),
+        )
+        val events = listOf(
+            event(text = "正在搜索", partial = true).copy(
+                functionCalls = listOf(streamedCall),
+            ),
+            event(text = "", partial = false).copy(
+                functionResponses = listOf(response),
+            ),
+        )
+        val fixture = fixture(configured = true, events = events)
+
+        fixture.viewModel.onAction(ChatAction.Send("你好"))
+        advanceUntilIdle()
+
+        val assistant = fixture.viewModel.uiState.value.messages.last { it.role == MessageRole.Assistant }
+        assertEquals("screen.png", assistant.functionResponses.single().localFileSearchResult?.files?.single()?.displayName)
+        assertEquals("search_media_files", assistant.functionCalls.single().name)
+    }
+
+    @Test
+    fun completeEventDoesNotDuplicateCallsAlreadyStreamedIntoPartialMessage() = runTest {
+        // 完整事件可能重复携带 partial 阶段已合入的调用（SSE 聚合结果），按 (id, name) 去重。
+        val streamedCall = ChatFunctionCall(id = "call-1", name = "search_media_files", args = emptyMap())
+        val events = listOf(
+            event(text = "正在搜索", partial = true).copy(
+                functionCalls = listOf(streamedCall),
+            ),
+            event(text = "", partial = false).copy(
+                functionCalls = listOf(streamedCall),
+            ),
+        )
+        val fixture = fixture(configured = true, events = events)
+
+        fixture.viewModel.onAction(ChatAction.Send("你好"))
+        advanceUntilIdle()
+
+        val assistant = fixture.viewModel.uiState.value.messages.last { it.role == MessageRole.Assistant }
+        assertEquals(1, assistant.functionCalls.size)
     }
 
     @Test

@@ -1,5 +1,10 @@
 package github.ponyhuang.gimi.feature.recommendation
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -58,7 +63,7 @@ fun RecommendationSettingsScreen(
                         icon = Icons.Default.AutoAwesome,
                         title = stringResource(R.string.recommendation_enabled_title),
                         subtitle = stringResource(R.string.recommendation_enabled_subtitle),
-                        showDivider = true,
+                        showDivider = state.enabled,
                         trailingContent = {
                             Switch(
                                 checked = state.enabled,
@@ -68,35 +73,51 @@ fun RecommendationSettingsScreen(
                             )
                         },
                     )
-                    PreferenceListItem(
-                        icon = Icons.Default.Schedule,
-                        title = stringResource(R.string.recommendation_interval_title),
-                        subtitle = stringResource(R.string.recommendation_interval_value, state.intervalHours),
-                        showDivider = true,
-                        onClick = if (state.enabled) ({ showIntervalDialog = true }) else null,
-                    )
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    // 更新相关配置仅在推荐开启后展开，关闭时整块隐藏。
+                    AnimatedVisibility(
+                        visible = state.enabled,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut(),
                     ) {
-                        Text(
-                            text = recommendationStatusText(state),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = state.lastError?.let { MaterialTheme.colorScheme.error }
-                                ?: MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Button(
-                            onClick = { onAction(RecommendationSettingsAction.RefreshNow) },
-                            enabled = state.enabled && state.refreshStatus == RecommendationRefreshStatus.Idle,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            androidx.compose.material3.Icon(Icons.Default.Refresh, contentDescription = null)
-                            Text(
-                                text = stringResource(R.string.recommendation_refresh_now),
-                                modifier = Modifier.padding(start = 8.dp),
+                        Column {
+                            PreferenceListItem(
+                                icon = Icons.Default.Schedule,
+                                title = stringResource(R.string.recommendation_interval_title),
+                                subtitle = stringResource(
+                                    R.string.recommendation_interval_value,
+                                    state.intervalHours,
+                                ),
+                                showDivider = true,
+                                onClick = { showIntervalDialog = true },
                             )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Text(
+                                    text = recommendationStatusText(state),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = state.lastError?.let { MaterialTheme.colorScheme.error }
+                                        ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Button(
+                                    onClick = { onAction(RecommendationSettingsAction.RefreshNow) },
+                                    enabled = state.enabled &&
+                                        state.refreshStatus == RecommendationRefreshStatus.Idle,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    androidx.compose.material3.Icon(
+                                        Icons.Default.Refresh,
+                                        contentDescription = null,
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.recommendation_refresh_now),
+                                        modifier = Modifier.padding(start = 8.dp),
+                                    )
+                                }
+                            }
                         }
                     }
                 }

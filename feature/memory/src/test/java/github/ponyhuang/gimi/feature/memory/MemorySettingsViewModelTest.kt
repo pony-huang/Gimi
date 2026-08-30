@@ -21,14 +21,53 @@ class MemorySettingsViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     @Test
-    fun `enabling without stored or entered token shows validation error`() = runTest {
-        val viewModel = MemorySettingsViewModel(FakeMemorySettingsRepository())
+    fun `enabling without token keeps draft on and shows validation error`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val repository = FakeMemorySettingsRepository()
+            val viewModel = MemorySettingsViewModel(repository)
+            // 先排空 repository 初始配置的收集，模拟真实 App 中收集器早于用户操作启动。
+            advanceUntilIdle()
+
+            viewModel.onAction(MemorySettingsAction.SetMem0Enabled(true))
+            advanceUntilIdle()
+
+            // 开关乐观置位以便展开 Token 配置区，但校验失败不落库。
+            assertTrue(viewModel.uiState.value.mem0Enabled)
+            assertTrue(viewModel.uiState.value.tokenError)
+            assertEquals(MemoryConfiguration(), repository.configuration.value)
+        }
+
+    @Test
+    fun `enabling with stored token persists immediately`() = runTest(mainDispatcherRule.dispatcher) {
+        val repository = FakeMemorySettingsRepository(MemoryConfiguration(apiKey = "token"))
+        val viewModel = MemorySettingsViewModel(repository)
 
         viewModel.onAction(MemorySettingsAction.SetMem0Enabled(true))
+        advanceUntilIdle()
 
-        assertFalse(viewModel.uiState.value.mem0Enabled)
-        assertTrue(viewModel.uiState.value.tokenError)
+        assertEquals(
+            MemoryConfiguration(mem0Enabled = true, apiKey = "token"),
+            repository.configuration.value,
+        )
+        assertFalse(viewModel.uiState.value.tokenError)
     }
+
+    @Test
+    fun `master off discards unfinished mem0 draft without token`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val repository = FakeMemorySettingsRepository()
+            val viewModel = MemorySettingsViewModel(repository)
+
+            viewModel.onAction(MemorySettingsAction.SetMem0Enabled(true))
+            viewModel.onAction(MemorySettingsAction.SetMemoryEnabled(false))
+            advanceUntilIdle()
+
+            assertEquals(
+                MemoryConfiguration(memoryEnabled = false, mem0Enabled = false),
+                repository.configuration.value,
+            )
+            assertFalse(viewModel.uiState.value.mem0Enabled)
+        }
 
     @Test
     fun `disabling Mem0 persists immediately`() = runTest(mainDispatcherRule.dispatcher) {

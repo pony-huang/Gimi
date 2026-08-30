@@ -43,19 +43,25 @@ class MemorySettingsViewModel @Inject constructor(
     fun onAction(action: MemorySettingsAction) {
         when (action) {
             is MemorySettingsAction.SetMemoryEnabled -> {
-                mutableUiState.update {
-                    it.copy(memoryEnabled = action.enabled, tokenError = false)
+                mutableUiState.update { state ->
+                    var next = state.copy(memoryEnabled = action.enabled, tokenError = false)
+                    if (!action.enabled && !next.hasStoredToken && next.token.isBlank()) {
+                        // 总开关关闭且 Mem0 只有未配置 Token 的草稿：随动放弃草稿，
+                        // 否则 persist 的 Token 校验会把总开关本身也卡在未保存状态。
+                        next = next.copy(mem0Enabled = false)
+                    }
+                    next
                 }
                 persist()
             }
             is MemorySettingsAction.SetMem0Enabled -> {
-                val state = mutableUiState.value
-                if (action.enabled && !state.hasStoredToken && state.token.isBlank()) {
-                    mutableUiState.update { it.copy(mem0Enabled = false, tokenError = true) }
-                    return
-                }
+                // 开关乐观置位：Token 缺失时保持打开并标红提示，让用户能看见并补填
+                // Token 输入区；真正落库由 persist() 的校验兜底，未保存前重启即回退。
                 mutableUiState.update {
-                    it.copy(mem0Enabled = action.enabled, tokenError = false)
+                    it.copy(
+                        mem0Enabled = action.enabled,
+                        tokenError = action.enabled && !it.hasStoredToken && it.token.isBlank(),
+                    )
                 }
                 persist()
             }

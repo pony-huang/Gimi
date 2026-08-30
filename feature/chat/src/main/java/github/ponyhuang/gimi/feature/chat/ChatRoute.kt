@@ -48,7 +48,8 @@ fun ChatRoute(
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
 ) {
-    val viewModel: ChatViewModel = hiltViewModel()
+    // Activity 作用域：与“查看全部”等子目的地共享同一份会话状态（见 activityScopedChatViewModel）。
+    val viewModel: ChatViewModel = activityScopedChatViewModel()
     val recommendationViewModel: ChatRecommendationsViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val recommendations by recommendationViewModel.recommendations.collectAsStateWithLifecycle()

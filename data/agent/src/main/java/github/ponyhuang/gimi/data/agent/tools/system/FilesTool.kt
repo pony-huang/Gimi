@@ -28,18 +28,26 @@ class FilesTool @Inject constructor(
 ) {
     // ---------- 文件选择 ----------
 
-    @Tool(name = "get_file", description = "Opens a file picker so the user can choose a file of the requested type.", requireConfirmation = true)
-    fun getFile(@Param("A file type such as image or pdf.") mimeType: String): Map<String, Any> =
+    @Tool(
+        name = "get_file",
+        description = "Opens a file picker so the user can choose a file of the requested type, then returns the chosen file's content URI in the 'data' field. Returns cancelled=true when the user aborts the picker.",
+        requireConfirmation = true,
+    )
+    suspend fun getFile(@Param("A file type such as image or pdf.") mimeType: String): Map<String, Any> =
         pick(Intent.ACTION_GET_CONTENT, "Choose file", mimeType)
 
-    @Tool(name = "open_file", description = "Opens the system document picker so the user can select a persistent file of the requested type.", requireConfirmation = true)
-    fun openFile(@Param("A file type such as image or pdf.") mimeType: String): Map<String, Any> =
+    @Tool(
+        name = "open_file",
+        description = "Opens the system document picker so the user can select a persistent file of the requested type, then returns the chosen document's content URI in the 'data' field. Returns cancelled=true when the user aborts the picker.",
+        requireConfirmation = true,
+    )
+    suspend fun openFile(@Param("A file type such as image or pdf.") mimeType: String): Map<String, Any> =
         pick(Intent.ACTION_OPEN_DOCUMENT, "Open file", mimeType)
 
-    private fun pick(action: String, title: String, mimeType: String): Map<String, Any> {
+    private suspend fun pick(action: String, title: String, mimeType: String): Map<String, Any> {
         val type = mimeType.trim()
         if (type.isEmpty() || !type.contains('/')) return mapOf("success" to false, "error" to "mimeType must be a MIME type.")
-        return queue.request(
+        return queue.requestForResult(
             title,
             "$title with type $type.",
             Intent(action).addCategory(Intent.CATEGORY_OPENABLE).setType(type),

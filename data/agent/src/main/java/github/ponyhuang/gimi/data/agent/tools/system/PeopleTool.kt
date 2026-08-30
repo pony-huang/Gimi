@@ -15,8 +15,12 @@ import javax.inject.Singleton
  */
 @Singleton
 class PeopleTool @Inject constructor(private val queue: IntentActionQueue) {
-    @Tool(name = "pick_contact", description = "Opens Contacts so the user can choose a contact.", requireConfirmation = true)
-    fun pickContact(): Map<String, Any> = queue.request(
+    @Tool(
+        name = "pick_contact",
+        description = "Opens Contacts so the user can choose a contact, then returns the chosen contact's content URI in the 'data' field — pass it to view_contact or edit_contact as contactUri. Returns cancelled=true when the user aborts the choice.",
+        requireConfirmation = true,
+    )
+    suspend fun pickContact(): Map<String, Any> = queue.requestForResult(
         "Choose contact",
         "Open Contacts to choose a contact.",
         Intent(Intent.ACTION_PICK, ContactsContract.Contacts.CONTENT_URI),

@@ -37,6 +37,14 @@ val ChatGptDarkSurfaceContainer = Color(0xFF1F1F23)
 val ChatGptDarkSurfaceContainerHigh = Color(0xFF27272C)
 val ChatGptDarkSurfaceContainerHighest = Color(0xFF303036)
 
+// ── Preference (settings) canvas & group card ────────────────
+// One UI 风格设置页配色：浅色为浅灰画布 + 纯白分组卡片；深色画布沿用全局底色，
+// 卡片比画布略亮一档，保证分组层次在暗色下仍可辨。
+val PreferenceCanvasLight = Color(0xFFF2F3F5)
+val PreferenceCanvasDark = ChatGptDarkBackground
+val PreferenceGroupCardLight = Color(0xFFFFFFFF)
+val PreferenceGroupCardDark = Color(0xFF1E1E23)
+
 // ── Legacy brand colours ─────────────────────────────────────
 val Blue10 = Color(0xFF000F5E)
 val Blue20 = Color(0xFF001E92)

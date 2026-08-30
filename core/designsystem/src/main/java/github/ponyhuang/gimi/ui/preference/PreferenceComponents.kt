@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -25,18 +26,34 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.ui.theme.PreferenceCanvasDark
+import github.ponyhuang.gimi.ui.theme.PreferenceCanvasLight
+import github.ponyhuang.gimi.ui.theme.PreferenceGroupCardDark
+import github.ponyhuang.gimi.ui.theme.PreferenceGroupCardLight
+
+/**
+ * 设置页画布色：浅色为 One UI 式浅灰画布，深色沿用全局底色。
+ * 通过背景亮度判定深浅主题，与两套 ColorScheme 保持自洽，供页面容器与 Scaffold 共用。
+ */
+@Composable
+fun preferenceCanvasColor(): Color {
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    return if (isDark) PreferenceCanvasDark else PreferenceCanvasLight
+}
+
+@Composable
+private fun preferenceGroupCardColor(): Color {
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    return if (isDark) PreferenceGroupCardDark else PreferenceGroupCardLight
+}
 
 @Composable
 fun PreferencePageContainer(
@@ -46,7 +63,7 @@ fun PreferencePageContainer(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(preferenceCanvasColor()),
     ) {
         Column(
             modifier = Modifier
@@ -64,18 +81,20 @@ fun PreferenceSectionTitle(
     text: String,
     modifier: Modifier = Modifier,
 ) {
+    // 左右 32dp 与分组卡片的内部文字对齐（卡片外边距 16dp + 行内边距 16dp）。
     Text(
         text = text,
         style = MaterialTheme.typography.labelLarge,
         fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+        modifier = modifier.padding(start = 32.dp, end = 32.dp, top = 16.dp, bottom = 8.dp),
     )
 }
 
 /**
  * Transparent settings section retained as a compatibility wrapper for form-heavy pages.
  * It deliberately has no card shape, elevation, or alternate surface colour.
+ * 过渡保留：待全部调用方迁移到 [PreferenceGroupCard] 后移除。
  */
 @Composable
 fun PreferenceCard(
@@ -88,6 +107,35 @@ fun PreferenceCard(
     )
 }
 
+/**
+ * One UI 风格的设置分组卡片：大圆角、白（深色为略亮表面）底容器。
+ * 内部按行摆放 [PreferenceListItem] 等内容；行间分隔线由行的 `showDivider` 控制，
+ * 调用方保证组内除末行外均开启分隔线。
+ */
+@Composable
+fun PreferenceGroupCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(preferenceGroupCardColor()),
+        content = content,
+    )
+}
+
+/**
+ * One UI 风格的设置行：左侧彩色圆形图标底 + 标题/副标题 + 可选尾部内容。
+ *
+ * 行本身无卡片背景，应放在 [PreferenceGroupCard] 内成组使用；
+ * `showDivider` 为 true 时在行底部绘制与文字左缘对齐的内缩分隔线。
+ *
+ * @property iconContainer 图标圆形底色，默认主题蓝。
+ * @property iconTint 圆底上的字形色，默认白色；禁用等特殊态可改为灰色组合。
+ */
 @Composable
 fun PreferenceListItem(
     icon: ImageVector,
@@ -95,53 +143,70 @@ fun PreferenceListItem(
     subtitle: String? = null,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    iconTint: Color = MaterialTheme.colorScheme.primary,
+    iconContainer: Color = MaterialTheme.colorScheme.primary,
+    iconTint: Color = Color.White,
+    showDivider: Boolean = false,
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = 84.dp)
-            .then(
-                if (onClick != null) {
-                    Modifier.clickable(role = Role.Button, onClick = onClick)
-                } else {
-                    Modifier
-                },
-            )
-            .padding(horizontal = 24.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = iconTint,
-            modifier = Modifier.size(30.dp),
-        )
-        Column(
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
             modifier = Modifier
-                .weight(1f)
-                .padding(start = 28.dp, end = if (trailingContent == null) 0.dp else 12.dp),
+                .fillMaxWidth()
+                .heightIn(min = 60.dp)
+                .then(
+                    if (onClick != null) {
+                        Modifier.clickable(role = Role.Button, onClick = onClick)
+                    } else {
+                        Modifier
+                    },
+                )
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Normal,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (!subtitle.isNullOrBlank()) {
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 2.dp),
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .background(color = iconContainer, shape = CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(20.dp),
                 )
             }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 16.dp, end = if (trailingContent == null) 0.dp else 8.dp),
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 1.dp),
+                    )
+                }
+            }
+            trailingContent?.invoke(this)
         }
-        trailingContent?.invoke(this)
+        if (showDivider) {
+            // 内缩到文字左缘（行内边距 16 + 圆形 34 + 间距 16）。
+            HorizontalDivider(
+                modifier = Modifier.padding(start = 66.dp, end = 16.dp),
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+            )
+        }
     }
 }
 
@@ -152,6 +217,8 @@ fun PreferenceNavigationCard(
     subtitle: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    iconContainer: Color = MaterialTheme.colorScheme.primary,
+    showDivider: Boolean = false,
 ) {
     PreferenceListItem(
         icon = icon,
@@ -159,25 +226,8 @@ fun PreferenceNavigationCard(
         subtitle = subtitle,
         onClick = onClick,
         modifier = modifier,
-    )
-}
-
-@Composable
-private fun GradientGlyph(
-    icon: ImageVector,
-    colors: List<Color>,
-    modifier: Modifier = Modifier,
-) {
-    val painter = rememberVectorPainter(icon)
-    val brush = Brush.verticalGradient(colors)
-    // 离屏合成让 SrcIn 只作用于字形本身，而不会吃到下层圆形/卡片底色。
-    Box(
-        modifier = modifier
-            .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-            .drawWithContent {
-                with(painter) { draw(size) }
-                drawRect(brush = brush, blendMode = BlendMode.SrcIn)
-            },
+        iconContainer = iconContainer,
+        showDivider = showDivider,
     )
 }
 
@@ -204,13 +254,14 @@ fun PreferenceBanner(
         PreferenceBannerTone.Info -> Icons.Default.Info
         PreferenceBannerTone.Error -> Icons.Default.Warning
     }
+    // 外边距与分组卡片对齐，横幅在画布上与卡片同宽。
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = containerColor,
         contentColor = contentColor,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 4.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),

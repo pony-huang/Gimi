@@ -33,7 +33,8 @@ fun PreferenceScaffold(
             TopAppBar(
                 title = { Text(title) },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
+                    // 与页面画布同色，让应用栏融入浅灰/深色画布。
+                    containerColor = preferenceCanvasColor(),
                     titleContentColor = MaterialTheme.colorScheme.onBackground,
                     navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
                 ),

@@ -43,10 +43,11 @@ class ToolAuthorizationScreenTest {
 
         compose.onNodeWithText("自定义工具").assertIsDisplayed()
         compose.onNodeWithText("已关闭").assertDoesNotExist()
-        compose.onNodeWithText("配置工具").assertIsDisplayed()
-        compose.onNodeWithText("开启自定义后可配置").assertIsDisplayed()
+        // 关闭态下依赖配置整行隐藏，而非置灰常显
+        compose.onNodeWithText("配置工具").assertDoesNotExist()
 
         compose.onNodeWithText("自定义工具").performClick()
+        compose.onNodeWithText("配置工具").assertIsDisplayed()
         compose.onNodeWithText("选择要启用的工具").assertIsDisplayed()
         compose.onNodeWithText("配置工具").performClick()
         assert(navigated)

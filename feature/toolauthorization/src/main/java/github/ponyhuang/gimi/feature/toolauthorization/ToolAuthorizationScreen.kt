@@ -1,6 +1,11 @@
 package github.ponyhuang.gimi.feature.toolauthorization
 
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -16,7 +21,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -65,12 +69,13 @@ fun ToolAuthorizationScreen(
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
             item {
+                val configurationEnabled = state.isCustomizationEnabled && !state.isMutationBlocked
                 PreferenceGroupCard {
                     PreferenceListItem(
                         icon = Icons.Default.Rule,
                         title = stringResource(R.string.toolauth_customize_label),
                         subtitle = stringResource(R.string.toolauth_customize_description),
-                        showDivider = true,
+                        showDivider = configurationEnabled,
                         onClick = {
                             if (!state.isMutationBlocked) {
                                 onAction(ToolAuthorizationAction.SetCustomizationEnabled(!state.isCustomizationEnabled))
@@ -86,31 +91,26 @@ fun ToolAuthorizationScreen(
                             )
                         },
                     )
-                    val configurationEnabled = state.isCustomizationEnabled && !state.isMutationBlocked
-                    PreferenceListItem(
-                        icon = Icons.Default.Tune,
-                        title = stringResource(R.string.toolauth_configure_tools),
-                        subtitle = stringResource(
-                            if (configurationEnabled) {
-                                R.string.toolauth_configure_subtitle
-                            } else {
-                                R.string.toolauth_configure_disabled_subtitle
-                            }
-                        ),
-                        onClick = if (configurationEnabled) onNavigateToConfiguration else null,
-                        modifier = Modifier.alpha(if (configurationEnabled) 1f else 0.38f),
-                        trailingContent = if (configurationEnabled) {
-                            {
+                    // 依赖配置按需展开：自定义关闭（或 Agent 占用）时整行隐藏，替代原先的置灰常显。
+                    AnimatedVisibility(
+                        visible = configurationEnabled,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut(),
+                    ) {
+                        PreferenceListItem(
+                            icon = Icons.Default.Tune,
+                            title = stringResource(R.string.toolauth_configure_tools),
+                            subtitle = stringResource(R.string.toolauth_configure_subtitle),
+                            onClick = onNavigateToConfiguration,
+                            trailingContent = {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                     contentDescription = null,
                                     modifier = Modifier.align(Alignment.CenterVertically),
                                 )
-                            }
-                        } else {
-                            null
-                        },
-                    )
+                            },
+                        )
+                    }
                 }
             }
             if (state.isMutationBlocked) {

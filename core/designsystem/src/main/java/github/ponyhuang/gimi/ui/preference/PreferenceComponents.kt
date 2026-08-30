@@ -92,22 +92,6 @@ fun PreferenceSectionTitle(
 }
 
 /**
- * Transparent settings section retained as a compatibility wrapper for form-heavy pages.
- * It deliberately has no card shape, elevation, or alternate surface colour.
- * 过渡保留：待全部调用方迁移到 [PreferenceGroupCard] 后移除。
- */
-@Composable
-fun PreferenceCard(
-    modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        content = content,
-    )
-}
-
-/**
  * One UI 风格的设置分组卡片：大圆角、白（深色为略亮表面）底容器。
  * 内部按行摆放 [PreferenceListItem] 等内容；行间分隔线由行的 `showDivider` 控制，
  * 调用方保证组内除末行外均开启分隔线。

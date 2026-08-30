@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FilterList
@@ -32,9 +31,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
+import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 
@@ -76,11 +75,14 @@ fun ToolAuthorizationConfigurationScreen(
             }
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+                contentPadding = PaddingValues(vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 item {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
                         SearchAndFilterRow(state, onAction)
                         Text(
                             text = stringResource(
@@ -102,18 +104,24 @@ fun ToolAuthorizationConfigurationScreen(
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 24.dp),
+                            modifier = Modifier.padding(horizontal = 32.dp, vertical = 24.dp),
                         )
                     }
                 } else {
-                    items(state.visibleTools, key = ToolDescriptor::id) { tool ->
-                        ToolAuthorizationRow(
-                            tool = tool,
-                            enabled = !state.isMutationBlocked,
-                            onEnabledChange = { enabled ->
-                                onAction(ToolAuthorizationConfigurationAction.SetEnabled(tool.id, enabled))
-                            },
-                        )
+                    item {
+                        // 工具列表整体放进一张卡片；行数有限，放弃逐项懒加载换取 One UI 分组外观。
+                        PreferenceGroupCard {
+                            state.visibleTools.forEachIndexed { index, tool ->
+                                ToolAuthorizationRow(
+                                    tool = tool,
+                                    enabled = !state.isMutationBlocked,
+                                    showDivider = index < state.visibleTools.lastIndex,
+                                    onEnabledChange = { enabled ->
+                                        onAction(ToolAuthorizationConfigurationAction.SetEnabled(tool.id, enabled))
+                                    },
+                                )
+                            }
+                        }
                     }
                 }
             }

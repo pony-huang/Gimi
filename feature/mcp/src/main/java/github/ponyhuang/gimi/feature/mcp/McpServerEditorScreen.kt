@@ -41,8 +41,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
-import github.ponyhuang.gimi.feature.mcp.R
-import github.ponyhuang.gimi.ui.preference.PreferenceCard
+import github.ponyhuang.gimi.ui.preference.PreferenceBanner
+import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
+import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
@@ -73,43 +74,44 @@ fun McpServerEditorScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (state.isMutationBlocked) {
-                Text(
+                PreferenceBanner(
                     text = stringResource(R.string.mcp_agent_mutation_blocked),
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 24.dp),
+                    tone = PreferenceBannerTone.Error,
                 )
             }
             // 启用开关是状态控制而非表单字段，置顶作主开关；
             // 样式与语音唤醒等设置页的 PreferenceListItem + 尾部 Switch 保持一致。
-            PreferenceListItem(
-                icon = Icons.Default.Extension,
-                title = stringResource(R.string.mcp_field_enable_server),
-                subtitle = stringResource(R.string.mcp_field_enable_subtitle),
-                onClick = {
-                    if (!state.isMutationBlocked) {
-                        onAction(
-                            McpSettingsAction.EditorChanged(
-                                draft.copy(isEnabled = !draft.isEnabled),
-                            ),
-                        )
-                    }
-                },
-                trailingContent = {
-                    Switch(
-                        checked = draft.isEnabled,
-                        enabled = !state.isMutationBlocked,
-                        onCheckedChange = {
+            PreferenceGroupCard {
+                PreferenceListItem(
+                    icon = Icons.Default.Extension,
+                    title = stringResource(R.string.mcp_field_enable_server),
+                    subtitle = stringResource(R.string.mcp_field_enable_subtitle),
+                    onClick = {
+                        if (!state.isMutationBlocked) {
                             onAction(
                                 McpSettingsAction.EditorChanged(
-                                    draft.copy(isEnabled = it),
+                                    draft.copy(isEnabled = !draft.isEnabled),
                                 ),
                             )
-                        },
-                    )
-                },
-            )
+                        }
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = draft.isEnabled,
+                            enabled = !state.isMutationBlocked,
+                            onCheckedChange = {
+                                onAction(
+                                    McpSettingsAction.EditorChanged(
+                                        draft.copy(isEnabled = it),
+                                    ),
+                                )
+                            },
+                        )
+                    },
+                )
+            }
             PreferenceSectionTitle(text = stringResource(R.string.mcp_section_basic_info))
-            PreferenceCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+            PreferenceGroupCard {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -225,7 +227,7 @@ fun McpServerEditorScreen(
                     )
                 }
             }
-            PreferenceCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+            PreferenceGroupCard {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),

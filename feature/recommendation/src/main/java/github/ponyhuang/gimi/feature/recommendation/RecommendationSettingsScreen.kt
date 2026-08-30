@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationRefreshStatus
+import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
@@ -52,62 +53,64 @@ fun RecommendationSettingsScreen(
         ) {
             item { PreferenceSectionTitle(stringResource(R.string.recommendation_settings_section)) }
             item {
-                PreferenceListItem(
-                    icon = Icons.Default.AutoAwesome,
-                    title = stringResource(R.string.recommendation_enabled_title),
-                    subtitle = stringResource(R.string.recommendation_enabled_subtitle),
-                    trailingContent = {
-                        Switch(
-                            checked = state.enabled,
-                            onCheckedChange = {
-                                onAction(RecommendationSettingsAction.SetEnabled(it))
-                            },
-                        )
-                    },
-                )
-            }
-            item {
-                PreferenceListItem(
-                    icon = Icons.Default.Schedule,
-                    title = stringResource(R.string.recommendation_interval_title),
-                    subtitle = stringResource(R.string.recommendation_interval_value, state.intervalHours),
-                    onClick = if (state.enabled) ({ showIntervalDialog = true }) else null,
-                )
-            }
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = recommendationStatusText(state),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = state.lastError?.let { MaterialTheme.colorScheme.error }
-                            ?: MaterialTheme.colorScheme.onSurfaceVariant,
+                PreferenceGroupCard {
+                    PreferenceListItem(
+                        icon = Icons.Default.AutoAwesome,
+                        title = stringResource(R.string.recommendation_enabled_title),
+                        subtitle = stringResource(R.string.recommendation_enabled_subtitle),
+                        showDivider = true,
+                        trailingContent = {
+                            Switch(
+                                checked = state.enabled,
+                                onCheckedChange = {
+                                    onAction(RecommendationSettingsAction.SetEnabled(it))
+                                },
+                            )
+                        },
                     )
-                    Button(
-                        onClick = { onAction(RecommendationSettingsAction.RefreshNow) },
-                        enabled = state.enabled && state.refreshStatus == RecommendationRefreshStatus.Idle,
-                        modifier = Modifier.fillMaxWidth(),
+                    PreferenceListItem(
+                        icon = Icons.Default.Schedule,
+                        title = stringResource(R.string.recommendation_interval_title),
+                        subtitle = stringResource(R.string.recommendation_interval_value, state.intervalHours),
+                        showDivider = true,
+                        onClick = if (state.enabled) ({ showIntervalDialog = true }) else null,
+                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        androidx.compose.material3.Icon(Icons.Default.Refresh, contentDescription = null)
                         Text(
-                            text = stringResource(R.string.recommendation_refresh_now),
-                            modifier = Modifier.padding(start = 8.dp),
+                            text = recommendationStatusText(state),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = state.lastError?.let { MaterialTheme.colorScheme.error }
+                                ?: MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        Button(
+                            onClick = { onAction(RecommendationSettingsAction.RefreshNow) },
+                            enabled = state.enabled && state.refreshStatus == RecommendationRefreshStatus.Idle,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            androidx.compose.material3.Icon(Icons.Default.Refresh, contentDescription = null)
+                            Text(
+                                text = stringResource(R.string.recommendation_refresh_now),
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
                     }
                 }
             }
             item { PreferenceSectionTitle(stringResource(R.string.recommendation_privacy_section)) }
             item {
-                PreferenceListItem(
-                    icon = Icons.Default.Apps,
-                    title = stringResource(R.string.recommendation_permissions_title),
-                    subtitle = stringResource(R.string.recommendation_permissions_subtitle),
-                    onClick = onOpenPermissions,
-                )
+                PreferenceGroupCard {
+                    PreferenceListItem(
+                        icon = Icons.Default.Apps,
+                        title = stringResource(R.string.recommendation_permissions_title),
+                        subtitle = stringResource(R.string.recommendation_permissions_subtitle),
+                        onClick = onOpenPermissions,
+                    )
+                }
             }
         }
     }

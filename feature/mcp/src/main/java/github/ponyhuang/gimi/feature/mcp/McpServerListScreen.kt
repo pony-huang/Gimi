@@ -1,8 +1,10 @@
 package github.ponyhuang.gimi.feature.mcp
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -32,6 +35,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -40,8 +44,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
-import github.ponyhuang.gimi.feature.mcp.R
-import github.ponyhuang.gimi.ui.preference.PreferenceCard
+import github.ponyhuang.gimi.ui.preference.PreferenceBanner
+import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
+import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceNavigationCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
@@ -58,10 +63,10 @@ fun McpServerListScreen(
     PreferencePageContainer(modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
             if (state.isMutationBlocked) {
-                Text(
+                PreferenceBanner(
                     text = stringResource(R.string.mcp_agent_mutation_blocked),
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                    tone = PreferenceBannerTone.Error,
+                    modifier = Modifier.padding(top = 8.dp),
                 )
             }
             if (state.servers.isEmpty()) {
@@ -75,23 +80,26 @@ fun McpServerListScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 12.dp, bottom = 24.dp),
+                    contentPadding = PaddingValues(vertical = 8.dp),
                 ) {
+                    // 每台服务器一张可展开卡片，展开能力详情时保持 One UI 的分组外观。
                     items(state.servers, key = McpServer::id) { server ->
-                        McpServerCard(
-                            server = server,
-                            mutationEnabled = !state.isMutationBlocked,
-                            expanded = state.expandedServerId == server.id,
-                            capabilityState = state.capabilities[server.id],
-                            onClick = { onAction(McpSettingsAction.ServerCardClicked(server.id)) },
-                            onEditClick = { onNavigateToEditor(server.id) },
-                            onToggleEnabled = {
-                                onAction(McpSettingsAction.ToggleServer(server, it))
-                            },
-                            onRetryCapabilities = {
-                                onAction(McpSettingsAction.RefreshCapabilities(server.id))
-                            },
-                        )
+                        PreferenceGroupCard(modifier = Modifier.padding(bottom = 8.dp)) {
+                            McpServerCard(
+                                server = server,
+                                mutationEnabled = !state.isMutationBlocked,
+                                expanded = state.expandedServerId == server.id,
+                                capabilityState = state.capabilities[server.id],
+                                onClick = { onAction(McpSettingsAction.ServerCardClicked(server.id)) },
+                                onEditClick = { onNavigateToEditor(server.id) },
+                                onToggleEnabled = {
+                                    onAction(McpSettingsAction.ToggleServer(server, it))
+                                },
+                                onRetryCapabilities = {
+                                    onAction(McpSettingsAction.RefreshCapabilities(server.id))
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -163,23 +171,23 @@ fun McpServerAddOptionsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             PreferenceSectionTitle(text = stringResource(R.string.mcp_section_add_methods))
-            PreferenceNavigationCard(
-                icon = Icons.Default.Add,
-                title = stringResource(R.string.mcp_method_new_title),
-                subtitle = stringResource(R.string.mcp_method_new_subtitle),
-                onClick = onCreate,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-            PreferenceNavigationCard(
-                icon = Icons.Default.ContentPaste,
-                title = stringResource(R.string.mcp_method_import_title),
-                subtitle = stringResource(R.string.mcp_method_import_subtitle),
-                onClick = onImport,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
+            PreferenceGroupCard {
+                PreferenceNavigationCard(
+                    icon = Icons.Default.Add,
+                    title = stringResource(R.string.mcp_method_new_title),
+                    subtitle = stringResource(R.string.mcp_method_new_subtitle),
+                    onClick = onCreate,
+                    showDivider = true,
+                )
+                PreferenceNavigationCard(
+                    icon = Icons.Default.ContentPaste,
+                    title = stringResource(R.string.mcp_method_import_title),
+                    subtitle = stringResource(R.string.mcp_method_import_subtitle),
+                    onClick = onImport,
+                )
+            }
         }
     }
 }
@@ -200,7 +208,7 @@ fun McpServerImportScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             PreferenceSectionTitle(text = stringResource(R.string.mcp_section_import_mcp))
-            PreferenceCard(modifier = Modifier.padding(horizontal = 16.dp)) {
+            PreferenceGroupCard {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -287,18 +295,26 @@ private fun McpServerCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Icon(
-                Icons.Default.Extension,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp),
-            )
+            // One UI 行首样式：主题蓝圆底 + 白色 glyph。
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .background(color = MaterialTheme.colorScheme.primary, shape = CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.Extension,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     server.name,
@@ -348,7 +364,7 @@ private fun McpServerCapabilities(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp, start = 48.dp),
+            .padding(top = 12.dp, start = 66.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         when (capabilityState) {
@@ -435,5 +451,5 @@ internal fun McpTransport.displayName(): String = when (this) {
 private fun McpServer.endpointHost(): String =
     runCatching { java.net.URI(endpointUrl).host }
         .getOrNull()
-        ?.takeUnless { it.isNullOrBlank() }
+        ?.takeUnless { it.isBlank() }
         ?: endpointUrl

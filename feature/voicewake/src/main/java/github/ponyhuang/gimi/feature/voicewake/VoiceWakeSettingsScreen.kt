@@ -9,12 +9,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothAudio
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -39,6 +39,7 @@ import github.ponyhuang.gimi.domain.speech.model.WakeModelStatus
 import github.ponyhuang.gimi.feature.voicewake.R
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
+import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
@@ -55,54 +56,56 @@ fun VoiceWakeSettingsScreen(
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
             item {
-                PreferenceListItem(
-                    icon = Icons.Default.BluetoothAudio,
-                    title = stringResource(R.string.voicewake_listening_title),
-                    subtitle = listeningSubtitle(state.voiceState),
-                    onClick = {
-                        onAction(
-                            VoiceWakeSettingsAction.ToggleListening(
-                                !state.voiceState.isRunning && !state.isStartPending,
-                            ),
-                        )
-                    },
-                    trailingContent = {
-                        Switch(
-                            checked = state.voiceState.isRunning || state.isStartPending,
-                            onCheckedChange = {
-                                onAction(VoiceWakeSettingsAction.ToggleListening(it))
-                            },
-                        )
-                    },
-                )
-            }
-            item {
-                PreferenceListItem(
-                    icon = Icons.Default.Bluetooth,
-                    title = stringResource(R.string.voicewake_bluetooth_only_title),
-                    subtitle = stringResource(R.string.voicewake_bluetooth_only_subtitle),
-                    onClick = {
-                        onAction(
-                            VoiceWakeSettingsAction.SetBluetoothOnly(
-                                !state.voiceState.bluetoothOnly,
-                            ),
-                        )
-                    },
-                    trailingContent = {
-                        Switch(
-                            checked = state.voiceState.bluetoothOnly,
-                            onCheckedChange = {
-                                onAction(VoiceWakeSettingsAction.SetBluetoothOnly(it))
-                            },
-                        )
-                    },
-                )
+                PreferenceGroupCard {
+                    PreferenceListItem(
+                        icon = Icons.Default.BluetoothAudio,
+                        title = stringResource(R.string.voicewake_listening_title),
+                        subtitle = listeningSubtitle(state.voiceState),
+                        showDivider = true,
+                        onClick = {
+                            onAction(
+                                VoiceWakeSettingsAction.ToggleListening(
+                                    !state.voiceState.isRunning && !state.isStartPending,
+                                ),
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = state.voiceState.isRunning || state.isStartPending,
+                                onCheckedChange = {
+                                    onAction(VoiceWakeSettingsAction.ToggleListening(it))
+                                },
+                            )
+                        },
+                    )
+                    PreferenceListItem(
+                        icon = Icons.Default.Bluetooth,
+                        title = stringResource(R.string.voicewake_bluetooth_only_title),
+                        subtitle = stringResource(R.string.voicewake_bluetooth_only_subtitle),
+                        onClick = {
+                            onAction(
+                                VoiceWakeSettingsAction.SetBluetoothOnly(
+                                    !state.voiceState.bluetoothOnly,
+                                ),
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = state.voiceState.bluetoothOnly,
+                                onCheckedChange = {
+                                    onAction(VoiceWakeSettingsAction.SetBluetoothOnly(it))
+                                },
+                            )
+                        },
+                    )
+                }
             }
             if (!state.configurationReady) {
                 item {
                     PreferenceBanner(
                         text = stringResource(R.string.voicewake_offline_setup_required),
                         tone = PreferenceBannerTone.Error,
+                        modifier = Modifier.padding(top = 8.dp),
                     )
                 }
             }
@@ -110,19 +113,24 @@ fun VoiceWakeSettingsScreen(
             item {
                 PreferenceSectionTitle(
                     text = stringResource(R.string.voicewake_section_models),
-                    modifier = Modifier.padding(top = 12.dp),
                 )
             }
-            items(state.voiceState.availableModels, key = { it.id }) { model ->
-                WakeModelRow(
-                    model = model,
-                    modelState = state.voiceState.modelStates[model.id] ?: WakeModelState(),
-                    isActive = state.voiceState.activeModelId == model.id,
-                    onSelect = { onAction(VoiceWakeSettingsAction.SelectModel(model.id)) },
-                    onInstall = { onAction(VoiceWakeSettingsAction.InstallModel(model.id)) },
-                    onCancel = { onAction(VoiceWakeSettingsAction.CancelInstall(model.id)) },
-                    onRemove = { onAction(VoiceWakeSettingsAction.RemoveModel(model.id)) },
-                )
+            item {
+                // 唤醒模型数量有限，整组渲染进同一张卡片。
+                PreferenceGroupCard {
+                    state.voiceState.availableModels.forEachIndexed { index, model ->
+                        WakeModelRow(
+                            model = model,
+                            modelState = state.voiceState.modelStates[model.id] ?: WakeModelState(),
+                            isActive = state.voiceState.activeModelId == model.id,
+                            showDivider = index < state.voiceState.availableModels.lastIndex,
+                            onSelect = { onAction(VoiceWakeSettingsAction.SelectModel(model.id)) },
+                            onInstall = { onAction(VoiceWakeSettingsAction.InstallModel(model.id)) },
+                            onCancel = { onAction(VoiceWakeSettingsAction.CancelInstall(model.id)) },
+                            onRemove = { onAction(VoiceWakeSettingsAction.RemoveModel(model.id)) },
+                        )
+                    }
+                }
             }
 
             item {
@@ -131,7 +139,6 @@ fun VoiceWakeSettingsScreen(
                         R.string.voicewake_section_keyword_with_language,
                         stringResource(languageNameRes(state.voiceState.activeModel)),
                     ),
-                    modifier = Modifier.padding(top = 12.dp),
                 )
             }
             item {
@@ -139,11 +146,11 @@ fun VoiceWakeSettingsScreen(
                     Text(
                         text = stringResource(wakeWordRes(state.voiceState.activeModelId)),
                         fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(horizontal = 24.dp),
+                        modifier = Modifier.padding(horizontal = 32.dp),
                     )
                     Text(
                         text = stringResource(R.string.voicewake_keyword_fixed_description),
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 4.dp),
                     )
                 }
             }
@@ -170,8 +177,10 @@ private fun WakeModelRow(
     onInstall: () -> Unit,
     onCancel: () -> Unit,
     onRemove: () -> Unit,
+    showDivider: Boolean = false,
 ) {
-    ListItem(
+    Column(modifier = Modifier.fillMaxWidth()) {
+        ListItem(
         headlineContent = {
             Text(
                 stringResource(modelNameRes(model.id)),
@@ -254,9 +263,15 @@ private fun WakeModelRow(
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = Modifier
             .fillMaxWidth()
-            .selectable(selected = isActive, onClick = onSelect, role = Role.RadioButton)
-            .padding(horizontal = 8.dp),
+            .selectable(selected = isActive, onClick = onSelect, role = Role.RadioButton),
     )
+        if (showDivider) {
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+            )
+        }
+    }
 }
 
 private fun modelNameRes(modelId: String): Int = when (modelId) {

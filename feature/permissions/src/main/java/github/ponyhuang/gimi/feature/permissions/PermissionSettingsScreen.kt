@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.feature.permissions.R
+import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
@@ -44,109 +45,113 @@ fun PermissionSettingsScreen(
         ) {
             item { PreferenceSectionTitle(text = stringResource(R.string.permissions_section_regular)) }
             item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Button(
-                        onClick = {
-                            onAction(PermissionSettingsAction.RequestAllRuntimePermissions)
-                        },
-                        enabled = !state.allRuntimeGranted,
-                        modifier = Modifier.fillMaxWidth(),
+                PreferenceGroupCard {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(
-                            if (state.allRuntimeGranted) {
-                                stringResource(R.string.permissions_regular_all_granted)
-                            } else {
-                                stringResource(R.string.permissions_grant_all)
-                            },
-                        )
-                    }
-                    if (state.permanentlyDenied.isNotEmpty()) {
-                        Text(
-                            text = stringResource(R.string.permissions_partial_blocked),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        TextButton(
+                        Button(
                             onClick = {
-                                onAction(PermissionSettingsAction.OpenApplicationSettings)
+                                onAction(PermissionSettingsAction.RequestAllRuntimePermissions)
                             },
+                            enabled = !state.allRuntimeGranted,
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text(stringResource(R.string.permissions_open_settings))
+                            Text(
+                                if (state.allRuntimeGranted) {
+                                    stringResource(R.string.permissions_regular_all_granted)
+                                } else {
+                                    stringResource(R.string.permissions_grant_all)
+                                },
+                            )
+                        }
+                        if (state.permanentlyDenied.isNotEmpty()) {
+                            Text(
+                                text = stringResource(R.string.permissions_partial_blocked),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            TextButton(
+                                onClick = {
+                                    onAction(PermissionSettingsAction.OpenApplicationSettings)
+                                },
+                            ) {
+                                Text(stringResource(R.string.permissions_open_settings))
+                            }
                         }
                     }
                 }
             }
-            state.groups.forEach { group ->
-                item(key = group.kind) {
-                    PreferenceListItem(
-                        icon = group.kind.icon,
-                        title = stringResource(group.titleRes),
-                        subtitle = stringResource(group.subtitleRes),
-                        onClick = if (group.status == PermissionGroupStatus.Granted) {
-                            null
-                        } else {
-                            { onAction(PermissionSettingsAction.RequestGroup(group.kind)) }
-                        },
-                        trailingContent = {
-                            PermissionStatusText(
-                                granted = group.status == PermissionGroupStatus.Granted,
-                                text = group.status.label(),
-                            )
-                        },
-                    )
+            item {
+                // 常规权限组数量有限，整组渲染进同一张卡片。
+                PreferenceGroupCard {
+                    state.groups.forEachIndexed { index, group ->
+                        PreferenceListItem(
+                            icon = group.kind.icon,
+                            title = stringResource(group.titleRes),
+                            subtitle = stringResource(group.subtitleRes),
+                            showDivider = index < state.groups.lastIndex,
+                            onClick = if (group.status == PermissionGroupStatus.Granted) {
+                                null
+                            } else {
+                                { onAction(PermissionSettingsAction.RequestGroup(group.kind)) }
+                            },
+                            trailingContent = {
+                                PermissionStatusText(
+                                    granted = group.status == PermissionGroupStatus.Granted,
+                                    text = group.status.label(),
+                                )
+                            },
+                        )
+                    }
                 }
             }
 
             item { PreferenceSectionTitle(text = stringResource(R.string.permissions_section_special)) }
             item {
-                PreferenceListItem(
-                    icon = Icons.Default.Tune,
-                    title = stringResource(R.string.permissions_special_modify_settings_title),
-                    subtitle = stringResource(R.string.permissions_special_modify_settings_subtitle),
-                    onClick = if (state.writeSettingsGranted) {
-                        null
-                    } else {
-                        { onAction(PermissionSettingsAction.OpenWriteSettings) }
-                    },
-                    trailingContent = {
-                        PermissionStatusText(granted = state.writeSettingsGranted)
-                    },
-                )
-            }
-            item {
-                PreferenceListItem(
-                    icon = Icons.Default.NotificationsActive,
-                    title = stringResource(R.string.permissions_special_notification_access_title),
-                    subtitle = stringResource(R.string.permissions_special_notification_access_subtitle),
-                    onClick = if (state.notificationAccessGranted) {
-                        null
-                    } else {
-                        { onAction(PermissionSettingsAction.OpenNotificationAccess) }
-                    },
-                    trailingContent = {
-                        PermissionStatusText(granted = state.notificationAccessGranted)
-                    },
-                )
-            }
-            item {
-                PreferenceListItem(
-                    icon = Icons.Default.Apps,
-                    title = stringResource(R.string.permissions_special_usage_access_title),
-                    subtitle = stringResource(R.string.permissions_special_usage_access_subtitle),
-                    onClick = if (state.usageAccessGranted) {
-                        null
-                    } else {
-                        { onAction(PermissionSettingsAction.OpenUsageAccess) }
-                    },
-                    trailingContent = {
-                        PermissionStatusText(granted = state.usageAccessGranted)
-                    },
-                )
+                PreferenceGroupCard {
+                    PreferenceListItem(
+                        icon = Icons.Default.Tune,
+                        title = stringResource(R.string.permissions_special_modify_settings_title),
+                        subtitle = stringResource(R.string.permissions_special_modify_settings_subtitle),
+                        showDivider = true,
+                        onClick = if (state.writeSettingsGranted) {
+                            null
+                        } else {
+                            { onAction(PermissionSettingsAction.OpenWriteSettings) }
+                        },
+                        trailingContent = {
+                            PermissionStatusText(granted = state.writeSettingsGranted)
+                        },
+                    )
+                    PreferenceListItem(
+                        icon = Icons.Default.NotificationsActive,
+                        title = stringResource(R.string.permissions_special_notification_access_title),
+                        subtitle = stringResource(R.string.permissions_special_notification_access_subtitle),
+                        showDivider = true,
+                        onClick = if (state.notificationAccessGranted) {
+                            null
+                        } else {
+                            { onAction(PermissionSettingsAction.OpenNotificationAccess) }
+                        },
+                        trailingContent = {
+                            PermissionStatusText(granted = state.notificationAccessGranted)
+                        },
+                    )
+                    PreferenceListItem(
+                        icon = Icons.Default.Apps,
+                        title = stringResource(R.string.permissions_special_usage_access_title),
+                        subtitle = stringResource(R.string.permissions_special_usage_access_subtitle),
+                        onClick = if (state.usageAccessGranted) {
+                            null
+                        } else {
+                            { onAction(PermissionSettingsAction.OpenUsageAccess) }
+                        },
+                        trailingContent = {
+                            PermissionStatusText(granted = state.usageAccessGranted)
+                        },
+                    )
+                }
             }
         }
     }

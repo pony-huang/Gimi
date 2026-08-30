@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Extension
@@ -30,6 +29,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -59,6 +59,7 @@ import github.ponyhuang.gimi.domain.plugin.model.PluginConfigFieldDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
+import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
@@ -130,17 +131,23 @@ fun PluginSettingsScreen(
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(vertical = 12.dp),
+                contentPadding = PaddingValues(vertical = 8.dp),
             ) {
-                items(state.plugins, key = { it.id }) { plugin ->
-                    PluginRow(
-                        plugin = plugin,
-                        icon = icons[plugin.id],
-                        onToggle = { enabled ->
-                            onAction(PluginSettingsAction.SetEnabled(plugin.id, enabled))
-                        },
-                        onClick = { onNavigateToConfig(plugin.id) },
-                    )
+                item {
+                    // 插件数量有限，整组渲染进同一张 One UI 卡片。
+                    PreferenceGroupCard {
+                        state.plugins.forEachIndexed { index, plugin ->
+                            PluginRow(
+                                plugin = plugin,
+                                icon = icons[plugin.id],
+                                showDivider = index < state.plugins.lastIndex,
+                                onToggle = { enabled ->
+                                    onAction(PluginSettingsAction.SetEnabled(plugin.id, enabled))
+                                },
+                                onClick = { onNavigateToConfig(plugin.id) },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -153,55 +160,64 @@ private fun PluginRow(
     icon: ImageBitmap?,
     onToggle: (Boolean) -> Unit,
     onClick: () -> Unit,
+    showDivider: Boolean = false,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 84.dp)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // 统一「应用图标」样式：白底圆角方片 + 居中 logo，宽版 wordmark（如知乎）等比缩放不拉伸。
-        Box(
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
             modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color.White),
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .heightIn(min = 60.dp)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (icon != null) {
-                Image(
-                    bitmap = icon,
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(0.66f),
-                    contentScale = ContentScale.Fit,
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.Extension,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(26.dp),
+            // 统一「应用图标」样式：白底圆角方片 + 居中 logo，宽版 wordmark（如知乎）等比缩放不拉伸。
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color.White),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (icon != null) {
+                    Image(
+                        bitmap = icon,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(0.66f),
+                        contentScale = ContentScale.Fit,
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Extension,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(26.dp),
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 16.dp, end = 8.dp),
+            ) {
+                Text(
+                    text = plugin.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-        }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = 28.dp, end = 12.dp),
-        ) {
-            Text(
-                text = plugin.name,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            Switch(
+                checked = plugin.isEnabled,
+                onCheckedChange = onToggle,
             )
         }
-        Switch(
-            checked = plugin.isEnabled,
-            onCheckedChange = onToggle,
-        )
+        if (showDivider) {
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+            )
+        }
     }
 }
 
@@ -307,38 +323,43 @@ private fun PluginConfigContent(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(vertical = 12.dp),
             ) {
-                items(state.fields, key = { it.key }) { field ->
-                    when (field.kind) {
-                        PluginConfigFieldDescriptor.Kind.TEXT -> PluginTextField(
-                            field = field,
-                            onValueChange = { onAction(PluginConfigAction.SetValue(field.key, it)) },
-                        )
-                        PluginConfigFieldDescriptor.Kind.TOGGLE -> PluginToggleField(
-                            field = field,
-                            onCheckedChange = { onAction(PluginConfigAction.SetValue(field.key, it.toString())) },
-                        )
-                        PluginConfigFieldDescriptor.Kind.SELECT -> PluginSelectField(
-                            field = field,
-                            onSelect = { onAction(PluginConfigAction.SetValue(field.key, it)) },
-                        )
-                    }
-                }
-                state.actions.forEach { action ->
-                    item(key = "action-${action.id}") {
-                        Button(
-                            onClick = { onAction(PluginConfigAction.RunAction(action.id)) },
-                            enabled = !action.running,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 4.dp),
-                        ) {
-                            Text(
-                                if (action.running) {
-                                    stringResource(R.string.plugin_action_running)
-                                } else {
-                                    action.label
-                                },
-                            )
+                item {
+                    // 配置字段与动作整组放进一张卡片，行间靠组件自身间距分隔。
+                    PreferenceGroupCard {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            state.fields.forEach { field ->
+                                when (field.kind) {
+                                    PluginConfigFieldDescriptor.Kind.TEXT -> PluginTextField(
+                                        field = field,
+                                        onValueChange = { onAction(PluginConfigAction.SetValue(field.key, it)) },
+                                    )
+                                    PluginConfigFieldDescriptor.Kind.TOGGLE -> PluginToggleField(
+                                        field = field,
+                                        onCheckedChange = { onAction(PluginConfigAction.SetValue(field.key, it.toString())) },
+                                    )
+                                    PluginConfigFieldDescriptor.Kind.SELECT -> PluginSelectField(
+                                        field = field,
+                                        onSelect = { onAction(PluginConfigAction.SetValue(field.key, it)) },
+                                    )
+                                }
+                            }
+                            state.actions.forEach { action ->
+                                Button(
+                                    onClick = { onAction(PluginConfigAction.RunAction(action.id)) },
+                                    enabled = !action.running,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                                ) {
+                                    Text(
+                                        if (action.running) {
+                                            stringResource(R.string.plugin_action_running)
+                                        } else {
+                                            action.label
+                                        },
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -348,7 +369,7 @@ private fun PluginConfigContent(
                     onClick = { onAction(PluginConfigAction.Save) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                 ) {
                     Text(stringResource(R.string.plugin_config_save))
                 }
@@ -374,7 +395,7 @@ private fun PluginTextField(
         },
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
     )
 }
 
@@ -404,7 +425,7 @@ private fun PluginSelectField(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Text(
             text = field.label,

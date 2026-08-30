@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Rule
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
@@ -24,6 +24,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
+import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
@@ -64,52 +65,53 @@ fun ToolAuthorizationScreen(
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
             item {
-                PreferenceListItem(
-                    icon = Icons.Default.Build,
-                    title = stringResource(R.string.toolauth_customize_label),
-                    subtitle = stringResource(R.string.toolauth_customize_description),
-                    onClick = {
-                        if (!state.isMutationBlocked) {
-                            onAction(ToolAuthorizationAction.SetCustomizationEnabled(!state.isCustomizationEnabled))
-                        }
-                    },
-                    trailingContent = {
-                        Switch(
-                            checked = state.isCustomizationEnabled,
-                            onCheckedChange = { enabled ->
-                                onAction(ToolAuthorizationAction.SetCustomizationEnabled(enabled))
-                            },
-                            enabled = !state.isMutationBlocked,
-                        )
-                    },
-                )
-            }
-            val configurationEnabled = state.isCustomizationEnabled && !state.isMutationBlocked
-            item {
-                PreferenceListItem(
-                    icon = Icons.Default.Tune,
-                    title = stringResource(R.string.toolauth_configure_tools),
-                    subtitle = stringResource(
-                        if (configurationEnabled) {
-                            R.string.toolauth_configure_subtitle
-                        } else {
-                            R.string.toolauth_configure_disabled_subtitle
-                        }
-                    ),
-                    onClick = if (configurationEnabled) onNavigateToConfiguration else null,
-                    modifier = Modifier.alpha(if (configurationEnabled) 1f else 0.38f),
-                    trailingContent = if (configurationEnabled) {
-                        {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                contentDescription = null,
-                                modifier = Modifier.align(Alignment.CenterVertically),
+                PreferenceGroupCard {
+                    PreferenceListItem(
+                        icon = Icons.Default.Rule,
+                        title = stringResource(R.string.toolauth_customize_label),
+                        subtitle = stringResource(R.string.toolauth_customize_description),
+                        showDivider = true,
+                        onClick = {
+                            if (!state.isMutationBlocked) {
+                                onAction(ToolAuthorizationAction.SetCustomizationEnabled(!state.isCustomizationEnabled))
+                            }
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = state.isCustomizationEnabled,
+                                onCheckedChange = { enabled ->
+                                    onAction(ToolAuthorizationAction.SetCustomizationEnabled(enabled))
+                                },
+                                enabled = !state.isMutationBlocked,
                             )
-                        }
-                    } else {
-                        null
-                    },
-                )
+                        },
+                    )
+                    val configurationEnabled = state.isCustomizationEnabled && !state.isMutationBlocked
+                    PreferenceListItem(
+                        icon = Icons.Default.Tune,
+                        title = stringResource(R.string.toolauth_configure_tools),
+                        subtitle = stringResource(
+                            if (configurationEnabled) {
+                                R.string.toolauth_configure_subtitle
+                            } else {
+                                R.string.toolauth_configure_disabled_subtitle
+                            }
+                        ),
+                        onClick = if (configurationEnabled) onNavigateToConfiguration else null,
+                        modifier = Modifier.alpha(if (configurationEnabled) 1f else 0.38f),
+                        trailingContent = if (configurationEnabled) {
+                            {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    modifier = Modifier.align(Alignment.CenterVertically),
+                                )
+                            }
+                        } else {
+                            null
+                        },
+                    )
+                }
             }
             if (state.isMutationBlocked) {
                 item {

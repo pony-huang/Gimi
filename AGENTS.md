@@ -167,17 +167,19 @@ Android Studio may run the `app` debug configuration on a device or emulator.
 - Prefer the `android` CLI for project, deployment, launch, screenshot, layout, and emulator workflows; consult `android help <command>` first.
 - Use plain `android run` for deployment/launch, `android layout` for primary UI inspection, `android layout --diff` for focused changes, and `android screen capture` for secondary visual checks. Always inspect captured PNGs visually.
 - Do not pass `--debug` during routine physical-device installation, launch, UI, layout, screenshot, or interaction verification. On some devices it enables "Waiting For Debugger", preventing the Activity and Compose hierarchy from appearing. Use `android run --debug` only when the task explicitly requires attaching a debugger; otherwise launch normally before inspecting the UI.
-- Do not use `adb` by habit. Fall back only when the installed CLI is unavailable/fails or lacks the operation, such as connection diagnostics, wake, raw input, or a narrow shell command. Record the reason, limit ADB to that operation, then return to the CLI.
+- Query connected devices/emulators with `adb devices -l` directly; device discovery is adb-first. The `android` CLI exposes no device-list command and cannot resolve some wireless serials (e.g. `adb-tls` mDNS names). Always resolve the serial dynamically at time of use; never hard-code or reuse a serial from memory.
+- For everything other than device discovery, prefer the `android` CLI. Fall back to `adb` only when the installed CLI is unavailable, fails, or lacks the operation, such as wake, raw input, install/launch/screencap on a serial the CLI cannot resolve, or a narrow shell command. Record the reason, limit ADB to that operation, then return to the CLI.
 
 ### Device verification
 
-- Prefer a connected physical Android device for installation, UI, permissions, system insets, and hardware behavior. Never hard-code a manufacturer, model, or serial; resolve the current physical device dynamically. Use an emulator only when no suitable device exists or the task requires one, and report the fallback.
-- If CLI device resolution fails, `adb devices -l` is permitted only for discovery. Build and run on the selected physical device with:
+- Prefer a connected physical Android device for installation, UI, permissions, system insets, and hardware behavior. Never hard-code a manufacturer, model, or serial; resolve the current physical device dynamically with `adb devices -l`. Use an emulator only when no suitable device exists or the task requires one, and report the fallback.
+- Build and run on the selected physical device with:
 
 ```powershell
 .\gradlew.bat app:assembleDebug
 android run --device "$serial" --apks=app\build\outputs\apk\debug\app-arm64-v8a-debug.apk
 ```
 
-- Use `android layout --device "$serial" --pretty` for hierarchy/text/bounds and `android screen capture -o build\device-screen.png` for visuals. Use narrowly scoped `adb -s "$serial" shell input ...` only when CLI lacks required input.
+- If `android run`/`android screen capture` cannot resolve the serial (e.g. wireless `adb-tls` names), fall back to `adb -s "$serial" install -r <apk>`, launch with `adb -s "$serial" shell monkey -p <applicationId> -c android.intent.category.LAUNCHER 1`, and capture with `adb -s "$serial" exec-out screencap -p > screen.png`; record the fallback reason.
+- Use `android layout --device "$serial" --pretty` for hierarchy/text/bounds and `android screen capture -o build\device-screen.png` for visuals. When the CLI cannot resolve the device, `adb -s "$serial" shell uiautomator dump` + `cat` is the hierarchy fallback. Use narrowly scoped `adb -s "$serial" shell input ...` only when CLI lacks required input.
 - If the device is asleep or not foregrounded and CLI has no wake command, use only `adb -s "$serial" shell input keyevent KEYCODE_WAKEUP`, then re-check with `android layout` or `android screen capture`. Never bypass device security. Report persistent test changes such as model selection.

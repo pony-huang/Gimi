@@ -53,7 +53,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.objectbox.android)
     implementation(libs.objectbox.kotlin)
-    implementation(libs.sentence.embeddings)
+    implementation(libs.mediapipe.tasks.text)
     implementation(libs.mcp.kotlin.client) {
         // ADK/Google GenAI still use Ktor 2.x. MCP uses the OkHttp transports in this module, so
         // exclude the SDK's optional Ktor 3 transport implementation from the Android graph.

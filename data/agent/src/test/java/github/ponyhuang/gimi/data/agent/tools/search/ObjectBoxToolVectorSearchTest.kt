@@ -81,7 +81,7 @@ class ObjectBoxToolVectorSearchTest {
     }
 
     private class FakeEmbeddingModel : ToolEmbeddingModel {
-        override val dimensions: Int = ToolEmbeddingDimensions.MINI_LM.toInt()
+        override val dimensions: Int = ToolEmbeddingDimensions.MEDIA_PIPE_USE.toInt()
         override val version: String = "fake-v1"
         val encodedTexts = mutableListOf<String>()
 

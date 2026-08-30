@@ -14,7 +14,7 @@ import io.objectbox.annotation.VectorDistanceType
  * @property documentKey 运行时工具候选的稳定键。
  * @property contentHash 工具可搜索文本的 SHA-256，用于跳过未变化的重新嵌入。
  * @property searchableText 名称、描述和参数组成的原始索引文本，便于诊断和更新。
- * @property embedding 由固定 MiniLM 模型生成的 384 维归一化向量。
+ * @property embedding 由固定 MediaPipe USE 模型生成的 100 维向量。
  */
 @Entity
 data class ToolVectorEntity(
@@ -24,7 +24,7 @@ data class ToolVectorEntity(
     var contentHash: String = "",
     var searchableText: String = "",
     @HnswIndex(
-        dimensions = ToolEmbeddingDimensions.MINI_LM,
+        dimensions = ToolEmbeddingDimensions.MEDIA_PIPE_USE,
         distanceType = VectorDistanceType.COSINE,
     )
     var embedding: FloatArray = FloatArray(0),
@@ -58,5 +58,5 @@ data class ToolVectorEntity(
 
 /** 工具向量模型的固定维度常量。 */
 object ToolEmbeddingDimensions {
-    const val MINI_LM: Long = 384
+    const val MEDIA_PIPE_USE: Long = 100
 }

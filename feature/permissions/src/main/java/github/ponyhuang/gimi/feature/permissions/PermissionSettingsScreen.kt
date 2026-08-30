@@ -83,8 +83,8 @@ fun PermissionSettingsScreen(
                 }
             }
             item {
-                // 常规权限组数量有限，整组渲染进同一张卡片。
-                PreferenceGroupCard {
+                // 常规权限组数量有限，整组渲染进同一张卡片；与上方操作卡保持组间距。
+                PreferenceGroupCard(modifier = Modifier.padding(top = 12.dp)) {
                     state.groups.forEachIndexed { index, group ->
                         PreferenceListItem(
                             icon = group.kind.icon,

@@ -92,6 +92,7 @@ objectbox-windows = { module = "io.objectbox:objectbox-windows", version.ref = "
 mediapipe-tasks-text = { module = "com.google.mediapipe:tasks-text", version.ref = "mediaPipeTasks" }
 multiplatform-markdown-renderer-m3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-m3", version.ref = "multiplatformMarkdownRenderer" }
 multiplatform-markdown-renderer-coil3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-coil3", version.ref = "multiplatformMarkdownRenderer" }
+multiplatform-markdown-renderer-code = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-code", version.ref = "multiplatformMarkdownRenderer" }
 mcp-kotlin-client = { module = "io.modelcontextprotocol:kotlin-sdk-client", version.ref = "mcpKotlin" }
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }

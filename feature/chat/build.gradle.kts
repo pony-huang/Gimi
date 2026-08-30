@@ -48,6 +48,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.core)
     implementation(libs.multiplatform.markdown.renderer.m3)
     implementation(libs.multiplatform.markdown.renderer.coil3)
+    implementation(libs.multiplatform.markdown.renderer.code)
 
     testImplementation(project(":core:testing"))
     testImplementation(libs.junit)

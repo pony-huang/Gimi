@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.feature.chat
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -10,16 +11,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
+import com.mikepenz.markdown.compose.components.markdownComponents
+import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeBlock
+import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeFence
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownTypography
-import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import com.mikepenz.markdown.model.rememberStreamingMarkdownState
+import dev.snipme.highlights.Highlights
+import dev.snipme.highlights.model.SyntaxThemes
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.ReceiveChannel
 
@@ -96,11 +103,40 @@ internal fun TextContent(
 
     val contentModifier = if (fillAvailableWidth) modifier.fillMaxWidth() else modifier
     val markdownModifier = if (fillAvailableWidth) Modifier.fillMaxWidth() else Modifier
+
+    // 代码高亮：语法主题跟随当前生效的主题（深色覆盖也生效），Atom 配色。
+    // showHeader 显示代码语言 + 复制按钮，聊天里长代码块更友好。
+    val isDarkTheme = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val highlightsBuilder = remember(isDarkTheme) {
+        Highlights.Builder().theme(SyntaxThemes.atom(darkMode = isDarkTheme))
+    }
+    val components = remember(highlightsBuilder) {
+        markdownComponents(
+            codeBlock = {
+                MarkdownHighlightedCodeBlock(
+                    content = it.content,
+                    node = it.node,
+                    highlightsBuilder = highlightsBuilder,
+                    showHeader = true,
+                )
+            },
+            codeFence = {
+                MarkdownHighlightedCodeFence(
+                    content = it.content,
+                    node = it.node,
+                    highlightsBuilder = highlightsBuilder,
+                    showHeader = true,
+                )
+            },
+        )
+    }
+
     SelectionContainer(modifier = contentModifier) {
         if (useStreamingState) {
             Markdown(
                 streamingMarkdownState = streamingState,
                 imageTransformer = Coil3ImageTransformerImpl,
+                components = components,
                 modifier = markdownModifier,
                 typography = chatMarkdownTypography(),
             )
@@ -108,6 +144,7 @@ internal fun TextContent(
             Markdown(
                 content = text,
                 imageTransformer = Coil3ImageTransformerImpl,
+                components = components,
                 modifier = markdownModifier,
                 typography = chatMarkdownTypography(),
             )

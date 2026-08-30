@@ -143,6 +143,13 @@ synthesis model.
 
 Optional: enable voice wake, add MCP servers, install plugins or skills, authorize working folders.
 
+## Privacy
+
+Gimi collects nothing: no analytics, no telemetry, no accounts, no developer servers. Conversations
+stay on your device; network traffic only goes to the services you configure (model providers,
+speech, MCP servers) and to GitHub for app updates. See [PRIVACY.md](PRIVACY.md) ·
+[隐私政策](PRIVACY.zh-CN.md).
+
 ## Thanks
 
 - [GetStream/chat-ai-samples](https://github.com/GetStream/chat-ai-samples)

@@ -121,6 +121,12 @@
 
 想扩展的话：开语音唤醒、加 MCP 服务器、装插件或技能、授权工作文件夹。
 
+## 隐私
+
+Gimi 不收集任何数据：无统计埋点、无遥测、无账号，开发者也没有服务器。对话保存在你的设备上，
+网络请求只发往你自行配置的服务（模型服务、语音、MCP 服务器）以及用于检查更新的 GitHub。
+详见[隐私政策](PRIVACY.zh-CN.md) · [Privacy Policy](PRIVACY.md)。
+
 ## 致谢
 
 - [GetStream/chat-ai-samples](https://github.com/GetStream/chat-ai-samples)

@@ -6,6 +6,7 @@
     <string name="modelsettings_api_key_show">Show key</string>
 
     <string name="modelsettings_api_url_label">API endpoint</string>
+    <string name="modelsettings_api_protocol_label">API standard</string>
     <string name="modelsettings_api_protocol_standard">Standard API endpoint</string>
     <string name="modelsettings_api_protocol_anthropic">Anthropic API endpoint</string>
     <string name="modelsettings_api_protocol_gemini">Gemini API</string>

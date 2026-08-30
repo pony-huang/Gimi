@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -21,6 +22,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.speech.model.TtsVoice
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.ui.components.PickerSingleChoiceDialog
+import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
@@ -47,72 +49,80 @@ fun DefaultModelSettingsScreen(
             }
             item { PreferenceSectionTitle(stringResource(R.string.modelsettings_defaults_section_chat)) }
             item {
-                DefaultModelOption(
-                    icon = Icons.AutoMirrored.Filled.Chat,
-                    title = stringResource(R.string.modelsettings_defaults_assistant_title),
-                    subtitle = stringResource(R.string.modelsettings_defaults_assistant_subtitle),
-                    selection = state.assistantSelection,
-                    rows = state.chatModels,
-                    onClick = if (state.isMutationBlocked) null else {
-                        { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Assistant)) }
-                    },
-                )
-            }
-            item {
-                DefaultModelOption(
-                    icon = Icons.Default.FlashOn,
-                    title = stringResource(R.string.modelsettings_defaults_quick_title),
-                    subtitle = stringResource(R.string.modelsettings_defaults_quick_subtitle),
-                    selection = state.fastSelection,
-                    rows = state.chatModels,
-                    onClick = if (state.isMutationBlocked) null else {
-                        { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Fast)) }
-                    },
-                )
+                PreferenceGroupCard {
+                    DefaultModelOption(
+                        icon = Icons.AutoMirrored.Filled.Chat,
+                        title = stringResource(R.string.modelsettings_defaults_assistant_title),
+                        subtitle = stringResource(R.string.modelsettings_defaults_assistant_subtitle),
+                        selection = state.assistantSelection,
+                        rows = state.chatModels,
+                        showDivider = true,
+                        onClick = if (state.isMutationBlocked) null else {
+                            { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Assistant)) }
+                        },
+                    )
+                    DefaultModelOption(
+                        icon = Icons.Default.FlashOn,
+                        title = stringResource(R.string.modelsettings_defaults_quick_title),
+                        subtitle = stringResource(R.string.modelsettings_defaults_quick_subtitle),
+                        selection = state.fastSelection,
+                        rows = state.chatModels,
+                        onClick = if (state.isMutationBlocked) null else {
+                            { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Fast)) }
+                        },
+                    )
+                }
             }
             item { PreferenceSectionTitle(stringResource(R.string.modelsettings_defaults_section_voice)) }
             item {
-                DefaultModelOption(
-                    icon = Icons.Default.Mic,
-                    title = stringResource(R.string.modelsettings_defaults_stt_title),
-                    subtitle = stringResource(R.string.modelsettings_defaults_stt_subtitle),
-                    selection = state.speechSelection,
-                    rows = state.speechModels,
-                    onClick = if (state.isMutationBlocked) null else {
-                        { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Speech)) }
-                    },
-                )
-            }
-            item {
-                DefaultModelOption(
-                    icon = Icons.AutoMirrored.Filled.VolumeUp,
-                    title = stringResource(R.string.modelsettings_defaults_tts_title),
-                    subtitle = stringResource(R.string.modelsettings_defaults_tts_subtitle),
-                    selection = state.ttsSelection,
-                    rows = state.ttsModels,
-                    onClick = if (state.isMutationBlocked) null else {
-                        { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Tts)) }
-                    },
-                )
-            }
-            item {
-                val voice = state.ttsVoiceOptions.firstOrNull { it.id == state.ttsVoiceId }
-                val enabled = state.ttsModels.any { it.selection() == state.ttsSelection }
-                PreferenceListItem(
-                    icon = Icons.Default.GraphicEq,
-                    title = stringResource(R.string.modelsettings_defaults_voice_title),
-                    subtitle = voice?.name ?: state.ttsVoiceId,
-                    onClick = if (enabled && !state.isMutationBlocked) {
-                        { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.TtsVoice)) }
-                    } else {
-                        null
-                    },
-                    iconTint = if (enabled) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.outline
-                    },
-                )
+                PreferenceGroupCard {
+                    DefaultModelOption(
+                        icon = Icons.Default.Mic,
+                        title = stringResource(R.string.modelsettings_defaults_stt_title),
+                        subtitle = stringResource(R.string.modelsettings_defaults_stt_subtitle),
+                        selection = state.speechSelection,
+                        rows = state.speechModels,
+                        showDivider = true,
+                        onClick = if (state.isMutationBlocked) null else {
+                            { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Speech)) }
+                        },
+                    )
+                    DefaultModelOption(
+                        icon = Icons.AutoMirrored.Filled.VolumeUp,
+                        title = stringResource(R.string.modelsettings_defaults_tts_title),
+                        subtitle = stringResource(R.string.modelsettings_defaults_tts_subtitle),
+                        selection = state.ttsSelection,
+                        rows = state.ttsModels,
+                        showDivider = true,
+                        onClick = if (state.isMutationBlocked) null else {
+                            { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Tts)) }
+                        },
+                    )
+                    val voice = state.ttsVoiceOptions.firstOrNull { it.id == state.ttsVoiceId }
+                    val enabled = state.ttsModels.any { it.selection() == state.ttsSelection }
+                    PreferenceListItem(
+                        icon = Icons.Default.GraphicEq,
+                        title = stringResource(R.string.modelsettings_defaults_voice_title),
+                        subtitle = voice?.name ?: state.ttsVoiceId,
+                        showDivider = false,
+                        onClick = if (enabled && !state.isMutationBlocked) {
+                            { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.TtsVoice)) }
+                        } else {
+                            null
+                        },
+                        // 禁用态用灰色圆底 + 灰字形表达不可选，替代原来的 outline 裸图标。
+                        iconContainer = if (enabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        iconTint = if (enabled) {
+                            Color.White
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
             }
         }
     }
@@ -169,6 +179,7 @@ private fun DefaultModelOption(
     selection: ModelSelection?,
     rows: List<SelectableModelRow>,
     onClick: (() -> Unit)?,
+    showDivider: Boolean = false,
 ) {
     val selected = rows.firstOrNull { it.selection() == selection }
     PreferenceListItem(
@@ -176,6 +187,7 @@ private fun DefaultModelOption(
         title = title,
         subtitle = selected?.let { "${it.model.name} · ${it.service.name}" } ?: subtitle,
         onClick = onClick,
+        showDivider = showDivider,
     )
 }
 

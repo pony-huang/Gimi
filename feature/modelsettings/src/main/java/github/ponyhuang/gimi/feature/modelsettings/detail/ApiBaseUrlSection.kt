@@ -42,7 +42,7 @@ fun ApiBaseUrlSection(
     val showsBaseUrlField = service.apiProtocol != ApiProtocol.Gemini
 
     Column(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (options.size == 1) {
@@ -52,7 +52,7 @@ fun ApiBaseUrlSection(
                 onValueChange = {},
                 readOnly = true,
                 enabled = false,
-                label = { Text(stringResource(R.string.modelsettings_api_url_label)) },
+                label = { Text(stringResource(R.string.modelsettings_api_protocol_label)) },
                 modifier = Modifier.fillMaxWidth(),
             )
         } else {
@@ -64,7 +64,7 @@ fun ApiBaseUrlSection(
                     value = currentLabel,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text(stringResource(R.string.modelsettings_api_url_label)) },
+                    label = { Text(stringResource(R.string.modelsettings_api_protocol_label)) },
                     trailingIcon = {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = isMenuExpanded)
                     },

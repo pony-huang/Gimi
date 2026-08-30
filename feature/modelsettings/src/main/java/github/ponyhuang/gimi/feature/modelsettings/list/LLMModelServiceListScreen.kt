@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,6 +15,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.feature.modelsettings.R
+import github.ponyhuang.gimi.ui.preference.PreferenceBanner
+import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
+import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 
@@ -30,13 +32,11 @@ fun LLMModelServiceListScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             PreferenceSectionTitle(
                 text = stringResource(R.string.modelsettings_list_section_configured),
-                modifier = Modifier.padding(top = 12.dp),
             )
             if (state.isMutationBlocked) {
-                Text(
+                PreferenceBanner(
                     text = stringResource(R.string.modelsettings_agent_mutation_blocked),
-                    color = androidx.compose.material3.MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                    tone = PreferenceBannerTone.Error,
                 )
             }
             when (state.loadState) {
@@ -54,17 +54,23 @@ fun LLMModelServiceListScreen(
                 }
                 CatalogLoadState.Ready -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 24.dp),
+                    contentPadding = PaddingValues(vertical = 4.dp),
                 ) {
-                    items(items = state.items, key = { it.id }) { item ->
-                        ModelServiceCard(
-                            item = item,
-                            mutationEnabled = !state.isMutationBlocked,
-                            onClick = onNavigateToDetail,
-                            onToggleEnabled = { id, enabled ->
-                                onAction(ModelServiceListAction.EnabledChanged(id, enabled))
-                            },
-                        )
+                    item {
+                        // 供应商数量有限，整组渲染进同一张 One UI 卡片即可。
+                        PreferenceGroupCard {
+                            state.items.forEachIndexed { index, item ->
+                                ModelServiceCard(
+                                    item = item,
+                                    mutationEnabled = !state.isMutationBlocked,
+                                    showDivider = index < state.items.lastIndex,
+                                    onClick = onNavigateToDetail,
+                                    onToggleEnabled = { id, enabled ->
+                                        onAction(ModelServiceListAction.EnabledChanged(id, enabled))
+                                    },
+                                )
+                            }
+                        }
                     }
                 }
             }

@@ -5,10 +5,11 @@
     <string name="voicewake_listening_subtitle">连接蓝牙耳机后，可通过唤醒词在后台执行任务</string>
 
     <string name="voicewake_section_models">唤醒模型</string>
+    <string name="voicewake_section_models_note">选择后自动下载，识别仅在本机进行</string>
     <string name="voicewake_model_cn_name">中文唤醒模型</string>
     <string name="voicewake_model_en_name">英语唤醒模型</string>
     <string name="voicewake_model_status_bundled">选择后自动准备</string>
-    <string name="voicewake_model_status_download_required">选择后自动下载约 %1$d MB，识别仅在本机进行</string>
+    <string name="voicewake_model_status_download_required">约 %1$d MB</string>
     <string name="voicewake_model_downloading_progress">正在下载 %1$d%%</string>
     <string name="voicewake_model_installing">正在安装模型</string>
     <string name="voicewake_model_removing">正在移除模型</string>

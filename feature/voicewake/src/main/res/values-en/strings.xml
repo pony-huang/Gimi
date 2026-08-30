@@ -5,10 +5,11 @@
     <string name="voicewake_listening_subtitle">After connecting a Bluetooth headset, use the wake word to run tasks in the background</string>
 
     <string name="voicewake_section_models">Wake models</string>
+    <string name="voicewake_section_models_note">Models download automatically after selection; recognition runs entirely on-device</string>
     <string name="voicewake_model_cn_name">Chinese wake-word model</string>
     <string name="voicewake_model_en_name">English wake-word model</string>
     <string name="voicewake_model_status_bundled">Prepared automatically when selected</string>
-    <string name="voicewake_model_status_download_required">Selecting downloads about %1$d MB; recognition stays on-device</string>
+    <string name="voicewake_model_status_download_required">About %1$d MB</string>
     <string name="voicewake_model_downloading_progress">Downloading %1$d%%</string>
     <string name="voicewake_model_installing">Installing model</string>
     <string name="voicewake_model_removing">Removing model</string>

@@ -114,6 +114,13 @@ fun VoiceWakeSettingsScreen(
                 PreferenceSectionTitle(
                     text = stringResource(R.string.voicewake_section_models),
                 )
+                // 各模型描述只保留差异化的体积信息，下载与本地识别的共性说明收敛为标题下备注。
+                Text(
+                    text = stringResource(R.string.voicewake_section_models_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 32.dp, end = 32.dp, bottom = 8.dp),
+                )
             }
             item {
                 // 唤醒模型数量有限，整组渲染进同一张卡片。

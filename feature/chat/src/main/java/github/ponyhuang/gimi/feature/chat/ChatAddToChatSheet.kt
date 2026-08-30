@@ -71,6 +71,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -89,6 +90,8 @@ import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
+import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
+import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
 
 private const val WEB_SEARCH_TOOL_ID: String = "web_search"
 private const val KIMI_FORMULAS_TOOL_ID: String = "kimi_formulas"
@@ -132,6 +135,8 @@ internal fun ChatAddToChatSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
+        // 面板底色与设置画布同源：灰画布承载白色分组卡片，与设置页保持同一视觉语言。
+        containerColor = preferenceCanvasColor(),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -355,7 +360,10 @@ private fun AddToChatHome(
                     onClick = onOpenTools,
                     testTag = "session-tools-nav",
                 )
-                HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 66.dp, end = 16.dp),
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                )
                 NavigationRow(
                     icon = Icons.Default.Tune,
                     title = stringResource(R.string.chat_tool_access_title),
@@ -365,7 +373,10 @@ private fun AddToChatHome(
                     onClick = onOpenToolAccess,
                     testTag = "tool-access-nav",
                 )
-                HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 66.dp, end = 16.dp),
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                )
                 FullAccessSwitchRow(
                     checked = state.fullAccess,
                     onCheckedChange = onFullAccessChange,
@@ -416,7 +427,7 @@ private fun AttachmentShortcut(
         enabled = enabled,
         modifier = modifier.height(108.dp),
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = preferenceGroupCardColor(),
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -436,7 +447,7 @@ private fun AttachmentShortcut(
 private fun GroupedCard(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = preferenceGroupCardColor(),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(content = content)
@@ -454,22 +465,22 @@ private fun NavigationRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 76.dp)
+            .heightIn(min = 60.dp)
             .clickable(onClick = onClick)
             .testTag(testTag)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconBubble(icon)
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 16.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(title, style = MaterialTheme.typography.titleMedium)
             Text(
                 subtitle,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -485,31 +496,31 @@ private fun FullAccessSwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 76.dp)
+            .heightIn(min = 60.dp)
             .toggleable(
                 value = checked,
                 role = Role.Switch,
                 onValueChange = onCheckedChange,
             )
             .testTag("full-access-switch")
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconBubble(Icons.Default.Lock)
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 16.dp),
         ) {
             Text(
                 stringResource(R.string.chat_full_access_title),
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.titleMedium,
             )
             Text(
                 stringResource(R.string.chat_full_access_description),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -694,7 +705,10 @@ private fun OfficialToolsDetailPage(
                                         onFunctionEnabledChange(tool.id, function.id, it)
                                     },
                                 )
-                                HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
+                                HorizontalDivider(
+                    modifier = Modifier.padding(start = 66.dp, end = 16.dp),
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                )
                             }
                         }
                     }
@@ -792,7 +806,7 @@ private fun OfficialToolFunctionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 72.dp)
+            .heightIn(min = 60.dp)
             .toggleable(
                 value = enabled,
                 enabled = mutationEnabled,
@@ -806,9 +820,9 @@ private fun OfficialToolFunctionRow(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 16.dp),
         ) {
-            Text(function.name, style = MaterialTheme.typography.bodyLarge)
+            Text(function.name, style = MaterialTheme.typography.titleMedium)
             Text(
                 function.description,
                 maxLines = 2,
@@ -874,7 +888,10 @@ private fun LocalToolsPage(
                         state.configuration != null,
                     onEnabledChange = { onEnabledChange(tool.id, it) },
                 )
-                HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 66.dp, end = 16.dp),
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                )
             }
         }
     }
@@ -890,7 +907,7 @@ private fun LocalToolRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 72.dp)
+            .heightIn(min = 60.dp)
             .toggleable(
                 value = enabled,
                 enabled = mutationEnabled,
@@ -904,9 +921,9 @@ private fun LocalToolRow(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 16.dp),
         ) {
-            Text(tool.name, style = MaterialTheme.typography.bodyLarge)
+            Text(tool.name, style = MaterialTheme.typography.titleMedium)
             Text(
                 tool.description,
                 maxLines = 2,
@@ -970,7 +987,10 @@ private fun McpServersPage(
                             state.configuration != null,
                         onEnabledChange = { onEnabledChange(server.id, it) },
                     )
-                    HorizontalDivider(modifier = Modifier.padding(start = 72.dp))
+                    HorizontalDivider(
+                    modifier = Modifier.padding(start = 66.dp, end = 16.dp),
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                )
                 }
             }
         }
@@ -987,23 +1007,23 @@ private fun McpServerRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 84.dp)
+            .heightIn(min = 60.dp)
             .toggleable(
                 value = enabled,
                 enabled = mutationEnabled,
                 role = Role.Switch,
                 onValueChange = onEnabledChange,
             )
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconBubble(ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp))
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 16.dp),
         ) {
-            Text(server.name.ifBlank { server.id }, style = MaterialTheme.typography.bodyLarge)
+            Text(server.name.ifBlank { server.id }, style = MaterialTheme.typography.titleMedium)
             Text(
                 when (server.transport) {
                     McpTransport.SSE -> stringResource(R.string.chat_mcp_transport_sse)
@@ -1136,17 +1156,18 @@ private fun InlineNotice(
 
 @Composable
 private fun IconBubble(icon: ImageVector) {
+    // 与设置行同一语言：主题蓝圆底 + 白色 glyph。
     Surface(
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.primaryContainer,
-        modifier = Modifier.size(44.dp),
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.size(34.dp),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(22.dp),
+                tint = Color.White,
+                modifier = Modifier.size(20.dp),
             )
         }
     }

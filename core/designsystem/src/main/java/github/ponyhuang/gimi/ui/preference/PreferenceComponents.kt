@@ -49,8 +49,12 @@ fun preferenceCanvasColor(): Color {
     return if (isDark) PreferenceCanvasDark else PreferenceCanvasLight
 }
 
+/**
+ * 设置分组卡片底色：浅色纯白、深色为比画布略亮的表面。
+ * 供 [PreferenceGroupCard] 与需要同语言卡片的浮层（如聊天抽屉）共用。
+ */
 @Composable
-private fun preferenceGroupCardColor(): Color {
+fun preferenceGroupCardColor(): Color {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     return if (isDark) PreferenceGroupCardDark else PreferenceGroupCardLight
 }

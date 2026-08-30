@@ -155,6 +155,7 @@ speech, MCP servers) and to GitHub for app updates. See [PRIVACY.md](PRIVACY.md)
 - [GetStream/chat-ai-samples](https://github.com/GetStream/chat-ai-samples)
 - [mikepenz/multiplatform-markdown-renderer](https://github.com/mikepenz/multiplatform-markdown-renderer)
 - [google/adk-kotlin](https://github.com/google/adk-kotlin)
+- [MediaPipe Text Embedder for Android](https://developers.google.com/edge/mediapipe/solutions/text/text_embedder/android)
 - [xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp)
 
 ## License

@@ -132,6 +132,7 @@ Gimi 不收集任何数据：无统计埋点、无遥测、无账号，开发者
 - [GetStream/chat-ai-samples](https://github.com/GetStream/chat-ai-samples)
 - [mikepenz/multiplatform-markdown-renderer](https://github.com/mikepenz/multiplatform-markdown-renderer)
 - [google/adk-kotlin](https://github.com/google/adk-kotlin)
+- [MediaPipe Text Embedder（Android）](https://developers.google.com/edge/mediapipe/solutions/text/text_embedder/android)
 - [xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp)
 
 ## 开源协议

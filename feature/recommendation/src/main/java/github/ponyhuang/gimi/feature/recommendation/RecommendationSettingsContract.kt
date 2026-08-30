@@ -11,6 +11,7 @@ import github.ponyhuang.gimi.domain.recommendation.model.RecommendationRefreshSt
  * @property generatedAtEpochMillis 最近成功更新时间。
  * @property refreshStatus 当前更新生命周期。
  * @property lastError 最近一次安全错误信息。
+ * @property retryDelaySeconds 距下次自动重试的等待秒数；仅在失败重试等待期非空。
  */
 data class RecommendationSettingsUiState(
     val enabled: Boolean = true,
@@ -19,6 +20,7 @@ data class RecommendationSettingsUiState(
     val generatedAtEpochMillis: Long? = null,
     val refreshStatus: RecommendationRefreshStatus = RecommendationRefreshStatus.Idle,
     val lastError: String? = null,
+    val retryDelaySeconds: Long? = null,
 )
 
 sealed interface RecommendationSettingsAction {

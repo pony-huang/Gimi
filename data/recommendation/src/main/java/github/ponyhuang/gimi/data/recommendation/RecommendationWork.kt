@@ -21,11 +21,11 @@ import github.ponyhuang.gimi.domain.recommendation.model.RecommendationSnapshot
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationCapabilitySource
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationContextSource
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationGenerator
-import java.io.IOException
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 
 /** 推荐刷新对于后台调度器的稳定结果分类。 */
 enum class RecommendationRefreshOutcome {
@@ -43,6 +43,8 @@ class RecommendationRefresher(
     private val preferences: RecommendationPreferences,
     private val runWhenAgentIdle: RunWhenAgentIdleUseCase,
     private val nowEpochMillis: () -> Long,
+    // 等待注入便于测试记录重试节奏，生产实现为真实挂起延迟。
+    private val retryDelay: suspend (Long) -> Unit = { delay(it) },
 ) {
     @Inject
     constructor(
@@ -79,19 +81,35 @@ class RecommendationRefresher(
         }
     }
 
-    suspend fun refreshSafely(): RecommendationRefreshOutcome = try {
-        refresh()
-    } catch (error: CancellationException) {
-        throw error
-    } catch (error: Throwable) {
-        preferences.markFailed(error.message ?: "Recommendation update failed")
-        when (error) {
-            is IOException -> RecommendationRefreshOutcome.Retry
-            is IllegalArgumentException,
-            is IllegalStateException,
-            -> RecommendationRefreshOutcome.Failure
-            else -> RecommendationRefreshOutcome.Retry
+    /**
+     * 失败自动重试包装：任意异常均按 [RETRY_DELAY_SECONDS] 顺序等待后重试，
+     * 梯子耗尽才记录最终失败。Agent 忙返回 [RecommendationRefreshOutcome.Retry]
+     * 交给 WorkManager 原生退避，不属于失败、不消耗梯子。
+     */
+    suspend fun refreshSafely(): RecommendationRefreshOutcome {
+        var attempt = 0
+        while (true) {
+            try {
+                return refresh()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                val message = error.message ?: "Recommendation update failed"
+                val delaySeconds = RETRY_DELAY_SECONDS.getOrNull(attempt)
+                if (delaySeconds == null) {
+                    preferences.markFailed(message)
+                    return RecommendationRefreshOutcome.Failure
+                }
+                preferences.markRetrying(delaySeconds, message)
+                retryDelay(delaySeconds * 1000)
+                attempt++
+            }
         }
+    }
+
+    private companion object {
+        /** 失败后的固定重试等待秒数；按序消耗，耗尽后落为最终失败。 */
+        val RETRY_DELAY_SECONDS: List<Long> = listOf(30L, 60L, 120L, 180L)
     }
 }
 

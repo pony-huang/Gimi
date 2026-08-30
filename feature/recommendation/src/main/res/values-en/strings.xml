@@ -11,6 +11,7 @@
     <string name="recommendation_status_never">No recommendations generated yet</string>
     <string name="recommendation_status_updated">Last updated: %1$s</string>
     <string name="recommendation_status_error">Update failed: %1$s</string>
+    <string name="recommendation_status_retrying">Update failed: %1$s. Retrying in %2$d s.</string>
     <string name="recommendation_privacy_section">Privacy</string>
     <string name="recommendation_permissions_title">Context permissions</string>
     <string name="recommendation_permissions_subtitle">Manage location and app usage; unavailable context is skipped</string>

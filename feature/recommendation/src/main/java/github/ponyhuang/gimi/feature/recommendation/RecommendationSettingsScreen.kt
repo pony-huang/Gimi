@@ -169,6 +169,12 @@ fun RecommendationSettingsScreen(
 
 @Composable
 private fun recommendationStatusText(state: RecommendationSettingsUiState): String = when {
+    state.lastError != null && state.retryDelaySeconds != null ->
+        stringResource(
+            R.string.recommendation_status_retrying,
+            state.lastError,
+            state.retryDelaySeconds,
+        )
     state.lastError != null -> stringResource(R.string.recommendation_status_error, state.lastError)
     state.refreshStatus == RecommendationRefreshStatus.Refreshing ->
         stringResource(R.string.recommendation_status_refreshing)

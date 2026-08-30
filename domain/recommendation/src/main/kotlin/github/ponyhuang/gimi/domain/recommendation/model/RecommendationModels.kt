@@ -83,12 +83,14 @@ sealed interface RecommendationRefreshStatus {
  * @property snapshot 最近一次成功快照；尚未生成时为空。
  * @property refreshStatus 当前刷新生命周期。
  * @property lastError 最近一次失败的安全展示信息。
+ * @property retryDelaySeconds 距下次自动重试的等待秒数；仅在失败重试等待期非空，其余阶段为 null。
  */
 data class RecommendationState(
     val settings: RecommendationSettings = RecommendationSettings(),
     val snapshot: RecommendationSnapshot? = null,
     val refreshStatus: RecommendationRefreshStatus = RecommendationRefreshStatus.Idle,
     val lastError: String? = null,
+    val retryDelaySeconds: Long? = null,
 )
 
 /**

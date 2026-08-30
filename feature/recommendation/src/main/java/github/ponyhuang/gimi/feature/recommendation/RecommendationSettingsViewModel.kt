@@ -41,5 +41,6 @@ private fun RecommendationState.toUiState() = RecommendationSettingsUiState(
     generatedAtEpochMillis = snapshot?.generatedAtEpochMillis,
     refreshStatus = refreshStatus,
     lastError = lastError,
+    retryDelaySeconds = retryDelaySeconds,
 )
 

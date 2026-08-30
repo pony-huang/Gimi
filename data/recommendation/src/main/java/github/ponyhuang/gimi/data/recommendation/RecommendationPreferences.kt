@@ -70,7 +70,11 @@ class RecommendationPreferences @Inject constructor(
     override fun requestRefresh() {
         if (!mutableState.value.settings.enabled) return
         mutableState.update {
-            it.copy(refreshStatus = RecommendationRefreshStatus.Scheduled, lastError = null)
+            it.copy(
+                refreshStatus = RecommendationRefreshStatus.Scheduled,
+                lastError = null,
+                retryDelaySeconds = null,
+            )
         }
         scheduler.enqueueImmediate()
     }
@@ -83,21 +87,41 @@ class RecommendationPreferences @Inject constructor(
                 snapshot = snapshot,
                 refreshStatus = RecommendationRefreshStatus.Idle,
                 lastError = null,
+                retryDelaySeconds = null,
             )
         }
     }
 
-    /** 标记刷新已实际进入模型调用。 */
+    /** 标记刷新已实际进入模型调用；重试等待结束进入新一次尝试时重置倒计时。 */
     fun markRefreshing() {
         mutableState.update {
-            it.copy(refreshStatus = RecommendationRefreshStatus.Refreshing, lastError = null)
+            it.copy(
+                refreshStatus = RecommendationRefreshStatus.Refreshing,
+                lastError = null,
+                retryDelaySeconds = null,
+            )
         }
     }
 
-    /** 记录安全错误文案，同时保留最后成功快照。 */
+    /** 记录失败后的等待倒计时；期间保持 Refreshing，避免手动刷新打断重试梯子。 */
+    fun markRetrying(delaySeconds: Long, message: String) {
+        mutableState.update {
+            it.copy(
+                refreshStatus = RecommendationRefreshStatus.Refreshing,
+                lastError = message,
+                retryDelaySeconds = delaySeconds,
+            )
+        }
+    }
+
+    /** 记录安全错误文案，同时保留最后成功快照；重试梯子耗尽后到达此处。 */
     fun markFailed(message: String) {
         mutableState.update {
-            it.copy(refreshStatus = RecommendationRefreshStatus.Idle, lastError = message)
+            it.copy(
+                refreshStatus = RecommendationRefreshStatus.Idle,
+                lastError = message,
+                retryDelaySeconds = null,
+            )
         }
     }
 

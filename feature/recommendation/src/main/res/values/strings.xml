@@ -11,6 +11,7 @@
     <string name="recommendation_status_never">尚未生成推荐</string>
     <string name="recommendation_status_updated">上次更新：%1$s</string>
     <string name="recommendation_status_error">更新失败：%1$s</string>
+    <string name="recommendation_status_retrying">更新失败：%1$s，%2$d 秒后自动重试</string>
     <string name="recommendation_privacy_section">隐私</string>
     <string name="recommendation_permissions_title">上下文权限</string>
     <string name="recommendation_permissions_subtitle">管理位置与应用使用情况；未授权的信息会被跳过</string>

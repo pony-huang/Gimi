@@ -14,6 +14,7 @@ import github.ponyhuang.gimi.domain.workfiles.repository.WorkDirectoryRepository
 import github.ponyhuang.gimi.data.agent.permission.MediaPermissionActivity
 import javax.inject.Inject
 import javax.inject.Singleton
+import androidx.core.net.toUri
 
 /**
  * 文件域工具：文件选择、共享媒体搜索、文档目录递归搜索、预览打开。
@@ -69,7 +70,13 @@ class FilesTool @Inject constructor(
 
     @Tool(
         name = "search_media_files",
-        description = "Searches shared images, videos, and audio files by name on this device. Returns up to 50 newest matches as structured results that the chat UI renders directly. Summarize the outcome without repeating the complete file-name list. Requires permission to access the requested media type.",
+        description = "Searches shared images, videos, and audio files by file name on this device. " +
+            "The query matches file NAMES only (no semantic or content search): for a request like " +
+            "'photos of cats', derive the short keyword most likely inside a file name (e.g. 'cat') " +
+            "instead of sending the full sentence. If the search returns no results, retry once or " +
+            "twice with a different keyword before reporting failure. Returns up to 50 newest matches " +
+            "as structured results that the chat UI renders directly. Summarize the outcome without " +
+            "repeating the complete file-name list. Requires permission to access the requested media type.",
         requireConfirmation = true,
     )
     fun searchMediaFiles(
@@ -93,19 +100,18 @@ class FilesTool @Inject constructor(
         val results = accessible.flatMap { collection -> queryMedia(collection, value) }
             .sortedByDescending { it["modifiedTimeMillis"] as Long }
             .take(MAX_RESULTS)
-        return mapOf(
-            "success" to true,
-            "query" to value,
-            "results" to results,
-            "skippedMediaTypes" to requested.filterNot(accessible::contains).map { it.type },
-        )
+        return mediaResponse(value, results, requested.filterNot(accessible::contains).map { it.type })
     }
 
     // ---------- 文档目录搜索 ----------
 
     @Tool(
         name = "search_documents",
-        description = "Recursively searches file names in document directories the user has authorized in Settings. Returns up to 50 newest matching files as structured results that the chat UI renders directly. Summarize the outcome without repeating the complete file-name list.",
+        description = "Recursively searches file names in document directories the user has authorized in Settings. " +
+            "The query matches file NAMES only: use a short keyword most likely inside the target file name, " +
+            "and if no results are returned, retry once or twice with a different keyword before reporting failure. " +
+            "Returns up to 50 newest matching files as structured results that the chat UI renders directly. " +
+            "Summarize the outcome without repeating the complete file-name list.",
         requireConfirmation = true,
     )
     fun searchDocuments(@Param("A non-blank file-name query.") query: String): Map<String, Any> {
@@ -118,13 +124,19 @@ class FilesTool @Inject constructor(
         val results = mutableListOf<Map<String, Any>>()
         trees.forEach { treeUri ->
             val rootId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull()
-            if (rootId != null) searchTree(treeUri, rootId, value, results)
+            if (rootId != null) searchTree(treeUri, rootId, listOf(value), results)
         }
-        return mapOf(
-            "success" to true,
-            "query" to value,
-            "results" to results.sortedByDescending { it["modifiedTimeMillis"] as Long }.take(MAX_RESULTS),
-        )
+        // 精确短语零结果时按分词放宽（任一词命中），与 queryMedia 的兜底策略保持一致。
+        if (results.isEmpty()) {
+            val tokens = relaxedQueryTokens(value)
+            if (tokens.size > 1) {
+                trees.forEach { treeUri ->
+                    val rootId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull()
+                    if (rootId != null) searchTree(treeUri, rootId, tokens, results)
+                }
+            }
+        }
+        return documentResponse(value, results)
     }
 
     @Tool(
@@ -133,7 +145,7 @@ class FilesTool @Inject constructor(
         requireConfirmation = true,
     )
     fun openLocalFile(@Param("The file identifier returned by search_mediaFiles or searchDocuments.") contentUri: String): Map<String, Any> {
-        val uri = runCatching { Uri.parse(contentUri) }.getOrNull() ?: return error("contentUri is invalid.")
+        val uri = runCatching { contentUri.toUri() }.getOrNull() ?: return error("contentUri is invalid.")
         if (uri.scheme != "content" || !isAllowedUri(uri)) return error(
             "contentUri is not an accessible media result or a file from an authorized document directory.",
         )
@@ -157,12 +169,29 @@ class FilesTool @Inject constructor(
             MediaStore.MediaColumns.SIZE,
             MediaStore.MediaColumns.DATE_MODIFIED,
         )
+        val primary = queryByName(collection, projection, listOf(query))
+        // 精确短语零结果时按空白分词放宽为“任一词命中”，避免多词查询因整体短语不在文件名里而完全失败。
+        if (primary.isNotEmpty()) return primary
+        val tokens = relaxedQueryTokens(query)
+        if (tokens.size <= 1) return primary
+        return queryByName(collection, projection, tokens)
+    }
+
+    private fun queryByName(
+        collection: MediaCollection,
+        projection: Array<String>,
+        patterns: List<String>,
+    ): List<Map<String, Any>> {
+        val selection = patterns.joinToString(" OR ") {
+            "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ? ESCAPE '\\' COLLATE NOCASE"
+        }
+        val selectionArgs = patterns.map { "%${escapeLikePattern(it)}%" }.toTypedArray()
         return runCatching {
             context.contentResolver.query(
                 collection.uri,
                 projection,
-                "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ? ESCAPE '\\' COLLATE NOCASE",
-                arrayOf("%${escapeLikePattern(query)}%"),
+                selection,
+                selectionArgs,
                 "${MediaStore.MediaColumns.DATE_MODIFIED} DESC",
             )?.use { cursor ->
                 buildList {
@@ -187,7 +216,7 @@ class FilesTool @Inject constructor(
     private fun searchTree(
         treeUri: Uri,
         parentId: String,
-        query: String,
+        patterns: List<String>,
         results: MutableList<Map<String, Any>>,
     ) {
         if (results.size >= MAX_RESULTS) return
@@ -206,8 +235,8 @@ class FilesTool @Inject constructor(
                     val displayName = cursor.getString(1).orEmpty()
                     val mimeType = cursor.getString(2).orEmpty()
                     if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) {
-                        searchTree(treeUri, documentId, query, results)
-                    } else if (displayName.contains(query, ignoreCase = true)) {
+                        searchTree(treeUri, documentId, patterns, results)
+                    } else if (patterns.any { displayName.contains(it, ignoreCase = true) }) {
                         results += fileResult(
                             uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId),
                             displayName = displayName,
@@ -219,6 +248,30 @@ class FilesTool @Inject constructor(
                     }
                 }
             }
+        }
+    }
+
+    // 零结果时明确告知模型“已搜过但文件名不含该词”，推动它换关键字重试而不是直接放弃。
+    private fun mediaResponse(
+        query: String,
+        results: List<Map<String, Any>>,
+        skippedMediaTypes: List<String>,
+    ): Map<String, Any> = buildMap {
+        put("success", true)
+        put("query", query)
+        put("results", results)
+        put("skippedMediaTypes", skippedMediaTypes)
+        if (results.isEmpty()) {
+            put("hint", NO_RESULT_HINT)
+        }
+    }
+
+    private fun documentResponse(query: String, unsorted: List<Map<String, Any>>): Map<String, Any> = buildMap {
+        put("success", true)
+        put("query", query)
+        put("results", unsorted.sortedByDescending { it["modifiedTimeMillis"] as Long }.take(MAX_RESULTS))
+        if (unsorted.isEmpty()) {
+            put("hint", NO_RESULT_HINT)
         }
     }
 
@@ -266,3 +319,11 @@ internal fun escapeLikePattern(value: String): String = buildString(value.length
         append(character)
     }
 }
+
+// 按空白分词去重；单 token 场景调用方直接回退原查询，不产生行为变化。
+internal fun relaxedQueryTokens(query: String): List<String> =
+    query.trim().split(Regex("\\s+")).filter(String::isNotEmpty).distinct()
+
+private const val NO_RESULT_HINT =
+    "No file name contains this query. Ask the user for a different or shorter keyword, " +
+        "or try a keyword that likely appears in the target file name."

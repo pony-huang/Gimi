@@ -2,9 +2,11 @@ package github.ponyhuang.gimi.data.agent.conversation
 
 import com.google.adk.kt.events.Event
 import com.google.adk.kt.types.FunctionCall
+import android.util.Log
 import github.ponyhuang.gimi.data.agent.AgentChatRunner
 import github.ponyhuang.gimi.domain.conversation.model.ChatFunctionCall
 import github.ponyhuang.gimi.domain.conversation.model.ChatFunctionResponse
+import github.ponyhuang.gimi.domain.conversation.model.isLocalFileSearchTool
 import github.ponyhuang.gimi.domain.conversation.model.parseLocalFileSearchResult
 import github.ponyhuang.gimi.domain.conversation.model.parseRemoteImageResult
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
@@ -87,10 +89,15 @@ class AdkChatAgentRepository @Inject constructor(
         },
         functionCalls = functionCalls().map { it.toDomain() },
         functionResponses = functionResponses().map {
+            val parsed = parseLocalFileSearchResult(it.name, it.response)
+            // 本地搜索“找到了文件却不出轮播”只能靠这条日志排查，成功/失败路径都留线索。
+            if (parsed == null && isLocalFileSearchTool(it.name)) {
+                diagnoseLocalSearchResponse(it.name, it.response)
+            }
             ChatFunctionResponse(
                 id = it.id,
                 name = it.name,
-                localFileSearchResult = parseLocalFileSearchResult(it.name, it.response),
+                localFileSearchResult = parsed,
                 remoteImageResult = parseRemoteImageResult(it.response),
             )
         },
@@ -118,7 +125,23 @@ class AdkChatAgentRepository @Inject constructor(
         return ChatFunctionCall(id, name, rawArgs, confirmation)
     }
 
+    // success=false 是工具的预期失败路径（如未授权），降为 Info；形状异常才值得 Warn。
+    private fun diagnoseLocalSearchResponse(name: String, response: Map<String, Any?>) {
+        val payload = (response["result"] as? Map<*, *>) ?: response
+        if (payload["success"] == false) {
+            Log.i(TAG, "Local search tool reported failure: tool=$name error=${payload["error"]}")
+        } else {
+            Log.w(
+                TAG,
+                "Local search response not renderable: tool=$name " +
+                    "resultType=${response["result"]?.let { it::class.java.simpleName }} " +
+                    "payloadKeys=${payload.keys}",
+            )
+        }
+    }
+
     private companion object {
         const val USER_ID = AgentSessionIdentity.DEFAULT_USER_ID
+        const val TAG = "AdkChatAgentRepository"
     }
 }

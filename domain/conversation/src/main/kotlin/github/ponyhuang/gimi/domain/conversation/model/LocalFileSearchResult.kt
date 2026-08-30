@@ -36,6 +36,9 @@ data class LocalFileSearchResult(
     val files: List<LocalFileReference>,
 )
 
+/** Whether a tool response should be interpreted as a local file search payload. */
+fun isLocalFileSearchTool(toolName: String): Boolean = toolName in LocalFileSearchToolNames
+
 /** Converts the JSON-native response of a local search tool into a UI-safe domain result. */
 fun parseLocalFileSearchResult(
     toolName: String,

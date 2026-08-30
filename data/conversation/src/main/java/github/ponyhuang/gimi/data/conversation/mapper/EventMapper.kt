@@ -5,11 +5,13 @@ import com.google.adk.kt.sessions.Session
 import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.FunctionResponse
 import com.google.adk.kt.types.Part
+import android.util.Log
 import github.ponyhuang.gimi.domain.conversation.model.FunctionCallView
 import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
+import github.ponyhuang.gimi.domain.conversation.model.isLocalFileSearchTool
 import github.ponyhuang.gimi.domain.conversation.model.parseLocalFileSearchResult
 import github.ponyhuang.gimi.domain.conversation.model.parseRemoteImageResult
 import github.ponyhuang.gimi.domain.conversation.model.Messages
@@ -214,13 +216,36 @@ object EventMapper {
         return FunctionCallView(id = id.orEmpty(), name = name, argsSummary = argsText)
     }
 
-    private fun FunctionResponse.toView(): FunctionResponseView =
-        FunctionResponseView(
+    private fun FunctionResponse.toView(): FunctionResponseView {
+        val parsed = parseLocalFileSearchResult(name, response)
+        // 与 AdkChatAgentRepository 的流式路径保持同一诊断：历史回放丢轮播时同样可追因。
+        if (parsed == null && isLocalFileSearchTool(name)) {
+            diagnoseLocalSearchResponse(name, response)
+        }
+        return FunctionResponseView(
             id = id.orEmpty(),
             name = name,
-            localFileSearchResult = parseLocalFileSearchResult(name, response),
+            localFileSearchResult = parsed,
             remoteImageResult = parseRemoteImageResult(response),
         )
+    }
+
+    private const val TAG = "EventMapper"
+
+    // success=false 是工具的预期失败路径（如未授权），降为 Info；形状异常才值得 Warn。
+    private fun diagnoseLocalSearchResponse(name: String, response: Map<String, Any?>) {
+        val payload = (response["result"] as? Map<*, *>) ?: response
+        if (payload["success"] == false) {
+            Log.i(TAG, "Local search tool reported failure: tool=$name error=${payload["error"]}")
+        } else {
+            Log.w(
+                TAG,
+                "Local search response not renderable: tool=$name " +
+                    "resultType=${response["result"]?.let { it::class.java.simpleName }} " +
+                    "payloadKeys=${payload.keys}",
+            )
+        }
+    }
 
     private fun summarizeValue(v: Any?): String = when (v) {
         null -> "null"

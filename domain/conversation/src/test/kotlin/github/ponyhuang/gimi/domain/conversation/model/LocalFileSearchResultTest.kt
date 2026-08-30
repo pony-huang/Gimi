@@ -1,7 +1,9 @@
 package github.ponyhuang.gimi.domain.conversation.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LocalFileSearchResultTest {
@@ -96,5 +98,13 @@ class LocalFileSearchResultTest {
     fun `ignores failed and unrelated tool responses`() {
         assertNull(parseLocalFileSearchResult("clock", mapOf("success" to true, "results" to emptyList<Any>())))
         assertNull(parseLocalFileSearchResult("search_documents", mapOf("success" to false)))
+    }
+
+    @Test
+    fun `recognizes local file search tool names only`() {
+        assertTrue(isLocalFileSearchTool("search_media_files"))
+        assertTrue(isLocalFileSearchTool("search_documents"))
+        assertFalse(isLocalFileSearchTool("search_web"))
+        assertFalse(isLocalFileSearchTool(""))
     }
 }

@@ -1,10 +1,10 @@
 plugins {
-    alias(libs.plugins.kotlin.jvm)
+    id("gimi.kotlin.jvm.library")
 }
-
-kotlin { jvmToolchain(11) }
 
 dependencies {
     implementation(libs.javax.inject)
     api(libs.kotlinx.coroutines.core)
+
+    testImplementation(libs.junit)
 }

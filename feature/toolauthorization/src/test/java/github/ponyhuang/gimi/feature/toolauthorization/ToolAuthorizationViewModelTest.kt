@@ -4,6 +4,8 @@ import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import app.cash.turbine.test
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
+import github.ponyhuang.gimi.domain.toolauthorization.usecase.SetToolAuthorizationUseCase
+import github.ponyhuang.gimi.domain.toolauthorization.usecase.ToolAuthorizationMutationResult
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 import io.mockk.every

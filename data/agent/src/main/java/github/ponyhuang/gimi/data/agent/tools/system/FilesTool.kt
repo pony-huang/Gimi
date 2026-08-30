@@ -1,0 +1,260 @@
+package github.ponyhuang.gimi.data.agent.tools.system
+
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.DocumentsContract
+import android.provider.MediaStore
+import com.google.adk.kt.annotations.Param
+import com.google.adk.kt.annotations.Tool
+import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.gimi.domain.workfiles.repository.WorkDirectoryRepository
+import github.ponyhuang.gimi.data.agent.permission.MediaPermissionActivity
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * 文件域工具：文件选择、共享媒体搜索、文档目录递归搜索、预览打开。
+ *
+ * 对应 [github.ponyhuang.gimi.domain.toolauthorization.model.LocalToolCategory.FILES]。
+ */
+@Singleton
+class FilesTool @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val queue: IntentActionQueue,
+    private val documentDirectories: WorkDirectoryRepository,
+) {
+    // ---------- 文件选择 ----------
+
+    @Tool(name = "get_file", description = "Opens a file picker so the user can choose a file of the requested type.", requireConfirmation = true)
+    fun getFile(@Param("A file type such as image or pdf.") mimeType: String): Map<String, Any> =
+        pick(Intent.ACTION_GET_CONTENT, "Choose file", mimeType)
+
+    @Tool(name = "open_file", description = "Opens the system document picker so the user can select a persistent file of the requested type.", requireConfirmation = true)
+    fun openFile(@Param("A file type such as image or pdf.") mimeType: String): Map<String, Any> =
+        pick(Intent.ACTION_OPEN_DOCUMENT, "Open file", mimeType)
+
+    private fun pick(action: String, title: String, mimeType: String): Map<String, Any> {
+        val type = mimeType.trim()
+        if (type.isEmpty() || !type.contains('/')) return mapOf("success" to false, "error" to "mimeType must be a MIME type.")
+        return queue.request(
+            title,
+            "$title with type $type.",
+            Intent(action).addCategory(Intent.CATEGORY_OPENABLE).setType(type),
+        )
+    }
+
+    // ---------- 媒体文件搜索 ----------
+
+    @Tool(
+        name = "request_media_file_permissions",
+        description = "Asks the user to grant permission to search shared images, videos, and audio files.",
+        requireConfirmation = true,
+    )
+    fun requestMediaFilePermissions(): Map<String, Any> = queue.request(
+        "Grant media search access",
+        "Allow access to shared images, videos, and audio for local file searches.",
+        Intent(context, MediaPermissionActivity::class.java),
+    )
+
+    @Tool(
+        name = "search_media_files",
+        description = "Searches shared images, videos, and audio files by name on this device. Returns up to 50 newest matches as structured results that the chat UI renders directly. Summarize the outcome without repeating the complete file-name list. Requires permission to access the requested media type.",
+        requireConfirmation = true,
+    )
+    fun searchMediaFiles(
+        @Param("A non-blank file-name query.") query: String,
+        @Param("Optional media category: all, image, video, or audio. Defaults to all.") mediaType: String? = "all",
+    ): Map<String, Any> {
+        val value = query.trim()
+        if (value.isEmpty()) return error("query must not be blank.")
+        val type = mediaType.orEmpty().trim().lowercase().ifEmpty { "all" }
+        val requested = when (type) {
+            "all" -> MEDIA_COLLECTIONS
+            "image" -> listOf(MEDIA_COLLECTIONS[0])
+            "video" -> listOf(MEDIA_COLLECTIONS[1])
+            "audio" -> listOf(MEDIA_COLLECTIONS[2])
+            else -> return error("mediaType must be all, image, video, or audio.")
+        }
+        val accessible = requested.filter { hasPermission(it.permission) }
+        if (accessible.isEmpty()) return error(
+            "Media permission is required. Call request_media_file_permissions and grant access before searching.",
+        )
+        val results = accessible.flatMap { collection -> queryMedia(collection, value) }
+            .sortedByDescending { it["modifiedTimeMillis"] as Long }
+            .take(MAX_RESULTS)
+        return mapOf(
+            "success" to true,
+            "query" to value,
+            "results" to results,
+            "skippedMediaTypes" to requested.filterNot(accessible::contains).map { it.type },
+        )
+    }
+
+    // ---------- 文档目录搜索 ----------
+
+    @Tool(
+        name = "search_documents",
+        description = "Recursively searches file names in document directories the user has authorized in Settings. Returns up to 50 newest matching files as structured results that the chat UI renders directly. Summarize the outcome without repeating the complete file-name list.",
+        requireConfirmation = true,
+    )
+    fun searchDocuments(@Param("A non-blank file-name query.") query: String): Map<String, Any> {
+        val value = query.trim()
+        if (value.isEmpty()) return error("query must not be blank.")
+        val trees = documentDirectories.currentDirectories().map { Uri.parse(it.uri) }
+        if (trees.isEmpty()) return error(
+            "No document search directory is configured. Ask the user to add one in Settings > Document search directories.",
+        )
+        val results = mutableListOf<Map<String, Any>>()
+        trees.forEach { treeUri ->
+            val rootId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull()
+            if (rootId != null) searchTree(treeUri, rootId, value, results)
+        }
+        return mapOf(
+            "success" to true,
+            "query" to value,
+            "results" to results.sortedByDescending { it["modifiedTimeMillis"] as Long }.take(MAX_RESULTS),
+        )
+    }
+
+    @Tool(
+        name = "open_local_file",
+        description = "Opens a file found by a local search in a compatible app for preview. The identifier must come from search_media_files or search_documents.",
+        requireConfirmation = true,
+    )
+    fun openLocalFile(@Param("The file identifier returned by search_mediaFiles or searchDocuments.") contentUri: String): Map<String, Any> {
+        val uri = runCatching { Uri.parse(contentUri) }.getOrNull() ?: return error("contentUri is invalid.")
+        if (uri.scheme != "content" || !isAllowedUri(uri)) return error(
+            "contentUri is not an accessible media result or a file from an authorized document directory.",
+        )
+        val mimeType = context.contentResolver.getType(uri) ?: "*/*"
+        return queue.request(
+            "Open local file",
+            "Open a local $mimeType file in a compatible app.",
+            Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, mimeType)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
+        )
+    }
+
+    // ---------- helpers ----------
+
+    private fun queryMedia(collection: MediaCollection, query: String): List<Map<String, Any>> {
+        val projection = arrayOf(
+            MediaStore.MediaColumns._ID,
+            MediaStore.MediaColumns.DISPLAY_NAME,
+            MediaStore.MediaColumns.MIME_TYPE,
+            MediaStore.MediaColumns.SIZE,
+            MediaStore.MediaColumns.DATE_MODIFIED,
+        )
+        return runCatching {
+            context.contentResolver.query(
+                collection.uri,
+                projection,
+                "${MediaStore.MediaColumns.DISPLAY_NAME} LIKE ? ESCAPE '\\' COLLATE NOCASE",
+                arrayOf("%${escapeLikePattern(query)}%"),
+                "${MediaStore.MediaColumns.DATE_MODIFIED} DESC",
+            )?.use { cursor ->
+                buildList {
+                    while (cursor.moveToNext() && size < MAX_RESULTS) {
+                        val id = cursor.getLong(0)
+                        add(
+                            fileResult(
+                                uri = Uri.withAppendedPath(collection.uri, id.toString()),
+                                displayName = cursor.getString(1).orEmpty(),
+                                mimeType = cursor.getString(2).orEmpty(),
+                                sizeBytes = cursor.getLong(3),
+                                modifiedTimeMillis = cursor.getLong(4) * 1000,
+                                category = collection.type,
+                            ),
+                        )
+                    }
+                }
+            }.orEmpty()
+        }.getOrDefault(emptyList())
+    }
+
+    private fun searchTree(
+        treeUri: Uri,
+        parentId: String,
+        query: String,
+        results: MutableList<Map<String, Any>>,
+    ) {
+        if (results.size >= MAX_RESULTS) return
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId)
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_SIZE,
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+        )
+        runCatching {
+            context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                while (cursor.moveToNext() && results.size < MAX_RESULTS) {
+                    val documentId = cursor.getString(0) ?: continue
+                    val displayName = cursor.getString(1).orEmpty()
+                    val mimeType = cursor.getString(2).orEmpty()
+                    if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        searchTree(treeUri, documentId, query, results)
+                    } else if (displayName.contains(query, ignoreCase = true)) {
+                        results += fileResult(
+                            uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId),
+                            displayName = displayName,
+                            mimeType = mimeType,
+                            sizeBytes = cursor.getLong(3),
+                            modifiedTimeMillis = cursor.getLong(4),
+                            category = "document",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun fileResult(
+        uri: Uri,
+        displayName: String,
+        mimeType: String,
+        sizeBytes: Long,
+        modifiedTimeMillis: Long,
+        category: String,
+    ): Map<String, Any> = mapOf(
+        "displayName" to displayName,
+        "mimeType" to mimeType,
+        "sizeBytes" to sizeBytes,
+        "modifiedTimeMillis" to modifiedTimeMillis,
+        "category" to category,
+        "contentUri" to uri.toString(),
+    )
+
+    private fun hasPermission(permission: String): Boolean =
+        context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+
+    private fun isAllowedUri(uri: Uri): Boolean =
+        uri.authority == MediaStore.AUTHORITY || documentDirectories.contains(uri.toString())
+
+    private fun error(message: String): Map<String, Any> = mapOf("success" to false, "error" to message)
+
+    private data class MediaCollection(val type: String, val uri: Uri, val permission: String)
+
+    private companion object {
+        const val MAX_RESULTS = 50
+        val MEDIA_COLLECTIONS by lazy {
+            listOf(
+                MediaCollection("image", MediaStore.Images.Media.EXTERNAL_CONTENT_URI, Manifest.permission.READ_MEDIA_IMAGES),
+                MediaCollection("video", MediaStore.Video.Media.EXTERNAL_CONTENT_URI, Manifest.permission.READ_MEDIA_VIDEO),
+                MediaCollection("audio", MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, Manifest.permission.READ_MEDIA_AUDIO),
+            )
+        }
+    }
+}
+
+internal fun escapeLikePattern(value: String): String = buildString(value.length) {
+    value.forEach { character ->
+        if (character == '\\' || character == '%' || character == '_') append('\\')
+        append(character)
+    }
+}

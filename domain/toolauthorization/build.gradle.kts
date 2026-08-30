@@ -1,12 +1,13 @@
 plugins {
-    alias(libs.plugins.kotlin.jvm)
-}
-
-kotlin {
-    jvmToolchain(11)
+    id("gimi.kotlin.jvm.library")
 }
 
 dependencies {
+    implementation(project(":domain:conversation"))
     implementation(libs.javax.inject)
     api(libs.kotlinx.coroutines.core)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockk)
 }

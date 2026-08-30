@@ -1,20 +1,13 @@
 plugins {
-    alias(libs.plugins.android.library)
+    id("gimi.android.library")
+    id("gimi.android.hilt")
     alias(libs.plugins.kotlin.kapt)
-    alias(libs.plugins.hilt.android)
-    alias(libs.plugins.ksp)
 }
 
 android {
     namespace = "github.ponyhuang.gimi.data.agent"
-    compileSdk { version = release(37) }
     defaultConfig {
-        minSdk = 34
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
     }
     // Baseline 记录现存 lint 问题（如 LocationTool 的 MissingPermission），
     // lint 继续对新问题报错。
@@ -67,11 +60,9 @@ dependencies {
         exclude(group = "io.ktor")
     }
     implementation(libs.gson)
-    implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.core)
     ksp(libs.androidx.room.compiler)
     ksp(libs.google.adk.kotlin.processor)
-    ksp(libs.hilt.android.compiler)
     kapt(libs.objectbox.processor)
 
     testImplementation(project(":core:testing"))
@@ -100,7 +91,7 @@ kapt {
         )
         arg(
             "objectbox.myObjectBoxPackage",
-            "github.ponyhuang.gimi.agent.tools.search",
+            "github.ponyhuang.gimi.data.agent.tools.search",
         )
     }
 }

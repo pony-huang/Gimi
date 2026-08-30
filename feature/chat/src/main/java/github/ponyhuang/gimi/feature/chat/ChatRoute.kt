@@ -43,6 +43,8 @@ fun ChatRoute(
     onOpenSettings: () -> Unit,
     onConfigureModels: () -> Unit,
     onShowAllLocalFiles: (sessionId: String, responseId: String) -> Unit,
+    requestedSessionId: String? = null,
+    onRequestedSessionHandled: () -> Unit = {},
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
 ) {
@@ -67,6 +69,16 @@ fun ChatRoute(
     val chatNoticeMemoryWriteFailed = stringResource(R.string.chat_notice_memory_write_failed)
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(viewModel, requestedSessionId) {
+        viewModel.onAction(ChatAction.RefreshConversations)
+        if (requestedSessionId.isNullOrBlank()) {
+            viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        } else {
+            viewModel.onAction(ChatAction.SwitchSession(requestedSessionId))
+            onRequestedSessionHandled()
+        }
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
@@ -246,7 +258,7 @@ private fun openDocumentAttachment(context: Context, attachment: FileAttachment)
     }
 }
 
-private fun openLocalFile(context: Context, file: LocalFileReference) {
+internal fun openLocalFile(context: Context, file: LocalFileReference) {
     runCatching {
         context.startActivity(
             Intent(Intent.ACTION_VIEW)

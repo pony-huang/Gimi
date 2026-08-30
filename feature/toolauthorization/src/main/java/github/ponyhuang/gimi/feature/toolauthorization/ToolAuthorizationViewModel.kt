@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.conversation.runtime.isBusy
+import github.ponyhuang.gimi.domain.toolauthorization.usecase.SetToolAuthorizationUseCase
+import github.ponyhuang.gimi.domain.toolauthorization.usecase.ToolAuthorizationMutationResult
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableSharedFlow

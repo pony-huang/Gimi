@@ -1,22 +1,15 @@
 plugins {
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.hilt.android)
-    alias(libs.plugins.ksp)
+    id("gimi.android.library")
+    id("gimi.android.compose")
+    id("gimi.android.hilt")
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
     namespace = "github.ponyhuang.gimi.feature.mcp"
-    compileSdk { version = release(37) }
     defaultConfig {
-        minSdk = 34
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-    buildFeatures { compose = true }
 }
 
 dependencies {
@@ -31,9 +24,9 @@ dependencies {
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.hilt.android)
+    implementation(libs.androidx.navigation3.runtime)
     implementation(libs.kotlinx.coroutines.core)
-    ksp(libs.hilt.android.compiler)
+    implementation(libs.kotlinx.serialization.core)
 
     testImplementation(project(":core:testing"))
     testImplementation(libs.junit)

@@ -1,22 +1,15 @@
 plugins {
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.hilt.android)
-    alias(libs.plugins.ksp)
+    id("gimi.android.library")
+    id("gimi.android.compose")
+    id("gimi.android.hilt")
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
     namespace = "github.ponyhuang.gimi.feature.chat"
-    compileSdk { version = release(37) }
     defaultConfig {
-        minSdk = 34
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-    buildFeatures { compose = true }
     // Baseline 记录现存 lint 问题（如 ChatComposer 录音权限检查），lint 继续对新问题报错。
     lint {
         baseline = file("lint-baseline.xml")
@@ -49,12 +42,12 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.navigation3.runtime)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
-    implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.core)
     implementation(libs.multiplatform.markdown.renderer.m3)
     implementation(libs.multiplatform.markdown.renderer.coil3)
-    ksp(libs.hilt.android.compiler)
 
     testImplementation(project(":core:testing"))
     testImplementation(libs.junit)

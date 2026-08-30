@@ -1,17 +1,10 @@
 plugins {
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.hilt.android)
-    alias(libs.plugins.ksp)
+    id("gimi.android.library")
+    id("gimi.android.hilt")
 }
 
 android {
     namespace = "github.ponyhuang.gimi.data.assistant"
-    compileSdk { version = release(37) }
-    defaultConfig { minSdk = 34 }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
 }
 
 dependencies {
@@ -20,9 +13,7 @@ dependencies {
     implementation(project(":domain:modelcatalog"))
     implementation(project(":domain:speech"))
     implementation(libs.androidx.core.ktx)
-    implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.core)
-    ksp(libs.hilt.android.compiler)
 
     testImplementation(project(":core:testing"))
     testImplementation(libs.junit)

@@ -1,18 +1,11 @@
 plugins {
-    alias(libs.plugins.android.library)
+    id("gimi.android.library")
+    id("gimi.android.hilt")
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.hilt.android)
-    alias(libs.plugins.ksp)
 }
 
 android {
     namespace = "github.ponyhuang.gimi.data.memory"
-    compileSdk { version = release(37) }
-    defaultConfig { minSdk = 34 }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
 }
 
 dependencies {
@@ -22,11 +15,9 @@ dependencies {
     implementation(project(":domain:memory"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.google.adk.kotlin.core)
-    implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
-    ksp(libs.hilt.android.compiler)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -1,19 +1,12 @@
 plugins {
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.hilt.android)
-    alias(libs.plugins.ksp)
+    id("gimi.android.library")
+    id("gimi.android.compose")
+    id("gimi.android.hilt")
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
     namespace = "github.ponyhuang.gimi.feature.settings"
-    compileSdk { version = release(37) }
-    defaultConfig { minSdk = 34 }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-    buildFeatures { compose = true }
     // 本地单测中 android.content.Intent 等框架类返回默认值，避免 "not mocked" 崩溃。
     testOptions {
         unitTests {
@@ -36,9 +29,9 @@ dependencies {
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.hilt.android)
+    implementation(libs.androidx.navigation3.runtime)
     implementation(libs.kotlinx.coroutines.core)
-    ksp(libs.hilt.android.compiler)
+    implementation(libs.kotlinx.serialization.core)
     testImplementation(project(":core:testing"))
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

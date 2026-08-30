@@ -1,9 +1,5 @@
 plugins {
-    alias(libs.plugins.kotlin.jvm)
-}
-
-kotlin {
-    jvmToolchain(11)
+    id("gimi.kotlin.jvm.library")
 }
 
 dependencies {

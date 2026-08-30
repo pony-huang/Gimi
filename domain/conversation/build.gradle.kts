@@ -1,9 +1,7 @@
 plugins {
-    alias(libs.plugins.kotlin.jvm)
+    id("gimi.kotlin.jvm.library")
     alias(libs.plugins.kotlin.serialization)
 }
-
-kotlin { jvmToolchain(11) }
 
 dependencies {
     api(project(":domain:modelcatalog"))

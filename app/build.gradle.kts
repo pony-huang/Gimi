@@ -1,21 +1,13 @@
 plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.ksp)
-    alias(libs.plugins.hilt.android)
+    id("gimi.android.application")
+    id("gimi.android.compose")
+    id("gimi.android.hilt")
 }
 
 android {
     namespace = "github.ponyhuang.gimi"
-    compileSdk {
-        version = release(37)
-    }
-
     defaultConfig {
         applicationId = "github.ponyhuang.gimi"
-        minSdk = 34
-        targetSdk = 37
         // CI 发布流程通过 -P 注入版本（见 .github/workflows/release.yml）；
         // 未注入时使用本地开发默认值。
         versionCode = providers.gradleProperty("releaseVersionCode").map(String::toInt).getOrElse(1)
@@ -58,12 +50,7 @@ android {
             }
         }
     }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
     buildFeatures {
-        compose = true
         buildConfig = true
     }
     // Baseline 记录现存 lint 问题（如 BluetoothVoiceService 蓝牙权限检查），lint 继续对新问题报错。
@@ -108,10 +95,6 @@ dependencies {
     implementation(project(":data:modelcatalog"))
     implementation(project(":data:speech"))
     implementation(project(":data:voicewake"))
-    // BluetoothVoiceService uses org.vosk.Model directly (wakeModels.acquire /
-    // VoskWakeWordDetector), so the app must declare vosk itself instead of
-    // relying on :data:voicewake's implementation-scope transitive.
-    implementation(libs.vosk.android)
     implementation(project(":data:conversation"))
     implementation(project(":data:agent"))
     implementation(project(":data:appearance"))
@@ -159,10 +142,7 @@ dependencies {
     implementation(libs.androidx.compose.foundation.layout)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.serialization.core)
     implementation(libs.javax.inject)
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)

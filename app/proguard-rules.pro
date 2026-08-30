@@ -44,15 +44,14 @@
 # ---------------------------------------------------------------------------
 -keep,allowshrinking class github.ponyhuang.gimi.** { *; }
 
-# App-route serializers are resolved reflectively by Navigation3; the ObjectBox
-# entity + generated box are native metadata bindings. All former Gson-migrated
-# data classes are now @Serializable (compile-time serializers referencing their
-# fields directly), so they need no keep rules — R8 sees the field accesses.
--keep class github.ponyhuang.gimi.ui.navigation.AppRoute$* { *; }
+# Feature destination serializers are resolved reflectively by Navigation3.
+# Other @Serializable models use compile-time serializers whose field accesses
+# remain visible to R8 and need no dedicated keep rule.
+-keep class github.ponyhuang.gimi.feature.**Destination$* { *; }
 
 # ObjectBox entity + generated box (native metadata binding).
--keep class github.ponyhuang.gimi.agent.tools.search.ToolVectorEntity { *; }
--keep class github.ponyhuang.gimi.agent.tools.search.MyObjectBox { *; }
+-keep class github.ponyhuang.gimi.data.agent.tools.search.ToolVectorEntity { *; }
+-keep class github.ponyhuang.gimi.data.agent.tools.search.MyObjectBox { *; }
 
 # ---------------------------------------------------------------------------
 # kxml2 / XmlPullParser

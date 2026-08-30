@@ -18,7 +18,6 @@
     <string name="mcp_method_import_title">导入</string>
     <string name="mcp_method_import_subtitle">粘贴 mcpServers JSON 配置</string>
     <string name="mcp_section_import_mcp">导入 MCP 配置</string>
-    <string name="mcp_import_help">粘贴包含 mcpServers 的 JSON 配置。支持 SSE 和 Streamable HTTP。</string>
     <string name="mcp_import_action">导入 MCP 服务</string>
     <string name="mcp_import_result">已新增 %1$d 个、更新 %2$d 个 MCP 服务</string>
     <string name="mcp_import_result_with_skipped">已新增 %1$d 个、更新 %2$d 个 MCP 服务；跳过 %3$d 个不受支持或无效的配置</string>

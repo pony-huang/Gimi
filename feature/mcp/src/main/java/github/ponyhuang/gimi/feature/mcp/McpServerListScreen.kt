@@ -216,7 +216,6 @@ fun McpServerImportScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text(stringResource(R.string.mcp_import_help))
                     OutlinedTextField(
                         value = state.importJson,
                         onValueChange = { onAction(McpSettingsAction.ImportJsonChanged(it)) },

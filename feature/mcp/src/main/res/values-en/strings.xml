@@ -10,7 +10,6 @@
     <string name="mcp_method_import_title">Import</string>
     <string name="mcp_method_import_subtitle">Paste an mcpServers JSON configuration</string>
     <string name="mcp_section_import_mcp">Import MCP configuration</string>
-    <string name="mcp_import_help">Paste a JSON configuration containing mcpServers. SSE and Streamable HTTP are supported.</string>
     <string name="mcp_import_action">Import MCP service</string>
     <string name="mcp_import_result">Created %1$d and updated %2$d MCP servers</string>
     <string name="mcp_import_result_with_skipped">Created %1$d and updated %2$d MCP servers; skipped %3$d unsupported or invalid entries</string>

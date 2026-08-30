@@ -25,10 +25,13 @@ class MemorySettingsScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Mem0").assertIsDisplayed()
-        composeRule.onNodeWithText("Mem0 API Token 不能为空").assertIsDisplayed()
+        // Mem0 关闭时 Token 配置区整体隐藏
+        composeRule.onNodeWithText("启用 Mem0").assertIsDisplayed()
+        composeRule.onNodeWithText("保存").assertDoesNotExist()
+
         composeRule.onNodeWithText("启用 Mem0").performClick()
-        composeRule.onNodeWithText("保存").performClick()
+        composeRule.onNodeWithText("Mem0 API Token 不能为空").assertIsDisplayed()
+        composeRule.onNodeWithText("保存").assertIsDisplayed().performClick()
 
         assertEquals(
             listOf(

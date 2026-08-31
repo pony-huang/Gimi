@@ -93,16 +93,21 @@ above.
 
 ### Plugins
 
-Install APK plugins for extra capabilities, then refresh the list — no restart needed. Plugins bring
-their own tools and can run an in-app authorization flow. Bundled plugins include **Spotify**
-(search, playback, playlists, your library), **知乎 Zhihu** (search, hot lists, Q&A), **V2EX**
-(notifications, node/topic/reply browsing, own account — via Personal Access Token), and
-**小红书 Xiaohongshu** (login, feeds, search, profiles,
-comments, notifications, interactions, and
-image/video publishing). The Xiaohongshu plugin operates the website directly with an on-device
-WebView and does not require an MCP server or relay URL, but it is currently less stable. Prefer the
-[xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) MCP server. Third parties
-can build their own with the public plugin API.
+Install APK plugins to add capabilities. Refresh the list to apply them immediately — no restart
+needed. Plugins bring their own tools and can run an in-app authorization flow.
+
+Bundled plugins:
+
+- **Spotify**: search, playback, playlists, and your library
+- **知乎 Zhihu**: search, hot lists, and Q&A
+- **V2EX**: notifications, node/topic/reply browsing, and account information (requires a Personal Access Token)
+- **小红书 Xiaohongshu**: login, feeds and search, profiles and notes, comments and interactions, notifications, and image/video publishing
+
+**About Xiaohongshu:** The plugin operates the website directly with an on-device WebView, without
+an MCP server or relay URL, but it is currently less stable. Prefer the
+[xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) MCP server.
+
+Third parties can build their own with the public plugin API.
 
 ### Memory
 

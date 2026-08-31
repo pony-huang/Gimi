@@ -27,11 +27,11 @@
   <img src="doc/assert/dad67e7e0bd1e7045ec58d4282ce2627.jpg" width="24%" alt="设置" />
 </p>
 
-<p align="center">
+<div align="center">
   <video src="https://github.com/user-attachments/assets/855737f5-61e6-4e77-88f4-bfe5385009eb" controls playsinline width="320">
     <a href="https://github.com/user-attachments/assets/855737f5-61e6-4e77-88f4-bfe5385009eb">观看演示视频</a>
   </video>
-</p>
+</div>
 
 ## 能干什么
 

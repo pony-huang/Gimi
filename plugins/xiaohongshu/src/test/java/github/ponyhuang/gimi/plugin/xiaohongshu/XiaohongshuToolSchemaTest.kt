@@ -16,15 +16,28 @@ class XiaohongshuToolSchemaTest {
         .associateBy { it.name }
 
     @Test
-    fun publishContentMatchesReferenceArguments() {
-        val declaration = requireNotNull((tools.getValue("publish_content") as FunctionTool).declaration())
-        val parameters = requireNotNull(declaration.parameters)
-
-        assertEquals(listOf("title", "content", "images"), parameters.required)
-        assertTrue(parameters.properties.orEmpty().keys.containsAll(
-            listOf("title", "content", "images", "tags", "schedule_at", "is_original", "visibility", "products"),
-        ))
-        assertNotNull(parameters.properties?.get("images")?.items)
+    fun stringParametersWithoutCandidatesDeclareNoEmptyEnum() {
+        // 回归：空 enum（"enum": []）在模型提供方严格校验下不允许任何取值，
+        // 会导致 title/content 等参数被清空后调用，必须以 null 表示无候选项。
+        for (tool in tools.values) {
+            val declaration = requireNotNull((tool as FunctionTool).declaration())
+            val properties = declaration.parameters?.properties.orEmpty()
+            for ((name, property) in properties) {
+                if (property.enum != null) {
+                    assertTrue(
+                        "工具 ${declaration.name} 参数 $name 声明了空 enum",
+                        property.enum.orEmpty().isNotEmpty(),
+                    )
+                }
+            }
+        }
+        // 有候选项的参数仍保留枚举约束。
+        val sortBy = requireNotNull(
+            requireNotNull(
+                (tools.getValue("search_feeds") as FunctionTool).declaration(),
+            ).parameters?.properties?.get("filters")?.properties?.get("sort_by"),
+        )
+        assertEquals(listOf("综合", "最新", "最多点赞", "最多评论", "最多收藏"), sortBy.enum)
     }
 
     @Test

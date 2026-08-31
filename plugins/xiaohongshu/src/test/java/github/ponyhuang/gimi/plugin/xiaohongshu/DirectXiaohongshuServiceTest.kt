@@ -217,141 +217,6 @@ class DirectXiaohongshuServiceTest {
     }
 
     @Test
-    fun publishContentUploadsFilesAndSubmitsOnCreatorWebsite() = runTest {
-        val browser = FakeBrowserGateway(
-            evaluations = ArrayDeque(listOf("true", "true")),
-            fileSelectionResult = true,
-        )
-        val service = DirectXiaohongshuService(browser)
-
-        val result = service.invoke(
-            "publish_content",
-            mapOf(
-                "title" to "上海咖啡",
-                "content" to "探店记录",
-                "images" to listOf("https://example.com/coffee.jpg"),
-                "tags" to listOf("咖啡", "上海"),
-            ),
-        ) as Map<*, *>
-
-        assertEquals(true, result["success"])
-        assertEquals(listOf("https://example.com/coffee.jpg"), browser.selectedFiles.single())
-        assertEquals(
-            "https://creator.xiaohongshu.com/publish/publish?source=official",
-            browser.navigations.single(),
-        )
-        assertTrue(browser.evaluationScripts.last().contains("上海咖啡"))
-        assertTrue(browser.evaluationScripts.last().contains("#咖啡"))
-    }
-
-    @Test
-    fun publishContentRecognizesTheModernCustomElementPublishButton() = runTest {
-        val browser = FakeBrowserGateway(
-            evaluations = ArrayDeque(listOf("true", "true")),
-            fileSelectionResult = true,
-        )
-
-        DirectXiaohongshuService(browser).invoke(
-            "publish_with_video",
-            mapOf(
-                "title" to "新版按钮",
-                "content" to "正文",
-                "video" to "https://example.com/a.mp4",
-            ),
-        )
-
-        assertTrue(
-            browser.waitScripts.any { it.contains("document.querySelector('xhs-publish-btn") },
-        )
-        assertTrue(
-            browser.evaluationScripts.last().contains("document.querySelector('xhs-publish-btn"),
-        )
-    }
-
-    @Test
-    fun publishContentUsesTheImageUploadInput() = runTest {
-        val browser = FakeBrowserGateway(
-            evaluations = ArrayDeque(listOf("true", "true")),
-            fileSelectionResult = true,
-        )
-
-        DirectXiaohongshuService(browser).invoke(
-            "publish_content",
-            mapOf(
-                "title" to "图片上传",
-                "content" to "正文",
-                "images" to listOf("https://example.com/a.jpg"),
-            ),
-        )
-
-        assertEquals("input[type='file'][accept*='image']", browser.fileSelectors.single())
-    }
-
-    @Test
-    fun publishVideoUsesTheVideoUploadInput() = runTest {
-        val browser = FakeBrowserGateway(
-            evaluations = ArrayDeque(listOf("true", "true")),
-            fileSelectionResult = true,
-        )
-
-        DirectXiaohongshuService(browser).invoke(
-            "publish_with_video",
-            mapOf(
-                "title" to "视频上传",
-                "content" to "正文",
-                "video" to "https://example.com/a.mp4",
-            ),
-        )
-
-        assertEquals("input[type='file'][accept*='video']", browser.fileSelectors.single())
-    }
-
-    @Test
-    fun publishContentBindsRequestedProductsInsteadOfSilentlyIgnoringThem() = runTest {
-        val browser = FakeBrowserGateway(
-            evaluations = ArrayDeque(listOf("true", "true", "true", "true", "true", "true")),
-            fileSelectionResult = true,
-        )
-        val service = DirectXiaohongshuService(browser)
-
-        service.invoke(
-            "publish_content",
-            mapOf(
-                "title" to "防晒",
-                "content" to "实测",
-                "images" to listOf("https://example.com/a.jpg"),
-                "products" to listOf("防晒霜 SPF50"),
-            ),
-        )
-
-        assertTrue(browser.evaluationScripts.any { it.contains("multi-goods-selector-modal") })
-        assertTrue(browser.evaluationScripts.any { it.contains("防晒霜 SPF50") })
-        assertFalse(browser.evaluationScripts.any { it.contains("products.length) return false") })
-    }
-
-    @Test
-    fun originalPublishConfirmsDeclarationBeforeSubmitting() = runTest {
-        val browser = FakeBrowserGateway(
-            evaluations = ArrayDeque(listOf("true", "true", "true", "true")),
-            fileSelectionResult = true,
-        )
-        val service = DirectXiaohongshuService(browser)
-
-        service.invoke(
-            "publish_content",
-            mapOf(
-                "title" to "原创内容",
-                "content" to "正文",
-                "images" to listOf("https://example.com/a.jpg"),
-                "is_original" to true,
-            ),
-        )
-
-        assertTrue(browser.evaluationScripts.any { it.contains("原创声明须知") })
-        assertTrue(browser.evaluationScripts.any { it.contains("button.custom-button") })
-    }
-
-    @Test
     fun feedDetailScrollsCommentsWhenRequested() = runTest {
         val browser = FakeBrowserGateway(
             evaluations = ArrayDeque(
@@ -386,13 +251,10 @@ private class FakeBrowserGateway(
     private val waitResult: Boolean = true,
     private val waitResults: ArrayDeque<Boolean> = ArrayDeque(),
     private val evaluations: ArrayDeque<String?> = ArrayDeque(),
-    private val fileSelectionResult: Boolean = false,
 ) : XiaohongshuBrowserGateway {
     val navigations = mutableListOf<String>()
     val waitScripts = mutableListOf<String>()
     val evaluationScripts = mutableListOf<String>()
-    val selectedFiles = mutableListOf<List<String>>()
-    val fileSelectors = mutableListOf<String>()
 
     override suspend fun navigate(url: String) {
         navigations += url
@@ -409,10 +271,4 @@ private class FakeBrowserGateway(
     }
 
     override suspend fun clearCookies() = Unit
-
-    override suspend fun selectFiles(selector: String, sources: List<String>): Boolean {
-        fileSelectors += selector
-        selectedFiles += sources
-        return fileSelectionResult
-    }
 }

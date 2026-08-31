@@ -12,14 +12,12 @@ internal object XiaohongshuToolCatalog {
         "check_login_status",
         "get_login_qrcode",
         "delete_cookies",
-        "publish_content",
         "list_feeds",
         "search_feeds",
         "get_feed_detail",
         "user_profile",
         "post_comment_to_feed",
         "reply_comment_in_feed",
-        "publish_with_video",
         "like_feed",
         "favorite_feed",
         "get_my_profile",
@@ -56,20 +54,6 @@ private class XiaohongshuFunctionTool(
 }
 
 private fun schemaOf(name: String): Schema = when (name) {
-    "publish_content" -> objectSchema(
-        listOf("title", "content", "images"),
-        "title" to string("标题，最多 20 个中文字或英文单词"),
-        "content" to string("正文；话题标签请放入 tags"),
-        "images" to array("图片的 HTTP/HTTPS URL、本地绝对路径或 content URI"),
-        "tags" to array("话题标签，最多 10 个"),
-        "schedule_at" to string("可选 ISO8601 定时发布时间，支持 1 小时至 14 天内"),
-        "is_original" to boolean("是否声明原创"),
-        "visibility" to string(
-            "可见范围，默认公开可见",
-            listOf("公开可见", "仅自己可见", "仅互关好友可见"),
-        ),
-        "products" to array("要绑定的商品关键词或商品 ID"),
-    )
     "search_feeds" -> objectSchema(
         listOf("keyword"),
         "keyword" to string("搜索关键词"),
@@ -107,16 +91,6 @@ private fun schemaOf(name: String): Schema = when (name) {
     )
     "like_feed" -> feedSchema("unlike" to boolean("true 表示取消点赞"))
     "favorite_feed" -> feedSchema("unfavorite" to boolean("true 表示取消收藏"))
-    "publish_with_video" -> objectSchema(
-        listOf("title", "content", "video"),
-        "title" to string("标题，最多 20 个中文字或英文单词"),
-        "content" to string("正文"),
-        "video" to string("本地视频路径或 content URI"),
-        "tags" to array("话题标签"),
-        "schedule_at" to string("可选 ISO8601 定时发布时间"),
-        "visibility" to string("可见范围", listOf("公开可见", "仅自己可见", "仅互关好友可见")),
-        "products" to array("商品关键词或商品 ID"),
-    )
     "list_notifications" -> objectSchema(
         "tab" to string("通知分区", listOf("mentions", "likes", "connections")),
         "limit" to integer("返回条数上限，默认 20"),
@@ -154,18 +128,14 @@ private fun objectSchema(
     vararg properties: Pair<String, Schema>,
 ): Schema = Schema(type = Type.OBJECT, properties = properties.toMap(), required = required)
 
+// 空 enum 会序列化成 "enum": []，模型提供方严格校验时任何取值都不合法，
+// 实测会把 title/content 等参数清空后再调用；因此无候选项时必须传 null。
 private fun string(description: String, values: List<String> = emptyList()): Schema =
-    Schema(type = Type.STRING, description = description, enum = values)
+    Schema(type = Type.STRING, description = description, enum = values.ifEmpty { null })
 
 private fun boolean(description: String): Schema = Schema(type = Type.BOOLEAN, description = description)
 
 private fun integer(description: String): Schema = Schema(type = Type.INTEGER, description = description)
-
-private fun array(description: String): Schema = Schema(
-    type = Type.ARRAY,
-    description = description,
-    items = Schema(type = Type.STRING),
-)
 
 private fun profileTabSchema(): Schema =
     string("主页分区，默认 note", listOf("note", "fav", "liked"))
@@ -174,14 +144,12 @@ private fun descriptionOf(name: String): String = when (name) {
     "check_login_status" -> "检查小红书网页登录状态。"
     "get_login_qrcode" -> "获取小红书登录二维码。"
     "delete_cookies" -> "清除小红书网页登录状态。"
-    "publish_content" -> "发布小红书图文笔记。"
     "list_feeds" -> "获取小红书首页推荐笔记。"
     "search_feeds" -> "按关键词和筛选条件搜索小红书笔记。"
     "get_feed_detail" -> "读取小红书笔记详情与评论。"
     "user_profile" -> "读取指定小红书用户主页。"
     "post_comment_to_feed" -> "给小红书笔记发表评论。"
     "reply_comment_in_feed" -> "回复小红书笔记中的评论。"
-    "publish_with_video" -> "发布小红书视频笔记。"
     "like_feed" -> "点赞或取消点赞小红书笔记。"
     "favorite_feed" -> "收藏或取消收藏小红书笔记。"
     "get_my_profile" -> "读取当前登录用户的小红书主页。"

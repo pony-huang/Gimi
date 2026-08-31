@@ -17,7 +17,6 @@ internal interface XiaohongshuBrowserGateway {
     suspend fun waitUntil(script: String, timeoutMillis: Long): Boolean
     suspend fun evaluate(script: String): String?
     suspend fun clearCookies()
-    suspend fun selectFiles(selector: String, sources: List<String>): Boolean
 }
 
 /**
@@ -55,8 +54,6 @@ internal class DirectXiaohongshuService(
         "list_notifications" -> listNotifications(args)
         "reply_notification" -> replyNotification(args)
         "like_notification" -> likeNotification(args)
-        "publish_content" -> publish(args, video = false)
-        "publish_with_video" -> publish(args, video = true)
         else -> throw IllegalArgumentException("尚未实现的小红书操作：$operation")
     }
 
@@ -336,56 +333,6 @@ internal class DirectXiaohongshuService(
         return mapOf("comment_id" to commentId, "success" to true, "liked" to want)
     }
 
-    private suspend fun publish(args: Map<String, Any?>, video: Boolean): Map<String, Any?> {
-        val title = args.string("title")
-        val content = args.string("content")
-        val sources = if (video) listOf(args.string("video")) else args.stringList("images")
-        val tags = args.stringList("tags", required = false).take(10)
-        val visibility = args.optionalString("visibility") ?: "公开可见"
-        require(visibility in VISIBILITY_VALUES) { "不支持的可见范围：$visibility" }
-        val scheduleAt = args.optionalString("schedule_at")
-        val products = args.stringList("products", required = false)
-
-        browser.navigate(PUBLISH_URL)
-        require(browser.waitUntil("document.querySelector('div.upload-content') !== null", PAGE_TIMEOUT_MS)) {
-            "小红书创作页面加载超时，请确认已登录创作平台"
-        }
-        val tab = if (video) "上传视频" else "上传图文"
-        require(browser.evaluate(publishTabScript(tab)) == "true") { "未找到发布页签：$tab" }
-        val uploadInput = if (video) {
-            "input[type='file'][accept*='video']"
-        } else {
-            "input[type='file'][accept*='image']"
-        }
-        require(browser.selectFiles(uploadInput, sources)) { "未能选择要上传的文件" }
-        val uploadReady = if (video) PUBLISH_BUTTON_READY_SCRIPT else
-            "document.querySelectorAll('.img-preview-area .pr').length >= ${sources.size}"
-        require(browser.waitUntil(uploadReady, UPLOAD_TIMEOUT_MS)) { "小红书文件上传或处理超时" }
-        if (args["is_original"] == true) configureOriginalDeclaration()
-        bindProducts(products)
-        require(
-            browser.evaluate(
-                fillAndSubmitPublishScript(
-                    title = title,
-                    content = content,
-                    tags = tags,
-                    scheduleAt = scheduleAt,
-                    original = false,
-                    visibility = visibility,
-                ),
-            ) == "true",
-        ) { "未能填写或提交小红书发布表单" }
-        require(browser.waitUntil("!location.href.includes('/publish/publish')", PUBLISH_CONFIRM_TIMEOUT_MS)) {
-            "发布未确认成功：提交后未离开发布页"
-        }
-        return mapOf(
-            "title" to title,
-            "status" to "发布完成",
-            "success" to true,
-            (if (video) "video" else "images") to (if (video) sources.single() else sources.size),
-        )
-    }
-
     private fun commentSubmitScript(content: String, commentId: String?, userId: String?): String {
         val target = if (commentId == null && userId == null) {
             "document.querySelector('div.input-box div.content-edit span')?.click();"
@@ -510,131 +457,6 @@ internal class DirectXiaohongshuService(
         })()
     """
 
-    private fun publishTabScript(tab: String): String = """
-        (() => {
-          document.querySelectorAll('div.d-popover').forEach(e => e.remove());
-          const target = [...document.querySelectorAll('div.creator-tab')]
-            .find(e => e.textContent?.trim() === ${JSONObject.quote(tab)});
-          if (!target) return false;
-          target.click();
-          return true;
-        })()
-    """
-
-    private fun fillAndSubmitPublishScript(
-        title: String,
-        content: String,
-        tags: List<String>,
-        scheduleAt: String?,
-        original: Boolean,
-        visibility: String,
-    ): String {
-        val body = buildString {
-            append(content)
-            if (tags.isNotEmpty()) {
-                append("\n\n")
-                append(tags.joinToString(" ") { "#$it" })
-            }
-        }
-        return """
-            (() => {
-              const title = document.querySelector('div.d-input input');
-              const editor = document.querySelector('div.ql-editor, p.content-input, [contenteditable=true]');
-              if (!title || !editor) return false;
-              const titleSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-              titleSetter?.call(title, ${JSONObject.quote(title)});
-              title.dispatchEvent(new Event('input', {bubbles: true}));
-              editor.focus();
-              editor.textContent = ${JSONObject.quote(body)};
-              editor.dispatchEvent(new InputEvent('input', {bubbles: true, inputType: 'insertText'}));
-
-              const scheduleAt = ${JSONObject.quote(scheduleAt.orEmpty())};
-              if (scheduleAt) {
-                const toggle = document.querySelector('.post-time-wrapper .d-switch');
-                const input = document.querySelector('.date-picker-container input');
-                if (!toggle || !input) return false;
-                if (!toggle.querySelector('input')?.checked) toggle.click();
-                const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-                setter?.call(input, scheduleAt.replace('T', ' ').slice(0, 16));
-                input.dispatchEvent(new Event('input', {bubbles: true}));
-                input.dispatchEvent(new Event('change', {bubbles: true}));
-              }
-
-              const visibility = ${JSONObject.quote(visibility)};
-              if (visibility !== '公开可见') {
-                document.querySelector('div.permission-card-wrapper div.d-select-content')?.click();
-                const option = [...document.querySelectorAll('div.d-options-wrapper div.custom-option')]
-                  .find(e => e.textContent?.includes(visibility));
-                if (!option) return false;
-                option.click();
-              }
-
-              if ($original) {
-                const card = [...document.querySelectorAll('div.custom-switch-card')]
-                  .find(e => e.textContent?.includes('原创声明'));
-                const toggle = card?.querySelector('div.d-switch');
-                if (!toggle) return false;
-                if (!toggle.querySelector('input')?.checked) toggle.click();
-              }
-
-              const button = document.querySelector('xhs-publish-btn:not([submit-disabled]), ' +
-                '.publish-page-publish-btn button.bg-red:not([disabled])');
-              if (!button) return false;
-              button.click();
-              return true;
-            })()
-        """
-    }
-
-    private suspend fun bindProducts(products: List<String>) {
-        if (products.isEmpty()) return
-        require(browser.evaluate(OPEN_PRODUCT_DIALOG_SCRIPT) == "true") {
-            "未找到添加商品按钮，账号可能未开通商品功能"
-        }
-        require(browser.waitUntil("document.querySelector('.multi-goods-selector-modal') !== null", PAGE_TIMEOUT_MS)) {
-            "商品选择弹窗加载超时"
-        }
-        for (product in products) {
-            require(browser.evaluate(productSearchScript(product)) == "true") { "无法搜索商品：$product" }
-            require(
-                browser.waitUntil(
-                    "document.querySelector('.multi-goods-selector-modal .goods-list-normal .good-card-container') !== null",
-                    PAGE_TIMEOUT_MS,
-                ),
-            ) { "未找到商品：$product" }
-            require(browser.evaluate(SELECT_FIRST_PRODUCT_SCRIPT) == "true") { "无法选择商品：$product" }
-        }
-        require(browser.evaluate(SAVE_PRODUCTS_SCRIPT) == "true") { "无法保存已选商品" }
-        require(
-            browser.waitUntil("document.querySelector('.multi-goods-selector-modal') === null", PAGE_TIMEOUT_MS),
-        ) { "商品弹窗关闭超时" }
-    }
-
-    private suspend fun configureOriginalDeclaration() {
-        require(browser.evaluate(ENABLE_ORIGINAL_SCRIPT) == "true") { "未找到原创声明开关" }
-        require(
-            browser.waitUntil(
-                "[...document.querySelectorAll('div.footer')].some(e => e.textContent?.includes('原创声明须知'))",
-                PAGE_TIMEOUT_MS,
-            ),
-        ) { "原创声明确认弹窗加载超时" }
-        require(browser.evaluate(CONFIRM_ORIGINAL_SCRIPT) == "true") { "无法确认原创声明" }
-    }
-
-    private fun productSearchScript(product: String): String = """
-        (() => {
-          const modal = document.querySelector('.multi-goods-selector-modal');
-          const input = modal?.querySelector('input[placeholder="搜索商品ID 或 商品名称"]');
-          if (!input) return false;
-          const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-          setter?.call(input, ${JSONObject.quote(product)});
-          input.dispatchEvent(new Event('input', {bubbles: true}));
-          input.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', code: 'Enter', bubbles: true}));
-          input.dispatchEvent(new KeyboardEvent('keyup', {key: 'Enter', code: 'Enter', bubbles: true}));
-          return true;
-        })()
-    """
-
     private suspend fun navigateFeed(feedId: String, token: String) {
         browser.navigate("$EXPLORE_URL/${encodePath(feedId)}?xsec_token=${encode(token)}&xsec_source=pc_feed")
         require(browser.waitUntil(NOTE_DETAIL_SCRIPT, PAGE_TIMEOUT_MS)) { "小红书笔记详情加载超时" }
@@ -681,14 +503,6 @@ internal class DirectXiaohongshuService(
     private fun Map<String, Any?>.optionalString(key: String): String? =
         (this[key] as? String)?.trim()?.takeIf(String::isNotEmpty)
 
-    private fun Map<String, Any?>.stringList(key: String, required: Boolean = true): List<String> {
-        val values = (this[key] as? List<*>)
-            ?.mapNotNull { (it as? String)?.trim()?.takeIf(String::isNotEmpty) }
-            .orEmpty()
-        if (required) require(values.isNotEmpty()) { "缺少参数 $key" }
-        return values
-    }
-
     private fun jsonArray(raw: String?): List<Any?> = when (val value = parseJson(raw)) {
         is List<*> -> value
         null -> emptyList()
@@ -717,8 +531,6 @@ internal class DirectXiaohongshuService(
         private const val SEARCH_URL = "$HOME_URL/search_result"
         private const val PROFILE_URL = "$HOME_URL/user/profile"
         private const val NOTIFICATION_URL = "$HOME_URL/notification"
-        private const val PUBLISH_URL =
-            "https://creator.xiaohongshu.com/publish/publish?source=official"
         private const val QUICK_TIMEOUT_MS = 30_000L
         private const val PAGE_SETTLE_TIMEOUT_MS = 2_000L
         private const val PAGE_TIMEOUT_MS = 60_000L
@@ -734,76 +546,8 @@ internal class DirectXiaohongshuService(
         private const val AFTER_INTERACT_MAX_MS = 1_500L
         private const val COMMENT_CONFIRM_TIMEOUT_MS = 8_000L
         private const val MAX_COMMENT_SCROLL_ROUNDS = 40
-        private const val UPLOAD_TIMEOUT_MS = 10 * 60_000L
-        private const val PUBLISH_CONFIRM_TIMEOUT_MS = 20_000L
         private const val LIKE_SELECTOR = ".interact-container .left .like-lottie"
         private const val FAVORITE_SELECTOR = ".interact-container .left .reds-icon.collect-icon"
-        private val VISIBILITY_VALUES = setOf("公开可见", "仅自己可见", "仅互关好友可见")
-        private const val PUBLISH_BUTTON_READY_SCRIPT = """
-            (() => {
-              const modern = document.querySelector('xhs-publish-btn');
-              if (modern && !modern.hasAttribute('submit-disabled') && modern.getAttribute('is-publish') !== 'false') return true;
-              const old = document.querySelector('.publish-page-publish-btn button.bg-red');
-              return Boolean(old && !old.disabled && old.getAttribute('aria-disabled') !== 'true');
-            })()
-        """
-        private const val OPEN_PRODUCT_DIALOG_SCRIPT = """
-            (() => {
-              const text = [...document.querySelectorAll('span.d-text')]
-                .find(e => e.textContent?.trim() === '添加商品');
-              const button = text?.closest('button, .d-button');
-              if (!button) return false;
-              button.click();
-              return true;
-            })()
-        """
-        private const val SELECT_FIRST_PRODUCT_SCRIPT = """
-            (() => {
-              const checkbox = document.querySelector(
-                '.multi-goods-selector-modal .goods-list-normal .good-card-container .d-checkbox'
-              );
-              if (!checkbox) return false;
-              const checked = checkbox.querySelector('.d-checkbox-simulator.checked, input[type=checkbox]:checked');
-              if (!checked) checkbox.click();
-              return true;
-            })()
-        """
-        private const val SAVE_PRODUCTS_SCRIPT = """
-            (() => {
-              const modal = document.querySelector('.multi-goods-selector-modal');
-              const button = modal?.querySelector(
-                '.goods-selected-footer button, .goods-selected-footer .d-button--primary'
-              );
-              if (!button) return false;
-              button.click();
-              return true;
-            })()
-        """
-        private const val ENABLE_ORIGINAL_SCRIPT = """
-            (() => {
-              const card = [...document.querySelectorAll('div.custom-switch-card')]
-                .find(e => e.textContent?.includes('原创声明'));
-              const toggle = card?.querySelector('div.d-switch');
-              if (!toggle) return false;
-              if (!toggle.querySelector('input')?.checked) toggle.click();
-              return true;
-            })()
-        """
-        private const val CONFIRM_ORIGINAL_SCRIPT = """
-            (() => {
-              const footer = [...document.querySelectorAll('div.footer')]
-                .find(e => e.textContent?.includes('原创声明须知') || e.textContent?.includes('声明原创'));
-              if (!footer) return false;
-              const checkbox = footer.querySelector('.d-checkbox, input[type=checkbox]');
-              const checked = footer.querySelector('input[type=checkbox]')?.checked ||
-                footer.querySelector('.d-checkbox-simulator.checked');
-              if (checkbox && !checked) checkbox.click();
-              const button = footer.querySelector('button.custom-button');
-              if (!button) return false;
-              button.click();
-              return true;
-            })()
-        """
 
         private const val LOGIN_SELECTOR_SCRIPT =
             "document.querySelector('.main-container .user .link-wrapper .channel') !== null"

@@ -1,35 +1,22 @@
 package github.ponyhuang.gimi.plugin.xiaohongshu
 
 import android.annotation.SuppressLint
-import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
-import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import android.os.Environment
-import android.provider.MediaStore
-import android.webkit.ValueCallback
 import android.webkit.CookieManager
-import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import java.io.IOException
-import java.io.File
-import java.io.FileInputStream
 import java.net.URI
-import java.net.URL
-import java.net.URLConnection
-import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONTokener
 import kotlin.time.Duration.Companion.milliseconds
@@ -44,61 +31,9 @@ internal class AndroidXiaohongshuBrowserGateway(
     override suspend fun navigate(url: String) = withTimeout(NAVIGATION_TIMEOUT_MS.milliseconds) {
         suspendCancellableCoroutine { continuation ->
             mainHandler.post {
-                val view = getOrCreateWebView()
-                var completed = false
-                view.webViewClient = object : WebViewClient() {
-                    override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
-                        val upgraded = url?.let(::upgradeToHttps)
-                        if (upgraded != url) {
-                            // 站点在个别流程会 http:// 重定向；强制升级 https 再加载，
-                            // 避免被宿主默认的明文拦截（net::ERR_CLEARTEXT_NOT_PERMITTED）。
-                            view.stopLoading()
-                            view.loadUrl(upgraded!!)
-                            return
-                        }
-                        completed = false
-                    }
-
-                    override fun shouldOverrideUrlLoading(
-                        view: WebView,
-                        request: WebResourceRequest,
-                    ): Boolean {
-                        val target = request.url.toString()
-                        val upgraded = upgradeToHttps(target)
-                        if (upgraded != target) {
-                            view.loadUrl(upgraded)
-                            return true
-                        }
-                        return false
-                    }
-
-                    override fun onPageFinished(view: WebView, loadedUrl: String?) {
-                        if (!completed && continuation.isActive) {
-                            completed = true
-                            continuation.resume(Unit)
-                        }
-                    }
-
-                    override fun onReceivedError(
-                        view: WebView,
-                        request: WebResourceRequest,
-                        error: WebResourceError,
-                    ) {
-                        if (!request.isForMainFrame || completed || !continuation.isActive) return
-                        val target = request.url.toString()
-                        val upgraded = upgradeToHttps(target)
-                        if (upgraded != target) {
-                            // 站点 http:// 重定向没走 shouldOverrideUrlLoading/onPageStarted 拦截
-                            // （如 meta refresh 或资源级加载）已到达错误回调：升级后重载而非报错。
-                            view.loadUrl(upgraded)
-                            return
-                        }
-                        completed = true
-                        // 带出具体 URL，便于定位被拦的是哪个地址。
-                        continuation.resumeWithException(IOException("${error.description} @ $target"))
-                    }
-                }
-                view.loadUrl(upgradeToHttps(url))
+                navContinuation = continuation
+                navCompleted = false
+                getOrCreateWebView().loadUrl(upgradeToHttps(url))
             }
         }
     }
@@ -129,79 +64,6 @@ internal class AndroidXiaohongshuBrowserGateway(
         }
     }
 
-    override suspend fun selectFiles(selector: String, sources: List<String>): Boolean {
-        val prepared = withContext(Dispatchers.IO) { sources.map(::prepareUploadUri) }
-        return try {
-            withTimeout(FILE_CHOOSER_TIMEOUT_MS.milliseconds) {
-                suspendCancellableCoroutine { continuation ->
-                    mainHandler.post {
-                        val view = getOrCreateWebView()
-                        view.webChromeClient = object : WebChromeClient() {
-                            override fun onShowFileChooser(
-                                webView: WebView,
-                                filePathCallback: ValueCallback<Array<Uri>>,
-                                fileChooserParams: FileChooserParams,
-                            ): Boolean {
-                                filePathCallback.onReceiveValue(prepared.map { it.uri }.toTypedArray())
-                                if (continuation.isActive) continuation.resume(true)
-                                return true
-                            }
-                        }
-                        val script = """
-                            (() => {
-                              const input = document.querySelector(${org.json.JSONObject.quote(selector)});
-                              if (!input) return false;
-                              input.click();
-                              return true;
-                            })()
-                        """.trimIndent()
-                        view.evaluateJavascript(script) { clicked ->
-                            if (clicked != "true" && continuation.isActive) continuation.resume(false)
-                        }
-                    }
-                }
-            }
-        } finally {
-            // WebView renderer 已取得文件句柄后再清理临时 MediaStore 项，避免长期污染下载目录。
-            mainHandler.postDelayed(
-                { prepared.filter(PreparedUpload::temporary).forEach { context.contentResolver.delete(it.uri, null, null) } },
-                UPLOAD_URI_LIFETIME_MS,
-            )
-        }
-    }
-
-    private fun prepareUploadUri(source: String): PreparedUpload {
-        if (source.startsWith("content://")) return PreparedUpload(Uri.parse(source), temporary = false)
-        val name = source.substringAfterLast('/').substringBefore('?').ifBlank { "gimi-${UUID.randomUUID()}" }
-        val mime = URLConnection.guessContentTypeFromName(name) ?: "application/octet-stream"
-        val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
-            put(MediaStore.MediaColumns.MIME_TYPE, mime)
-            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Gimi")
-            put(MediaStore.MediaColumns.IS_PENDING, 1)
-        }
-        val uri = requireNotNull(
-            context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values),
-        ) { "无法创建上传临时文件" }
-        try {
-            val input = when {
-                source.startsWith("http://") || source.startsWith("https://") -> URL(source).openStream()
-                source.startsWith("file://") -> FileInputStream(File(requireNotNull(Uri.parse(source).path)))
-                else -> FileInputStream(File(source))
-            }
-            input.use { sourceStream ->
-                context.contentResolver.openOutputStream(uri, "w")!!.use(sourceStream::copyTo)
-            }
-            values.clear()
-            values.put(MediaStore.MediaColumns.IS_PENDING, 0)
-            context.contentResolver.update(uri, values, null, null)
-            return PreparedUpload(uri, temporary = true)
-        } catch (error: Throwable) {
-            context.contentResolver.delete(uri, null, null)
-            throw error
-        }
-    }
-
     @SuppressLint("SetJavaScriptEnabled")
     private fun getOrCreateWebView(): WebView {
         check(Looper.myLooper() == Looper.getMainLooper()) { "WebView 只能在主线程创建" }
@@ -215,27 +77,92 @@ internal class AndroidXiaohongshuBrowserGateway(
             settings.userAgentString = DESKTOP_USER_AGENT
             CookieManager.getInstance().setAcceptCookie(true)
             CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+            webViewClient = GimiWebViewClient()
+            // WebView 不 attach 到任何窗口（隐藏浏览器），但必须手动给它尺寸：
+            // 未布局的视图是 0x0，输入事件与视口度量都会异常。
+            val metrics = context.resources.displayMetrics
+            val width = metrics.widthPixels.coerceAtLeast(1080)
+            val height = metrics.heightPixels.coerceAtLeast(1920)
+            measure(
+                android.view.View.MeasureSpec.makeMeasureSpec(width, android.view.View.MeasureSpec.EXACTLY),
+                android.view.View.MeasureSpec.makeMeasureSpec(height, android.view.View.MeasureSpec.EXACTLY),
+            )
+            layout(0, 0, width, height)
         }.also { webView = it }
     }
 
+    // 用基类型 Continuation 持有导航等待者：withTimeout 取消后页面回调再 resume 会抛
+    // IllegalStateException，统一用 runCatching 吞掉即可。
+    private var navContinuation: kotlin.coroutines.Continuation<Unit>? = null
+    private var navCompleted: Boolean = false
+
+    /** 处理导航回调（https 升级/完成/错误）。 */
+    private inner class GimiWebViewClient : WebViewClient() {
+        override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+            val upgraded = url?.let(::upgradeToHttps)
+            if (upgraded != url) {
+                // 站点在个别流程会 http:// 重定向；强制升级 https 再加载，
+                // 避免被宿主默认的明文拦截（net::ERR_CLEARTEXT_NOT_PERMITTED）。
+                view.stopLoading()
+                view.loadUrl(upgraded!!)
+                return
+            }
+            navCompleted = false
+        }
+
+        override fun shouldOverrideUrlLoading(
+            view: WebView,
+            request: WebResourceRequest,
+        ): Boolean {
+            val target = request.url.toString()
+            val upgraded = upgradeToHttps(target)
+            if (upgraded != target) {
+                view.loadUrl(upgraded)
+                return true
+            }
+            return false
+        }
+
+        override fun onPageFinished(view: WebView, loadedUrl: String?) {
+            val continuation = navContinuation
+            if (!navCompleted && continuation != null) {
+                navCompleted = true
+                navContinuation = null
+                runCatching { continuation.resume(Unit) }
+            }
+        }
+
+        override fun onReceivedError(
+            view: WebView,
+            request: WebResourceRequest,
+            error: WebResourceError,
+        ) {
+            if (!request.isForMainFrame) return
+            val target = request.url.toString()
+            val upgraded = upgradeToHttps(target)
+            if (upgraded != target) {
+                // 站点 http:// 重定向没走 shouldOverrideUrlLoading/onPageStarted 拦截
+                // （如 meta refresh 或资源级加载）已到达错误回调：升级后重载而非报错。
+                view.loadUrl(upgraded)
+                return
+            }
+            val continuation = navContinuation ?: return
+            navContinuation = null
+            navCompleted = true
+            // 带出具体 URL，便于定位被拦的是哪个地址。
+            runCatching { continuation.resumeWithException(IOException("${error.description} @ $target")) }
+        }
+    }
+
     companion object {
+        private const val TAG = "XhsBrowserGateway"
         private const val NAVIGATION_TIMEOUT_MS = 60_000L
         private const val POLL_INTERVAL_MS = 250L
-        private const val FILE_CHOOSER_TIMEOUT_MS = 15_000L
-        private const val UPLOAD_URI_LIFETIME_MS = 2 * 60_000L
         private const val DESKTOP_USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
     }
 }
-
-/**
- * WebView 文件选择器使用的 URI。
- *
- * @property uri 可被 WebView renderer 读取的 content URI。
- * @property temporary 是否由插件临时写入 MediaStore、稍后需清理。
- */
-private data class PreparedUpload(val uri: Uri, val temporary: Boolean)
 
 /** 已知小红书域名；这些域在个别流程会走 http:// 重定向，需升级为 https。 */
 internal val XHS_CLEARTEXT_HOSTS: Set<String> = setOf("xiaohongshu.com", "xhscdn.com", "xhslink.com")

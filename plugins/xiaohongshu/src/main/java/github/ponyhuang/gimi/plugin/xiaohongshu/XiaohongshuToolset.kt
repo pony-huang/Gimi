@@ -35,9 +35,7 @@ private val XIAOHONGSHU_INSTRUCTIONS: String = """
       identifiers for replies; never fabricate IDs, tokens, profiles, notification items, or engagement results.
     - Use `get_my_profile` for the signed-in account and `user_profile` for another user. Use notification tools only
       with identifiers returned by `list_notifications`.
-    - For `publish_content` or `publish_with_video`, preserve the user's title, body, media, tags, visibility, schedule,
-      originality, and product choices. Follow the declared schema limits and do not silently omit supplied media.
-    - Publishing, commenting, replying, liking, favoriting, and notification actions mutate the user's account. Report
+    - Commenting, replying, liking, favoriting, and notification actions mutate the user's account. Report
       success only after the tool succeeds, and surface page/login errors rather than claiming completion.
     </xiaohongshu>
 """.trimIndent()

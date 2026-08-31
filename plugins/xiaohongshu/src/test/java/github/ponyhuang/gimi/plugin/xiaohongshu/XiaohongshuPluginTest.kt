@@ -23,7 +23,7 @@ class XiaohongshuPluginTest {
         assertEquals("小红书", plugin.displayName)
         assertTrue(plugin.config.fields.isEmpty())
         assertTrue(plugin.tools().isEmpty())
-        assertEquals(18, plugin.toolCount)
+        assertEquals(16, plugin.toolCount)
         val toolset = plugin.toolSets().single()
         assertEquals(
             listOf(
@@ -37,14 +37,12 @@ class XiaohongshuPluginTest {
                 "check_login_status",
                 "get_login_qrcode",
                 "delete_cookies",
-                "publish_content",
                 "list_feeds",
                 "search_feeds",
                 "get_feed_detail",
                 "user_profile",
                 "post_comment_to_feed",
                 "reply_comment_in_feed",
-                "publish_with_video",
                 "like_feed",
                 "favorite_feed",
                 "get_my_profile",
@@ -72,7 +70,7 @@ class XiaohongshuPluginTest {
         assertTrue(instructions.contains("<xiaohongshu>"))
         assertTrue(instructions.contains("feed_id"))
         assertTrue(instructions.contains("xsec_token"))
-        assertTrue(instructions.contains("publish_content"))
+        assertTrue(instructions.contains("notification"))
     }
 
     @Test

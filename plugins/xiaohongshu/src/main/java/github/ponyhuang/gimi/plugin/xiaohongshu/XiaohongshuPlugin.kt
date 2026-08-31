@@ -19,7 +19,7 @@ class XiaohongshuPlugin internal constructor(
     override val pluginId: String = "xiaohongshu"
     override val displayName: String = "小红书"
     override val version: Int = 1
-    override val toolCount: Int = 18
+    override val toolCount: Int = 16
     override val config: PluginConfig = PluginConfig(
         actions = listOf(
             PluginConfigAction(id = ACTION_LOGIN, label = "登录小红书"),

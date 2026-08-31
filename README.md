@@ -27,6 +27,8 @@
   <img src="doc/assert/dad67e7e0bd1e7045ec58d4282ce2627.jpg" width="24%" alt="设置" />
 </p>
 
+## Demo 展示
+
 <div align="center">
   <video src="https://github.com/user-attachments/assets/855737f5-61e6-4e77-88f4-bfe5385009eb" controls playsinline width="320">
     <a href="https://github.com/user-attachments/assets/855737f5-61e6-4e77-88f4-bfe5385009eb">观看演示视频</a>
@@ -35,7 +37,7 @@
 
 ## 能干什么
 
-你填自己的 API Key。Gimi 让模型在你授权的范围内操作设备：闹钟、日历、媒体播放、屏幕亮度、指定文件夹，以及你接入的插件和外部工具。不锁定厂商，不收费。
+填入自己的 API Key 后，Gimi 就能在你的授权范围内帮你操作设备：设闹钟、看日程、播放媒体、调节屏幕亮度、访问指定文件夹，还能使用你接入的插件和外部工具。
 
 ## 功能
 

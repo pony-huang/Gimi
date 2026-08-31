@@ -27,17 +27,19 @@ Chat or talk naturally, then put your phone's alarms, calendar, files, music, pl
   <img src="doc/assert/dad67e7e0bd1e7045ec58d4282ce2627.jpg" width="24%" alt="Settings" />
 </p>
 
-<p align="center">
-  <video src="https://github.com/pony-huang/Gimi/raw/refs/heads/main/doc/assert/Demo1.mp4" controls playsinline width="320">
-    <a href="doc/assert/Demo1.mp4">Watch the demo video</a>
+## Demo
+
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/855737f5-61e6-4e77-88f4-bfe5385009eb" controls playsinline width="320">
+    <a href="https://github.com/user-attachments/assets/855737f5-61e6-4e77-88f4-bfe5385009eb">Watch the demo video</a>
   </video>
-</p>
+</div>
 
 ## What it does
 
-You bring your own API key. Gimi gives its model access to your device within the permissions you
-choose: alarms, calendar, media, screen brightness, folders you pick, plugins, and external tools.
-No vendor lock-in. No subscription.
+Add your own API key, and Gimi can help with your device within the permissions you choose: set
+alarms, check your calendar, play media, adjust screen brightness, access folders you select, and
+use the plugins and external tools you connect.
 
 ## Features
 

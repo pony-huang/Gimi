@@ -98,6 +98,20 @@ fun SettingsScreen(
                         onClick = { onAction(SettingsAction.OpenPlugins) },
                         showDivider = true,
                     )
+                    PreferenceListItem(
+                        icon = Icons.Default.Visibility,
+                        title = stringResource(R.string.settings_chat_display_title),
+                        subtitle = stringResource(R.string.settings_chat_display_subtitle),
+                        showDivider = true,
+                        trailingContent = {
+                            Switch(
+                                checked = state.showToolActivity,
+                                onCheckedChange = {
+                                    onAction(SettingsAction.SetToolActivityVisible(it))
+                                },
+                            )
+                        },
+                    )
                     PreferenceNavigationCard(
                         icon = Icons.Default.Rule,
                         title = stringResource(R.string.settings_tool_authorization_title),
@@ -136,20 +150,6 @@ fun SettingsScreen(
                         subtitle = stringResource(R.string.settings_recommendations_subtitle),
                         onClick = { onAction(SettingsAction.OpenRecommendations) },
                         showDivider = true,
-                    )
-                    PreferenceListItem(
-                        icon = Icons.Default.Visibility,
-                        title = stringResource(R.string.settings_chat_display_title),
-                        subtitle = stringResource(R.string.settings_chat_display_subtitle),
-                        showDivider = true,
-                        trailingContent = {
-                            Switch(
-                                checked = state.showToolActivity,
-                                onCheckedChange = {
-                                    onAction(SettingsAction.SetToolActivityVisible(it))
-                                },
-                            )
-                        },
                     )
                     PreferenceNavigationCard(
                         icon = Icons.Default.Security,

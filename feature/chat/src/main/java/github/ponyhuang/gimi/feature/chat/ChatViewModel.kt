@@ -38,6 +38,7 @@ import github.ponyhuang.gimi.domain.memory.model.MemoryOperation
 import github.ponyhuang.gimi.domain.memory.repository.MemoryRuntimeStatus
 import github.ponyhuang.gimi.domain.speech.repository.SpeechRecognitionRepository
 import github.ponyhuang.gimi.domain.speech.repository.SpeechPlaybackRepository
+import github.ponyhuang.gimi.domain.speech.repository.VoiceWakeRepository
 import github.ponyhuang.gimi.domain.speech.usecase.markdownToSpeechText
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
@@ -84,6 +85,7 @@ class ChatViewModel @Inject constructor(
     private val mcpSkipReporter: McpSkipReporter,
     private val speechRecognitionRepository: SpeechRecognitionRepository,
     private val speechPlaybackController: SpeechPlaybackRepository,
+    private val voiceWake: VoiceWakeRepository,
     private val attachments: ChatAttachmentRepository,
     private val officialFunctionCatalog: OfficialToolFunctionCatalog,
     private val memoryRuntimeStatus: MemoryRuntimeStatus,
@@ -252,6 +254,16 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             speechPlaybackController.state.collect { playback ->
                 _uiState.update { it.copy(speechPlaybackState = playback) }
+            }
+        }
+        viewModelScope.launch {
+            voiceWake.state.collect { wakeState ->
+                _uiState.update {
+                    it.copy(
+                        voiceWakeStatus = wakeState.status,
+                        voiceWakeSessionId = wakeState.voiceSessionId,
+                    )
+                }
             }
         }
         viewModelScope.launch {

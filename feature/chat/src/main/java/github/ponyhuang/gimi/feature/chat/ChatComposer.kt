@@ -11,6 +11,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -68,6 +72,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.sin
 
 /**
  * Chat composer with attach, voice, and send buttons.
@@ -102,6 +107,7 @@ public fun ChatComposer(
     onSendClick: (data: MessageData) -> Boolean,
     onStopClick: () -> Unit,
     isGenerating: Boolean,
+    isVoiceWakeCapturing: Boolean = false,
     modifier: Modifier = Modifier,
     messageData: MessageData = MessageData(),
     onVoiceInputStart: () -> Unit = { },
@@ -191,7 +197,8 @@ public fun ChatComposer(
         if (
             voiceInputState != VoiceInputUiState.Idle ||
             !isVoiceInputAvailable ||
-            isGenerating
+            isGenerating ||
+            isVoiceWakeCapturing
         ) {
             return
         }
@@ -269,6 +276,12 @@ public fun ChatComposer(
 
     LaunchedEffect(isGenerating) {
         if (isGenerating && voiceInputState is VoiceInputUiState.Recording) {
+            cancelVoiceInput()
+        }
+    }
+
+    LaunchedEffect(isVoiceWakeCapturing) {
+        if (isVoiceWakeCapturing && voiceInputState is VoiceInputUiState.Recording) {
             cancelVoiceInput()
         }
     }
@@ -355,7 +368,9 @@ public fun ChatComposer(
 
     val componentFactory = LocalChatAiComponentFactory.current
     val recordingState = voiceInputState as? VoiceInputUiState.Recording
-    val isCapsuleExpanded = isComposerExpanded || retainExpanded || recordingState != null
+    val wakeCaptureLevels = rememberWakeCaptureWaveformLevels(isVoiceWakeCapturing)
+    val isCapsuleExpanded = isComposerExpanded || retainExpanded ||
+        recordingState != null || isVoiceWakeCapturing
 
     LaunchedEffect(isCapsuleExpanded) {
         onExpandedChange(isCapsuleExpanded)
@@ -384,12 +399,13 @@ public fun ChatComposer(
             color = MaterialTheme.colorScheme.surfaceContainer,
             tonalElevation = 0.dp,
         ) {
-            if (recordingState != null) {
+            if (recordingState != null || isVoiceWakeCapturing) {
                 with(componentFactory) {
                     VoiceRecordingContent(
                         VoiceRecordingContentParams(
-                            levels = recordingState.levels,
-                            remainingSeconds = recordingState.remainingSeconds,
+                            levels = recordingState?.levels ?: wakeCaptureLevels,
+                            remainingSeconds = recordingState?.remainingSeconds ?: 0,
+                            externallyManaged = recordingState == null,
                             onCancel = ::cancelVoiceInput,
                             onFinish = ::finishVoiceInput,
                         ),
@@ -499,6 +515,26 @@ internal val ComposerInsetAnimationSpec: AnimationSpec<Dp> = tween(
 )
 
 private const val MAX_WAVEFORM_SAMPLES = 96
+private const val WAKE_WAVE_CYCLE_MS = 900
+private const val WAKE_WAVE_OFFSET = 0.65f
+
+/** 语音唤醒独占麦克风时，用动画波形明确展示当前会话仍在收音。 */
+@Composable
+private fun rememberWakeCaptureWaveformLevels(isCapturing: Boolean): List<Float> {
+    if (!isCapturing) return emptyList()
+    val transition = rememberInfiniteTransition(label = "wakeCaptureWaveform")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = (Math.PI * 2).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = WAKE_WAVE_CYCLE_MS, easing = LinearEasing),
+        ),
+        label = "wakeCaptureWavePhase",
+    )
+    return List(MAX_WAVEFORM_SAMPLES) { index ->
+        (0.2f + ((sin(phase + index * WAKE_WAVE_OFFSET) + 1f) * 0.3f)).coerceIn(0f, 1f)
+    }
+}
 
 internal class VoicePcmBuffer {
     private val output = ByteArrayOutputStream()

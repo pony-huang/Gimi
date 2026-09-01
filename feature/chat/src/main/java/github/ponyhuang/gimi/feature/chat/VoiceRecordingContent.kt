@@ -37,10 +37,11 @@ internal const val VOICE_WAVEFORM_TEST_TAG = "voice_recording_waveform"
 
 @Composable
 internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
-    val recordingState = stringResource(
-        R.string.chat_voice_recording_remaining,
-        params.remainingSeconds,
-    )
+    val recordingState = if (params.externallyManaged) {
+        stringResource(R.string.chat_voice_wake_capturing)
+    } else {
+        stringResource(R.string.chat_voice_recording_remaining, params.remainingSeconds)
+    }
     val waveformDescription = stringResource(R.string.chat_voice_waveform)
     Row(
         modifier = Modifier
@@ -51,21 +52,23 @@ internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FilledIconButton(
-            onClick = params.onCancel,
-            modifier = Modifier
-                .size(48.dp)
-                .testTag(VOICE_CANCEL_TEST_TAG),
-            colors = IconButtonDefaults.filledIconButtonColors(
-                // 与输入栏内其他按钮一致，比栏背景 surfaceContainer 抬一级
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-        ) {
-            Icon(
-                imageVector = Icons.Default.Close,
-                contentDescription = stringResource(R.string.chat_voice_cancel_recording),
-            )
+        if (!params.externallyManaged) {
+            FilledIconButton(
+                onClick = params.onCancel,
+                modifier = Modifier
+                    .size(48.dp)
+                    .testTag(VOICE_CANCEL_TEST_TAG),
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    // 与输入栏内其他按钮一致，比栏背景 surfaceContainer 抬一级
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = stringResource(R.string.chat_voice_cancel_recording),
+                )
+            }
         }
 
         VoiceWaveform(
@@ -79,17 +82,19 @@ internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
                 },
         )
 
-        FilledIconButton(
-            onClick = params.onFinish,
-            modifier = Modifier
-                .size(48.dp)
-                .testTag(VOICE_FINISH_TEST_TAG),
-        ) {
-            // 语义是"完成录音并转写"，用对勾而非停止方块——方块容易被理解为"中断丢弃"。
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = stringResource(R.string.chat_voice_finish_recording),
-            )
+        if (!params.externallyManaged) {
+            FilledIconButton(
+                onClick = params.onFinish,
+                modifier = Modifier
+                    .size(48.dp)
+                    .testTag(VOICE_FINISH_TEST_TAG),
+            ) {
+                // 语义是"完成录音并转写"，用对勾而非停止方块——方块容易被理解为"中断丢弃"。
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = stringResource(R.string.chat_voice_finish_recording),
+                )
+            }
         }
     }
 }

@@ -9,6 +9,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState
+import github.ponyhuang.gimi.domain.speech.model.VoiceWakeStatus
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
@@ -70,7 +71,16 @@ data class ChatUiState(
     /** 被用户拒绝确认的工具名（内存展示态）；工具 chip 据此显示 ✗ 而非永远悬在"未完成"。 */
     val rejectedToolNames: Set<String> = emptySet(),
     val speechPlaybackState: SpeechPlaybackState = SpeechPlaybackState(),
+    /** 语音唤醒运行状态；仅用于将当前会话的采集态投射到输入栏。 */
+    val voiceWakeStatus: VoiceWakeStatus = VoiceWakeStatus.Stopped,
+    /** 语音唤醒当前绑定的共享会话；非当前会话时不应影响可见输入栏。 */
+    val voiceWakeSessionId: String? = null,
 )
+
+/** 当前显示会话是否正通过语音唤醒采集命令。 */
+val ChatUiState.isVoiceWakeCapturing: Boolean
+    get() = voiceWakeStatus == VoiceWakeStatus.CapturingCommand &&
+        voiceWakeSessionId != null && voiceWakeSessionId == sessionId
 
 val ChatUiState.pendingToolConfirmation: PendingToolConfirmation?
     get() = pendingToolConfirmations.firstOrNull()

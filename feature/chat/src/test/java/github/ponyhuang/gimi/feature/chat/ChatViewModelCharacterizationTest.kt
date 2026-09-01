@@ -35,8 +35,11 @@ import github.ponyhuang.gimi.domain.memory.model.MemoryOperation
 import github.ponyhuang.gimi.domain.memory.model.MemoryRuntimeFailure
 import github.ponyhuang.gimi.domain.memory.repository.MemoryRuntimeStatus
 import github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState
+import github.ponyhuang.gimi.domain.speech.model.VoiceWakeState
+import github.ponyhuang.gimi.domain.speech.model.VoiceWakeStatus
 import github.ponyhuang.gimi.domain.speech.repository.SpeechPlaybackRepository
 import github.ponyhuang.gimi.domain.speech.repository.SpeechRecognitionRepository
+import github.ponyhuang.gimi.domain.speech.repository.VoiceWakeRepository
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 import io.mockk.coEvery
@@ -99,6 +102,21 @@ class ChatViewModelCharacterizationTest {
         assertFalse(state.messages[1].partial)
         assertFalse(state.isAgentRunning)
         coVerify { fixture.conversations.refreshConversation("session-1") }
+    }
+
+    @Test
+    fun wakeCommandCaptureForCurrentSessionShowsVoiceRecordingState() = runTest {
+        val fixture = fixture(configured = true)
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-1"))
+        advanceUntilIdle()
+
+        fixture.voiceWake.value = VoiceWakeState(
+            status = VoiceWakeStatus.CapturingCommand,
+            voiceSessionId = "session-1",
+        )
+        advanceUntilIdle()
+
+        assertTrue(fixture.viewModel.uiState.value.isVoiceWakeCapturing)
     }
 
     @Test
@@ -735,6 +753,10 @@ class ChatViewModelCharacterizationTest {
             every { state } returns MutableStateFlow(SpeechPlaybackState())
             every { errors } returns MutableSharedFlow()
         }
+        val voiceWakeState = MutableStateFlow(VoiceWakeState())
+        val voiceWake = mockk<VoiceWakeRepository>(relaxed = true) {
+            every { state } returns voiceWakeState
+        }
         val attachments = mockk<ChatAttachmentRepository> {
             coEvery { read(any(), any()) } returns emptyList()
             coEvery { deleteDrafts(any()) } returns Unit
@@ -781,6 +803,7 @@ class ChatViewModelCharacterizationTest {
                 toolApproval = toolApproval,
                 speechRecognitionRepository = recognition,
                 speechPlaybackController = playback,
+                voiceWake = voiceWake,
                 attachments = attachments,
                 toolAuthorization = toolAuthorization,
                 mcpRepository = mcpRepository,
@@ -798,6 +821,7 @@ class ChatViewModelCharacterizationTest {
             appearance = appearance,
             toolApproval = toolApproval,
             mcpRepository = mcpRepository,
+            voiceWake = voiceWakeState,
         )
     }
 
@@ -867,6 +891,7 @@ class ChatViewModelCharacterizationTest {
         val appearance: AppearanceRepository,
         val toolApproval: FakeToolApprovalRepository,
         val mcpRepository: McpRepository,
+        val voiceWake: MutableStateFlow<VoiceWakeState>,
     )
 }
 

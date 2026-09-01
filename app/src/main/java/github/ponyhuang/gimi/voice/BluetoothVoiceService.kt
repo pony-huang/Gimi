@@ -91,7 +91,7 @@ class BluetoothVoiceService : Service() {
         if (event.status == BluetoothVoiceStatus.Stopped) return
         getSystemService(NotificationManager::class.java).notify(
             NOTIFICATION_ID,
-            buildNotification(event.status, event.message),
+            buildNotification(event.status, VoiceNotificationText.forEvent(event)),
         )
     }
 

@@ -63,6 +63,8 @@ public sealed interface VoiceInputUiState {
 public data class VoiceRecordingContentParams(
     val levels: List<Float>,
     val remainingSeconds: Int,
+    /** true 时录音由语音唤醒服务管理，输入栏只展示波形而不提供手动结束操作。 */
+    val externallyManaged: Boolean = false,
     val onCancel: () -> Unit,
     val onFinish: () -> Unit,
 )

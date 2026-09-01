@@ -68,6 +68,29 @@ class VoiceRecordingContentTest {
     }
 
     @Test
+    fun wakeCaptureShowsWaveformWithoutManualRecordingControls() {
+        composeRule.setContent {
+            MaterialTheme {
+                Box(modifier = Modifier.width(360.dp)) {
+                    DefaultVoiceRecordingContent(
+                        VoiceRecordingContentParams(
+                            levels = List(48) { 0.5f },
+                            remainingSeconds = 0,
+                            externallyManaged = true,
+                            onCancel = { },
+                            onFinish = { },
+                        ),
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(VOICE_WAVEFORM_TEST_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(VOICE_CANCEL_TEST_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(VOICE_FINISH_TEST_TAG).assertDoesNotExist()
+    }
+
+    @Test
     fun transcribingStateReplacesEditableComposerContent() {
         composeRule.setContent {
             MaterialTheme {

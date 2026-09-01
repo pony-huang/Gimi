@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -36,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -236,17 +236,17 @@ fun McpServerEditorScreen(
                         onClick = { onAction(McpSettingsAction.SaveEditor) },
                         enabled = !state.isMutationBlocked && !state.isTestingConnection &&
                             draft.name.isNotBlank() && draft.endpointUrl.isNotBlank(),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth(0.5f)
+                            .align(Alignment.CenterHorizontally)
+                            .testTag("mcp_save_action"),
                     ) {
-                        if (state.isTestingConnection) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.padding(end = 8.dp).size(18.dp),
-                                strokeWidth = 2.dp,
-                            )
-                            Text(stringResource(R.string.mcp_connection_testing))
-                        } else {
-                            Text(stringResource(R.string.mcp_save))
-                        }
+                        Text(
+                            stringResource(
+                                if (state.isTestingConnection) R.string.mcp_connection_testing
+                                else R.string.mcp_save,
+                            ),
+                        )
                     }
                     state.connectionError?.let { error ->
                         Text(

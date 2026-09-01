@@ -1,7 +1,9 @@
 package github.ponyhuang.gimi.feature.permissions
 
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import github.ponyhuang.gimi.domain.permissions.model.AppPermission
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
@@ -41,5 +43,22 @@ class PermissionSettingsScreenTest {
             PermissionSettingsAction.RequestGroup(PermissionGroupKind.Microphone),
             action,
         )
+    }
+
+    @Test
+    fun grantAllButtonUsesTheCenteredHalfWidthPrimaryActionLayout() {
+        composeRule.setContent {
+            AsssistantaiTheme {
+                PermissionSettingsScreen(state = PermissionSettingsUiState(), onAction = {})
+            }
+        }
+
+        val root = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
+        val button = composeRule.onNodeWithTag("permissions_grant_all_action")
+            .fetchSemanticsNode()
+            .boundsInRoot
+
+        assertEquals(root.width / 2f, button.width, 24f)
+        assertEquals(root.left + root.width / 2f, button.left + button.width / 2f, 1f)
     }
 }

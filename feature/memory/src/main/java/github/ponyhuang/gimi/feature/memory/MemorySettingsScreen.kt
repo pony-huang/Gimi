@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -32,6 +31,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -189,14 +190,15 @@ fun MemorySettingsScreen(
                                 Button(
                                     onClick = { onAction(MemorySettingsAction.Save) },
                                     enabled = !state.saving && state.memoryEnabled,
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.5f)
+                                        .align(Alignment.CenterHorizontally)
+                                        .testTag("memory_save_action"),
                                 ) {
-                                    Icon(Icons.Default.Save, contentDescription = null)
                                     Text(
                                         text = stringResource(
                                             if (state.saving) R.string.memory_saving else R.string.memory_save,
                                         ),
-                                        modifier = Modifier.padding(start = 8.dp),
                                     )
                                 }
                             }

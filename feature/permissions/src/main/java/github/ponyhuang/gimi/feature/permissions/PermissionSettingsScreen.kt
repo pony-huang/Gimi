@@ -23,6 +23,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -55,7 +57,10 @@ fun PermissionSettingsScreen(
                                 onAction(PermissionSettingsAction.RequestAllRuntimePermissions)
                             },
                             enabled = !state.allRuntimeGranted,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth(0.5f)
+                                .align(Alignment.CenterHorizontally)
+                                .testTag("permissions_grant_all_action"),
                         ) {
                             Text(
                                 if (state.allRuntimeGranted) {

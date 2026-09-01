@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -31,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationRefreshStatus
@@ -106,16 +106,12 @@ fun RecommendationSettingsScreen(
                                     onClick = { onAction(RecommendationSettingsAction.RefreshNow) },
                                     enabled = state.enabled &&
                                         state.refreshStatus == RecommendationRefreshStatus.Idle,
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.5f)
+                                        .align(Alignment.CenterHorizontally)
+                                        .testTag("recommendation_refresh_action"),
                                 ) {
-                                    androidx.compose.material3.Icon(
-                                        Icons.Default.Refresh,
-                                        contentDescription = null,
-                                    )
-                                    Text(
-                                        text = stringResource(R.string.recommendation_refresh_now),
-                                        modifier = Modifier.padding(start = 8.dp),
-                                    )
+                                    Text(text = stringResource(R.string.recommendation_refresh_now))
                                 }
                             }
                         }
@@ -190,4 +186,3 @@ private fun recommendationStatusText(state: RecommendationSettingsUiState): Stri
         stringResource(R.string.recommendation_status_updated, formatted)
     }
 }
-

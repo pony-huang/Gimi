@@ -10,13 +10,9 @@ import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import github.ponyhuang.gimi.domain.memory.model.MemoryOperation
 import github.ponyhuang.gimi.domain.memory.repository.MemoryRuntimeStatus
-import github.ponyhuang.gimi.domain.memory.repository.MemorySettingsRepository
 import java.io.IOException
 import java.util.concurrent.CancellationException
 import java.util.logging.Logger
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -31,18 +27,11 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 
 class Mem0MemoryService(
-    private val httpClient: OkHttpClient,
-    private val settingsRepository: MemorySettingsRepository,
+    private val api: Mem0ApiClient,
     private val runtimeStatus: MemoryRuntimeStatus,
-    private val baseUrl: String = DEFAULT_BASE_URL,
 ) : MemoryService {
-    private val json = Json { ignoreUnknownKeys = true }
 
     override suspend fun searchMemory(
         appName: String,
@@ -59,9 +48,10 @@ class Mem0MemoryService(
                         add(buildJsonObject { put("app_id", appName) })
                     })
                 })
+                put("threshold", 0.7)
                 put("top_k", SEARCH_LIMIT)
             }
-            val response = execute("/v3/memories/search/", requestBody)
+            val response = api.post("/v3/memories/search/", requestBody)
             SearchMemoryResponse(
                 (response["results"] as? JsonArray).orEmpty().mapNotNull(::toMemoryEntry),
             )
@@ -72,7 +62,7 @@ class Mem0MemoryService(
         val messages = session.events.mapNotNull(::toMessage)
         if (messages.isEmpty()) return
         recover(MemoryOperation.WRITE, Unit) {
-            execute(
+            api.post(
                 path = "/v3/memories/add/",
                 body = buildJsonObject {
                     put("messages", buildJsonArray { messages.forEach(::add) })
@@ -94,7 +84,7 @@ class Mem0MemoryService(
         val messages = events.mapNotNull(::toMessage)
         if (messages.isEmpty()) return
         recover(MemoryOperation.WRITE, Unit) {
-            execute(
+            api.post(
                 path = "/v3/memories/add/",
                 body = buildJsonObject {
                     put("messages", buildJsonArray { messages.forEach(::add) })
@@ -103,23 +93,6 @@ class Mem0MemoryService(
                 },
             )
             Unit
-        }
-    }
-
-    private suspend fun execute(path: String, body: JsonObject): JsonObject = withContext(Dispatchers.IO) {
-        val apiKey = settingsRepository.configuration.value.apiKey
-        require(apiKey.isNotBlank()) { "Mem0 API key is missing." }
-        val request = Request.Builder()
-            .url(baseUrl.trimEnd('/') + path)
-            .header("Authorization", "Token $apiKey")
-            .header("Accept", "application/json")
-            .post(body.toString().toRequestBody(JSON_MEDIA_TYPE))
-            .build()
-        httpClient.newCall(request).execute().use { response ->
-            val responseBody = response.body?.string().orEmpty()
-            if (!response.isSuccessful) throw IOException("Mem0 HTTP ${response.code}: ${responseBody.take(200)}")
-            if (responseBody.isBlank()) JsonObject(emptyMap())
-            else json.parseToJsonElement(responseBody).jsonObject
         }
     }
 
@@ -185,9 +158,7 @@ class Mem0MemoryService(
     }
 
     private companion object {
-        const val DEFAULT_BASE_URL = "https://api.mem0.ai"
-        const val SEARCH_LIMIT = 5
-        val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+        const val SEARCH_LIMIT = 10
         val logger: Logger = Logger.getLogger(Mem0MemoryService::class.java.name)
     }
 }

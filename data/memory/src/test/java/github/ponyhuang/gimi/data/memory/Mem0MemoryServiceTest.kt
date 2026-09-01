@@ -38,10 +38,12 @@ class Mem0MemoryServiceTest {
         settings = FakeMemorySettingsRepository(MemoryConfiguration(mem0Enabled = true, apiKey = "mem0-key"))
         status = DefaultMemoryRuntimeStatus()
         service = Mem0MemoryService(
-            httpClient = OkHttpClient(),
-            settingsRepository = settings,
+            api = Mem0ApiClient(
+                httpClient = OkHttpClient(),
+                settingsRepository = settings,
+                baseUrl = server.url("/").toString().removeSuffix("/"),
+            ),
             runtimeStatus = status,
-            baseUrl = server.url("/").toString().removeSuffix("/"),
         )
     }
 

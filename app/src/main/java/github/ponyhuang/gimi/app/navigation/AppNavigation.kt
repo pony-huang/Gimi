@@ -128,7 +128,7 @@ fun MainScreen(
                         onBack = goBack,
                         onOpenPermissions = { navigate(PermissionDestination.Settings) },
                     ) ||
-                    MemoryEntryProvider(destination, goBack) ||
+                    MemoryEntryProvider(destination, goBack, navigate) ||
                     PermissionEntryProvider(destination, goBack) ||
                     SkillsEntryProvider(destination, goBack) ||
                     VoiceWakeEntryProvider(destination, goBack) ||

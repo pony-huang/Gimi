@@ -2,9 +2,10 @@
     <string name="memory_screen_title">Memory</string>
     <string name="memory_enabled_title">Enable memory</string>
     <string name="memory_enabled_subtitle">When off, conversations are no longer saved to or recalled from memory</string>
-    <string name="memory_section_provider">Memory service</string>
+    <string name="memory_section_provider">Mem0</string>
     <string name="memory_mem0_enabled_title">Enable Mem0</string>
     <string name="memory_mem0_enabled_subtitle">Uses on-device memory when disabled</string>
+    <string name="memory_mem0_quickstart">Mem0 quickstart</string>
     <string name="memory_token_label">Mem0 API Token</string>
     <string name="memory_token_stored_placeholder">Stored securely; leave blank to keep it</string>
     <string name="memory_token_required">Mem0 API Token is required</string>
@@ -14,4 +15,24 @@
     <string name="memory_saving">Saving</string>
     <string name="memory_saved">Memory settings saved</string>
     <string name="memory_save_failed">Could not save memory settings</string>
+    <string name="memory_history_title">Cloud memory history</string>
+    <string name="memory_history_subtitle">View, delete, and rate current Mem0 memories</string>
+    <string name="memory_history_screen_title">Cloud memory history</string>
+    <string name="memory_history_refresh">Refresh</string>
+    <string name="memory_history_empty">No cloud memories yet</string>
+    <string name="memory_history_load_more">Load more</string>
+    <string name="memory_history_loading">Loading</string>
+    <string name="memory_history_updated_at">Updated: %1$s</string>
+    <string name="memory_history_positive_feedback">Helpful</string>
+    <string name="memory_history_negative_feedback">Not helpful</string>
+    <string name="memory_history_feedback_reason">Reason (optional)</string>
+    <string name="memory_history_submit">Submit</string>
+    <string name="memory_history_delete">Delete</string>
+    <string name="memory_history_delete_title">Delete this memory?</string>
+    <string name="memory_history_delete_message">This cannot be undone.</string>
+    <string name="memory_history_delete_confirm">Delete</string>
+    <string name="memory_history_cancel">Cancel</string>
+    <string name="memory_history_deleted">Memory deleted</string>
+    <string name="memory_history_feedback_submitted">Feedback submitted</string>
+    <string name="memory_history_operation_failed">Could not complete the operation. Try again later.</string>
 </resources>

@@ -21,6 +21,8 @@ class MemorySettingsScreenTest {
                 MemorySettingsScreen(
                     state = MemorySettingsUiState(tokenError = true),
                     onAction = actions::add,
+                    onNavigateToHistory = {},
+                    onOpenMem0Quickstart = {},
                 )
             }
         }

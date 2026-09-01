@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.ui.theme.PreferenceCanvasDark
 import github.ponyhuang.gimi.ui.theme.PreferenceCanvasLight
@@ -123,6 +124,7 @@ fun PreferenceGroupCard(
  *
  * @property iconContainer 图标圆形底色，默认主题蓝。
  * @property iconTint 圆底上的字形色，默认白色；禁用等特殊态可改为灰色组合。
+ * @property iconSize 图标本身的尺寸；品牌图标可使用与容器相同的尺寸以保留原始外观。
  */
 @Composable
 fun PreferenceListItem(
@@ -133,6 +135,7 @@ fun PreferenceListItem(
     onClick: (() -> Unit)? = null,
     iconContainer: Color = MaterialTheme.colorScheme.primary,
     iconTint: Color = Color.White,
+    iconSize: Dp = 20.dp,
     showDivider: Boolean = false,
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
 ) {
@@ -161,7 +164,7 @@ fun PreferenceListItem(
                     imageVector = icon,
                     contentDescription = null,
                     tint = iconTint,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(iconSize),
                 )
             }
             Column(

@@ -169,10 +169,18 @@ class VoiceAudioPipeline @Inject constructor(
             return
         }
         val current = route
-        if (current?.id == available.id && recorder != null &&
-            controller.state.value.status == BluetoothVoiceStatus.Listening
-        ) return
-        startListening(available)
+        // 采集命令时录音仍在运行；路由回调不能中断这段音频并重新创建录音器。
+        if (current?.id == available.id && recorder != null) return
+        when (
+            WakeListeningRestartPolicy.decide(
+                currentRouteId = current?.id,
+                availableRouteId = available.id,
+                hasActiveDetector = detector != null,
+            )
+        ) {
+            WakeListeningRestartAction.ResumeCapture -> resumeListening(available)
+            WakeListeningRestartAction.RecreateSession -> startListening(available)
+        }
     }
 
     private suspend fun startListening(newRoute: VoiceAudioRoute) {
@@ -214,8 +222,21 @@ class VoiceAudioPipeline @Inject constructor(
             return
         }
         detector = wakeDetector
+        startRecorder(newRoute, wakeDetector)
+    }
+
+    /** 在检测器与音频路由仍有效时，仅重新打开录音，避免每轮 ASR 后重建唤醒会话。 */
+    private suspend fun resumeListening(existingRoute: VoiceAudioRoute) {
+        val wakeDetector = detector ?: run {
+            startListening(existingRoute)
+            return
+        }
         preRoll = PcmPreRollBuffer()
         capture = null
+        startRecorder(existingRoute, wakeDetector)
+    }
+
+    private fun startRecorder(newRoute: VoiceAudioRoute, wakeDetector: VoskWakeWordDetector) {
         val pcmRecorder = BluetoothPcmRecorder()
         recorder = pcmRecorder
         val started = pcmRecorder.start(

@@ -21,6 +21,20 @@ enum class ToolAccessMode {
 }
 
 /**
+ * 当前会话交给模型的推理深度。
+ *
+ * 四档命名与 ADK、OpenAI 的推理强度保持一致；具体模型适配层可按其协议映射为
+ * `thinkingLevel`、`reasoning_effort` 或 extended-thinking 预算。
+ */
+@Serializable
+enum class ReasoningEffort {
+    MINIMAL,
+    LOW,
+    MEDIUM,
+    HIGH,
+}
+
+/**
  * 兼容历史持久化数据：旧版本曾把该字段写成 `"AUTO"`，未知值回退到 [ToolAccessMode.ALWAYS_AVAILABLE]。
  * kotlinx 默认对未知枚举名抛异常，这里用自定义 serializer 保留 codec 的归一化语义。
  */
@@ -55,6 +69,7 @@ object ToolAccessModeSerializer : KSerializer<ToolAccessMode> {
  * @property pendingMcpCredentialServerId 当前会话最近一次等待补充认证凭据的 MCP server ID。
  * @property enabledOfficialFunctionIdsByService 按模型服务和官方工具分组的函数选择。
  * @property toolAccessMode 当前会话采用的工具声明加载模式。
+ * @property reasoningEffort 当前会话请求模型时采用的推理强度。
  */
 @Serializable
 data class ConversationToolConfiguration(
@@ -63,6 +78,7 @@ data class ConversationToolConfiguration(
     val pendingMcpCredentialServerId: String? = null,
     val enabledOfficialFunctionIdsByService: Map<String, Map<String, Set<String>>> = emptyMap(),
     val toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
+    val reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM,
 ) {
     fun enabledOfficialFunctionIds(serviceId: String, toolId: String): Set<String> =
         enabledOfficialFunctionIdsByService[serviceId]?.get(toolId).orEmpty()

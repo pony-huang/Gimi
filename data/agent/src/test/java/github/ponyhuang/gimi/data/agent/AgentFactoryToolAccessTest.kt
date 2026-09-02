@@ -9,6 +9,7 @@ import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.tools.Toolset
 import com.google.adk.kt.tools.PreloadMemoryTool
 import com.google.adk.kt.types.FunctionDeclaration
+import com.google.adk.kt.types.ThinkingLevel
 import github.ponyhuang.gimi.data.agent.tools.search.TOOL_SEARCH_NAME
 import github.ponyhuang.gimi.data.agent.tools.search.ToolSearchToolset
 import github.ponyhuang.gimi.data.agent.tools.search.ToolVectorSearch
@@ -20,6 +21,7 @@ import github.ponyhuang.gimi.data.agent.tools.official.SearchOfficialToolset
 import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolset
 import github.ponyhuang.gimi.data.agent.tools.system.LocalToolset
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
@@ -39,6 +41,18 @@ import org.junit.Test
  * Toolset 自过滤），这里只验证每种模式挂载的 Toolset 组合。
  */
 class AgentFactoryToolAccessTest {
+
+    @Test
+    fun appliesTheSessionReasoningEffortToTheAdkThinkingLevel() = runTest {
+        val factory = factory()
+
+        val agent = factory.create(reasoningEffort = ReasoningEffort.HIGH).agent as LlmAgent
+
+        assertEquals(
+            ThinkingLevel.HIGH,
+            agent.generateContentConfig?.thinkingConfig?.thinkingLevel,
+        )
+    }
 
     @Test
     fun alwaysAvailableAttachesEveryToolsetDirectlyWithoutSearchGateway() = runTest {

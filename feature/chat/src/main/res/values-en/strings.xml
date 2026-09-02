@@ -23,9 +23,18 @@
     <string name="chat_session_tools_title">Tools</string>
     <string name="chat_tool_access_title">Tool access</string>
     <string name="chat_tool_access_on_demand">Auto search (Recommended)</string>
-    <string name="chat_tool_access_on_demand_description">Tools are searched and loaded only when needed. Keeps context lean, but requires more model calls and may be slightly less accurate</string>
+    <string name="chat_tool_access_on_demand_description">Searches and loads tools only when needed, saving context at the cost of more model calls and slightly lower accuracy</string>
     <string name="chat_tool_access_always">Always available</string>
-    <string name="chat_tool_access_always_description">All tools are loaded from the start. Fewer model calls and higher accuracy, at the cost of more context</string>
+    <string name="chat_tool_access_always_description">Loads all tools at the start of a conversation, reducing model calls and improving accuracy at the cost of more context</string>
+    <string name="chat_reasoning_effort_title">Reasoning effort</string>
+    <string name="chat_reasoning_effort_minimal">Minimal</string>
+    <string name="chat_reasoning_effort_minimal_description">Fastest responses for simple questions</string>
+    <string name="chat_reasoning_effort_low">Low</string>
+    <string name="chat_reasoning_effort_low_description">Fast responses for everyday questions</string>
+    <string name="chat_reasoning_effort_medium">Medium</string>
+    <string name="chat_reasoning_effort_medium_description">Balanced quality and speed (default)</string>
+    <string name="chat_reasoning_effort_high">High</string>
+    <string name="chat_reasoning_effort_high_description">Deeper analysis for complex questions; responses may take longer</string>
     <string name="chat_session_mcp_title">MCP</string>
     <string name="chat_session_only_notice">Applies to this chat only</string>
     <string name="chat_session_tools_running_notice">Tools cannot be changed while this chat is running</string>
@@ -68,7 +77,7 @@
     <string name="chat_action_allow">Allow</string>
     <string name="chat_action_always_allow">Always allow</string>
     <string name="chat_full_access_title">Full access</string>
-    <string name="chat_full_access_description">When on, tool calls that require confirmation are allowed automatically without showing a confirmation card</string>
+    <string name="chat_full_access_description">Automatically allows all tool calls that require confirmation</string>
 
     <string name="chat_model_picker_change">Select model</string>
     <string name="chat_model_loading">Loading models…</string>

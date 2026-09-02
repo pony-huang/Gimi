@@ -192,6 +192,9 @@ fun ChatRoute(
             onToolAccessModeChange = { mode ->
                 viewModel.onAction(ChatAction.SetToolAccessMode(mode))
             },
+            onReasoningEffortChange = { effort ->
+                viewModel.onAction(ChatAction.SetReasoningEffort(effort))
+            },
             onMcpServerEnabledChange = { serverId, enabled ->
                 viewModel.onAction(ChatAction.SetMcpServerEnabled(serverId, enabled))
             },

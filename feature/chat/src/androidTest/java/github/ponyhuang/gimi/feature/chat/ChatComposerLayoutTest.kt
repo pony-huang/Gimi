@@ -25,12 +25,15 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
 import org.junit.Rule
 import org.junit.Test
@@ -234,6 +237,114 @@ class ChatComposerLayoutTest {
     }
 
     @Test
+    fun sessionConfigurationGroupsMcpWithToolOptions() {
+        setComposer(
+            addToChatState = ChatAddToChatState(
+                configuration = ConversationToolConfiguration(),
+                mcpServers = listOf(McpServer(id = "mcp-1", name = "Test MCP")),
+            ),
+        )
+
+        composeRule.onNodeWithTag("chat_composer_add").performClick()
+
+        composeRule.onNodeWithTag("session-configuration-group").assertIsDisplayed()
+        composeRule.onNodeWithTag("session-mcp-nav").assertIsDisplayed()
+    }
+
+    @Test
+    fun officialAndMcpToolsUseCompactSharedSwitchRows() {
+        setComposer(
+            addToChatState = ChatAddToChatState(
+                serviceId = "service",
+                configuration = ConversationToolConfiguration(),
+                mcpServers = listOf(McpServer(id = "mcp-1", name = "Test MCP")),
+                officialTools = listOf(
+                    OfficialToolDescriptor(
+                        id = "web_search",
+                        functions = listOf(
+                            OfficialToolFunction(
+                                id = "search",
+                                name = "Search",
+                                description = "Search the web",
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        composeRule.onNodeWithTag("chat_composer_add").performClick()
+        composeRule.onNodeWithTag("official-tools-nav").performClick()
+        assertCompactSwitchRow("official-tool-function-web_search-search")
+        assertPageIsCompact(pageTag = "official-tools-detail", maxHeight = 260.dp)
+
+        composeRule.onNodeWithTag("add-to-chat-back").performClick()
+        composeRule.onNodeWithTag("session-mcp-nav").performClick()
+        assertCompactSwitchRow("mcp-server-mcp-1")
+        assertPageIsCompact(pageTag = "session-mcp-page", maxHeight = 240.dp)
+    }
+
+    @Test
+    fun reasoningEffortOptionsUseCompactRows() {
+        setComposer(
+            addToChatState = ChatAddToChatState(
+                configuration = ConversationToolConfiguration(
+                    reasoningEffort = ReasoningEffort.MEDIUM,
+                ),
+            ),
+        )
+
+        composeRule.onNodeWithTag("chat_composer_add").performClick()
+        composeRule.onNodeWithTag("reasoning-effort-nav").performClick()
+
+        ReasoningEffort.entries.forEach { effort ->
+            val rowHeight = composeRule
+                .onNodeWithTag("reasoning-effort-${effort.name.lowercase()}")
+                .fetchSemanticsNode()
+                .boundsInRoot
+                .height
+            val maxRowHeight = with(composeRule.density) { 84.dp.toPx() }
+            assert(rowHeight <= maxRowHeight)
+        }
+    }
+
+    @Test
+    fun toolAccessOptionsAnchorToTheBottomOfTheirPage() {
+        setComposer(
+            addToChatState = ChatAddToChatState(
+                configuration = ConversationToolConfiguration(),
+            ),
+        )
+
+        composeRule.onNodeWithTag("chat_composer_add").performClick()
+        composeRule.onNodeWithTag("tool-access-nav").performClick()
+
+        assertAnchoredToBottom(
+            pageTag = "tool-access-page",
+            lastOptionTag = "tool-access-always",
+        )
+        assertPageIsCompact(pageTag = "tool-access-page", maxHeight = 280.dp)
+    }
+
+    @Test
+    fun reasoningEffortOptionsAnchorToTheBottomOfTheirPage() {
+        setComposer(
+            addToChatState = ChatAddToChatState(
+                configuration = ConversationToolConfiguration(),
+            ),
+        )
+
+        composeRule.onNodeWithTag("chat_composer_add").performClick()
+        composeRule.onNodeWithTag("reasoning-effort-nav").performClick()
+
+        assertAnchoredToBottom(
+            pageTag = "reasoning-effort-page",
+            lastOptionTag = "reasoning-effort-high",
+        )
+        assertPageIsCompact(pageTag = "reasoning-effort-page", maxHeight = 480.dp)
+    }
+
+    @Test
     fun toolAccessModesAreDisabledWhileAgentRuns() {
         setComposer(
             addToChatState = ChatAddToChatState(
@@ -307,5 +418,38 @@ class ChatComposerLayoutTest {
                 )
             }
         }
+    }
+
+    private fun assertAnchoredToBottom(pageTag: String, lastOptionTag: String) {
+        val pageBottom = composeRule.onNodeWithTag(pageTag)
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .bottom
+        val optionBottom = composeRule.onNodeWithTag(lastOptionTag)
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .bottom
+        val maxGap = with(composeRule.density) { 32.dp.toPx() }
+        assert(pageBottom - optionBottom <= maxGap)
+    }
+
+    private fun assertPageIsCompact(pageTag: String, maxHeight: Dp) {
+        val pageHeight = composeRule.onNodeWithTag(pageTag)
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .height
+        val maxHeightPx = with(composeRule.density) { maxHeight.toPx() }
+        assert(pageHeight <= maxHeightPx)
+    }
+
+    private fun assertCompactSwitchRow(tag: String) {
+        val height = composeRule.onNodeWithTag(tag)
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .height
+        val minHeight = with(composeRule.density) { 80.dp.toPx() }
+        val maxHeight = with(composeRule.density) { 84.dp.toPx() }
+        assert(height >= minHeight)
+        assert(height <= maxHeight)
     }
 }

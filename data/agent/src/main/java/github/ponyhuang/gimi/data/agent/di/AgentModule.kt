@@ -148,11 +148,12 @@ object AgentModule {
         agentLLMModelFactory: AgentLLMModelFactory,
         pluginRuntimeProvider: PluginRuntimeProvider<AgentPlugin>,
     ): AgentChatRunner = AgentChatRunner(
-        factory = { selection, toolAccessMode, pluginRuntime ->
+        factory = { selection, toolAccessMode, reasoningEffort, pluginRuntime ->
             modelServices.awaitReady()
             agentFactory.create(
                 selection = selection,
                 toolAccessMode = toolAccessMode,
+                reasoningEffort = reasoningEffort,
                 pluginRuntime = pluginRuntime,
             )
         },

@@ -7,6 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
+import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
@@ -121,6 +122,7 @@ class ChatViewModel @Inject constructor(
             is ChatAction.SetLocalToolEnabled ->
                 setLocalToolEnabled(action.toolId, action.enabled)
             is ChatAction.SetToolAccessMode -> setToolAccessMode(action.mode)
+            is ChatAction.SetReasoningEffort -> setReasoningEffort(action.effort)
             is ChatAction.SetMcpServerEnabled ->
                 setMcpServerEnabled(action.serverId, action.enabled)
             is ChatAction.SetOfficialFunctionEnabled -> setOfficialFunctionEnabled(
@@ -1029,6 +1031,12 @@ class ChatViewModel @Inject constructor(
     private fun setToolAccessMode(mode: ToolAccessMode) {
         updateToolConfiguration { configuration ->
             configuration.copy(toolAccessMode = mode)
+        }
+    }
+
+    private fun setReasoningEffort(effort: ReasoningEffort) {
+        updateToolConfiguration { configuration ->
+            configuration.copy(reasoningEffort = effort)
         }
     }
 

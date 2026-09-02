@@ -25,9 +25,18 @@
     <string name="chat_session_tools_title">工具</string>
     <string name="chat_tool_access_title">工具访问</string>
     <string name="chat_tool_access_on_demand">自动搜索（推荐）</string>
-    <string name="chat_tool_access_on_demand_description">需要时自动搜索并加载工具，上下文更精简；模型调用更多、准确率可能略低</string>
+    <string name="chat_tool_access_on_demand_description">仅在需要时搜索并加载工具，节省上下文；可能增加模型调用，并略微影响准确性</string>
     <string name="chat_tool_access_always">始终可用</string>
-    <string name="chat_tool_access_always_description">全部工具从一开始就加载，模型调用更少、准确率更高，但占用更多上下文</string>
+    <string name="chat_tool_access_always_description">在对话开始时加载全部工具，减少模型调用并提高准确性；会占用更多上下文</string>
+    <string name="chat_reasoning_effort_title">推理强度</string>
+    <string name="chat_reasoning_effort_minimal">极简</string>
+    <string name="chat_reasoning_effort_minimal_description">最快响应，适合简单问题</string>
+    <string name="chat_reasoning_effort_low">低</string>
+    <string name="chat_reasoning_effort_low_description">较快响应，适合日常问答</string>
+    <string name="chat_reasoning_effort_medium">中等</string>
+    <string name="chat_reasoning_effort_medium_description">质量与速度的平衡（默认）</string>
+    <string name="chat_reasoning_effort_high">高</string>
+    <string name="chat_reasoning_effort_high_description">更深入地分析复杂问题，响应可能更慢</string>
     <string name="chat_session_mcp_title">MCP</string>
     <string name="chat_session_only_notice">仅影响当前会话</string>
     <string name="chat_session_tools_running_notice">会话运行中，暂时无法修改工具</string>
@@ -70,8 +79,8 @@
     <string name="chat_action_reject">拒绝</string>
     <string name="chat_action_allow">允许</string>
     <string name="chat_action_always_allow">总是允许</string>
-    <string name="chat_full_access_title">Full access</string>
-    <string name="chat_full_access_description">开启后，所有需要确认的工具调用都会自动允许，不再弹出确认卡片</string>
+    <string name="chat_full_access_title">完全访问</string>
+    <string name="chat_full_access_description">自动允许所有需要确认的工具调用</string>
 
     <!-- ChatScreenModelPicker -->
     <string name="chat_model_picker_change">选择模型</string>

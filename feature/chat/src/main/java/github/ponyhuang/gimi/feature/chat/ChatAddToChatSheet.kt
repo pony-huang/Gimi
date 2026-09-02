@@ -30,7 +30,6 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -39,12 +38,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Functions
-import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
@@ -53,15 +51,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -87,10 +82,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
+import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
-import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
+import github.ponyhuang.gimi.ui.components.GimiBottomSheet
+import github.ponyhuang.gimi.ui.components.GimiBottomSheetHeader
+import github.ponyhuang.gimi.ui.components.GimiBottomSheetOptionRow
+import github.ponyhuang.gimi.ui.components.GimiBottomSheetSwitchRow
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
 
 private const val WEB_SEARCH_TOOL_ID: String = "web_search"
@@ -98,17 +97,18 @@ private const val KIMI_FORMULAS_TOOL_ID: String = "kimi_formulas"
 private const val GLM_WEB_SEARCH_TOOL_ID: String = "glm_web_search"
 private const val URL_CONTEXT_TOOL_ID: String = "url_context"
 private const val GOOGLE_MAPS_TOOL_ID: String = "google_maps"
+private const val COMPACT_SHEET_ITEM_LIMIT: Int = 3
 
 private enum class AddToChatPage {
     HOME,
     LOCAL_TOOLS,
     TOOL_ACCESS,
+    REASONING_EFFORT,
     MCP,
     OFFICIAL_TOOL,
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 internal fun ChatAddToChatSheet(
     state: ChatAddToChatState,
     onDismiss: () -> Unit,
@@ -119,6 +119,7 @@ internal fun ChatAddToChatSheet(
     filesEnabled: Boolean,
     onLocalToolEnabledChange: (String, Boolean) -> Unit,
     onToolAccessModeChange: (ToolAccessMode) -> Unit,
+    onReasoningEffortChange: (ReasoningEffort) -> Unit,
     onMcpServerEnabledChange: (String, Boolean) -> Unit,
     onFullAccessChange: (Boolean) -> Unit,
     onOfficialToolOpened: (String) -> Unit,
@@ -126,19 +127,11 @@ internal fun ChatAddToChatSheet(
     onOfficialToolFunctionsRetry: (String) -> Unit,
 ) {
     var page by rememberSaveable { mutableStateOf(AddToChatPage.HOME) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-
     BackHandler(enabled = page != AddToChatPage.HOME) {
         page = AddToChatPage.HOME
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        // 面板底色与设置画布同源：灰画布承载白色分组卡片，与设置页保持同一视觉语言。
-        containerColor = preferenceCanvasColor(),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-    ) {
+    GimiBottomSheet(onDismissRequest = onDismiss) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val maximumPageHeight = maxHeight * 0.92f
             AnimatedContent(
@@ -174,11 +167,9 @@ internal fun ChatAddToChatSheet(
                 ) {
                     val isFullHeightPage = when (currentPage) {
                         AddToChatPage.LOCAL_TOOLS -> true
-                        AddToChatPage.TOOL_ACCESS -> true
-                        AddToChatPage.MCP -> state.mcpServers.isNotEmpty()
-                        AddToChatPage.OFFICIAL_TOOL -> state.officialTools.any {
-                            it.functions.isNotEmpty() || it.isLoadingFunctions
-                        }
+                        AddToChatPage.MCP -> state.mcpServers.size > COMPACT_SHEET_ITEM_LIMIT
+                        AddToChatPage.OFFICIAL_TOOL -> state.officialTools.sumOf { it.functions.size } >
+                            COMPACT_SHEET_ITEM_LIMIT
                         else -> false
                     }
                     val pageHeightModifier = if (isFullHeightPage) {
@@ -190,21 +181,41 @@ internal fun ChatAddToChatSheet(
                         modifier = pageHeightModifier
                             .widthIn(max = 640.dp),
                     ) {
-                        SheetHeader(
+                        GimiBottomSheetHeader(
                             title = when (currentPage) {
                                 AddToChatPage.HOME -> stringResource(R.string.chat_add_to_chat_title)
                                 AddToChatPage.LOCAL_TOOLS -> stringResource(R.string.chat_session_tools_title)
                                 AddToChatPage.TOOL_ACCESS ->
                                     stringResource(R.string.chat_tool_access_title)
+                                AddToChatPage.REASONING_EFFORT ->
+                                    stringResource(R.string.chat_reasoning_effort_title)
                                 AddToChatPage.MCP -> stringResource(R.string.chat_session_mcp_title)
                                 AddToChatPage.OFFICIAL_TOOL ->
                                     stringResource(R.string.chat_official_tools_title)
                             },
-                            isRoot = currentPage == AddToChatPage.HOME,
+                            navigationIcon = if (currentPage == AddToChatPage.HOME) {
+                                Icons.Default.Close
+                            } else {
+                                Icons.AutoMirrored.Filled.ArrowBack
+                            },
+                            navigationContentDescription = stringResource(
+                                if (currentPage == AddToChatPage.HOME) {
+                                    R.string.chat_add_to_chat_close
+                                } else {
+                                    R.string.chat_add_to_chat_back
+                                },
+                            ),
                             onNavigationClick = {
                                 if (currentPage == AddToChatPage.HOME) onDismiss()
                                 else page = AddToChatPage.HOME
                             },
+                            navigationModifier = Modifier.testTag(
+                                if (currentPage == AddToChatPage.HOME) {
+                                    "add-to-chat-close"
+                                } else {
+                                    "add-to-chat-back"
+                                },
+                            ),
                         )
                         when (currentPage) {
                             AddToChatPage.HOME -> AddToChatHome(
@@ -216,6 +227,7 @@ internal fun ChatAddToChatSheet(
                                 filesEnabled = filesEnabled,
                                 onOpenTools = { page = AddToChatPage.LOCAL_TOOLS },
                                 onOpenToolAccess = { page = AddToChatPage.TOOL_ACCESS },
+                                onOpenReasoningEffort = { page = AddToChatPage.REASONING_EFFORT },
                                 onOpenMcp = { page = AddToChatPage.MCP },
                                 onFullAccessChange = onFullAccessChange,
                                 onOpenOfficialTools = {
@@ -232,6 +244,10 @@ internal fun ChatAddToChatSheet(
                             AddToChatPage.TOOL_ACCESS -> ToolAccessPage(
                                 state = state,
                                 onModeChange = onToolAccessModeChange,
+                            )
+                            AddToChatPage.REASONING_EFFORT -> ReasoningEffortPage(
+                                state = state,
+                                onEffortChange = onReasoningEffortChange,
                             )
                             AddToChatPage.MCP -> McpServersPage(
                                 state = state,
@@ -251,45 +267,6 @@ internal fun ChatAddToChatSheet(
 }
 
 @Composable
-private fun SheetHeader(
-    title: String,
-    isRoot: Boolean,
-    onNavigationClick: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .padding(horizontal = 4.dp),
-    ) {
-        IconButton(
-            onClick = onNavigationClick,
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .size(48.dp)
-                .testTag(if (isRoot) "add-to-chat-close" else "add-to-chat-back"),
-        ) {
-            Icon(
-                imageVector = if (isRoot) {
-                    Icons.Default.Close
-                } else {
-                    Icons.AutoMirrored.Filled.ArrowBack
-                },
-                contentDescription = stringResource(
-                    if (isRoot) R.string.chat_add_to_chat_close else R.string.chat_add_to_chat_back,
-                ),
-            )
-        }
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.align(Alignment.Center),
-        )
-    }
-}
-
-@Composable
 private fun AddToChatHome(
     state: ChatAddToChatState,
     onTakePhoto: () -> Unit,
@@ -299,6 +276,7 @@ private fun AddToChatHome(
     filesEnabled: Boolean,
     onOpenTools: () -> Unit,
     onOpenToolAccess: () -> Unit,
+    onOpenReasoningEffort: () -> Unit,
     onOpenMcp: () -> Unit,
     onOpenOfficialTools: () -> Unit,
     onFullAccessChange: (Boolean) -> Unit,
@@ -352,7 +330,7 @@ private fun AddToChatHome(
             }
         }
         item {
-            GroupedCard {
+            GroupedCard(modifier = Modifier.testTag("session-configuration-group")) {
                 NavigationRow(
                     icon = Icons.Default.Build,
                     title = stringResource(R.string.chat_session_tools_title),
@@ -381,10 +359,23 @@ private fun AddToChatHome(
                     checked = state.fullAccess,
                     onCheckedChange = onFullAccessChange,
                 )
-            }
-        }
-        item {
-            GroupedCard {
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 66.dp, end = 16.dp),
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                )
+                NavigationRow(
+                    icon = Icons.Default.Psychology,
+                    title = stringResource(R.string.chat_reasoning_effort_title),
+                    subtitle = reasoningEffortLabel(
+                        state.configuration?.reasoningEffort ?: ReasoningEffort.MEDIUM,
+                    ),
+                    onClick = onOpenReasoningEffort,
+                    testTag = "reasoning-effort-nav",
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 66.dp, end = 16.dp),
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                )
                 NavigationRow(
                     icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
                     title = stringResource(R.string.chat_session_mcp_title),
@@ -444,11 +435,14 @@ private fun AttachmentShortcut(
 }
 
 @Composable
-private fun GroupedCard(content: @Composable ColumnScope.() -> Unit) {
+private fun GroupedCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Surface(
         shape = RoundedCornerShape(24.dp),
         color = preferenceGroupCardColor(),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Column(content = content)
     }
@@ -535,13 +529,13 @@ private fun ToolAccessPage(
 ) {
     Column(
         modifier = Modifier
-            .fillMaxSize()
+            .wrapContentHeight()
             .testTag("tool-access-page"),
     ) {
         PageStatus(state)
         LazyColumn(
             contentPadding = PaddingValues(bottom = 24.dp),
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.wrapContentHeight(),
         ) {
             items(ToolAccessMode.entries, key = ToolAccessMode::name) { mode ->
                 ToolAccessModeRow(
@@ -562,56 +556,42 @@ private fun ToolAccessModeRow(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    val contentColor = if (selected) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.onSurface
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 96.dp)
-            .selectable(
-                selected = selected,
-                enabled = enabled,
-                role = Role.RadioButton,
-                onClick = onClick,
-            )
-            .testTag(
-                when (mode) {
-                    ToolAccessMode.ON_DEMAND -> "tool-access-on-demand"
-                    ToolAccessMode.ALWAYS_AVAILABLE -> "tool-access-always"
-                },
-            )
-            .padding(horizontal = 24.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = toolAccessModeLabel(mode),
-                style = MaterialTheme.typography.titleMedium,
-                color = contentColor,
-            )
-            Text(
-                text = toolAccessModeDescription(mode),
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
-        if (selected) {
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .padding(start = 16.dp)
-                    .size(28.dp),
-            )
+    GimiBottomSheetOptionRow(
+        selected = selected,
+        enabled = enabled,
+        onClick = onClick,
+        label = toolAccessModeLabel(mode),
+        description = toolAccessModeDescription(mode),
+        modifier = Modifier.testTag(
+            when (mode) {
+                ToolAccessMode.ON_DEMAND -> "tool-access-on-demand"
+                ToolAccessMode.ALWAYS_AVAILABLE -> "tool-access-always"
+            },
+        ),
+    )
+}
+
+@Composable
+private fun ReasoningEffortPage(
+    state: ChatAddToChatState,
+    onEffortChange: (ReasoningEffort) -> Unit,
+) {
+    Column(Modifier.wrapContentHeight().testTag("reasoning-effort-page")) {
+        PageStatus(state)
+        LazyColumn(
+            modifier = Modifier.wrapContentHeight(),
+            contentPadding = PaddingValues(bottom = 24.dp),
+        ) {
+            items(ReasoningEffort.entries, key = ReasoningEffort::name) { effort ->
+                GimiBottomSheetOptionRow(
+                    selected = state.configuration?.reasoningEffort == effort,
+                    enabled = state.configuration != null && !state.isMutationBlocked,
+                    onClick = { onEffortChange(effort) },
+                    label = reasoningEffortLabel(effort),
+                    description = reasoningEffortDescription(effort),
+                    modifier = Modifier.testTag("reasoning-effort-${effort.name.lowercase()}"),
+                )
+            }
         }
     }
 }
@@ -636,9 +616,13 @@ private fun OfficialToolsDetailPage(
     onFunctionEnabledChange: (String, String, Boolean) -> Unit,
     onRetry: (String) -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxSize().testTag("official-tools-detail")) {
+    val totalFunctions = state.officialTools.sumOf { it.functions.size }
+    val isScrollable = totalFunctions > COMPACT_SHEET_ITEM_LIMIT
+    Column(
+        modifier = (if (isScrollable) Modifier.fillMaxSize() else Modifier.wrapContentHeight())
+            .testTag("official-tools-detail"),
+    ) {
         PageStatus(state)
-        val totalFunctions = state.officialTools.sumOf { it.functions.size }
         val anyLoading = state.officialTools.any { it.isLoadingFunctions }
         val anyError = state.officialTools.any { it.loadError != null && it.functions.isEmpty() }
 
@@ -669,7 +653,7 @@ private fun OfficialToolsDetailPage(
                     state = listState,
                     contentPadding = PaddingValues(bottom = 24.dp),
                     modifier = Modifier
-                        .fillMaxSize()
+                        .then(if (isScrollable) Modifier.fillMaxSize() else Modifier.wrapContentHeight())
                         .nestedScroll(rememberLowerBoundaryNestedScrollConnection(listState)),
                 ) {
                     state.officialTools.forEachIndexed { index, tool ->
@@ -697,6 +681,7 @@ private fun OfficialToolsDetailPage(
                         } else {
                             items(tool.functions, key = { "${tool.id}-${it.id}" }) { function ->
                                 OfficialToolFunctionRow(
+                                    toolId = tool.id,
                                     function = function,
                                     enabled = state.isOfficialFunctionEnabled(tool.id, function.id),
                                     mutationEnabled = !state.isMutationBlocked &&
@@ -798,41 +783,21 @@ private fun EmptyCenteredMessage(message: String) {
 
 @Composable
 private fun OfficialToolFunctionRow(
+    toolId: String,
     function: OfficialToolFunction,
     enabled: Boolean,
     mutationEnabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 60.dp)
-            .toggleable(
-                value = enabled,
-                enabled = mutationEnabled,
-                role = Role.Switch,
-                onValueChange = onEnabledChange,
-            )
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconBubble(Icons.Default.Functions)
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 16.dp),
-        ) {
-            Text(function.name, style = MaterialTheme.typography.titleMedium)
-            Text(
-                function.description,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Switch(checked = enabled, onCheckedChange = null, enabled = mutationEnabled)
-    }
+    GimiBottomSheetSwitchRow(
+        icon = Icons.Default.Functions,
+        label = function.name,
+        description = function.description,
+        checked = enabled,
+        enabled = mutationEnabled,
+        onCheckedChange = onEnabledChange,
+        modifier = Modifier.testTag("official-tool-function-$toolId-${function.id}"),
+    )
 }
 
 @Composable
@@ -904,36 +869,15 @@ private fun LocalToolRow(
     mutationEnabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 60.dp)
-            .toggleable(
-                value = enabled,
-                enabled = mutationEnabled,
-                role = Role.Switch,
-                onValueChange = onEnabledChange,
-            )
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconBubble(Icons.Default.Build)
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 16.dp),
-        ) {
-            Text(tool.name, style = MaterialTheme.typography.titleMedium)
-            Text(
-                tool.description,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Switch(checked = enabled, onCheckedChange = null, enabled = mutationEnabled)
-    }
+    GimiBottomSheetSwitchRow(
+        icon = Icons.Default.Build,
+        label = tool.name,
+        description = tool.description,
+        checked = enabled,
+        enabled = mutationEnabled,
+        onCheckedChange = onEnabledChange,
+        modifier = Modifier.testTag("local-tool-${tool.id}"),
+    )
 }
 
 @Composable
@@ -942,7 +886,11 @@ private fun McpServersPage(
     onEnabledChange: (String, Boolean) -> Unit,
 ) {
     val listState = rememberLazyListState()
-    Column(modifier = Modifier.fillMaxSize().testTag("session-mcp-page")) {
+    val isScrollable = state.mcpServers.size > COMPACT_SHEET_ITEM_LIMIT
+    Column(
+        modifier = (if (isScrollable) Modifier.fillMaxSize() else Modifier.wrapContentHeight())
+            .testTag("session-mcp-page"),
+    ) {
         PageStatus(state)
         if (state.mcpServers.isEmpty()) {
             Column(
@@ -975,7 +923,7 @@ private fun McpServersPage(
                 state = listState,
                 contentPadding = PaddingValues(bottom = 24.dp),
                 modifier = Modifier
-                    .fillMaxSize()
+                    .then(if (isScrollable) Modifier.fillMaxSize() else Modifier.wrapContentHeight())
                     .nestedScroll(rememberLowerBoundaryNestedScrollConnection(listState)),
             ) {
                 items(state.mcpServers, key = McpServer::id) { server ->
@@ -1004,45 +952,19 @@ private fun McpServerRow(
     mutationEnabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 60.dp)
-            .toggleable(
-                value = enabled,
-                enabled = mutationEnabled,
-                role = Role.Switch,
-                onValueChange = onEnabledChange,
-            )
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconBubble(ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp))
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 16.dp),
-        ) {
-            Text(server.name.ifBlank { server.id }, style = MaterialTheme.typography.titleMedium)
-            Text(
-                when (server.transport) {
-                    McpTransport.SSE -> stringResource(R.string.chat_mcp_transport_sse)
-                    McpTransport.STREAMABLE_HTTP ->
-                        stringResource(R.string.chat_mcp_transport_streamable_http)
-                },
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                server.endpointUrl,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Switch(checked = enabled, onCheckedChange = null, enabled = mutationEnabled)
-    }
+    GimiBottomSheetSwitchRow(
+        icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
+        label = server.name.ifBlank { server.id },
+        description = when (server.transport) {
+            McpTransport.SSE -> stringResource(R.string.chat_mcp_transport_sse)
+            McpTransport.STREAMABLE_HTTP ->
+                stringResource(R.string.chat_mcp_transport_streamable_http)
+        },
+        checked = enabled,
+        enabled = mutationEnabled,
+        onCheckedChange = onEnabledChange,
+        modifier = Modifier.testTag("mcp-server-${server.id}"),
+    )
 }
 
 @Composable
@@ -1156,7 +1078,6 @@ private fun InlineNotice(
 
 @Composable
 private fun IconBubble(icon: ImageVector) {
-    // 与设置行同一语言：主题蓝圆底 + 白色 glyph。
     Surface(
         shape = CircleShape,
         color = MaterialTheme.colorScheme.primary,
@@ -1164,7 +1085,7 @@ private fun IconBubble(icon: ImageVector) {
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
-                icon,
+                imageVector = icon,
                 contentDescription = null,
                 tint = Color.White,
                 modifier = Modifier.size(20.dp),
@@ -1205,6 +1126,26 @@ private fun toolAccessModeDescription(mode: ToolAccessMode): String = stringReso
     when (mode) {
         ToolAccessMode.ON_DEMAND -> R.string.chat_tool_access_on_demand_description
         ToolAccessMode.ALWAYS_AVAILABLE -> R.string.chat_tool_access_always_description
+    },
+)
+
+@Composable
+private fun reasoningEffortLabel(effort: ReasoningEffort): String = stringResource(
+    when (effort) {
+        ReasoningEffort.MINIMAL -> R.string.chat_reasoning_effort_minimal
+        ReasoningEffort.LOW -> R.string.chat_reasoning_effort_low
+        ReasoningEffort.MEDIUM -> R.string.chat_reasoning_effort_medium
+        ReasoningEffort.HIGH -> R.string.chat_reasoning_effort_high
+    },
+)
+
+@Composable
+private fun reasoningEffortDescription(effort: ReasoningEffort): String = stringResource(
+    when (effort) {
+        ReasoningEffort.MINIMAL -> R.string.chat_reasoning_effort_minimal_description
+        ReasoningEffort.LOW -> R.string.chat_reasoning_effort_low_description
+        ReasoningEffort.MEDIUM -> R.string.chat_reasoning_effort_medium_description
+        ReasoningEffort.HIGH -> R.string.chat_reasoning_effort_high_description
     },
 )
 

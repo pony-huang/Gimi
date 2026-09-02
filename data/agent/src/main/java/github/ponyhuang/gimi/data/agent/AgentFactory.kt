@@ -8,6 +8,10 @@ import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.SkillToolset
 import com.google.adk.kt.tools.Toolset
 import com.google.adk.kt.tools.PreloadMemoryTool
+import com.google.adk.kt.types.GenerateContentConfig
+import com.google.adk.kt.types.ThinkingConfig
+import com.google.adk.kt.types.ThinkingLevel
+import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.data.agent.tools.mcp.ConversationMcpToolset
 import github.ponyhuang.gimi.data.agent.tools.mcp.McpAuthorizationTool
 import github.ponyhuang.gimi.data.agent.tools.mcp.McpConfigurationTool
@@ -72,19 +76,21 @@ class AgentFactory @Inject constructor(
      *
      * @param selection 模型选择；为 null 时使用默认模型
      * @param toolAccessMode 工具声明加载模式
+     * @param reasoningEffort 当前会话的推理强度
      */
     suspend fun create(
         selection: ModelSelection? = null,
         toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
+        reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM,
         pluginRuntime: PluginRuntimeSnapshot<AgentPlugin> = pluginRuntimeProvider.runtime.value,
     ): AgentRuntime {
         val modelConfig = agentLLMModelFactory.selectModelConfig(selection)
         val model = agentLLMModelFactory.createModel(modelConfig)
         val agent = when (toolAccessMode) {
             ToolAccessMode.ALWAYS_AVAILABLE ->
-                createAlwaysAvailableAgent(model, pluginRuntime)
+                createAlwaysAvailableAgent(model, reasoningEffort, pluginRuntime)
             ToolAccessMode.ON_DEMAND ->
-                createSearchAgent(model, pluginRuntime)
+                createSearchAgent(model, reasoningEffort, pluginRuntime)
         }
         return AgentRuntime(
             agent = agent,
@@ -95,10 +101,12 @@ class AgentFactory @Inject constructor(
     /** 所有启用工具从首个请求起直接声明。 */
     private fun createAlwaysAvailableAgent(
         model: Model,
+        reasoningEffort: ReasoningEffort,
         pluginRuntime: PluginRuntimeSnapshot<AgentPlugin>,
     ): BaseAgent =
         baseAgent(
             model = model,
+            reasoningEffort = reasoningEffort,
             pluginRuntime = pluginRuntime,
             toolsets = buildList {
                 add(localToolset)
@@ -117,6 +125,7 @@ class AgentFactory @Inject constructor(
      */
     private suspend fun createSearchAgent(
         model: Model,
+        reasoningEffort: ReasoningEffort,
         pluginRuntime: PluginRuntimeSnapshot<AgentPlugin>,
     ): BaseAgent {
         val (officialToolsets, directOfficialToolsets) =
@@ -134,6 +143,7 @@ class AgentFactory @Inject constructor(
         }
         return baseAgent(
             model = model,
+            reasoningEffort = reasoningEffort,
             pluginRuntime = pluginRuntime,
             toolsets = buildList {
                 addAll(directOfficialToolsets)
@@ -150,11 +160,15 @@ class AgentFactory @Inject constructor(
 
     private fun baseAgent(
         model: Model,
+        reasoningEffort: ReasoningEffort,
         toolsets: List<Toolset>,
         pluginRuntime: PluginRuntimeSnapshot<AgentPlugin>,
     ): BaseAgent = LlmAgent(
         name = "Assistant",
         model = model,
+        generateContentConfig = GenerateContentConfig(
+            thinkingConfig = ThinkingConfig(thinkingLevel = reasoningEffort.toAdkThinkingLevel()),
+        ),
         instruction = Instruction(AgentPrompts.defaultAssistantInstruction()),
         tools = buildList {
             // ADK 内置请求处理器：每轮模型调用前自动从当前 MemoryService 召回相关记忆。
@@ -177,4 +191,12 @@ class AgentFactory @Inject constructor(
             addAll(pluginRuntime.enabledPlugins.flatMap { plugin -> plugin.toolSets() })
         },
     )
+}
+
+/** 将产品层四档推理强度转换为 ADK 传给模型适配层的统一配置。 */
+private fun ReasoningEffort.toAdkThinkingLevel(): ThinkingLevel = when (this) {
+    ReasoningEffort.MINIMAL -> ThinkingLevel.MINIMAL
+    ReasoningEffort.LOW -> ThinkingLevel.LOW
+    ReasoningEffort.MEDIUM -> ThinkingLevel.MEDIUM
+    ReasoningEffort.HIGH -> ThinkingLevel.HIGH
 }

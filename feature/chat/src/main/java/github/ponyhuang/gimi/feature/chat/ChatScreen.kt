@@ -73,6 +73,7 @@ import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
+import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -130,6 +131,7 @@ fun ChatScaffold(
     onNewConversation: () -> Unit,
     onLocalToolEnabledChange: (String, Boolean) -> Unit,
     onToolAccessModeChange: (ToolAccessMode) -> Unit,
+    onReasoningEffortChange: (ReasoningEffort) -> Unit,
     onMcpServerEnabledChange: (String, Boolean) -> Unit,
     onOfficialToolOpened: (String) -> Unit,
     onOfficialToolFunctionEnabledChange: (String, String, Boolean) -> Unit,
@@ -303,6 +305,7 @@ fun ChatScaffold(
                     attachmentCapabilities = attachmentCapabilities,
                     onLocalToolEnabledChange = onLocalToolEnabledChange,
                     onToolAccessModeChange = onToolAccessModeChange,
+                    onReasoningEffortChange = onReasoningEffortChange,
                     onMcpServerEnabledChange = onMcpServerEnabledChange,
                     onFullAccessChange = onFullAccessChange,
                     onOfficialToolOpened = onOfficialToolOpened,

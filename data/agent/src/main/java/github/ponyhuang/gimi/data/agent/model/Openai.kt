@@ -12,6 +12,7 @@ import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Schema
+import com.google.adk.kt.types.ThinkingLevel
 import com.google.adk.kt.types.UsageMetadata
 import com.openai.client.OpenAIClient
 import com.openai.core.JsonValue
@@ -129,8 +130,11 @@ open class Openai(
             .messages(messages)
             .also { if (tools.isNotEmpty()) it.tools(tools) }
 
-        request.config.thinkingConfig?.let {
-            if (it.includeThoughts == false) {
+        request.config.thinkingConfig?.let { thinkingConfig ->
+            thinkingConfig.thinkingLevel?.let { level ->
+                builder.reasoningEffort(level.toOpenAiReasoningEffort())
+            }
+            if (thinkingConfig.includeThoughts == false) {
                 // OpenAI-compatible APIs no longer accept "none"; LOW keeps lightweight
                 // requests such as title generation within the supported enum values.
                 builder.reasoningEffort(ReasoningEffort.LOW)
@@ -563,4 +567,12 @@ open class Openai(
         else FinishReason.FINISH_REASON_UNSPECIFIED,
         errorMessage = e.message
     )
+}
+
+/** ADK 的会话推理档位与 OpenAI Chat Completions 的 `reasoning_effort` 一一对应。 */
+private fun ThinkingLevel.toOpenAiReasoningEffort(): ReasoningEffort = when (this) {
+    ThinkingLevel.MINIMAL -> ReasoningEffort.MINIMAL
+    ThinkingLevel.LOW -> ReasoningEffort.LOW
+    ThinkingLevel.MEDIUM -> ReasoningEffort.MEDIUM
+    ThinkingLevel.HIGH, ThinkingLevel.THINKING_LEVEL_UNSPECIFIED -> ReasoningEffort.HIGH
 }

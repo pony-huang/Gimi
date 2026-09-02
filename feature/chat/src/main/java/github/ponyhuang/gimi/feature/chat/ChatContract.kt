@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.feature.chat
 
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
+import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 
 /**
@@ -60,6 +61,9 @@ sealed interface ChatAction {
 
     /** 设置当前会话向模型声明函数工具的加载方式。 */
     data class SetToolAccessMode(val mode: ToolAccessMode) : ChatAction
+
+    /** 设置当前会话发给模型的推理强度。 */
+    data class SetReasoningEffort(val effort: ReasoningEffort) : ChatAction
 
     /** 启用 / 停用某个 MCP server。 */
     data class SetMcpServerEnabled(val serverId: String, val enabled: Boolean) : ChatAction

@@ -68,6 +68,7 @@ import github.ponyhuang.gimi.feature.chat.R
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
+import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.delay
@@ -122,6 +123,7 @@ public fun ChatComposer(
     addToChatState: ChatAddToChatState = ChatAddToChatState(),
     onLocalToolEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
     onToolAccessModeChange: (ToolAccessMode) -> Unit = { _ -> },
+    onReasoningEffortChange: (ReasoningEffort) -> Unit = { _ -> },
     onMcpServerEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
     onFullAccessChange: (Boolean) -> Unit = { _ -> },
     onOfficialToolOpened: (String) -> Unit = { _ -> },
@@ -484,6 +486,7 @@ public fun ChatComposer(
                 attachmentCapabilities.supportsDocuments,
             onLocalToolEnabledChange = onLocalToolEnabledChange,
             onToolAccessModeChange = onToolAccessModeChange,
+            onReasoningEffortChange = onReasoningEffortChange,
             onMcpServerEnabledChange = onMcpServerEnabledChange,
             onFullAccessChange = onFullAccessChange,
             onOfficialToolOpened = onOfficialToolOpened,

@@ -24,6 +24,7 @@ import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
 import github.ponyhuang.gimi.data.agent.di.AgentModule
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
+import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
@@ -63,6 +64,7 @@ class AgentChatRunner(
     private val factory: suspend (
         ModelSelection?,
         ToolAccessMode,
+        ReasoningEffort,
         PluginRuntimeSnapshot<AgentPlugin>,
     ) -> AgentRuntime,
     private val sessionService: SessionService,
@@ -81,11 +83,13 @@ class AgentChatRunner(
      *
      * @property selection 构建 Agent 时使用的显式模型选择（模型名称）。
      * @property toolAccessMode 工具声明加载模式。
+     * @property reasoningEffort 当前会话的推理强度。
      * @property revision 构建时的外部配置版本（工具授权/MCP/模型目录）。
      */
     private data class AgentKey(
         val selection: ModelSelection?,
         val toolAccessMode: ToolAccessMode,
+        val reasoningEffort: ReasoningEffort,
         val revision: Any,
     )
 
@@ -200,6 +204,7 @@ class AgentChatRunner(
             sessionId,
             selection,
             toolConfiguration?.toolAccessMode ?: ToolAccessMode.ALWAYS_AVAILABLE,
+            toolConfiguration?.reasoningEffort ?: ReasoningEffort.MEDIUM,
             allowConfirmationRequiredTools,
             toolConfiguration,
         )
@@ -283,15 +288,17 @@ class AgentChatRunner(
         sessionId: String,
         selection: ModelSelection?,
         toolAccessMode: ToolAccessMode,
+        reasoningEffort: ReasoningEffort,
         allowConfirmationRequiredTools: Boolean,
         toolConfiguration: ConversationToolConfiguration?,
     ): ActiveTurn {
         val buildConfiguration = configuration()
-        val key = AgentKey(selection, toolAccessMode, buildConfiguration.revision)
+        val key = AgentKey(selection, toolAccessMode, reasoningEffort, buildConfiguration.revision)
         return runnerMutex.withLock {
             val runtime = runtimes[key] ?: factory(
                 selection,
                 toolAccessMode,
+                reasoningEffort,
                 buildConfiguration.pluginRuntime,
             ).let { agentRuntime ->
                 SharedRuntime(

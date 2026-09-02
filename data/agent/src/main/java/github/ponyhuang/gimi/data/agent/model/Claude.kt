@@ -25,6 +25,7 @@ import com.anthropic.models.messages.RawMessageStreamEvent
 import com.anthropic.models.messages.TextBlockParam
 import com.anthropic.models.messages.ThinkingBlockParam
 import com.anthropic.models.messages.ThinkingConfigDisabled
+import com.anthropic.models.messages.ThinkingConfigEnabled
 import com.anthropic.models.messages.ThinkingConfigParam
 import com.anthropic.models.messages.Tool
 import com.anthropic.models.messages.ToolResultBlockParam
@@ -46,6 +47,7 @@ import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Schema
+import com.google.adk.kt.types.ThinkingLevel
 import com.google.adk.kt.types.UsageMetadata
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -121,8 +123,18 @@ open class Claude(
             .messages(messages)
             .maxTokens(resolveMaxTokens(request))
 
-        request.config.thinkingConfig?.let {
-            if (it.includeThoughts == false) {
+        request.config.thinkingConfig?.let { thinkingConfig ->
+            thinkingConfig.thinkingLevel?.let { level ->
+                val budget = minOf(level.toClaudeThinkingBudget(), resolveMaxTokens(request) - 1)
+                if (budget >= MIN_CLAUDE_THINKING_BUDGET) {
+                    paramsBuilder.thinking(
+                        ThinkingConfigParam.ofEnabled(
+                            ThinkingConfigEnabled.builder().budgetTokens(budget).build(),
+                        ),
+                    )
+                }
+            }
+            if (thinkingConfig.includeThoughts == false) {
                 paramsBuilder.thinking(
                     ThinkingConfigParam.ofDisabled(
                         ThinkingConfigDisabled.builder().build()
@@ -441,6 +453,16 @@ open class Claude(
         errorMessage = if (e is AnthropicServiceException) "${e.statusCode()}: ${e.message}"
         else e.message
     )
+}
+
+private const val MIN_CLAUDE_THINKING_BUDGET: Long = 1024L
+
+/** Claude 使用 extended-thinking 的 token budget 表示同一套四档会话推理强度。 */
+private fun ThinkingLevel.toClaudeThinkingBudget(): Long = when (this) {
+    ThinkingLevel.MINIMAL -> 1024L
+    ThinkingLevel.LOW -> 2048L
+    ThinkingLevel.MEDIUM -> 4096L
+    ThinkingLevel.HIGH, ThinkingLevel.THINKING_LEVEL_UNSPECIFIED -> 6144L
 }
 
 

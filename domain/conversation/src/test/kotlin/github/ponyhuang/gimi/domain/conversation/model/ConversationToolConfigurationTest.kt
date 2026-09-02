@@ -8,6 +8,27 @@ import org.junit.Test
 class ConversationToolConfigurationTest {
 
     @Test
+    fun newConversationsDefaultToMediumReasoningEffort() {
+        assertEquals(
+            ReasoningEffort.MEDIUM,
+            ConversationToolConfiguration().reasoningEffort,
+        )
+    }
+
+    @Test
+    fun reasoningEffortOnlyContainsTheFourSupportedLevels() {
+        assertEquals(
+            listOf(
+                ReasoningEffort.MINIMAL,
+                ReasoningEffort.LOW,
+                ReasoningEffort.MEDIUM,
+                ReasoningEffort.HIGH,
+            ),
+            ReasoningEffort.entries,
+        )
+    }
+
+    @Test
     fun newConversationsDefaultToAlwaysAvailableToolAccess() {
         assertEquals(
             ToolAccessMode.ALWAYS_AVAILABLE,

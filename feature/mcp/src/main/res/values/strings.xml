@@ -21,6 +21,13 @@
     <string name="mcp_import_action">导入 MCP 服务</string>
     <string name="mcp_import_result">已新增 %1$d 个、更新 %2$d 个 MCP 服务</string>
     <string name="mcp_import_result_with_skipped">已新增 %1$d 个、更新 %2$d 个 MCP 服务；跳过 %3$d 个不受支持或无效的配置</string>
+    <string name="mcp_import_error_content_too_large">MCP 配置内容过大</string>
+    <string name="mcp_import_error_invalid_json">MCP JSON 格式无效</string>
+    <string name="mcp_import_error_mcp_servers_not_object">mcpServers 必须是对象</string>
+    <string name="mcp_import_error_invalid_curl">curl MCP 配置无效</string>
+    <string name="mcp_import_error_storage_failure">MCP 配置无法安全保存，请重试</string>
+    <string name="mcp_connection_error_default">无法连接到服务器，请检查配置</string>
+    <string name="mcp_save_error_default">MCP 配置保存失败，请重试</string>
     <string name="mcp_paste">粘贴</string>
     <string name="mcp_field_json_label">MCP JSON</string>
     <string name="mcp_field_json_placeholder">{\n  \"mcpServers\": { … }\n}</string>
@@ -36,9 +43,9 @@
     <string name="mcp_field_type_required">类型 *</string>
     <string name="mcp_field_endpoint_required">服务器端点 *</string>
     <string name="mcp_field_endpoint_placeholder">https://example.com/mcp</string>
-    <string name="mcp_field_bearer_token_optional">Bearer Token（可选）</string>
-    <string name="mcp_field_header_optional">请求头参数（可选）</string>
-    <string name="mcp_field_header_placeholder">X-Api-Key=your-key\nX-Client=assistant</string>
+    <string name="mcp_field_bearer_token_optional">Bearer Token（常规认证，可选）</string>
+    <string name="mcp_field_header_optional">自定义请求头（特殊认证可用）</string>
+    <string name="mcp_field_header_placeholder">Authorization=Token your-token\nX-Client=assistant</string>
     <string name="mcp_field_enable_server">启用此服务器</string>
     <string name="mcp_field_enable_subtitle">停用后，助手不会连接此服务器</string>
     <string name="mcp_save">保存</string>

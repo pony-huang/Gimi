@@ -26,8 +26,8 @@
     <string name="settings_skills_title">Skills</string>
     <string name="settings_skills_subtitle">安装可复用的说明与资源</string>
 
-    <string name="settings_chat_display_title">工具过程</string>
-    <string name="settings_chat_display_subtitle">显示工具调用和返回结果</string>
+    <string name="settings_chat_display_title">显示工具详情</string>
+    <string name="settings_chat_display_subtitle">在聊天中显示工具调用过程和结果</string>
 
     <string name="settings_work_files_title">文件夹</string>
     <string name="settings_work_files_subtitle">授权助手搜索的本机文件夹</string>

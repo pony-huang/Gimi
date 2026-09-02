@@ -84,20 +84,6 @@ fun SettingsScreen(
             item { PreferenceSectionTitle(stringResource(R.string.settings_group_tools)) }
             item {
                 PreferenceGroupCard {
-                    PreferenceNavigationCard(
-                        icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
-                        title = stringResource(R.string.settings_mcp_title),
-                        subtitle = stringResource(R.string.settings_mcp_subtitle),
-                        onClick = { onAction(SettingsAction.OpenMcpServers) },
-                        showDivider = true,
-                    )
-                    PreferenceNavigationCard(
-                        icon = Icons.Default.Extension,
-                        title = stringResource(R.string.settings_plugins_title),
-                        subtitle = stringResource(R.string.settings_plugins_subtitle),
-                        onClick = { onAction(SettingsAction.OpenPlugins) },
-                        showDivider = true,
-                    )
                     PreferenceListItem(
                         icon = Icons.Default.Visibility,
                         title = stringResource(R.string.settings_chat_display_title),
@@ -111,6 +97,20 @@ fun SettingsScreen(
                                 },
                             )
                         },
+                    )
+                    PreferenceNavigationCard(
+                        icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
+                        title = stringResource(R.string.settings_mcp_title),
+                        subtitle = stringResource(R.string.settings_mcp_subtitle),
+                        onClick = { onAction(SettingsAction.OpenMcpServers) },
+                        showDivider = true,
+                    )
+                    PreferenceNavigationCard(
+                        icon = Icons.Default.Extension,
+                        title = stringResource(R.string.settings_plugins_title),
+                        subtitle = stringResource(R.string.settings_plugins_subtitle),
+                        onClick = { onAction(SettingsAction.OpenPlugins) },
+                        showDivider = true,
                     )
                     PreferenceNavigationCard(
                         icon = Icons.Default.Rule,

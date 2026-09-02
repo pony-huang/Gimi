@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.data.mcp.repository
 
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
+import github.ponyhuang.gimi.domain.mcp.model.McpImportError
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -190,12 +191,36 @@ class SecureMcpServerRepositoryCharacterizationTest {
     }
 
     @Test
-    fun invalidJsonReturnsLocalizedErrorWithoutChangingServers() {
+    fun importPortableJsonPreservesMem0TokenAuthorization() {
+        val repository = SecureMcpServerRepository(FakeStorage())
+
+        val result = repository.importJson(
+            """
+            {
+              "mcpServers": {
+                "mem0": {
+                  "url": "https://mcp.mem0.ai/mcp",
+                  "headers": { "Authorization": "Token m0-test-key" }
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(1, result.created)
+        assertEquals(
+            "Authorization=Token m0-test-key",
+            repository.currentServers().single().headers,
+        )
+    }
+
+    @Test
+    fun invalidJsonReturnsLocalizedErrorCodeWithoutChangingServers() {
         val repository = SecureMcpServerRepository(FakeStorage())
 
         val result = repository.importJson("not-json")
 
-        assertEquals("JSON 格式无效", result.error)
+        assertEquals(McpImportError.INVALID_JSON, result.errorCode)
         assertEquals(emptyList<Any>(), repository.currentServers())
     }
 

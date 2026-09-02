@@ -68,7 +68,10 @@ class OkHttpMcpTransportTest {
     val transport =
       OkHttpStreamableHttpTransport(
         url = server.url("/mcp").toString(),
-        headers = mapOf("X-Test" to "yes"),
+        headers = mapOf(
+          "Authorization" to "Token test-key",
+          "X-Test" to "yes",
+        ),
         client = OkHttpClient(),
       )
     var received: Any? = null
@@ -81,14 +84,17 @@ class OkHttpMcpTransportTest {
     val listener = server.takeRequest(5, TimeUnit.SECONDS)
     assertEquals("POST", post?.method)
     assertEquals("yes", post?.getHeader("X-Test"))
+    assertEquals("Token test-key", post?.getHeader("Authorization"))
     assertEquals("GET", listener?.method)
     assertEquals("session-1", listener?.getHeader("Mcp-Session-Id"))
+    assertEquals("Token test-key", listener?.getHeader("Authorization"))
     assertNotNull(received)
 
     transport.close()
     val delete = server.takeRequest(5, TimeUnit.SECONDS)
     assertEquals("DELETE", delete?.method)
     assertEquals("session-1", delete?.getHeader("Mcp-Session-Id"))
+    assertEquals("Token test-key", delete?.getHeader("Authorization"))
     assertEquals("2025-11-25", delete?.getHeader("MCP-Protocol-Version"))
   }
 }

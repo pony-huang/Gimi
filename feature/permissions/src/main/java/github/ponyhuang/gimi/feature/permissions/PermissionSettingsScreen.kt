@@ -49,7 +49,9 @@ fun PermissionSettingsScreen(
             item {
                 PreferenceGroupCard {
                     Column(
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Button(

@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.conversation.runtime.isBusy
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import github.ponyhuang.gimi.domain.mcp.model.McpImportResult
+import github.ponyhuang.gimi.domain.mcp.model.McpImportError
 import github.ponyhuang.gimi.domain.mcp.model.McpProbeResult
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.usecase.FetchMcpServerCapabilitiesUseCase
@@ -93,7 +94,7 @@ class McpSettingsViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                McpImportResult(error = DEFAULT_IMPORT_ERROR)
+                McpImportResult(errorCode = McpImportError.STORAGE_FAILURE)
             }
             localState.update { it.copy(importResult = result) }
             if (result.error == null && result.imported > 0) {
@@ -220,8 +221,7 @@ class McpSettingsViewModel @Inject constructor(
     )
 
     private companion object {
-        const val DEFAULT_CONNECTION_ERROR = "无法连接到服务器，请检查配置"
-        const val DEFAULT_IMPORT_ERROR = "MCP 配置导入失败，请重试"
-        const val DEFAULT_SAVE_ERROR = "MCP 配置保存失败，请重试"
+        const val DEFAULT_CONNECTION_ERROR = "mcp.connection_error"
+        const val DEFAULT_SAVE_ERROR = "mcp.save_error"
     }
 }

@@ -113,7 +113,9 @@ fun McpServerEditorScreen(
             PreferenceSectionTitle(text = stringResource(R.string.mcp_section_basic_info))
             PreferenceGroupCard {
                 Column(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     OutlinedTextField(
@@ -250,7 +252,7 @@ fun McpServerEditorScreen(
                     }
                     state.connectionError?.let { error ->
                         Text(
-                            text = error,
+                            text = localizeMcpError(error),
                             color = MaterialTheme.colorScheme.error,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.fillMaxWidth(),

@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.data.mcp.repository
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import github.ponyhuang.gimi.domain.mcp.model.McpImportResult
+import github.ponyhuang.gimi.domain.mcp.model.McpImportError
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
@@ -52,7 +53,7 @@ class SecureMcpServerRepository @Inject constructor(
     override fun importConfiguration(content: String): McpImportResult {
         val portableJson = if (content.trimStart().startsWith("curl", ignoreCase = true)) {
             curlToPortableJson(content)
-                ?: return McpImportResult(error = "curl MCP 配置无效")
+                ?: return McpImportResult(errorCode = McpImportError.INVALID_CURL)
         } else {
             content
         }
@@ -95,15 +96,15 @@ class SecureMcpServerRepository @Inject constructor(
     @Synchronized
     override fun importJson(json: String): McpImportResult {
         if (json.length > MAX_IMPORT_CHARACTERS) {
-            return McpImportResult(error = "JSON 内容过大")
+            return McpImportResult(errorCode = McpImportError.CONTENT_TOO_LARGE)
         }
         val root = runCatching { JsonParser.parseString(json).asJsonObject }
-            .getOrElse { return McpImportResult(error = "JSON 格式无效") }
+            .getOrElse { return McpImportResult(errorCode = McpImportError.INVALID_JSON) }
         val wrappedSource = root.get("mcpServers")
         val source = when {
             wrappedSource == null -> root
             wrappedSource.isJsonObject -> wrappedSource.asJsonObject
-            else -> return McpImportResult(error = "mcpServers 必须是对象")
+            else -> return McpImportResult(errorCode = McpImportError.MCP_SERVERS_NOT_OBJECT)
         }
         val updatedServers = servers.value.toMutableList()
         val affectedServerIds = linkedSetOf<String>()

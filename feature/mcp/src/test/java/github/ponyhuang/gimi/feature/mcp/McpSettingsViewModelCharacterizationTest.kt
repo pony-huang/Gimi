@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.mcp.model.McpImportResult
+import github.ponyhuang.gimi.domain.mcp.model.McpImportError
 import github.ponyhuang.gimi.domain.mcp.model.McpProbeResult
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.model.McpToolSummary
@@ -158,7 +159,7 @@ class McpSettingsViewModelCharacterizationTest {
                     state = awaitItem()
                 } while (state.importResult == null)
 
-                assertEquals("MCP 配置导入失败，请重试", state.importResult.error)
+                assertEquals(McpImportError.STORAGE_FAILURE, state.importResult.errorCode)
                 cancelAndIgnoreRemainingEvents()
             }
             expectNoEvents()
@@ -193,7 +194,7 @@ class McpSettingsViewModelCharacterizationTest {
                 state = awaitItem()
             } while (state.isTestingConnection || state.connectionError == null)
 
-            assertEquals("无法连接到服务器，请检查配置", state.connectionError)
+            assertEquals("mcp.connection_error", state.connectionError)
             verify(exactly = 0) { repository.save(any()) }
             cancelAndIgnoreRemainingEvents()
         }
@@ -224,7 +225,7 @@ class McpSettingsViewModelCharacterizationTest {
                 state = awaitItem()
             } while (state.isTestingConnection || state.connectionError == null)
 
-            assertEquals("MCP 配置保存失败，请重试", state.connectionError)
+            assertEquals("mcp.save_error", state.connectionError)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -289,7 +290,7 @@ class McpSettingsViewModelCharacterizationTest {
             } while (state.capabilities["server"] !is ServerCapabilityState.Failed)
 
             assertEquals(
-                "无法连接到服务器，请检查配置",
+                "mcp.connection_error",
                 (state.capabilities["server"] as ServerCapabilityState.Failed).message,
             )
             cancelAndIgnoreRemainingEvents()

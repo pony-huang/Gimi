@@ -22,6 +22,15 @@ data class McpServer(
     val isEnabled: Boolean = true,
 )
 
+/** MCP 配置导入失败的可本地化原因，不携带端点、请求头或认证凭据。 */
+enum class McpImportError {
+    CONTENT_TOO_LARGE,
+    INVALID_JSON,
+    MCP_SERVERS_NOT_OBJECT,
+    INVALID_CURL,
+    STORAGE_FAILURE,
+}
+
 /**
  * MCP 配置批量导入结果。
  *
@@ -30,6 +39,7 @@ data class McpServer(
  * @property skipped 因传输方式或字段无效而跳过的条目数量。
  * @property affectedServerIds 成功新增或更新的服务器稳定 ID。
  * @property credentialRequiredServerIds 已导入但仍需用户补充认证凭据的服务器 ID。
+ * @property errorCode 可本地化的安全失败原因；不包含配置内容或认证凭据。
  * @property error 顶层输入无法处理时的错误；部分条目无效时使用 [skipped] 表达。
  */
 data class McpImportResult(
@@ -38,6 +48,7 @@ data class McpImportResult(
     val skipped: Int = 0,
     val affectedServerIds: Set<String> = emptySet(),
     val credentialRequiredServerIds: Set<String> = emptySet(),
+    val errorCode: McpImportError? = null,
     val error: String? = null,
 ) {
     val imported: Int

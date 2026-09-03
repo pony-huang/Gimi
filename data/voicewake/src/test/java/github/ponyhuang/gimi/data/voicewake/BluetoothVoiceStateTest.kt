@@ -14,11 +14,11 @@ class BluetoothVoiceStateTest {
 
     @Test
     fun fixedChineseWakeWordIsRemovedFromTranscriptPrefix() {
-        assertEquals("打开地图", stripWakeKeyword("吉 米，打开地图", WakeModelCatalog.Chinese.wakeWord))
+        assertEquals("打开地图", stripWakeKeyword("你好 吉米，打开地图", WakeModelCatalog.Chinese.defaultWakeWord))
     }
 
     @Test
     fun transcriptWithoutWakePrefixIsPreserved() {
-        assertEquals("播放音乐", stripWakeKeyword("播放音乐", WakeModelCatalog.Chinese.wakeWord))
+        assertEquals("播放音乐", stripWakeKeyword("播放音乐", WakeModelCatalog.Chinese.defaultWakeWord))
     }
 }

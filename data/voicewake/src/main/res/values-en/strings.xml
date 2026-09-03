@@ -4,7 +4,6 @@
     <string name="bluetooth_voice_default_device_name">Bluetooth headset</string>
     <string name="bluetooth_voice_speaker_device_name">Phone speaker</string>
     <string name="bluetooth_voice_playback_failed">Bluetooth playback failed: %1$d</string>
-    <string name="bluetooth_voice_status_waiting_bluetooth">Connect a Bluetooth headset with a call microphone</string>
     <string name="bluetooth_voice_status_model_missing">Wake model is not installed</string>
     <string name="bluetooth_voice_status_bluetooth_audio_unavailable">Could not enable Bluetooth call audio</string>
     <string name="bluetooth_voice_status_model_load_failed">Could not load wake model</string>

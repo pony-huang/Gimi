@@ -19,6 +19,13 @@ sealed interface VoiceAudioRoute {
     val id: String
 }
 
+/**
+ * 可用于语音采集与播放的蓝牙 SCO 路由。
+ *
+ * @property input 录音器绑定的蓝牙输入设备。
+ * @property communication 系统通信音频绑定的蓝牙设备。
+ * @property name 面向用户展示的设备名称。
+ */
 data class BluetoothAudioRoute(
     val input: AudioDeviceInfo,
     val communication: AudioDeviceInfo,
@@ -27,7 +34,11 @@ data class BluetoothAudioRoute(
     override val id: String get() = "bluetooth:${input.id}"
 }
 
-/** 手机外放路由：使用系统默认麦克风与扬声器，不绑定任何蓝牙设备。 */
+/**
+ * 手机外放路由：使用系统默认麦克风与扬声器，不绑定任何蓝牙设备。
+ *
+ * @property name 面向用户展示的本机路由名称。
+ */
 data class SpeakerAudioRoute(
     override val name: String,
 ) : VoiceAudioRoute {
@@ -42,18 +53,14 @@ class BluetoothAudioRouter @Inject constructor(
     private var previousMode: Int? = null
     private var callback: AudioDeviceCallback? = null
 
-    /**
-     * 依据「仅蓝牙」开关选择音频路由：优先使用已连接的蓝牙 SCO 耳机；
-     * 允许外放时，在无蓝牙耳机的情况下回退到手机外放。
-     */
-    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    fun findRoute(bluetoothOnly: Boolean): VoiceAudioRoute? {
+    /** 优先返回蓝牙 SCO 路由；不可用或无权限时回退到手机。 */
+    fun findRoute(): VoiceAudioRoute {
         val bluetooth = runCatching { findBluetoothRoute() }.getOrNull()
         if (bluetooth != null) return bluetooth
-        if (bluetoothOnly) return null
         return SpeakerAudioRoute(context.getString(R.string.bluetooth_voice_speaker_device_name))
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private fun findBluetoothRoute(): BluetoothAudioRoute? {
         val input = audioManager.getDevices(AudioManager.GET_DEVICES_INPUTS)
             .firstOrNull { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
@@ -81,6 +88,12 @@ class BluetoothAudioRouter @Inject constructor(
         }
     }
 
+    /** 蓝牙路由激活失败时继续使用手机，不让监听停在等待蓝牙状态。 */
+    fun activateWithFallback(route: VoiceAudioRoute): VoiceAudioRoute? {
+        val speaker = SpeakerAudioRoute(context.getString(R.string.bluetooth_voice_speaker_device_name))
+        return activatePreferredVoiceRoute(route, speaker, ::activate)
+    }
+
     fun release() {
         audioManager.clearCommunicationDevice()
         previousMode?.let { audioManager.mode = it }
@@ -99,4 +112,15 @@ class BluetoothAudioRouter @Inject constructor(
         callback?.let(audioManager::unregisterAudioDeviceCallback)
         callback = null
     }
+}
+
+/** 激活首选路由，仅在蓝牙路由失败时尝试手机回退。 */
+internal fun activatePreferredVoiceRoute(
+    preferred: VoiceAudioRoute,
+    speaker: SpeakerAudioRoute,
+    activate: (VoiceAudioRoute) -> Boolean,
+): VoiceAudioRoute? {
+    if (runCatching { activate(preferred) }.getOrDefault(false)) return preferred
+    if (preferred !is BluetoothAudioRoute) return null
+    return speaker.takeIf { runCatching { activate(it) }.getOrDefault(false) }
 }

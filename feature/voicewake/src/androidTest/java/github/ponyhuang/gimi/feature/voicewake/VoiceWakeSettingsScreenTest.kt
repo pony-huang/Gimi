@@ -1,6 +1,8 @@
 package github.ponyhuang.gimi.feature.voicewake
 
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.hasProgressBarRangeInfo
 import androidx.compose.ui.test.hasSetTextAction
@@ -8,6 +10,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.platform.app.InstrumentationRegistry
 import github.ponyhuang.gimi.domain.speech.model.VoiceWakeState
 import github.ponyhuang.gimi.domain.speech.model.VoiceWakeStatus
@@ -46,7 +49,7 @@ class VoiceWakeSettingsScreenTest {
     }
 
     @Test
-    fun englishModelShowsFixedGimiWakeWordWithoutEditor() {
+    fun englishModelShowsEditableWakeWordAndCounters() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         composeRule.setContent {
             AsssistantaiTheme {
@@ -65,8 +68,50 @@ class VoiceWakeSettingsScreenTest {
                 context.getString(R.string.voicewake_language_en),
             ),
         ).assertExists()
-        composeRule.onNodeWithText(context.getString(R.string.voicewake_keyword_en)).assertExists()
-        composeRule.onAllNodes(hasSetTextAction()).assertCountEquals(0)
+        composeRule.onAllNodes(hasSetTextAction()).assertCountEquals(1)
+        composeRule.onAllNodes(hasSetTextAction())[0].assertTextContains("Gimi")
+        composeRule.onNodeWithText("1/4 · 4/40").assertExists()
+    }
+
+    @Test
+    fun editorEmitsDraftSuggestionClearAndSaveActions() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val actions = mutableListOf<VoiceWakeSettingsAction>()
+        val state = VoiceWakeSettingsUiState(
+            voiceState = twoModelState(),
+            keywordDraft = "小助手",
+            hasUnsavedKeyword = true,
+        )
+        composeRule.setContent {
+            AsssistantaiTheme {
+                VoiceWakeSettingsScreen(state = state, onAction = actions::add)
+            }
+        }
+
+        composeRule.onAllNodes(hasSetTextAction())[0].performTextReplacement("语音助手")
+        composeRule.onNodeWithText("吉米").performClick()
+        composeRule.onNodeWithText(context.getString(R.string.voicewake_keyword_save))
+            .assertIsEnabled()
+            .performClick()
+
+        assertEquals(VoiceWakeSettingsAction.KeywordChanged("语音助手"), actions[0])
+        assertEquals(VoiceWakeSettingsAction.SuggestedKeywordSelected("吉米"), actions[1])
+        assertEquals(VoiceWakeSettingsAction.SaveKeyword, actions[2])
+    }
+
+    @Test
+    fun legacyBluetoothOnlySettingIsAbsent() {
+        composeRule.setContent {
+            AsssistantaiTheme {
+                VoiceWakeSettingsScreen(
+                    state = VoiceWakeSettingsUiState(voiceState = twoModelState()),
+                    onAction = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("仅蓝牙耳机时触发").assertDoesNotExist()
+        composeRule.onNodeWithText("Trigger only with Bluetooth headset").assertDoesNotExist()
     }
 
     @Test

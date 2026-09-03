@@ -31,19 +31,21 @@ class BluetoothVoiceController @Inject constructor(
         BluetoothVoiceUiState(
             availableModels = WakeModelCatalog.models,
             activeModelId = preferences.activeModelId.value,
+            wakeWord = preferences.wakeWord.value,
             modelStates = modelRepository.states.value,
             voiceSessionId = voiceSessionStore.voiceSessionId.value,
-            bluetoothOnly = preferences.bluetoothOnly.value,
         ),
     )
     override val state: StateFlow<BluetoothVoiceUiState> = _state.asStateFlow()
 
     init {
         scope.launch {
-            preferences.activeModelId.collect { modelId -> _state.update { it.copy(activeModelId = modelId) } }
+            preferences.activeModelId.collect { modelId ->
+                _state.update { it.copy(activeModelId = modelId, wakeWord = preferences.wakeWord.value) }
+            }
         }
         scope.launch {
-            preferences.bluetoothOnly.collect { enabled -> _state.update { it.copy(bluetoothOnly = enabled) } }
+            preferences.wakeWord.collect { wakeWord -> _state.update { it.copy(wakeWord = wakeWord) } }
         }
         scope.launch {
             modelRepository.states.collect { states -> _state.update { it.copy(modelStates = states) } }
@@ -57,6 +59,9 @@ class BluetoothVoiceController @Inject constructor(
 
     override fun selectModel(modelId: String) {
         runCatching { preferences.setActiveModel(modelId) }.onFailure { return }
+        _state.update {
+            it.copy(activeModelId = preferences.activeModelId.value, wakeWord = preferences.wakeWord.value)
+        }
         if (_state.value.isRunning) {
             stop()
             start()
@@ -93,13 +98,26 @@ class BluetoothVoiceController @Inject constructor(
         )
     }
 
-    override fun setBluetoothOnly(bluetoothOnly: Boolean) {
-        if (preferences.bluetoothOnly.value == bluetoothOnly) return
-        preferences.setBluetoothOnly(bluetoothOnly)
-        // 运行中切换监听模式时，重启服务以按新模式重新选择音频路由。
-        if (_state.value.isRunning) {
-            stop()
-            start()
+    override fun setWakeWord(modelId: String, wakeWord: String): Result<Unit> = runCatching {
+        val restartActiveListener = _state.value.isRunning && _state.value.activeModelId == modelId
+        val previousWakeWord = preferences.wakeWord(modelId)
+        preferences.setWakeWord(modelId, wakeWord)
+        try {
+            if (_state.value.activeModelId == modelId) {
+                _state.update { it.copy(wakeWord = preferences.wakeWord.value) }
+            }
+            if (restartActiveListener) {
+                stop()
+                start()
+            }
+        } catch (error: RuntimeException) {
+            // 重启请求同步失败时回滚持久化值，保证旧检测器/下次启动仍使用旧唤醒词。
+            runCatching { preferences.setWakeWord(modelId, previousWakeWord) }
+            if (_state.value.activeModelId == modelId) {
+                _state.update { it.copy(wakeWord = previousWakeWord) }
+            }
+            if (restartActiveListener) runCatching { start() }
+            throw error
         }
     }
 

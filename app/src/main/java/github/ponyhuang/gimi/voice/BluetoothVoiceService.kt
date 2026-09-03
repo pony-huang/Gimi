@@ -172,7 +172,6 @@ class BluetoothVoiceService : Service() {
 
     private fun hasRequiredPermissions(): Boolean = listOf(
         Manifest.permission.RECORD_AUDIO,
-        Manifest.permission.BLUETOOTH_CONNECT,
     ).all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
 
     private fun isCallActive(): Boolean =

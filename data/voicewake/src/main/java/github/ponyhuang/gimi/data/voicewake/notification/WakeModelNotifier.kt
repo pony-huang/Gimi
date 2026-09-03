@@ -64,7 +64,7 @@ class AndroidWakeModelNotifier @Inject constructor(
         }
         val notification = baseBuilder()
             .setContentTitle(
-                context.getString(R.string.wake_model_notification_downloading, info.wakeWord),
+                context.getString(R.string.wake_model_notification_downloading, info.defaultWakeWord),
             )
             .setContentText(contentText)
             .setSmallIcon(android.R.drawable.stat_sys_download)
@@ -80,7 +80,7 @@ class AndroidWakeModelNotifier @Inject constructor(
         lastProgressUpdates.remove(info.id)
         val notification = baseBuilder()
             .setContentTitle(context.getString(R.string.wake_model_notification_installing))
-            .setContentText(info.wakeWord)
+            .setContentText(info.defaultWakeWord)
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setProgress(0, 0, true)
             .setOngoing(true)
@@ -94,7 +94,7 @@ class AndroidWakeModelNotifier @Inject constructor(
         lastProgressUpdates.remove(info.id)
         val notification = baseBuilder()
             .setContentTitle(context.getString(R.string.wake_model_notification_ready))
-            .setContentText(info.wakeWord)
+            .setContentText(info.defaultWakeWord)
             .setSmallIcon(android.R.drawable.stat_sys_download_done)
             .setAutoCancel(true)
             .build()
@@ -107,7 +107,7 @@ class AndroidWakeModelNotifier @Inject constructor(
         lastProgressUpdates.remove(info.id)
         val notification = baseBuilder()
             .setContentTitle(context.getString(R.string.wake_model_notification_failed))
-            .setContentText(info.wakeWord)
+            .setContentText(info.defaultWakeWord)
             .setSmallIcon(android.R.drawable.stat_sys_warning)
             .setAutoCancel(true)
             .build()

@@ -22,6 +22,6 @@ interface VoiceWakeRepository {
 
     fun stop()
 
-    /** 设置是否仅在蓝牙耳机连接时才触发监听；false 时允许回退到手机外放。 */
-    fun setBluetoothOnly(bluetoothOnly: Boolean)
+    /** 保存当前模型的唤醒词；校验失败时返回类型化错误。 */
+    fun setWakeWord(modelId: String, wakeWord: String): Result<Unit>
 }

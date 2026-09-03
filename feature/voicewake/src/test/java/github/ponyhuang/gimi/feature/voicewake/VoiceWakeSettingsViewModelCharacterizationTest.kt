@@ -11,6 +11,8 @@ import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogReposito
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.speech.model.VoiceWakeState
 import github.ponyhuang.gimi.domain.speech.model.VoiceWakeStatus
+import github.ponyhuang.gimi.domain.speech.model.WakeKeywordError
+import github.ponyhuang.gimi.domain.speech.model.WakeKeywordException
 import github.ponyhuang.gimi.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.gimi.domain.speech.model.WakeModelState
 import github.ponyhuang.gimi.domain.speech.model.WakeModelStatus
@@ -22,7 +24,9 @@ import io.mockk.mockk
 import io.mockk.verify
 import io.mockk.verifyOrder
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -297,13 +301,148 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
     }
 
     @Test
-    fun settingBluetoothOnlyDelegatesToRepository() = runTest {
+    fun editingWakeWordsKeepsIndependentDraftForEachModel() = runTest {
         val voiceRepository = voiceRepository(ready = true)
         val viewModel = viewModel(modelRepository(), voiceRepository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
 
-        viewModel.onAction(VoiceWakeSettingsAction.SetBluetoothOnly(enabled = false))
+        advanceUntilIdle()
+        viewModel.onAction(VoiceWakeSettingsAction.KeywordChanged("小助手"))
+        viewModel.onAction(VoiceWakeSettingsAction.SelectModel(WakeModelCatalog.English.id))
+        advanceUntilIdle()
+        viewModel.onAction(VoiceWakeSettingsAction.KeywordChanged("Hey Assistant"))
+        viewModel.onAction(VoiceWakeSettingsAction.SelectModel(WakeModelCatalog.Chinese.id))
+        advanceUntilIdle()
 
-        verify(exactly = 1) { voiceRepository.setBluetoothOnly(false) }
+        assertEquals("小助手", viewModel.uiState.value.keywordDraft)
+        assertTrue(viewModel.uiState.value.hasUnsavedKeyword)
+    }
+
+    @Test
+    fun validKeywordSaveDelegatesNormalizedValueAndEmitsSuccess() = runTest {
+        val voiceRepository = voiceRepository(ready = true)
+        every { voiceRepository.setWakeWord(any(), any()) } returns Result.success(Unit)
+        val viewModel = viewModel(modelRepository(), voiceRepository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+
+        advanceUntilIdle()
+        viewModel.onAction(VoiceWakeSettingsAction.KeywordChanged("  小助手  "))
+        advanceUntilIdle()
+        viewModel.effects.test {
+            viewModel.onAction(VoiceWakeSettingsAction.SaveKeyword)
+
+            assertEquals(
+                VoiceWakeSettingsEffect.KeywordSaved("小助手"),
+                awaitItem(),
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        verify(exactly = 1) {
+            voiceRepository.setWakeWord(WakeModelCatalog.Chinese.id, "小助手")
+        }
+    }
+
+    @Test
+    fun invalidKeywordShowsInlineErrorWithoutCallingRepository() = runTest {
+        val voiceRepository = voiceRepository(ready = true)
+        val viewModel = viewModel(modelRepository(), voiceRepository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+
+        advanceUntilIdle()
+        viewModel.onAction(VoiceWakeSettingsAction.KeywordChanged("好"))
+        advanceUntilIdle()
+
+        assertEquals(WakeKeywordError.InvalidLength, viewModel.uiState.value.keywordError)
+        verify(exactly = 0) { voiceRepository.setWakeWord(any(), any()) }
+    }
+
+    @Test
+    fun repositoryFailureKeepsDraftAndShowsTypedError() = runTest {
+        val voiceRepository = voiceRepository(ready = true)
+        every { voiceRepository.setWakeWord(any(), any()) } returns Result.failure(
+            WakeKeywordException(WakeKeywordError.InvalidCharacters),
+        )
+        val viewModel = viewModel(modelRepository(), voiceRepository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+
+        advanceUntilIdle()
+        viewModel.onAction(VoiceWakeSettingsAction.KeywordChanged("小助手"))
+        advanceUntilIdle()
+        viewModel.onAction(VoiceWakeSettingsAction.SaveKeyword)
+        advanceUntilIdle()
+
+        assertEquals("小助手", viewModel.uiState.value.keywordDraft)
+        assertEquals(WakeKeywordError.InvalidCharacters, viewModel.uiState.value.keywordError)
+    }
+
+    @Test
+    fun persistenceFailureKeepsValidDraftAndExposesRetryState() = runTest {
+        val voiceRepository = voiceRepository(ready = true)
+        every { voiceRepository.setWakeWord(any(), any()) } returns Result.failure(
+            IllegalStateException("storage unavailable"),
+        )
+        val viewModel = viewModel(modelRepository(), voiceRepository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+
+        advanceUntilIdle()
+        viewModel.onAction(VoiceWakeSettingsAction.KeywordChanged("小助手"))
+        advanceUntilIdle()
+        viewModel.onAction(VoiceWakeSettingsAction.SaveKeyword)
+        advanceUntilIdle()
+
+        assertEquals("小助手", viewModel.uiState.value.keywordDraft)
+        assertEquals(null, viewModel.uiState.value.keywordError)
+        assertTrue(viewModel.uiState.value.keywordSaveFailed)
+        assertTrue(viewModel.uiState.value.hasUnsavedKeyword)
+    }
+
+    @Test
+    fun runningListenerReportsApplyFailureWhenRuntimeRollsBackWakeWord() = runTest {
+        val voiceState = voiceState(ready = true).apply {
+            value = value.copy(status = VoiceWakeStatus.Listening)
+        }
+        val voiceRepository = voiceRepository(voiceState)
+        every { voiceRepository.setWakeWord(any(), any()) } answers {
+            voiceState.value = voiceState.value.copy(
+                status = VoiceWakeStatus.Starting,
+                wakeWord = secondArg(),
+            )
+            Result.success(Unit)
+        }
+        val viewModel = viewModel(modelRepository(), voiceRepository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+
+        advanceUntilIdle()
+        viewModel.onAction(VoiceWakeSettingsAction.KeywordChanged("小助手"))
+        viewModel.onAction(VoiceWakeSettingsAction.SaveKeyword)
+        advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.isApplyingKeyword)
+
+        voiceState.value = voiceState.value.copy(
+            status = VoiceWakeStatus.Listening,
+            wakeWord = WakeModelCatalog.Chinese.defaultWakeWord,
+        )
+        advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isApplyingKeyword)
+        assertTrue(viewModel.uiState.value.keywordSaveFailed)
+        assertTrue(viewModel.uiState.value.hasUnsavedKeyword)
+    }
+
+    @Test
+    fun backWithDirtyDraftShowsConfirmationInsteadOfNavigating() = runTest {
+        val voiceRepository = voiceRepository(ready = true)
+        val viewModel = viewModel(modelRepository(), voiceRepository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect { } }
+
+        advanceUntilIdle()
+        viewModel.onAction(VoiceWakeSettingsAction.KeywordChanged("小助手"))
+        advanceUntilIdle()
+        viewModel.onAction(VoiceWakeSettingsAction.RequestBack)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.showUnsavedChangesDialog)
     }
 
     private fun viewModel(
@@ -326,7 +465,16 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
             every { state } returns flow
             every { selectModel(any()) } answers {
                 val info = WakeModelCatalog.byId(firstArg()) ?: return@answers Unit
-                flow.value = flow.value.copy(activeModelId = info.id)
+                flow.value = flow.value.copy(
+                    activeModelId = info.id,
+                    wakeWord = info.defaultWakeWord,
+                )
+            }
+            every { setWakeWord(any(), any()) } answers {
+                val modelId = firstArg<String>()
+                val wakeWord = secondArg<String>()
+                if (flow.value.activeModelId == modelId) flow.value = flow.value.copy(wakeWord = wakeWord)
+                Result.success(Unit)
             }
         }
     }

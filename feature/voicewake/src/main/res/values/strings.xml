@@ -2,7 +2,7 @@
     <!-- VoiceWakeSettingsScreen -->
     <string name="voicewake_screen_title">语音唤醒</string>
     <string name="voicewake_listening_title">后台监听</string>
-    <string name="voicewake_listening_subtitle">连接蓝牙耳机后，可通过唤醒词在后台执行任务</string>
+    <string name="voicewake_listening_subtitle">优先使用蓝牙耳机，不可用时自动改用手机</string>
 
     <string name="voicewake_section_models">唤醒模型</string>
     <string name="voicewake_section_models_note">选择后自动下载，识别仅在本机进行</string>
@@ -23,12 +23,31 @@
     <string name="voicewake_section_keyword_with_language">唤醒词 · %1$s</string>
     <string name="voicewake_language_zh">中文</string>
     <string name="voicewake_language_en">English</string>
-    <string name="voicewake_keyword_zh">吉米</string>
-    <string name="voicewake_keyword_en">Gimi</string>
-    <string name="voicewake_keyword_fixed_description">唤醒词由语言模型固定，不可修改</string>
+    <string name="voicewake_keyword_say_preview">说出“%1$s”然后说出你的任务</string>
+    <string name="voicewake_keyword_empty_preview">唤醒词</string>
+    <string name="voicewake_keyword_field_label">自定义</string>
+    <string name="voicewake_keyword_hint_zh">请输入 2–20 个字符</string>
+    <string name="voicewake_keyword_hint_en">请输入 1–4 个英文单词</string>
+    <string name="voicewake_keyword_error_length_zh">唤醒词需要包含 2–20 个字符</string>
+    <string name="voicewake_keyword_error_length_en">唤醒词总长度需要在 2–40 个字符之间</string>
+    <string name="voicewake_keyword_error_characters">唤醒词不能包含控制字符</string>
+    <string name="voicewake_keyword_error_format_en">请使用 1–4 个英文单词，不要输入符号或数字</string>
+    <string name="voicewake_keyword_clear">清空唤醒词</string>
+    <string name="voicewake_keyword_recommendations">推荐唤醒词</string>
+    <string name="voicewake_keyword_vocabulary_notice">唤醒词由离线模型识别，少见名称或生造词可能无法触发。</string>
+    <string name="voicewake_keyword_model_required">可以先保存；安装当前唤醒模型后生效。</string>
+    <string name="voicewake_keyword_use_default">使用默认值</string>
+    <string name="voicewake_keyword_save">保存更改</string>
+    <string name="voicewake_keyword_retry">重试</string>
+    <string name="voicewake_keyword_save_failed">未能保存或应用唤醒词，旧唤醒词仍然有效。</string>
+    <string name="voicewake_keyword_saved">唤醒词已更新为“%1$s”</string>
+    <string name="voicewake_keyword_applying">正在应用新唤醒词…</string>
+    <string name="voicewake_unsaved_title">保存唤醒词修改？</string>
+    <string name="voicewake_unsaved_message">你还有未保存的唤醒词。</string>
+    <string name="voicewake_unsaved_save">保存修改</string>
+    <string name="voicewake_unsaved_discard">放弃修改</string>
+    <string name="voicewake_unsaved_continue">继续编辑</string>
 
     <string name="voicewake_offline_setup_required">启用前请配置可用的默认模型和语音识别模型。</string>
 
-    <string name="voicewake_bluetooth_only_title">仅蓝牙耳机时触发</string>
-    <string name="voicewake_bluetooth_only_subtitle">关闭后，未连接蓝牙耳机时改用手机外放监听</string>
 </resources>

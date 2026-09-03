@@ -1,7 +1,10 @@
 package github.ponyhuang.gimi.feature.voicewake
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,33 +12,59 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothAudio
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.speech.model.VoiceWakeState
+import github.ponyhuang.gimi.domain.speech.model.WakeKeywordError
 import github.ponyhuang.gimi.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.gimi.domain.speech.model.WakeModelInfo
 import github.ponyhuang.gimi.domain.speech.model.WakeModelSource
 import github.ponyhuang.gimi.domain.speech.model.WakeModelState
 import github.ponyhuang.gimi.domain.speech.model.WakeModelStatus
+import github.ponyhuang.gimi.domain.speech.model.normalizeWakeKeyword
 import github.ponyhuang.gimi.feature.voicewake.R
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
@@ -50,6 +79,9 @@ fun VoiceWakeSettingsScreen(
     onAction: (VoiceWakeSettingsAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (state.showUnsavedChangesDialog) {
+        UnsavedKeywordDialog(onAction)
+    }
     PreferencePageContainer(modifier = modifier) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -60,8 +92,11 @@ fun VoiceWakeSettingsScreen(
                     PreferenceListItem(
                         icon = Icons.Default.BluetoothAudio,
                         title = stringResource(R.string.voicewake_listening_title),
-                        subtitle = listeningSubtitle(state.voiceState),
-                        showDivider = true,
+                        subtitle = if (state.isApplyingKeyword) {
+                            stringResource(R.string.voicewake_keyword_applying)
+                        } else {
+                            listeningSubtitle(state.voiceState)
+                        },
                         onClick = {
                             onAction(
                                 VoiceWakeSettingsAction.ToggleListening(
@@ -74,26 +109,6 @@ fun VoiceWakeSettingsScreen(
                                 checked = state.voiceState.isRunning || state.isStartPending,
                                 onCheckedChange = {
                                     onAction(VoiceWakeSettingsAction.ToggleListening(it))
-                                },
-                            )
-                        },
-                    )
-                    PreferenceListItem(
-                        icon = Icons.Default.Bluetooth,
-                        title = stringResource(R.string.voicewake_bluetooth_only_title),
-                        subtitle = stringResource(R.string.voicewake_bluetooth_only_subtitle),
-                        onClick = {
-                            onAction(
-                                VoiceWakeSettingsAction.SetBluetoothOnly(
-                                    !state.voiceState.bluetoothOnly,
-                                ),
-                            )
-                        },
-                        trailingContent = {
-                            Switch(
-                                checked = state.voiceState.bluetoothOnly,
-                                onCheckedChange = {
-                                    onAction(VoiceWakeSettingsAction.SetBluetoothOnly(it))
                                 },
                             )
                         },
@@ -128,6 +143,11 @@ fun VoiceWakeSettingsScreen(
                     state.voiceState.availableModels.forEachIndexed { index, model ->
                         WakeModelRow(
                             model = model,
+                            wakeWord = if (state.voiceState.activeModelId == model.id) {
+                                state.voiceState.wakeWord
+                            } else {
+                                model.defaultWakeWord
+                            },
                             modelState = state.voiceState.modelStates[model.id] ?: WakeModelState(),
                             isActive = state.voiceState.activeModelId == model.id,
                             showDivider = index < state.voiceState.availableModels.lastIndex,
@@ -149,20 +169,233 @@ fun VoiceWakeSettingsScreen(
                 )
             }
             item {
-                Column {
-                    Text(
-                        text = stringResource(wakeWordRes(state.voiceState.activeModelId)),
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(horizontal = 32.dp),
+                WakeKeywordEditor(state = state, onAction = onAction)
+            }
+        }
+    }
+}
+
+@Composable
+private fun WakeKeywordEditor(
+    state: VoiceWakeSettingsUiState,
+    onAction: (VoiceWakeSettingsAction) -> Unit,
+) {
+    val model = state.voiceState.activeModel
+    val isEnglish = model.languageTag.startsWith("en")
+    var fieldValue by remember(model.id) {
+        mutableStateOf(TextFieldValue(state.keywordDraft, TextRange(0, state.keywordDraft.length)))
+    }
+    var hadFocus by remember(model.id) { mutableStateOf(false) }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    LaunchedEffect(state.keywordDraft) {
+        if (fieldValue.text != state.keywordDraft) {
+            fieldValue = TextFieldValue(state.keywordDraft, TextRange(state.keywordDraft.length))
+        }
+    }
+    val preview = state.keywordDraft.trim().ifEmpty { stringResource(R.string.voicewake_keyword_empty_preview) }
+    val saveEnabled = state.hasUnsavedKeyword && state.keywordError == null
+    PreferenceGroupCard {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            // 唤醒方式预览合并为一行“说出“X”然后说出你的任务”，不再单独展示描述标题。
+            Text(
+                text = stringResource(R.string.voicewake_keyword_say_preview, preview),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = fieldValue,
+                onValueChange = { value ->
+                    fieldValue = value
+                    onAction(VoiceWakeSettingsAction.KeywordChanged(value.text))
+                },
+                label = { Text(stringResource(R.string.voicewake_keyword_field_label)) },
+                singleLine = true,
+                isError = state.keywordError != null,
+                supportingText = {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = state.keywordError?.let { stringResource(keywordErrorRes(it, isEnglish)) }
+                                ?: stringResource(
+                                    if (isEnglish) R.string.voicewake_keyword_hint_en
+                                    else R.string.voicewake_keyword_hint_zh,
+                                ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .semantics { liveRegion = LiveRegionMode.Polite },
+                        )
+                        Text(
+                            text = keywordCounter(state.keywordDraft, isEnglish),
+                            color = if (isKeywordNearLimit(state.keywordDraft, isEnglish)) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                },
+                trailingIcon = if (fieldValue.text.isNotEmpty()) {
+                    {
+                        IconButton(
+                            onClick = {
+                                fieldValue = TextFieldValue("")
+                                onAction(VoiceWakeSettingsAction.KeywordChanged(""))
+                            },
+                        ) {
+                            Icon(
+                                Icons.Default.Clear,
+                                contentDescription = stringResource(R.string.voicewake_keyword_clear),
+                            )
+                        }
+                    }
+                } else {
+                    null
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        if (saveEnabled) {
+                            onAction(VoiceWakeSettingsAction.SaveKeyword)
+                            keyboardController?.hide()
+                        }
+                    },
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused && !hadFocus) {
+                            fieldValue = fieldValue.copy(selection = TextRange(0, fieldValue.text.length))
+                        }
+                        hadFocus = focusState.isFocused
+                    },
+            )
+            Text(
+                text = stringResource(R.string.voicewake_keyword_recommendations),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                model.recommendedWakeWords.forEach { wakeWord ->
+                    AssistChip(
+                        onClick = {
+                            onAction(VoiceWakeSettingsAction.SuggestedKeywordSelected(wakeWord))
+                        },
+                        label = { Text(wakeWord) },
                     )
+                }
+            }
+            Text(
+                text = stringResource(
+                    if (state.voiceState.model.status == WakeModelStatus.Ready) {
+                        R.string.voicewake_keyword_vocabulary_notice
+                    } else {
+                        R.string.voicewake_keyword_model_required
+                    },
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (state.keywordSaveFailed) {
+                Text(
+                    text = stringResource(R.string.voicewake_keyword_save_failed),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(
+                    onClick = { onAction(VoiceWakeSettingsAction.UseDefaultKeyword) },
+                    enabled = normalizeWakeKeyword(state.keywordDraft) != model.defaultWakeWord,
+                ) {
+                    Text(stringResource(R.string.voicewake_keyword_use_default))
+                }
+                Button(
+                    onClick = {
+                        onAction(VoiceWakeSettingsAction.SaveKeyword)
+                        keyboardController?.hide()
+                    },
+                    enabled = saveEnabled,
+                ) {
                     Text(
-                        text = stringResource(R.string.voicewake_keyword_fixed_description),
-                        modifier = Modifier.padding(start = 32.dp, end = 32.dp, top = 4.dp),
+                        stringResource(
+                            if (state.keywordSaveFailed) {
+                                R.string.voicewake_keyword_retry
+                            } else {
+                                R.string.voicewake_keyword_save
+                            },
+                        ),
                     )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun UnsavedKeywordDialog(onAction: (VoiceWakeSettingsAction) -> Unit) {
+    AlertDialog(
+        onDismissRequest = { onAction(VoiceWakeSettingsAction.DismissUnsavedChanges) },
+        title = { Text(stringResource(R.string.voicewake_unsaved_title)) },
+        text = { Text(stringResource(R.string.voicewake_unsaved_message)) },
+        confirmButton = {
+            TextButton(onClick = { onAction(VoiceWakeSettingsAction.SaveChangesAndLeave) }) {
+                Text(stringResource(R.string.voicewake_unsaved_save))
+            }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = { onAction(VoiceWakeSettingsAction.DiscardChangesAndLeave) }) {
+                    Text(stringResource(R.string.voicewake_unsaved_discard))
+                }
+                TextButton(onClick = { onAction(VoiceWakeSettingsAction.DismissUnsavedChanges) }) {
+                    Text(stringResource(R.string.voicewake_unsaved_continue))
+                }
+            }
+        },
+    )
+}
+
+private fun keywordCounter(value: String, isEnglish: Boolean): String {
+    val normalized = normalizeWakeKeyword(value)
+    return if (isEnglish) {
+        val words = normalized.takeIf(String::isNotEmpty)?.split(' ')?.size ?: 0
+        "$words/4 · ${normalized.length}/40"
+    } else {
+        "${normalized.length}/20"
+    }
+}
+
+private fun isKeywordNearLimit(value: String, isEnglish: Boolean): Boolean {
+    val normalized = normalizeWakeKeyword(value)
+    if (!isEnglish) return normalized.length >= 18
+    val words = normalized.takeIf(String::isNotEmpty)?.split(' ')?.size ?: 0
+    return words >= 4 || normalized.length >= 36
+}
+
+private fun keywordErrorRes(error: WakeKeywordError, isEnglish: Boolean): Int = when (error) {
+    WakeKeywordError.InvalidLength -> if (isEnglish) {
+        R.string.voicewake_keyword_error_length_en
+    } else {
+        R.string.voicewake_keyword_error_length_zh
+    }
+    WakeKeywordError.InvalidCharacters -> R.string.voicewake_keyword_error_characters
+    WakeKeywordError.InvalidWordFormat -> R.string.voicewake_keyword_error_format_en
 }
 
 /** 运行中展示服务层实时状态（含唤醒词与设备名），停止时展示功能说明。 */
@@ -178,6 +411,7 @@ private fun listeningSubtitle(voiceState: VoiceWakeState): String {
 @Composable
 private fun WakeModelRow(
     model: WakeModelInfo,
+    wakeWord: String,
     modelState: WakeModelState,
     isActive: Boolean,
     onSelect: () -> Unit,
@@ -227,7 +461,7 @@ private fun WakeModelRow(
                 WakeModelStatus.Ready -> Text(
                     stringResource(
                         R.string.voicewake_model_ready,
-                        stringResource(wakeWordRes(model.id)),
+                        wakeWord,
                     ),
                 )
                 WakeModelStatus.Error -> Text(
@@ -289,8 +523,3 @@ private fun modelNameRes(modelId: String): Int = when (modelId) {
 private fun languageNameRes(model: WakeModelInfo): Int =
     if (model.languageTag.startsWith("en")) R.string.voicewake_language_en
     else R.string.voicewake_language_zh
-
-private fun wakeWordRes(modelId: String): Int = when (modelId) {
-    WakeModelCatalog.English.id -> R.string.voicewake_keyword_en
-    else -> R.string.voicewake_keyword_zh
-}

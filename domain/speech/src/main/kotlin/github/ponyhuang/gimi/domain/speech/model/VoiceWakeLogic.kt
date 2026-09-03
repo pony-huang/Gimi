@@ -29,6 +29,16 @@ fun stripWakeKeyword(transcript: String, keyword: String): String {
     return trimmed
 }
 
+/** 从识别结果前缀同时尝试剥离展示词和离线识别器实际使用的 grammar。 */
+fun stripWakeKeywordVariants(
+    transcript: String,
+    displayKeyword: String,
+    recognitionGrammar: String,
+): String = stripWakeKeyword(
+    stripWakeKeyword(transcript, displayKeyword),
+    recognitionGrammar,
+)
+
 private const val PHONE_SUFFIX_LENGTH = 4
 private const val ARGUMENT_VALUE_MAX_LENGTH = 40
 private const val CONFIRMATION_SPEECH_MAX_LENGTH = 120

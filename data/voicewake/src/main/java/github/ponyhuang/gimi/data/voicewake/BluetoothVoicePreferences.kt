@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.core.content.edit
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.domain.speech.model.WakeModelCatalog
+import github.ponyhuang.gimi.domain.speech.model.WakeKeywordException
+import github.ponyhuang.gimi.domain.speech.model.normalizeWakeKeyword
+import github.ponyhuang.gimi.domain.speech.model.validateWakeKeyword
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,27 +24,41 @@ class BluetoothVoicePreferences @Inject constructor(
             ?: WakeModelCatalog.default.id,
     )
     val activeModelId: StateFlow<String> = _activeModelId.asStateFlow()
-
-    /** 是否仅在蓝牙耳机（SCO）连接时才监听；默认 true 保持历史行为。 */
-    private val _bluetoothOnly = MutableStateFlow(
-        preferences.getBoolean(BLUETOOTH_ONLY_KEY, true),
-    )
-    val bluetoothOnly: StateFlow<Boolean> = _bluetoothOnly.asStateFlow()
+    private val _wakeWord = MutableStateFlow(loadWakeWord(_activeModelId.value))
+    val wakeWord: StateFlow<String> = _wakeWord.asStateFlow()
 
     fun setActiveModel(modelId: String) {
         val info = requireNotNull(WakeModelCatalog.byId(modelId)) { "Unknown wake model: $modelId" }
         _activeModelId.value = info.id
         preferences.edit { putString(ACTIVE_MODEL_KEY, info.id) }
+        _wakeWord.value = loadWakeWord(info.id)
     }
 
-    fun setBluetoothOnly(enabled: Boolean) {
-        _bluetoothOnly.value = enabled
-        preferences.edit { putBoolean(BLUETOOTH_ONLY_KEY, enabled) }
+    fun setWakeWord(modelId: String, value: String) {
+        val model = requireNotNull(WakeModelCatalog.byId(modelId)) { "Unknown wake model: $modelId" }
+        validateWakeKeyword(value, model)?.let { throw WakeKeywordException(it) }
+        val normalized = normalizeWakeKeyword(value)
+        check(preferences.edit().putString(wakeWordKey(model.id), normalized).commit()) {
+            "Unable to persist wake word for ${model.id}"
+        }
+        if (_activeModelId.value == model.id) _wakeWord.value = normalized
     }
+
+    private fun loadWakeWord(modelId: String): String {
+        val model = WakeModelCatalog.byId(modelId) ?: WakeModelCatalog.default
+        return preferences.getString(wakeWordKey(model.id), null)
+            ?.let(::normalizeWakeKeyword)
+            ?.takeIf(String::isNotBlank)
+            ?: model.defaultWakeWord
+    }
+
+    fun wakeWord(modelId: String): String = loadWakeWord(modelId)
 
     private companion object {
         const val PREFERENCES_NAME = "bluetooth_voice_preferences"
         const val ACTIVE_MODEL_KEY = "active_model_id"
-        const val BLUETOOTH_ONLY_KEY = "bluetooth_only"
+        const val WAKE_WORD_KEY_PREFIX = "wake_word."
+
+        fun wakeWordKey(modelId: String) = "$WAKE_WORD_KEY_PREFIX$modelId"
     }
 }

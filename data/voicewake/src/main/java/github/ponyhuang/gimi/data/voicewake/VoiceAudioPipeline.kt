@@ -11,7 +11,8 @@ import github.ponyhuang.gimi.core.audio.VoiceCommandCapture
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.domain.speech.model.WakeModelInfo
 import github.ponyhuang.gimi.domain.speech.model.isVoiceConfirmationApproved
-import github.ponyhuang.gimi.domain.speech.model.stripWakeKeyword
+import github.ponyhuang.gimi.domain.speech.model.stripWakeKeywordVariants
+import github.ponyhuang.gimi.domain.speech.model.wakeWordGrammar
 import github.ponyhuang.gimi.domain.speech.model.voiceConfirmationTarget
 import github.ponyhuang.gimi.domain.speech.repository.SpeechRecognitionRepository
 import github.ponyhuang.gimi.domain.speech.usecase.markdownToSpeechText
@@ -158,13 +159,13 @@ class VoiceAudioPipeline @Inject constructor(
     private suspend fun reconcileBluetoothRoute() {
         if (pausedByUser || pausedByCall || processingJob?.isActive == true) return
         val available = runCatching {
-            audioRouter.findRoute(controller.state.value.bluetoothOnly)
+            audioRouter.findRoute()
         }.getOrNull()
         if (available == null) {
             stopAudioCapture(releaseRoute = true)
             setStatus(
-                BluetoothVoiceStatus.WaitingForBluetooth,
-                context.getString(R.string.bluetooth_voice_status_waiting_bluetooth),
+                BluetoothVoiceStatus.Error,
+                context.getString(R.string.bluetooth_voice_status_bluetooth_audio_unavailable),
             )
             return
         }
@@ -190,20 +191,26 @@ class VoiceAudioPipeline @Inject constructor(
             setStatus(BluetoothVoiceStatus.Error, context.getString(R.string.bluetooth_voice_status_model_missing))
             return
         }
-        val activated = runCatching { audioRouter.activate(newRoute) }.getOrDefault(false)
-        if (!activated) {
+        val activeRoute = runCatching { audioRouter.activateWithFallback(newRoute) }.getOrNull()
+        if (activeRoute == null) {
             audioRouter.release()
             setStatus(
-                BluetoothVoiceStatus.WaitingForBluetooth,
+                BluetoothVoiceStatus.Error,
                 context.getString(R.string.bluetooth_voice_status_bluetooth_audio_unavailable),
             )
             return
         }
-        route = newRoute
+        route = activeRoute
         val wakeDetector = cancellationAwareRunCatching {
             withContext(Dispatchers.IO) {
                 val model = withTimeout(ACQUIRE_MODEL_TIMEOUT_MS) { wakeModels.acquire(modelPath) }
-                VoskWakeWordDetector(model, controller.state.value.activeModel.wakeWordGrammar)
+                VoskWakeWordDetector(
+                    model,
+                    wakeWordGrammar(
+                        controller.state.value.wakeWord,
+                        controller.state.value.activeModel,
+                    ),
+                )
             }
         }.getOrElse { error ->
             audioRouter.release()
@@ -222,7 +229,7 @@ class VoiceAudioPipeline @Inject constructor(
             return
         }
         detector = wakeDetector
-        startRecorder(newRoute, wakeDetector)
+        startRecorder(activeRoute, wakeDetector)
     }
 
     /** 在检测器与音频路由仍有效时，仅重新打开录音，避免每轮 ASR 后重建唤醒会话。 */
@@ -324,9 +331,11 @@ class VoiceAudioPipeline @Inject constructor(
                 setStatus(BluetoothVoiceStatus.Transcribing, context.getString(R.string.bluetooth_voice_status_transcribing))
                 val transcript = speechRecognition.transcribe(pcm16)
                 val activeModel = controller.state.value.activeModel
-                val command = stripWakeKeyword(
-                    stripWakeKeyword(transcript, activeModel.wakeWord),
-                    activeModel.wakeWordGrammar,
+                val wakeWord = controller.state.value.wakeWord
+                val command = stripWakeKeywordVariants(
+                    transcript = transcript,
+                    displayKeyword = wakeWord,
+                    recognitionGrammar = wakeWordGrammar(wakeWord, activeModel),
                 )
                 check(command.isNotBlank()) { context.getString(R.string.bluetooth_voice_status_no_task_content) }
                 setStatus(
@@ -339,7 +348,7 @@ class VoiceAudioPipeline @Inject constructor(
                 )
                 val result = agentTasks.execute(command, ::confirmVoiceTool)
                 val activeRoute = runCatching {
-                    audioRouter.findRoute(controller.state.value.bluetoothOnly)
+                    audioRouter.findRoute()
                 }.getOrNull()
                 if (activeRoute != null && speechPlayer.isAvailable()) {
                     setStatus(
@@ -372,7 +381,7 @@ class VoiceAudioPipeline @Inject constructor(
 
     private suspend fun confirmVoiceTool(request: VoiceToolConfirmation): Boolean {
         val activeRoute = runCatching {
-            audioRouter.findRoute(controller.state.value.bluetoothOnly)
+            audioRouter.findRoute()
         }.getOrNull() ?: return false
         if (!speechPlayer.isAvailable()) return false
         val wakeModel = activeWakeModel()

@@ -130,7 +130,7 @@
 | <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/zhipu-color.svg" width="16" alt="GLM" /> **智谱 GLM** | OpenAI 兼容 / Anthropic 协议 |
 | <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/minimax-color.svg" width="16" alt="MiniMax" /> **MiniMax** | OpenAI 兼容 / Anthropic 协议 |
 | <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/xiaomimimo.svg" width="16" alt="MiMo" /> **小米 MiMo** | OpenAI 兼容 / Anthropic 协议 |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/gemini-color.svg" width="16" alt="Gemini" /> **Gemini** | 原生 Gemini 接口 |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/gemini-color.svg" width="16" alt="Gemini" /> **Gemini** | 暂不支持：ADK Kotlin 禁止在 Android 使用 API Key / GoogleCredentials（[官方说明](https://github.com/google/adk-kotlin)） |
 
 可配置：快速模型（会话标题）、语音识别模型、语音合成模型。
 

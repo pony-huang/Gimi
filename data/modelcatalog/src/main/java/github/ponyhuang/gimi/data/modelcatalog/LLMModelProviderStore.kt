@@ -114,7 +114,9 @@ class ModelServiceRepository @Inject constructor(
                 settings.value = readInitialSettings()
                 seedCatalogIfEmpty()
                 dao.observeAll().collectLatest { entities ->
-                    _services.value = entities.mapNotNull { entity ->
+                    _services.value = entities.filter { entity ->
+                        LLMModelConfigs.isSupportedService(entity.serviceId)
+                    }.mapNotNull { entity ->
                         cancellationAwareRunCatching { entityToProvider(entity) }
                             .onFailure { error ->
                                 Log.w(TAG, "Skipping corrupt model service ${entity.serviceId}.", error)

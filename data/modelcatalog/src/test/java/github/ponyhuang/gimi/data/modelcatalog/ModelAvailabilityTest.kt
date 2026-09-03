@@ -99,16 +99,11 @@ class ModelAvailabilityTest {
     }
 
     @Test
-    fun builtInGeminiIsSingleProtocolAndStartsDisabled() {
-        val providers = LLMModelConfigs.services.associateBy { it.serviceId }
-
-        val gemini = providers.getValue(LLMModelType.Gemini.serviceId)
-        assertFalse(gemini.isEnabled)
-        assertEquals(listOf(ApiBaseType.Gemini), gemini.supportedBaseTypes)
-        assertEquals(ApiBaseType.Gemini, gemini.baseType)
-        assertEquals(
-            listOf(WEB_SEARCH_TOOL_ID, URL_CONTEXT_TOOL_ID, GOOGLE_MAPS_TOOL_ID),
-            gemini.toDomain().supportedOfficialTools,
+    fun builtInGeminiIsHiddenBecauseAdkDoesNotSupportApiKeyOnAndroid() {
+        assertFalse(
+            LLMModelConfigs.services.any { provider ->
+                provider.serviceId == LLMModelType.Gemini.serviceId
+            },
         )
     }
 
@@ -140,5 +135,3 @@ class ModelAvailabilityTest {
 private const val WEB_SEARCH_TOOL_ID: String = "web_search"
 private const val KIMI_FORMULAS_TOOL_ID: String = "kimi_formulas"
 private const val GLM_WEB_SEARCH_TOOL_ID: String = "glm_web_search"
-private const val URL_CONTEXT_TOOL_ID: String = "url_context"
-private const val GOOGLE_MAPS_TOOL_ID: String = "google_maps"

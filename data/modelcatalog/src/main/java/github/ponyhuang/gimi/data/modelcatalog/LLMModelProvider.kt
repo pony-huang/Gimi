@@ -267,6 +267,10 @@ enum class LLMModelType(
  */
 object LLMModelConfigs {
 
+    // ADK Kotlin 的 Gemini 当前禁止在 Android 使用 API Key / GoogleCredentials：
+    // https://github.com/google/adk-kotlin
+    private val temporarilyUnsupportedServiceIds = setOf(LLMModelType.Gemini.serviceId)
+
     val services: List<LLMModelProvider> = listOf(
         LLMModelType.DeepSeek.toProvider(),
         LLMModelType.MiniMax.toProvider(
@@ -289,10 +293,12 @@ object LLMModelConfigs {
         LLMModelType.Mimo.toProvider(),
         LLMModelType.OpenAI.toProvider(),
         LLMModelType.Anthropic.toProvider(),
-        LLMModelType.Gemini.toProvider(),
         LLMModelType.Moonshot.toProvider(),
         LLMModelType.Glm.toProvider(),
     ).sortedBy { it.serviceId }
+
+    fun isSupportedService(serviceId: String): Boolean =
+        serviceId !in temporarilyUnsupportedServiceIds
 
     fun fromServiceId(serviceId: String): LLMModelType? =
         LLMModelType.fromServiceId(serviceId)

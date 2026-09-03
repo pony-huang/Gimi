@@ -34,11 +34,8 @@ class VoskWakeWordDetector(
     }
 
     private fun createRecognizer(): Recognizer {
-        // 自定义唤醒词可能落在所选模型的词汇表之外。Vosk 的 UpdateGrammarFst 在 grammar
-        // 词汇全部不在表内时会构造出病态 grammar FST，LookaheadComposeFst 随之触发
-        // pure-virtual 崩溃。因此这里不做 grammar 限定，唤醒检测完全交给 accept() 的
-        // 文本包含匹配；匹配关键词即构造参数 recognitionPhrase。
-        return Recognizer(model, VoiceAudioRecorder.SAMPLE_RATE_HZ.toFloat())
+        val escaped = recognitionPhrase.replace("\\", "\\\\").replace("\"", "\\\"")
+        return Recognizer(model, VoiceAudioRecorder.SAMPLE_RATE_HZ.toFloat(), "[\"$escaped\", \"[unk]\"]")
     }
 
     override fun close() {

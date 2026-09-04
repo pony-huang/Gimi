@@ -56,8 +56,6 @@ class ChatNavigationCallbacks(
     val onConfigureModels: () -> Unit,
     val onOpenSearchResults: (sessionId: String, responseId: String) -> Unit,
     val onBack: () -> Unit,
-    val requestedSessionId: String?,
-    val onRequestedSessionHandled: () -> Unit,
     val sharedMediaUris: List<Uri>,
     val onSharedMediaConsumed: () -> Unit,
 )
@@ -74,8 +72,6 @@ fun ChatEntryProvider(
             onOpenSettings = callbacks.onOpenSettings,
             onConfigureModels = callbacks.onConfigureModels,
             onShowAllLocalFiles = callbacks.onOpenSearchResults,
-            requestedSessionId = callbacks.requestedSessionId,
-            onRequestedSessionHandled = callbacks.onRequestedSessionHandled,
             sharedMediaUris = callbacks.sharedMediaUris,
             onSharedMediaConsumed = callbacks.onSharedMediaConsumed,
         )

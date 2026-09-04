@@ -8,6 +8,9 @@ enum class AssistantSessionPhase {
     /** 缺少必要配置（默认助理模型或 STT），无法执行任务。 */
     MISSING_CONFIG,
 
+    /** 当前聊天会话已有任务，无法并发写入。 */
+    BUSY,
+
     /** 正在录音监听用户语音。 */
     LISTENING,
 
@@ -28,6 +31,9 @@ enum class AssistantSessionPhase {
 
     /** 回答完成，可手动追问；空闲一段时间后浮层自动关闭。 */
     FOLLOW_UP_IDLE,
+
+    /** 用户主动停止了当前任务。 */
+    STOPPED,
 
     /** 发生错误，可重试。 */
     ERROR,

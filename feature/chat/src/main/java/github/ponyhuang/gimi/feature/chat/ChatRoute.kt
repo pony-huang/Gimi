@@ -43,8 +43,6 @@ fun ChatRoute(
     onOpenSettings: () -> Unit,
     onConfigureModels: () -> Unit,
     onShowAllLocalFiles: (sessionId: String, responseId: String) -> Unit,
-    requestedSessionId: String? = null,
-    onRequestedSessionHandled: () -> Unit = {},
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
 ) {
@@ -58,6 +56,8 @@ fun ChatRoute(
     val chatNoticeConfigureChatModel = stringResource(R.string.chat_notice_configure_chat_model)
     val chatNoticeModelSwitchBlocked = stringResource(R.string.chat_notice_model_switch_blocked)
     val chatNoticeParallelLimit = stringResource(R.string.chat_notice_parallel_limit)
+    val chatNoticeCurrentConversationBusy =
+        stringResource(R.string.chat_notice_current_conversation_busy)
     val chatNoticeActiveDeleteBlocked = stringResource(R.string.chat_notice_active_delete_blocked)
     val chatNoticeMixedAttachmentCategories =
         stringResource(R.string.chat_notice_mixed_attachment_categories)
@@ -71,14 +71,9 @@ fun ChatRoute(
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(viewModel, requestedSessionId) {
+    LaunchedEffect(viewModel) {
         viewModel.onAction(ChatAction.RefreshConversations)
-        if (requestedSessionId.isNullOrBlank()) {
-            viewModel.onAction(ChatAction.RestoreOrCreateSession)
-        } else {
-            viewModel.onAction(ChatAction.SwitchSession(requestedSessionId))
-            onRequestedSessionHandled()
-        }
+        viewModel.onAction(ChatAction.RestoreOrCreateSession)
     }
 
     LaunchedEffect(viewModel) {
@@ -88,6 +83,7 @@ fun ChatRoute(
                     ChatNotice.ConfigureChatModel -> chatNoticeConfigureChatModel
                     ChatNotice.ModelSwitchBlocked -> chatNoticeModelSwitchBlocked
                     ChatNotice.ParallelTaskLimitReached -> chatNoticeParallelLimit
+                    ChatNotice.CurrentConversationBusy -> chatNoticeCurrentConversationBusy
                     ChatNotice.ActiveConversationDeleteBlocked -> chatNoticeActiveDeleteBlocked
                     ChatNotice.MixedAttachmentCategories -> chatNoticeMixedAttachmentCategories
                     ChatNotice.ChatModelUnavailable -> chatNoticeChatModelUnavailable

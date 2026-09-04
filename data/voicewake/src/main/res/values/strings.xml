@@ -28,6 +28,8 @@
     <string name="bluetooth_voice_error_not_recording">蓝牙麦克风没有开始录音</string>
     <string name="bluetooth_voice_error_read_failed">蓝牙麦克风读取失败：%1$d</string>
     <string name="bluetooth_voice_no_agent_model">请先配置可用的默认模型</string>
+    <string name="bluetooth_voice_current_conversation_busy">当前会话正在执行任务，请稍后再试</string>
+    <string name="bluetooth_voice_status_task_stopped">已停止</string>
     <string name="bluetooth_voice_task_completed">任务已完成</string>
     <string name="wake_model_reading_bundled">正在读取内置唤醒模型</string>
     <string name="wake_model_downloading">正在下载唤醒模型</string>

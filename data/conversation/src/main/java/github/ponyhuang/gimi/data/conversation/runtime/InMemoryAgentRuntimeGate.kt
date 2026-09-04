@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.data.conversation.runtime
 import github.ponyhuang.gimi.domain.conversation.runtime.ActiveAgentTask
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentMutationResult
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRunLease
+import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionBusyException
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeState
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
@@ -29,6 +30,9 @@ class InMemoryAgentRuntimeGate @Inject constructor() : AgentRuntimeGate {
         phase: AgentTaskPhase,
     ): AgentRunLease = mutationMutex.withLock {
         synchronized(tasks) {
+            if (sessionId != null && tasks.values.any { it.sessionId == sessionId }) {
+                throw AgentSessionBusyException(sessionId)
+            }
             val token = Any()
             tasks[token] = ActiveAgentTask(
                 source = source,

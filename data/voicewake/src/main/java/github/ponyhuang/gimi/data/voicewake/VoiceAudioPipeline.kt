@@ -46,6 +46,9 @@ data class VoicePipelineEvent(
     val message: String,
     val deviceName: String? = null,
     val lastCommand: String? = null,
+    val completesInteraction: Boolean = false,
+    val startsInteraction: Boolean = false,
+    val stopsInteraction: Boolean = false,
 )
 
 /**
@@ -310,6 +313,7 @@ class VoiceAudioPipeline @Inject constructor(
                 setStatus(
                     BluetoothVoiceStatus.CapturingCommand,
                     context.getString(R.string.bluetooth_voice_status_say_command),
+                    startsInteraction = true,
                 )
             }
         }
@@ -364,14 +368,24 @@ class VoiceAudioPipeline @Inject constructor(
                     result.responseText.take(NOTIFICATION_PREVIEW_LENGTH),
                     deviceName = activeRoute?.name,
                     lastCommand = command,
+                    completesInteraction = true,
                 )
             }.onFailure { error ->
-                setStatus(
-                    BluetoothVoiceStatus.Error,
-                    error.message ?: context.getString(R.string.bluetooth_voice_status_task_failed),
-                    lastCommand = controller.state.value.lastCommand,
-                )
-                delay(ERROR_DISPLAY_DELAY_MS)
+                if (error is VoiceAgentTaskStoppedException) {
+                    setStatus(
+                        BluetoothVoiceStatus.Listening,
+                        context.getString(R.string.bluetooth_voice_status_task_stopped),
+                        lastCommand = controller.state.value.lastCommand,
+                        stopsInteraction = true,
+                    )
+                } else {
+                    setStatus(
+                        BluetoothVoiceStatus.Error,
+                        error.message ?: context.getString(R.string.bluetooth_voice_status_task_failed),
+                        lastCommand = controller.state.value.lastCommand,
+                    )
+                    delay(ERROR_DISPLAY_DELAY_MS)
+                }
             }
         } finally {
             processingJob = null
@@ -503,9 +517,22 @@ class VoiceAudioPipeline @Inject constructor(
         message: String,
         deviceName: String? = controller.state.value.deviceName,
         lastCommand: String? = controller.state.value.lastCommand,
+        completesInteraction: Boolean = false,
+        startsInteraction: Boolean = false,
+        stopsInteraction: Boolean = false,
     ) {
         controller.setStatus(status, deviceName, lastCommand, message.takeIf(String::isNotEmpty))
-        _events.tryEmit(VoicePipelineEvent(status, message, deviceName, lastCommand))
+        _events.tryEmit(
+            VoicePipelineEvent(
+                status,
+                message,
+                deviceName,
+                lastCommand,
+                completesInteraction,
+                startsInteraction,
+                stopsInteraction,
+            ),
+        )
     }
 
     private companion object {

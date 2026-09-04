@@ -41,6 +41,10 @@ interface AgentRunLease {
     fun release()
 }
 
+/** 同一会话已有活动任务，新的写入任务不能启动。 */
+class AgentSessionBusyException(sessionId: String) :
+    IllegalStateException("Conversation $sessionId already has an active agent task.")
+
 interface AgentRuntimeGate {
     val state: StateFlow<AgentRuntimeState>
 

@@ -115,6 +115,26 @@ class VoiceWakeSettingsScreenTest {
     }
 
     @Test
+    fun optionalOverlayPermissionOpensSystemSettings() {
+        var opened = false
+        composeRule.setContent {
+            AsssistantaiTheme {
+                VoiceWakeSettingsScreen(
+                    state = VoiceWakeSettingsUiState(voiceState = twoModelState()),
+                    overlayPermissionGranted = false,
+                    onOpenOverlaySettings = { opened = true },
+                    onAction = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("允许悬浮显示").performClick()
+
+        assertEquals(true, opened)
+        composeRule.onNodeWithText("未授权，后台仍通过通知和语音反馈").assertExists()
+    }
+
+    @Test
     fun missingModelShowsDownloadButtonAndEmitsInstallAction() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val installLabel = if (context.resources.configuration.locales[0].language == "zh") {

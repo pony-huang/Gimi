@@ -5,28 +5,37 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.KeyguardManager
 import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.media.AudioManager
 import android.os.IBinder
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.AndroidEntryPoint
 import github.ponyhuang.gimi.MainActivity
+import github.ponyhuang.gimi.MainActivityVisibility
 import github.ponyhuang.gimi.R
 import github.ponyhuang.gimi.data.voicewake.BluetoothVoiceController
 import github.ponyhuang.gimi.data.voicewake.BluetoothVoiceStatus
 import github.ponyhuang.gimi.data.voicewake.VoiceAudioPipeline
 import github.ponyhuang.gimi.data.voicewake.VoicePipelineEvent
+import github.ponyhuang.gimi.data.voicewake.assistantPresentationEvent
+import github.ponyhuang.gimi.domain.assistant.model.AssistantSurfaceEnvironment
+import github.ponyhuang.gimi.domain.assistant.model.AssistantSurfaceTarget
+import github.ponyhuang.gimi.domain.assistant.model.routeAssistantSurface
+import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /** Android 前台服务边界：只处理生命周期、权限、Intent、通话抢占和通知投射。 */
@@ -34,14 +43,18 @@ import kotlinx.coroutines.launch
 class BluetoothVoiceService : Service() {
     @Inject lateinit var controller: BluetoothVoiceController
     @Inject lateinit var pipeline: VoiceAudioPipeline
+    @Inject lateinit var assistantCoordinator: AssistantSessionCoordinator
+    @Inject lateinit var assistantOverlayWindow: AssistantOverlayWindow
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val audioManager by lazy { getSystemService(AudioManager::class.java) }
+    private val keyguardManager by lazy { getSystemService(KeyguardManager::class.java) }
+    private var lockScreenRequested = false
     private val callModeListener = AudioManager.OnModeChangedListener { mode ->
         val callActive = mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_RINGTONE
         if (callActive) {
             pipeline.pauseForCall()
-        } else if (!callActive) {
+        } else {
             pipeline.resumeAfterCall()
         }
     }
@@ -52,6 +65,15 @@ class BluetoothVoiceService : Service() {
         audioManager.addOnModeChangedListener(ContextCompat.getMainExecutor(this), callModeListener)
         scope.launch {
             pipeline.events.collect(::renderPipelineEvent)
+        }
+        scope.launch {
+            combine(
+                assistantCoordinator.state,
+                MainActivityVisibility.foreground,
+            ) { state, appForeground -> state to appForeground }
+                .collect { (state, appForeground) ->
+                    renderAssistantSurface(state.presentationVisible, appForeground)
+                }
         }
     }
 
@@ -88,11 +110,53 @@ class BluetoothVoiceService : Service() {
     }
 
     private fun renderPipelineEvent(event: VoicePipelineEvent) {
+        event.assistantPresentationEvent()?.let(assistantCoordinator::updatePresentation)
         if (event.status == BluetoothVoiceStatus.Stopped) return
         getSystemService(NotificationManager::class.java).notify(
             NOTIFICATION_ID,
             buildNotification(event.status, VoiceNotificationText.forEvent(event)),
         )
+    }
+
+    private fun renderAssistantSurface(presentationVisible: Boolean, appForeground: Boolean) {
+        val overlayGranted = Settings.canDrawOverlays(this)
+        val target = routeAssistantSurface(
+            AssistantSurfaceEnvironment(
+                presentationVisible = presentationVisible,
+                appForeground = appForeground,
+                chatVisible = false,
+                deviceLocked = keyguardManager.isKeyguardLocked,
+                overlayPermissionGranted = overlayGranted,
+                // SYSTEM_ALERT_WINDOW 是 Android 后台 Activity 启动的明确豁免条件之一。
+                lockScreenLaunchAllowed = overlayGranted,
+            ),
+        )
+        when (target) {
+            AssistantSurfaceTarget.SYSTEM_OVERLAY -> {
+                lockScreenRequested = false
+                assistantOverlayWindow.show()
+            }
+            AssistantSurfaceTarget.LOCK_SCREEN_ACTIVITY -> {
+                assistantOverlayWindow.hide()
+                if (!lockScreenRequested) {
+                    lockScreenRequested = true
+                    runCatching {
+                        startActivity(
+                            Intent(this, AssistantLockScreenActivity::class.java)
+                                .addFlags(
+                                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                                        Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                                ),
+                        )
+                    }.onFailure { lockScreenRequested = false }
+                }
+            }
+            else -> {
+                lockScreenRequested = false
+                assistantOverlayWindow.hide()
+            }
+        }
     }
 
     private fun publishServiceStatus(status: BluetoothVoiceStatus, message: String) {
@@ -105,16 +169,16 @@ class BluetoothVoiceService : Service() {
 
     private fun stopCompletely() {
         pipeline.stop()
+        assistantCoordinator.hidePresentation()
+        assistantOverlayWindow.hide()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
     private fun buildNotification(status: BluetoothVoiceStatus, message: String): Notification {
         val openIntent = Intent(this, MainActivity::class.java).apply {
+            setAction(MainActivity.ACTION_OPEN_CURRENT_CHAT)
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            controller.state.value.voiceSessionId?.let {
-                putExtra(BluetoothVoiceController.BLUETOOTH_VOICE_EXTRA_SESSION_ID, it)
-            }
         }
         val contentIntent = PendingIntent.getActivity(
             this,
@@ -179,13 +243,13 @@ class BluetoothVoiceService : Service() {
 
     override fun onDestroy() {
         pipeline.stop()
+        assistantOverlayWindow.hide()
         audioManager.removeOnModeChangedListener(callModeListener)
         scope.cancel()
         super.onDestroy()
     }
 
     companion object {
-        const val EXTRA_VOICE_SESSION_ID = BluetoothVoiceController.BLUETOOTH_VOICE_EXTRA_SESSION_ID
         private const val NOTIFICATION_CHANNEL_ID = "bluetooth_voice_wake"
         private const val NOTIFICATION_ID = 4107
     }

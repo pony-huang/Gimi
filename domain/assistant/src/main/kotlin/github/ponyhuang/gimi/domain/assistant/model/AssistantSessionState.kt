@@ -19,7 +19,7 @@ data class AssistantTurn(
 
 /** 助理会话的可观察状态。 */
 data class AssistantSessionState(
-    /** 共享语音会话 id；尚未创建时为 null。 */
+    /** 当前任务绑定的聊天会话 id；尚未提交任务时为 null。 */
     val sessionId: String? = null,
     val phase: AssistantSessionPhase = AssistantSessionPhase.PREPARING,
     /** 最近一次唤起来源。 */
@@ -31,8 +31,8 @@ data class AssistantSessionState(
     val configIssue: AssistantConfigIssue? = null,
     /** 是否有已提交且仍在执行的任务（关闭浮层不取消）。 */
     val taskActive: Boolean = false,
-    /** 浮层是否可见；仅用于入口恢复，不影响任务执行。 */
-    val overlayVisible: Boolean = false,
+    /** 当前语音交互是否需要展示；具体承载界面由运行环境决定。 */
+    val presentationVisible: Boolean = false,
 ) {
     /** 是否处于可恢复展示的活动中状态（再次唤起时不重新录音）。 */
     val hasActiveTask: Boolean

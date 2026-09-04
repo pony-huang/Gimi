@@ -122,6 +122,7 @@ dependencies {
     implementation(project(":feature:plugin"))
     implementation(project(":feature:skills"))
     implementation(project(":feature:chat"))
+    implementation(project(":feature:assistant"))
     implementation(project(":feature:recommendation"))
     implementation(project(":feature:memory"))
     testImplementation(project(":core:testing"))

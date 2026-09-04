@@ -127,6 +127,7 @@
     <string name="chat_notice_configure_chat_model">Please configure and enable a chat model in Model services first</string>
     <string name="chat_notice_model_switch_blocked">The assistant is still generating a reply. Please wait before switching models.</string>
     <string name="chat_notice_parallel_limit">Up to 3 conversation tasks can run at once</string>
+    <string name="chat_notice_current_conversation_busy">The current conversation is busy. Try again shortly.</string>
     <string name="chat_notice_active_delete_blocked">A running task or pending confirmation prevents deleting this conversation</string>
     <string name="chat_notice_mixed_attachment_categories">Only one type of attachment can be sent at a time</string>
     <string name="chat_notice_chat_model_unavailable">The current chat model is unavailable</string>

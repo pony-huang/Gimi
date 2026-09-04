@@ -34,8 +34,11 @@ data class VoiceToolConfirmation(
     val arguments: Map<String, Any?>,
 )
 
+/** 用户从助手界面主动停止了当前语音任务。 */
+class VoiceAgentTaskStoppedException : IllegalStateException()
+
 /**
- * 蓝牙语音任务的执行入口：委托共享 [AssistantSessionCoordinator] 提交到同一语音会话，
+ * 蓝牙语音任务的执行入口：委托共享 [AssistantSessionCoordinator] 提交到当前聊天会话，
  * 保留蓝牙侧的语音确认回调与结果形态。
  */
 @Singleton
@@ -63,6 +66,9 @@ class VoiceAgentTaskExecutor @Inject constructor(
                 error(state.errorMessage ?: context.getString(R.string.bluetooth_voice_status_task_failed))
             AssistantSessionPhase.MISSING_CONFIG ->
                 error(context.getString(R.string.bluetooth_voice_no_agent_model))
+            AssistantSessionPhase.BUSY ->
+                error(context.getString(R.string.bluetooth_voice_current_conversation_busy))
+            AssistantSessionPhase.STOPPED -> throw VoiceAgentTaskStoppedException()
             else -> Unit
         }
         return VoiceAgentResult(

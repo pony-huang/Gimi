@@ -49,5 +49,9 @@
     <string name="voicewake_unsaved_continue">Keep editing</string>
 
     <string name="voicewake_offline_setup_required">Configure a default assistant model and a speech recognition model before enabling.</string>
+    <string name="voicewake_section_display">Background display</string>
+    <string name="voicewake_overlay_permission_title">Allow floating assistant</string>
+    <string name="voicewake_overlay_permission_granted">Allowed. Wake interactions appear over other apps.</string>
+    <string name="voicewake_overlay_permission_missing">Not allowed. Background feedback still uses notifications and speech.</string>
 
 </resources>

@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.domain.assistant.repository
 
 import github.ponyhuang.gimi.domain.assistant.model.AssistantConfigIssue
 import github.ponyhuang.gimi.domain.assistant.model.AssistantInvocationSource
+import github.ponyhuang.gimi.domain.assistant.model.AssistantPresentationEvent
 import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionState
 import github.ponyhuang.gimi.domain.assistant.model.PendingAssistantConfirmation
 import kotlinx.coroutines.flow.StateFlow
@@ -12,16 +13,13 @@ fun interface AssistantConfirmationHandler {
 }
 
 /**
- * 进程级助理会话协调器：统一系统浮层与蓝牙语音任务，串行化同一语音会话的请求。
+ * 进程级助理会话协调器：统一系统浮层与蓝牙语音任务，并把请求提交到当前聊天会话。
  *
- * 关闭浮层（[hideOverlay]）不取消已提交任务；只有 [stop] 取消任务。
+ * 关闭展示界面（[hidePresentation]）不取消已提交任务；只有 [stop] 取消任务。
  */
 interface AssistantSessionCoordinator {
     /** 单一可观察状态源；浮层重建时从此恢复。 */
     val state: StateFlow<AssistantSessionState>
-
-    /** 共享语音会话 id（不创建新会话；未创建时为 null）。 */
-    val voiceSessionId: StateFlow<String?>
 
     /** 检查执行所需配置；返回 null 表示可执行。 */
     suspend fun configurationIssue(): AssistantConfigIssue?
@@ -29,9 +27,12 @@ interface AssistantSessionCoordinator {
     /** 记录一次唤起：恢复浮层可见性，不启动新任务、不重置进行中的任务。 */
     fun noteInvocation(source: AssistantInvocationSource)
 
+    /** 将录音、转写和播报阶段投射到共享助手界面。 */
+    fun updatePresentation(event: AssistantPresentationEvent)
+
     /**
-     * 提交一条用户指令到共享语音会话并挂起直到任务结束（完成/失败/被取消）。
-     * 同一语音会话的请求按提交顺序串行执行。
+     * 提交一条用户指令到当前聊天会话并挂起直到任务结束（完成/失败/被取消）。
+     * 助手入口的请求按提交顺序串行执行。
      *
      * 等待方协程被取消（如浮层销毁）不会取消任务本身；取消任务必须调用 [stop]。
      *
@@ -57,6 +58,6 @@ interface AssistantSessionCoordinator {
      */
     fun respondToConfirmation(confirmationCallId: String, confirmed: Boolean): Boolean
 
-    /** 仅隐藏浮层：停止界面层交互，不取消已提交任务。 */
-    fun hideOverlay()
+    /** 仅隐藏展示界面：停止界面层交互，不取消已提交任务。 */
+    fun hidePresentation()
 }

@@ -112,7 +112,6 @@ data class VoiceWakeState(
     val deviceName: String? = null,
     val lastCommand: String? = null,
     val message: String? = null,
-    val voiceSessionId: String? = null,
 ) {
     /** 激活模型的安装状态（派生自 modelStates）。 */
     val model: WakeModelState

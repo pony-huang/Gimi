@@ -26,4 +26,15 @@ class AppManifestComponentOwnershipTest {
             ),
         )
     }
+
+    @Test
+    fun voiceAssistantDeclaresOptionalOverlayPermissionAndPrivateLockScreenActivity() {
+        val content = File("src/main/AndroidManifest.xml").readText()
+
+        assertTrue(content.contains("android.permission.SYSTEM_ALERT_WINDOW"))
+        assertTrue(content.contains("android:name=\".voice.AssistantLockScreenActivity\""))
+        assertTrue(content.contains("android:exported=\"false\""))
+        assertTrue(content.contains("android:excludeFromRecents=\"true\""))
+        assertTrue(content.contains("android:noHistory=\"true\""))
+    }
 }

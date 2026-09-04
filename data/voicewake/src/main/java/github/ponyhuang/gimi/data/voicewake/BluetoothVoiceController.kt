@@ -5,7 +5,6 @@ import android.content.Intent
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.data.voicewake.R
-import github.ponyhuang.gimi.domain.assistant.repository.VoiceSessionStore
 import github.ponyhuang.gimi.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.gimi.domain.speech.repository.VoiceWakeRepository
 import javax.inject.Inject
@@ -24,7 +23,6 @@ class BluetoothVoiceController @Inject constructor(
     @ApplicationContext private val context: Context,
     private val preferences: BluetoothVoicePreferences,
     private val modelRepository: WakeModelRepository,
-    private val voiceSessionStore: VoiceSessionStore,
 ) : VoiceWakeRepository {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val _state = MutableStateFlow(
@@ -33,7 +31,6 @@ class BluetoothVoiceController @Inject constructor(
             activeModelId = preferences.activeModelId.value,
             wakeWord = preferences.wakeWord.value,
             modelStates = modelRepository.states.value,
-            voiceSessionId = voiceSessionStore.voiceSessionId.value,
         ),
     )
     override val state: StateFlow<BluetoothVoiceUiState> = _state.asStateFlow()
@@ -49,11 +46,6 @@ class BluetoothVoiceController @Inject constructor(
         }
         scope.launch {
             modelRepository.states.collect { states -> _state.update { it.copy(modelStates = states) } }
-        }
-        scope.launch {
-            voiceSessionStore.voiceSessionId.collect { sessionId ->
-                _state.update { it.copy(voiceSessionId = sessionId) }
-            }
         }
     }
 
@@ -153,7 +145,6 @@ class BluetoothVoiceController @Inject constructor(
         const val BLUETOOTH_VOICE_ACTION_STOP = "github.ponyhuang.gimi.voice.STOP"
         const val BLUETOOTH_VOICE_ACTION_PAUSE = "github.ponyhuang.gimi.voice.PAUSE"
         const val BLUETOOTH_VOICE_ACTION_RESUME = "github.ponyhuang.gimi.voice.RESUME"
-        const val BLUETOOTH_VOICE_EXTRA_SESSION_ID = "voice_session_id"
         private const val BLUETOOTH_VOICE_SERVICE_CLASS = "github.ponyhuang.gimi.voice.BluetoothVoiceService"
     }
 }

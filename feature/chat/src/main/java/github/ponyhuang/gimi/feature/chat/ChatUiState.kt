@@ -73,14 +73,11 @@ data class ChatUiState(
     val speechPlaybackState: SpeechPlaybackState = SpeechPlaybackState(),
     /** 语音唤醒运行状态；仅用于将当前会话的采集态投射到输入栏。 */
     val voiceWakeStatus: VoiceWakeStatus = VoiceWakeStatus.Stopped,
-    /** 语音唤醒当前绑定的共享会话；非当前会话时不应影响可见输入栏。 */
-    val voiceWakeSessionId: String? = null,
 )
 
-/** 当前显示会话是否正通过语音唤醒采集命令。 */
+/** 语音唤醒是否正在采集命令。采集结果会提交到届时的当前聊天会话。 */
 val ChatUiState.isVoiceWakeCapturing: Boolean
-    get() = voiceWakeStatus == VoiceWakeStatus.CapturingCommand &&
-        voiceWakeSessionId != null && voiceWakeSessionId == sessionId
+    get() = voiceWakeStatus == VoiceWakeStatus.CapturingCommand
 
 val ChatUiState.pendingToolConfirmation: PendingToolConfirmation?
     get() = pendingToolConfirmations.firstOrNull()

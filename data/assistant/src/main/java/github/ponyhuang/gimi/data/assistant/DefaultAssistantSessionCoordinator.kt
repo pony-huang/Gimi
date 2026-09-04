@@ -2,22 +2,24 @@ package github.ponyhuang.gimi.data.assistant
 
 import github.ponyhuang.gimi.domain.assistant.model.AssistantConfigIssue
 import github.ponyhuang.gimi.domain.assistant.model.AssistantInvocationSource
+import github.ponyhuang.gimi.domain.assistant.model.AssistantPresentationEvent
 import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionPhase
 import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionState
 import github.ponyhuang.gimi.domain.assistant.model.AssistantTurn
 import github.ponyhuang.gimi.domain.assistant.model.PendingAssistantConfirmation
+import github.ponyhuang.gimi.domain.assistant.model.applyPresentationEvent
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantConfirmationHandler
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
-import github.ponyhuang.gimi.domain.assistant.repository.VoiceSessionStore
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
+import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionBusyException
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskSource
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.gimi.domain.speech.repository.SpeechRecognitionRepository
@@ -30,6 +32,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,7 +48,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * [AssistantSessionCoordinator] 的进程级实现。
  *
  * 同一语音会话的任务经 [submitMutex] 串行；任务在协调器自有作用域执行，
- * [stop] 只取消任务协程，浮层关闭（[hideOverlay]）不影响任务。
+ * [stop] 只取消任务协程，展示界面关闭（[hidePresentation]）不影响任务。
  */
 @Singleton
 class DefaultAssistantSessionCoordinator @Inject constructor(
@@ -54,7 +57,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     private val modelCatalog: ModelCatalogRepository,
     private val speechRecognition: SpeechRecognitionRepository,
     private val runtimeGate: AgentRuntimeGate,
-    private val sessionStore: VoiceSessionStore,
+    private val sessionResolver: ConversationSessionResolver,
     private val toolApproval: ToolApprovalRepository,
 ) : AssistantSessionCoordinator {
 
@@ -64,11 +67,11 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     private val scope by lazy { CoroutineScope(SupervisorJob() + taskDispatcher) }
     private val submitMutex = Mutex()
     private var runningJob: Job? = null
+    private var presentationHideJob: Job? = null
     private var confirmationResponse: PendingConfirmationResponse? = null
 
     private val _state = MutableStateFlow(AssistantSessionState())
     override val state: StateFlow<AssistantSessionState> = _state.asStateFlow()
-    override val voiceSessionId: StateFlow<String?> = sessionStore.voiceSessionId
 
     override suspend fun configurationIssue(): AssistantConfigIssue? {
         modelCatalog.awaitReady()
@@ -78,7 +81,18 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     }
 
     override fun noteInvocation(source: AssistantInvocationSource) {
-        _state.update { it.copy(source = source, overlayVisible = true) }
+        updatePresentation(AssistantPresentationEvent.CaptureStarted(source))
+    }
+
+    override fun updatePresentation(event: AssistantPresentationEvent) {
+        presentationHideJob?.cancel()
+        _state.update { it.applyPresentationEvent(event) }
+        if (event == AssistantPresentationEvent.Completed || event == AssistantPresentationEvent.Stopped) {
+            presentationHideJob = scope.launch {
+                delay(PRESENTATION_RESULT_DURATION_MS)
+                _state.update { it.copy(presentationVisible = false) }
+            }
+        }
     }
 
     override suspend fun submit(
@@ -99,6 +113,9 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
 
     override fun stop() {
         confirmationResponse?.response?.complete(false)
+        _state.update {
+            if (it.taskActive) it.applyPresentationEvent(AssistantPresentationEvent.Stopped) else it
+        }
         runningJob?.cancel()
     }
 
@@ -112,8 +129,9 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
         return pending.response.complete(confirmed)
     }
 
-    override fun hideOverlay() {
-        _state.update { it.copy(overlayVisible = false) }
+    override fun hidePresentation() {
+        presentationHideJob?.cancel()
+        _state.update { it.copy(presentationVisible = false) }
     }
 
     private suspend fun runTask(
@@ -134,12 +152,26 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
             }
             return
         }
-        val sessionId = ensureSession(selection)
+        val session = sessionResolver.resolveCurrentOrCreate()
+        val sessionId = session.sessionId
         val gateSource = when (source) {
             AssistantInvocationSource.BLUETOOTH_WAKE -> AgentTaskSource.BLUETOOTH_VOICE
-            else -> AgentTaskSource.SYSTEM_ASSISTANT
         }
-        val lease = runtimeGate.acquire(gateSource, sessionId)
+        val lease = try {
+            runtimeGate.acquire(gateSource, sessionId)
+        } catch (_: AgentSessionBusyException) {
+            _state.update {
+                it.copy(
+                    sessionId = sessionId,
+                    phase = AssistantSessionPhase.BUSY,
+                    source = source,
+                    taskActive = false,
+                    pendingConfirmation = null,
+                    errorMessage = null,
+                )
+            }
+            return
+        }
         val run = TaskRun()
         _state.update {
             it.copy(
@@ -151,11 +183,20 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                 errorMessage = null,
                 configIssue = null,
                 taskActive = true,
+                presentationVisible = true,
             )
         }
         try {
-            conversations.setConversationModel(sessionId, ModelSelectionCodec.encode(selection))
-            collectTurn(chatAgent.send(sessionId, selection, text, emptyList()), run)
+            collectTurn(
+                chatAgent.send(
+                    sessionId,
+                    session.modelSelection,
+                    text,
+                    emptyList(),
+                    session.toolConfiguration,
+                ),
+                run,
+            )
             while (run.pendingConfirmations.isNotEmpty()) {
                 lease.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
                 val request = run.pendingConfirmations.removeFirst()
@@ -194,11 +235,15 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
             }
         } catch (cancelled: CancellationException) {
             _state.update {
-                it.copy(
-                    phase = AssistantSessionPhase.FOLLOW_UP_IDLE,
-                    taskActive = false,
-                    pendingConfirmation = null,
-                )
+                if (it.phase == AssistantSessionPhase.STOPPED) {
+                    it.copy(taskActive = false, pendingConfirmation = null)
+                } else {
+                    it.copy(
+                        phase = AssistantSessionPhase.FOLLOW_UP_IDLE,
+                        taskActive = false,
+                        pendingConfirmation = null,
+                    )
+                }
             }
             throw cancelled
         } catch (error: Throwable) {
@@ -284,19 +329,6 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
         }
     }
 
-    private suspend fun ensureSession(selection: ModelSelection): String {
-        sessionStore.voiceSessionId.value?.takeIf(String::isNotBlank)?.let { saved ->
-            if (conversations.loadMessages(saved) != null) return saved
-        }
-        val created = conversations.createConversation(
-            initialModel = ModelSelectionCodec.encode(selection),
-            activate = false,
-        )
-        check(created.isNotBlank()) { "Unable to create the shared voice session." }
-        sessionStore.setVoiceSessionId(created)
-        return created
-    }
-
     private fun defaultSelection(): ModelSelection? {
         val services = modelCatalog.currentServices()
         val saved = modelCatalog.currentAssistantSelection()
@@ -329,6 +361,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
 
     private companion object {
         const val CONFIRMATION_TIMEOUT_MS = 15_000L
+        const val PRESENTATION_RESULT_DURATION_MS = 5_000L
     }
 }
 

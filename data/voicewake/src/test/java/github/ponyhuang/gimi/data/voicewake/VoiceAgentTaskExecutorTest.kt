@@ -75,13 +75,34 @@ class VoiceAgentTaskExecutorTest {
         executor.execute("指令") { true }
     }
 
+    @Test
+    fun `busy current conversation surfaces localized error`() = runTest {
+        coordinator.onSubmit = {
+            coordinatorState.value = AssistantSessionState(phase = AssistantSessionPhase.BUSY)
+        }
+
+        val error = runCatching { executor.execute("指令") { true } }.exceptionOrNull()
+
+        assertTrue(error is IllegalStateException)
+        assertEquals("错误", error?.message)
+    }
+
+    @Test
+    fun `stopped coordinator task surfaces a typed cancellation`() = runTest {
+        coordinator.onSubmit = {
+            coordinatorState.value = AssistantSessionState(phase = AssistantSessionPhase.STOPPED)
+        }
+
+        val error = runCatching { executor.execute("指令") { true } }.exceptionOrNull()
+
+        assertTrue(error is VoiceAgentTaskStoppedException)
+    }
+
     private class FakeCoordinator(
         override val state: MutableStateFlow<AssistantSessionState>,
     ) : AssistantSessionCoordinator {
         val submissions = mutableListOf<Pair<AssistantInvocationSource, AssistantConfirmationHandler?>>()
         var onSubmit: () -> Unit = {}
-        override val voiceSessionId = MutableStateFlow<String?>(null)
-
         override suspend fun configurationIssue(): AssistantConfigIssue? = null
 
         override fun noteInvocation(source: AssistantInvocationSource) = Unit
@@ -102,6 +123,8 @@ class VoiceAgentTaskExecutorTest {
             confirmed: Boolean,
         ): Boolean = true
 
-        override fun hideOverlay() = Unit
+        override fun updatePresentation(event: github.ponyhuang.gimi.domain.assistant.model.AssistantPresentationEvent) = Unit
+
+        override fun hidePresentation() = Unit
     }
 }

@@ -28,6 +28,8 @@
     <string name="bluetooth_voice_error_not_recording">Bluetooth microphone did not start recording</string>
     <string name="bluetooth_voice_error_read_failed">Bluetooth microphone read failed: %1$d</string>
     <string name="bluetooth_voice_no_agent_model">Configure a default assistant model first</string>
+    <string name="bluetooth_voice_current_conversation_busy">The current conversation is busy. Try again shortly.</string>
+    <string name="bluetooth_voice_status_task_stopped">Stopped</string>
     <string name="bluetooth_voice_task_completed">Task completed</string>
     <string name="wake_model_reading_bundled">Reading bundled wake model</string>
     <string name="wake_model_downloading">Downloading wake model</string>

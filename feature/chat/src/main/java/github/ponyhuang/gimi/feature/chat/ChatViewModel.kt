@@ -15,8 +15,10 @@ import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentReposi
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRunLease
+import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionBusyException
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskSource
@@ -52,8 +54,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 
 /**
@@ -77,6 +77,7 @@ class ChatViewModel @Inject constructor(
     private val runner: ChatAgentRepository,
     private val agentRuntimeGate: AgentRuntimeGate,
     private val repository: ConversationRepository,
+    private val sessionResolver: ConversationSessionResolver,
     private val modelServices: ModelCatalogRepository,
     private val chatDisplayPreferences: ChatDisplayRepository,
     private val appearanceRepository: AppearanceRepository,
@@ -93,7 +94,6 @@ class ChatViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
-    private val sessionCreationMutex = Mutex()
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     private val _effects = MutableSharedFlow<ChatEffect>(extraBufferCapacity = 8)
@@ -263,7 +263,6 @@ class ChatViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         voiceWakeStatus = wakeState.status,
-                        voiceWakeSessionId = wakeState.voiceSessionId,
                     )
                 }
             }
@@ -557,26 +556,41 @@ class ChatViewModel @Inject constructor(
     fun send(text: String, draftAttachments: List<DraftAttachment> = emptyList()): Boolean {
         if (text.isBlank() && draftAttachments.isEmpty()) return false
         if (_uiState.value.pendingToolConfirmation != null) return false
+        val sessionId = _uiState.value.sessionId
         val usableSelection = _uiState.value.currentModelSelection
             ?.takeIf(::isUsableChatSelection)
-            ?: defaultSelection()
-        if (usableSelection == null) {
-            emitNotice(ChatNotice.ConfigureChatModel)
-            return false
+        if (sessionId.isBlank() || usableSelection == null) {
+            viewModelScope.launch {
+                val snapshot = runCatching {
+                    if (sessionId.isBlank()) {
+                        sessionResolver.resolveCurrentOrCreate()
+                    } else {
+                        sessionResolver.activate(sessionId)
+                            ?: sessionResolver.resolveCurrentOrCreate()
+                    }
+                }.getOrElse {
+                    emitNotice(ChatNotice.ConfigureChatModel)
+                    return@launch
+                }
+                validateAttachments(snapshot.modelSelection, draftAttachments)?.let { notice ->
+                    emitNotice(notice)
+                    return@launch
+                }
+                val runtime = runtimeFor(snapshot.sessionId)
+                runtime.modelSelection = snapshot.modelSelection
+                runtime.toolConfiguration = snapshot.toolConfiguration
+                if (!runtime.isLoaded) {
+                    runtime.messages = repository.loadMessages(snapshot.sessionId).orEmpty()
+                    runtime.isLoaded = true
+                }
+                showRuntime(snapshot.sessionId)
+                startSend(snapshot.sessionId, snapshot.modelSelection, text, draftAttachments)
+            }
+            return true
         }
         validateAttachments(usableSelection, draftAttachments)?.let { notice ->
             emitNotice(notice)
             return false
-        }
-        val sessionId = _uiState.value.sessionId
-        if (sessionId.isBlank()) {
-            viewModelScope.launch {
-                val ensured = ensureSessionId()
-                if (ensured.isNotBlank()) {
-                    startSend(ensured, usableSelection, text, draftAttachments)
-                }
-            }
-            return true
         }
         return startSend(sessionId, usableSelection, text, draftAttachments)
     }
@@ -605,7 +619,13 @@ class ChatViewModel @Inject constructor(
         publishRuntime(runtime)
 
         runtime.job = viewModelScope.launch {
-            ensureRunLease(runtime).updatePhase(AgentTaskPhase.GENERATING)
+            try {
+                ensureRunLease(runtime).updatePhase(AgentTaskPhase.GENERATING)
+            } catch (_: AgentSessionBusyException) {
+                emitNotice(ChatNotice.CurrentConversationBusy)
+                finishRunIfOwned(sessionId, runToken)
+                return@launch
+            }
             // Agent 工具可能在上一轮直接更新了当前会话的 MCP 选择；发送前以持久化配置
             // 为准，避免把旧的内存快照继续传给下一轮 Runner。
             loadOrInitializeToolConfiguration(sessionId, selection)
@@ -684,24 +704,6 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * 兜底：保证 [sessionId] 非空。当前值为空时调 [ConversationRepository.createConversation] 建一个。
-     *
-     * 注：是 `suspend` 内部方法，调用方必须在协程里调用以确保 `_uiState.value.sessionId` 已更新后再继续。
-     */
-    private suspend fun ensureSessionId(): String = sessionCreationMutex.withLock {
-        modelServices.awaitReady()
-        _uiState.value.sessionId.takeIf { it.isNotBlank() }?.let { return@withLock it }
-        val newId = createConversationWithDefaults()
-        if (newId.isNotBlank()) {
-            val runtime = runtimeFor(newId)
-            runtime.modelSelection = activateConversationSettings(newId)
-            runtime.isLoaded = true
-            showRuntime(newId)
-        }
-        _uiState.value.sessionId
-    }
-
-    /**
      * 启动期会话恢复：依次尝试
      * 1. 元数据 RoomDatabase 中 `isLast=true` 的 id（仍在 ADK Room 中）；
      * 2. Room 中 `lastUpdateTime` 最大的会话（即最近活跃的）；
@@ -718,46 +720,25 @@ class ChatViewModel @Inject constructor(
         _uiState.update { it.copy(isInitializing = true) }
         viewModelScope.launch {
             modelServices.awaitReady()
-            // 1. 元数据中的当前会话优先 — 仅当 ADK Room 里仍存在该 session 才算命中。
-            val remembered = repository.lastConversationId()
-            if (remembered != null) {
-                val history = repository.loadMessages(remembered)
-                if (history != null) {
-                    val runtime = runtimeFor(remembered)
+            runCatching { sessionResolver.resolveCurrentOrCreate() }
+                .onSuccess { snapshot ->
+                    val history = repository.loadMessages(snapshot.sessionId).orEmpty()
+                    val runtime = runtimeFor(snapshot.sessionId)
                     runtime.messages = history
-                    runtime.modelSelection = activateConversationSettings(remembered)
+                    runtime.modelSelection = snapshot.modelSelection
+                    runtime.toolConfiguration = snapshot.toolConfiguration
                     runtime.isLoaded = true
-                    showRuntime(remembered)
-                    Log.i(TAG, "restoreOrCreateSession: restored from prefs id=$remembered (events=${history.size}).")
-                    return@launch
-                } else {
-                    repository.discardConversationMetadata(remembered)
-                    Log.i(TAG, "restoreOrCreateSession: remembered id=$remembered missing; cleared metadata.")
+                    showRuntime(snapshot.sessionId)
+                    Log.i(
+                        TAG,
+                        "restoreOrCreateSession: resolved current id=${snapshot.sessionId} " +
+                            "(events=${history.size}).",
+                    )
                 }
-            }
-
-            // 2. fallback：取 Room 里最近活跃的会话。
-            val mostRecent = repository.listConversations().firstOrNull()
-            if (mostRecent != null) {
-                // switchSession 内部会自己维护 isInitializing（置 true → false）。
-                switchSession(mostRecent.id)
-                Log.i(TAG, "restoreOrCreateSession: fell back to most recent id=${mostRecent.id}.")
-                return@launch
-            }
-
-            // 3. 兜底：数据库里一个 session 都没有，建一个空会话（首次安装 / 全删场景）。
-            val newId = createConversationWithDefaults()
-            if (newId.isNotBlank()) {
-                val runtime = runtimeFor(newId)
-                runtime.modelSelection = activateConversationSettings(newId)
-                runtime.isLoaded = true
-                showRuntime(newId)
-                Log.i(TAG, "restoreOrCreateSession: created fresh session id=$newId.")
-            } else {
-                // create 失败也别把 spinner 永久卡住。
-                _uiState.update { it.copy(isInitializing = false) }
-                Log.w(TAG, "restoreOrCreateSession: failed to create a fresh session; isInitializing cleared anyway.")
-            }
+                .onFailure { error ->
+                    _uiState.update { it.copy(isInitializing = false) }
+                    Log.w(TAG, "restoreOrCreateSession: unable to resolve current conversation.", error)
+                }
         }
     }
 
@@ -919,51 +900,23 @@ class ChatViewModel @Inject constructor(
      * 可用模型，则清空运行时选择和旧 runner，保留空会话等待用户完成模型配置。
      */
     private suspend fun activateConversationSettings(sessionId: String): ModelSelection? {
-        modelServices.awaitReady()
-        val storedModel = repository.activateConversation(sessionId, defaultModelPayload())
-        val savedSelection = ModelSelectionCodec.decode(storedModel)
-        val validSavedSelection = savedSelection?.takeIf {
-            isUsableChatSelection(it)
-        }
-        val selection = validSavedSelection ?: defaultSelection()
-        if (savedSelection != selection) {
-            repository.setConversationModel(
-                sessionId = sessionId,
-                model = selection?.let(ModelSelectionCodec::encode).orEmpty(),
-            )
-        }
-        if (selection == null) {
+        val snapshot = sessionResolver.activate(sessionId)
+        if (snapshot == null) {
             runner.releaseSession(sessionId)
-            Log.w(TAG, "activateConversationSettings($sessionId): no available model.")
+            Log.w(TAG, "activateConversationSettings($sessionId): conversation is unavailable.")
+            return null
         }
-        loadOrInitializeToolConfiguration(sessionId, selection)
-        return selection
+        runtimeFor(sessionId).toolConfiguration = snapshot.toolConfiguration
+        return snapshot.modelSelection
     }
 
     private suspend fun createConversationWithDefaults(): String {
-        val selection = defaultSelection()
-        return repository.createConversation(
-            initialModel = selection?.let(ModelSelectionCodec::encode).orEmpty(),
-            initialToolConfiguration = defaultToolConfiguration(selection),
-        )
-    }
-
-    private fun defaultToolConfiguration(
-        selection: ModelSelection?,
-    ): ConversationToolConfiguration {
-        val officialSelections = selection?.let { current ->
-            mapOf(
-                current.serviceId to supportedOfficialToolIds(current)
-                    .associateWith { setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER) },
-            )
-        }.orEmpty()
-        return ConversationToolConfiguration(
-            enabledLocalToolIds = toolAuthorization.enabledToolIds(),
-            enabledMcpServerIds = mcpRepository.currentServers()
-                .filter { it.isEnabled }
-                .mapTo(linkedSetOf()) { it.id },
-            enabledOfficialFunctionIdsByService = officialSelections,
-        )
+        val snapshot = sessionResolver.createAndActivate()
+        runtimeFor(snapshot.sessionId).apply {
+            modelSelection = snapshot.modelSelection
+            toolConfiguration = snapshot.toolConfiguration
+        }
+        return snapshot.sessionId
     }
 
     private suspend fun loadOrInitializeToolConfiguration(
@@ -971,25 +924,17 @@ class ChatViewModel @Inject constructor(
         selection: ModelSelection?,
     ) {
         val runtime = runtimeFor(sessionId)
-        val stored = repository.conversationToolConfiguration(sessionId)
-        val initial = stored ?: defaultToolConfiguration(selection)
-        val availableLocalIds = toolAuthorization.tools.value.mapTo(hashSetOf()) { it.id }
-        val availableMcpIds = mcpRepository.currentServers().mapTo(hashSetOf()) { it.id }
-        val sanitized = initial.sanitize(availableLocalIds, availableMcpIds)
-        val initialized = selection?.let { current ->
-            sanitized.initializeOfficialFunctions(
-                current.serviceId,
-                supportedOfficialToolIds(current),
-            )
-        } ?: sanitized
-        runtime.toolConfiguration = initialized
-        if (stored != initialized) {
-            val saved = repository.setConversationToolConfiguration(sessionId, initialized)
-            if (!saved) {
-                _uiState.update {
-                    it.copy(hasToolConfigurationError = true)
-                }
-            }
+        if (selection == null) {
+            runtime.toolConfiguration = ConversationToolConfiguration()
+            return
+        }
+        runCatching {
+            sessionResolver.resolveToolConfiguration(sessionId, selection)
+        }.onSuccess { configuration ->
+            runtime.toolConfiguration = configuration
+            _uiState.update { it.copy(hasToolConfigurationError = false) }
+        }.onFailure {
+            _uiState.update { it.copy(hasToolConfigurationError = true) }
         }
     }
 
@@ -998,7 +943,8 @@ class ChatViewModel @Inject constructor(
         runtime: ChatSessionRuntime,
         selection: ModelSelection,
     ) {
-        val current = runtime.toolConfiguration ?: defaultToolConfiguration(selection)
+        val current = runtime.toolConfiguration
+            ?: sessionResolver.resolveToolConfiguration(sessionId, selection)
         val initialized = current.initializeOfficialFunctions(
             selection.serviceId,
             supportedOfficialToolIds(selection),
@@ -1192,7 +1138,7 @@ class ChatViewModel @Inject constructor(
         if (sessionId.isBlank()) return
         val runtime = runtimeFor(sessionId)
         if (runtime.isActive) return
-        val current = runtime.toolConfiguration ?: defaultToolConfiguration(runtime.modelSelection)
+        val current = runtime.toolConfiguration ?: return
         val updated = transform(current)
         if (updated == current) return
         viewModelScope.launch {
@@ -1216,27 +1162,6 @@ class ChatViewModel @Inject constructor(
                 ?.supportedOfficialTools
                 ?.toSet()
         }.orEmpty()
-
-    /** New conversations use the saved default assistant model, with a first-available fallback. */
-    private fun defaultModelPayload(): String = defaultSelection()
-        ?.let(ModelSelectionCodec::encode)
-        .orEmpty()
-
-    private fun defaultSelection(): ModelSelection? {
-        val services = modelServices.currentServices()
-        return modelServices.currentAssistantSelection()
-            ?.takeIf { selection -> services.isUsableChatSelection(selection) }
-            ?: services.asSequence()
-                .filter { it.isEnabled && it.apiKey.isNotBlank() }
-                .flatMap { service ->
-                    service.groups.asSequence().flatMap { group ->
-                        group.models.asSequence()
-                            .filter { !it.isStt && !it.isTts }
-                            .map { ModelSelection(service.id, group.id, it.id) }
-                    }
-                }
-                .firstOrNull()
-    }
 
     private fun isUsableChatSelection(selection: ModelSelection): Boolean =
         modelServices.currentServices().isUsableChatSelection(selection)

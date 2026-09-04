@@ -136,6 +136,7 @@
     <string name="chat_notice_configure_chat_model">请先在模型服务中配置并启用聊天模型</string>
     <string name="chat_notice_model_switch_blocked">正在生成回复，完成后再切换模型</string>
     <string name="chat_notice_parallel_limit">最多同时运行 3 个会话任务</string>
+    <string name="chat_notice_current_conversation_busy">当前会话正在执行任务，请稍后再试</string>
     <string name="chat_notice_active_delete_blocked">任务运行或等待确认时不可删除该会话</string>
     <string name="chat_notice_mixed_attachment_categories">每次只能发送同一类型的附件</string>
     <string name="chat_notice_chat_model_unavailable">当前聊天模型不可用</string>

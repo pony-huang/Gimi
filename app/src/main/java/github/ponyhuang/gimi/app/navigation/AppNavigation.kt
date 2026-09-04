@@ -6,6 +6,10 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
@@ -16,6 +20,9 @@ import github.ponyhuang.gimi.BuildConfig
 import github.ponyhuang.gimi.feature.chat.ChatDestination
 import github.ponyhuang.gimi.feature.chat.ChatEntryProvider
 import github.ponyhuang.gimi.feature.chat.ChatNavigationCallbacks
+import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
+import github.ponyhuang.gimi.feature.assistant.AssistantSurface
+import github.ponyhuang.gimi.feature.assistant.AssistantSurfaceMode
 import github.ponyhuang.gimi.feature.mcp.McpDestination
 import github.ponyhuang.gimi.feature.mcp.McpEntryProvider
 import github.ponyhuang.gimi.feature.memory.MemoryDestination
@@ -42,13 +49,15 @@ import github.ponyhuang.gimi.feature.workfiles.WorkFilesEntryProvider
 
 /** App-level composition root. Feature modules own destination dispatch and never navigate directly. */
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun MainScreen(
-    requestedSessionId: String? = null,
-    onRequestedSessionHandled: () -> Unit = {},
+    assistantSessionCoordinator: AssistantSessionCoordinator,
+    openChatRequest: Int = 0,
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
 ) {
     val backStack = rememberNavBackStack(ChatDestination.Chat)
+    val assistantState by assistantSessionCoordinator.state.collectAsStateWithLifecycle()
     val goBack: () -> Unit = {
         if (backStack.size > 1) backStack.removeLastOrNull()
     }
@@ -64,6 +73,10 @@ fun MainScreen(
 
     LaunchedEffect(sharedMediaUris) {
         if (sharedMediaUris.isNotEmpty()) returnToChat()
+    }
+
+    LaunchedEffect(openChatRequest) {
+        if (openChatRequest > 0) returnToChat()
     }
 
     NavDisplay(
@@ -89,8 +102,6 @@ fun MainScreen(
                             navigate(ChatDestination.SearchResults(sessionId, responseId))
                         },
                         onBack = goBack,
-                        requestedSessionId = requestedSessionId,
-                        onRequestedSessionHandled = onRequestedSessionHandled,
                         sharedMediaUris = sharedMediaUris,
                         onSharedMediaConsumed = onSharedMediaConsumed,
                     ),
@@ -150,6 +161,26 @@ fun MainScreen(
                 slideOutHorizontally(targetOffsetX = { it })
         },
     )
+
+    if (
+        assistantState.presentationVisible &&
+        backStack.lastOrNull() != ChatDestination.Chat
+    ) {
+        ModalBottomSheet(
+            onDismissRequest = assistantSessionCoordinator::hidePresentation,
+        ) {
+            AssistantSurface(
+                state = assistantState,
+                mode = AssistantSurfaceMode.SHEET,
+                onDismiss = assistantSessionCoordinator::hidePresentation,
+                onStop = assistantSessionCoordinator::stop,
+                onOpenChat = {
+                    assistantSessionCoordinator.hidePresentation()
+                    returnToChat()
+                },
+            )
+        }
+    }
 }
 
 private fun NavKey.navigationContentKey(): String {

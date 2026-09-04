@@ -49,5 +49,9 @@
     <string name="voicewake_unsaved_continue">继续编辑</string>
 
     <string name="voicewake_offline_setup_required">启用前请配置可用的默认模型和语音识别模型。</string>
+    <string name="voicewake_section_display">后台显示</string>
+    <string name="voicewake_overlay_permission_title">允许悬浮显示</string>
+    <string name="voicewake_overlay_permission_granted">已授权，后台唤醒时显示助手浮层</string>
+    <string name="voicewake_overlay_permission_missing">未授权，后台仍通过通知和语音反馈</string>
 
 </resources>

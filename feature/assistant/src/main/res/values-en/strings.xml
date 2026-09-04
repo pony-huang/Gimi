@@ -1,0 +1,17 @@
+<resources>
+    <string name="assistant_status_preparing">Preparing</string>
+    <string name="assistant_status_missing_config">Finish model and voice setup</string>
+    <string name="assistant_status_busy">This chat is busy</string>
+    <string name="assistant_status_listening">Listening</string>
+    <string name="assistant_status_transcribing">Transcribing</string>
+    <string name="assistant_status_generating">Thinking</string>
+    <string name="assistant_status_executing_tool">Using a tool</string>
+    <string name="assistant_status_confirming">Waiting for confirmation</string>
+    <string name="assistant_status_speaking">Responding</string>
+    <string name="assistant_status_completed">Done</string>
+    <string name="assistant_status_stopped">Stopped</string>
+    <string name="assistant_status_error">Something went wrong</string>
+    <string name="assistant_action_close">Close</string>
+    <string name="assistant_action_stop">Stop</string>
+    <string name="assistant_action_open_chat">Open chat</string>
+</resources>

@@ -2,17 +2,21 @@ package github.ponyhuang.gimi.data.assistant
 
 import github.ponyhuang.gimi.domain.assistant.model.AssistantConfigIssue
 import github.ponyhuang.gimi.domain.assistant.model.AssistantInvocationSource
+import github.ponyhuang.gimi.domain.assistant.model.AssistantPresentationEvent
 import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionPhase
-import github.ponyhuang.gimi.domain.assistant.repository.VoiceSessionStore
 import github.ponyhuang.gimi.domain.conversation.model.ChatFunctionCall
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunPart
+import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ToolConfirmationRequest
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
+import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionSnapshot
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentMutationResult
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRunLease
+import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionBusyException
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeState
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskSource
@@ -52,7 +56,7 @@ class DefaultAssistantSessionCoordinatorTest {
     private val modelCatalog: ModelCatalogRepository = mockk()
     private val speechRecognition: SpeechRecognitionRepository = mockk()
     private val gate = RecordingAgentRuntimeGate()
-    private val store = FakeVoiceSessionStore()
+    private val sessionResolver: ConversationSessionResolver = mockk()
     private val toolApproval = FakeToolApprovalRepository()
     private lateinit var coordinator: DefaultAssistantSessionCoordinator
 
@@ -66,13 +70,18 @@ class DefaultAssistantSessionCoordinatorTest {
         every { speechRecognition.availability } returns flowOf(true)
         coEvery { conversations.loadMessages(any()) } returns null
         coEvery { conversations.createConversation(any(), any()) } returns "voice-session-1"
+        coEvery { sessionResolver.resolveCurrentOrCreate() } returns ConversationSessionSnapshot(
+            sessionId = "voice-session-1",
+            modelSelection = selection,
+            toolConfiguration = ConversationToolConfiguration(),
+        )
         coordinator = DefaultAssistantSessionCoordinator(
             conversations = conversations,
             chatAgent = chatAgent,
             modelCatalog = modelCatalog,
             speechRecognition = speechRecognition,
             runtimeGate = gate,
-            sessionStore = store,
+            sessionResolver = sessionResolver,
             toolApproval = toolApproval,
         )
     }
@@ -80,7 +89,7 @@ class DefaultAssistantSessionCoordinatorTest {
     @Test
     fun `submit folds partial events into the current turn answer`() = runTest {
         coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
-        coEvery { chatAgent.send(any(), any(), any(), any()) } returns flowOf(
+        coEvery { chatAgent.send(any(), any(), any(), any(), any()) } returns flowOf(
             textEvent("你", partial = true),
             textEvent("好", partial = true),
             textEvent("你好。", partial = false),
@@ -95,21 +104,48 @@ class DefaultAssistantSessionCoordinatorTest {
         assertEquals("打招呼", state.turn?.userText)
         assertEquals("你好。", state.turn?.responseText)
         assertEquals(false, state.taskActive)
-        assertEquals("voice-session-1", store.voiceSessionId.value)
     }
 
     @Test
-    fun `submit reuses the persisted voice session`() = runTest {
+    fun `submit reuses the current conversation model and tools`() = runTest {
         coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
-        store.setVoiceSessionId("existing-session")
-        coEvery { conversations.loadMessages("existing-session") } returns emptyList()
-        coEvery { chatAgent.send(any(), any(), any(), any()) } returns flowOf(textEvent("好"))
+        val currentSelection = ModelSelection("svc", "grp", "current-model")
+        val currentTools = ConversationToolConfiguration(enabledLocalToolIds = setOf("clock"))
+        coEvery { sessionResolver.resolveCurrentOrCreate() } returns ConversationSessionSnapshot(
+            sessionId = "current-session",
+            modelSelection = currentSelection,
+            toolConfiguration = currentTools,
+        )
+        coEvery { chatAgent.send(any(), any(), any(), any(), any()) } returns flowOf(textEvent("好"))
 
         coordinator.submit("继续", AssistantInvocationSource.BLUETOOTH_WAKE)
         advanceUntilIdle()
 
-        assertEquals("existing-session", coordinator.state.value.sessionId)
+        assertEquals("current-session", coordinator.state.value.sessionId)
         coVerify(exactly = 0) { conversations.createConversation(any(), any()) }
+        coVerify {
+            chatAgent.send(
+                "current-session",
+                currentSelection,
+                "继续",
+                emptyList(),
+                currentTools,
+            )
+        }
+        coVerify(exactly = 0) { conversations.setConversationModel(any(), any()) }
+    }
+
+    @Test
+    fun `busy current conversation rejects assistant task before agent send`() = runTest {
+        coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
+        gate.acquireException = AgentSessionBusyException("voice-session-1")
+
+        coordinator.submit("继续", AssistantInvocationSource.BLUETOOTH_WAKE)
+        advanceUntilIdle()
+
+        assertEquals(AssistantSessionPhase.BUSY, coordinator.state.value.phase)
+        assertFalse(coordinator.state.value.taskActive)
+        coVerify(exactly = 0) { chatAgent.send(any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -117,7 +153,7 @@ class DefaultAssistantSessionCoordinatorTest {
         coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
         val firstGate = CompletableDeferred<Unit>()
         var sendCount = 0
-        coEvery { chatAgent.send(any(), any(), any(), any()) } answers {
+        coEvery { chatAgent.send(any(), any(), any(), any(), any()) } answers {
             sendCount++
             if (sendCount == 1) {
                 flow {
@@ -146,7 +182,7 @@ class DefaultAssistantSessionCoordinatorTest {
     @Test
     fun `tool calls switch phase and confirmation approval continues the task`() = runTest {
         coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
-        coEvery { chatAgent.send(any(), any(), any(), any()) } returns flowOf(
+        coEvery { chatAgent.send(any(), any(), any(), any(), any()) } returns flowOf(
             toolCallEvent("call-1", "brightness_set"),
             confirmationEvent("confirm-1", "brightness_set"),
         )
@@ -174,7 +210,7 @@ class DefaultAssistantSessionCoordinatorTest {
     @Test
     fun `stale confirmation id cannot approve the current request`() = runTest {
         coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
-        coEvery { chatAgent.send(any(), any(), any(), any()) } returns flowOf(
+        coEvery { chatAgent.send(any(), any(), any(), any(), any()) } returns flowOf(
             confirmationEvent("confirm-current", "brightness_set"),
         )
         coEvery {
@@ -201,7 +237,7 @@ class DefaultAssistantSessionCoordinatorTest {
     @Test
     fun `confirmation is auto rejected after fifteen seconds`() = runTest {
         coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
-        coEvery { chatAgent.send(any(), any(), any(), any()) } returns flowOf(
+        coEvery { chatAgent.send(any(), any(), any(), any(), any()) } returns flowOf(
             confirmationEvent("confirm-1", "camera_open"),
         )
         coEvery {
@@ -220,10 +256,10 @@ class DefaultAssistantSessionCoordinatorTest {
     }
 
     @Test
-    fun `stop cancels the running task but hideOverlay keeps it`() = runTest {
+    fun `stop cancels the running task but hidePresentation keeps it`() = runTest {
         coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
         val gate = CompletableDeferred<Unit>()
-        coEvery { chatAgent.send(any(), any(), any(), any()) } returns flow {
+        coEvery { chatAgent.send(any(), any(), any(), any(), any()) } returns flow {
             emit(textEvent("处理中"))
             gate.await()
         }
@@ -232,15 +268,52 @@ class DefaultAssistantSessionCoordinatorTest {
         advanceUntilIdle()
         assertTrue(coordinator.state.value.taskActive)
 
-        coordinator.hideOverlay()
+        coordinator.hidePresentation()
         advanceUntilIdle()
         assertTrue(coordinator.state.value.taskActive)
-        assertEquals(false, coordinator.state.value.overlayVisible)
+        assertEquals(false, coordinator.state.value.presentationVisible)
 
         coordinator.stop()
         submission.await()
         advanceUntilIdle()
         assertEquals(false, coordinator.state.value.taskActive)
+        assertEquals(AssistantSessionPhase.STOPPED, coordinator.state.value.phase)
+    }
+
+    @Test
+    fun `completed presentation hides after five seconds`() = runTest {
+        coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
+
+        coordinator.updatePresentation(
+            AssistantPresentationEvent.CaptureStarted(AssistantInvocationSource.BLUETOOTH_WAKE),
+        )
+        coordinator.updatePresentation(AssistantPresentationEvent.Completed)
+        runCurrent()
+        assertTrue(coordinator.state.value.presentationVisible)
+
+        advanceTimeBy(4_999)
+        runCurrent()
+        assertTrue(coordinator.state.value.presentationVisible)
+
+        advanceTimeBy(1)
+        runCurrent()
+        assertFalse(coordinator.state.value.presentationVisible)
+    }
+
+    @Test
+    fun `new capture cancels pending automatic hide`() = runTest {
+        coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
+
+        coordinator.updatePresentation(AssistantPresentationEvent.Completed)
+        advanceTimeBy(4_000)
+        coordinator.updatePresentation(
+            AssistantPresentationEvent.CaptureStarted(AssistantInvocationSource.BLUETOOTH_WAKE),
+        )
+        advanceTimeBy(2_000)
+        runCurrent()
+
+        assertTrue(coordinator.state.value.presentationVisible)
+        assertEquals(AssistantSessionPhase.LISTENING, coordinator.state.value.phase)
     }
 
     @Test
@@ -248,14 +321,14 @@ class DefaultAssistantSessionCoordinatorTest {
         coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
         every { modelCatalog.currentAssistantSelection() } returns null
         every { modelCatalog.currentServices() } returns emptyList()
-        coEvery { chatAgent.send(any(), any(), any(), any()) } returns flowOf()
+        coEvery { chatAgent.send(any(), any(), any(), any(), any()) } returns flowOf()
 
         assertEquals(AssistantConfigIssue.MISSING_AGENT_MODEL, coordinator.configurationIssue())
 
         coordinator.submit("你好", AssistantInvocationSource.BLUETOOTH_WAKE)
         advanceUntilIdle()
         assertEquals(AssistantSessionPhase.MISSING_CONFIG, coordinator.state.value.phase)
-        coVerify(exactly = 0) { chatAgent.send(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { chatAgent.send(any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -268,7 +341,7 @@ class DefaultAssistantSessionCoordinatorTest {
     @Test
     fun `agent failure surfaces error state`() = runTest {
         coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
-        coEvery { chatAgent.send(any(), any(), any(), any()) } returns flow {
+        coEvery { chatAgent.send(any(), any(), any(), any(), any()) } returns flow {
             throw IllegalStateException("network down")
         }
 
@@ -284,7 +357,7 @@ class DefaultAssistantSessionCoordinatorTest {
     @Test
     fun `quick tile source maps to system assistant lease`() = runTest {
         coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
-        coEvery { chatAgent.send(any(), any(), any(), any()) } returns flowOf(textEvent("好"))
+        coEvery { chatAgent.send(any(), any(), any(), any(), any()) } returns flowOf(textEvent("好"))
 
         coordinator.submit("你好", AssistantInvocationSource.BLUETOOTH_WAKE)
         advanceUntilIdle()
@@ -298,7 +371,7 @@ class DefaultAssistantSessionCoordinatorTest {
     @Test
     fun `bluetooth source maps to bluetooth voice lease`() = runTest {
         coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
-        coEvery { chatAgent.send(any(), any(), any(), any()) } returns flowOf(textEvent("好"))
+        coEvery { chatAgent.send(any(), any(), any(), any(), any()) } returns flowOf(textEvent("好"))
 
         coordinator.submit("你好", AssistantInvocationSource.BLUETOOTH_WAKE)
         advanceUntilIdle()
@@ -313,7 +386,7 @@ class DefaultAssistantSessionCoordinatorTest {
     fun `full access auto approves confirmation without waiting`() = runTest {
         coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
         toolApproval.setFullAccess(true)
-        coEvery { chatAgent.send(any(), any(), any(), any()) } returns flowOf(
+        coEvery { chatAgent.send(any(), any(), any(), any(), any()) } returns flowOf(
             confirmationEvent("confirm-1", "brightness_set"),
         )
         coEvery {
@@ -332,7 +405,7 @@ class DefaultAssistantSessionCoordinatorTest {
     fun `always allowed tool auto approves confirmation without waiting`() = runTest {
         coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
         toolApproval.setAlwaysAllowed("brightness_set")
-        coEvery { chatAgent.send(any(), any(), any(), any()) } returns flowOf(
+        coEvery { chatAgent.send(any(), any(), any(), any(), any()) } returns flowOf(
             confirmationEvent("confirm-1", "brightness_set"),
         )
         coEvery {
@@ -438,18 +511,10 @@ private class FakeToolApprovalRepository : ToolApprovalRepository {
         _fullAccess.value || toolName in _alwaysAllowedToolNames.value
 }
 
-private class FakeVoiceSessionStore : VoiceSessionStore {
-    private val _voiceSessionId = MutableStateFlow<String?>(null)
-    override val voiceSessionId = _voiceSessionId
-
-    override fun setVoiceSessionId(value: String?) {
-        _voiceSessionId.value = value
-    }
-}
-
 private class RecordingAgentRuntimeGate : AgentRuntimeGate {
     val acquisitions = mutableListOf<Pair<AgentTaskSource, String?>>()
     override val state = MutableStateFlow<AgentRuntimeState>(AgentRuntimeState.Idle)
+    var acquireException: Throwable? = null
 
     override suspend fun acquire(
         source: AgentTaskSource,
@@ -457,6 +522,7 @@ private class RecordingAgentRuntimeGate : AgentRuntimeGate {
         phase: github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase,
     ): AgentRunLease {
         acquisitions += source to sessionId
+        acquireException?.let { throw it }
         return object : AgentRunLease {
             override fun updatePhase(phase: github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase) = Unit
             override fun release() = Unit

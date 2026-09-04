@@ -106,6 +106,7 @@ sealed interface ChatNotice {
     data object ConfigureChatModel : ChatNotice
     data object ModelSwitchBlocked : ChatNotice
     data object ParallelTaskLimitReached : ChatNotice
+    data object CurrentConversationBusy : ChatNotice
     data object ActiveConversationDeleteBlocked : ChatNotice
 
     /** 一次发送混入了多种类型的附件。 */

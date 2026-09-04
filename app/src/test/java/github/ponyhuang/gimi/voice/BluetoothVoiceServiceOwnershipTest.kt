@@ -32,5 +32,13 @@ class BluetoothVoiceServiceOwnershipTest {
                 content.contains(forbiddenSymbol),
             )
         }
+        assertFalse(
+            "Voice notifications should open the current chat without a dedicated session extra",
+            content.contains("EXTRA_VOICE_SESSION_ID"),
+        )
+        assertTrue(
+            "Voice notifications should route directly to the current chat",
+            content.contains("setAction(MainActivity.ACTION_OPEN_CURRENT_CHAT)"),
+        )
     }
 }

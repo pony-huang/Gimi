@@ -10,13 +10,13 @@ class AssistantSessionStateTest {
         assertTrue(
             AssistantSessionState(
                 taskActive = true,
-                overlayVisible = false,
+                presentationVisible = false,
             ).hasActiveTask,
         )
         assertFalse(
             AssistantSessionState(
                 taskActive = false,
-                overlayVisible = true,
+                presentationVisible = true,
             ).hasActiveTask,
         )
     }

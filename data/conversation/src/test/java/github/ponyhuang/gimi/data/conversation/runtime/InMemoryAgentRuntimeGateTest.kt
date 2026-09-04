@@ -9,9 +9,37 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Assert.fail
 import org.junit.Test
 
 class InMemoryAgentRuntimeGateTest {
+    @Test
+    fun sameSessionCannotBeAcquiredTwice() = runTest {
+        val gate = InMemoryAgentRuntimeGate()
+        val first = gate.acquire(AgentTaskSource.CHAT, sessionId = "session-a")
+
+        try {
+            gate.acquire(AgentTaskSource.BLUETOOTH_VOICE, sessionId = "session-a")
+            fail("Expected the second acquisition for the same session to be rejected")
+        } catch (_: IllegalStateException) {
+            // Expected: one conversation may only have one active writer.
+        } finally {
+            first.release()
+        }
+    }
+
+    @Test
+    fun differentSessionsCanStillRunConcurrently() = runTest {
+        val gate = InMemoryAgentRuntimeGate()
+        val first = gate.acquire(AgentTaskSource.CHAT, sessionId = "session-a")
+        val second = gate.acquire(AgentTaskSource.BLUETOOTH_VOICE, sessionId = "session-b")
+
+        assertEquals(2, (gate.state.value as AgentRuntimeState.Busy).tasks.size)
+
+        first.release()
+        second.release()
+    }
+
     @Test
     fun activeTasksBlockMutationsUntilEveryLeaseIsReleased() = runTest {
         val gate = InMemoryAgentRuntimeGate()

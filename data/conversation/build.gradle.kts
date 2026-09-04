@@ -10,7 +10,9 @@ android {
 
 dependencies {
     implementation(project(":domain:conversation"))
+    implementation(project(":domain:mcp"))
     implementation(project(":domain:modelcatalog"))
+    implementation(project(":domain:toolauthorization"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.room.runtime)

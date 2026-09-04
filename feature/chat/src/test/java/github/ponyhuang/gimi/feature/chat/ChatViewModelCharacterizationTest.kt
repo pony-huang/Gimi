@@ -19,7 +19,10 @@ import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentReposi
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
+import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionSnapshot
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
+import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionBusyException
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
@@ -105,6 +108,20 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun sameSessionBusyRejectsChatSendWithoutLeavingRunningState() = runTest {
+        val gate = FakeAgentRuntimeGate().apply {
+            acquireException = AgentSessionBusyException("session-1")
+        }
+        val fixture = fixture(configured = true, agentRuntimeGate = gate)
+
+        fixture.viewModel.onAction(ChatAction.Send("你好"))
+        advanceUntilIdle()
+
+        assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
+        coVerify(exactly = 0) { fixture.agent.send(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
     fun wakeCommandCaptureForCurrentSessionShowsVoiceRecordingState() = runTest {
         val fixture = fixture(configured = true)
         fixture.viewModel.onAction(ChatAction.SwitchSession("session-1"))
@@ -112,7 +129,6 @@ class ChatViewModelCharacterizationTest {
 
         fixture.voiceWake.value = VoiceWakeState(
             status = VoiceWakeStatus.CapturingCommand,
-            voiceSessionId = "session-1",
         )
         advanceUntilIdle()
 
@@ -224,14 +240,10 @@ class ChatViewModelCharacterizationTest {
         coVerify {
             fixture.conversations.createConversation(
                 any(),
-                any(),
+                true,
                 match { configuration ->
-                    configuration?.enabledLocalToolIds == setOf("compose_message") &&
-                        configuration.enabledMcpServerIds == setOf("enabled-mcp") &&
-                        configuration.enabledOfficialFunctionIds(
-                            "service",
-                            "web_search",
-                        ) == setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER)
+                    configuration.enabledLocalToolIds == setOf("compose_message") &&
+                        configuration.enabledMcpServerIds == setOf("enabled-mcp")
                 },
             )
         }
@@ -254,6 +266,7 @@ class ChatViewModelCharacterizationTest {
         coEvery {
             fixture.conversations.conversationToolConfiguration("session-1")
         } returnsMany listOf(beforeImport, afterImport)
+        coEvery { fixture.conversations.lastConversationId() } returns "session-1"
 
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
@@ -717,6 +730,7 @@ class ChatViewModelCharacterizationTest {
         sessionIds: List<String> = listOf("session-1"),
         officialCatalogOverride: OfficialToolFunctionCatalog? = null,
         memoryFailures: MutableSharedFlow<MemoryRuntimeFailure> = MutableSharedFlow(),
+        agentRuntimeGate: FakeAgentRuntimeGate = FakeAgentRuntimeGate(),
     ): Fixture {
         val selection = ModelSelection("service", "chat", "model")
         val services = if (configured) listOf(service()) else emptyList()
@@ -752,6 +766,52 @@ class ChatViewModelCharacterizationTest {
         val playback = mockk<SpeechPlaybackRepository>(relaxed = true) {
             every { state } returns MutableStateFlow(SpeechPlaybackState())
             every { errors } returns MutableSharedFlow()
+        }
+        val defaultTools = ConversationToolConfiguration(
+            enabledLocalToolIds = setOf("compose_message"),
+            enabledMcpServerIds = setOf("enabled-mcp"),
+            enabledOfficialFunctionIdsByService = mapOf(
+                "service" to mapOf(
+                    "web_search" to setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
+                ),
+            ),
+        )
+        val sessionResolver = object : ConversationSessionResolver {
+            override suspend fun resolveCurrentOrCreate(): ConversationSessionSnapshot {
+                val sessionId = conversations.lastConversationId()
+                    ?.takeIf(String::isNotBlank)
+                    ?: conversations.listConversations().firstOrNull()?.id
+                    ?: return createAndActivate()
+                return requireNotNull(activate(sessionId))
+            }
+
+            override suspend fun createAndActivate(): ConversationSessionSnapshot {
+                check(configured) { "No available assistant model." }
+                val sessionId = conversations.createConversation(
+                    ModelSelectionCodec.encode(selection),
+                    true,
+                    defaultTools,
+                )
+                return ConversationSessionSnapshot(sessionId, selection, defaultTools)
+            }
+
+            override suspend fun activate(sessionId: String): ConversationSessionSnapshot? {
+                if (sessionId.isBlank()) return null
+                check(configured) { "No available assistant model." }
+                if (conversations.loadMessages(sessionId) == null) return null
+                conversations.activateConversation(sessionId, ModelSelectionCodec.encode(selection))
+                return ConversationSessionSnapshot(
+                    sessionId,
+                    selection,
+                    conversations.conversationToolConfiguration(sessionId) ?: defaultTools,
+                )
+            }
+
+            override suspend fun resolveToolConfiguration(
+                sessionId: String,
+                modelSelection: ModelSelection,
+            ): ConversationToolConfiguration =
+                conversations.conversationToolConfiguration(sessionId) ?: defaultTools
         }
         val voiceWakeState = MutableStateFlow(VoiceWakeState())
         val voiceWake = mockk<VoiceWakeRepository>(relaxed = true) {
@@ -795,8 +855,9 @@ class ChatViewModelCharacterizationTest {
         return Fixture(
             viewModel = ChatViewModel(
                 runner = agent,
-                agentRuntimeGate = FakeAgentRuntimeGate(),
+                agentRuntimeGate = agentRuntimeGate,
                 repository = conversations,
+                sessionResolver = sessionResolver,
                 modelServices = catalog,
                 chatDisplayPreferences = display,
                 appearanceRepository = appearance,
@@ -816,6 +877,7 @@ class ChatViewModelCharacterizationTest {
                 },
             ),
             conversations = conversations,
+            sessionResolver = sessionResolver,
             agent = agent,
             display = display,
             appearance = appearance,
@@ -886,6 +948,7 @@ class ChatViewModelCharacterizationTest {
     private data class Fixture(
         val viewModel: ChatViewModel,
         val conversations: ConversationRepository,
+        val sessionResolver: ConversationSessionResolver,
         val agent: ChatAgentRepository,
         val display: ChatDisplayRepository,
         val appearance: AppearanceRepository,

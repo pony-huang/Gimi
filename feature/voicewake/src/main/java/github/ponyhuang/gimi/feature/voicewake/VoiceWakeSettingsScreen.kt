@@ -19,6 +19,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BluetoothAudio
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -78,6 +79,8 @@ fun VoiceWakeSettingsScreen(
     state: VoiceWakeSettingsUiState,
     onAction: (VoiceWakeSettingsAction) -> Unit,
     modifier: Modifier = Modifier,
+    overlayPermissionGranted: Boolean = false,
+    onOpenOverlaySettings: () -> Unit = {},
 ) {
     if (state.showUnsavedChangesDialog) {
         UnsavedKeywordDialog(onAction)
@@ -121,6 +124,24 @@ fun VoiceWakeSettingsScreen(
                         text = stringResource(R.string.voicewake_offline_setup_required),
                         tone = PreferenceBannerTone.Error,
                         modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            }
+
+            item {
+                PreferenceSectionTitle(text = stringResource(R.string.voicewake_section_display))
+                PreferenceGroupCard {
+                    PreferenceListItem(
+                        icon = Icons.Default.PictureInPictureAlt,
+                        title = stringResource(R.string.voicewake_overlay_permission_title),
+                        subtitle = stringResource(
+                            if (overlayPermissionGranted) {
+                                R.string.voicewake_overlay_permission_granted
+                            } else {
+                                R.string.voicewake_overlay_permission_missing
+                            },
+                        ),
+                        onClick = onOpenOverlaySettings,
                     )
                 }
             }

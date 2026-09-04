@@ -15,6 +15,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.milliseconds
+
+internal fun playbackDrainTimeoutMs(frameCount: Long, sampleRate: Int): Long {
+    val audioDurationMs = frameCount.coerceAtLeast(0L) * 1_000L / sampleRate
+    return maxOf(MIN_PLAYBACK_DRAIN_TIMEOUT_MS, audioDurationMs + PLAYBACK_DRAIN_MARGIN_MS)
+}
+
+internal fun speechPlaybackTimeoutMs(textLength: Int): Long =
+    (PLAYBACK_BASE_TIMEOUT_MS + textLength.coerceAtLeast(0).toLong() * PLAYBACK_TIMEOUT_PER_CHARACTER_MS)
+        .coerceIn(MIN_PLAYBACK_TIMEOUT_MS, MAX_PLAYBACK_TIMEOUT_MS)
 
 @Singleton
 class VoiceSpeechPlayer @Inject constructor(
@@ -66,21 +77,27 @@ class VoiceSpeechPlayer @Inject constructor(
             if (route is BluetoothAudioRoute && !track.setPreferredDevice(route.communication)) {
                 return@withContext false
             }
-            var frames = 0L
-            track.play()
-            synthesis.synthesize(text).collect { bytes ->
-                var offset = 0
-                while (offset < bytes.size) {
-                    val written = track.write(bytes, offset, bytes.size - offset, AudioTrack.WRITE_BLOCKING)
-                    check(written >= 0) {
-                        context.getString(R.string.bluetooth_voice_playback_failed, written)
+            // TTS 网络流或底层播放头都可能在路由切换后停止推进；到期后释放资源，
+            // 让上层退出 Speaking 并重新打开唤醒监听。
+            withTimeoutOrNull(speechPlaybackTimeoutMs(text.length).milliseconds) {
+                var frames = 0L
+                track.play()
+                synthesis.synthesize(text).collect { bytes ->
+                    var offset = 0
+                    while (offset < bytes.size) {
+                        val written = track.write(bytes, offset, bytes.size - offset, AudioTrack.WRITE_BLOCKING)
+                        check(written >= 0) {
+                            context.getString(R.string.bluetooth_voice_playback_failed, written)
+                        }
+                        offset += written
+                        frames += written / 2
                     }
-                    offset += written
-                    frames += written / 2
                 }
-            }
-            while (track.playbackHeadPosition.toLong() < frames) delay(20)
-            true
+                withTimeoutOrNull(playbackDrainTimeoutMs(frames, SAMPLE_RATE).milliseconds) {
+                    while (track.playbackHeadPosition.toLong() < frames) delay(PLAYBACK_POLL_INTERVAL_MS)
+                    true
+                } ?: false
+            } ?: false
         } finally {
             track.runCatching { stop() }
             track.release()
@@ -90,5 +107,13 @@ class VoiceSpeechPlayer @Inject constructor(
 
     private companion object {
         const val SAMPLE_RATE = 24_000
+        const val PLAYBACK_POLL_INTERVAL_MS = 20L
     }
 }
+
+private const val MIN_PLAYBACK_DRAIN_TIMEOUT_MS = 3_000L
+private const val PLAYBACK_DRAIN_MARGIN_MS = 2_000L
+private const val PLAYBACK_BASE_TIMEOUT_MS = 10_000L
+private const val PLAYBACK_TIMEOUT_PER_CHARACTER_MS = 500L
+private const val MIN_PLAYBACK_TIMEOUT_MS = 30_000L
+private const val MAX_PLAYBACK_TIMEOUT_MS = 300_000L

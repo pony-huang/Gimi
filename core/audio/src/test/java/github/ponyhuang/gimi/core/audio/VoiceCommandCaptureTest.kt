@@ -82,7 +82,7 @@ class VoiceCommandCaptureTest {
     }
 
     @Test
-    fun lowGainAudioIsTranscribedAtSpeechStartDeadline() {
+    fun lowGainBackgroundNoiseIsCancelledAtSpeechStartDeadline() {
         val capture = VoiceCommandCapture(preRoll = byteArrayOf(), startedAtMs = 0L)
         assertEquals(CaptureDecision.Continue, capture.append(pcmWithAmplitude(200), 100L))
 
@@ -91,7 +91,7 @@ class VoiceCommandCaptureTest {
             VoiceCommandCapture.SPEECH_START_TIMEOUT_MS,
         )
 
-        assertTrue(result is CaptureDecision.Complete)
+        assertEquals(CaptureDecision.Cancel, result)
     }
 
     private fun silentPcm(): ByteArray = ByteArray(3_200)

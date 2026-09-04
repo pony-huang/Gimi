@@ -1,9 +1,11 @@
 package github.ponyhuang.gimi.data.voicewake
 
+import android.Manifest
 import android.content.Context
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.SystemClock
+import androidx.annotation.RequiresPermission
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.core.audio.CaptureDecision
 import github.ponyhuang.gimi.core.audio.PcmPreRollBuffer
@@ -32,6 +34,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 可由 Android Service 投射到通知的语音运行时状态。
@@ -87,6 +90,7 @@ class VoiceAudioPipeline @Inject constructor(
     val events: SharedFlow<VoicePipelineEvent> = _events.asSharedFlow()
 
     /** 启动或重新启动完整语音运行时。 */
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun start() {
         ensureScope()
         recoveryJob?.cancel()
@@ -114,6 +118,7 @@ class VoiceAudioPipeline @Inject constructor(
     }
 
     /** 用户恢复监听。 */
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun resume() {
         pausedByUser = false
         if (!pausedByCall) launchRuntime { reconcileBluetoothRoute() }
@@ -128,10 +133,11 @@ class VoiceAudioPipeline @Inject constructor(
     }
 
     /** 通话结束后按用户暂停状态决定是否恢复。 */
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun resumeAfterCall() {
         if (!pausedByCall) return
         pausedByCall = false
-        if (!pausedByUser) launchRuntime { reconcileBluetoothRoute() }
+        if (!pausedByUser) launchRuntime{ reconcileBluetoothRoute() }
     }
 
     /** 停止运行时并释放本次 Service 生命周期持有的全部资源。 */
@@ -159,6 +165,7 @@ class VoiceAudioPipeline @Inject constructor(
     private fun launchRuntime(block: suspend CoroutineScope.() -> Unit): Job =
         ensureScope().launch(block = block)
 
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     private suspend fun reconcileBluetoothRoute() {
         if (pausedByUser || pausedByCall || processingJob?.isActive == true) return
         val available = runCatching {
@@ -187,6 +194,7 @@ class VoiceAudioPipeline @Inject constructor(
         }
     }
 
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     private suspend fun startListening(newRoute: VoiceAudioRoute) {
         stopAudioCapture(releaseRoute = false)
         val modelPath = controller.modelPath()
@@ -206,7 +214,7 @@ class VoiceAudioPipeline @Inject constructor(
         route = activeRoute
         val wakeDetector = cancellationAwareRunCatching {
             withContext(Dispatchers.IO) {
-                val model = withTimeout(ACQUIRE_MODEL_TIMEOUT_MS) { wakeModels.acquire(modelPath) }
+                val model = withTimeout(ACQUIRE_MODEL_TIMEOUT_MS.milliseconds) { wakeModels.acquire(modelPath) }
                 VoskWakeWordDetector(
                     model,
                     wakeWordGrammar(
@@ -236,6 +244,7 @@ class VoiceAudioPipeline @Inject constructor(
     }
 
     /** 在检测器与音频路由仍有效时，仅重新打开录音，避免每轮 ASR 后重建唤醒会话。 */
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     private suspend fun resumeListening(existingRoute: VoiceAudioRoute) {
         val wakeDetector = detector ?: run {
             startListening(existingRoute)
@@ -246,6 +255,7 @@ class VoiceAudioPipeline @Inject constructor(
         startRecorder(existingRoute, wakeDetector)
     }
 
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     private fun startRecorder(newRoute: VoiceAudioRoute, wakeDetector: VoskWakeWordDetector) {
         val pcmRecorder = BluetoothPcmRecorder()
         recorder = pcmRecorder
@@ -327,12 +337,12 @@ class VoiceAudioPipeline @Inject constructor(
         val tone = cueToneGenerator ?: return
         try {
             tone.startTone(ToneGenerator.TONE_PROP_BEEP, TONE_DURATION_MS)
-            delay(TONE_DELAY_MS)
+            delay(TONE_DELAY_MS.milliseconds)
         } catch (_: RuntimeException) {
             cueToneGenerator = null
         }
     }
-
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     private suspend fun processCommand(pcm16: ByteArray) {
         try {
             cancellationAwareRunCatching {
@@ -388,7 +398,7 @@ class VoiceAudioPipeline @Inject constructor(
                         error.message ?: context.getString(R.string.bluetooth_voice_status_task_failed),
                         lastCommand = controller.state.value.lastCommand,
                     )
-                    delay(ERROR_DISPLAY_DELAY_MS)
+                    delay(ERROR_DISPLAY_DELAY_MS.milliseconds)
                 }
             }
         } finally {
@@ -447,7 +457,7 @@ class VoiceAudioPipeline @Inject constructor(
             return false
         }
         val pcm16 = try {
-            withTimeoutOrNull(CONFIRMATION_TIMEOUT_MS) { audio.await() }
+            withTimeoutOrNull(CONFIRMATION_TIMEOUT_MS.milliseconds) { audio.await() }
         } finally {
             synchronized(audioLock) { if (recorder === confirmationRecorder) recorder = null }
             confirmationRecorder.release()

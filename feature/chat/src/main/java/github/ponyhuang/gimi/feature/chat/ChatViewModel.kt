@@ -101,6 +101,11 @@ class ChatViewModel @Inject constructor(
     /** 一次性 UI 反馈通道（Toast 等），由 Route 消费；见 [ChatEffect]。 */
     val effects = _effects.asSharedFlow()
 
+    /** 当前聊天页处于前台时，通知语音运行时忽略唤醒词。 */
+    fun setCurrentChatVisible(visible: Boolean) {
+        voiceWake.setCurrentChatVisible(visible)
+    }
+
     /**
      * 用户意图统一入口 — 所有"发后即忘"的用户操作都经这里分发，见 [ChatAction]。
      */
@@ -256,15 +261,6 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             speechPlaybackController.state.collect { playback ->
                 _uiState.update { it.copy(speechPlaybackState = playback) }
-            }
-        }
-        viewModelScope.launch {
-            voiceWake.state.collect { wakeState ->
-                _uiState.update {
-                    it.copy(
-                        voiceWakeStatus = wakeState.status,
-                    )
-                }
             }
         }
         viewModelScope.launch {

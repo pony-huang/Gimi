@@ -24,6 +24,9 @@ class BluetoothVoiceController @Inject constructor(
     private val preferences: BluetoothVoicePreferences,
     private val modelRepository: WakeModelRepository,
 ) : VoiceWakeRepository {
+    @Volatile
+    private var currentChatVisible = false
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val _state = MutableStateFlow(
         BluetoothVoiceUiState(
@@ -112,6 +115,12 @@ class BluetoothVoiceController @Inject constructor(
             throw error
         }
     }
+
+    override fun setCurrentChatVisible(visible: Boolean) {
+        currentChatVisible = visible
+    }
+
+    internal fun isCurrentChatVisible(): Boolean = currentChatVisible
 
     fun pauseOrResume() {
         val action = if (_state.value.status == BluetoothVoiceStatus.Paused) {

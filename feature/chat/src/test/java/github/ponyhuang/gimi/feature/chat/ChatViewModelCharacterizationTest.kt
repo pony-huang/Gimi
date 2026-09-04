@@ -52,6 +52,7 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import io.mockk.verifyOrder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -122,17 +123,31 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
-    fun wakeCommandCaptureForCurrentSessionShowsVoiceRecordingState() = runTest {
+    fun wakeCommandCaptureDoesNotReplaceCurrentChatComposer() = runTest {
         val fixture = fixture(configured = true)
         fixture.viewModel.onAction(ChatAction.SwitchSession("session-1"))
         advanceUntilIdle()
+        val stateBeforeWake = fixture.viewModel.uiState.value
 
         fixture.voiceWake.value = VoiceWakeState(
             status = VoiceWakeStatus.CapturingCommand,
         )
         advanceUntilIdle()
 
-        assertTrue(fixture.viewModel.uiState.value.isVoiceWakeCapturing)
+        assertEquals(stateBeforeWake, fixture.viewModel.uiState.value)
+    }
+
+    @Test
+    fun currentChatVisibilityIsForwardedToVoiceWakeRuntime() = runTest {
+        val fixture = fixture(configured = true)
+
+        fixture.viewModel.setCurrentChatVisible(true)
+        fixture.viewModel.setCurrentChatVisible(false)
+
+        verifyOrder {
+            fixture.voiceWakeRepository.setCurrentChatVisible(true)
+            fixture.voiceWakeRepository.setCurrentChatVisible(false)
+        }
     }
 
     @Test
@@ -884,6 +899,7 @@ class ChatViewModelCharacterizationTest {
             toolApproval = toolApproval,
             mcpRepository = mcpRepository,
             voiceWake = voiceWakeState,
+            voiceWakeRepository = voiceWake,
         )
     }
 
@@ -955,6 +971,7 @@ class ChatViewModelCharacterizationTest {
         val toolApproval: FakeToolApprovalRepository,
         val mcpRepository: McpRepository,
         val voiceWake: MutableStateFlow<VoiceWakeState>,
+        val voiceWakeRepository: VoiceWakeRepository,
     )
 }
 

@@ -20,6 +20,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.core.content.FileProvider
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.LocalFileReference
 import kotlinx.coroutines.launch
@@ -70,6 +71,11 @@ fun ChatRoute(
     val chatNoticeMemoryWriteFailed = stringResource(R.string.chat_notice_memory_write_failed)
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+
+    LifecycleResumeEffect(viewModel) {
+        viewModel.setCurrentChatVisible(true)
+        onPauseOrDispose { viewModel.setCurrentChatVisible(false) }
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.onAction(ChatAction.RefreshConversations)

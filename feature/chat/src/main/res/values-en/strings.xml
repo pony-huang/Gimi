@@ -94,7 +94,6 @@
     <string name="chat_voice_finish_recording">Stop and transcribe</string>
     <string name="chat_voice_transcribing">Transcribing…</string>
     <string name="chat_voice_recording_remaining">Recording, %1$d seconds remaining</string>
-    <string name="chat_voice_wake_capturing">Listening for a voice command</string>
     <string name="chat_voice_waveform">Live voice waveform</string>
 
     <string name="chat_stt_configure_default_first">Please configure the default voice model in Settings first</string>

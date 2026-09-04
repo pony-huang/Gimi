@@ -285,7 +285,6 @@ fun ChatScaffold(
                     },
                     onStopClick = onStop,
                     isGenerating = isAgentRunning,
-                    isVoiceWakeCapturing = state.isVoiceWakeCapturing,
                     isVoiceInputAvailable = isSpeechRecognitionAvailable,
                     onTranscribeVoice = onTranscribeVoice,
                     addToChatState = ChatAddToChatState(

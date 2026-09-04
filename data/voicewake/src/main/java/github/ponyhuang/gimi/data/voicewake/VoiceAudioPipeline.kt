@@ -298,8 +298,12 @@ class VoiceAudioPipeline @Inject constructor(
                 }
                 return
             }
-            if (controller.state.value.status != BluetoothVoiceStatus.Listening ||
-                now - lastWakeAtMs < WAKE_COOLDOWN_MS
+            if (
+                !WakeTriggerPolicy.canTrigger(
+                    status = controller.state.value.status,
+                    currentChatVisible = controller.isCurrentChatVisible(),
+                    cooldownElapsed = now - lastWakeAtMs >= WAKE_COOLDOWN_MS,
+                )
             ) return
             val detected = runCatching { detector?.accept(chunk) == true }.getOrElse { error ->
                 launchRuntime { recoverFromAudioError(error) }

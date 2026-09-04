@@ -22,6 +22,9 @@ interface VoiceWakeRepository {
 
     fun stop()
 
+    /** 标记当前聊天页是否在前台可交互；可见时不响应唤醒词。 */
+    fun setCurrentChatVisible(visible: Boolean)
+
     /** 保存当前模型的唤醒词；校验失败时返回类型化错误。 */
     fun setWakeWord(modelId: String, wakeWord: String): Result<Unit>
 }

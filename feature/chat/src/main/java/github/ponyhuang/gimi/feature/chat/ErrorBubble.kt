@@ -10,19 +10,20 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.Messages
+import github.ponyhuang.gimi.ui.chatcontent.ChatMessageBubble
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /**
  * 错误气泡 — 用 `errorContainer` 红色色块展示 `Message.error`。
  *
- * 通过 [ChatBubble] 的 content slot 复用其对齐 / 圆角包装，但用自定义 Surface 覆盖配色。
+ * 通过 [ChatMessageBubble] 的 content slot 复用其对齐 / 圆角包装，但用自定义 Surface 覆盖配色。
  */
 @Composable
 fun ErrorBubble(
     message: Message,
     modifier: Modifier = Modifier,
 ) {
-    ChatBubble(role = message.role, modifier = modifier) {
+    ChatMessageBubble(role = message.role.toChatBubbleRole(), modifier = modifier) {
         Surface(
             color = MaterialTheme.colorScheme.errorContainer,
             contentColor = MaterialTheme.colorScheme.onErrorContainer,

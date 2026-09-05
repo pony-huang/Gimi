@@ -191,7 +191,7 @@ fun ChatScaffold(
         }
     }
 
-    // `TextContent` 从 channel 接收增量后只会改变气泡尺寸，不会改变 messages 引用。
+    // `ChatTextContent` 从 channel 接收增量后只会改变气泡尺寸，不会改变 messages 引用。
     // 监听可见项的布局边界，确保每次气泡增长到新行时都能把底部锚点带回视口。
     LaunchedEffect(listState, isAgentRunning) {
         snapshotFlow {

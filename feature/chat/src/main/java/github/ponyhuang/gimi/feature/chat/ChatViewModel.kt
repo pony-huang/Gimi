@@ -1175,7 +1175,7 @@ class ChatViewModel @Inject constructor(
      * 同步把仍在 `partial` 状态的 assistant message 翻成 `partial = false`：因为是用户主动
      * 中断,不会有 final non-partial event 到达来触发 [appendCompleteEvent] 的就地翻标志位;
      * 如果不在这里手动翻,那条 message 会一直停留在 `partial = true`,用户后续滚动离开再
-     * 滚回时,LazyColumn 重新 Composition 后 [TextContent] 会用 `partial = true && chunkChannel != null`
+     * 滚回时,LazyColumn 重新 Composition 后 [ChatTextContent] 会用 `partial = true && chunkChannel != null`
      * 落到 streaming 路径,但本地 `streamingState` 已被重置为空 → 气泡内容丢失。和流式自然
      * 完成的滚动回看场景是同一个 root cause family,这里一并兜底。
      *
@@ -1341,9 +1341,9 @@ class ChatViewModel @Inject constructor(
      * **就地翻标志位**(不要整体替换):原实现用 `buildMessageFromParts(event)` 返回的新 Message 整体
      * 替换 partial message,新 Message 的 `TextPart.id` 由 `finalEvent.id` 派生,与 partial 阶段累积
      * 用的 `TextPart.id` 不同,导致 `partChannelProvider(part.id)` 在收尾瞬间查不到 channel,
-     * `TextContent` 的 `partial` 分支条件不成立,会从 streaming 切到 static,触发整段 markdown
+     * `ChatTextContent` 的 `partial` 分支条件不成立,会从 streaming 切到 static,触发整段 markdown
      * 重 parse / 重布局 — 气泡闪一下。这里改为 `old.copy(partial = false, turnComplete = ...)`,
-     * 保留 `TextPart.id`,channel 订阅继续命中,TextContent 不切分支。
+     * 保留 `TextPart.id`,channel 订阅继续命中,ChatTextContent 不切分支。
      */
     private fun appendCompleteEvent(sessionId: String, event: ChatRunEvent) {
         val runtime = runtimeFor(sessionId)

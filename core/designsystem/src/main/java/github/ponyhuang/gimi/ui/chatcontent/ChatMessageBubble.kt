@@ -1,8 +1,7 @@
-package github.ponyhuang.gimi.feature.chat
+package github.ponyhuang.gimi.ui.chatcontent
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,28 +13,29 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.ui.theme.LocalUserBubbleColors
 
-
 /**
- * 聊天气泡包装器。
+ * 聊天气泡包装器（业务无关共享组件）。
  *
  * 统一消息气泡的外观：自动根据 [role] 处理对齐方向、背景色、圆角形状
  * 以及内容前景色。内部内容（文本、图片、富文本等）只需关心自身排版，
  * 无需重复处理气泡壳样式。
+ *
+ * 当前消费方：`:feature:chat`（聊天页消息）与 `:feature:assistant`（语音助手面板），
+ * 两侧借此保证消息视觉完全一致。
  *
  * @param role      消息角色，决定左右对齐和配色
  * @param modifier  修饰符（气泡整体容器的 Modifier）
  * @param content   气泡内部内容，可以是任意 Composable
  */
 @Composable
-internal fun ChatBubble(
-    role: MessageRole,
+fun ChatMessageBubble(
+    role: ChatBubbleRole,
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
-    val isUser = role == MessageRole.User
+    val isUser = role == ChatBubbleRole.USER
     val userBubbleColors = LocalUserBubbleColors.current
 
     Row(

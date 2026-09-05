@@ -19,7 +19,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,60 +42,29 @@ import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState
 import github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackStatus
+import github.ponyhuang.gimi.ui.chatcontent.ChatBubbleRole
+import github.ponyhuang.gimi.ui.chatcontent.ChatMessageBubble
+import github.ponyhuang.gimi.ui.chatcontent.ChatTextContent
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 
-/**
- * 聊天气泡文本 —— [ChatBubble] 的便捷包装，内部使用 [TextContent] 渲染，
- * 自动支持 **粗体**、*斜体*、`行内代码`、代码块、标题、列表等 Markdown 语法。
- *
- * ## 流式渲染
- *
- * `partial = true` 且 `chunkChannel != null` 时走 [TextContent] 的增量解析路径，
- * 与 [MessageBubble] / [ThoughtBubble] 的流式行为一致 —— partial 阶段每来一段增量
- * 不会触发整段重解析。
- *
- * 旧调用点 `ChatBubbleText(text, role, modifier)` 保持完全兼容（默认 `partial = false` /
- * `chunkChannel = null`，走静态路径）。
- *
- * @param text         消息文本（Markdown）
- * @param role         消息角色
- * @param chunkChannel reducer 暴露的文本增量 channel；流式场景由调用方注入
- * @param partial      是否处于流式 partial 阶段
- * @param modifier     修饰符
- */
-@Composable
-fun ChatBubbleText(
-    text: String,
-    role: MessageRole,
-    chunkChannel: ReceiveChannel<String>? = null,
-    partial: Boolean = false,
-    modifier: Modifier = Modifier,
-) {
-    ChatBubble(role = role, modifier = modifier) {
-        CompositionLocalProvider {
-            TextContent(
-                text = text,
-                partial = partial,
-                chunkChannel = chunkChannel,
-                modifier = if (role == MessageRole.User) modifier else modifier.fillMaxWidth(),
-                fillAvailableWidth = role != MessageRole.User,
-            )
-        }
-    }
+/** 把会话消息角色映射为共享气泡组件的角色（[ChatMessageBubble] 与业务模型解耦）。 */
+internal fun MessageRole.toChatBubbleRole(): ChatBubbleRole = when (this) {
+    MessageRole.User -> ChatBubbleRole.USER
+    MessageRole.Assistant -> ChatBubbleRole.ASSISTANT
 }
 
 
 /**
- * 消息气泡 — 把 [Message] 渲染到 [ChatBubble] 的 content slot 里。
+ * 消息气泡 — 把 [Message] 渲染到 [ChatMessageBubble] 的 content slot 里。
  *
  * 渲染顺序：
  * 1. 工具活动 chip 行（call/response 按 id 配对为单 chip，确认协议信令已过滤）
  * 2. 每个 [TextPart]：
  *    - `thought == true` → 走 [ThoughtBubble]（同样支持流式渲染）
- *    - 否则 → 流式 Markdown（经由 [TextContent] 收口）
+ *    - 否则 → 流式 Markdown（经由 [ChatTextContent] 收口）
  *
  * @param partChannelProvider reducer 暴露的"按 TextPart.id 取 chunk channel"函数。
  *        Composable 拿到 channel 后用 `for (chunk in channel) streamingState.append(chunk)`
@@ -120,7 +88,7 @@ fun MessageBubble(
 ) {
     val role = message.role
     val fillsBubbleWidth = role != MessageRole.User
-    ChatBubble(role = role, modifier = modifier) {
+    ChatMessageBubble(role = role.toChatBubbleRole(), modifier = modifier) {
         Column(modifier = if (fillsBubbleWidth) Modifier.fillMaxWidth() else Modifier) {
             // 工具活动 chip 行：call/response 按 id 配对成单个状态 chip（见 ToolCallChip），
             // 确认协议信令（adk_request_confirmation）在 visibleFunction* 里已过滤。
@@ -318,7 +286,7 @@ private fun ChipRow(
 /**
  * 流式渲染一段普通 markdown 文本。
  *
- * 薄壳 — 真正的 partial / static 双路径决策收口在 [TextContent] 里。
+ * 薄壳 — 真正的 partial / static 双路径决策收口在 [ChatTextContent] 里。
  *
  * - `partial = true` 且 `chunkChannel != null` → 增量解析路径（`StreamingMarkdownState`）
  * - 其它 → 静态路径（`Markdown(content = part.text)`）
@@ -333,7 +301,7 @@ private fun RenderTextPart(
     chunkChannel: ReceiveChannel<String>?,
     fillAvailableWidth: Boolean,
 ) {
-    TextContent(
+    ChatTextContent(
         text = part.text,
         partial = partial,
         chunkChannel = chunkChannel,

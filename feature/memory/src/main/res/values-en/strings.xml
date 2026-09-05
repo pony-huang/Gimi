@@ -18,10 +18,7 @@
     <string name="memory_history_title">Cloud memory history</string>
     <string name="memory_history_subtitle">View, delete, and rate current Mem0 memories</string>
     <string name="memory_history_screen_title">Cloud memory history</string>
-    <string name="memory_history_refresh">Refresh</string>
     <string name="memory_history_empty">No cloud memories yet</string>
-    <string name="memory_history_load_more">Load more</string>
-    <string name="memory_history_loading">Loading</string>
     <string name="memory_history_updated_at">Updated: %1$s</string>
     <string name="memory_history_positive_feedback">Helpful</string>
     <string name="memory_history_negative_feedback">Not helpful</string>

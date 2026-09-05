@@ -15,13 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material3.Button
@@ -30,7 +26,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
@@ -47,14 +41,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
-import github.ponyhuang.gimi.domain.mcp.model.McpImportError
-import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
-import github.ponyhuang.gimi.ui.preference.PreferenceNavigationCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
-import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 
 @Composable
 fun McpServerListScreen(
@@ -167,125 +157,6 @@ private fun McpEmptyState(
 }
 
 @Composable
-fun McpServerAddOptionsScreen(
-    onCreate: () -> Unit,
-    onImport: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    PreferencePageContainer(modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(vertical = 12.dp),
-        ) {
-            PreferenceSectionTitle(text = stringResource(R.string.mcp_section_add_methods))
-            PreferenceGroupCard {
-                PreferenceNavigationCard(
-                    icon = Icons.Default.Add,
-                    title = stringResource(R.string.mcp_method_new_title),
-                    subtitle = stringResource(R.string.mcp_method_new_subtitle),
-                    onClick = onCreate,
-                    showDivider = true,
-                )
-                PreferenceNavigationCard(
-                    icon = Icons.Default.ContentPaste,
-                    title = stringResource(R.string.mcp_method_import_title),
-                    subtitle = stringResource(R.string.mcp_method_import_subtitle),
-                    onClick = onImport,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun McpServerImportScreen(
-    state: McpSettingsUiState,
-    onAction: (McpSettingsAction) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val clipboard = LocalClipboardManager.current
-    PreferencePageContainer(modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            PreferenceSectionTitle(text = stringResource(R.string.mcp_section_import_mcp))
-            PreferenceGroupCard {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    OutlinedTextField(
-                        value = state.importJson,
-                        onValueChange = { onAction(McpSettingsAction.ImportJsonChanged(it)) },
-                        label = { Text(stringResource(R.string.mcp_field_json_label)) },
-                        placeholder = { Text(stringResource(R.string.mcp_field_json_placeholder)) },
-                        minLines = 10,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    state.importResult?.let { result ->
-                        val resultText = result.errorCode?.let { importErrorText(it) } ?: if (result.skipped > 0) {
-                            stringResource(
-                                R.string.mcp_import_result_with_skipped,
-                                result.created,
-                                result.updated,
-                                result.skipped,
-                            )
-                        } else {
-                            stringResource(
-                                R.string.mcp_import_result,
-                                result.created,
-                                result.updated,
-                            )
-                        }
-                        Text(resultText, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                clipboard.getText()?.text?.let {
-                                    onAction(McpSettingsAction.ImportJsonChanged(it))
-                                }
-                            },
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Icon(
-                                Icons.Default.ContentPaste,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp),
-                            )
-                            Text(
-                                stringResource(R.string.mcp_paste),
-                                modifier = Modifier.padding(start = 8.dp),
-                            )
-                        }
-                        Button(
-                            onClick = { onAction(McpSettingsAction.ImportServers) },
-                            enabled = state.importJson.isNotBlank() && !state.isMutationBlocked,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(stringResource(R.string.mcp_import_action))
-                        }
-                    }
-                    Text(
-                        stringResource(R.string.mcp_stdio_skip_notice),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun McpServerCard(
     server: McpServer,
     mutationEnabled: Boolean,
@@ -333,24 +204,6 @@ private fun McpServerCard(
             )
         }
     }
-}
-
-@Composable
-private fun importErrorText(error: McpImportError): String = stringResource(
-    when (error) {
-        McpImportError.CONTENT_TOO_LARGE -> R.string.mcp_import_error_content_too_large
-        McpImportError.INVALID_JSON -> R.string.mcp_import_error_invalid_json
-        McpImportError.MCP_SERVERS_NOT_OBJECT -> R.string.mcp_import_error_mcp_servers_not_object
-        McpImportError.INVALID_CURL -> R.string.mcp_import_error_invalid_curl
-        McpImportError.STORAGE_FAILURE -> R.string.mcp_import_error_storage_failure
-    },
-)
-
-@Composable
-internal fun localizeMcpError(error: String): String = when (error) {
-    "mcp.connection_error" -> stringResource(R.string.mcp_connection_error_default)
-    "mcp.save_error" -> stringResource(R.string.mcp_save_error_default)
-    else -> error
 }
 
 /** MCP 服务与其工具共用的两行列表外观；尾部操作仅用于服务卡片。 */
@@ -488,10 +341,4 @@ private fun CapabilitySection(
             overflow = TextOverflow.Ellipsis,
         )
     }
-}
-
-@Composable
-internal fun McpTransport.displayName(): String = when (this) {
-    McpTransport.SSE -> stringResource(R.string.mcp_transport_sse)
-    McpTransport.STREAMABLE_HTTP -> stringResource(R.string.mcp_transport_streamable_http)
 }

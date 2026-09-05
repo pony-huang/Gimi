@@ -535,3 +535,35 @@ private fun Context.openSettings() {
     }
     startActivity(intent)
 }
+
+/**
+ * 语音输入按钮空闲态的默认内容：麦克风图标按钮。
+ * 保留 testTag 供布局测试断言。
+ */
+@Composable
+internal fun DefaultIdleContent(onClick: () -> Unit, enabled: Boolean = true) {
+    val colorScheme = MaterialTheme.colorScheme
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .size(48.dp)
+            .testTag("chat_composer_microphone"),
+        colors = IconButtonDefaults.iconButtonColors(
+            containerColor = composerActionContainerColor(),
+            contentColor = composerActionIconColor(colorScheme, enabled = true),
+            disabledContainerColor = composerActionContainerColor(),
+            disabledContentColor = composerActionIconColor(colorScheme, enabled = false),
+        ),
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.stream_ai_compose_ic_mic),
+            contentDescription = if (enabled) {
+                stringResource(R.string.stream_ai_compose_speech_to_text_idle_button)
+            } else {
+                stringResource(R.string.chat_stt_configure_default_first)
+            },
+            tint = composerActionIconColor(colorScheme, enabled),
+        )
+    }
+}

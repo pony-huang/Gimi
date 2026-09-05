@@ -1,21 +1,16 @@
 package github.ponyhuang.gimi.feature.settings.update
 
-import android.content.Context
-import android.content.pm.PackageInfo
-import android.content.pm.PackageManager
-import android.net.Uri
 import app.cash.turbine.test
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.appupdate.model.AppUpdateInfo
 import github.ponyhuang.gimi.domain.appupdate.model.AppVersion
+import github.ponyhuang.gimi.domain.appupdate.repository.AppInstallEnvironment
 import github.ponyhuang.gimi.domain.appupdate.repository.AppUpdateRepository
 import github.ponyhuang.gimi.domain.appupdate.repository.AppUpdateState
 import github.ponyhuang.gimi.domain.appupdate.repository.UpdateCheckResult
 import github.ponyhuang.gimi.feature.settings.R
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,16 +39,14 @@ class UpdateViewModelTest {
         publishedAt = null,
     )
 
-    private fun fakeContext(canInstall: Boolean = false): Context {
-        val packageInfo = PackageInfo().apply { versionName = "0.1.1-alpha" }
-        val packageManager = mockk<PackageManager> {
-            every { getPackageInfo(any<String>(), any<Int>()) } returns packageInfo
-            every { canRequestPackageInstalls() } returns canInstall
-        }
-        return mockk {
-            every { this@mockk.packageManager } returns packageManager
-            every { packageName } returns "github.ponyhuang.gimi"
-        }
+    private fun fakeEnvironment(
+        canInstall: Boolean = false,
+        versionName: String? = "0.1.1-alpha",
+        apkContentUri: String? = "content://github.ponyhuang.gimi.fileprovider/updates/apk.apk",
+    ): AppInstallEnvironment = mockk {
+        every { canRequestPackageInstalls() } returns canInstall
+        every { currentVersionName() } returns versionName
+        every { apkContentUri(any()) } returns apkContentUri
     }
 
     @Test
@@ -63,7 +56,7 @@ class UpdateViewModelTest {
                 checkResult = UpdateCheckResult.UpdateAvailable(updateInfo),
                 resultState = AppUpdateState.Available(updateInfo, "0.1.1-alpha"),
             )
-            val viewModel = UpdateViewModel(fakeContext(), repository)
+            val viewModel = UpdateViewModel(repository, fakeEnvironment())
             backgroundScope.launch { viewModel.uiState.collect {} }
 
             viewModel.onAction(UpdateAction.CheckNow)
@@ -79,7 +72,7 @@ class UpdateViewModelTest {
             checkResult = UpdateCheckResult.UpToDate,
             resultState = AppUpdateState.Idle,
         )
-        val viewModel = UpdateViewModel(fakeContext(), repository)
+        val viewModel = UpdateViewModel(repository, fakeEnvironment())
 
         viewModel.effects.test {
             viewModel.onAction(UpdateAction.CheckNow)
@@ -101,7 +94,7 @@ class UpdateViewModelTest {
                 resultState = AppUpdateState.Available(updateInfo, "0.1.1-alpha"),
             )
             repository.mutableState.value = AppUpdateState.Available(updateInfo, "0.1.1-alpha")
-            val viewModel = UpdateViewModel(fakeContext(), repository)
+            val viewModel = UpdateViewModel(repository, fakeEnvironment())
             backgroundScope.launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
 
@@ -120,7 +113,7 @@ class UpdateViewModelTest {
                 resultState = AppUpdateState.Available(updateInfo, "0.1.1-alpha"),
             )
             repository.mutableState.value = AppUpdateState.Downloading(updateInfo, 0.37f)
-            val viewModel = UpdateViewModel(fakeContext(), repository)
+            val viewModel = UpdateViewModel(repository, fakeEnvironment())
             backgroundScope.launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
 
@@ -144,25 +137,44 @@ class UpdateViewModelTest {
                 apkPath = "/cache/updates/Gimi-v0.2.0-arm64-v8a.apk",
                 signatureMismatch = false,
             )
-            val viewModel = UpdateViewModel(fakeContext(canInstall = false), repository)
+            val viewModel = UpdateViewModel(repository, fakeEnvironment(canInstall = false))
             backgroundScope.launch { viewModel.uiState.collect {} }
             advanceUntilIdle()
 
-            // isReturnDefaultValues 下 Uri.parse 返回 null 会让 toUri() 抛 NPE，
-            // 这里用 mockk 静态拦截。
-            mockkStatic(Uri::class)
-            every { Uri.parse(any()) } returns mockk()
-            try {
-                viewModel.effects.test {
-                    viewModel.onAction(UpdateAction.ConfirmInstall)
-                    advanceUntilIdle()
-                    // 本地单测的 android.content.Intent 是空壳（isReturnDefaultValues），
-                    // 只能断言发出了启动意图，无法校验 action。
-                    assertTrue(awaitItem() is UpdateEffect.LaunchIntent)
-                    cancelAndIgnoreRemainingEvents()
-                }
-            } finally {
-                unmockkStatic(Uri::class)
+            viewModel.effects.test {
+                viewModel.onAction(UpdateAction.ConfirmInstall)
+                advanceUntilIdle()
+                assertEquals(UpdateEffect.OpenUnknownSourceSettings, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `confirmInstall emits apk content uri when permission granted`() =
+        runTest(mainDispatcherRule.dispatcher) {
+            val repository = FakeAppUpdateRepository(
+                checkResult = UpdateCheckResult.UpToDate,
+                resultState = AppUpdateState.Idle,
+            )
+            repository.mutableState.value = AppUpdateState.Downloaded(
+                updateInfo,
+                apkPath = "/cache/updates/Gimi-v0.2.0-arm64-v8a.apk",
+                signatureMismatch = false,
+            )
+            val viewModel = UpdateViewModel(repository, fakeEnvironment(canInstall = true))
+            backgroundScope.launch { viewModel.uiState.collect {} }
+            advanceUntilIdle()
+
+            viewModel.effects.test {
+                viewModel.onAction(UpdateAction.ConfirmInstall)
+                advanceUntilIdle()
+                assertEquals(
+                    UpdateEffect.InstallApk(
+                        "content://github.ponyhuang.gimi.fileprovider/updates/apk.apk",
+                    ),
+                    awaitItem(),
+                )
+                cancelAndIgnoreRemainingEvents()
             }
         }
 
@@ -173,7 +185,7 @@ class UpdateViewModelTest {
             resultState = AppUpdateState.Idle,
         )
         repository.mutableState.value = AppUpdateState.Available(updateInfo, "0.1.1-alpha")
-        val viewModel = UpdateViewModel(fakeContext(), repository)
+        val viewModel = UpdateViewModel(repository, fakeEnvironment())
 
         viewModel.onAction(UpdateAction.DismissDialog)
         advanceUntilIdle()

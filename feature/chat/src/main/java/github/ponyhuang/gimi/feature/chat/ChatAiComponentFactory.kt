@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
  *
  * Every slot has a default implementation, so you only override the ones you want to change.
  * Provide a custom factory through [LocalChatAiComponentFactory], usually with
- * [CompoundChatAiComponentFactory], to customize the components within a part of the
+ * [ChatAiComponentFactory], to customize the components within a part of the
  * composition. When no factory is provided, components fall back to
  * [DefaultChatAiComponentFactory], so they work without any setup.
  */
@@ -86,31 +86,15 @@ public interface ChatAiComponentFactory {
     }
 
     /**
-     * The idle content of [SpeechToTextButton], shown when not recording.
+     * 语音输入按钮空闲态内容，未录音时显示。
      *
-     * The default renders a microphone icon button.
+     * 默认渲染麦克风图标按钮。
      *
      * @param params The parameters for the idle content.
      */
     @Composable
     public fun SpeechToTextButtonIdleContent(params: SpeechToTextButtonIdleContentParams) {
         DefaultIdleContent(onClick = params.onClick, enabled = params.enabled)
-    }
-
-    /**
-     * The recording content of [SpeechToTextButton], shown while recording.
-     *
-     * The default renders animated bars that respond to the audio level.
-     *
-     * @param params The parameters for the recording content.
-     */
-    @Composable
-    public fun SpeechToTextButtonRecordingContent(params: SpeechToTextButtonRecordingContentParams) {
-        DefaultRecordingContent(
-            onClick = params.onClick,
-            rmsdB = params.rmsdB,
-            remainingSeconds = params.remainingSeconds,
-        )
     }
 }
 

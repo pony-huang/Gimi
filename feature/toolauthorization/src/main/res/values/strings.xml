@@ -3,14 +3,10 @@
     <string name="toolauth_screen_title">工具授权</string>
     <string name="toolauth_count_label">已启用 %1$d / %2$d</string>
     <string name="toolauth_customize_label">自定义工具</string>
-    <string name="toolauth_state_enabled">已开启</string>
-    <string name="toolauth_state_disabled">已关闭</string>
     <string name="toolauth_customize_description">开启后可选择允许助手使用的工具；关闭则全部可用</string>
     <string name="toolauth_configure_tools">配置工具</string>
     <string name="toolauth_configure_subtitle">选择要启用的工具</string>
-    <string name="toolauth_configure_disabled_subtitle">开启自定义后可配置</string>
     <string name="toolauth_configuration_title">工具配置</string>
-    <string name="toolauth_filter_label">过滤</string>
     <string name="toolauth_filter_content_description">过滤，当前：%1$s</string>
     <string name="toolauth_filter_all">全部</string>
     <string name="toolauth_filter_enabled">已启用</string>

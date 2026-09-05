@@ -7,7 +7,6 @@
     <string name="plugin_action_running">处理中…</string>
     <string name="plugin_added_notice">已发现新插件：%1$s</string>
     <string name="plugin_action_callback_title">授权</string>
-    <string name="plugin_action_callback_close">关闭</string>
     <string name="plugin_action_callback_unsupported">宿主不支持回调处理器：%1$s</string>
     <string name="plugin_config_no_fields">该插件无需配置。</string>
 </resources>

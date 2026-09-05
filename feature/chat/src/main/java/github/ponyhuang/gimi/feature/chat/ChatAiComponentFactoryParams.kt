@@ -110,15 +110,3 @@ public data class SpeechToTextButtonIdleContentParams(
     val onClick: () -> Unit,
     val enabled: Boolean = true,
 )
-
-/**
- * Parameters for [ChatAiComponentFactory.SpeechToTextButtonRecordingContent].
- *
- * @param onClick Called when the user taps the recording content to stop recording.
- * @param rmsdB The current audio level in decibels, for visualization.
- */
-public data class SpeechToTextButtonRecordingContentParams(
-    val onClick: () -> Unit,
-    val rmsdB: Float,
-    val remainingSeconds: Int = 60,
-)

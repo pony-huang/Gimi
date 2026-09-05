@@ -5,6 +5,8 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.gimi.data.appupdate.DefaultAppUpdateRepository
+import github.ponyhuang.gimi.data.appupdate.apk.DefaultAppInstallEnvironment
+import github.ponyhuang.gimi.domain.appupdate.repository.AppInstallEnvironment
 import github.ponyhuang.gimi.domain.appupdate.repository.AppUpdateRepository
 import javax.inject.Singleton
 
@@ -17,4 +19,10 @@ abstract class AppUpdateModule {
     abstract fun bindAppUpdateRepository(
         implementation: DefaultAppUpdateRepository,
     ): AppUpdateRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAppInstallEnvironment(
+        implementation: DefaultAppInstallEnvironment,
+    ): AppInstallEnvironment
 }

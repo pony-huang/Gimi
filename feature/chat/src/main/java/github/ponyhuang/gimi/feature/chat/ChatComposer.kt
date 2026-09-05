@@ -81,7 +81,7 @@ import kotlinx.coroutines.launch
  * - Stop button (shown during AI generating)
  *
  * The rendered components are resolved through [LocalChatAiComponentFactory], so each part can
- * be overridden without replacing the whole composer. See [CompoundChatAiComponentFactory].
+ * be overridden without replacing the whole composer. See [ChatAiComponentFactory].
  *
  * @param onSendClick Callback invoked when the send button is clicked with the composed message data.
  * @param onStopClick Callback invoked when the stop button is clicked (during AI generation).

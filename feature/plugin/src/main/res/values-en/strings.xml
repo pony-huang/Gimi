@@ -7,7 +7,6 @@
     <string name="plugin_action_running">Working…</string>
     <string name="plugin_added_notice">Discovered new plugins: %1$s</string>
     <string name="plugin_action_callback_title">Authorization</string>
-    <string name="plugin_action_callback_close">Close</string>
     <string name="plugin_action_callback_unsupported">Unsupported callback handler: %1$s</string>
     <string name="plugin_config_no_fields">This plugin has no configurable fields.</string>
 </resources>

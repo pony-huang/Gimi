@@ -11,6 +11,7 @@ import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmWebToolApi
 import github.ponyhuang.gimi.data.agent.tools.official.kimi.KimiFormulaCache
 import github.ponyhuang.gimi.data.agent.tools.official.kimi.KimiFormulaTool
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import javax.inject.Inject
@@ -87,63 +88,63 @@ class OfficialToolRegistry @Inject constructor(
     /** 全部官方工具声明;每行由对应厂商自行维护,toolId 厂商唯一。 */
     val all: List<OfficialToolSpec> = listOf(
         OfficialToolSpec(
-            toolId = "openai_web_search",
+            toolId = OfficialToolIds.OPENAI_WEB_SEARCH,
             serviceId = "openai",
             protocols = setOf(ApiProtocol.Standard),
             displayName = "OpenAI web search",
-            staticFunctionIds = listOf("openai_web_search"),
+            staticFunctionIds = listOf(OfficialToolIds.OPENAI_WEB_SEARCH),
             binding = OfficialToolBinding.ProviderDeclaration(wireName = "web_search"),
         ),
         OfficialToolSpec(
-            toolId = "anthropic_web_search",
+            toolId = OfficialToolIds.ANTHROPIC_WEB_SEARCH,
             serviceId = "anthropic",
             protocols = setOf(ApiProtocol.Anthropic),
             displayName = "Anthropic web search",
-            staticFunctionIds = listOf("anthropic_web_search"),
+            staticFunctionIds = listOf(OfficialToolIds.ANTHROPIC_WEB_SEARCH),
             binding = OfficialToolBinding.ProviderDeclaration(wireName = "web_search"),
         ),
         OfficialToolSpec(
-            toolId = "minimax_web_search",
+            toolId = OfficialToolIds.MINIMAX_WEB_SEARCH,
             serviceId = "minimax",
             protocols = setOf(ApiProtocol.Anthropic),
             displayName = "MiniMax web search",
-            staticFunctionIds = listOf("minimax_web_search"),
+            staticFunctionIds = listOf(OfficialToolIds.MINIMAX_WEB_SEARCH),
             binding = OfficialToolBinding.ProviderDeclaration(wireName = "web_search"),
         ),
         OfficialToolSpec(
-            toolId = "mimo_web_search",
+            toolId = OfficialToolIds.MIMO_WEB_SEARCH,
             serviceId = "mimo",
             protocols = setOf(ApiProtocol.Standard),
             displayName = "MiMo web search",
-            staticFunctionIds = listOf("mimo_web_search"),
+            staticFunctionIds = listOf(OfficialToolIds.MIMO_WEB_SEARCH),
             binding = OfficialToolBinding.ProviderDeclaration(wireName = "web_search"),
         ),
         OfficialToolSpec(
-            toolId = "gemini_web_search",
+            toolId = OfficialToolIds.GEMINI_WEB_SEARCH,
             serviceId = "gemini",
             protocols = setOf(ApiProtocol.Gemini),
             displayName = "Google Search",
-            staticFunctionIds = listOf("gemini_web_search"),
+            staticFunctionIds = listOf(OfficialToolIds.GEMINI_WEB_SEARCH),
             binding = OfficialToolBinding.AdkNative(create = ::GoogleSearchTool),
         ),
         OfficialToolSpec(
-            toolId = "gemini_url_context",
+            toolId = OfficialToolIds.GEMINI_URL_CONTEXT,
             serviceId = "gemini",
             protocols = setOf(ApiProtocol.Gemini),
             displayName = "URL context",
-            staticFunctionIds = listOf("gemini_url_context"),
+            staticFunctionIds = listOf(OfficialToolIds.GEMINI_URL_CONTEXT),
             binding = OfficialToolBinding.AdkNative(create = ::UrlContextTool),
         ),
         OfficialToolSpec(
-            toolId = "gemini_google_maps",
+            toolId = OfficialToolIds.GEMINI_GOOGLE_MAPS,
             serviceId = "gemini",
             protocols = setOf(ApiProtocol.Gemini),
             displayName = "Google Maps",
-            staticFunctionIds = listOf("gemini_google_maps"),
+            staticFunctionIds = listOf(OfficialToolIds.GEMINI_GOOGLE_MAPS),
             binding = OfficialToolBinding.AdkNative(create = ::GoogleMapsTool),
         ),
         OfficialToolSpec(
-            toolId = "glm_web_search",
+            toolId = OfficialToolIds.GLM_WEB_SEARCH,
             serviceId = "glm",
             protocols = setOf(ApiProtocol.Standard, ApiProtocol.Anthropic),
             modelFamilies = setOf("glm"),
@@ -162,7 +163,7 @@ class OfficialToolRegistry @Inject constructor(
             },
         ),
         OfficialToolSpec(
-            toolId = "kimi_formulas",
+            toolId = OfficialToolIds.KIMI_FORMULAS,
             serviceId = "kimi",
             protocols = setOf(ApiProtocol.Standard, ApiProtocol.Anthropic),
             modelFamilies = setOf("kimi", "moonshot"),

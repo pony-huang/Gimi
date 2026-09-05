@@ -47,7 +47,7 @@ import github.ponyhuang.gimi.ui.settings.llmmodel.LLMModelServiceIcon
  * - 点击 pill 后弹出 [`PickerSingleChoiceDialog`] 列出所有已启用服务下的模型；
  *   点击行即提交（不重置当前会话）。
  * - [ModelTitleAndPicker]：把上述两个组件 + 内部订阅模型服务状态 + 弹窗显示
- *                       状态打包成单棵子树，避免宿主屏幕（[MainScreenImpl]）顶层订阅全局
+ *                       状态打包成单棵子树，避免宿主屏幕（[ChatRoute]）顶层订阅全局
  *                       服务列表 / 当前选择后整段重组。
  */
 

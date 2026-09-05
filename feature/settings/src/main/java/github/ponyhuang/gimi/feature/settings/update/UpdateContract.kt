@@ -1,6 +1,5 @@
 package github.ponyhuang.gimi.feature.settings.update
 
-import android.content.Intent
 import androidx.annotation.StringRes
 import github.ponyhuang.gimi.domain.appupdate.repository.AppUpdateState
 
@@ -32,8 +31,14 @@ sealed interface UpdateAction {
 }
 
 sealed interface UpdateEffect {
-    /** 启动系统页面：未知来源授权 / 系统安装器 / 应用详情。 */
-    data class LaunchIntent(val intent: Intent) : UpdateEffect
+    /** 打开系统「允许安装未知来源应用」授权页。 */
+    data object OpenUnknownSourceSettings : UpdateEffect
+
+    /** 调起系统安装器安装已下载的 APK。[apkContentUri] 为 FileProvider content Uri。 */
+    data class InstallApk(val apkContentUri: String) : UpdateEffect
+
+    /** 打开系统应用详情页（签名不匹配时引导卸载）。 */
+    data object OpenAppDetails : UpdateEffect
 
     data class ShowToast(@param:StringRes val messageRes: Int) : UpdateEffect
 }

@@ -117,7 +117,6 @@ fun ChatRoute(
         conversations = uiState.conversations,
         currentSessionId = currentSessionId,
         conversationTaskStatuses = uiState.conversationTaskStatuses,
-        isConversationSwitchEnabled = true,
         onConversationClick = { conversation ->
             viewModel.onAction(ChatAction.SwitchSession(conversation.id))
             onReturnToChat()

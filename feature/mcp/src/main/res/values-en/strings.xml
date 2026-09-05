@@ -1,5 +1,4 @@
 <resources>
-    <string name="mcp_section_servers">MCP servers</string>
     <string name="mcp_empty_title">No MCP servers yet</string>
     <string name="mcp_empty_subtitle">Once you add a server, the assistant can use the tools it provides.</string>
     <string name="mcp_empty_action_new">New server</string>
@@ -42,7 +41,6 @@
     <string name="mcp_save">Save</string>
     <string name="mcp_save_success">MCP configuration saved</string>
     <string name="mcp_connection_testing">Verifying connection…</string>
-    <string name="mcp_capabilities_tools">Tools (%1$d)</string>
     <string name="mcp_capabilities_resources">Resources (%1$d)</string>
     <string name="mcp_capabilities_prompts">Prompts (%1$d)</string>
     <string name="mcp_capabilities_retry">Retry</string>

@@ -79,26 +79,13 @@ import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.gimi.ui.components.GimiBottomSheet
 import github.ponyhuang.gimi.ui.components.GimiBottomSheetHeader
 import github.ponyhuang.gimi.ui.components.GimiBottomSheetOptionRow
 import github.ponyhuang.gimi.ui.components.GimiBottomSheetSwitchRow
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
 
-// 官方工具目录 ID — 厂商唯一,不跨厂商复用;与 :data:agent OfficialToolRegistry 保持一致。
-private const val OPENAI_WEB_SEARCH_TOOL_ID: String = "openai_web_search"
-private const val ANTHROPIC_WEB_SEARCH_TOOL_ID: String = "anthropic_web_search"
-private const val MINIMAX_WEB_SEARCH_TOOL_ID: String = "minimax_web_search"
-private const val MIMO_WEB_SEARCH_TOOL_ID: String = "mimo_web_search"
-private const val GEMINI_WEB_SEARCH_TOOL_ID: String = "gemini_web_search"
-private const val GEMINI_URL_CONTEXT_TOOL_ID: String = "gemini_url_context"
-private const val GEMINI_GOOGLE_MAPS_TOOL_ID: String = "gemini_google_maps"
-private const val GLM_WEB_SEARCH_TOOL_ID: String = "glm_web_search"
-private const val KIMI_FORMULAS_TOOL_ID: String = "kimi_formulas"
-
-// GLM 在一个工具目录下展开两个本地执行函数,函数 ID 即厂商协议函数名(GlmWebSearchTool/GlmReaderTool.NAME)。
-private const val GLM_WEB_SEARCH_FUNCTION_ID: String = "web_search"
-private const val GLM_WEB_READER_FUNCTION_ID: String = "web_reader"
 private const val COMPACT_SHEET_ITEM_LIMIT: Int = 3
 
 private enum class AddToChatPage {
@@ -1033,34 +1020,34 @@ private fun reasoningEffortDescription(effort: ReasoningEffort): String = string
 
 @Composable
 private fun officialToolLabel(toolId: String): String = when (toolId) {
-    OPENAI_WEB_SEARCH_TOOL_ID,
-    ANTHROPIC_WEB_SEARCH_TOOL_ID,
-    MINIMAX_WEB_SEARCH_TOOL_ID,
-    MIMO_WEB_SEARCH_TOOL_ID,
-    GEMINI_WEB_SEARCH_TOOL_ID,
+    OfficialToolIds.OPENAI_WEB_SEARCH,
+    OfficialToolIds.ANTHROPIC_WEB_SEARCH,
+    OfficialToolIds.MINIMAX_WEB_SEARCH,
+    OfficialToolIds.MIMO_WEB_SEARCH,
+    OfficialToolIds.GEMINI_WEB_SEARCH,
     -> stringResource(R.string.chat_official_tool_web_search)
-    KIMI_FORMULAS_TOOL_ID -> stringResource(R.string.chat_official_tool_kimi_formulas)
-    GLM_WEB_SEARCH_TOOL_ID -> stringResource(R.string.chat_official_tool_glm_web_search)
-    GEMINI_URL_CONTEXT_TOOL_ID -> stringResource(R.string.chat_official_tool_url_context)
-    GEMINI_GOOGLE_MAPS_TOOL_ID -> stringResource(R.string.chat_official_tool_google_maps)
+    OfficialToolIds.KIMI_FORMULAS -> stringResource(R.string.chat_official_tool_kimi_formulas)
+    OfficialToolIds.GLM_WEB_SEARCH -> stringResource(R.string.chat_official_tool_glm_web_search)
+    OfficialToolIds.GEMINI_URL_CONTEXT -> stringResource(R.string.chat_official_tool_url_context)
+    OfficialToolIds.GEMINI_GOOGLE_MAPS -> stringResource(R.string.chat_official_tool_google_maps)
     else -> toolId
 }
 
 @Composable
 private fun officialToolDescription(toolId: String): String = when (toolId) {
-    OPENAI_WEB_SEARCH_TOOL_ID,
-    ANTHROPIC_WEB_SEARCH_TOOL_ID,
-    MINIMAX_WEB_SEARCH_TOOL_ID,
-    MIMO_WEB_SEARCH_TOOL_ID,
-    GEMINI_WEB_SEARCH_TOOL_ID,
+    OfficialToolIds.OPENAI_WEB_SEARCH,
+    OfficialToolIds.ANTHROPIC_WEB_SEARCH,
+    OfficialToolIds.MINIMAX_WEB_SEARCH,
+    OfficialToolIds.MIMO_WEB_SEARCH,
+    OfficialToolIds.GEMINI_WEB_SEARCH,
     -> stringResource(R.string.chat_official_tool_web_search_description)
-    KIMI_FORMULAS_TOOL_ID ->
+    OfficialToolIds.KIMI_FORMULAS ->
         stringResource(R.string.chat_official_tool_kimi_formulas_description)
-    GLM_WEB_SEARCH_TOOL_ID ->
+    OfficialToolIds.GLM_WEB_SEARCH ->
         stringResource(R.string.chat_official_tool_glm_web_search_description)
-    GEMINI_URL_CONTEXT_TOOL_ID ->
+    OfficialToolIds.GEMINI_URL_CONTEXT ->
         stringResource(R.string.chat_official_tool_url_context_description)
-    GEMINI_GOOGLE_MAPS_TOOL_ID ->
+    OfficialToolIds.GEMINI_GOOGLE_MAPS ->
         stringResource(R.string.chat_official_tool_google_maps_description)
     else -> stringResource(R.string.chat_official_tool_default_description)
 }
@@ -1073,9 +1060,9 @@ private fun officialToolDescription(toolId: String): String = when (toolId) {
 private fun officialFunctionLabel(toolId: String, functionId: String): String =
     when {
         functionId == toolId -> officialToolLabel(toolId)
-        functionId == GLM_WEB_SEARCH_FUNCTION_ID ->
+        functionId == OfficialToolIds.GLM_WEB_SEARCH_FUNCTION ->
             stringResource(R.string.chat_official_tool_web_search)
-        functionId == GLM_WEB_READER_FUNCTION_ID ->
+        functionId == OfficialToolIds.GLM_WEB_READER_FUNCTION ->
             stringResource(R.string.chat_official_tool_web_reader)
         else -> functionId
     }
@@ -1084,9 +1071,9 @@ private fun officialFunctionLabel(toolId: String, functionId: String): String =
 private fun officialFunctionDescription(toolId: String, functionId: String, fallback: String): String =
     when {
         functionId == toolId -> officialToolDescription(toolId)
-        functionId == GLM_WEB_SEARCH_FUNCTION_ID ->
+        functionId == OfficialToolIds.GLM_WEB_SEARCH_FUNCTION ->
             stringResource(R.string.chat_official_tool_web_search_description)
-        functionId == GLM_WEB_READER_FUNCTION_ID ->
+        functionId == OfficialToolIds.GLM_WEB_READER_FUNCTION ->
             stringResource(R.string.chat_official_tool_web_reader_description)
         else -> fallback
     }

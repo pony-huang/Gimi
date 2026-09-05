@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.feature.settings
 
 import android.content.Intent
+import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,6 +19,9 @@ import github.ponyhuang.gimi.feature.settings.update.UpdateViewModel
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 
 private const val PROJECT_URL = "https://github.com/pony-huang/Gimi"
+
+/** APK 安装包 MIME 类型，调起系统安装器时使用。 */
+private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
 
 @Composable
 fun SettingsRoute(
@@ -67,7 +71,26 @@ fun SettingsRoute(
         updateViewModel.onAction(UpdateAction.ScreenEntered)
         updateViewModel.effects.collect { effect ->
             when (effect) {
-                is UpdateEffect.LaunchIntent -> context.startActivity(effect.intent)
+                UpdateEffect.OpenAppDetails -> context.startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        "package:${context.packageName}".toUri(),
+                    ),
+                )
+
+                UpdateEffect.OpenUnknownSourceSettings -> context.startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        "package:${context.packageName}".toUri(),
+                    ),
+                )
+
+                is UpdateEffect.InstallApk -> context.startActivity(
+                    Intent(Intent.ACTION_VIEW)
+                        .setDataAndType(effect.apkContentUri.toUri(), APK_MIME_TYPE)
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
+                )
+
                 is UpdateEffect.ShowToast ->
                     Toast.makeText(context, effect.messageRes, Toast.LENGTH_SHORT).show()
             }

@@ -7,7 +7,6 @@
     <string name="mcp_edit_server">编辑 MCP 服务器</string>
 
     <!-- McpServerListScreen -->
-    <string name="mcp_section_servers">MCP 服务</string>
     <string name="mcp_empty_title">还没有 MCP 服务器</string>
     <string name="mcp_empty_subtitle">添加服务器后，助手就能使用它提供的工具。</string>
     <string name="mcp_empty_action_new">新建服务器</string>
@@ -51,7 +50,6 @@
     <string name="mcp_save">保存</string>
     <string name="mcp_save_success">MCP 配置已保存</string>
     <string name="mcp_connection_testing">正在验证连接…</string>
-    <string name="mcp_capabilities_tools">工具（%1$d）</string>
     <string name="mcp_capabilities_resources">资源（%1$d）</string>
     <string name="mcp_capabilities_prompts">提示词（%1$d）</string>
     <string name="mcp_capabilities_retry">重试</string>

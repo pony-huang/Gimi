@@ -27,12 +27,6 @@ internal fun deletePendingCameraAttachment(path: String?) {
     path?.let(::File)?.delete()
 }
 
-internal fun deleteCameraAttachment(context: Context, uri: Uri) {
-    if (uri.scheme != "content" || uri.authority != "${context.packageName}.fileprovider") return
-    val fileName = uri.lastPathSegment?.takeIf { it.isNotBlank() } ?: return
-    File(File(context.cacheDir, CAMERA_DIRECTORY), fileName).delete()
-}
-
 private const val CAMERA_DIRECTORY = "camera"
 private const val CAMERA_FILE_PREFIX = "attachment_"
 private const val CAMERA_FILE_SUFFIX = ".jpg"

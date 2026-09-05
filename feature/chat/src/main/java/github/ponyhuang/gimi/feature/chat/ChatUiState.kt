@@ -34,7 +34,7 @@ import github.ponyhuang.gimi.domain.mcp.model.McpServer
  * @param isInitializing 当前是否处于会话/历史初始化阶段 — 启动期
  *                     [ChatViewModel.restoreOrCreateSession] 或用户切换会话触发的
  *                     [ChatViewModel.switchSession] 在异步读 Room 期间为 true，
- *                     commit 完成或兜底分支结束置 false。驱动 [MainScreen] 中
+ *                     commit 完成或兜底分支结束置 false。驱动 [ChatRoute] 中
  *                     `AnimatedContent` 的中央 spinner —— 让用户在历史"灌入"前
  *                     看到一个加载态，避免旧内容残留闪烁。
  *
@@ -82,9 +82,6 @@ sealed interface ConversationTaskStatus {
 
 fun ChatUiState.getCurrentUserMessage(): Message? =
     messages.firstOrNull()?.takeIf { message -> message.role == MessageRole.User }
-
-fun ChatUiState.getCurrentAssistantMessage(): Message? =
-    messages.firstOrNull()?.takeIf { message -> message.role == MessageRole.Assistant }
 
 /**
  * A user-selectable official tool exposed by the active model service. The

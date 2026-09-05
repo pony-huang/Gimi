@@ -14,10 +14,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
-import androidx.compose.material.pullrefresh.pullRefresh
-import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ThumbDown
@@ -29,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -52,7 +49,6 @@ import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
 
 /** 展示 Mem0 当前云端记忆；展开单项后提供删除和反馈操作的无状态页面。 */
-@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun MemoryHistoryScreen(
     state: MemoryHistoryUiState,
@@ -61,10 +57,6 @@ fun MemoryHistoryScreen(
 ) {
     var negativeFeedbackMemory by remember { mutableStateOf<ManagedMemory?>(null) }
     val listState = rememberLazyListState()
-    val pullRefreshState = rememberPullRefreshState(
-        refreshing = state.refreshing,
-        onRefresh = { onAction(MemoryHistoryAction.Refresh) },
-    )
     LaunchedEffect(state.memories.size, state.hasNextPage, state.loadingNextPage) {
         snapshotFlow {
             listState.layoutInfo.visibleItemsInfo
@@ -84,7 +76,12 @@ fun MemoryHistoryScreen(
             .collect { onAction(MemoryHistoryAction.LoadNextPage) }
     }
     PreferencePageContainer(modifier = modifier) {
-        Box(modifier = Modifier.fillMaxSize().pullRefresh(pullRefreshState)) {
+        // 下拉刷新；isRefreshing 由 ViewModel 在 refresh() 期间置位。
+        PullToRefreshBox(
+            isRefreshing = state.refreshing,
+            onRefresh = { onAction(MemoryHistoryAction.Refresh) },
+            modifier = Modifier.fillMaxSize(),
+        ) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
@@ -124,13 +121,6 @@ fun MemoryHistoryScreen(
                     }
                 }
             }
-            PullRefreshIndicator(
-                refreshing = state.refreshing,
-                state = pullRefreshState,
-                modifier = Modifier.align(androidx.compose.ui.Alignment.TopCenter),
-                backgroundColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.primary,
-            )
         }
     }
     state.pendingDelete?.let { memory ->

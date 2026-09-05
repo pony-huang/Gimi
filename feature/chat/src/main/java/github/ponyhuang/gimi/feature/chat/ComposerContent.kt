@@ -79,8 +79,10 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun DefaultComposerLeadingContent(params: ComposerLeadingContentParams) {
     val colorScheme = MaterialTheme.colorScheme
+    // 会话工具配置未加载完时禁用附件入口，保证弹窗打开即持有可编辑配置。
+    val isEnabled = !params.isGenerating && params.configurationReady
     IconButton(
-        enabled = !params.isGenerating,
+        enabled = isEnabled,
         onClick = params.onAttachmentsClick,
         modifier = Modifier
             .size(48.dp)
@@ -95,7 +97,7 @@ internal fun DefaultComposerLeadingContent(params: ComposerLeadingContentParams)
         Icon(
             painter = painterResource(R.drawable.stream_ai_compose_ic_add),
             contentDescription = stringResource(R.string.stream_ai_compose_composer_add_attachments_button),
-            tint = composerActionIconColor(colorScheme, enabled = !params.isGenerating),
+            tint = composerActionIconColor(colorScheme, enabled = isEnabled),
         )
     }
 }
@@ -294,6 +296,7 @@ internal fun DefaultComposerInputContent(
                         ComposerLeadingContent(
                             ComposerLeadingContentParams(
                                 isGenerating = params.isGenerating,
+                                configurationReady = params.configurationReady,
                                 onAttachmentsClick = params.onAttachmentsClick,
                             ),
                         )

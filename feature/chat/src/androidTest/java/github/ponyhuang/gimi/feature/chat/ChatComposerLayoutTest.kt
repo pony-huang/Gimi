@@ -54,6 +54,27 @@ class ChatComposerLayoutTest {
     }
 
     @Test
+    fun addButtonIsDisabledUntilSessionConfigurationIsLoaded() {
+        // 会话工具配置未就绪时禁用附件入口，保证弹窗只能在配置加载完后打开。
+        setComposer(
+            addToChatState = ChatAddToChatState(configuration = null),
+        )
+
+        composeRule.onNodeWithTag("chat_composer_add").assertIsNotEnabled()
+    }
+
+    @Test
+    fun addButtonIsEnabledOnceSessionConfigurationIsLoaded() {
+        setComposer(
+            addToChatState = ChatAddToChatState(
+                configuration = ConversationToolConfiguration(),
+            ),
+        )
+
+        composeRule.onNodeWithTag("chat_composer_add").assertIsEnabled()
+    }
+
+    @Test
     fun focusedEmptyComposerExpandsAndShowsModelSelector() {
         setComposer()
 

@@ -403,6 +403,7 @@ public fun ChatComposer(
                             ComposerInputContentParams(
                                 messageData = messageData,
                                 isGenerating = isGenerating,
+                                configurationReady = addToChatState.configuration != null,
                                 voiceInputState = voiceInputState,
                                 isVoiceInputAvailable = isVoiceInputAvailable,
                                 voiceErrorMessage = voiceErrorMessage,

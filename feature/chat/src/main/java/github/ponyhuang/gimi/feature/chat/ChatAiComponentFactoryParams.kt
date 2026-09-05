@@ -8,10 +8,14 @@ import androidx.compose.ui.Modifier
  * Parameters for [ChatAiComponentFactory.ComposerLeadingContent].
  *
  * @param isGenerating Whether the AI is currently generating a response.
+ * @param configurationReady Whether the per-session tool configuration has been loaded.
+ *   While false the attachment entry stays disabled so the "add to chat" sheet cannot
+ *   be opened against unloaded configuration.
  * @param onAttachmentsClick Called when the user requests to add attachments.
  */
 public data class ComposerLeadingContentParams(
     val isGenerating: Boolean,
+    val configurationReady: Boolean = true,
     val onAttachmentsClick: () -> Unit,
 )
 
@@ -28,6 +32,8 @@ public data class ComposerLeadingContentParams(
  * @param onVoiceInputStart Called when the user starts voice input.
  * @param retainExpanded Whether an active child surface requires the composer to stay expanded.
  * @param onExpandedChange Called when the default input switches between compact and expanded layouts.
+ * @param configurationReady Whether the per-session tool configuration has been loaded;
+ *   forwarded to [ComposerLeadingContentParams].
  */
 public data class ComposerInputContentParams(
     val messageData: MessageData,
@@ -45,6 +51,7 @@ public data class ComposerInputContentParams(
     val onExpandedChange: (Boolean) -> Unit = { },
     val onAttachmentsClick: () -> Unit = { },
     val modelSelectorContent: @Composable () -> Unit = { },
+    val configurationReady: Boolean = true,
 )
 
 /** Immutable presentation state for the composer's voice-input session. */

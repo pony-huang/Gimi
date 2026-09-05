@@ -6,6 +6,7 @@ import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmWebSearchTool
 import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmWebSearchToolset
 import github.ponyhuang.gimi.data.agent.tools.official.kimi.KimiFormulaCache
 import github.ponyhuang.gimi.data.agent.tools.official.kimi.KimiFormulaToolset
+import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
@@ -24,7 +25,11 @@ import javax.inject.Singleton
 @Singleton
 class DefaultOfficialToolFunctionCatalog @Inject constructor(
     private val kimiFormulaCatalog: KimiFormulaCatalog,
+    private val registry: OfficialToolRegistry,
 ) : OfficialToolFunctionCatalog {
+
+    override suspend fun supportedToolIds(serviceId: String, protocol: ApiProtocol): Set<String> =
+        registry.supportedToolIds(serviceId, protocol)
 
     override suspend fun listFunctions(toolId: String): List<OfficialToolFunction> = when (toolId) {
         WEB_SEARCH_TOOL_ID -> listOf(

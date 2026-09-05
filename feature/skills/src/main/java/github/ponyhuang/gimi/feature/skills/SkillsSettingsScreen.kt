@@ -34,13 +34,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
+import github.ponyhuang.gimi.domain.skills.model.InstalledSkill
 import github.ponyhuang.gimi.feature.skills.R
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
 fun SkillsSettingsScreen(
@@ -246,6 +249,39 @@ fun SkillsSettingsScreen(
                     Text(stringResource(R.string.skills_cancel))
                 }
             },
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SkillsSettingsScreenEmptyPreview() {
+    AsssistantaiTheme {
+        SkillsSettingsScreen(
+            state = SkillsSettingsUiState(),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SkillsSettingsScreenWithSkillsPreview() {
+    AsssistantaiTheme {
+        SkillsSettingsScreen(
+            state = SkillsSettingsUiState(
+                skills = listOf(
+                    InstalledSkill(
+                        name = "网页摘要",
+                        description = "抓取指定网页内容并生成中文要点摘要，支持长文分段。",
+                    ),
+                    InstalledSkill(
+                        name = "代码评审",
+                        description = "按团队规范评审 diff，输出问题清单与修改建议。",
+                    ),
+                ),
+            ),
+            onAction = {},
         )
     }
 }

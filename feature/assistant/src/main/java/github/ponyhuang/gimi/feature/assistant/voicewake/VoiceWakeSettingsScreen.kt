@@ -57,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.speech.model.VoiceWakeState
 import github.ponyhuang.gimi.domain.speech.model.WakeKeywordError
@@ -73,6 +74,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
 fun VoiceWakeSettingsScreen(
@@ -544,3 +546,29 @@ private fun modelNameRes(modelId: String): Int = when (modelId) {
 private fun languageNameRes(model: WakeModelInfo): Int =
     if (model.languageTag.startsWith("en")) R.string.voicewake_language_en
     else R.string.voicewake_language_zh
+
+@Preview(showBackground = true)
+@Composable
+private fun VoiceWakeSettingsScreenPreview() {
+    AsssistantaiTheme {
+        VoiceWakeSettingsScreen(
+            state = VoiceWakeSettingsUiState(),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun VoiceWakeSettingsScreenRunningPreview() {
+    AsssistantaiTheme {
+        VoiceWakeSettingsScreen(
+            state = VoiceWakeSettingsUiState(
+                configurationReady = true,
+                hasUnsavedKeyword = true,
+            ),
+            onAction = {},
+            overlayPermissionGranted = true,
+        )
+    }
+}

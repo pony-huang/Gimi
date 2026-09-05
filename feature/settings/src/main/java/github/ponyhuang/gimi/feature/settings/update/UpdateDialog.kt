@@ -16,9 +16,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
+import github.ponyhuang.gimi.domain.appupdate.model.AppUpdateInfo
+import github.ponyhuang.gimi.domain.appupdate.model.AppVersion
 import github.ponyhuang.gimi.domain.appupdate.repository.AppUpdateState
 import github.ponyhuang.gimi.domain.appupdate.repository.UpdateFailure
 import github.ponyhuang.gimi.feature.settings.R
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /** 检查更新对话框：发现新版本 → 下载中 → 下载完成/失败。 */
 @Composable
@@ -186,4 +190,62 @@ private fun FailedDialog(
             }
         },
     )
+}
+
+private fun previewUpdateInfo(): AppUpdateInfo = AppUpdateInfo(
+    version = AppVersion(0, 3, 0, null),
+    tagName = "v0.3.0",
+    title = "Gimi v0.3.0",
+    changelog = "- 新增技能导入\n- 修复若干问题",
+    assets = emptyList(),
+    publishedAt = null,
+)
+
+@Preview(showBackground = true)
+@Composable
+private fun UpdateDialogAvailablePreview() {
+    AsssistantaiTheme {
+        UpdateDialog(
+            state = UpdateUiState(
+                status = AppUpdateState.Available(info = previewUpdateInfo(), currentVersion = "0.2.0"),
+                dialogVisible = true,
+                currentVersionName = "0.2.0",
+            ),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun UpdateDialogDownloadingPreview() {
+    AsssistantaiTheme {
+        UpdateDialog(
+            state = UpdateUiState(
+                status = AppUpdateState.Downloading(info = previewUpdateInfo(), progress = 0.42f),
+                dialogVisible = true,
+                currentVersionName = "0.2.0",
+            ),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun UpdateDialogDownloadedPreview() {
+    AsssistantaiTheme {
+        UpdateDialog(
+            state = UpdateUiState(
+                status = AppUpdateState.Downloaded(
+                    info = previewUpdateInfo(),
+                    apkPath = "/cache/gimi-v0.3.0.apk",
+                    signatureMismatch = false,
+                ),
+                dialogVisible = true,
+                currentVersionName = "0.2.0",
+            ),
+            onAction = {},
+        )
+    }
 }

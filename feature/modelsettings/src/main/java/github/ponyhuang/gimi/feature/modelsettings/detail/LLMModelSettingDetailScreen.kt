@@ -12,6 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
+import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.model.Model
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
@@ -124,4 +130,48 @@ private fun LLMModelSettingDetailAction.changesAgentConfiguration(): Boolean = w
     LLMModelSettingDetailAction.ConfirmAddLLMModel,
     LLMModelSettingDetailAction.RefreshModels -> true
     else -> false
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun LLMModelSettingDetailScreenPreview() {
+    AsssistantaiTheme {
+        val service = LLMModelSetting(
+            id = "openai",
+            name = "OpenAI",
+            isEnabled = true,
+            apiKey = "sk-test",
+            apiBaseUrl = "https://api.openai.com/v1",
+            apiProtocol = ApiProtocol.Standard,
+            anthropicBaseUrl = "https://api.anthropic.com",
+            groups = listOf(
+                ModelGroup(
+                    id = "gpt",
+                    name = "GPT",
+                    models = listOf(Model(id = "gpt-4o", name = "GPT-4o")),
+                ),
+            ),
+            homepageUrl = "https://openai.com",
+            keyHelpUrl = "https://help.openai.com",
+        )
+        LLMModelSettingDetailScreen(
+            state = LLMModelSettingDetailUiState(
+                isLoading = false,
+                service = service,
+                rows = listOf(
+                    LLMModelSettingDetailRow.GroupHeader(
+                        groupId = service.groups.first().id,
+                        groupName = service.groups.first().name,
+                        isExpanded = true,
+                    ),
+                    LLMModelSettingDetailRow.LLMModelItem(
+                        groupId = service.groups.first().id,
+                        model = service.groups.first().models.first(),
+                    ),
+                ),
+            ),
+            onAction = {},
+            onOpenUrl = { _, _ -> },
+        )
+    }
 }

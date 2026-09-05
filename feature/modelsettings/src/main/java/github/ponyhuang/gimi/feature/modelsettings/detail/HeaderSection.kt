@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.ui.settings.llmmodel.LLMModelServiceIcon
@@ -52,5 +54,28 @@ fun HeaderSection(
                 contentDescription = stringResource(R.string.modelsettings_open_homepage),
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun HeaderSectionPreview() {
+    AsssistantaiTheme {
+        HeaderSection(
+            service = LLMModelSetting(
+                id = "openai",
+                name = "OpenAI",
+                isEnabled = true,
+                apiKey = "sk-test",
+                apiBaseUrl = "https://api.openai.com/v1",
+                apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Standard,
+                anthropicBaseUrl = "https://api.anthropic.com",
+                groups = emptyList(),
+                homepageUrl = "https://openai.com",
+                keyHelpUrl = "https://help.openai.com",
+            ),
+            onToggleEnabled = {},
+            onOpenHomepage = {},
+        )
     }
 }

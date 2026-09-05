@@ -19,6 +19,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -26,7 +27,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
@@ -141,5 +144,37 @@ internal fun ToolAuthorizationEffects(effects: SharedFlow<ToolAuthorizationEffec
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ToolAuthorizationScreenCustomizationEnabledPreview() {
+    AsssistantaiTheme {
+        ToolAuthorizationScreen(
+            state = ToolAuthorizationUiState(
+                isCustomizationEnabled = true,
+                tools = listOf(
+                    ToolDescriptor(id = "web_search", name = "web_search", description = "搜索互联网。", isEnabled = true),
+                ),
+            ),
+            onAction = {},
+            onNavigateToConfiguration = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ToolAuthorizationScreenMutationBlockedPreview() {
+    AsssistantaiTheme {
+        ToolAuthorizationScreen(
+            state = ToolAuthorizationUiState(
+                isCustomizationEnabled = false,
+                isMutationBlocked = true,
+            ),
+            onAction = {},
+            onNavigateToConfiguration = {},
+        )
     }
 }

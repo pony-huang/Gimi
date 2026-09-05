@@ -16,7 +16,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import github.ponyhuang.gimi.core.designsystem.R
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /** Shared settings-page shell that preserves the existing app-bar and back behavior. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,6 +58,21 @@ fun PreferenceScaffold(
                 .padding(innerPadding),
         ) {
             content(Modifier.fillMaxSize())
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PreferenceScaffoldPreview() {
+    AsssistantaiTheme {
+        PreferenceScaffold(
+            title = "设置页标题",
+            onBack = {},
+        ) { modifier ->
+            PreferencePageContainer(modifier = modifier) {
+                PreferenceSectionTitle(text = "分组标题")
+            }
         }
     }
 }

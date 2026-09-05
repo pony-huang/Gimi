@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -36,6 +37,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
 fun PluginConfigRoute(
@@ -242,5 +244,54 @@ private fun PluginSelectField(
                 )
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PluginConfigScreenEmptyPreview() {
+    AsssistantaiTheme {
+        PluginConfigScreen(
+            state = PluginConfigUiState(pluginId = "zhihu"),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PluginConfigScreenWithFieldsPreview() {
+    AsssistantaiTheme {
+        PluginConfigScreen(
+            state = PluginConfigUiState(
+                pluginId = "zhihu",
+                fields = listOf(
+                    PluginConfigFieldUiState(
+                        key = "cookie",
+                        label = "Cookie",
+                        kind = PluginConfigFieldDescriptor.Kind.TEXT,
+                        secret = true,
+                        value = "z_c4f2",
+                    ),
+                    PluginConfigFieldUiState(
+                        key = "desktop_mode",
+                        label = "桌面版模式",
+                        kind = PluginConfigFieldDescriptor.Kind.TOGGLE,
+                        value = "true",
+                    ),
+                    PluginConfigFieldUiState(
+                        key = "quality",
+                        label = "画质",
+                        kind = PluginConfigFieldDescriptor.Kind.SELECT,
+                        options = listOf("自动", "高清", "标清"),
+                        value = "高清",
+                    ),
+                ),
+                actions = listOf(
+                    PluginActionUiState(id = "login", label = "授权登录"),
+                ),
+            ),
+            onAction = {},
+        )
     }
 }

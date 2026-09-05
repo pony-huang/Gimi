@@ -27,6 +27,7 @@ dependencies {
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.core)
+    implementation(libs.androidx.compose.ui.tooling.preview)
 
     testImplementation(project(":core:testing"))
     testImplementation(libs.junit)

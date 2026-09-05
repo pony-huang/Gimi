@@ -30,7 +30,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
@@ -38,6 +40,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.ui.components.PickerSingleChoiceDialog
 import github.ponyhuang.gimi.ui.settings.llmmodel.LLMModelServiceIcon
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /**
  * 聊天 TopAppBar 中央"当前模型显示与切换"组件。
@@ -308,3 +311,73 @@ private fun LLMModelSetting.isConfiguredForChat(): Boolean =
 private fun Model.isChatModel(): Boolean =
     !isStt && !isTts && !id.contains("tts", ignoreCase = true) &&
             !name.contains("tts", ignoreCase = true)
+
+private fun previewModelServices(): List<LLMModelSetting> = listOf(
+    LLMModelSetting(
+        id = "openai",
+        name = "OpenAI",
+        isEnabled = true,
+        apiKey = "sk-preview",
+        apiBaseUrl = "https://api.openai.com/v1",
+        apiProtocol = ApiProtocol.Standard,
+        anthropicBaseUrl = "https://api.anthropic.com",
+        groups = listOf(
+            ModelGroup(
+                id = "gpt",
+                name = "GPT",
+                models = listOf(
+                    Model(id = "gpt-4o", name = "GPT-4o"),
+                    Model(id = "gpt-4o-mini", name = "GPT-4o mini"),
+                ),
+            ),
+        ),
+    ),
+)
+
+@Preview(showBackground = true)
+@Composable
+private fun ModelStatusDisplayActivePreview() {
+    AsssistantaiTheme {
+        ModelStatusDisplay(
+            modelName = "GPT-4o",
+            serviceId = "openai",
+            emptyText = "未选择模型",
+            isLoading = false,
+            onClick = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ModelStatusDisplayEmptyPreview() {
+    AsssistantaiTheme {
+        ModelStatusDisplay(
+            modelName = null,
+            serviceId = null,
+            emptyText = "未选择模型",
+            isLoading = false,
+            onClick = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ModelTitleAndPickerPreview() {
+    AsssistantaiTheme {
+        ModelTitleAndPicker(
+            services = previewModelServices(),
+            currentSelection = ModelSelection(
+                serviceId = "openai",
+                groupId = "gpt",
+                modelId = "gpt-4o",
+            ),
+            loadState = CatalogLoadState.Ready,
+            isAgentRunning = false,
+            onConfigureModels = {},
+            onSelectModel = {},
+            onModelSwitchBlocked = {},
+        )
+    }
+}

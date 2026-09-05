@@ -7,8 +7,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
+import github.ponyhuang.gimi.domain.assistant.model.AssistantMessage
+import github.ponyhuang.gimi.domain.assistant.model.AssistantMessageAuthor
 import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionState
 import github.ponyhuang.gimi.domain.assistant.model.shouldShowConversation
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /** 助手界面在不同宿主中的承载方式。 */
 enum class AssistantSurfaceMode {
@@ -77,6 +81,37 @@ fun AssistantSurface(
             onInputFocusChange = onInputFocusChange,
             overlayIme = mode == AssistantSurfaceMode.OVERLAY,
             modifier = modifier,
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun AssistantSurfaceCapsulePreview() {
+    AsssistantaiTheme {
+        AssistantSurface(
+            state = AssistantSessionState(),
+            mode = AssistantSurfaceMode.SHEET,
+            onDismiss = {},
+            onOpenChat = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun AssistantSurfacePanelPreview() {
+    AsssistantaiTheme {
+        AssistantSurface(
+            state = AssistantSessionState(
+                messages = listOf(
+                    AssistantMessage(1, AssistantMessageAuthor.USER, "现在几点了？"),
+                    AssistantMessage(2, AssistantMessageAuthor.ASSISTANT, "现在是下午四点二十。"),
+                ),
+            ),
+            mode = AssistantSurfaceMode.SHEET,
+            onDismiss = {},
+            onOpenChat = {},
         )
     }
 }

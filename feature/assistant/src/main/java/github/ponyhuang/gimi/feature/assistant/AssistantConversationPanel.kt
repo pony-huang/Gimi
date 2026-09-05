@@ -44,6 +44,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.assistant.model.AssistantMessage
@@ -53,6 +54,7 @@ import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionState
 import github.ponyhuang.gimi.ui.chatcontent.ChatBubbleRole
 import github.ponyhuang.gimi.ui.chatcontent.ChatMessageBubble
 import github.ponyhuang.gimi.ui.chatcontent.ChatTextContent
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /**
  * 面板态：通栏底部面板（顶部大圆角 + 拖动手柄），消息列表与聊天页同一渲染组件，
@@ -326,5 +328,83 @@ private fun AssistantMessageRow(message: AssistantMessage) {
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun AssistantConversationPanelEmptyPreview() {
+    AsssistantaiTheme {
+        AssistantConversationPanel(
+            state = AssistantSessionState(),
+            onDismiss = {},
+            onOpenChat = {},
+            onMicToggle = {},
+            onTextSubmit = {},
+            recording = false,
+            audioLevel = 0f,
+            onInputFocusChange = {},
+            onCollapse = {},
+            overlayIme = false,
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun AssistantConversationPanelWithMessagesPreview() {
+    AsssistantaiTheme {
+        AssistantConversationPanel(
+            state = AssistantSessionState(
+                phase = AssistantSessionPhase.GENERATING,
+                messages = listOf(
+                    AssistantMessage(1, AssistantMessageAuthor.USER, "帮我看看今天的日程"),
+                    AssistantMessage(
+                        id = 2,
+                        author = AssistantMessageAuthor.ASSISTANT,
+                        text = "你今天下午三点有一个项目评审会议。",
+                        toolNames = listOf("calendar"),
+                    ),
+                ),
+            ),
+            onDismiss = {},
+            onOpenChat = {},
+            onMicToggle = {},
+            onTextSubmit = {},
+            recording = false,
+            audioLevel = 0f,
+            onInputFocusChange = {},
+            onCollapse = {},
+            overlayIme = false,
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun AssistantConversationPanelErrorPreview() {
+    AsssistantaiTheme {
+        AssistantConversationPanel(
+            state = AssistantSessionState(
+                messages = listOf(
+                    AssistantMessage(1, AssistantMessageAuthor.USER, "明天提醒我买菜"),
+                    AssistantMessage(
+                        id = 2,
+                        author = AssistantMessageAuthor.ASSISTANT,
+                        text = "任务执行失败，请稍后重试。",
+                        isError = true,
+                    ),
+                ),
+            ),
+            onDismiss = {},
+            onOpenChat = {},
+            onMicToggle = {},
+            onTextSubmit = {},
+            recording = false,
+            audioLevel = 0f,
+            onInputFocusChange = {},
+            onCollapse = {},
+            overlayIme = false,
+        )
     }
 }

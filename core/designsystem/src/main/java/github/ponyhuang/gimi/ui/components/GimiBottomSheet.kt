@@ -30,9 +30,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /**
  * 统一应用内的底部抽屉容器。
@@ -216,6 +218,85 @@ fun GimiBottomSheetSwitchRow(
             checked = checked,
             onCheckedChange = null,
             enabled = enabled,
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun GimiBottomSheetPreview() {
+    AsssistantaiTheme {
+        GimiBottomSheet(onDismissRequest = {}) {
+            GimiBottomSheetOptionRow(
+                selected = true,
+                enabled = true,
+                label = "选项一",
+                description = "已选中的选项描述",
+                onClick = {},
+            )
+            GimiBottomSheetOptionRow(
+                selected = false,
+                enabled = true,
+                label = "选项二",
+                description = "未选中的选项描述",
+                onClick = {},
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun GimiBottomSheetHeaderPreview() {
+    AsssistantaiTheme {
+        GimiBottomSheetHeader(
+            title = "抽屉标题",
+            navigationIcon = Icons.Default.Check,
+            navigationContentDescription = "返回",
+            onNavigationClick = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun GimiBottomSheetOptionRowSelectedPreview() {
+    AsssistantaiTheme {
+        GimiBottomSheetOptionRow(
+            selected = true,
+            enabled = true,
+            label = "选项一",
+            description = "已选中的选项描述",
+            onClick = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun GimiBottomSheetOptionRowUnselectedPreview() {
+    AsssistantaiTheme {
+        GimiBottomSheetOptionRow(
+            selected = false,
+            enabled = true,
+            label = "选项二",
+            description = "未选中的选项描述",
+            onClick = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun GimiBottomSheetSwitchRowPreview() {
+    AsssistantaiTheme {
+        GimiBottomSheetSwitchRow(
+            icon = Icons.Default.Check,
+            label = "开关选项",
+            description = "可独立启停的配置项",
+            checked = true,
+            enabled = true,
+            onCheckedChange = {},
         )
     }
 }

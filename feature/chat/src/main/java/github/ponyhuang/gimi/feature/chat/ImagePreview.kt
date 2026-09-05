@@ -36,9 +36,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import kotlin.math.max
 
 /** Current zoom and pan values for the full-screen image preview. */
@@ -204,3 +206,29 @@ private fun ZoomableImagePreviewFrame(
 
 private const val MinPreviewScale = 1f
 private const val MaxPreviewScale = 5f
+
+@Preview(showBackground = true)
+@Composable
+private fun ZoomableImagePreviewDialogPreview() {
+    AsssistantaiTheme {
+        ZoomableImagePreviewDialog(
+            imageKey = "preview-bitmap",
+            contentDescription = "预览图片",
+            loadBitmap = { Bitmap.createBitmap(320, 200, Bitmap.Config.ARGB_8888) },
+            onDismiss = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ZoomableCoilImagePreviewDialogPreview() {
+    AsssistantaiTheme {
+        ZoomableCoilImagePreviewDialog(
+            model = "https://example.com/sample-image.png",
+            imageKey = "https://example.com/sample-image.png",
+            contentDescription = "预览远程图片",
+            onDismiss = {},
+        )
+    }
+}

@@ -27,12 +27,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.permissions.model.AppPermission
 import github.ponyhuang.gimi.feature.permissions.R
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
 fun PermissionSettingsScreen(
@@ -200,4 +203,57 @@ private fun PermissionGroupStatus.label(): String = when (this) {
     PermissionGroupStatus.Granted -> stringResource(R.string.permissions_status_granted)
     PermissionGroupStatus.Denied -> stringResource(R.string.permissions_status_not_granted)
     PermissionGroupStatus.PartiallyGranted -> stringResource(R.string.permissions_status_partially_granted)
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PermissionSettingsScreenDeniedPreview() {
+    AsssistantaiTheme {
+        PermissionSettingsScreen(
+            state = PermissionSettingsUiState(
+                groups = listOf(
+                    PermissionGroupUiModel(
+                        kind = PermissionGroupKind.Microphone,
+                        titleRes = R.string.permission_name_microphone,
+                        subtitleRes = R.string.permission_desc_microphone,
+                        permissions = listOf(AppPermission.RecordAudio),
+                        status = PermissionGroupStatus.Denied,
+                    ),
+                    PermissionGroupUiModel(
+                        kind = PermissionGroupKind.Location,
+                        titleRes = R.string.permission_name_location,
+                        subtitleRes = R.string.permission_desc_location,
+                        permissions = listOf(AppPermission.CoarseLocation, AppPermission.FineLocation),
+                        status = PermissionGroupStatus.PartiallyGranted,
+                    ),
+                ),
+            ),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PermissionSettingsScreenGrantedPreview() {
+    AsssistantaiTheme {
+        PermissionSettingsScreen(
+            state = PermissionSettingsUiState(
+                groups = listOf(
+                    PermissionGroupUiModel(
+                        kind = PermissionGroupKind.Notifications,
+                        titleRes = R.string.permission_name_notifications,
+                        subtitleRes = R.string.permission_desc_notifications,
+                        permissions = listOf(AppPermission.PostNotifications),
+                        status = PermissionGroupStatus.Granted,
+                    ),
+                ),
+                allRuntimeGranted = true,
+                writeSettingsGranted = true,
+                notificationAccessGranted = true,
+                permanentlyDenied = setOf(AppPermission.RecordAudio),
+            ),
+            onAction = {},
+        )
+    }
 }

@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -17,6 +18,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /**
  * 单个工具的授权行（等宽字体名 + 描述 + 开关）。
@@ -70,5 +72,40 @@ fun ToolAuthorizationRow(
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ToolAuthorizationRowEnabledPreview() {
+    AsssistantaiTheme {
+        ToolAuthorizationRow(
+            tool = ToolDescriptor(
+                id = "web_search",
+                name = "web_search",
+                description = "搜索互联网并返回结果摘要。",
+                isEnabled = true,
+            ),
+            enabled = true,
+            onEnabledChange = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ToolAuthorizationRowDisabledPreview() {
+    AsssistantaiTheme {
+        ToolAuthorizationRow(
+            tool = ToolDescriptor(
+                id = "read_file",
+                name = "read_file",
+                description = "读取工作目录内指定路径的文本文件内容。",
+                isEnabled = false,
+            ),
+            enabled = false,
+            onEnabledChange = {},
+            showDivider = true,
+        )
     }
 }

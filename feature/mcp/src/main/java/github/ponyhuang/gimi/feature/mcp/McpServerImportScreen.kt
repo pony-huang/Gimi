@@ -21,11 +21,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.mcp.model.McpImportError
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
 fun McpServerImportScreen(
@@ -124,3 +126,27 @@ private fun importErrorText(error: McpImportError): String = stringResource(
         McpImportError.STORAGE_FAILURE -> R.string.mcp_import_error_storage_failure
     },
 )
+
+@Preview(showBackground = true)
+@Composable
+private fun McpServerImportScreenEmptyPreview() {
+    AsssistantaiTheme {
+        McpServerImportScreen(
+            state = McpSettingsUiState(),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun McpServerImportScreenWithJsonPreview() {
+    AsssistantaiTheme {
+        McpServerImportScreen(
+            state = McpSettingsUiState(
+                importJson = "{\"mcpServers\":{\"context7\":{\"url\":\"https://mcp.example.com/mcp\"}}}",
+            ),
+            onAction = {},
+        )
+    }
+}

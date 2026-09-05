@@ -35,6 +35,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
@@ -319,4 +321,77 @@ private fun AddModelDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.modelsettings_dialog_cancel)) }
         },
     )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun LLMModelManagementSectionPreview() {
+    AsssistantaiTheme {
+        val service = LLMModelSetting(
+            id = "openai",
+            name = "OpenAI",
+            isEnabled = true,
+            apiKey = "sk-test",
+            apiBaseUrl = "https://api.openai.com/v1",
+            apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Standard,
+            anthropicBaseUrl = "https://api.anthropic.com",
+            groups = listOf(
+                github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup(
+                    id = "gpt",
+                    name = "GPT",
+                    models = listOf(
+                        github.ponyhuang.gimi.domain.modelcatalog.model.Model(
+                            id = "gpt-4o",
+                            name = "GPT-4o",
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val model = service.groups.first().models.first()
+        LLMModelManagementSection(
+            service = service,
+            rows = listOf(
+                LLMModelSettingDetailRow.GroupHeader(
+                    groupId = service.groups.first().id,
+                    groupName = service.groups.first().name,
+                    isExpanded = true,
+                ),
+                LLMModelSettingDetailRow.LLMModelItem(
+                    groupId = service.groups.first().id,
+                    model = model,
+                ),
+            ),
+            isRefreshing = false,
+            isAddDialogVisible = false,
+            newModelId = "custom-model",
+            newModelKind = NewModelKind.Chat,
+            onAction = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun LLMModelManagementSectionAddDialogPreview() {
+    AsssistantaiTheme {
+        LLMModelManagementSection(
+            service = LLMModelSetting(
+                id = "openai",
+                name = "OpenAI",
+                isEnabled = true,
+                apiKey = "sk-test",
+                apiBaseUrl = "https://api.openai.com/v1",
+                apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Standard,
+                anthropicBaseUrl = "https://api.anthropic.com",
+                groups = emptyList(),
+            ),
+            rows = emptyList(),
+            isRefreshing = false,
+            isAddDialogVisible = true,
+            newModelId = "my-custom-model",
+            newModelKind = NewModelKind.Chat,
+            onAction = {},
+        )
+    }
 }

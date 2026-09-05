@@ -53,9 +53,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.assistant.model.AssistantConfigIssue
 import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionPhase
 import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionState
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import kotlinx.coroutines.delay
 
 /** 胶囊态：底部居中悬浮胶囊 + 可选的提示文案（配置缺失/会话忙/链路错误）。 */
@@ -345,5 +348,137 @@ private fun AssistantLevelBars(
                     .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun AssistantCapsuleOverlayIdlePreview() {
+    AsssistantaiTheme {
+        AssistantCapsuleOverlay(
+            state = AssistantSessionState(phase = AssistantSessionPhase.PREPARING),
+            onDismiss = {},
+            onMicToggle = {},
+            onTextSubmit = {},
+            recording = false,
+            audioLevel = 0f,
+            onInputFocusChange = {},
+            overlayIme = false,
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun AssistantCapsuleOverlayMissingConfigPreview() {
+    AsssistantaiTheme {
+        AssistantCapsuleOverlay(
+            state = AssistantSessionState(
+                phase = AssistantSessionPhase.MISSING_CONFIG,
+                configIssue = AssistantConfigIssue.MISSING_AGENT_MODEL,
+            ),
+            onDismiss = {},
+            onMicToggle = {},
+            onTextSubmit = {},
+            recording = false,
+            audioLevel = 0f,
+            onInputFocusChange = {},
+            overlayIme = false,
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun AssistantCapsuleBarIdlePreview() {
+    AsssistantaiTheme {
+        AssistantCapsuleBar(
+            listening = false,
+            transcribing = false,
+            recording = false,
+            audioLevel = 0f,
+            docked = false,
+            overlayIme = false,
+            onMicToggle = {},
+            onTextSubmit = {},
+            onInputFocusChange = {},
+            onDismiss = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun AssistantCapsuleBarListeningPreview() {
+    AsssistantaiTheme {
+        AssistantCapsuleBar(
+            listening = true,
+            transcribing = false,
+            recording = false,
+            audioLevel = 0f,
+            docked = false,
+            overlayIme = false,
+            onMicToggle = {},
+            onTextSubmit = {},
+            onInputFocusChange = {},
+            onDismiss = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun AssistantCapsuleBarRecordingPreview() {
+    AsssistantaiTheme {
+        AssistantCapsuleBar(
+            listening = false,
+            transcribing = false,
+            recording = true,
+            audioLevel = 0.6f,
+            docked = false,
+            overlayIme = false,
+            onMicToggle = {},
+            onTextSubmit = {},
+            onInputFocusChange = {},
+            onDismiss = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun AssistantCapsuleBarTranscribingPreview() {
+    AsssistantaiTheme {
+        AssistantCapsuleBar(
+            listening = false,
+            transcribing = true,
+            recording = false,
+            audioLevel = 0f,
+            docked = false,
+            overlayIme = false,
+            onMicToggle = {},
+            onTextSubmit = {},
+            onInputFocusChange = {},
+            onDismiss = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun AssistantCapsuleBarDockedPreview() {
+    AsssistantaiTheme {
+        AssistantCapsuleBar(
+            listening = false,
+            transcribing = false,
+            recording = false,
+            audioLevel = 0f,
+            docked = true,
+            overlayIme = false,
+            onMicToggle = {},
+            onTextSubmit = {},
+            onInputFocusChange = {},
+            onDismiss = null,
+        )
     }
 }

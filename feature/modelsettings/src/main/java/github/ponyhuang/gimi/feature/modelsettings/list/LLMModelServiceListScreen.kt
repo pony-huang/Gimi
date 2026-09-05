@@ -13,6 +13,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
+import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
@@ -75,5 +78,41 @@ fun LLMModelServiceListScreen(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun LLMModelServiceListScreenPreview() {
+    AsssistantaiTheme {
+        LLMModelServiceListScreen(
+            state = ModelServiceListUiState(
+                loadState = CatalogLoadState.Ready,
+                items = listOf(
+                    LLMModelSetting(
+                        id = "openai",
+                        name = "OpenAI",
+                        isEnabled = true,
+                        apiKey = "sk-test",
+                        apiBaseUrl = "https://api.openai.com/v1",
+                        apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Standard,
+                        anthropicBaseUrl = "https://api.anthropic.com",
+                        groups = emptyList(),
+                    ),
+                    LLMModelSetting(
+                        id = "deepseek",
+                        name = "DeepSeek",
+                        isEnabled = false,
+                        apiKey = "",
+                        apiBaseUrl = "https://api.deepseek.com/v1",
+                        apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Standard,
+                        anthropicBaseUrl = "https://api.anthropic.com",
+                        groups = emptyList(),
+                    ),
+                ),
+            ),
+            onAction = {},
+            onNavigateToDetail = {},
+        )
     }
 }

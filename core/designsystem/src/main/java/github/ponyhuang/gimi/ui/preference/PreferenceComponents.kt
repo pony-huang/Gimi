@@ -33,8 +33,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.ui.theme.PreferenceCanvasDark
 import github.ponyhuang.gimi.ui.theme.PreferenceCanvasLight
 import github.ponyhuang.gimi.ui.theme.PreferenceGroupCardDark
@@ -271,5 +273,118 @@ fun PreferenceBanner(
                 modifier = Modifier.padding(start = 10.dp),
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PreferencePageContainerPreview() {
+    AsssistantaiTheme {
+        PreferencePageContainer {
+            PreferenceSectionTitle(text = "分组标题")
+            PreferenceGroupCard {
+                PreferenceListItem(
+                    icon = Icons.Default.Info,
+                    title = "设置项",
+                    subtitle = "设置项副标题",
+                    onClick = {},
+                )
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PreferenceSectionTitlePreview() {
+    AsssistantaiTheme {
+        PreferenceSectionTitle(text = "分组标题")
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PreferenceGroupCardPreview() {
+    AsssistantaiTheme {
+        PreferenceGroupCard {
+            PreferenceListItem(
+                icon = Icons.Default.Info,
+                title = "设置项一",
+                onClick = {},
+                showDivider = true,
+            )
+            PreferenceListItem(
+                icon = Icons.Default.Warning,
+                title = "设置项二",
+                onClick = {},
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PreferenceListItemPreview() {
+    AsssistantaiTheme {
+        PreferenceListItem(
+            icon = Icons.Default.Info,
+            title = "设置项",
+            subtitle = "设置项副标题，最多两行展示",
+            onClick = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PreferenceListItemWithTrailingPreview() {
+    AsssistantaiTheme {
+        PreferenceListItem(
+            icon = Icons.Default.Info,
+            title = "带尾部内容的设置项",
+            showDivider = false,
+            trailingContent = {
+                Text(
+                    text = "尾部",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            },
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PreferenceNavigationCardPreview() {
+    AsssistantaiTheme {
+        PreferenceNavigationCard(
+            icon = Icons.Default.Info,
+            title = "导航入口",
+            subtitle = "进入子页面",
+            onClick = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PreferenceBannerInfoPreview() {
+    AsssistantaiTheme {
+        PreferenceBanner(
+            text = "信息提示文案",
+            tone = PreferenceBannerTone.Info,
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PreferenceBannerErrorPreview() {
+    AsssistantaiTheme {
+        PreferenceBanner(
+            text = "错误提示文案",
+            tone = PreferenceBannerTone.Error,
+        )
     }
 }

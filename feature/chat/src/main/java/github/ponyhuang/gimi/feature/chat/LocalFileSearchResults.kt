@@ -48,10 +48,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.conversation.model.LocalFileReference
 import github.ponyhuang.gimi.domain.conversation.model.LocalFileSearchResult
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -306,3 +308,62 @@ private fun LocalFileImagePreview(
 }
 
 private const val CarouselPreviewLimit = 10
+
+private val previewSearchFiles: List<LocalFileReference> = listOf(
+    LocalFileReference(
+        displayName = "IMG_20240101_093000.jpg",
+        mimeType = "image/jpeg",
+        sizeBytes = 2_621_440,
+        modifiedTimeMillis = 1_704_067_200_000,
+        category = "image",
+        contentUri = "content://media/external/images/1",
+    ),
+    LocalFileReference(
+        displayName = "产品需求文档.pdf",
+        mimeType = "application/pdf",
+        sizeBytes = 524_288,
+        modifiedTimeMillis = 1_704_067_200_000,
+        category = "document",
+        contentUri = "content://media/external/documents/2",
+    ),
+)
+
+private fun previewLocalFileSearchResult(): LocalFileSearchResult =
+    LocalFileSearchResult(query = "报表", files = previewSearchFiles)
+
+@Preview(showBackground = true)
+@Composable
+private fun LocalFileSearchCarouselPreview() {
+    AsssistantaiTheme {
+        LocalFileSearchCarousel(
+            responseId = "resp-1",
+            result = previewLocalFileSearchResult(),
+            onOpenFile = {},
+            onShowAll = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun LocalFileSearchResultsScreenFilledPreview() {
+    AsssistantaiTheme {
+        LocalFileSearchResultsScreen(
+            result = previewLocalFileSearchResult(),
+            onBack = {},
+            onOpenFile = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun LocalFileSearchResultsScreenEmptyPreview() {
+    AsssistantaiTheme {
+        LocalFileSearchResultsScreen(
+            result = null,
+            onBack = {},
+            onOpenFile = {},
+        )
+    }
+}

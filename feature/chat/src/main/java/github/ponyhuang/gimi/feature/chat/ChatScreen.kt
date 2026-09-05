@@ -77,6 +77,11 @@ import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
+import androidx.compose.ui.tooling.preview.Preview
+import github.ponyhuang.gimi.domain.conversation.model.Messages
+import github.ponyhuang.gimi.domain.conversation.model.TextPart
+import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -679,6 +684,117 @@ private fun MessageRow(
             onOpenLocalFile = onOpenLocalFile,
             onShowAllLocalFiles = onShowAllLocalFiles,
             modifier = modifier
+        )
+    }
+}
+
+private fun previewChatRecommendations(): List<AgentRecommendation> = listOf(
+    AgentRecommendation(
+        id = "rec-1",
+        prompt = "帮我总结这篇文档的核心要点",
+        category = RecommendationCategory.REASONING,
+    ),
+    AgentRecommendation(
+        id = "rec-2",
+        prompt = "分析这张截图里的报错信息",
+        category = RecommendationCategory.VISION,
+    ),
+    AgentRecommendation(
+        id = "rec-3",
+        prompt = "把会议记录整理成待办事项清单",
+        category = RecommendationCategory.PRODUCTIVITY,
+    ),
+)
+
+@Preview(showBackground = true)
+@Composable
+private fun ChatScaffoldEmptyPreview() {
+    AsssistantaiTheme {
+        ChatScaffold(
+            state = ChatUiState(sessionId = "preview-session"),
+            partChannelProvider = { null },
+            onSend = { _, _ -> true },
+            onStop = {},
+            onTranscribeVoice = { "" },
+            onToggleSpeechPlayback = { _, _ -> },
+            onToggleAutoSpeak = {},
+            onOpenDocument = {},
+            onOpenLocalFile = {},
+            onShowAllLocalFiles = {},
+            onToolConfirmation = {},
+            onToolConfirmationAlwaysAllow = {},
+            onFullAccessChange = {},
+            onSelectModel = {},
+            onModelSwitchBlocked = {},
+            onOpenDrawer = {},
+            onOpenSettings = {},
+            onConfigureModels = {},
+            onNewConversation = {},
+            onToolAccessModeChange = {},
+            onReasoningEffortChange = {},
+            onMcpServerEnabledChange = { _, _ -> },
+            onOfficialToolOpened = {},
+            onOfficialToolFunctionEnabledChange = { _, _, _ -> },
+            onOfficialToolFunctionsRetry = {},
+            recommendations = previewChatRecommendations(),
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ChatScaffoldWithMessagesPreview() {
+    AsssistantaiTheme {
+        ChatScaffold(
+            state = ChatUiState(
+                sessionId = "preview-session",
+                messages = listOf(
+                    Messages.fromUser("帮我查一下今天上海的天气"),
+                    Message(
+                        author = "DefaultAssistant",
+                        role = MessageRole.Assistant,
+                        textParts = listOf(TextPart(text = "上海今天晴，28°C，适合出门。")),
+                    ),
+                ),
+            ),
+            partChannelProvider = { null },
+            onSend = { _, _ -> true },
+            onStop = {},
+            onTranscribeVoice = { "" },
+            onToggleSpeechPlayback = { _, _ -> },
+            onToggleAutoSpeak = {},
+            onOpenDocument = {},
+            onOpenLocalFile = {},
+            onShowAllLocalFiles = {},
+            onToolConfirmation = {},
+            onToolConfirmationAlwaysAllow = {},
+            onFullAccessChange = {},
+            onSelectModel = {},
+            onModelSwitchBlocked = {},
+            onOpenDrawer = {},
+            onOpenSettings = {},
+            onConfigureModels = {},
+            onNewConversation = {},
+            onToolAccessModeChange = {},
+            onReasoningEffortChange = {},
+            onMcpServerEnabledChange = { _, _ -> },
+            onOfficialToolOpened = {},
+            onOfficialToolFunctionEnabledChange = { _, _, _ -> },
+            onOfficialToolFunctionsRetry = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ChatHeaderActionsPreview() {
+    AsssistantaiTheme {
+        ChatHeaderActions(
+            autoSpeakEnabled = true,
+            onOpenDrawer = {},
+            onNewConversation = {},
+            onOpenSettings = {},
+            onToggleAutoSpeak = {},
         )
     }
 }

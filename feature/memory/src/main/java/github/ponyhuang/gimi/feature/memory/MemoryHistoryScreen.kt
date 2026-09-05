@@ -38,15 +38,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
+import java.time.Instant
 import github.ponyhuang.gimi.domain.memory.model.ManagedMemory
 import github.ponyhuang.gimi.domain.memory.model.ManagedMemoryFeedback
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /** 展示 Mem0 当前云端记忆；展开单项后提供删除和反馈操作的无状态页面。 */
 @Composable
@@ -256,4 +259,42 @@ private fun NegativeFeedbackDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.memory_history_cancel)) }
         },
     )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun MemoryHistoryScreenEmptyPreview() {
+    AsssistantaiTheme {
+        MemoryHistoryScreen(
+            state = MemoryHistoryUiState(),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun MemoryHistoryScreenWithMemoriesPreview() {
+    AsssistantaiTheme {
+        MemoryHistoryScreen(
+            state = MemoryHistoryUiState(
+                memories = listOf(
+                    ManagedMemory(
+                        id = "memory-1",
+                        text = "用户偏好使用 Kotlin 开发 Android 项目，并遵循模块化架构。",
+                        createdAt = Instant.parse("2026-01-01T08:00:00Z"),
+                        updatedAt = Instant.parse("2026-01-02T08:00:00Z"),
+                    ),
+                    ManagedMemory(
+                        id = "memory-2",
+                        text = "用户所在时区为东八区，常用中文交流。",
+                        createdAt = Instant.parse("2026-01-03T08:00:00Z"),
+                        updatedAt = null,
+                    ),
+                ),
+                expandedMemoryIds = setOf("memory-1"),
+            ),
+            onAction = {},
+        )
+    }
 }

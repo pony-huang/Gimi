@@ -10,6 +10,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceNavigationCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
@@ -44,5 +46,16 @@ fun McpServerAddOptionsScreen(
                 )
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun McpServerAddOptionsScreenPreview() {
+    AsssistantaiTheme {
+        McpServerAddOptionsScreen(
+            onCreate = {},
+            onImport = {},
+        )
     }
 }

@@ -39,12 +39,16 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.mcp.model.McpProbeResult
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
+import github.ponyhuang.gimi.domain.mcp.model.McpToolSummary
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
 fun McpServerListScreen(
@@ -339,6 +343,55 @@ private fun CapabilitySection(
             style = MaterialTheme.typography.bodySmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun McpServerListScreenEmptyPreview() {
+    AsssistantaiTheme {
+        McpServerListScreen(
+            state = McpSettingsUiState(),
+            onAction = {},
+            onNavigateToEditor = {},
+            onCreateServer = {},
+            onImportServers = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun McpServerListScreenWithServersPreview() {
+    val server = McpServer(
+        id = "server-1",
+        name = "GitHub MCP",
+        description = "仓库与 Issue 操作",
+        endpointUrl = "https://mcp.example.com/mcp",
+        isEnabled = true,
+    )
+    AsssistantaiTheme {
+        McpServerListScreen(
+            state = McpSettingsUiState(
+                servers = listOf(server),
+                expandedServerId = server.id,
+                capabilities = mapOf(
+                    server.id to ServerCapabilityState.Loaded(
+                        result = McpProbeResult(
+                            reachable = true,
+                            tools = listOf(
+                                McpToolSummary(name = "create_issue", description = "创建 Issue"),
+                            ),
+                        ),
+                        serverSnapshot = server,
+                    ),
+                ),
+            ),
+            onAction = {},
+            onNavigateToEditor = {},
+            onCreateServer = {},
+            onImportServers = {},
         )
     }
 }

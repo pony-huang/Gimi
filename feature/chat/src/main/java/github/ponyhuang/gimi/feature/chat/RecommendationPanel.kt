@@ -36,9 +36,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /**
  * 空会话中的全局推荐列表，每项都是可直接发起任务的药丸按钮。
@@ -141,3 +143,30 @@ private val RecommendationCategory.icon: ImageVector
         RecommendationCategory.PRODUCTIVITY -> Icons.Default.TaskAlt
         RecommendationCategory.GENERAL -> Icons.Default.AutoAwesome
     }
+
+@Preview(showBackground = true)
+@Composable
+private fun RecommendationPanelPreview() {
+    AsssistantaiTheme {
+        RecommendationPanel(
+            recommendations = listOf(
+                AgentRecommendation(
+                    id = "rec-1",
+                    prompt = "帮我总结这篇文档的核心要点",
+                    category = RecommendationCategory.REASONING,
+                ),
+                AgentRecommendation(
+                    id = "rec-2",
+                    prompt = "分析这张截图里的报错信息",
+                    category = RecommendationCategory.VISION,
+                ),
+                AgentRecommendation(
+                    id = "rec-3",
+                    prompt = "把会议记录整理成待办事项清单",
+                    category = RecommendationCategory.PRODUCTIVITY,
+                ),
+            ),
+            onRecommendationClick = {},
+        )
+    }
+}

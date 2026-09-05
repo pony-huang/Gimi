@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.feature.chat
 import android.net.Uri
 import android.content.Context
 import android.content.Intent
+import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import android.provider.Settings
 import androidx.annotation.DrawableRes
@@ -68,7 +69,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
 import github.ponyhuang.gimi.feature.chat.R
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import kotlinx.coroutines.launch
 
 /**
@@ -564,6 +567,104 @@ internal fun DefaultIdleContent(onClick: () -> Unit, enabled: Boolean = true) {
                 stringResource(R.string.chat_stt_configure_default_first)
             },
             tint = composerActionIconColor(colorScheme, enabled),
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun DefaultComposerLeadingContentPreview() {
+    AsssistantaiTheme {
+        DefaultComposerLeadingContent(
+            params = ComposerLeadingContentParams(
+                isGenerating = false,
+                onAttachmentsClick = {},
+            ),
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun DefaultComposerInputContentEmptyPreview() {
+    AsssistantaiTheme {
+        DefaultComposerInputContent(
+            modifier = Modifier,
+            params = ComposerInputContentParams(
+                messageData = MessageData(),
+                isGenerating = false,
+                voiceInputState = VoiceInputUiState.Idle,
+                isVoiceInputAvailable = true,
+                voiceErrorMessage = null,
+                onVoiceErrorShown = {},
+                onTextChange = {},
+                onRemoveAttachment = {},
+                onSendClick = {},
+                onStopClick = {},
+                onVoiceInputStart = {},
+            ),
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun DefaultComposerInputContentFilledPreview() {
+    AsssistantaiTheme {
+        DefaultComposerInputContent(
+            modifier = Modifier,
+            params = ComposerInputContentParams(
+                messageData = MessageData(
+                    text = "帮我总结一下今天的工作计划",
+                    attachments = listOf(
+                        DraftAttachment("1", "notes.pdf", "application/pdf", 1024, AttachmentCategory.DOCUMENT),
+                    ),
+                ),
+                isGenerating = false,
+                voiceInputState = VoiceInputUiState.Idle,
+                isVoiceInputAvailable = true,
+                voiceErrorMessage = null,
+                onVoiceErrorShown = {},
+                onTextChange = {},
+                onRemoveAttachment = {},
+                onSendClick = {},
+                onStopClick = {},
+                onVoiceInputStart = {},
+            ),
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun DefaultComposerInputContentTranscribingPreview() {
+    AsssistantaiTheme {
+        DefaultComposerInputContent(
+            modifier = Modifier,
+            params = ComposerInputContentParams(
+                messageData = MessageData(),
+                isGenerating = false,
+                voiceInputState = VoiceInputUiState.Transcribing,
+                isVoiceInputAvailable = true,
+                voiceErrorMessage = null,
+                onVoiceErrorShown = {},
+                onTextChange = {},
+                onRemoveAttachment = {},
+                onSendClick = {},
+                onStopClick = {},
+                onVoiceInputStart = {},
+            ),
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun DefaultIdleContentPreview() {
+    AsssistantaiTheme {
+        DefaultIdleContent(
+            onClick = {},
+            enabled = true,
         )
     }
 }

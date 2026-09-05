@@ -32,12 +32,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationRefreshStatus
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -184,5 +186,37 @@ private fun recommendationStatusText(state: RecommendationSettingsUiState): Stri
                     .atZone(ZoneId.systemDefault()),
             )
         stringResource(R.string.recommendation_status_updated, formatted)
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun RecommendationSettingsScreenEnabledPreview() {
+    AsssistantaiTheme {
+        RecommendationSettingsScreen(
+            state = RecommendationSettingsUiState(
+                enabled = true,
+                intervalHours = 2,
+                generatedAtEpochMillis = Instant.parse("2026-09-06T08:30:00Z").toEpochMilli(),
+                refreshStatus = RecommendationRefreshStatus.Scheduled,
+            ),
+            onAction = {},
+            onOpenPermissions = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun RecommendationSettingsScreenDisabledPreview() {
+    AsssistantaiTheme {
+        RecommendationSettingsScreen(
+            state = RecommendationSettingsUiState(
+                enabled = false,
+                lastError = "权限不足，无法读取使用记录",
+            ),
+            onAction = {},
+            onOpenPermissions = {},
+        )
     }
 }

@@ -54,6 +54,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,6 +64,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
 fun PluginSettingsRoute(
@@ -316,4 +318,49 @@ private fun UninstallConfirmDialog(
             }
         },
     )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PluginSettingsScreenEmptyPreview() {
+    AsssistantaiTheme {
+        PluginSettingsScreen(
+            state = PluginSettingsUiState(),
+            icons = emptyMap(),
+            onAction = {},
+            onNavigateToConfig = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PluginSettingsScreenWithPluginsPreview() {
+    AsssistantaiTheme {
+        PluginSettingsScreen(
+            state = PluginSettingsUiState(
+                plugins = listOf(
+                    PluginDescriptor(
+                        id = "zhihu",
+                        name = "知乎",
+                        packageName = "github.ponyhuang.gimi.plugin.zhihu",
+                        version = 1,
+                        toolCount = 3,
+                        isEnabled = true,
+                    ),
+                    PluginDescriptor(
+                        id = "spotify",
+                        name = "Spotify",
+                        packageName = "github.ponyhuang.gimi.plugin.spotify",
+                        version = 2,
+                        toolCount = 5,
+                        isEnabled = false,
+                    ),
+                ),
+            ),
+            icons = emptyMap(),
+            onAction = {},
+            onNavigateToConfig = {},
+        )
+    }
 }

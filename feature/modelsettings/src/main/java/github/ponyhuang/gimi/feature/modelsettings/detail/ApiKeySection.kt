@@ -27,6 +27,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.feature.modelsettings.R
 
 @Composable
@@ -99,3 +101,37 @@ fun ApiKeySection(
 }
 
 private const val TAG_KEY_HELP = "key_help"
+
+@Preview(showBackground = true)
+@Composable
+private fun ApiKeySectionPreview() {
+    AsssistantaiTheme {
+        ApiKeySection(
+            apiKey = "sk-1234567890",
+            keyHelpUrl = "https://help.example.com/keys",
+            isVisible = false,
+            isTesting = false,
+            onApiKeyChange = {},
+            onToggleVisibility = {},
+            onTest = {},
+            onOpenKeyHelp = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ApiKeySectionTestingPreview() {
+    AsssistantaiTheme {
+        ApiKeySection(
+            apiKey = "",
+            keyHelpUrl = "https://help.example.com/keys",
+            isVisible = true,
+            isTesting = true,
+            onApiKeyChange = {},
+            onToggleVisibility = {},
+            onTest = {},
+            onOpenKeyHelp = {},
+        )
+    }
+}

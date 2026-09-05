@@ -20,8 +20,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.core.designsystem.R
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /**
  * 单选选择对话框：Material 3 单选列表样式。
@@ -92,4 +94,41 @@ fun <T> PickerSingleChoiceDialog(
         confirmButton = {},
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.picker_cancel)) } },
     )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PickerSingleChoiceDialogPreview() {
+    val options = listOf("选项一", "选项二", "选项三")
+    AsssistantaiTheme {
+        PickerSingleChoiceDialog(
+            options = options,
+            selected = { it == options.first() },
+            key = { it },
+            title = "选择模型",
+            optionTitle = { it },
+            optionSubtitle = { "副标题：$it" },
+            emptyText = "暂无可选项",
+            onPick = {},
+            onDismiss = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PickerSingleChoiceDialogEmptyPreview() {
+    AsssistantaiTheme {
+        PickerSingleChoiceDialog(
+            options = emptyList<String>(),
+            selected = { false },
+            key = { it },
+            title = "选择模型",
+            optionTitle = { it },
+            optionSubtitle = { "" },
+            emptyText = "暂无可选项",
+            onPick = {},
+            onDismiss = {},
+        )
+    }
 }

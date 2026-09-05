@@ -29,8 +29,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.feature.workfiles.R
+import github.ponyhuang.gimi.domain.workfiles.model.WorkDirectory
 import github.ponyhuang.gimi.domain.workfiles.repository.WorkDirectoryOperationResult
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
@@ -38,6 +40,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
 fun WorkFilesSettingsScreen(
@@ -191,5 +194,40 @@ fun WorkFilesSettingsScreen(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun WorkFilesSettingsScreenEmptyPreview() {
+    AsssistantaiTheme {
+        WorkFilesSettingsScreen(
+            state = WorkFilesSettingsUiState(),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun WorkFilesSettingsScreenWithDirectoriesPreview() {
+    AsssistantaiTheme {
+        WorkFilesSettingsScreen(
+            state = WorkFilesSettingsUiState(
+                directories = listOf(
+                    WorkDirectory(
+                        uri = "content://com.android.externalstorage.documents/tree/primary%3ADocuments",
+                        displayName = "Documents",
+                        authority = "com.android.externalstorage.documents",
+                    ),
+                    WorkDirectory(
+                        uri = "content://com.android.externalstorage.documents/tree/primary%3ADownload",
+                        displayName = "Download",
+                        authority = "com.android.externalstorage.documents",
+                    ),
+                ),
+            ),
+            onAction = {},
+        )
     }
 }

@@ -17,6 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.ui.settings.llmmodel.LLMModelServiceIcon
 
@@ -74,5 +76,26 @@ fun ModelServiceCard(
                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ModelServiceCardPreview() {
+    AsssistantaiTheme {
+        ModelServiceCard(
+            item = LLMModelSetting(
+                id = "openai",
+                name = "OpenAI",
+                isEnabled = true,
+                apiKey = "sk-test",
+                apiBaseUrl = "https://api.openai.com/v1",
+                apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Standard,
+                anthropicBaseUrl = "https://api.anthropic.com",
+                groups = emptyList(),
+            ),
+            onClick = {},
+            onToggleEnabled = { _, _ -> },
+        )
     }
 }

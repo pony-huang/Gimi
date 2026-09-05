@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
@@ -47,6 +48,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -307,5 +309,39 @@ fun McpServerEditorScreen(
                 }
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun McpServerEditorScreenLoadingPreview() {
+    AsssistantaiTheme {
+        McpServerEditorScreen(
+            state = McpSettingsUiState(editor = null),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun McpServerEditorScreenLoadedPreview() {
+    AsssistantaiTheme {
+        McpServerEditorScreen(
+            state = McpSettingsUiState(
+                editor = McpEditorDraft(
+                    id = "server-1",
+                    isNew = false,
+                    name = "GitHub MCP",
+                    description = "仓库与 Issue 操作",
+                    endpointUrl = "https://mcp.example.com/mcp",
+                    transport = McpTransport.STREAMABLE_HTTP,
+                    bearerToken = "token",
+                    headers = "",
+                    isEnabled = true,
+                ),
+            ),
+            onAction = {},
+        )
     }
 }

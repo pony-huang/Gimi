@@ -82,7 +82,10 @@ import github.ponyhuang.gimi.ui.components.GimiBottomSheet
 import github.ponyhuang.gimi.ui.components.GimiBottomSheetHeader
 import github.ponyhuang.gimi.ui.components.GimiBottomSheetOptionRow
 import github.ponyhuang.gimi.ui.components.GimiBottomSheetSwitchRow
+import androidx.compose.ui.tooling.preview.Preview
+import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 private const val COMPACT_SHEET_ITEM_LIMIT: Int = 3
 
@@ -1081,3 +1084,114 @@ private fun officialFunctionDescription(toolId: String, functionId: String, fall
             stringResource(R.string.chat_official_tool_web_reader_description)
         else -> fallback
     }
+
+private fun previewAddToChatState(
+    configuration: ConversationToolConfiguration? = ConversationToolConfiguration(),
+    errorMessage: String? = null,
+): ChatAddToChatState = ChatAddToChatState(
+    configuration = configuration,
+    mcpServers = listOf(
+        McpServer(id = "server-1", name = "文件检索服务", transport = McpTransport.STREAMABLE_HTTP),
+        McpServer(id = "server-2", name = "浏览器服务", transport = McpTransport.SSE),
+    ),
+    officialTools = listOf(
+        OfficialToolDescriptor(
+            id = OfficialToolIds.OPENAI_WEB_SEARCH,
+            functions = listOf(
+                OfficialToolFunction(
+                    id = OfficialToolIds.OPENAI_WEB_SEARCH,
+                    name = "Web Search",
+                    description = "Search the web for up-to-date information.",
+                ),
+            ),
+        ),
+    ),
+    errorMessage = errorMessage,
+)
+
+@Preview(showBackground = true)
+@Composable
+private fun ChatAddToChatHomePreview() {
+    AsssistantaiTheme {
+        AddToChatHome(
+            state = previewAddToChatState(),
+            onTakePhoto = {},
+            onChoosePhotos = {},
+            onChooseFiles = {},
+            imagesEnabled = true,
+            filesEnabled = true,
+            onOpenToolAccess = {},
+            onOpenReasoningEffort = {},
+            onOpenMcp = {},
+            onOpenOfficialTools = {},
+            onOpenPermissionMode = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ChatAddToChatHomeWithErrorPreview() {
+    AsssistantaiTheme {
+        AddToChatHome(
+            state = previewAddToChatState(errorMessage = "工具配置保存失败，请重试。"),
+            onTakePhoto = {},
+            onChoosePhotos = {},
+            onChooseFiles = {},
+            imagesEnabled = true,
+            filesEnabled = false,
+            onOpenToolAccess = {},
+            onOpenReasoningEffort = {},
+            onOpenMcp = {},
+            onOpenOfficialTools = {},
+            onOpenPermissionMode = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ChatAddToChatToolAccessPagePreview() {
+    AsssistantaiTheme {
+        ToolAccessPage(
+            state = previewAddToChatState(),
+            onModeChange = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ChatAddToChatReasoningEffortPagePreview() {
+    AsssistantaiTheme {
+        ReasoningEffortPage(
+            state = previewAddToChatState(),
+            onEffortChange = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ChatAddToChatMcpServersPagePreview() {
+    AsssistantaiTheme {
+        McpServersPage(
+            state = previewAddToChatState(
+                configuration = ConversationToolConfiguration(enabledMcpServerIds = setOf("server-1")),
+            ),
+            onEnabledChange = { _, _ -> },
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ChatAddToChatOfficialToolsDetailPagePreview() {
+    AsssistantaiTheme {
+        OfficialToolsDetailPage(
+            state = previewAddToChatState(),
+            onFunctionEnabledChange = { _, _, _ -> },
+            onRetry = {},
+        )
+    }
+}

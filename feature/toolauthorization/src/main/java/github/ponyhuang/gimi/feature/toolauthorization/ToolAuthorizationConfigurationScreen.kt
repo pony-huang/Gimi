@@ -26,16 +26,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
 fun ToolAuthorizationConfigurationRoute(
@@ -192,4 +195,41 @@ private fun ToolAuthorizationFilter.labelRes(): Int = when (this) {
     ToolAuthorizationFilter.ALL -> R.string.toolauth_filter_all
     ToolAuthorizationFilter.ENABLED -> R.string.toolauth_filter_enabled
     ToolAuthorizationFilter.DISABLED -> R.string.toolauth_filter_disabled
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ToolAuthorizationConfigurationScreenEmptyPreview() {
+    AsssistantaiTheme {
+        ToolAuthorizationConfigurationScreen(
+            state = ToolAuthorizationConfigurationUiState(),
+            onAction = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ToolAuthorizationConfigurationScreenWithToolsPreview() {
+    AsssistantaiTheme {
+        ToolAuthorizationConfigurationScreen(
+            state = ToolAuthorizationConfigurationUiState(
+                tools = listOf(
+                    ToolDescriptor(
+                        id = "web_search",
+                        name = "web_search",
+                        description = "搜索互联网并返回结果摘要。",
+                        isEnabled = true,
+                    ),
+                    ToolDescriptor(
+                        id = "read_file",
+                        name = "read_file",
+                        description = "读取工作目录内指定路径的文本文件内容。",
+                        isEnabled = false,
+                    ),
+                ),
+            ),
+            onAction = {},
+        )
+    }
 }

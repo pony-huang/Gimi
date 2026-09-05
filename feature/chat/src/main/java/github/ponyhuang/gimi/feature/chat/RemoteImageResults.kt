@@ -21,8 +21,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.domain.conversation.model.RemoteImageReference
 import github.ponyhuang.gimi.domain.conversation.model.RemoteImageResult
 
@@ -100,3 +102,19 @@ internal fun RemoteImageCarousel(
 }
 
 private const val RemoteImagePreviewLimit = 10
+
+@Preview(showBackground = true)
+@Composable
+private fun RemoteImageCarouselPreview() {
+    AsssistantaiTheme {
+        RemoteImageCarousel(
+            result = RemoteImageResult(
+                images = listOf(
+                    RemoteImageReference(url = "https://example.com/image-1.png"),
+                    RemoteImageReference(url = "https://example.com/image-2.png"),
+                    RemoteImageReference(url = "https://example.com/image-3.png"),
+                ),
+            ),
+        )
+    }
+}

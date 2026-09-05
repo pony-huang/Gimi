@@ -14,6 +14,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.Preview
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.feature.modelsettings.R
@@ -93,5 +95,55 @@ fun ApiBaseUrlSection(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ApiBaseUrlSectionPreview() {
+    AsssistantaiTheme {
+        ApiBaseUrlSection(
+            service = LLMModelSetting(
+                id = "openai",
+                name = "OpenAI",
+                isEnabled = true,
+                apiKey = "sk-test",
+                apiBaseUrl = "https://api.openai.com/v1",
+                apiProtocol = ApiProtocol.Standard,
+                anthropicBaseUrl = "https://api.anthropic.com",
+                groups = emptyList(),
+            ),
+            isMenuExpanded = false,
+            onToggleMenu = {},
+            onDismissMenu = {},
+            onProtocolChange = {},
+            onBaseUrlChange = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ApiBaseUrlSectionLockedProtocolPreview() {
+    AsssistantaiTheme {
+        // Gemini 单协议厂商：协议只读、无 Base URL 输入框。
+        ApiBaseUrlSection(
+            service = LLMModelSetting(
+                id = "gemini",
+                name = "Gemini",
+                isEnabled = true,
+                apiKey = "test",
+                apiBaseUrl = "https://generativelanguage.googleapis.com",
+                apiProtocol = ApiProtocol.Gemini,
+                supportedProtocols = listOf(ApiProtocol.Gemini),
+                anthropicBaseUrl = "",
+                groups = emptyList(),
+            ),
+            isMenuExpanded = false,
+            onToggleMenu = {},
+            onDismissMenu = {},
+            onProtocolChange = {},
+            onBaseUrlChange = {},
+        )
     }
 }

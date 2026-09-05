@@ -8,14 +8,19 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavEntry
@@ -23,7 +28,9 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import kotlinx.coroutines.delay
 import github.ponyhuang.gimi.BuildConfig
+import github.ponyhuang.gimi.domain.assistant.model.isPresentationResultIdle
 import github.ponyhuang.gimi.feature.chat.ChatDestination
 import github.ponyhuang.gimi.feature.chat.ChatEntryProvider
 import github.ponyhuang.gimi.feature.chat.ChatNavigationCallbacks
@@ -59,7 +66,6 @@ import androidx.core.content.ContextCompat
 
 /** App-level composition root. Feature modules own destination dispatch and never navigate directly. */
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 fun MainScreen(
     assistantSessionCoordinator: AssistantSessionCoordinator,
     assistantPanelInteractor: AssistantPanelInteractor,
@@ -198,30 +204,46 @@ fun MainScreen(
     if (
         assistantState.presentationVisible
     ) {
-        ModalBottomSheet(
-            onDismissRequest = {
-                assistantPanelInteractor.cancelRecording()
+        // 与悬浮窗/锁屏一致的空闲自动收起：结果停留 5 秒后隐藏。
+        LaunchedEffect(assistantState.phase) {
+            if (assistantState.phase.isPresentationResultIdle()) {
+                delay(AssistantResultStayMs)
                 assistantSessionCoordinator.hidePresentation()
-            },
+            }
+        }
+        // 应用内助手层：与悬浮窗/锁屏渲染同一套胶囊/面板视觉；
+        // 不再用 ModalBottomSheet 承载，避免同一状态在不同宿主呈现不同样式。
+        // 非获焦 Popup：点击穿透到下层应用内容，显隐完全由助手状态驱动。
+        Popup(
+            alignment = Alignment.BottomStart,
+            properties = PopupProperties(
+                focusable = false,
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false,
+            ),
         ) {
-            AssistantSurface(
-                state = assistantState,
-                mode = AssistantSurfaceMode.SHEET,
-                onDismiss = {
-                    assistantPanelInteractor.cancelRecording()
-                    assistantSessionCoordinator.hidePresentation()
-                },
-                onStop = assistantSessionCoordinator::stop,
-                onOpenChat = {
-                    assistantPanelInteractor.cancelRecording()
-                    assistantSessionCoordinator.hidePresentation()
-                    returnToChat()
-                },
-                onMicToggle = onMicToggle,
-                onTextSubmit = assistantPanelInteractor::submitText,
-                recording = recording,
-                audioLevel = audioLevel,
-            )
+            Box(
+                // 底部沉浸式：面板自行延伸到导航栏后面；键盘高度由 imePadding 处理。
+                modifier = Modifier.fillMaxWidth().imePadding(),
+            ) {
+                AssistantSurface(
+                    state = assistantState,
+                    mode = AssistantSurfaceMode.SHEET,
+                    onDismiss = {
+                        assistantPanelInteractor.cancelRecording()
+                        assistantSessionCoordinator.hidePresentation()
+                    },
+                    onOpenChat = {
+                        assistantPanelInteractor.cancelRecording()
+                        assistantSessionCoordinator.hidePresentation()
+                        returnToChat()
+                    },
+                    onMicToggle = onMicToggle,
+                    onTextSubmit = assistantPanelInteractor::submitText,
+                    recording = recording,
+                    audioLevel = audioLevel,
+                )
+            }
         }
     }
 }
@@ -230,3 +252,5 @@ private fun NavKey.navigationContentKey(): String {
     // Navigation 3 默认使用 toString()；跨 feature 的多个 Settings data object 会因此共享 Scene key。
     return "${this::class.qualifiedName}:$this"
 }
+
+private const val AssistantResultStayMs = 5_000L

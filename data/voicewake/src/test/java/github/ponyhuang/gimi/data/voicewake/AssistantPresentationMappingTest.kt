@@ -81,4 +81,16 @@ class AssistantPresentationMappingTest {
             ).assistantPresentationEvent(),
         )
     }
+
+    @Test
+    fun `abandoned capture hides presentation instead of lingering`() {
+        assertEquals(
+            AssistantPresentationEvent.CaptureAbandoned,
+            VoicePipelineEvent(
+                BluetoothVoiceStatus.Listening,
+                "未听到任务",
+                abandonsInteraction = true,
+            ).assistantPresentationEvent(),
+        )
+    }
 }

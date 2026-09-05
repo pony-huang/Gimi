@@ -1,13 +1,15 @@
 <resources>
     <string name="assistant_status_missing_config">需要完成模型和语音配置</string>
+    <string name="assistant_status_busy">当前会话忙，请稍后再试</string>
     <string name="assistant_status_generating">正在思考</string>
     <string name="assistant_action_close">关闭</string>
-    <string name="assistant_action_stop">停止</string>
     <string name="assistant_action_open_chat">打开聊天</string>
     <string name="assistant_voice_start">开始聆听</string>
     <string name="assistant_voice_stop">结束聆听</string>
-    <string name="assistant_voice_idle_hint">点按开始说话</string>
+    <string name="assistant_listening_hint">正在聆听…</string>
+    <string name="assistant_transcribing_hint">正在转写…</string>
+    <string name="assistant_panel_collapse">收起面板</string>
     <string name="assistant_send">发送</string>
-    <string name="assistant_input_placeholder">有什么可以帮你？</string>
+    <string name="assistant_input_placeholder">有问题尽管问我…</string>
     <string name="assistant_tool_running">正在执行：%1$s</string>
 </resources>

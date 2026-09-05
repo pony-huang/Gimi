@@ -9,13 +9,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import github.ponyhuang.gimi.MainActivity
@@ -28,11 +26,12 @@ import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import javax.inject.Inject
 import kotlinx.coroutines.delay
 
-/** 锁屏语音唤醒的轻量界面，只展示当前一轮摘要。 */
+/** 锁屏语音唤醒的轻量界面，展示胶囊/面板两态会话。 */
 @AndroidEntryPoint
 class AssistantLockScreenActivity : ComponentActivity() {
     @Inject lateinit var coordinator: AssistantSessionCoordinator
     @Inject lateinit var appearanceRepository: AppearanceRepository
+    @Inject lateinit var panelInteractor: AssistantPanelInteractor
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,6 +41,8 @@ class AssistantLockScreenActivity : ComponentActivity() {
         setContent {
             val state by coordinator.state.collectAsStateWithLifecycle()
             val darkThemeOverride by appearanceRepository.darkThemeOverride.collectAsStateWithLifecycle()
+            val recording by panelInteractor.recording.collectAsStateWithLifecycle()
+            val audioLevel by panelInteractor.audioLevel.collectAsStateWithLifecycle()
             LaunchedEffect(state.presentationVisible) {
                 if (!state.presentationVisible) finish()
             }
@@ -56,21 +57,25 @@ class AssistantLockScreenActivity : ComponentActivity() {
             }
             AsssistantaiTheme(darkTheme = darkThemeOverride ?: isSystemInDarkTheme()) {
                 Box(
+                    // 底部沉浸式：面板自行延伸到导航栏后面；键盘高度由 imePadding 处理。
                     modifier = Modifier
                         .fillMaxSize()
-                        .safeDrawingPadding()
-                        .padding(16.dp),
+                        .imePadding(),
                     contentAlignment = Alignment.BottomCenter,
                 ) {
                     AssistantSurface(
                         state = state,
                         mode = AssistantSurfaceMode.LOCK_SCREEN,
                         onDismiss = {
+                            panelInteractor.cancelRecording()
                             coordinator.hidePresentation()
                             finish()
                         },
-                        onStop = coordinator::stop,
                         onOpenChat = ::unlockAndOpenChat,
+                        onMicToggle = panelInteractor::toggleMic,
+                        onTextSubmit = panelInteractor::submitText,
+                        recording = recording,
+                        audioLevel = audioLevel,
                     )
                 }
             }
@@ -92,6 +97,7 @@ class AssistantLockScreenActivity : ComponentActivity() {
     }
 
     private fun openCurrentChat() {
+        panelInteractor.cancelRecording()
         coordinator.hidePresentation()
         startActivity(
             Intent(this, MainActivity::class.java)

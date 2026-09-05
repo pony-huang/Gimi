@@ -69,6 +69,13 @@ data class AssistantSessionState(
         get() = taskActive
 }
 
+/**
+ * 是否应展开会话面板：存在轮次、消息或待确认工具时展开为对话面板，
+ * 否则保持悬浮胶囊态（刚唤醒、仅采集指令的阶段）。
+ */
+val AssistantSessionState.shouldShowConversation: Boolean
+    get() = turn != null || messages.isNotEmpty() || pendingConfirmation != null
+
 /** 追加一条用户输入气泡。 */
 fun AssistantSessionState.appendUserMessage(text: String): AssistantSessionState {
     val nextId = nextMessageId(messages)

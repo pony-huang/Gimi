@@ -52,6 +52,7 @@ data class VoicePipelineEvent(
     val completesInteraction: Boolean = false,
     val startsInteraction: Boolean = false,
     val stopsInteraction: Boolean = false,
+    val abandonsInteraction: Boolean = false,
 )
 
 /**
@@ -297,6 +298,7 @@ class VoiceAudioPipeline @Inject constructor(
                         setStatus(
                             BluetoothVoiceStatus.Listening,
                             context.getString(R.string.bluetooth_voice_status_no_command),
+                            abandonsInteraction = true,
                         )
                     }
                     is CaptureDecision.Complete -> {
@@ -534,6 +536,7 @@ class VoiceAudioPipeline @Inject constructor(
         completesInteraction: Boolean = false,
         startsInteraction: Boolean = false,
         stopsInteraction: Boolean = false,
+        abandonsInteraction: Boolean = false,
     ) {
         controller.setStatus(status, deviceName, lastCommand, message.takeIf(String::isNotEmpty))
         _events.tryEmit(
@@ -545,6 +548,7 @@ class VoiceAudioPipeline @Inject constructor(
                 completesInteraction,
                 startsInteraction,
                 stopsInteraction,
+                abandonsInteraction,
             ),
         )
     }

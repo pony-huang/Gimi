@@ -69,6 +69,9 @@ sealed interface AssistantPresentationEvent {
     /** 用户主动停止本轮任务。 */
     data object Stopped : AssistantPresentationEvent
 
+    /** 采集到内容前链路放弃本轮指令（超时未听到语音等），界面应立即收起。 */
+    data object CaptureAbandoned : AssistantPresentationEvent
+
     /** 语音链路失败。 */
     data class Failed(val message: String) : AssistantPresentationEvent
 }
@@ -106,6 +109,13 @@ fun AssistantSessionState.applyPresentationEvent(
         phase = AssistantSessionPhase.STOPPED,
         taskActive = false,
         pendingConfirmation = null,
+    )
+    AssistantPresentationEvent.CaptureAbandoned -> copy(
+        phase = AssistantSessionPhase.STOPPED,
+        taskActive = false,
+        turn = null,
+        pendingConfirmation = null,
+        presentationVisible = false,
     )
     is AssistantPresentationEvent.Failed -> copy(
         phase = AssistantSessionPhase.ERROR,

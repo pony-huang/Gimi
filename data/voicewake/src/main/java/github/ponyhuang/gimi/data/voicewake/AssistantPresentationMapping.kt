@@ -17,6 +17,7 @@ fun VoicePipelineEvent.assistantPresentationEvent(): AssistantPresentationEvent?
     BluetoothVoiceStatus.Listening -> when {
         stopsInteraction -> AssistantPresentationEvent.Stopped
         completesInteraction -> AssistantPresentationEvent.Completed
+        abandonsInteraction -> AssistantPresentationEvent.CaptureAbandoned
         else -> null
     }
     BluetoothVoiceStatus.Starting,

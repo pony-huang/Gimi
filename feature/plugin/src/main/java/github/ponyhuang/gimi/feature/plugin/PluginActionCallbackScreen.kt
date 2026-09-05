@@ -6,38 +6,51 @@ import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import java.net.URLEncoder
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
 
 /**
- * 内置浏览器授权页：用 WebView 加载授权 URL，不跳出到系统浏览器。
+ * 配置动作回调页：当前通过 WebView 完成网页交互，并把产生的通用参数交回插件。
  *
- * 当导航命中 [PluginBrowserUiState.redirectBase] 前缀（OAuth 回调）时，
- * 截获完整重定向 URL 交给 [onComplete]，并返回插件配置页。
+ * 当导航命中 [PluginActionCallbackUiState.redirectBase] 前缀时，把完整 URL 放入回调参数；
+ * 页面条件完成时则回传捕获到的 Cookie。
  */
 @Composable
-internal fun PluginBrowserScreen(
-    browser: PluginBrowserUiState,
-    onComplete: (String) -> Unit,
+internal fun PluginActionCallbackScreen(
+    callback: PluginActionCallbackUiState,
+    onCallback: (Map<String, String>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    BrowserWebView(
-        browser = browser,
-        onComplete = onComplete,
+    if (callback.handlerId != HANDLER_WEB) {
+        Text(
+            text = stringResource(R.string.plugin_action_callback_unsupported, callback.handlerId),
+            modifier = modifier.fillMaxSize(),
+        )
+        return
+    }
+    ActionCallbackWebView(
+        callback = callback,
+        onCallback = onCallback,
         modifier = modifier.fillMaxSize(),
     )
 }
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun BrowserWebView(
-    browser: PluginBrowserUiState,
-    onComplete: (String) -> Unit,
+private fun ActionCallbackWebView(
+    callback: PluginActionCallbackUiState,
+    onCallback: (Map<String, String>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val authorizeUrl = callback.parameters[PARAM_AUTHORIZE_URL].orEmpty()
+    val redirectBase = callback.parameters[PARAM_REDIRECT_BASE].orEmpty()
+    val completionScript = callback.parameters[PARAM_COMPLETION_SCRIPT]
+    val captureCookiesForUrl = callback.parameters[PARAM_CAPTURE_COOKIES_FOR_URL]
+    val desktopMode = callback.parameters[PARAM_DESKTOP_MODE].toBoolean()
     AndroidView(
         factory = { context ->
             WebView(context).apply {
@@ -45,7 +58,7 @@ private fun BrowserWebView(
                 settings.domStorageEnabled = true
                 settings.useWideViewPort = true
                 settings.loadWithOverviewMode = true
-                if (browser.desktopMode) {
+                if (desktopMode) {
                     // 登录与后续自动化必须共享桌面版 DOM；仅改 viewport 仍可能被站点按移动 UA 分流。
                     settings.userAgentString = DESKTOP_USER_AGENT
                 }
@@ -59,9 +72,9 @@ private fun BrowserWebView(
 
                     /** 命中 redirectBase 即截获重定向；post 到主线程避免在回调栈内销毁自身。 */
                     private fun tryComplete(view: WebView, url: String?): Boolean {
-                        if (!completed && url != null && url.startsWith(browser.redirectBase)) {
+                        if (!completed && redirectBase.isNotEmpty() && url?.startsWith(redirectBase) == true) {
                             completed = true
-                            view.post { onComplete(url) }
+                            view.post { onCallback(mapOf(CALLBACK_URL_KEY to url)) }
                             return true
                         }
                         return completed
@@ -69,7 +82,7 @@ private fun BrowserWebView(
 
                     /** 页面条件成立后刷新 Cookie 持久层，再用一次性内存回调交给插件。 */
                     private fun startCompletionPolling(view: WebView) {
-                        val script = browser.completionScript ?: return
+                        val script = completionScript ?: return
                         if (polling || completed) return
                         polling = true
 
@@ -78,19 +91,14 @@ private fun BrowserWebView(
                             view.evaluateJavascript("Boolean($script)") { raw ->
                                 if (raw == "true") {
                                     completed = true
-                                    val cookieUrl = browser.captureCookiesForUrl
+                                    val cookieUrl = captureCookiesForUrl
                                     val cookies = cookieUrl?.let { url ->
                                         CookieManager.getInstance().getCookie(url)
                                     }.orEmpty()
                                     CookieManager.getInstance().flush()
-                                    val callback = buildString {
-                                        append("gimi-plugin-capture://complete")
-                                        if (cookies.isNotEmpty()) {
-                                            append("?cookies=")
-                                            append(URLEncoder.encode(cookies, Charsets.UTF_8.name()))
-                                        }
+                                    view.post {
+                                        onCallback(mapOf(CALLBACK_COOKIES_KEY to cookies))
                                     }
-                                    view.post { onComplete(callback) }
                                 } else {
                                     view.postDelayed(::poll, COMPLETION_POLL_INTERVAL_MS)
                                 }
@@ -150,13 +158,13 @@ private fun BrowserWebView(
                 // 永不回调、无任何网络请求）。以 onPageStarted 作为「导航真正开始」的信号，
                 // 未开始就延迟重试，直到 WebView 就绪或超过次数上限。原 addOnLayoutChangeListener
                 // 门控同样不可靠（部分设备不触发，URL 从未加载）。
-                if (browser.authorizeUrl.isBlank()) {
-                    Log.w(TAG, "Empty authorize URL for ${browser.actionId}")
+                if (authorizeUrl.isBlank()) {
+                    Log.w(TAG, "Empty authorize URL for ${callback.actionId}")
                 } else {
                     fun retryLoad(attempt: Int) {
                         if (navigationStarted || attempt > LOAD_MAX_ATTEMPTS) return
-                        Log.w(TAG, "Loading plugin authorize URL (attempt $attempt): ${browser.authorizeUrl}")
-                        loadUrl(browser.authorizeUrl)
+                        Log.w(TAG, "Loading plugin authorize URL (attempt $attempt): $authorizeUrl")
+                        loadUrl(authorizeUrl)
                         postDelayed({ retryLoad(attempt + 1) }, LOAD_RETRY_DELAY_MS)
                     }
                     post { retryLoad(1) }
@@ -168,7 +176,15 @@ private fun BrowserWebView(
     )
 }
 
-private const val TAG: String = "PluginBrowser"
+private const val TAG: String = "PluginActionCallback"
+private const val HANDLER_WEB: String = "web"
+private const val CALLBACK_URL_KEY: String = "url"
+private const val CALLBACK_COOKIES_KEY: String = "cookies"
+private const val PARAM_AUTHORIZE_URL: String = "authorize_url"
+private const val PARAM_REDIRECT_BASE: String = "redirect_base"
+private const val PARAM_COMPLETION_SCRIPT: String = "completion_script"
+private const val PARAM_CAPTURE_COOKIES_FOR_URL: String = "capture_cookies_for_url"
+private const val PARAM_DESKTOP_MODE: String = "desktop_mode"
 
 /** 授权 URL 加载重试上限与间隔：WebView 未就绪时导航会被静默丢弃，需要重试到渲染进程就绪。 */
 private const val LOAD_MAX_ATTEMPTS: Int = 6

@@ -1,7 +1,8 @@
 package github.ponyhuang.gimi.domain.plugin.repository
 
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionOutcome
-import github.ponyhuang.gimi.domain.plugin.model.PluginBrowserRequest
+import github.ponyhuang.gimi.domain.plugin.model.PluginActionCallback
+import github.ponyhuang.gimi.domain.plugin.model.PluginActionExecution
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
 import kotlinx.coroutines.flow.StateFlow
@@ -33,7 +34,7 @@ interface PluginRepository {
      *
      * @return 插件不存在或动作未知时返回 null。
      */
-    suspend fun runAction(pluginId: String, actionId: String): PluginActionOutcome?
+    suspend fun runAction(pluginId: String, actionId: String): PluginActionExecution?
 
     /**
      * 重新发现已安装插件，无需重启即把新装插件纳入列表与 Agent 运行。
@@ -43,16 +44,13 @@ interface PluginRepository {
     suspend fun refresh(): List<String>
 
     /**
-     * 查询配置页动作是否需要内置浏览器（WebView）授权。
-     *
-     * @return 需要则返回浏览器请求；否则返回 null（走 [runAction] 的阻塞路径）。
-     */
-    fun configActionBrowserRequest(pluginId: String, actionId: String): PluginBrowserRequest?
-
-    /**
-     * 把内置浏览器截获的重定向 URL 交给插件完成动作（如换 token）。
+     * 把宿主能力产生的通用参数回传插件，完成等待中的配置动作。
      *
      * @return 插件不存在或动作未知时返回 null。
      */
-    suspend fun completeAction(pluginId: String, actionId: String, redirectUrl: String): PluginActionOutcome?
+    suspend fun onActionCallback(
+        pluginId: String,
+        actionId: String,
+        callback: PluginActionCallback,
+    ): PluginActionOutcome?
 }

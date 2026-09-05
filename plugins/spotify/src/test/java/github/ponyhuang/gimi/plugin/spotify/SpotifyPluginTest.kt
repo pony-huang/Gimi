@@ -7,34 +7,23 @@ import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.Part
+import github.ponyhuang.gimi.pluginapi.PluginConfigActionExecution
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SpotifyPluginTest {
 
     @Test
-    fun spotifyAuthorizationUsesSystemBrowserInsteadOfEmbeddedWebView() {
-        val context = mockk<Context>()
-        every { context.applicationContext } returns context
-        every { context.getSharedPreferences(any(), any()) } returns mockk<SharedPreferences>(relaxed = true)
-        val plugin = SpotifyPlugin().apply {
-            onAttach(context)
-            configure(
-                mapOf(
-                    SpotifyPlugin.KEY_CLIENT_ID to "client-id",
-                    SpotifyPlugin.KEY_CLIENT_SECRET to "client-secret",
-                ),
-            )
-        }
+    fun spotifyAuthorizationCompletesWithoutHostCallbackRequest() = runTest {
+        val execution = SpotifyPlugin().runConfigAction(SpotifyPlugin.ACTION_LOGIN)
+            as PluginConfigActionExecution.Completed
 
-        val request = plugin.configActionBrowserRequest(SpotifyPlugin.ACTION_LOGIN)
-
-        assertNull(request)
+        assertFalse(execution.result.success)
     }
 
     @Test

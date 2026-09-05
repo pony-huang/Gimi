@@ -6,18 +6,14 @@ import android.webkit.CookieManager
 import android.webkit.WebView
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigFieldDescriptor
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -28,7 +24,7 @@ class PluginConfigScreenTest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun browserAuthorizationReplacesConfigurationPage() {
+    fun actionCallbackInteractionReplacesConfigurationPage() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         composeRule.setContent {
             MaterialTheme {
@@ -41,10 +37,13 @@ class PluginConfigScreenTest {
                                 kind = PluginConfigFieldDescriptor.Kind.TEXT,
                             ),
                         ),
-                        browser = PluginBrowserUiState(
+                        callback = PluginActionCallbackUiState(
                             actionId = "login",
-                            authorizeUrl = "about:blank",
-                            redirectBase = "http://127.0.0.1/callback",
+                            handlerId = "web",
+                            parameters = mapOf(
+                                "authorize_url" to "about:blank",
+                                "redirect_base" to "http://127.0.0.1/callback",
+                            ),
                         ),
                     ),
                     onAction = {},
@@ -52,32 +51,31 @@ class PluginConfigScreenTest {
             }
         }
 
-        composeRule.onNodeWithText(context.getString(R.string.plugin_browser_title)).assertIsDisplayed()
+        composeRule.onNodeWithText(context.getString(R.string.plugin_action_callback_title)).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.plugin_config_save)).assertDoesNotExist()
     }
 
     @Test
-    fun browserAuthorizationLoadsAfterWebViewHasSize() {
-        val hasSize = mutableStateOf(false)
+    fun actionCallbackInteractionLoadsAndConfiguresWebView() {
         val dataUrl = "data:text/html,<html><body>Authorization</body></html>"
         composeRule.setContent {
             MaterialTheme {
-                PluginBrowserScreen(
-                    browser = PluginBrowserUiState(
+                PluginActionCallbackScreen(
+                    callback = PluginActionCallbackUiState(
                         actionId = "login",
-                        authorizeUrl = dataUrl,
-                        redirectBase = "http://127.0.0.1/callback",
+                        handlerId = "web",
+                        parameters = mapOf(
+                            "authorize_url" to dataUrl,
+                            "redirect_base" to "http://127.0.0.1/callback",
+                        ),
                     ),
-                    onComplete = {},
-                    modifier = if (hasSize.value) Modifier.fillMaxSize() else Modifier.size(0.dp),
+                    onCallback = {},
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
         }
 
         val webView = composeRule.activity.window.decorView.findWebView()
-        composeRule.runOnIdle { assertNull(webView.url) }
-
-        composeRule.runOnIdle { hasSize.value = true }
         composeRule.waitForIdle()
         composeRule.runOnIdle {
             assertEquals(dataUrl, webView.url)
@@ -86,6 +84,26 @@ class PluginConfigScreenTest {
             assertTrue(webView.settings.loadWithOverviewMode)
             assertTrue(CookieManager.getInstance().acceptThirdPartyCookies(webView))
         }
+    }
+
+    @Test
+    fun unsupportedActionCallbackHandlerShowsExplanation() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        composeRule.setContent {
+            MaterialTheme {
+                PluginActionCallbackScreen(
+                    callback = PluginActionCallbackUiState(
+                        actionId = "pair",
+                        handlerId = "device-code",
+                    ),
+                    onCallback = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(
+            context.getString(R.string.plugin_action_callback_unsupported, "device-code"),
+        ).assertIsDisplayed()
     }
 
     private fun View.findWebView(): WebView {

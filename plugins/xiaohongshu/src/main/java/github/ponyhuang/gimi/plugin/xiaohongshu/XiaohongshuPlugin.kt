@@ -4,10 +4,12 @@ import android.content.Context
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
-import github.ponyhuang.gimi.pluginapi.BrowserAuthRequest
+import github.ponyhuang.gimi.pluginapi.PluginActionCallback
+import github.ponyhuang.gimi.pluginapi.PluginActionCallbackRequest
 import github.ponyhuang.gimi.pluginapi.PluginActionResult
 import github.ponyhuang.gimi.pluginapi.PluginConfig
 import github.ponyhuang.gimi.pluginapi.PluginConfigAction
+import github.ponyhuang.gimi.pluginapi.PluginConfigActionExecution
 
 /** 直接通过 Android 浏览器会话操作小红书网页的第一方插件。 */
 class XiaohongshuPlugin internal constructor(
@@ -44,36 +46,49 @@ class XiaohongshuPlugin internal constructor(
         }
     }
 
-    override fun configActionBrowserRequest(actionId: String): BrowserAuthRequest? = when (actionId) {
-        ACTION_LOGIN -> BrowserAuthRequest(
-            authorizeUrl = "https://www.xiaohongshu.com/explore",
-            redirectBase = "gimi-plugin-capture://complete",
-            completionScript =
-                "document.querySelector('.main-container .user .link-wrapper .channel') !== null",
-            captureCookiesForUrl = "https://www.xiaohongshu.com",
-            desktopMode = true,
-        )
-        else -> null
-    }
-
-    override suspend fun completeConfigAction(actionId: String, redirectUrl: String): PluginActionResult =
-        if (actionId == ACTION_LOGIN && redirectUrl.startsWith("gimi-plugin-capture://complete")) {
+    override suspend fun onConfigActionCallback(
+        actionId: String,
+        callback: PluginActionCallback,
+    ): PluginActionResult =
+        if (actionId == ACTION_LOGIN && callback.values.containsKey(CALLBACK_COOKIES)) {
             PluginActionResult(message = "小红书登录成功")
         } else {
             PluginActionResult(message = "无法完成小红书登录", success = false)
         }
 
-    override suspend fun runConfigAction(actionId: String): PluginActionResult = when (actionId) {
-        ACTION_LOGOUT -> runCatching { service.invoke("delete_cookies", emptyMap()) }
-            .fold(
-                onSuccess = { PluginActionResult(message = "已退出小红书登录") },
-                onFailure = { PluginActionResult(it.message ?: "退出登录失败", success = false) },
-            )
-        else -> PluginActionResult(message = "不支持的操作：$actionId", success = false)
+    override suspend fun runConfigAction(actionId: String): PluginConfigActionExecution = when (actionId) {
+        ACTION_LOGIN -> PluginConfigActionExecution.AwaitingCallback(
+            PluginActionCallbackRequest(
+                handlerId = HANDLER_WEB,
+                parameters = mapOf(
+                    PARAM_AUTHORIZE_URL to "https://www.xiaohongshu.com/explore",
+                    PARAM_COMPLETION_SCRIPT to
+                        "document.querySelector('.main-container .user .link-wrapper .channel') !== null",
+                    PARAM_CAPTURE_COOKIES_FOR_URL to "https://www.xiaohongshu.com",
+                    PARAM_DESKTOP_MODE to true.toString(),
+                ),
+            ),
+        )
+        ACTION_LOGOUT -> PluginConfigActionExecution.Completed(
+            runCatching { service.invoke("delete_cookies", emptyMap()) }
+                .fold(
+                    onSuccess = { PluginActionResult(message = "已退出小红书登录") },
+                    onFailure = { PluginActionResult(it.message ?: "退出登录失败", success = false) },
+                ),
+        )
+        else -> PluginConfigActionExecution.Completed(
+            PluginActionResult(message = "不支持的操作：$actionId", success = false),
+        )
     }
 
     companion object {
         const val ACTION_LOGIN: String = "login"
         const val ACTION_LOGOUT: String = "logout"
+        private const val HANDLER_WEB: String = "web"
+        private const val PARAM_AUTHORIZE_URL: String = "authorize_url"
+        private const val PARAM_COMPLETION_SCRIPT: String = "completion_script"
+        private const val PARAM_CAPTURE_COOKIES_FOR_URL: String = "capture_cookies_for_url"
+        private const val PARAM_DESKTOP_MODE: String = "desktop_mode"
+        private const val CALLBACK_COOKIES: String = "cookies"
     }
 }

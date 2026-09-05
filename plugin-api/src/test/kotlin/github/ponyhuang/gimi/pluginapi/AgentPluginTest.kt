@@ -9,22 +9,35 @@ import org.junit.Test
 class AgentPluginTest {
 
     @Test
-    fun pageStateBrowserCaptureBumpsPluginApiVersion() {
-        assertEquals(2, PluginApi.VERSION)
+    fun actionCallbackContractBumpsPluginApiVersion() {
+        assertEquals(3, PluginApi.VERSION)
     }
 
     @Test
-    fun browserRequestCanCompleteFromPageStateAndCaptureCookies() {
-        val request = BrowserAuthRequest(
-            authorizeUrl = "https://example.com/login",
-            redirectBase = "gimi://unused",
-            completionScript = "document.querySelector('.account') !== null",
-            captureCookiesForUrl = "https://example.com",
+    fun callbackRequestCarriesOpaqueHandlerParameters() {
+        val request = PluginActionCallbackRequest(
+            handlerId = "custom-interaction",
+            parameters = mapOf(
+                "entry" to "https://example.com/login",
+                "completion" to "document.querySelector('.account') !== null",
+            ),
         )
 
-        assertEquals("document.querySelector('.account') !== null", request.completionScript)
-        assertEquals("https://example.com", request.captureCookiesForUrl)
-        assertFalse(request.desktopMode)
+        assertEquals("custom-interaction", request.handlerId)
+        assertEquals("https://example.com/login", request.parameters["entry"])
+    }
+
+    @Test
+    fun actionCallbackCarriesPluginDefinedValues() {
+        val callback = PluginActionCallback(
+            values = mapOf(
+                "authorization_code" to "abc",
+                "account_id" to "123",
+            ),
+        )
+
+        assertEquals("abc", callback.values["authorization_code"])
+        assertEquals("123", callback.values["account_id"])
     }
 
     private fun plugin(): AgentPlugin = object : AgentPlugin {
@@ -66,7 +79,8 @@ class AgentPluginTest {
 
     @Test
     fun runConfigActionDefaultsToUnsupported() = runTest {
-        val result = plugin().runConfigAction("whatever")
+        val execution = plugin().runConfigAction("whatever")
+        val result = (execution as PluginConfigActionExecution.Completed).result
 
         assertFalse(result.success)
         assertTrue(result.message.contains("whatever"))

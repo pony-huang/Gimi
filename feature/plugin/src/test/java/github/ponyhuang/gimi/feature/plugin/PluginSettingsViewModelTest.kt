@@ -2,8 +2,9 @@ package github.ponyhuang.gimi.feature.plugin
 
 import app.cash.turbine.test
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
+import github.ponyhuang.gimi.domain.plugin.model.PluginActionCallback
+import github.ponyhuang.gimi.domain.plugin.model.PluginActionExecution
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionOutcome
-import github.ponyhuang.gimi.domain.plugin.model.PluginBrowserRequest
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
 import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
@@ -103,7 +104,7 @@ class PluginSettingsViewModelTest {
         override fun configDescriptor(pluginId: String): PluginConfigDescriptor? = null
         override fun configValues(pluginId: String): Map<String, String> = emptyMap()
         override fun updateConfig(pluginId: String, values: Map<String, String>) = Unit
-        override suspend fun runAction(pluginId: String, actionId: String): PluginActionOutcome? = null
+        override suspend fun runAction(pluginId: String, actionId: String): PluginActionExecution? = null
 
         override suspend fun refresh(): List<String> {
             refreshCalls += 1
@@ -111,12 +112,10 @@ class PluginSettingsViewModelTest {
             return refreshResult
         }
 
-        override fun configActionBrowserRequest(pluginId: String, actionId: String): PluginBrowserRequest? = null
-
-        override suspend fun completeAction(
+        override suspend fun onActionCallback(
             pluginId: String,
             actionId: String,
-            redirectUrl: String,
+            callback: PluginActionCallback,
         ): PluginActionOutcome? = null
     }
 }

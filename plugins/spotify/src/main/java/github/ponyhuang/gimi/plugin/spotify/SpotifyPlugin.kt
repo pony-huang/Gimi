@@ -13,6 +13,7 @@ import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import github.ponyhuang.gimi.pluginapi.PluginActionResult
 import github.ponyhuang.gimi.pluginapi.PluginConfig
 import github.ponyhuang.gimi.pluginapi.PluginConfigAction
+import github.ponyhuang.gimi.pluginapi.PluginConfigActionExecution
 import github.ponyhuang.gimi.pluginapi.PluginConfigField
 
 /**
@@ -86,16 +87,20 @@ class SpotifyPlugin : AgentPlugin {
         }
     }
 
-    override suspend fun runConfigAction(actionId: String): PluginActionResult = when (actionId) {
-        ACTION_LOGIN -> runCatching {
-            performLogin(auth, { clientId }, { clientSecret }, { redirectUri }) { appContext }
-        }.fold(
-            onSuccess = { message -> PluginActionResult(message = message) },
-            onFailure = { error ->
-                PluginActionResult(message = error.message ?: "Authorization failed", success = false)
-            },
+    override suspend fun runConfigAction(actionId: String): PluginConfigActionExecution = when (actionId) {
+        ACTION_LOGIN -> PluginConfigActionExecution.Completed(
+            runCatching {
+                performLogin(auth, { clientId }, { clientSecret }, { redirectUri }) { appContext }
+            }.fold(
+                onSuccess = { message -> PluginActionResult(message = message) },
+                onFailure = { error ->
+                    PluginActionResult(message = error.message ?: "Authorization failed", success = false)
+                },
+            ),
         )
-        else -> PluginActionResult(message = "Unknown action: $actionId", success = false)
+        else -> PluginConfigActionExecution.Completed(
+            PluginActionResult(message = "Unknown action: $actionId", success = false),
+        )
     }
 
     companion object {

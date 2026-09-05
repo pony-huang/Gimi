@@ -1,25 +1,29 @@
 package github.ponyhuang.gimi.data.plugin
 
 import android.content.Context
+import androidx.core.content.edit
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.Toolset
 import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.gimi.domain.plugin.model.PluginActionCallback
+import github.ponyhuang.gimi.domain.plugin.model.PluginActionCallbackRequest
+import github.ponyhuang.gimi.domain.plugin.model.PluginActionExecution
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionOutcome
-import github.ponyhuang.gimi.domain.plugin.model.PluginBrowserRequest
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
 import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
+import github.ponyhuang.gimi.pluginapi.PluginConfigActionExecution
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
-import androidx.core.content.edit
 
 /**
  * 动态插件管理器 — 宿主侧唯一入口。
@@ -98,40 +102,40 @@ class PluginManager @Inject constructor(
                 )
             }
 
-    override suspend fun runAction(pluginId: String, actionId: String): PluginActionOutcome? {
+    override suspend fun runAction(pluginId: String, actionId: String): PluginActionExecution? {
         val plugin = loaded.firstOrNull { it.plugin.pluginId == pluginId }?.plugin ?: return null
-        // 动作可能长时间挂起（如等待 OAuth 回调），切到 IO 执行。
+        // 普通动作可能长时间挂起；需要宿主交互的动作则返回请求，由 feature 层继续驱动。
         return withContext(Dispatchers.IO) {
-            runCatching { plugin.runConfigAction(actionId) }
-                .map { outcome -> PluginActionOutcome(outcome.message, outcome.success) }
-                .getOrElse { error -> PluginActionOutcome(error.message ?: "Action failed", success = false) }
+            try {
+                plugin.runConfigAction(actionId).toDomainExecution()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                PluginActionExecution.Completed(
+                    PluginActionOutcome(error.message ?: "Action failed", success = false),
+                )
+            }
         }
     }
 
-    override fun configActionBrowserRequest(pluginId: String, actionId: String): PluginBrowserRequest? =
-        loaded.firstOrNull { it.plugin.pluginId == pluginId }
-            ?.plugin
-            ?.configActionBrowserRequest(actionId)
-            ?.let { request ->
-                PluginBrowserRequest(
-                    authorizeUrl = request.authorizeUrl,
-                    redirectBase = request.redirectBase,
-                    completionScript = request.completionScript,
-                    captureCookiesForUrl = request.captureCookiesForUrl,
-                    desktopMode = request.desktopMode,
-                )
-            }
-
-    override suspend fun completeAction(
+    override suspend fun onActionCallback(
         pluginId: String,
         actionId: String,
-        redirectUrl: String,
+        callback: PluginActionCallback,
     ): PluginActionOutcome? {
         val plugin = loaded.firstOrNull { it.plugin.pluginId == pluginId }?.plugin ?: return null
         return withContext(Dispatchers.IO) {
-            runCatching { plugin.completeConfigAction(actionId, redirectUrl) }
-                .map { outcome -> PluginActionOutcome(outcome.message, outcome.success) }
-                .getOrElse { error -> PluginActionOutcome(error.message ?: "Action failed", success = false) }
+            try {
+                val outcome = plugin.onConfigActionCallback(
+                    actionId = actionId,
+                    callback = github.ponyhuang.gimi.pluginapi.PluginActionCallback(callback.values),
+                )
+                PluginActionOutcome(outcome.message, outcome.success)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                PluginActionOutcome(error.message ?: "Action failed", success = false)
+            }
         }
     }
 
@@ -162,6 +166,18 @@ class PluginManager @Inject constructor(
 
     private fun synchronizeRevision() {
         _revision.value = runtime.value.revision
+    }
+
+    private fun PluginConfigActionExecution.toDomainExecution(): PluginActionExecution = when (this) {
+        is PluginConfigActionExecution.Completed -> PluginActionExecution.Completed(
+            PluginActionOutcome(result.message, result.success),
+        )
+        is PluginConfigActionExecution.AwaitingCallback -> PluginActionExecution.AwaitingCallback(
+            PluginActionCallbackRequest(
+                handlerId = request.handlerId,
+                parameters = request.parameters,
+            ),
+        )
     }
 
     private companion object {

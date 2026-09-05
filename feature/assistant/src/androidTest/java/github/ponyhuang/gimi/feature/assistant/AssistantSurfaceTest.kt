@@ -61,7 +61,8 @@ class AssistantSurfaceTest {
         }
 
         composeRule.onNodeWithText("停止").assertIsDisplayed()
-        composeRule.onNodeWithText("正在思考").assertIsDisplayed()
+        // 头部状态标题已移除（避免与操作按钮重叠），无消息时不应出现“正在思考”。
+        composeRule.onNodeWithText("正在思考").assertDoesNotExist()
     }
 
     @Test

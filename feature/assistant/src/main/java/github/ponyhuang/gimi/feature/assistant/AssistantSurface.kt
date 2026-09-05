@@ -135,19 +135,18 @@ private fun AssistantHeader(
     onStop: () -> Unit,
     onOpenChat: () -> Unit,
 ) {
-    // 标题绝对居中，操作按钮固定在右侧，保证面板初始（无操作项）时标题处于正中心。
     Box(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(state.phase.statusTextRes()),
-            modifier = Modifier.align(Alignment.Center),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = if (state.phase == AssistantSessionPhase.ERROR) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            },
-        )
+        // 运行阶段不再展示标题，避免与右侧操作按钮重叠；错误以消息气泡呈现。
+        // 仅保留“未配置模型”：该状态没有消息和操作按钮，标题是唯一反馈出口。
+        if (state.phase == AssistantSessionPhase.MISSING_CONFIG) {
+            Text(
+                text = stringResource(R.string.assistant_status_missing_config),
+                modifier = Modifier.align(Alignment.Center),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
         Row(
             modifier = Modifier.align(Alignment.CenterEnd),
             verticalAlignment = Alignment.CenterVertically,
@@ -427,19 +426,4 @@ private fun AssistantMicrophoneButton(
             )
         }
     }
-}
-
-private fun AssistantSessionPhase.statusTextRes(): Int = when (this) {
-    AssistantSessionPhase.PREPARING -> R.string.assistant_status_preparing
-    AssistantSessionPhase.MISSING_CONFIG -> R.string.assistant_status_missing_config
-    AssistantSessionPhase.BUSY -> R.string.assistant_status_busy
-    AssistantSessionPhase.LISTENING -> R.string.assistant_status_listening
-    AssistantSessionPhase.TRANSCRIBING -> R.string.assistant_status_transcribing
-    AssistantSessionPhase.GENERATING -> R.string.assistant_status_generating
-    AssistantSessionPhase.EXECUTING_TOOL -> R.string.assistant_status_executing_tool
-    AssistantSessionPhase.AWAITING_CONFIRMATION -> R.string.assistant_status_confirming
-    AssistantSessionPhase.SPEAKING -> R.string.assistant_status_speaking
-    AssistantSessionPhase.FOLLOW_UP_IDLE -> R.string.assistant_status_completed
-    AssistantSessionPhase.STOPPED -> R.string.assistant_status_stopped
-    AssistantSessionPhase.ERROR -> R.string.assistant_status_error
 }

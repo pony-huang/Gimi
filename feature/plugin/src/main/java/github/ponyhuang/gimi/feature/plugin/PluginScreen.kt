@@ -275,22 +275,22 @@ fun PluginConfigScreen(
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val browser = state.browser
+    val callback = state.callback
     PreferenceScaffold(
         title = stringResource(
-            if (browser == null) R.string.plugin_config_title else R.string.plugin_browser_title,
+            if (callback == null) R.string.plugin_config_title else R.string.plugin_action_callback_title,
         ),
-        onBack = if (browser == null) {
+        onBack = if (callback == null) {
             onBack
         } else {
-            { onAction(PluginConfigAction.CloseBrowser) }
+            { onAction(PluginConfigAction.DismissActionCallback) }
         },
     ) { contentModifier ->
-        if (browser != null) {
-            PluginBrowserScreen(
-                browser = browser,
-                onComplete = { url ->
-                    onAction(PluginConfigAction.CompleteAction(browser.actionId, url))
+        if (callback != null) {
+            PluginActionCallbackScreen(
+                callback = callback,
+                onCallback = { values ->
+                    onAction(PluginConfigAction.ReceiveActionCallback(callback.actionId, values))
                 },
                 modifier = contentModifier,
             )

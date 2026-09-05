@@ -9,7 +9,7 @@ package github.ponyhuang.gimi.pluginapi
 object PluginApi {
 
     /** 插件协议兼容性主版本；宿主与插件必须一致。 */
-    const val VERSION: Int = 2
+    const val VERSION: Int = 3
 
     /** 插件声明发现组件的 intent-filter action。 */
     const val DISCOVERY_ACTION: String = "github.ponyhuang.gimi.plugin.DISCOVERY"

@@ -2,9 +2,11 @@ package github.ponyhuang.gimi.feature.plugin
 
 import app.cash.turbine.test
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
+import github.ponyhuang.gimi.domain.plugin.model.PluginActionCallback
+import github.ponyhuang.gimi.domain.plugin.model.PluginActionCallbackRequest
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionDescriptor
+import github.ponyhuang.gimi.domain.plugin.model.PluginActionExecution
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionOutcome
-import github.ponyhuang.gimi.domain.plugin.model.PluginBrowserRequest
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigFieldDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
@@ -12,6 +14,7 @@ import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -169,7 +172,9 @@ class PluginConfigViewModelTest {
             descriptor = PluginConfigDescriptor(
                 actions = listOf(PluginActionDescriptor(id = "login", label = "Authorize")),
             ),
-            runOutcome = PluginActionOutcome(message = "Authorized", success = true),
+            runExecution = PluginActionExecution.Completed(
+                PluginActionOutcome(message = "Authorized", success = true),
+            ),
         )
         val viewModel = PluginConfigViewModel(repository)
         viewModel.load("spotify")
@@ -185,67 +190,76 @@ class PluginConfigViewModelTest {
     }
 
     @Test
-    fun runActionWithBrowserRequestShowsBrowserInsteadOfBlocking() = runTest {
+    fun runActionAwaitingCallbackShowsCallbackPage() = runTest {
         val repository = FakePluginRepository(
             descriptor = PluginConfigDescriptor(
                 actions = listOf(PluginActionDescriptor(id = "login", label = "Authorize")),
             ),
-            browserRequest = PluginBrowserRequest(
-                authorizeUrl = "https://accounts.spotify.com/authorize?x",
-                redirectBase = "http://127.0.0.1:8888/callback",
-                desktopMode = true,
+            runExecution = PluginActionExecution.AwaitingCallback(
+                PluginActionCallbackRequest(
+                    handlerId = "web",
+                    parameters = mapOf(
+                        "authorize_url" to "https://accounts.spotify.com/authorize?x",
+                        "redirect_base" to "http://127.0.0.1:8888/callback",
+                        "desktop_mode" to "true",
+                    ),
+                ),
             ),
         )
         val viewModel = PluginConfigViewModel(repository)
         viewModel.load("spotify")
 
         viewModel.onAction(PluginConfigAction.RunAction("login"))
+        advanceUntilIdle()
 
-        // 有浏览器请求 → 弹出 WebView，且不进入阻塞 runAction。
-        assertEquals("login", viewModel.state.value.browser?.actionId)
-        assertEquals("https://accounts.spotify.com/authorize?x", viewModel.state.value.browser?.authorizeUrl)
-        assertEquals(true, viewModel.state.value.browser?.desktopMode)
-        assertEquals(0, repository.runActionCalls.size)
+        assertEquals("login", viewModel.state.value.callback?.actionId)
+        assertEquals("web", viewModel.state.value.callback?.handlerId)
+        assertEquals(
+            "https://accounts.spotify.com/authorize?x",
+            viewModel.state.value.callback?.parameters?.get("authorize_url"),
+        )
+        assertEquals(listOf("spotify" to "login"), repository.runActionCalls)
     }
 
     @Test
-    fun completeActionDelegatesAndEmitsResultToast() = runTest {
-        val redirectUrl = "http://127.0.0.1:8888/callback?code=abc&state=st"
+    fun actionCallbackDelegatesGenericValuesAndEmitsResultToast() = runTest {
+        val values = mapOf("device_code" to "abc", "account_id" to "123")
         val repository = FakePluginRepository(
             descriptor = PluginConfigDescriptor(
                 actions = listOf(PluginActionDescriptor(id = "login", label = "Authorize")),
             ),
-            completeOutcome = PluginActionOutcome(message = "Spotify authorization succeeded", success = true),
+            callbackOutcome = PluginActionOutcome(message = "Authorization succeeded", success = true),
         )
         val viewModel = PluginConfigViewModel(repository)
         viewModel.load("spotify")
 
         viewModel.effects.test {
-            viewModel.onAction(PluginConfigAction.CompleteAction("login", redirectUrl))
+            viewModel.onAction(PluginConfigAction.ReceiveActionCallback("login", values))
 
             assertEquals(
-                PluginConfigEffect.ShowToast(message = "Spotify authorization succeeded"),
+                PluginConfigEffect.ShowToast(message = "Authorization succeeded"),
                 awaitItem(),
             )
         }
-        assertEquals(listOf(Triple("spotify", "login", redirectUrl)), repository.completeActionCalls)
-        // 弹窗已关闭。
-        assertEquals(null, viewModel.state.value.browser)
+        assertEquals(
+            listOf(Triple("spotify", "login", PluginActionCallback(values))),
+            repository.actionCallbackCalls,
+        )
+        assertEquals(null, viewModel.state.value.callback)
     }
 
     private class FakePluginRepository(
         private val descriptor: PluginConfigDescriptor = PluginConfigDescriptor(),
         var stored: Map<String, String> = emptyMap(),
-        private val runOutcome: PluginActionOutcome? = null,
-        private val browserRequest: PluginBrowserRequest? = null,
-        private val completeOutcome: PluginActionOutcome? = null,
+        private val runExecution: PluginActionExecution? = null,
+        private val callbackOutcome: PluginActionOutcome? = null,
     ) : PluginRepository {
         val pluginsFlow = MutableStateFlow<List<PluginDescriptor>>(emptyList())
         override val plugins: StateFlow<List<PluginDescriptor>> = pluginsFlow
         override val revision: StateFlow<Long> = MutableStateFlow(0L)
         var updatedConfig: Pair<String, Map<String, String>>? = null
         val runActionCalls = mutableListOf<Pair<String, String>>()
-        val completeActionCalls = mutableListOf<Triple<String, String, String>>()
+        val actionCallbackCalls = mutableListOf<Triple<String, String, PluginActionCallback>>()
 
         override fun setEnabled(pluginId: String, enabled: Boolean) = Unit
         override fun configDescriptor(pluginId: String): PluginConfigDescriptor? = descriptor
@@ -254,23 +268,20 @@ class PluginConfigViewModelTest {
             updatedConfig = pluginId to values
         }
 
-        override suspend fun runAction(pluginId: String, actionId: String): PluginActionOutcome? {
+        override suspend fun runAction(pluginId: String, actionId: String): PluginActionExecution? {
             runActionCalls += pluginId to actionId
-            return runOutcome
+            return runExecution
         }
 
         override suspend fun refresh(): List<String> = emptyList()
 
-        override fun configActionBrowserRequest(pluginId: String, actionId: String): PluginBrowserRequest? =
-            browserRequest
-
-        override suspend fun completeAction(
+        override suspend fun onActionCallback(
             pluginId: String,
             actionId: String,
-            redirectUrl: String,
+            callback: PluginActionCallback,
         ): PluginActionOutcome? {
-            completeActionCalls += Triple(pluginId, actionId, redirectUrl)
-            return completeOutcome
+            actionCallbackCalls += Triple(pluginId, actionId, callback)
+            return callbackOutcome
         }
     }
 }

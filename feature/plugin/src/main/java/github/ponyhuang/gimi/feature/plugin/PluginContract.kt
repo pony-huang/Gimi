@@ -28,7 +28,7 @@ data class PluginConfigUiState(
     val pluginId: String = "",
     val fields: List<PluginConfigFieldUiState> = emptyList(),
     val actions: List<PluginActionUiState> = emptyList(),
-    val browser: PluginBrowserUiState? = null,
+    val callback: PluginActionCallbackUiState? = null,
 ) {
     val hasFields: Boolean get() = fields.isNotEmpty()
     val hasActions: Boolean get() = actions.isNotEmpty()
@@ -36,23 +36,16 @@ data class PluginConfigUiState(
 }
 
 /**
- * 内置浏览器授权页状态。
+ * 配置动作等待宿主回调时的交互页状态。
  *
  * @property actionId 触发弹窗的配置页动作。
- * @property authorizeUrl WebView 加载的授权 URL。
- * @property redirectBase WebView 应拦截的重定向前缀，截获后交给
- *   [PluginConfigAction.CompleteAction]。
- * @property completionScript 页面完成条件脚本。
- * @property captureCookiesForUrl 完成时读取 Cookie 的站点。
- * @property desktopMode 是否使用桌面浏览器 UA 与宽视口加载网页。
+ * @property handlerId 宿主交互处理器标识。
+ * @property parameters 由处理器解释的不透明参数。
  */
-data class PluginBrowserUiState(
+data class PluginActionCallbackUiState(
     val actionId: String,
-    val authorizeUrl: String,
-    val redirectBase: String,
-    val completionScript: String? = null,
-    val captureCookiesForUrl: String? = null,
-    val desktopMode: Boolean = false,
+    val handlerId: String,
+    val parameters: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -88,11 +81,19 @@ sealed interface PluginConfigAction {
     data object Save : PluginConfigAction
     data class RunAction(val actionId: String) : PluginConfigAction
 
-    /** 内置浏览器截获重定向后，把完整重定向 URL 交给插件完成动作。 */
-    data class CompleteAction(val actionId: String, val redirectUrl: String) : PluginConfigAction
+    /**
+     * 把宿主交互生成的通用键值回传插件。
+     *
+     * @property actionId 等待回调的配置动作。
+     * @property values 插件自行解释的回调参数。
+     */
+    data class ReceiveActionCallback(
+        val actionId: String,
+        val values: Map<String, String>,
+    ) : PluginConfigAction
 
-    /** 关闭内置浏览器授权页（用户取消）。 */
-    data object CloseBrowser : PluginConfigAction
+    /** 用户取消并关闭配置动作的回调交互页。 */
+    data object DismissActionCallback : PluginConfigAction
 }
 
 sealed interface PluginConfigEffect {

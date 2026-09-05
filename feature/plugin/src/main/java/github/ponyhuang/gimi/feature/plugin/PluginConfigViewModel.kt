@@ -3,6 +3,8 @@ package github.ponyhuang.gimi.feature.plugin
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import github.ponyhuang.gimi.domain.plugin.model.PluginActionCallback
+import github.ponyhuang.gimi.domain.plugin.model.PluginActionExecution
 import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
 import github.ponyhuang.gimi.feature.plugin.R
 import javax.inject.Inject
@@ -68,33 +70,16 @@ class PluginConfigViewModel @Inject constructor(
                 }
             }
             is PluginConfigAction.RunAction -> runAction(action.actionId)
-            is PluginConfigAction.CompleteAction -> completeAction(action.actionId, action.redirectUrl)
-            PluginConfigAction.CloseBrowser -> _state.update { it.copy(browser = null) }
+            is PluginConfigAction.ReceiveActionCallback -> receiveActionCallback(action.actionId, action.values)
+            PluginConfigAction.DismissActionCallback -> _state.update { it.copy(callback = null) }
         }
     }
 
     /**
-     * 执行配置页动作。需要内置浏览器授权的动作（[PluginRepository.configActionBrowserRequest]
-     * 非空）进入 WebView 授权页，等截获回调后走 [completeAction]；否则走阻塞路径
-     * [PluginRepository.runAction]（实现方负责 IO/挂起）。
+     * 执行配置页动作。插件可直接返回最终结果，或请求宿主进入交互页并等待通用参数回调。
      */
     private fun runAction(actionId: String) {
         if (_state.value.isAnyActionRunning) return
-        repository.configActionBrowserRequest(_state.value.pluginId, actionId)?.let { request ->
-            _state.update {
-                it.copy(
-                    browser = PluginBrowserUiState(
-                        actionId = actionId,
-                        authorizeUrl = request.authorizeUrl,
-                        redirectBase = request.redirectBase,
-                        completionScript = request.completionScript,
-                        captureCookiesForUrl = request.captureCookiesForUrl,
-                        desktopMode = request.desktopMode,
-                    ),
-                )
-            }
-            return
-        }
         viewModelScope.launch {
             _state.update { state ->
                 state.copy(
@@ -103,7 +88,7 @@ class PluginConfigViewModel @Inject constructor(
                     },
                 )
             }
-            val outcome = repository.runAction(_state.value.pluginId, actionId)
+            val execution = repository.runAction(_state.value.pluginId, actionId)
             _state.update { state ->
                 state.copy(
                     actions = state.actions.map { action ->
@@ -111,15 +96,36 @@ class PluginConfigViewModel @Inject constructor(
                     },
                 )
             }
-            outcome?.let { mutableEffects.emit(PluginConfigEffect.ShowToast(message = it.message)) }
+            when (execution) {
+                is PluginActionExecution.Completed -> {
+                    mutableEffects.emit(PluginConfigEffect.ShowToast(message = execution.outcome.message))
+                }
+                is PluginActionExecution.AwaitingCallback -> {
+                    val request = execution.request
+                    _state.update {
+                        it.copy(
+                            callback = PluginActionCallbackUiState(
+                                actionId = actionId,
+                                handlerId = request.handlerId,
+                                parameters = request.parameters,
+                            ),
+                        )
+                    }
+                }
+                null -> Unit
+            }
         }
     }
 
-    /** 内置浏览器截获重定向后，把授权码交给插件完成（如换 token）。 */
-    private fun completeAction(actionId: String, redirectUrl: String) {
+    /** 把宿主交互生成的通用参数信封回传插件。 */
+    private fun receiveActionCallback(actionId: String, values: Map<String, String>) {
         viewModelScope.launch {
-            _state.update { it.copy(browser = null) }
-            val outcome = repository.completeAction(_state.value.pluginId, actionId, redirectUrl)
+            _state.update { it.copy(callback = null) }
+            val outcome = repository.onActionCallback(
+                pluginId = _state.value.pluginId,
+                actionId = actionId,
+                callback = PluginActionCallback(values),
+            )
             outcome?.let { mutableEffects.emit(PluginConfigEffect.ShowToast(message = it.message)) }
         }
     }

@@ -65,25 +65,52 @@ data class PluginActionDescriptor(
     val label: String,
 )
 
-/** 配置页动作的执行结果。 */
+/**
+ * 配置页动作的最终执行结果。
+ *
+ * @property message 面向用户的结果消息。
+ * @property success 动作是否成功完成。
+ */
 data class PluginActionOutcome(
     val message: String,
     val success: Boolean = true,
 )
 
 /**
- * 内置浏览器（WebView）授权请求。
+ * 配置动作希望宿主执行的通用回调交互请求。
  *
- * @property authorizeUrl WebView 加载的授权 URL。
- * @property redirectBase WebView 应拦截的重定向 URL 前缀。
- * @property completionScript 页面完成条件脚本；返回 true 时结束浏览器动作。
- * @property captureCookiesForUrl 完成时读取 Cookie 的站点。
- * @property desktopMode 是否使用桌面浏览器 UA 与宽视口加载网页。
+ * @property handlerId 宿主交互处理器标识。
+ * @property parameters 由对应处理器解释的不透明字符串参数。
  */
-data class PluginBrowserRequest(
-    val authorizeUrl: String,
-    val redirectBase: String,
-    val completionScript: String? = null,
-    val captureCookiesForUrl: String? = null,
-    val desktopMode: Boolean = false,
+data class PluginActionCallbackRequest(
+    val handlerId: String,
+    val parameters: Map<String, String> = emptyMap(),
 )
+
+/**
+ * 宿主回传给插件配置动作的通用参数信封。
+ *
+ * @property values 插件自行解释的字符串键值。
+ */
+data class PluginActionCallback(
+    val values: Map<String, String> = emptyMap(),
+)
+
+/** 配置动作首次执行后的下一步。 */
+sealed interface PluginActionExecution {
+    /**
+     * 配置动作已经结束。
+     *
+     * @property outcome 最终执行结果。
+     */
+    data class Completed(val outcome: PluginActionOutcome) : PluginActionExecution
+
+    /**
+     * 配置动作等待宿主完成交互并回调。
+     *
+     * @property request 宿主需要执行的交互请求。
+     */
+    data class AwaitingCallback(
+        val request: PluginActionCallbackRequest,
+    ) : PluginActionExecution
+}

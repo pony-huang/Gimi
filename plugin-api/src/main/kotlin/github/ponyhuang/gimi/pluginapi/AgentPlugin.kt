@@ -10,10 +10,9 @@ import com.google.adk.kt.tools.Toolset
  * 插件作者实现本接口（[pluginId] / [version] / [config] + 需要的 ADK 回调），宿主经
  * DexClassLoader 实例化后直接当作 ADK [Plugin] 注入 Agent 运行。
  *
- * 内置浏览器（WebView）是面向**所有**插件的通用授权/抓包通道，不限于某个插件（如
- * Spotify、知乎）：当前用于配置页 OAuth 授权（[configActionBrowserRequest] /
- * [completeConfigAction]）；后续扩展为「抓包」式拦截 —— 截获浏览器内用户以身份访问
- * Web 服务时产生的 token/session/cookie，供插件凭此调用对应的 Web API。
+ * 配置动作既可直接完成，也可通过 [PluginConfigActionExecution.AwaitingCallback] 请求宿主
+ * 协助完成交互，再由 [onConfigActionCallback] 把结果回传插件。宿主交互的具体实现不属于
+ * 插件生命周期契约，插件只需声明请求并解释回调参数。
  *
  * 预留扩展点（后续填充默认实现）：
  * - MCP 注入：插件声明要注入会话的 MCP 服务器；
@@ -82,55 +81,65 @@ interface AgentPlugin : Plugin {
     /**
      * 执行配置页动作（对应 [PluginConfig.actions] 里的 [PluginConfigAction]），如「授权登录」。
      *
-     * 宿主在配置页点按按钮后经 [PluginManager.runConfigAction] 转调；可挂起（如等待 OAuth 回调）。
-     * 需要内置浏览器授权时见 [configActionBrowserRequest]。默认返回不支持。
+     * 宿主在配置页点按按钮后转调。普通动作返回 [PluginConfigActionExecution.Completed]；
+     * 需要宿主继续交互的动作返回 [PluginConfigActionExecution.AwaitingCallback]。默认返回不支持。
      */
-    suspend fun runConfigAction(actionId: String): PluginActionResult =
-        PluginActionResult(message = "Plugin does not support action: $actionId", success = false)
+    suspend fun runConfigAction(actionId: String): PluginConfigActionExecution =
+        PluginConfigActionExecution.Completed(
+            PluginActionResult(message = "Plugin does not support action: $actionId", success = false),
+        )
 
     /**
-     * 配置页动作若需宿主用内置浏览器（WebView）完成授权，返回浏览器请求；
-     * 宿主据此打开 WebView 加载 [BrowserAuthRequest.authorizeUrl]，并在导航到
-     * [BrowserAuthRequest.redirectBase] 前缀时截获完整重定向 URL 交给 [completeConfigAction]。
-     * 返回 null 表示无需浏览器。
-     *
-     * 该通道是通用能力：任何需要以用户身份调 Web API 的插件（Spotify、知乎等）都可复用；
-     * 后续在此基础上扩展为抓包式拦截 —— 直接把浏览器内访问产生的 token/session/cookie
-     * 捕获下来，供插件调用对应 Web API。
+     * 接收宿主为等待中的配置动作生成的通用回调参数。
+     * 插件自行约定并解释 [PluginActionCallback.values]；回调来源不限于网页交互。默认返回不支持。
      */
-    fun configActionBrowserRequest(actionId: String): BrowserAuthRequest? = null
-
-    /**
-     * 内置浏览器授权回调：宿主把截获的重定向 URL（含 code/state）交给插件完成动作（如换 token）。
-     *
-     * 这是抓包式取凭证的基础：宿主只负责把浏览器里截获的 URL/请求交给插件，插件自行解析出
-     * token/session/cookie 并保存（如 [configure]），之后据此调用 Web API。通用机制，不限插件。
-     * 默认返回不支持。
-     */
-    suspend fun completeConfigAction(actionId: String, redirectUrl: String): PluginActionResult =
-        PluginActionResult(message = "Plugin does not support in-app browser callback: $actionId", success = false)
+    suspend fun onConfigActionCallback(
+        actionId: String,
+        callback: PluginActionCallback,
+    ): PluginActionResult =
+        PluginActionResult(message = "Plugin does not support action callback: $actionId", success = false)
 }
 
 /**
- * 内置浏览器授权请求。
+ * 配置动作希望宿主执行的通用回调交互请求。
  *
- * 浏览器通道不只服务 OAuth：后续用作通用抓包入口 —— 插件通过 WebView 以用户身份访问服务，
- * 宿主截获其中的 token/session/cookie 交还插件，据此调用对应 Web API（对 Spotify、知乎等
- * 所有插件通用）。
+ * plugin-api 不解释参数内容；插件实现方选择宿主支持的处理器，并按该处理器约定提供参数。
  *
- * @property authorizeUrl WebView 加载的授权 URL。
- * @property redirectBase WebView 应拦截的重定向 URL 前缀（如 `http://127.0.0.1:8888/callback`）。
- * @property completionScript 可选的网页完成条件；脚本返回 true 时结束浏览器动作。
- * @property captureCookiesForUrl 完成时要读取 Cookie 的站点；Cookie 只经内存回调交给插件。
- * @property desktopMode 是否使用桌面浏览器 UA 与宽视口加载网页。
+ * @property handlerId 宿主交互处理器标识。
+ * @property parameters 由对应处理器解释的不透明字符串参数。
  */
-data class BrowserAuthRequest(
-    val authorizeUrl: String,
-    val redirectBase: String,
-    val completionScript: String? = null,
-    val captureCookiesForUrl: String? = null,
-    val desktopMode: Boolean = false,
+data class PluginActionCallbackRequest(
+    val handlerId: String,
+    val parameters: Map<String, String> = emptyMap(),
 )
+
+/**
+ * 宿主回传给插件配置动作的通用参数信封。
+ *
+ * @property values 插件自行解释的字符串键值；宿主能力可按双方约定填充不同参数。
+ */
+data class PluginActionCallback(
+    val values: Map<String, String> = emptyMap(),
+)
+
+/** 配置动作首次执行后的下一步。 */
+sealed interface PluginConfigActionExecution {
+    /**
+     * 配置动作已经结束。
+     *
+     * @property result 最终执行结果。
+     */
+    data class Completed(val result: PluginActionResult) : PluginConfigActionExecution
+
+    /**
+     * 配置动作等待宿主完成交互并调用 [AgentPlugin.onConfigActionCallback]。
+     *
+     * @property request 宿主需要执行的交互请求。
+     */
+    data class AwaitingCallback(
+        val request: PluginActionCallbackRequest,
+    ) : PluginConfigActionExecution
+}
 
 /** 配置页动作的执行结果。 */
 data class PluginActionResult(

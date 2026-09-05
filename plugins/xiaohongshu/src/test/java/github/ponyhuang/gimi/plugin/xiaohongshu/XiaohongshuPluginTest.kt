@@ -5,11 +5,12 @@ import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.Part
+import github.ponyhuang.gimi.pluginapi.PluginActionCallback
 import github.ponyhuang.gimi.pluginapi.PluginConfigAction
+import github.ponyhuang.gimi.pluginapi.PluginConfigActionExecution
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -74,15 +75,28 @@ class XiaohongshuPluginTest {
     }
 
     @Test
-    fun loginUsesWebsitePageStateInsteadOfMcpOrServerAddress() {
-        val request = XiaohongshuPlugin(injectedService = FakeXiaohongshuService())
-            .configActionBrowserRequest("login")
+    fun loginRequestsHostCallbackInteractionWithPluginOwnedParameters() = runTest {
+        val execution = XiaohongshuPlugin(injectedService = FakeXiaohongshuService())
+            .runConfigAction("login") as PluginConfigActionExecution.AwaitingCallback
+        val request = execution.request
 
-        assertNotNull(request)
-        assertEquals("https://www.xiaohongshu.com/explore", request?.authorizeUrl)
-        assertEquals("https://www.xiaohongshu.com", request?.captureCookiesForUrl)
-        assertTrue(request?.completionScript.orEmpty().contains(".main-container .user"))
-        assertEquals(true, request?.desktopMode)
+        assertEquals("web", request.handlerId)
+        assertEquals("https://www.xiaohongshu.com/explore", request.parameters["authorize_url"])
+        assertEquals("https://www.xiaohongshu.com", request.parameters["capture_cookies_for_url"])
+        assertTrue(request.parameters["completion_script"].orEmpty().contains(".main-container .user"))
+        assertEquals("true", request.parameters["desktop_mode"])
+    }
+
+    @Test
+    fun loginCallbackInterpretsGenericValues() = runTest {
+        val result = XiaohongshuPlugin(injectedService = FakeXiaohongshuService())
+            .onConfigActionCallback(
+                actionId = "login",
+                callback = PluginActionCallback(mapOf("cookies" to "session=abc")),
+            )
+
+        assertTrue(result.success)
+        assertEquals("小红书登录成功", result.message)
     }
 }
 

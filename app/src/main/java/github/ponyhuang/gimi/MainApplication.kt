@@ -12,7 +12,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 @HiltAndroidApp
-class AsssistantaiApp : Application(), Configuration.Provider {
+class MainApplication : Application(), Configuration.Provider {
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var recommendationStartupInitializer: RecommendationStartupInitializer
 

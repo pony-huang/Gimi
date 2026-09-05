@@ -1,4 +1,4 @@
-package github.ponyhuang.gimi.app.navigation
+package github.ponyhuang.gimi.navigation
 
 import android.Manifest
 import android.content.pm.PackageManager

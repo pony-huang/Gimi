@@ -11,7 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
-import github.ponyhuang.gimi.app.navigation.MainScreen
+import github.ponyhuang.gimi.navigation.MainScreen
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
 import github.ponyhuang.gimi.feature.chat.sharedImageUris

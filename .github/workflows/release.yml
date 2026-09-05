@@ -120,10 +120,11 @@ jobs:
           done
           ls -la dist/
 
-      # 发布策略：release-please 合并 Release PR 时，会先打 tag、再用 CHANGELOG.md
-      # 创建带分组更新日志的 Release；本工作流由 tag 推送触发，构建完成后：
-      #   - 若 Release 已存在 -> 仅上传 APK，保留其更新日志，避免被空正文覆盖；
-      #   - 若 Release 不存在（手动打 tag）-> 用 GitHub 自动生成的更新日志创建 Release。
+      # 发布策略：本工作流由 v* tag 推送或手动触发，构建完成后：
+      #   - 若 Release 已存在 -> 仅上传 APK，保留其已有更新日志，避免覆盖；
+      #   - 若 Release 不存在（手动打 tag 的常规路径）-> 用 GitHub 自动生成的
+      #     更新日志（--generate-notes）创建 Release；应用内更新检查读取的
+      #     就是这个 Release body。
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

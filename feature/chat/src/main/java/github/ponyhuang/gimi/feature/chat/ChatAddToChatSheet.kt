@@ -29,7 +29,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -54,7 +53,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -74,11 +72,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
@@ -103,6 +99,7 @@ private enum class AddToChatPage {
     HOME,
     LOCAL_TOOLS,
     TOOL_ACCESS,
+    PERMISSION_MODE,
     REASONING_EFFORT,
     MCP,
     OFFICIAL_TOOL,
@@ -187,6 +184,8 @@ internal fun ChatAddToChatSheet(
                                 AddToChatPage.LOCAL_TOOLS -> stringResource(R.string.chat_session_tools_title)
                                 AddToChatPage.TOOL_ACCESS ->
                                     stringResource(R.string.chat_tool_access_title)
+                                AddToChatPage.PERMISSION_MODE ->
+                                    stringResource(R.string.chat_permission_mode_title)
                                 AddToChatPage.REASONING_EFFORT ->
                                     stringResource(R.string.chat_reasoning_effort_title)
                                 AddToChatPage.MCP -> stringResource(R.string.chat_session_mcp_title)
@@ -229,7 +228,7 @@ internal fun ChatAddToChatSheet(
                                 onOpenToolAccess = { page = AddToChatPage.TOOL_ACCESS },
                                 onOpenReasoningEffort = { page = AddToChatPage.REASONING_EFFORT },
                                 onOpenMcp = { page = AddToChatPage.MCP },
-                                onFullAccessChange = onFullAccessChange,
+                                onOpenPermissionMode = { page = AddToChatPage.PERMISSION_MODE },
                                 onOpenOfficialTools = {
                                     state.officialTools.forEach { tool ->
                                         onOfficialToolOpened(tool.id)
@@ -244,6 +243,10 @@ internal fun ChatAddToChatSheet(
                             AddToChatPage.TOOL_ACCESS -> ToolAccessPage(
                                 state = state,
                                 onModeChange = onToolAccessModeChange,
+                            )
+                            AddToChatPage.PERMISSION_MODE -> PermissionModePage(
+                                fullAccess = state.fullAccess,
+                                onFullAccessChange = onFullAccessChange,
                             )
                             AddToChatPage.REASONING_EFFORT -> ReasoningEffortPage(
                                 state = state,
@@ -279,7 +282,7 @@ private fun AddToChatHome(
     onOpenReasoningEffort: () -> Unit,
     onOpenMcp: () -> Unit,
     onOpenOfficialTools: () -> Unit,
-    onFullAccessChange: (Boolean) -> Unit,
+    onOpenPermissionMode: () -> Unit,
 ) {
     val listState = rememberLazyListState()
     LazyColumn(
@@ -355,9 +358,12 @@ private fun AddToChatHome(
                     modifier = Modifier.padding(start = 66.dp, end = 16.dp),
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
                 )
-                FullAccessSwitchRow(
-                    checked = state.fullAccess,
-                    onCheckedChange = onFullAccessChange,
+                NavigationRow(
+                    icon = Icons.Default.Lock,
+                    title = stringResource(R.string.chat_permission_mode_title),
+                    subtitle = permissionModeLabel(state.fullAccess),
+                    onClick = onOpenPermissionMode,
+                    testTag = "permission-mode-nav",
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(start = 66.dp, end = 16.dp),
@@ -483,44 +489,40 @@ private fun NavigationRow(
 }
 
 @Composable
-private fun FullAccessSwitchRow(
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
+private fun PermissionModePage(
+    fullAccess: Boolean,
+    onFullAccessChange: (Boolean) -> Unit,
 ) {
-    Row(
+    Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 60.dp)
-            .toggleable(
-                value = checked,
-                role = Role.Switch,
-                onValueChange = onCheckedChange,
-            )
-            .testTag("full-access-switch")
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .wrapContentHeight()
+            .testTag("permission-mode-page")
+            .padding(bottom = 24.dp),
     ) {
-        IconBubble(Icons.Default.Lock)
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 16.dp),
-        ) {
-            Text(
-                stringResource(R.string.chat_full_access_title),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                stringResource(R.string.chat_full_access_description),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // 权限模式沿用全局审批开关，运行中也允许切换以放行挂起的确认。
+        listOf(false, true).forEach { approveAll ->
+            GimiBottomSheetOptionRow(
+                selected = fullAccess == approveAll,
+                enabled = true,
+                onClick = { onFullAccessChange(approveAll) },
+                label = permissionModeLabel(approveAll),
+                description = stringResource(
+                    if (approveAll) R.string.chat_permission_mode_full_description
+                    else R.string.chat_permission_mode_request_description,
+                ),
+                modifier = Modifier.testTag(
+                    if (approveAll) "permission-mode-full" else "permission-mode-request",
+                ),
             )
         }
-        Switch(checked = checked, onCheckedChange = null)
     }
 }
+
+@Composable
+private fun permissionModeLabel(fullAccess: Boolean): String = stringResource(
+    if (fullAccess) R.string.chat_permission_mode_full
+    else R.string.chat_permission_mode_request,
+)
 
 @Composable
 private fun ToolAccessPage(

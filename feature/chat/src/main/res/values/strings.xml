@@ -79,8 +79,11 @@
     <string name="chat_action_reject">拒绝</string>
     <string name="chat_action_allow">允许</string>
     <string name="chat_action_always_allow">总是允许</string>
-    <string name="chat_full_access_title">完全访问</string>
-    <string name="chat_full_access_description">自动允许所有需要确认的工具调用</string>
+    <string name="chat_permission_mode_title">权限模式</string>
+    <string name="chat_permission_mode_request">请求批准</string>
+    <string name="chat_permission_mode_full">完全批准</string>
+    <string name="chat_permission_mode_request_description">需要确认的工具调用会请求批准</string>
+    <string name="chat_permission_mode_full_description">自动允许所有需要确认的工具调用</string>
 
     <!-- ChatScreenModelPicker -->
     <string name="chat_model_picker_change">选择模型</string>

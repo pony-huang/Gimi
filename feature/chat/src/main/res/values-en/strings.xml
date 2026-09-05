@@ -74,8 +74,11 @@
     <string name="chat_action_reject">Reject</string>
     <string name="chat_action_allow">Allow</string>
     <string name="chat_action_always_allow">Always allow</string>
-    <string name="chat_full_access_title">Full access</string>
-    <string name="chat_full_access_description">Automatically allows all tool calls that require confirmation</string>
+    <string name="chat_permission_mode_title">Permission mode</string>
+    <string name="chat_permission_mode_request">Request approval</string>
+    <string name="chat_permission_mode_full">Full approval</string>
+    <string name="chat_permission_mode_request_description">Requests approval for tool calls that require confirmation</string>
+    <string name="chat_permission_mode_full_description">Automatically allows all tool calls that require confirmation</string>
 
     <string name="chat_model_picker_change">Select model</string>
     <string name="chat_model_loading">Loading models…</string>

@@ -69,10 +69,10 @@ object WakeModelCatalog {
         sha256 = "3af8b0e7e0f835ae9d414ce5df580237a3cfb08d586c9fbbb0f7ff29ad5b14ba",
         defaultWakeWord = "吉米",
         defaultWakeWordGrammar = "吉米",
-        recommendedWakeWords = listOf("吉米", "小助手", "语音助手"),
+        recommendedWakeWords = listOf("小爱同学", "小艺", "豆包", "小欧"),
         confirmWords = listOf("确认", "允许", "执行"),
         rejectWords = listOf("取消", "拒绝", "不要"),
-        confirmationPromptTemplate = "需要执行工具 %1${'$'}s。请说确认、允许或执行；如需取消，请说取消、拒绝或不要。",
+        confirmationPromptTemplate = $$"需要执行工具 %1$s。请说确认、允许或执行；如需取消，请说取消、拒绝或不要。",
     )
 
     val English = WakeModelInfo(
@@ -87,10 +87,10 @@ object WakeModelCatalog {
         defaultWakeWord = "Gimi",
         // 英语模型词表不包含品牌拼写 gimi，但包含同音词 jimmy。
         defaultWakeWordGrammar = "jimmy",
-        recommendedWakeWords = listOf("Gimi", "hey assistant", "voice assistant"),
+        recommendedWakeWords = listOf("Siri", "Google", "hey trump"),
         confirmWords = listOf("confirm", "yes", "proceed"),
         rejectWords = listOf("cancel", "no", "don't"),
-        confirmationPromptTemplate = "Tool %1${'$'}s needs your confirmation. " +
+        confirmationPromptTemplate = $$"Tool %1$s needs your confirmation. " +
             "Say confirm, yes, or proceed to allow; say cancel or no to decline.",
     )
 
@@ -166,6 +166,8 @@ private val ENGLISH_WORD_REGEX = Regex("[A-Za-z']+")
 private val CHINESE_WAKE_WORD_GRAMMARS = mapOf(
     "小助手" to "小助手",
     "语音助手" to "语音 助手",
+    // Vosk 中文词元按分词拆开，四字品牌词需拆成模型可识别的短词组合。
+    "小爱同学" to "小爱 同学",
 )
 
 /** 语音唤醒设置页所需的领域状态。 */

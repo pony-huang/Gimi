@@ -798,3 +798,39 @@ private fun ChatHeaderActionsPreview() {
         )
     }
 }
+
+@Preview(showBackground = true)
+@Composable
+private fun ToolConfirmationCardPreview() {
+    AsssistantaiTheme {
+        ToolConfirmationCard(
+            request = PendingToolConfirmation(
+                confirmationCallId = "call-1",
+                toolName = "web_search",
+                description = "联网搜索工具，用于查询实时信息",
+                arguments = "query: 上海今天天气\nlimit: 5",
+            ),
+            onConfirm = {},
+            onReject = {},
+            onAlwaysAllow = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ToolConfirmationCardUnknownDescriptionPreview() {
+    AsssistantaiTheme {
+        ToolConfirmationCard(
+            request = PendingToolConfirmation(
+                confirmationCallId = "call-2",
+                toolName = "unknown_tool",
+                description = "",
+                arguments = "",
+            ),
+            onConfirm = {},
+            onReject = {},
+            onAlwaysAllow = {},
+        )
+    }
+}

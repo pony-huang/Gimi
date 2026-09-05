@@ -10,6 +10,13 @@ import com.google.adk.kt.tools.Toolset
 import com.google.adk.kt.tools.PreloadMemoryTool
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.ThinkingLevel
+import github.ponyhuang.gimi.data.agent.contribution.LocalToolContribution
+import github.ponyhuang.gimi.data.agent.contribution.McpToolContribution
+import github.ponyhuang.gimi.data.agent.contribution.MemoryToolContribution
+import github.ponyhuang.gimi.data.agent.contribution.ModelCatalogContribution
+import github.ponyhuang.gimi.data.agent.contribution.OfficialToolContribution
+import github.ponyhuang.gimi.data.agent.contribution.PluginToolContribution
+import github.ponyhuang.gimi.data.agent.contribution.SkillToolContribution
 import github.ponyhuang.gimi.data.agent.tools.search.TOOL_SEARCH_NAME
 import github.ponyhuang.gimi.data.agent.tools.search.ToolSearchToolset
 import github.ponyhuang.gimi.data.agent.tools.search.ToolVectorSearch
@@ -24,10 +31,15 @@ import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfigura
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
+import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
+import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
+import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -37,16 +49,17 @@ import org.junit.Test
 /**
  * 两种工具访问模式的 Agent 组装验证。
  *
- * 会话级工具勾选不再经过 AgentFactory（改由 RunConfig metadata 透传 + 各
- * Toolset 自过滤），这里只验证每种模式挂载的 Toolset 组合。
+ * 会话级工具勾选不经过 AgentFactory（改由 RunConfig metadata 透传 + 各
+ * Toolset 自过滤），这里只验证每种模式挂载的 Toolset/工具组合；AgentFactory
+ * 从贡献方注册表聚合，测试用真实贡献方 + Mock 依赖构成注册表。
  */
 class AgentFactoryToolAccessTest {
 
     @Test
     fun appliesTheSessionReasoningEffortToTheAdkThinkingLevel() = runTest {
-        val factory = factory()
+        val fixture = fixture()
 
-        val agent = factory.create(reasoningEffort = ReasoningEffort.HIGH).agent as LlmAgent
+        val agent = fixture.create(reasoningEffort = ReasoningEffort.HIGH).agent as LlmAgent
 
         assertEquals(
             ThinkingLevel.HIGH,
@@ -58,9 +71,9 @@ class AgentFactoryToolAccessTest {
     fun alwaysAvailableAttachesEveryToolsetDirectlyWithoutSearchGateway() = runTest {
         val native = FakeOfficialToolset("web_search")
         val formula = FakeSearchOfficialToolset("formula_tool")
-        val factory = factory(officialToolsets = setOf(native, formula))
+        val fixture = fixture(officialToolsets = setOf(native, formula))
 
-        val agent = factory.create(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE).agent as LlmAgent
+        val agent = fixture.create(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE).agent as LlmAgent
 
         assertTrue(native in agent.toolsets)
         assertTrue(formula in agent.toolsets)
@@ -73,12 +86,12 @@ class AgentFactoryToolAccessTest {
     fun onDemandKeepsNativeOfficialDirectAndHidesCandidatesBehindSearch() = runTest {
         val native = FakeOfficialToolset("web_search")
         val formula = FakeSearchOfficialToolset("formula_tool")
-        val factory = factory(
+        val fixture = fixture(
             localTools = listOf(declarationTool("clock")),
             officialToolsets = setOf(native, formula),
         )
 
-        val agent = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
+        val agent = fixture.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
 
         assertTrue(native in agent.toolsets)
         assertFalse(formula in agent.toolsets)
@@ -88,19 +101,19 @@ class AgentFactoryToolAccessTest {
 
     @Test
     fun defaultModeIsAlwaysAvailable() = runTest {
-        val factory = factory()
+        val fixture = fixture()
 
-        val agent = factory.create().agent as LlmAgent
+        val agent = fixture.create().agent as LlmAgent
 
         assertTrue(agent.toolsets.none { it is ToolSearchToolset })
     }
 
     @Test
     fun preloadMemoryRunsInBothAccessModesWithoutModelDeclaration() = runTest {
-        val factory = factory()
+        val fixture = fixture()
 
-        val always = factory.create(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE).agent as LlmAgent
-        val onDemand = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
+        val always = fixture.create(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE).agent as LlmAgent
+        val onDemand = fixture.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
 
         assertTrue(always.tools.any { it is PreloadMemoryTool })
         assertTrue(onDemand.tools.any { it is PreloadMemoryTool })
@@ -118,14 +131,14 @@ class AgentFactoryToolAccessTest {
         val manualConfigurationTool = mockk<McpManualConfigurationTool>(relaxed = true) {
             every { name } returns McpManualConfigurationTool.NAME
         }
-        val factory = factory(
+        val fixture = fixture(
             mcpConfigurationTool = configurationTool,
             mcpAuthorizationTool = authorizationTool,
             mcpManualConfigurationTool = manualConfigurationTool,
         )
 
-        val always = factory.create(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE).agent as LlmAgent
-        val onDemand = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
+        val always = fixture.create(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE).agent as LlmAgent
+        val onDemand = fixture.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
 
         assertTrue(configurationTool in always.tools)
         assertTrue(configurationTool in onDemand.tools)
@@ -137,40 +150,44 @@ class AgentFactoryToolAccessTest {
 
     @Test
     fun localToolRemainsResolvableForConfirmationResumeWithoutDuplicateDeclaration() = runTest {
-        val factory = factory(
+        val fixture = fixture(
             localTools = listOf(declarationTool("adjust_media_volume")),
             confirmationRequiredToolIds = setOf("adjust_media_volume"),
         )
 
-        val agent = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
+        val agent = fixture.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
 
+        // 基础工具按贡献方 id 排序聚合：local 确认续接工具 → mcp 维护工具 → memory 召回工具。
         assertEquals(
             listOf(
-                "preload_memory",
                 "adjust_media_volume",
                 McpConfigurationTool.NAME,
                 McpAuthorizationTool.NAME,
                 McpManualConfigurationTool.NAME,
+                "preload_memory",
             ),
             agent.tools.map(BaseTool::name),
         )
-        assertEquals(null, agent.tools.first().declaration())
+        assertEquals(
+            null,
+            agent.tools.filterIsInstance<PreloadMemoryTool>().single().declaration(),
+        )
     }
 
     @Test
     fun localToolWithoutConfirmationIsNotRegisteredAsResumeFallback() = runTest {
-        val factory = factory(
+        val fixture = fixture(
             localTools = listOf(declarationTool("get_media_volume")),
         )
 
-        val agent = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
+        val agent = fixture.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
 
         assertEquals(
             listOf(
-                "preload_memory",
                 McpConfigurationTool.NAME,
                 McpAuthorizationTool.NAME,
                 McpManualConfigurationTool.NAME,
+                "preload_memory",
             ),
             agent.tools.map(BaseTool::name),
         )
@@ -179,16 +196,33 @@ class AgentFactoryToolAccessTest {
     @Test
     fun pluginToolsetsAreAttachedInBothAccessModes() = runTest {
         val pluginToolset = FakePluginToolset("playback_control")
-        val factory = factory(pluginToolsets = listOf(pluginToolset))
+        val fixture = fixture(pluginToolsets = listOf(pluginToolset))
 
-        val always = factory.create(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE).agent as LlmAgent
-        val onDemand = factory.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
+        val always = fixture.create(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE).agent as LlmAgent
+        val onDemand = fixture.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
 
         assertTrue("always-available 模式应挂载插件 Toolset", pluginToolset in always.toolsets)
         assertTrue("on-demand 模式应挂载插件 Toolset", pluginToolset in onDemand.toolsets)
     }
 
-    private fun factory(
+    /** 组装好的工厂与构建用插件快照，提供按默认参数构建 Agent 的便捷入口。 */
+    private class Fixture(
+        val agentFactory: AgentFactory,
+        val pluginRuntime: PluginRuntimeSnapshot<AgentPlugin>,
+    ) {
+        suspend fun create(
+            toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
+            reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM,
+        ): AgentRuntime = agentFactory.create(
+            AgentBuildSpec(
+                toolAccessMode = toolAccessMode,
+                reasoningEffort = reasoningEffort,
+                pluginRuntime = pluginRuntime,
+            ),
+        )
+    }
+
+    private fun fixture(
         localTools: List<BaseTool> = emptyList(),
         confirmationRequiredToolIds: Set<String> = emptySet(),
         officialToolsets: Set<OfficialToolset> = emptySet(),
@@ -202,33 +236,56 @@ class AgentFactoryToolAccessTest {
         mcpManualConfigurationTool: McpManualConfigurationTool = mockk(relaxed = true) {
             every { name } returns McpManualConfigurationTool.NAME
         },
-    ): AgentFactory {
+    ): Fixture {
         val localToolCatalog = mockk<LocalToolCatalog>()
+        // 显式限定接收者：块内简单名会优先解析到本函数的同名参数而非 mock 属性。
         every { localToolCatalog.tools() } returns localTools
         every { localToolCatalog.confirmationRequiredToolIds } returns confirmationRequiredToolIds
         val localToolset = mockk<LocalToolset>(relaxed = true)
         coEvery { localToolset.getTools(any()) } returns localTools
+        val toolAuthorization = mockk<ToolAuthorizationRepository> {
+            every { revision } returns MutableStateFlow(0L)
+        }
         val mcpToolset = mockk<ConversationMcpToolset>(relaxed = true)
-        val mcpRegistry = mockk<github.ponyhuang.gimi.data.agent.McpToolsetRegistry>(relaxed = true)
-        coEvery { mcpRegistry.resolve() } returns github.ponyhuang.gimi.data.agent.McpToolsetResolution(emptyList())
+        val mcpRepository = mockk<McpRepository> {
+            every { revision } returns MutableStateFlow(0L)
+        }
+        val mcpRegistry = mockk<McpToolsetRegistry>(relaxed = true)
+        coEvery { mcpRegistry.resolveAll() } returns McpToolsetResolution(emptyList())
+        val modelServices = mockk<AgentModelConfigurationSource> {
+            every { configurationRevision } returns MutableStateFlow(0L)
+        }
         val modelFactory = mockk<AgentLLMModelFactory>()
         every { modelFactory.selectModelConfig(any()) } returns modelConfig()
         every { modelFactory.createModel(any()) } returns mockk<Model>(relaxed = true)
         val plugin = FakeAgentPlugin("test", pluginToolsets = pluginToolsets)
         val pluginRuntimeProvider = FakePluginRuntimeProvider(plugins = listOf(plugin))
-        return AgentFactory(
-            localToolCatalog = localToolCatalog,
-            localToolset = localToolset,
-            conversationMcpToolset = mcpToolset,
-            mcpToolsetRegistry = mcpRegistry,
-            skillSource = mockk<SkillSource>(relaxed = true),
-            agentLLMModelFactory = modelFactory,
-            officialToolsets = officialToolsets,
-            toolVectorSearch = mockk<ToolVectorSearch>(relaxed = true),
-            mcpConfigurationTool = mcpConfigurationTool,
-            mcpAuthorizationTool = mcpAuthorizationTool,
-            mcpManualConfigurationTool = mcpManualConfigurationTool,
-            pluginRuntimeProvider = pluginRuntimeProvider,
+
+        val registry = AgentContributionRegistry(
+            setOf(
+                LocalToolContribution(localToolCatalog, localToolset, toolAuthorization),
+                McpToolContribution(
+                    conversationMcpToolset = mcpToolset,
+                    mcpToolsetRegistry = mcpRegistry,
+                    mcpConfigurationTool = mcpConfigurationTool,
+                    mcpAuthorizationTool = mcpAuthorizationTool,
+                    mcpManualConfigurationTool = mcpManualConfigurationTool,
+                    mcpRepository = mcpRepository,
+                ),
+                OfficialToolContribution(officialToolsets),
+                SkillToolContribution(mockk<SkillSource>(relaxed = true)),
+                PluginToolContribution(pluginRuntimeProvider),
+                MemoryToolContribution(),
+                ModelCatalogContribution(modelServices),
+            ),
+        )
+        return Fixture(
+            agentFactory = AgentFactory(
+                contributions = registry,
+                agentLLMModelFactory = modelFactory,
+                toolVectorSearch = mockk<ToolVectorSearch>(relaxed = true),
+            ),
+            pluginRuntime = pluginRuntimeProvider.runtime.value,
         )
     }
 

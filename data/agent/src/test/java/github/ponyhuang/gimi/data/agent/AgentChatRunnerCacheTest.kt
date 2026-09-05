@@ -47,9 +47,9 @@ class AgentChatRunnerCacheTest {
     fun sessionsWithSameConfigurationShareOneRuntimeAndConfirmationReusesIt() = runTest {
         val createdSelections = mutableListOf<ModelSelection?>()
         val runner = AgentChatRunner(
-            factory = { selection, _, _, _ ->
-                createdSelections += selection
-                runtime(selection)
+            factory = { spec ->
+                createdSelections += spec.selection
+                runtime(spec.selection)
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
@@ -78,9 +78,9 @@ class AgentChatRunnerCacheTest {
         var revision = 0
         var creations = 0
         val runner = AgentChatRunner(
-            factory = { selection, _, _, _ ->
+            factory = { spec ->
                 creations += 1
-                runtime(selection)
+                runtime(spec.selection)
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
@@ -114,9 +114,9 @@ class AgentChatRunnerCacheTest {
         var factorySnapshot: PluginRuntimeSnapshot<*>? = null
         var pluginSnapshot: PluginRuntimeSnapshot<*>? = null
         val runner = AgentChatRunner(
-            factory = { selection, _, _, runtimeSnapshot ->
-                factorySnapshot = runtimeSnapshot
-                runtime(selection)
+            factory = { spec ->
+                factorySnapshot = spec.pluginRuntime
+                runtime(spec.selection)
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
@@ -143,9 +143,9 @@ class AgentChatRunnerCacheTest {
     fun runtimeCacheEvictsLeastRecentlyUsedConfiguration() = runTest {
         var creations = 0
         val runner = AgentChatRunner(
-            factory = { selection, _, _, _ ->
+            factory = { spec ->
                 creations += 1
-                runtime(selection)
+                runtime(spec.selection)
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
@@ -166,24 +166,24 @@ class AgentChatRunnerCacheTest {
     fun conversationToolSelectionChangeDoesNotRebuildRuntime() = runTest {
         var creations = 0
         val runner = AgentChatRunner(
-            factory = { selection, _, _, _ ->
+            factory = { spec ->
                 creations += 1
-                runtime(selection)
+                runtime(spec.selection)
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
             memoryService = InMemoryMemoryService(),
         )
         val selection = ModelSelection("service", "group", "model")
-        val clockOnly = ConversationToolConfiguration(enabledLocalToolIds = setOf("clock"))
-        val clockAndLocation = ConversationToolConfiguration(
-            enabledLocalToolIds = setOf("clock", "location"),
+        val githubOnly = ConversationToolConfiguration(enabledMcpServerIds = setOf("github"))
+        val githubAndFilesystem = ConversationToolConfiguration(
+            enabledMcpServerIds = setOf("github", "filesystem"),
         )
 
-        runner.send("user", "session-a", selection, "a", toolConfiguration = clockOnly)
-        runner.send("user", "session-b", selection, "b", toolConfiguration = clockOnly)
+        runner.send("user", "session-a", selection, "a", toolConfiguration = githubOnly)
+        runner.send("user", "session-b", selection, "b", toolConfiguration = githubOnly)
         // 会话内工具勾选变化经 RunConfig metadata 透传，不触发 Agent 重建。
-        runner.send("user", "session-a", selection, "a2", toolConfiguration = clockAndLocation)
+        runner.send("user", "session-a", selection, "a2", toolConfiguration = githubAndFilesystem)
 
         assertEquals(1, creations)
     }
@@ -192,9 +192,9 @@ class AgentChatRunnerCacheTest {
     fun toolAccessModeChangeCreatesNewSharedRuntime() = runTest {
         var creations = 0
         val runner = AgentChatRunner(
-            factory = { selection, _, _, _ ->
+            factory = { spec ->
                 creations += 1
-                runtime(selection)
+                runtime(spec.selection)
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
@@ -228,9 +228,9 @@ class AgentChatRunnerCacheTest {
     fun confirmationToolsToggleDoesNotRebuildRuntime() = runTest {
         var creations = 0
         val runner = AgentChatRunner(
-            factory = { selection, _, _, _ ->
+            factory = { spec ->
                 creations += 1
-                runtime(selection)
+                runtime(spec.selection)
             },
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,

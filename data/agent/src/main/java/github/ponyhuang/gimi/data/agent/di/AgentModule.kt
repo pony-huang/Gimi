@@ -17,6 +17,7 @@ import github.ponyhuang.gimi.data.agent.AdkMcpConnectionTester
 import github.ponyhuang.gimi.data.agent.AdkMcpSkipReporter
 import github.ponyhuang.gimi.data.agent.AgentChatRunner
 import github.ponyhuang.gimi.data.agent.AgentBuildConfigurationSnapshot
+import github.ponyhuang.gimi.data.agent.AgentContributionRegistry
 import github.ponyhuang.gimi.data.agent.AgentFactory
 import github.ponyhuang.gimi.data.agent.AgentLLMModelFactory
 import github.ponyhuang.gimi.data.agent.LocalToolCatalog
@@ -31,13 +32,11 @@ import github.ponyhuang.gimi.data.agent.tools.search.ToolVectorEntity
 import github.ponyhuang.gimi.data.agent.tools.search.ToolVectorSearch
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.mcp.repository.McpConnectionTester
-import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import github.ponyhuang.gimi.domain.mcp.repository.McpSkipReporter
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import github.ponyhuang.gimi.domain.toolauthorization.repository.LocalToolDefinitionSource
-import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 import io.objectbox.Box
 import io.objectbox.BoxStore
 import java.io.File
@@ -143,19 +142,13 @@ object AgentModule {
         memoryService: MemoryService,
         agentFactory: AgentFactory,
         modelServices: AgentModelConfigurationSource,
-        toolAuthorization: ToolAuthorizationRepository,
-        mcpRepository: McpRepository,
         agentLLMModelFactory: AgentLLMModelFactory,
+        contributionRegistry: AgentContributionRegistry,
         pluginRuntimeProvider: PluginRuntimeProvider<AgentPlugin>,
     ): AgentChatRunner = AgentChatRunner(
-        factory = { selection, toolAccessMode, reasoningEffort, pluginRuntime ->
+        factory = { spec ->
             modelServices.awaitReady()
-            agentFactory.create(
-                selection = selection,
-                toolAccessMode = toolAccessMode,
-                reasoningEffort = reasoningEffort,
-                pluginRuntime = pluginRuntime,
-            )
+            agentFactory.create(spec)
         },
         sessionService = sessionService,
         artifactService = artifactService,
@@ -163,12 +156,7 @@ object AgentModule {
         configuration = {
             val pluginRuntime = pluginRuntimeProvider.runtime.value
             AgentBuildConfigurationSnapshot(
-                revision = listOf(
-                    toolAuthorization.revision.value,
-                    mcpRepository.revision.value,
-                    modelServices.configurationRevision.value,
-                    pluginRuntime.revision,
-                ),
+                revision = contributionRegistry.revision(),
                 pluginRuntime = pluginRuntime,
             )
         },

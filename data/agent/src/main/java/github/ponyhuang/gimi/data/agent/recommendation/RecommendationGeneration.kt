@@ -11,22 +11,18 @@ import com.google.adk.kt.types.ToolConfig
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import com.google.adk.kt.tools.BaseTool
+import github.ponyhuang.gimi.data.agent.AgentContributionRegistry
 import github.ponyhuang.gimi.data.agent.AgentLLMModelFactory
 import github.ponyhuang.gimi.data.agent.AgentPrompts
-import github.ponyhuang.gimi.data.agent.LocalToolCatalog
-import github.ponyhuang.gimi.data.agent.McpToolsetRegistry
+import github.ponyhuang.gimi.data.agent.AgentToolCatalogContext
 import github.ponyhuang.gimi.data.agent.ModelConfig
 import github.ponyhuang.gimi.data.agent.toRuntimeMetadata
-import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolset
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationGenerationInput
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationSnapshot
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationGenerator
-import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
-import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
 import github.ponyhuang.gimi.pluginapi.PluginJson
-import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.toList
@@ -157,14 +153,10 @@ private class JsonNativeTool(
 @Singleton
 class AgentRecommendationGenerator @Inject constructor(
     private val modelFactory: AgentLLMModelFactory,
-    private val localToolCatalog: LocalToolCatalog,
-    private val pluginRuntimeProvider: PluginRuntimeProvider<AgentPlugin>,
-    private val mcpToolsetRegistry: McpToolsetRegistry,
-    private val officialToolsets: Set<@JvmSuppressWildcards OfficialToolset>,
+    private val contributionRegistry: AgentContributionRegistry,
 ) : RecommendationGenerator {
     override suspend fun generate(input: RecommendationGenerationInput): List<AgentRecommendation> {
         val resolvedInput = input.copy(systemInstruction = AgentPrompts.defaultAssistantInstruction())
-        val pluginRuntime = pluginRuntimeProvider.runtime.value
         val config = modelFactory.selectFastModelConfig() ?: modelFactory.selectModelConfig(null)
         val model = modelFactory.createModel(config)
         val request = LlmRequest(
@@ -193,7 +185,7 @@ class AgentRecommendationGenerator @Inject constructor(
                         ),
                     ),
                 ),
-            ).appendTools(allRecommendationTools(config, pluginRuntime))
+            ).appendTools(allRecommendationTools(config))
         val responses = model.generateContent(request).toList()
         responses.firstOrNull { !it.errorMessage.isNullOrBlank() }?.errorMessage?.let { message ->
             error("Recommendation model request failed: $message")
@@ -214,28 +206,15 @@ class AgentRecommendationGenerator @Inject constructor(
         return RecommendationOutputParser.parse(raw)
     }
 
-    private suspend fun allRecommendationTools(
-        config: ModelConfig,
-        pluginRuntime: PluginRuntimeSnapshot<AgentPlugin>,
-    ): List<BaseTool> =
-        buildList {
-            addAll(localToolCatalog.tools())
-            addAll(pluginRuntime.enabledPlugins.flatMap { plugin -> plugin.tools() })
-            pluginRuntime.enabledPlugins.flatMap { plugin -> plugin.toolSets() }.forEach { toolset ->
-                runCatching { addAll(toolset.getTools(null)) }
-            }
-            runCatching {
-                mcpToolsetRegistry.resolveAll().handles.forEach { handle ->
-                    runCatching { addAll(handle.toolset.getTools(null)) }
-                }
-            }
-            runCatching {
-                val runtime = config.toRuntimeMetadata()
-                officialToolsets.forEach { toolset ->
-                    runCatching { addAll(toolset.resolveTools(runtime, null)) }
-                }
-            }
-        }.distinctBy { it.name }
+    /**
+     * 经贡献方注册表聚合全部来源的扁平工具目录，与 Agent 构建共用同一套配置源；
+     * 推荐会话实际允许的函数由 [READ_ONLY_STATUS_TOOLS] 在 ToolConfig 层约束。
+     */
+    private suspend fun allRecommendationTools(config: ModelConfig): List<BaseTool> =
+        contributionRegistry
+            .toolCatalog(AgentToolCatalogContext(modelRuntime = config.toRuntimeMetadata()))
+            .flatMap { entry -> entry.tools }
+            .distinctBy { it.name }
             .map(::JsonNativeTool)
 
     private companion object {

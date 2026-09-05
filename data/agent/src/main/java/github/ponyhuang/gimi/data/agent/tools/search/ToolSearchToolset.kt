@@ -36,8 +36,11 @@ internal data class ToolAccessBudget(
  *
  * 来源分别暴露完整目录和当前启用目录。向量同步始终使用 [loadAllTools]，只有
  * 最近邻搜索完成后才调用 [loadEnabledTools] 应用当前会话开关与授权。
+ *
+ * 接口本身公开：[github.ponyhuang.gimi.data.agent.AgentContribution] 的检索
+ * 候选源面需要跨类型引用它；具体实现保持模块内部。
  */
-internal interface ToolCandidateSource {
+interface ToolCandidateSource {
     val id: String
     val displayName: String
 

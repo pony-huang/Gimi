@@ -4,32 +4,14 @@ import com.google.adk.kt.agents.BaseAgent
 import com.google.adk.kt.agents.Instruction
 import com.google.adk.kt.agents.LlmAgent
 import com.google.adk.kt.models.Model
-import com.google.adk.kt.skills.SkillSource
-import com.google.adk.kt.tools.SkillToolset
-import com.google.adk.kt.tools.Toolset
-import com.google.adk.kt.tools.PreloadMemoryTool
 import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.ThinkingConfig
 import com.google.adk.kt.types.ThinkingLevel
-import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
-import github.ponyhuang.gimi.data.agent.tools.mcp.ConversationMcpToolset
-import github.ponyhuang.gimi.data.agent.tools.mcp.McpAuthorizationTool
-import github.ponyhuang.gimi.data.agent.tools.mcp.McpConfigurationTool
-import github.ponyhuang.gimi.data.agent.tools.mcp.McpManualConfigurationTool
-import github.ponyhuang.gimi.data.agent.tools.official.SearchOfficialToolset
-import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolset
-import github.ponyhuang.gimi.data.agent.tools.search.LocalToolSource
-import github.ponyhuang.gimi.data.agent.tools.search.McpServerSource
-import github.ponyhuang.gimi.data.agent.tools.search.OfficialToolCandidateSource
+import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.data.agent.tools.search.ToolSearchToolset
 import github.ponyhuang.gimi.data.agent.tools.search.ToolVectorSearch
-import github.ponyhuang.gimi.data.agent.tools.system.LocalToolset
-import github.ponyhuang.gimi.data.agent.tools.system.ToolsetConfirmationResumeTool
+import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
-import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
-import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -45,52 +27,44 @@ data class AgentRuntime(
 )
 
 /**
- * Agent 工厂 — 按工具访问模式构建两种独立的 [BaseAgent]。
+ * Agent 工厂 — 按 [AgentBuildSpec] 编排各能力贡献方装配 [BaseAgent]。
+ *
+ * 本类只负责模型解析与 LlmAgent 组装，工具/工具集全部来自
+ * [AgentContributionRegistry] 聚合的 [AgentContribution] 贡献方；新增配置源时
+ * 实现贡献方并注册多绑定即可，无需修改本类。
  *
  * 构建期生成 Agent 和不含凭据的 [ModelRuntimeMetadata]；后者与会话级工具勾选
  * 一起进入 invocation RunConfig，各 Toolset 在每次模型请求时自行读取和过滤，
  * 因此会话内修改工具选择不会触发 Agent 重建。
  *
  * 两种访问模式（[ToolAccessMode]）：
- * - [ToolAccessMode.ALWAYS_AVAILABLE]：全部启用工具直接声明，无检索网关。
- * - [ToolAccessMode.ON_DEMAND]：只声明核心工具 + `tool_search`，可搜索工具先统一
- *   写入向量索引，命中后再按当前会话开关和授权状态过滤。
+ * - [ToolAccessMode.ALWAYS_AVAILABLE]：贡献方的全部常驻工具集直接声明，无检索网关。
+ * - [ToolAccessMode.ON_DEMAND]：常驻工具集之外，把贡献方的检索候选源统一注册进
+ *   `ToolSearchToolset`，可搜索工具先写入向量索引，命中后再按当前会话开关和
+ *   授权状态过滤。
  */
 @Singleton
 class AgentFactory @Inject constructor(
-    private val localToolCatalog: LocalToolCatalog,
-    private val localToolset: LocalToolset,
-    private val conversationMcpToolset: ConversationMcpToolset,
-    private val mcpToolsetRegistry: McpToolsetRegistry,
-    private val skillSource: SkillSource,
+    private val contributions: AgentContributionRegistry,
     private val agentLLMModelFactory: AgentLLMModelFactory,
-    private val officialToolsets: Set<@JvmSuppressWildcards OfficialToolset>,
     private val toolVectorSearch: ToolVectorSearch,
-    private val mcpConfigurationTool: McpConfigurationTool,
-    private val mcpAuthorizationTool: McpAuthorizationTool,
-    private val mcpManualConfigurationTool: McpManualConfigurationTool,
-    private val pluginRuntimeProvider: PluginRuntimeProvider<AgentPlugin>,
 ) {
-    /**
-     * 按访问模式构建 [AgentRuntime]。
-     *
-     * @param selection 模型选择；为 null 时使用默认模型
-     * @param toolAccessMode 工具声明加载模式
-     * @param reasoningEffort 当前会话的推理强度
-     */
-    suspend fun create(
-        selection: ModelSelection? = null,
-        toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
-        reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM,
-        pluginRuntime: PluginRuntimeSnapshot<AgentPlugin> = pluginRuntimeProvider.runtime.value,
-    ): AgentRuntime {
-        val modelConfig = agentLLMModelFactory.selectModelConfig(selection)
+    /** 按 [spec] 装配 [AgentRuntime]。 */
+    suspend fun create(spec: AgentBuildSpec): AgentRuntime {
+        val modelConfig = agentLLMModelFactory.selectModelConfig(spec.selection)
         val model = agentLLMModelFactory.createModel(modelConfig)
-        val agent = when (toolAccessMode) {
+        val agent = when (spec.toolAccessMode) {
             ToolAccessMode.ALWAYS_AVAILABLE ->
-                createAlwaysAvailableAgent(model, reasoningEffort, pluginRuntime)
+                baseAgent(model, spec, contributions.toolsets(spec))
             ToolAccessMode.ON_DEMAND ->
-                createSearchAgent(model, reasoningEffort, pluginRuntime)
+                baseAgent(
+                    model = model,
+                    spec = spec,
+                    toolsets = contributions.toolsets(spec) + ToolSearchToolset(
+                        sources = contributions.candidateSources(spec),
+                        vectorSearch = toolVectorSearch,
+                    ),
+                )
         }
         return AgentRuntime(
             agent = agent,
@@ -98,98 +72,20 @@ class AgentFactory @Inject constructor(
         )
     }
 
-    /** 所有启用工具从首个请求起直接声明。 */
-    private fun createAlwaysAvailableAgent(
-        model: Model,
-        reasoningEffort: ReasoningEffort,
-        pluginRuntime: PluginRuntimeSnapshot<AgentPlugin>,
-    ): BaseAgent =
-        baseAgent(
-            model = model,
-            reasoningEffort = reasoningEffort,
-            pluginRuntime = pluginRuntime,
-            toolsets = buildList {
-                add(localToolset)
-                add(conversationMcpToolset)
-                addAll(officialToolsets)
-                add(SkillToolset(skillSource))
-            },
-        )
-
-    /**
-     * 业务工具拆分为多个 source 后注册到 [ToolSearchToolset]：
-     * - 全部本地工具构成一个扁平 source；
-     * - 每个 MCP server 单独一个 source（基于当前 [McpToolsetRegistry] 的解析结果），
-     *   单个 server 发现失败时不影响其它 server；
-     * - 可展开官方函数（[SearchOfficialToolset]）继续作为独立 source。
-     */
-    private suspend fun createSearchAgent(
-        model: Model,
-        reasoningEffort: ReasoningEffort,
-        pluginRuntime: PluginRuntimeSnapshot<AgentPlugin>,
-    ): BaseAgent {
-        val (officialToolsets, directOfficialToolsets) =
-            officialToolsets.partition { it is SearchOfficialToolset }
-        val sources = buildList {
-            add(LocalToolSource(localToolCatalog, localToolset))
-            mcpToolsetRegistry.resolveAll().handles.forEach { handle ->
-                add(McpServerSource(handle))
-            }
-            officialToolsets
-                .filterIsInstance<SearchOfficialToolset>()
-                .forEach { toolset ->
-                    add(OfficialToolCandidateSource(toolset))
-                }
-        }
-        return baseAgent(
-            model = model,
-            reasoningEffort = reasoningEffort,
-            pluginRuntime = pluginRuntime,
-            toolsets = buildList {
-                addAll(directOfficialToolsets)
-                add(
-                    ToolSearchToolset(
-                        sources = sources,
-                        vectorSearch = toolVectorSearch,
-                    ),
-                )
-                add(SkillToolset(skillSource))
-            },
-        )
-    }
-
+    /** 机械组装：业务工具/工具集全部来自贡献方聚合结果，此处只补指令与推理配置。 */
     private fun baseAgent(
         model: Model,
-        reasoningEffort: ReasoningEffort,
+        spec: AgentBuildSpec,
         toolsets: List<Toolset>,
-        pluginRuntime: PluginRuntimeSnapshot<AgentPlugin>,
     ): BaseAgent = LlmAgent(
         name = "Assistant",
         model = model,
         generateContentConfig = GenerateContentConfig(
-            thinkingConfig = ThinkingConfig(thinkingLevel = reasoningEffort.toAdkThinkingLevel()),
+            thinkingConfig = ThinkingConfig(thinkingLevel = spec.reasoningEffort.toAdkThinkingLevel()),
         ),
         instruction = Instruction(AgentPrompts.defaultAssistantInstruction()),
-        tools = buildList {
-            // ADK 内置请求处理器：每轮模型调用前自动从当前 MemoryService 召回相关记忆。
-            add(PreloadMemoryTool())
-            addAll(
-                localToolCatalog.tools()
-                    .filter { tool -> tool.name in localToolCatalog.confirmationRequiredToolIds }
-                    .map { tool -> ToolsetConfirmationResumeTool(localToolset, tool) },
-            )
-            add(mcpConfigurationTool)
-            add(mcpAuthorizationTool)
-            add(mcpManualConfigurationTool)
-            // 每次构建 Agent 时读取当前启用的插件工具，使开关/配置在下次请求立即生效。
-            addAll(pluginRuntime.enabledPlugins.flatMap { plugin -> plugin.tools() })
-        },
-        toolsets = buildList {
-            addAll(toolsets)
-            // 插件 Toolset 按请求期上下文动态出工具；与 tools 一样每次构建时读取，
-            // 插件启停/重装经 revision 使 Agent 重建后即时生效。
-            addAll(pluginRuntime.enabledPlugins.flatMap { plugin -> plugin.toolSets() })
-        },
+        tools = contributions.tools(spec),
+        toolsets = toolsets,
     )
 }
 

@@ -61,12 +61,7 @@ import kotlinx.coroutines.sync.withLock
  * 线程模型：缓存由 [runnerMutex] 保护，所有调用都通过协程 `Flow` 完成。
  */
 class AgentChatRunner(
-    private val factory: suspend (
-        ModelSelection?,
-        ToolAccessMode,
-        ReasoningEffort,
-        PluginRuntimeSnapshot<AgentPlugin>,
-    ) -> AgentRuntime,
+    private val factory: suspend (AgentBuildSpec) -> AgentRuntime,
     private val sessionService: SessionService,
     private val artifactService: ArtifactService?,
     private val memoryService: MemoryService ?,
@@ -84,7 +79,8 @@ class AgentChatRunner(
      * @property selection 构建 Agent 时使用的显式模型选择（模型名称）。
      * @property toolAccessMode 工具声明加载模式。
      * @property reasoningEffort 当前会话的推理强度。
-     * @property revision 构建时的外部配置版本（工具授权/MCP/模型目录）。
+     * @property revision 构建时的外部配置版本（各贡献方 revision 的组合，
+     *   含工具授权/MCP/模型目录/插件运行时）。
      */
     private data class AgentKey(
         val selection: ModelSelection?,
@@ -296,10 +292,12 @@ class AgentChatRunner(
         val key = AgentKey(selection, toolAccessMode, reasoningEffort, buildConfiguration.revision)
         return runnerMutex.withLock {
             val runtime = runtimes[key] ?: factory(
-                selection,
-                toolAccessMode,
-                reasoningEffort,
-                buildConfiguration.pluginRuntime,
+                AgentBuildSpec(
+                    selection = selection,
+                    toolAccessMode = toolAccessMode,
+                    reasoningEffort = reasoningEffort,
+                    pluginRuntime = buildConfiguration.pluginRuntime,
+                ),
             ).let { agentRuntime ->
                 SharedRuntime(
                     modelRuntime = agentRuntime.modelRuntime,

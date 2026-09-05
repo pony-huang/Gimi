@@ -49,9 +49,7 @@ object ToolRunMetadata {
             metadata[KEY_PRESENT] = true
             metadata[KEY_MCP_SERVER_IDS] = toolConfiguration.enabledMcpServerIds.toList()
             metadata[KEY_OFFICIAL_FUNCTIONS] =
-                toolConfiguration.enabledOfficialFunctionIdsByService.mapValues { (_, byTool) ->
-                    byTool.mapValues { (_, ids) -> ids.toList() }
-                }
+                toolConfiguration.enabledOfficialFunctionIds.mapValues { (_, ids) -> ids.toList() }
             metadata[KEY_TOOL_ACCESS_MODE] = toolConfiguration.toolAccessMode.name
         }
         return metadata
@@ -78,21 +76,15 @@ object ToolRunMetadata {
         if (metadata == null || metadata[KEY_PRESENT] != true) return null
         val official = (metadata[KEY_OFFICIAL_FUNCTIONS] as? Map<*, *>)
             .orEmpty()
-            .mapNotNull { (service, byTool) ->
-                val toolMap = (byTool as? Map<*, *>)
-                    .orEmpty()
-                    .mapNotNull { (tool, ids) ->
-                        val idSet = (ids as? List<*>)?.filterIsInstance<String>()?.toSet()
-                            ?: return@mapNotNull null
-                        (tool as? String)?.let { it to idSet }
-                    }
-                    .toMap()
-                (service as? String)?.let { it to toolMap }
+            .mapNotNull { (tool, ids) ->
+                val idSet = (ids as? List<*>)?.filterIsInstance<String>()?.toSet()
+                    ?: return@mapNotNull null
+                (tool as? String)?.let { it to idSet }
             }
             .toMap()
         return ConversationToolConfiguration(
             enabledMcpServerIds = metadata.stringSet(KEY_MCP_SERVER_IDS),
-            enabledOfficialFunctionIdsByService = official,
+            enabledOfficialFunctionIds = official,
             toolAccessMode = when (metadata[KEY_TOOL_ACCESS_MODE] as? String) {
                 ToolAccessMode.ON_DEMAND.name -> ToolAccessMode.ON_DEMAND
                 ToolAccessMode.ALWAYS_AVAILABLE.name -> ToolAccessMode.ALWAYS_AVAILABLE

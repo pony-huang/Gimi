@@ -85,11 +85,20 @@ import github.ponyhuang.gimi.ui.components.GimiBottomSheetOptionRow
 import github.ponyhuang.gimi.ui.components.GimiBottomSheetSwitchRow
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
 
-private const val WEB_SEARCH_TOOL_ID: String = "web_search"
-private const val KIMI_FORMULAS_TOOL_ID: String = "kimi_formulas"
+// 官方工具目录 ID — 厂商唯一,不跨厂商复用;与 :data:agent OfficialToolRegistry 保持一致。
+private const val OPENAI_WEB_SEARCH_TOOL_ID: String = "openai_web_search"
+private const val ANTHROPIC_WEB_SEARCH_TOOL_ID: String = "anthropic_web_search"
+private const val MINIMAX_WEB_SEARCH_TOOL_ID: String = "minimax_web_search"
+private const val MIMO_WEB_SEARCH_TOOL_ID: String = "mimo_web_search"
+private const val GEMINI_WEB_SEARCH_TOOL_ID: String = "gemini_web_search"
+private const val GEMINI_URL_CONTEXT_TOOL_ID: String = "gemini_url_context"
+private const val GEMINI_GOOGLE_MAPS_TOOL_ID: String = "gemini_google_maps"
 private const val GLM_WEB_SEARCH_TOOL_ID: String = "glm_web_search"
-private const val URL_CONTEXT_TOOL_ID: String = "url_context"
-private const val GOOGLE_MAPS_TOOL_ID: String = "google_maps"
+private const val KIMI_FORMULAS_TOOL_ID: String = "kimi_formulas"
+
+// GLM 在一个工具目录下展开两个本地执行函数,函数 ID 即厂商协议函数名(GlmWebSearchTool/GlmReaderTool.NAME)。
+private const val GLM_WEB_SEARCH_FUNCTION_ID: String = "web_search"
+private const val GLM_WEB_READER_FUNCTION_ID: String = "web_reader"
 private const val COMPACT_SHEET_ITEM_LIMIT: Int = 3
 
 private enum class AddToChatPage {
@@ -753,8 +762,8 @@ private fun OfficialToolFunctionRow(
 ) {
     GimiBottomSheetSwitchRow(
         icon = Icons.Default.Functions,
-        label = function.name,
-        description = function.description,
+        label = officialFunctionLabel(toolId, function.id),
+        description = officialFunctionDescription(toolId, function.id, function.description),
         checked = enabled,
         enabled = mutationEnabled,
         onCheckedChange = onEnabledChange,
@@ -1024,25 +1033,60 @@ private fun reasoningEffortDescription(effort: ReasoningEffort): String = string
 
 @Composable
 private fun officialToolLabel(toolId: String): String = when (toolId) {
-    WEB_SEARCH_TOOL_ID -> stringResource(R.string.chat_official_tool_web_search)
+    OPENAI_WEB_SEARCH_TOOL_ID,
+    ANTHROPIC_WEB_SEARCH_TOOL_ID,
+    MINIMAX_WEB_SEARCH_TOOL_ID,
+    MIMO_WEB_SEARCH_TOOL_ID,
+    GEMINI_WEB_SEARCH_TOOL_ID,
+    -> stringResource(R.string.chat_official_tool_web_search)
     KIMI_FORMULAS_TOOL_ID -> stringResource(R.string.chat_official_tool_kimi_formulas)
     GLM_WEB_SEARCH_TOOL_ID -> stringResource(R.string.chat_official_tool_glm_web_search)
-    URL_CONTEXT_TOOL_ID -> stringResource(R.string.chat_official_tool_url_context)
-    GOOGLE_MAPS_TOOL_ID -> stringResource(R.string.chat_official_tool_google_maps)
+    GEMINI_URL_CONTEXT_TOOL_ID -> stringResource(R.string.chat_official_tool_url_context)
+    GEMINI_GOOGLE_MAPS_TOOL_ID -> stringResource(R.string.chat_official_tool_google_maps)
     else -> toolId
 }
 
 @Composable
 private fun officialToolDescription(toolId: String): String = when (toolId) {
-    WEB_SEARCH_TOOL_ID ->
-        stringResource(R.string.chat_official_tool_web_search_description)
+    OPENAI_WEB_SEARCH_TOOL_ID,
+    ANTHROPIC_WEB_SEARCH_TOOL_ID,
+    MINIMAX_WEB_SEARCH_TOOL_ID,
+    MIMO_WEB_SEARCH_TOOL_ID,
+    GEMINI_WEB_SEARCH_TOOL_ID,
+    -> stringResource(R.string.chat_official_tool_web_search_description)
     KIMI_FORMULAS_TOOL_ID ->
         stringResource(R.string.chat_official_tool_kimi_formulas_description)
     GLM_WEB_SEARCH_TOOL_ID ->
         stringResource(R.string.chat_official_tool_glm_web_search_description)
-    URL_CONTEXT_TOOL_ID ->
+    GEMINI_URL_CONTEXT_TOOL_ID ->
         stringResource(R.string.chat_official_tool_url_context_description)
-    GOOGLE_MAPS_TOOL_ID ->
+    GEMINI_GOOGLE_MAPS_TOOL_ID ->
         stringResource(R.string.chat_official_tool_google_maps_description)
     else -> stringResource(R.string.chat_official_tool_default_description)
 }
+
+/**
+ * 函数行展示:目录 ID 与工具相同的单函数工具复用工具文案;GLM 的两个本地函数
+ * 按厂商函数名映射;Kimi 公式等动态函数直接展示厂商返回的名称/描述。
+ */
+@Composable
+private fun officialFunctionLabel(toolId: String, functionId: String): String =
+    when {
+        functionId == toolId -> officialToolLabel(toolId)
+        functionId == GLM_WEB_SEARCH_FUNCTION_ID ->
+            stringResource(R.string.chat_official_tool_web_search)
+        functionId == GLM_WEB_READER_FUNCTION_ID ->
+            stringResource(R.string.chat_official_tool_web_reader)
+        else -> functionId
+    }
+
+@Composable
+private fun officialFunctionDescription(toolId: String, functionId: String, fallback: String): String =
+    when {
+        functionId == toolId -> officialToolDescription(toolId)
+        functionId == GLM_WEB_SEARCH_FUNCTION_ID ->
+            stringResource(R.string.chat_official_tool_web_search_description)
+        functionId == GLM_WEB_READER_FUNCTION_ID ->
+            stringResource(R.string.chat_official_tool_web_reader_description)
+        else -> fallback
+    }

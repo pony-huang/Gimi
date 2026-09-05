@@ -34,13 +34,10 @@ class ChatAddToChatStateTest {
     @Test
     fun enabledOfficialFunctionCountUsesTheMarkerAsAFullSelection() {
         val state = ChatAddToChatState(
-            serviceId = "kimi",
             configuration = ConversationToolConfiguration(
-                enabledOfficialFunctionIdsByService = mapOf(
-                    "kimi" to mapOf(
-                        KIMI_FORMULAS_TOOL_ID to
-                            setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
-                    ),
+                enabledOfficialFunctionIds = mapOf(
+                    KIMI_FORMULAS_TOOL_ID to
+                        setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
                 ),
             ),
             officialTools = listOf(

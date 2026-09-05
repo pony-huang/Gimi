@@ -935,7 +935,6 @@ class ChatViewModel @Inject constructor(
         val current = runtime.toolConfiguration
             ?: sessionResolver.resolveToolConfiguration(sessionId, selection)
         val initialized = current.initializeOfficialFunctions(
-            selection.serviceId,
             supportedOfficialToolIds(selection),
         )
         if (initialized != current) {
@@ -988,11 +987,10 @@ class ChatViewModel @Inject constructor(
         val selection = _uiState.value.currentModelSelection ?: return
         updateToolConfiguration { configuration ->
             configuration.setOfficialFunctionEnabled(
-                selection.serviceId,
-                toolId,
-                functionId,
-                supportedFunctionIds,
-                enabled,
+                toolId = toolId,
+                functionId = functionId,
+                supportedFunctionIds = supportedFunctionIds,
+                enabled = enabled,
             )
         }
     }
@@ -1025,7 +1023,7 @@ class ChatViewModel @Inject constructor(
         val selection = _uiState.value.currentModelSelection ?: return
         val descriptors = _uiState.value.officialToolDescriptors
         descriptors.forEach { descriptor ->
-            val raw = configuration.enabledOfficialFunctionIds(selection.serviceId, descriptor.id)
+            val raw = configuration.enabledOfficialFunctionIds(descriptor.id)
             val needsExpansion = ConversationToolConfiguration.ALL_FUNCTIONS_MARKER in raw
             val alreadyLoaded = descriptor.functions.isNotEmpty()
             if (!needsExpansion) return@forEach
@@ -1080,12 +1078,11 @@ class ChatViewModel @Inject constructor(
     private fun expandMarkerAfterLoad(tool: OfficialToolDescriptor) {
         val selection = _uiState.value.currentModelSelection ?: return
         val configuration = _uiState.value.toolConfiguration ?: return
-        val ids = configuration.enabledOfficialFunctionIds(selection.serviceId, tool.id)
+        val ids = configuration.enabledOfficialFunctionIds(tool.id)
         if (ConversationToolConfiguration.ALL_FUNCTIONS_MARKER !in ids) return
         if (tool.functions.isEmpty()) return
         updateToolConfiguration { configuration ->
             configuration.expandOfficialFunctionsMarker(
-                selection.serviceId,
                 tool.id,
                 tool.functions.mapTo(hashSetOf()) { it.id },
             )
@@ -1132,13 +1129,17 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    private fun supportedOfficialToolIds(selection: ModelSelection?): Set<String> =
-        selection?.let { current ->
-            modelServices.currentServices()
-                .firstOrNull { it.id == current.serviceId }
-                ?.supportedOfficialTools
-                ?.toSet()
-        }.orEmpty()
+    /**
+     * 当前选择支持的官方工具 ID(厂商唯一)。官方工具支持矩阵由 agent 层的
+     * [OfficialToolFunctionCatalog] 实现维护,按服务 + 当前协议查询。
+     */
+    private fun supportedOfficialToolIds(selection: ModelSelection?): Set<String> {
+        val current = selection ?: return emptySet()
+        val service = modelServices.currentServices()
+            .firstOrNull { it.id == current.serviceId }
+            ?: return emptySet()
+        return officialFunctionCatalog.supportedToolIds(current.serviceId, service.apiProtocol)
+    }
 
     private fun isUsableChatSelection(selection: ModelSelection): Boolean =
         modelServices.currentServices().isUsableChatSelection(selection)

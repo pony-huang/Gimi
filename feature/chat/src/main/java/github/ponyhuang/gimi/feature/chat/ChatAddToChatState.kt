@@ -25,7 +25,6 @@ internal fun consumeAtLowerScrollBoundary(
 ): Float = if (canScrollForward) 0f else availableY.coerceAtMost(0f)
 
 data class ChatAddToChatState(
-    val serviceId: String? = null,
     val configuration: ConversationToolConfiguration? = null,
     val mcpServers: List<McpServer> = emptyList(),
     val officialTools: List<OfficialToolDescriptor> = emptyList(),
@@ -48,9 +47,8 @@ data class ChatAddToChatState(
      * case the count is reported as 1 because the marker itself is one entry).
      */
     fun enabledOfficialFunctionCount(toolId: String): Int {
-        val serviceId = serviceId ?: return 0
         val config = configuration ?: return 0
-        val raw = config.enabledOfficialFunctionIds(serviceId, toolId)
+        val raw = config.enabledOfficialFunctionIds(toolId)
         if (ConversationToolConfiguration.ALL_FUNCTIONS_MARKER in raw) {
             val descriptor = officialTools.firstOrNull { it.id == toolId }
             return descriptor?.functions?.size ?: 1
@@ -74,9 +72,8 @@ data class ChatAddToChatState(
      * function is unknown.
      */
     fun isOfficialFunctionEnabled(toolId: String, functionId: String): Boolean {
-        val serviceId = serviceId ?: return false
         val config = configuration ?: return false
-        val raw = config.enabledOfficialFunctionIds(serviceId, toolId)
+        val raw = config.enabledOfficialFunctionIds(toolId)
         return ConversationToolConfiguration.ALL_FUNCTIONS_MARKER in raw ||
             functionId in raw
     }

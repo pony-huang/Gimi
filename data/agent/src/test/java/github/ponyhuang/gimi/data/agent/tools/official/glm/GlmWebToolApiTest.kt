@@ -1,14 +1,5 @@
 package github.ponyhuang.gimi.data.agent.tools.official.glm
 
-import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
-import github.ponyhuang.gimi.data.agent.tools.official.DefaultOfficialToolFunctionCatalog
-import github.ponyhuang.gimi.data.agent.tools.official.KimiFormulaCatalog
-import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
-import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
-import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
-import io.mockk.every
-import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -19,110 +10,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class GlmWebSearchToolsetTest {
-
-    @Test
-    fun notApplicableWhenModelIsNotGlm() = runTest {
-        val toolset = toolset()
-        val config = config(modelId = "other-model")
-
-        assertTrue(toolset.resolveTools(config, selection = null).isEmpty())
-    }
-
-    @Test
-    fun notApplicableWhenConversationSelectionExcludesIt() = runTest {
-        val toolset = toolset()
-        val selection = ConversationToolConfiguration(
-            enabledOfficialFunctionIdsByService = mapOf(
-                "glm" to mapOf(GlmWebSearchToolset.TOOL_ID to emptySet()),
-            ),
-        )
-
-        assertTrue(toolset.resolveTools(config(), selection).isEmpty())
-    }
-
-    @Test
-    fun resolvesWebSearchAndReaderTools() = runTest {
-        val toolset = toolset()
-
-        val tools = toolset.resolveTools(config(), selection = null)
-
-        assertEquals(
-            listOf(GlmWebSearchTool.NAME, GlmReaderTool.NAME),
-            tools.map { it.name },
-        )
-        assertEquals(
-            listOf("search_query"),
-            tools.first().declaration()!!.parameters?.required,
-        )
-        assertEquals(
-            listOf("url"),
-            tools.last().declaration()!!.parameters?.required,
-        )
-    }
-
-    @Test
-    fun filtersIndividualGlmFunctionsFromConversationSelection() = runTest {
-        val toolset = toolset()
-        val selection = ConversationToolConfiguration(
-            enabledOfficialFunctionIdsByService = mapOf(
-                "glm" to mapOf(
-                    GlmWebSearchToolset.TOOL_ID to setOf(GlmReaderTool.NAME),
-                ),
-            ),
-        )
-
-        val tools = toolset.resolveTools(config(), selection)
-
-        assertEquals(listOf(GlmReaderTool.NAME), tools.map { it.name })
-    }
-
-    @Test
-    fun officialCatalogListsSearchAndReaderFunctions() = runTest {
-        val catalog = DefaultOfficialToolFunctionCatalog(mockk<KimiFormulaCatalog>())
-
-        val functions = catalog.listFunctions(GlmWebSearchToolset.TOOL_ID)
-
-        assertEquals(
-            listOf(GlmWebSearchTool.NAME, GlmReaderTool.NAME),
-            functions.map { it.id },
-        )
-    }
-
-    @Test
-    fun resolvesForAnthropicProtocolConfigs() = runTest {
-        val toolset = toolset()
-        val config = config(baseType = ApiProtocol.Anthropic)
-
-        assertEquals(2, toolset.resolveTools(config, selection = null).size)
-    }
-
-    private fun config(
-        modelId: String = "glm-4.6",
-        baseType: ApiProtocol = ApiProtocol.Standard,
-    ) = ModelRuntimeMetadata(
-        serviceId = "glm",
-        baseType = baseType,
-        modelId = modelId,
-        fullBaseUrl = "https://open.bigmodel.cn/api/paas/v4/",
-    )
-
-    private fun toolset(
-        httpClient: OkHttpClient = OkHttpClient(),
-        credential: String = "key",
-    ): GlmWebSearchToolset {
-        val service = mockk<LLMModelSetting> {
-            every { id } returns "glm"
-            every { isEnabled } returns true
-            every { apiKey } returns credential
-        }
-        val modelServices = mockk<AgentModelConfigurationSource> {
-            every { currentServices() } returns listOf(service)
-        }
-        return GlmWebSearchToolset(httpClient, modelServices)
-    }
-}
-
+/**
+ * GLM Web 工具 HTTP 网关的 wire 行为;工具在会话中的解析与过滤
+ * 由 [github.ponyhuang.gimi.data.agent.tools.official.DefaultOfficialToolsetTest] 覆盖。
+ */
 class GlmWebToolApiTest {
 
     @Test

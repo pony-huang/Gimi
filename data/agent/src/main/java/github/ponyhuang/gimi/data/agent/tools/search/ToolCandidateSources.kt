@@ -6,7 +6,8 @@ import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.data.agent.McpToolsetHandle
 import github.ponyhuang.gimi.data.agent.tools.modelRuntimeMetadataOrNull
 import github.ponyhuang.gimi.data.agent.tools.toolConfigurationOrNull
-import github.ponyhuang.gimi.data.agent.tools.official.SearchOfficialToolset
+import github.ponyhuang.gimi.data.agent.tools.official.DefaultOfficialToolset
+import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolSpec
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 
 /**
@@ -62,26 +63,28 @@ internal class ToolsetCandidateSource(
 }
 
 /**
- * 把官方函数工具集适配为动态候选来源。
+ * 把一个官方工具声明适配为动态候选来源。
  *
- * 会话级函数选择通过 invocation 上下文（RunConfig metadata）按请求读取；
- * 动态目录只决定这些函数何时把 schema 暴露给模型，不再次解释厂商协议。
+ * 会话级函数选择通过 invocation 上下文（RunConfig metadata）按请求读取;
+ * 动态目录只决定这些函数何时把 schema 暴露给模型,不再次解释厂商协议。
+ * 工具构造复用 [DefaultOfficialToolset.resolveSpec],与请求期注入语义一致。
  */
 internal class OfficialToolCandidateSource(
-    private val toolset: SearchOfficialToolset,
+    private val spec: OfficialToolSpec,
+    private val officialToolset: DefaultOfficialToolset,
 ) : ToolCandidateSource {
-    override val id: String = toolset.sourceId
-    override val displayName: String = toolset.sourceDisplayName
+    override val id: String = "official:${spec.toolId}"
+    override val displayName: String = spec.displayName
 
     override suspend fun loadAllTools(readonlyContext: ReadonlyContext?): List<BaseTool> {
         val modelRuntime = readonlyContext.modelRuntimeMetadataOrNull() ?: return emptyList()
-        return toolset.resolveTools(modelRuntime, selection = null)
+        return officialToolset.resolveSpec(spec, modelRuntime, selection = null)
     }
 
     override suspend fun loadEnabledTools(
         readonlyContext: ReadonlyContext?,
     ): List<BaseTool> {
         val modelRuntime = readonlyContext.modelRuntimeMetadataOrNull() ?: return emptyList()
-        return toolset.resolveTools(modelRuntime, readonlyContext.toolConfigurationOrNull())
+        return officialToolset.resolveSpec(spec, modelRuntime, readonlyContext.toolConfigurationOrNull())
     }
 }

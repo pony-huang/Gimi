@@ -8,6 +8,7 @@ import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelectionCodec
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -20,6 +21,7 @@ class DefaultConversationSessionResolver @Inject constructor(
     private val conversations: ConversationRepository,
     private val modelCatalog: ModelCatalogRepository,
     private val mcpRepository: McpRepository,
+    private val officialTools: OfficialToolFunctionCatalog,
 ) : ConversationSessionResolver {
     private val mutex = Mutex()
 
@@ -91,10 +93,7 @@ class DefaultConversationSessionResolver @Inject constructor(
         val availableMcpIds = mcpRepository.currentServers().mapTo(hashSetOf()) { it.id }
         val resolved = (stored ?: defaultToolConfiguration(selection))
             .sanitize(availableMcpIds)
-            .initializeOfficialFunctions(
-                selection.serviceId,
-                supportedOfficialToolIds(selection),
-            )
+            .initializeOfficialFunctions(supportedOfficialToolIds(selection))
         if (stored != resolved) {
             check(conversations.setConversationToolConfiguration(sessionId, resolved)) {
                 "Unable to save the conversation tool configuration."
@@ -108,10 +107,8 @@ class DefaultConversationSessionResolver @Inject constructor(
             enabledMcpServerIds = mcpRepository.currentServers()
                 .filter { it.isEnabled }
                 .mapTo(linkedSetOf()) { it.id },
-            enabledOfficialFunctionIdsByService = mapOf(
-                selection.serviceId to supportedOfficialToolIds(selection)
-                    .associateWith { setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER) },
-            ),
+            enabledOfficialFunctionIds = supportedOfficialToolIds(selection)
+                .associateWith { setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER) },
         )
 
     private fun defaultSelection(): ModelSelection? {
@@ -130,11 +127,14 @@ class DefaultConversationSessionResolver @Inject constructor(
                 .firstOrNull()
     }
 
+    /**
+     * 当前服务 + 协议支持的官方工具 ID(厂商唯一);官方工具支持矩阵由 agent 层的
+     * [OfficialToolFunctionCatalog] 实现维护,模型目录不再承载该职责。
+     */
     private fun supportedOfficialToolIds(selection: ModelSelection): Set<String> =
         modelCatalog.currentServices()
             .firstOrNull { it.id == selection.serviceId }
-            ?.supportedOfficialTools
-            ?.toSet()
+            ?.let { service -> officialTools.supportedToolIds(selection.serviceId, service.apiProtocol) }
             .orEmpty()
 
     private fun isUsable(selection: ModelSelection): Boolean =

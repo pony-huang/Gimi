@@ -11,6 +11,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelectionCodec
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -34,20 +35,22 @@ class DefaultConversationSessionResolverTest {
             McpServer(id = "mcp", name = "MCP", isEnabled = true),
         )
     }
+    private val officialTools = mockk<OfficialToolFunctionCatalog> {
+        every { supportedToolIds("service", ApiProtocol.Standard) } returns setOf("service_web_search")
+    }
     private val resolver = DefaultConversationSessionResolver(
         conversations,
         modelCatalog,
         mcpRepository,
+        officialTools,
     )
 
     @Test
     fun resolveCurrentOrCreateUsesCurrentConversationModelAndTools() = runTest {
         val tools = ConversationToolConfiguration(
             enabledMcpServerIds = setOf("mcp"),
-            enabledOfficialFunctionIdsByService = mapOf(
-                "service" to mapOf(
-                    "web_search" to setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
-                ),
+            enabledOfficialFunctionIds = mapOf(
+                "service_web_search" to setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
             ),
         )
         coEvery { conversations.lastConversationId() } returns "current"
@@ -98,7 +101,7 @@ class DefaultConversationSessionResolverTest {
         assertEquals(setOf("mcp"), configuration.captured.enabledMcpServerIds)
         assertEquals(
             setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
-            configuration.captured.enabledOfficialFunctionIds("service", "web_search"),
+            configuration.captured.enabledOfficialFunctionIds("service_web_search"),
         )
     }
 
@@ -128,6 +131,5 @@ class DefaultConversationSessionResolverTest {
                 models = listOf(Model(id = "model", name = "Model")),
             ),
         ),
-        supportedOfficialTools = listOf("web_search"),
     )
 }

@@ -241,7 +241,7 @@ class OfficialToolRegistry @Inject constructor(
     suspend fun createTools(spec: OfficialToolSpec, config: ModelRuntimeMetadata): List<BaseTool> =
         when (val binding = spec.binding) {
             is OfficialToolBinding.ProviderDeclaration ->
-                listOf(OfficialBuiltInTool(toolId = binding.wireName))
+                listOf(OfficialBuiltInTool(declarationName = binding.wireName))
 
             is OfficialToolBinding.AdkNative -> listOf(binding.create())
 

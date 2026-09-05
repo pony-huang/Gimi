@@ -287,7 +287,6 @@ fun ChatScaffold(
                     isVoiceInputAvailable = isSpeechRecognitionAvailable,
                     onTranscribeVoice = onTranscribeVoice,
                     addToChatState = ChatAddToChatState(
-                        serviceId = state.currentModelSelection?.serviceId,
                         configuration = state.toolConfiguration,
                         mcpServers = state.availableMcpServers,
                         officialTools = state.officialToolDescriptors,

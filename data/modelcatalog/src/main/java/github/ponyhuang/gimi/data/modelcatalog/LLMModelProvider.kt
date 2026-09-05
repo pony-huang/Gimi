@@ -3,12 +3,6 @@ package github.ponyhuang.gimi.data.modelcatalog
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import kotlinx.serialization.Serializable
 
-private const val WEB_SEARCH_TOOL_ID: String = "web_search"
-private const val KIMI_FORMULAS_TOOL_ID: String = "kimi_formulas"
-private const val GLM_WEB_SEARCH_TOOL_ID: String = "glm_web_search"
-private const val URL_CONTEXT_TOOL_ID: String = "url_context"
-private const val GOOGLE_MAPS_TOOL_ID: String = "google_maps"
-
 /**
  * 模型服务与配置中心 — 数据契约。
  * @property serviceId 平台唯一 ID（如 `"deepseek"`）。
@@ -25,8 +19,6 @@ private const val GOOGLE_MAPS_TOOL_ID: String = "google_maps"
  *                  新增厂商时只需在 [LLMModelConfigs] 中赋值即可，无需改 UI 调用点。
  * @property homepageUrl 平台官方主页（Header 外链目标）。
  * @property keyHelpUrl "点击这里获取密钥" 富文本跳转目标。
- * @property officialToolProtocols 官方工具 ID 到支持协议的静态映射；运行时按当前协议
- * 计算菜单可见能力，不保存到用户配置。
  */
 data class LLMModelProvider(
     val serviceId: String,
@@ -41,7 +33,6 @@ data class LLMModelProvider(
     val iconRes: Int? = null,
     val homepageUrl: String = "",
     val keyHelpUrl: String = "",
-    val officialToolProtocols: Map<String, List<ApiBaseType>> = emptyMap(),
 ) {
     /** 当前 [baseType] 对应的实际请求地址。两种协议的地址分别保存，切换时互不覆盖。 */
     val activeApiBaseUrl: String
@@ -51,13 +42,6 @@ data class LLMModelProvider(
             // Gemini 走 ADK 原生实现，无需请求地址；apiBaseUrl 仅供连接测试 / 模型刷新。
             ApiBaseType.Gemini -> apiBaseUrl
         }
-
-    val supportedOfficialTools: List<String>
-        get() = officialToolProtocols
-            .filterValues { baseType in it }
-            .keys
-            .toList()
-
 }
 
 /**
@@ -127,7 +111,6 @@ enum class LLMModelType(
     val defaultAnthropicBaseUrl: String? = null,
     val homepageUrl: String = "",
     val keyHelpUrl: String = "",
-    val officialToolProtocols: Map<String, List<ApiBaseType>> = emptyMap(),
     val iconRes: Int? = null,
 ) {
     DeepSeek(
@@ -149,9 +132,6 @@ enum class LLMModelType(
         defaultAnthropicBaseUrl = "https://api.minimaxi.com/anthropic",
         homepageUrl = "https://www.minimaxi.com/",
         keyHelpUrl = "https://platform.minimaxi.com/user-center/basic-information/interface-key",
-        officialToolProtocols = mapOf(
-            WEB_SEARCH_TOOL_ID to listOf(ApiBaseType.Anthropic),
-        ),
     ),
     Mimo(
         serviceId = "mimo",
@@ -162,9 +142,6 @@ enum class LLMModelType(
         defaultAnthropicBaseUrl = "https://api.xiaomimimo.com/anthropic",
         homepageUrl = "https://mimo.mi.com/",
         keyHelpUrl = "https://platform.xiaomimimo.com/console/api-keys",
-        officialToolProtocols = mapOf(
-            WEB_SEARCH_TOOL_ID to listOf(ApiBaseType.Standard),
-        ),
     ),
     OpenAI(
         serviceId = "openai",
@@ -174,9 +151,6 @@ enum class LLMModelType(
         supportedBaseTypes = listOf(ApiBaseType.Standard),
         homepageUrl = "https://openai.com/",
         keyHelpUrl = "https://platform.openai.com/api-keys",
-        officialToolProtocols = mapOf(
-            WEB_SEARCH_TOOL_ID to listOf(ApiBaseType.Standard),
-        ),
     ),
     Anthropic(
         serviceId = "anthropic",
@@ -187,9 +161,6 @@ enum class LLMModelType(
         defaultAnthropicBaseUrl = "https://api.anthropic.com",
         homepageUrl = "https://www.anthropic.com/",
         keyHelpUrl = "https://console.anthropic.com/settings/keys",
-        officialToolProtocols = mapOf(
-            WEB_SEARCH_TOOL_ID to listOf(ApiBaseType.Anthropic),
-        ),
     ),
     Gemini(
         serviceId = "gemini",
@@ -201,12 +172,6 @@ enum class LLMModelType(
         supportedBaseTypes = listOf(ApiBaseType.Gemini),
         homepageUrl = "https://gemini.google.com/",
         keyHelpUrl = "https://aistudio.google.com/app/apikey",
-        // Google Search 复用 web_search ID（选择按服务隔离）；三个工具都由 ADK 原生注入。
-        officialToolProtocols = mapOf(
-            WEB_SEARCH_TOOL_ID to listOf(ApiBaseType.Gemini),
-            URL_CONTEXT_TOOL_ID to listOf(ApiBaseType.Gemini),
-            GOOGLE_MAPS_TOOL_ID to listOf(ApiBaseType.Gemini),
-        ),
     ),
     Moonshot(
         serviceId = "kimi",
@@ -217,9 +182,6 @@ enum class LLMModelType(
         defaultAnthropicBaseUrl = "https://api.moonshot.cn/anthropic",
         homepageUrl = "https://www.kimi.com/",
         keyHelpUrl = "https://platform.kimi.com/console/api-keys",
-        officialToolProtocols = mapOf(
-            KIMI_FORMULAS_TOOL_ID to DUAL_API_BASE_TYPES,
-        ),
     ),
     Glm(
         serviceId = "glm",
@@ -230,9 +192,6 @@ enum class LLMModelType(
         defaultAnthropicBaseUrl = "https://open.bigmodel.cn/api/anthropic",
         homepageUrl = "https://bigmodel.cn/",
         keyHelpUrl = "https://bigmodel.cn/usercenter/proj-mgmt/apikeys",
-        officialToolProtocols = mapOf(
-            GLM_WEB_SEARCH_TOOL_ID to DUAL_API_BASE_TYPES,
-        ),
     );
 
     fun toProvider(
@@ -251,7 +210,6 @@ enum class LLMModelType(
         lLMModelGroups = modelGroups,
         homepageUrl = homepageUrl,
         keyHelpUrl = keyHelpUrl,
-        officialToolProtocols = officialToolProtocols,
         iconRes = iconRes,
     )
 
@@ -308,7 +266,4 @@ object LLMModelConfigs {
 
     fun supportedBaseTypesFor(serviceId: String): List<ApiBaseType> =
         fromServiceId(serviceId)?.supportedBaseTypes ?: DUAL_API_BASE_TYPES
-
-    fun officialToolProtocolsFor(serviceId: String): Map<String, List<ApiBaseType>> =
-        fromServiceId(serviceId)?.officialToolProtocols.orEmpty()
 }

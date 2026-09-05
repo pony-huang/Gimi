@@ -52,6 +52,8 @@
     <string name="chat_official_tool_kimi_formulas_description">Use Kimi formula calculations</string>
     <string name="chat_official_tool_glm_web_search">GLM web search</string>
     <string name="chat_official_tool_glm_web_search_description">Search the web for current information with Zhipu’s search engine</string>
+    <string name="chat_official_tool_web_reader">Web reader</string>
+    <string name="chat_official_tool_web_reader_description">Read and parse the content of a given web page</string>
     <string name="chat_official_tool_url_context">URL reader</string>
     <string name="chat_official_tool_url_context_description">Read the content of linked web pages</string>
     <string name="chat_official_tool_google_maps">Google Maps</string>

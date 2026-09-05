@@ -22,8 +22,8 @@ class ToolRunMetadataTest {
     fun roundTripPreservesTheFullConfiguration() {
         val configuration = ConversationToolConfiguration(
             enabledMcpServerIds = setOf("github"),
-            enabledOfficialFunctionIdsByService = mapOf(
-                "kimi" to mapOf("kimi_formulas" to setOf("translate", "code")),
+            enabledOfficialFunctionIds = mapOf(
+                "kimi_formulas" to setOf("translate", "code"),
             ),
             toolAccessMode = ToolAccessMode.ON_DEMAND,
         )
@@ -100,8 +100,8 @@ class ToolRunMetadataTest {
             modelRuntime = modelRuntime(),
             toolConfiguration = ConversationToolConfiguration(
                 enabledMcpServerIds = setOf("github"),
-                enabledOfficialFunctionIdsByService = mapOf(
-                    "kimi" to mapOf("kimi_formulas" to setOf("translate")),
+                enabledOfficialFunctionIds = mapOf(
+                    "kimi_formulas" to setOf("translate"),
                 ),
                 toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
             ),

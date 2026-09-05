@@ -16,8 +16,6 @@ data class LLMModelSetting(
     val iconRes: Int? = null,
     val homepageUrl: String = "",
     val keyHelpUrl: String = "",
-    /** Official tools exposed by this provider. They are enabled by default. */
-    val supportedOfficialTools: List<String> = emptyList(),
 ) {
     val activeApiBaseUrl: String
         get() = when (apiProtocol) {

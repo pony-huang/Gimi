@@ -655,6 +655,7 @@ class ChatViewModelCharacterizationTest {
     @Test
     fun cancelledOfficialFunctionLoadDoesNotSwallowCancellationException() = runTest {
         val catalog = mockk<OfficialToolFunctionCatalog>(relaxed = true) {
+            every { supportedToolIds(any(), any()) } returns setOf("web_search")
             coEvery { listFunctions("web_search") } throws CancellationException("load cancelled")
         }
         val fixture = fixture(configured = true, officialCatalogOverride = catalog)
@@ -763,10 +764,8 @@ class ChatViewModelCharacterizationTest {
         }
         val defaultTools = ConversationToolConfiguration(
             enabledMcpServerIds = setOf("enabled-mcp"),
-            enabledOfficialFunctionIdsByService = mapOf(
-                "service" to mapOf(
-                    "web_search" to setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
-                ),
+            enabledOfficialFunctionIds = mapOf(
+                "web_search" to setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
             ),
         )
         val sessionResolver = object : ConversationSessionResolver {
@@ -842,6 +841,7 @@ class ChatViewModelCharacterizationTest {
         }
         val officialFunctionCatalog = officialCatalogOverride
             ?: mockk<OfficialToolFunctionCatalog>(relaxed = true) {
+                every { supportedToolIds(any(), any()) } returns setOf("web_search")
                 coEvery { listFunctions(any()) } returns emptyList()
             }
         val toolApproval = FakeToolApprovalRepository()
@@ -936,7 +936,6 @@ class ChatViewModelCharacterizationTest {
                 models = listOf(Model(id = "model", name = "Model")),
             ),
         ),
-        supportedOfficialTools = listOf("web_search"),
     )
 
     private data class Fixture(

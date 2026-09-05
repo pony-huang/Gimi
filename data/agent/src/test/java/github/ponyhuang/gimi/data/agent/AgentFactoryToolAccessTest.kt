@@ -24,8 +24,10 @@ import github.ponyhuang.gimi.data.agent.tools.mcp.ConversationMcpToolset
 import github.ponyhuang.gimi.data.agent.tools.mcp.McpAuthorizationTool
 import github.ponyhuang.gimi.data.agent.tools.mcp.McpConfigurationTool
 import github.ponyhuang.gimi.data.agent.tools.mcp.McpManualConfigurationTool
-import github.ponyhuang.gimi.data.agent.tools.official.SearchOfficialToolset
-import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolset
+import github.ponyhuang.gimi.data.agent.tools.official.DefaultOfficialToolset
+import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolRegistry
+import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolSpec
+import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolBinding
 import github.ponyhuang.gimi.data.agent.tools.system.LocalToolset
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
@@ -68,33 +70,28 @@ class AgentFactoryToolAccessTest {
     }
 
     @Test
-    fun alwaysAvailableAttachesEveryToolsetDirectlyWithoutSearchGateway() = runTest {
-        val native = FakeOfficialToolset("web_search")
-        val formula = FakeSearchOfficialToolset("formula_tool")
-        val fixture = fixture(officialToolsets = setOf(native, formula))
+    fun alwaysAvailableAttachesOfficialToolsetDirectlyWithoutSearchGateway() = runTest {
+        val fixture = fixture()
 
         val agent = fixture.create(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE).agent as LlmAgent
 
-        assertTrue(native in agent.toolsets)
-        assertTrue(formula in agent.toolsets)
+        assertTrue(fixture.officialToolset in agent.toolsets)
         assertTrue(agent.toolsets.none { it is ToolSearchToolset })
         assertTrue(agent.toolsets.any { it is LocalToolset })
         assertTrue(agent.toolsets.any { it is ConversationMcpToolset })
     }
 
     @Test
-    fun onDemandKeepsNativeOfficialDirectAndHidesCandidatesBehindSearch() = runTest {
-        val native = FakeOfficialToolset("web_search")
-        val formula = FakeSearchOfficialToolset("formula_tool")
+    fun onDemandKeepsOfficialToolsetDirectAndHidesCandidatesBehindSearch() = runTest {
         val fixture = fixture(
             localTools = listOf(declarationTool("clock")),
-            officialToolsets = setOf(native, formula),
         )
 
         val agent = fixture.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
 
-        assertTrue(native in agent.toolsets)
-        assertFalse(formula in agent.toolsets)
+        assertTrue(fixture.officialToolset in agent.toolsets)
+        // ON_DEMAND 下候选是否真的被跳过由 DefaultOfficialToolsetTest 验证;
+        // 这里验证检索网关挂载且默认只暴露 tool_search。
         val search = agent.toolsets.filterIsInstance<ToolSearchToolset>().single()
         assertEquals(listOf(TOOL_SEARCH_NAME), search.getTools().map(BaseTool::name))
     }
@@ -209,6 +206,7 @@ class AgentFactoryToolAccessTest {
     private class Fixture(
         val agentFactory: AgentFactory,
         val pluginRuntime: PluginRuntimeSnapshot<AgentPlugin>,
+        val officialToolset: DefaultOfficialToolset,
     ) {
         suspend fun create(
             toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
@@ -225,7 +223,7 @@ class AgentFactoryToolAccessTest {
     private fun fixture(
         localTools: List<BaseTool> = emptyList(),
         confirmationRequiredToolIds: Set<String> = emptySet(),
-        officialToolsets: Set<OfficialToolset> = emptySet(),
+        officialRegistry: OfficialToolRegistry = officialRegistry(),
         pluginToolsets: List<Toolset> = emptyList(),
         mcpConfigurationTool: McpConfigurationTool = mockk(relaxed = true) {
             every { name } returns McpConfigurationTool.NAME
@@ -261,6 +259,7 @@ class AgentFactoryToolAccessTest {
         val plugin = FakeAgentPlugin("test", pluginToolsets = pluginToolsets)
         val pluginRuntimeProvider = FakePluginRuntimeProvider(plugins = listOf(plugin))
 
+        val officialToolset = DefaultOfficialToolset(officialRegistry)
         val registry = AgentContributionRegistry(
             setOf(
                 LocalToolContribution(localToolCatalog, localToolset, toolAuthorization),
@@ -272,7 +271,7 @@ class AgentFactoryToolAccessTest {
                     mcpManualConfigurationTool = mcpManualConfigurationTool,
                     mcpRepository = mcpRepository,
                 ),
-                OfficialToolContribution(officialToolsets),
+                OfficialToolContribution(officialToolset, officialRegistry),
                 SkillToolContribution(mockk<SkillSource>(relaxed = true)),
                 PluginToolContribution(pluginRuntimeProvider),
                 MemoryToolContribution(),
@@ -286,6 +285,7 @@ class AgentFactoryToolAccessTest {
                 toolVectorSearch = mockk<ToolVectorSearch>(relaxed = true),
             ),
             pluginRuntime = pluginRuntimeProvider.runtime.value,
+            officialToolset = officialToolset,
         )
     }
 
@@ -297,25 +297,21 @@ class AgentFactoryToolAccessTest {
         fullBaseUrl = "https://example.com",
     )
 
-    private class FakeOfficialToolset(
-        private val toolName: String,
-    ) : OfficialToolset {
-        override suspend fun resolveTools(
-            config: ModelRuntimeMetadata,
-            selection: ConversationToolConfiguration?,
-        ): List<BaseTool> = listOf(declarationTool(toolName))
-    }
-
-    private class FakeSearchOfficialToolset(
-        private val toolName: String,
-    ) : SearchOfficialToolset {
-        override val sourceId: String = "formula"
-        override val sourceDisplayName: String = "Formula"
-
-        override suspend fun resolveTools(
-            config: ModelRuntimeMetadata,
-            selection: ConversationToolConfiguration?,
-        ): List<BaseTool> = listOf(declarationTool(toolName))
+    /**
+     * 注册表 mock:暴露一个检索候选声明(Kimi formulas 形态),驱动 ON_DEMAND
+     * 模式的候选源装配路径。
+     */
+    private fun officialRegistry(): OfficialToolRegistry = mockk {
+        every { all } returns listOf(
+            OfficialToolSpec(
+                toolId = "kimi_formulas",
+                serviceId = "kimi",
+                protocols = setOf(ApiProtocol.Standard),
+                displayName = "Kimi formulas",
+                searchCandidate = true,
+                binding = OfficialToolBinding.ProviderDeclaration(wireName = "formula_tool"),
+            ),
+        )
     }
 
     /** 模拟插件返回的 ADK [Toolset]：忽略请求期上下文，恒定出一个工具。 */

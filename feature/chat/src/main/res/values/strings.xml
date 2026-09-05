@@ -54,6 +54,8 @@
     <string name="chat_official_tool_kimi_formulas_description">使用 Kimi 的公式计算能力</string>
     <string name="chat_official_tool_glm_web_search">GLM 网页搜索</string>
     <string name="chat_official_tool_glm_web_search_description">调用智谱搜索引擎获取最新的互联网信息</string>
+    <string name="chat_official_tool_web_reader">网页阅读</string>
+    <string name="chat_official_tool_web_reader_description">读取并解析指定网页内容</string>
     <string name="chat_official_tool_url_context">网页读取</string>
     <string name="chat_official_tool_url_context_description">读取链接指向的网页内容</string>
     <string name="chat_official_tool_google_maps">Google 地图</string>

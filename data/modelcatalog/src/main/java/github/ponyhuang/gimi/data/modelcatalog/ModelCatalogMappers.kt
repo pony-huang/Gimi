@@ -19,7 +19,6 @@ fun LLMModelProvider.toDomain(): LLMModelSetting = LLMModelSetting(
     iconRes = iconRes,
     homepageUrl = homepageUrl,
     keyHelpUrl = keyHelpUrl,
-    supportedOfficialTools = supportedOfficialTools,
 )
 
 fun Model.toData(): LLMModelItem = LLMModelItem(

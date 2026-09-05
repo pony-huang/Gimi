@@ -58,49 +58,18 @@ interface OfficialToolset : Toolset {
  * （与旧的 `ModelConfig.forConversation` 过滤语义一致）。
  */
 internal fun ConversationToolConfiguration?.isOfficialToolEnabled(
-    serviceId: String,
     toolId: String,
-): Boolean = this == null || enabledOfficialFunctionIds(serviceId, toolId).isNotEmpty()
-
-/** 从安全模型配置源读取当前启用服务的凭据；凭据不会进入 RunConfig metadata。 */
-internal fun AgentModelConfigurationSource.apiKeyForService(serviceId: String): String? =
-    currentServices()
-        .firstOrNull { service -> service.id == serviceId && service.isEnabled }
-        ?.apiKey
-        ?.takeIf(String::isNotBlank)
+): Boolean = this == null || enabledOfficialFunctionIds(toolId).isNotEmpty()
 
 /**
- * 按实际请求模型 ID 判断模型家族。
+ * Declaration-only tool executed by the remote model provider, never by the local Agent runtime.
  *
- * 模型 ID 可能是普通名称，也可能带 `models/` 等路径前缀；家族名后只接受常见
- * 分隔符，避免把 `glmatrix` 之类无关名称误判为 GLM。
+ * @property declarationName 发给厂商 API 的保留声明字面量(如 `web_search`),由各协议
+ * 模型适配层转换为厂商原生 wire 格式;目录级厂商唯一 ID 不用于线上声明。
  */
-internal fun String.belongsToModelFamily(vararg familyNames: String): Boolean {
-    val modelId = substringAfterLast('/').lowercase()
-    return familyNames.any { familyName ->
-        val family = familyName.lowercase()
-        modelId == family ||
-                modelId.startsWith("$family-") ||
-                modelId.startsWith("${family}_") ||
-                modelId.startsWith("$family.")
-    }
-}
-
-/**
- * 需要进入 Tool access 动态候选目录的官方函数工具集。
- *
- * 厂商原生工具不实现该接口，仍由 [OfficialToolset.processLlmRequest] 直接注入；
- * 会展开为普通函数声明的工具集实现本接口，由统一动态 Toolset 控制暴露时机。
- */
-interface SearchOfficialToolset : OfficialToolset {
-    val sourceId: String
-    val sourceDisplayName: String
-}
-
-/** Declaration-only tool executed by the remote model provider, never by the local Agent runtime. */
 internal class OfficialBuiltInTool(
-    toolId: String,
-) : BaseTool(name = toolId, description = toolId) {
+    val declarationName: String,
+) : BaseTool(name = declarationName, description = declarationName) {
 
     override fun declaration(): FunctionDeclaration =
         FunctionDeclaration(name = name, description = description)

@@ -39,41 +39,41 @@ class ConversationToolSelectionTest {
     @Test
     fun officialToolIsEnabledWithAnyFunctionSelected() {
         val configuration = ConversationToolConfiguration(
-            enabledOfficialFunctionIdsByService = mapOf(
-                "mimo" to mapOf("web_search" to setOf("web_search")),
+            enabledOfficialFunctionIds = mapOf(
+                "mimo_web_search" to setOf("mimo_web_search"),
             ),
         )
 
-        assertTrue(configuration.isOfficialToolEnabled("mimo", "web_search"))
+        assertTrue(configuration.isOfficialToolEnabled("mimo_web_search"))
     }
 
     @Test
     fun officialToolIsDisabledWhenNoFunctionsAreSelected() {
         val configuration = ConversationToolConfiguration(
-            enabledOfficialFunctionIdsByService = mapOf(
-                "mimo" to mapOf("web_search" to emptySet()),
+            enabledOfficialFunctionIds = mapOf(
+                "mimo_web_search" to emptySet(),
             ),
         )
 
-        assertFalse(configuration.isOfficialToolEnabled("mimo", "web_search"))
+        assertFalse(configuration.isOfficialToolEnabled("mimo_web_search"))
     }
 
     @Test
     fun officialToolIsDisabledWhenAbsentFromConversationSelection() {
         val configuration = ConversationToolConfiguration(
-            enabledOfficialFunctionIdsByService = mapOf(
-                "mimo" to mapOf("web_search" to setOf("web_search")),
+            enabledOfficialFunctionIds = mapOf(
+                "mimo_web_search" to setOf("mimo_web_search"),
             ),
         )
 
-        assertFalse(configuration.isOfficialToolEnabled("mimo", "kimi_formulas"))
+        assertFalse(configuration.isOfficialToolEnabled("kimi_formulas"))
     }
 
     @Test
     fun absentConversationSelectionEnablesEveryServiceLevelTool() {
         val configuration: ConversationToolConfiguration? = null
 
-        assertTrue(configuration.isOfficialToolEnabled("mimo", "web_search"))
-        assertTrue(configuration.isOfficialToolEnabled("mimo", "kimi_formulas"))
+        assertTrue(configuration.isOfficialToolEnabled("mimo_web_search"))
+        assertTrue(configuration.isOfficialToolEnabled("kimi_formulas"))
     }
 }

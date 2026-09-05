@@ -56,17 +56,17 @@ object ToolAccessModeSerializer : KSerializer<ToolAccessMode> {
 /**
  * Persistent, per-conversation tool selection state.
  *
- * Official tool selection is stored at function granularity: a tool id only
- * appears in [enabledOfficialFunctionIdsByService] when at least one of its
- * functions is selected. When the available function list has not been loaded
- * yet (e.g. before the user opens the sub-page for the first time), we use
- * [ALL_FUNCTIONS_MARKER] as a sentinel meaning "every function of this tool is
- * enabled" — it is expanded to the real id set the moment the catalog becomes
- * available.
+ * Official tool selection is stored at function granularity. Tool ids are
+ * vendor-unique, so a single-level map suffices: a tool id only appears in
+ * [enabledOfficialFunctionIds] when at least one of its functions is selected.
+ * When the available function list has not been loaded yet (e.g. before the
+ * user opens the sub-page for the first time), we use [ALL_FUNCTIONS_MARKER]
+ * as a sentinel meaning "every function of this tool is enabled" — it is
+ * expanded to the real id set the moment the catalog becomes available.
  *
  * @property enabledMcpServerIds 当前会话选择的 MCP server ID。
  * @property pendingMcpCredentialServerId 当前会话最近一次等待补充认证凭据的 MCP server ID。
- * @property enabledOfficialFunctionIdsByService 按模型服务和官方工具分组的函数选择。
+ * @property enabledOfficialFunctionIds 按官方工具(厂商唯一 ID)分组的函数选择。
  * @property toolAccessMode 当前会话采用的工具声明加载模式。
  * @property reasoningEffort 当前会话请求模型时采用的推理强度。
  */
@@ -74,34 +74,27 @@ object ToolAccessModeSerializer : KSerializer<ToolAccessMode> {
 data class ConversationToolConfiguration(
     val enabledMcpServerIds: Set<String> = emptySet(),
     val pendingMcpCredentialServerId: String? = null,
-    val enabledOfficialFunctionIdsByService: Map<String, Map<String, Set<String>>> = emptyMap(),
+    val enabledOfficialFunctionIds: Map<String, Set<String>> = emptyMap(),
     val toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
     val reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM,
 ) {
-    fun enabledOfficialFunctionIds(serviceId: String, toolId: String): Set<String> =
-        enabledOfficialFunctionIdsByService[serviceId]?.get(toolId).orEmpty()
+    fun enabledOfficialFunctionIds(toolId: String): Set<String> =
+        enabledOfficialFunctionIds[toolId].orEmpty()
 
-    fun enabledOfficialFunctionCount(serviceId: String, toolId: String): Int =
-        enabledOfficialFunctionIds(serviceId, toolId).size
+    fun enabledOfficialFunctionCount(toolId: String): Int =
+        enabledOfficialFunctionIds(toolId).size
 
     /**
-     * First-encounter default: enable every supported tool under [serviceId] by
-     * seeding each entry with the [ALL_FUNCTIONS_MARKER] sentinel. The actual
-     * function ids are loaded lazily by the UI; when the catalog answers, the
-     * caller must invoke [expandOfficialFunctionsMarker] to resolve the
-     * sentinel into concrete ids.
+     * First-encounter default: enable every supported tool by seeding each
+     * entry with the [ALL_FUNCTIONS_MARKER] sentinel. The actual function ids
+     * are loaded lazily by the UI; when the catalog answers, the caller must
+     * invoke [expandOfficialFunctionsMarker] to resolve the sentinel into
+     * concrete ids.
      */
-    fun initializeOfficialFunctions(
-        serviceId: String,
-        supportedToolIds: Set<String>,
-    ): ConversationToolConfiguration {
-        val existing = enabledOfficialFunctionIdsByService[serviceId]
-        if (existing != null) return this
+    fun initializeOfficialFunctions(supportedToolIds: Set<String>): ConversationToolConfiguration {
+        if (enabledOfficialFunctionIds.keys.containsAll(supportedToolIds)) return this
         val seeded = supportedToolIds.associateWith { setOf(ALL_FUNCTIONS_MARKER) }
-        return copy(
-            enabledOfficialFunctionIdsByService =
-                enabledOfficialFunctionIdsByService + (serviceId to seeded),
-        )
+        return copy(enabledOfficialFunctionIds = enabledOfficialFunctionIds + seeded)
     }
 
     /**
@@ -110,21 +103,15 @@ data class ConversationToolConfiguration(
      * so the write never persists the marker alongside specific ids.
      */
     fun setOfficialFunctionEnabled(
-        serviceId: String,
         toolId: String,
         functionId: String,
         supportedFunctionIds: Set<String>,
         enabled: Boolean,
     ): ConversationToolConfiguration {
-        val perService = enabledOfficialFunctionIdsByService[serviceId].orEmpty()
-        val expanded = expandMarker(perService, toolId, supportedFunctionIds)
+        val expanded = expandMarker(enabledOfficialFunctionIds, toolId, supportedFunctionIds)
         val current = expanded[toolId].orEmpty()
         val updated = if (enabled) current + functionId else current - functionId
-        val nextPerService = expanded + (toolId to updated)
-        return copy(
-            enabledOfficialFunctionIdsByService =
-                enabledOfficialFunctionIdsByService + (serviceId to nextPerService),
-        )
+        return copy(enabledOfficialFunctionIds = expanded + (toolId to updated))
     }
 
     /**
@@ -133,18 +120,15 @@ data class ConversationToolConfiguration(
      * the configuration without persisting if the tool has no selection at all.
      */
     fun expandOfficialFunctionsMarker(
-        serviceId: String,
         toolId: String,
         supportedFunctionIds: Set<String>,
     ): ConversationToolConfiguration {
         if (supportedFunctionIds.isEmpty()) return this
-        val perService = enabledOfficialFunctionIdsByService[serviceId] ?: return this
-        val current = perService[toolId] ?: return this
+        val current = enabledOfficialFunctionIds[toolId] ?: return this
         if (ALL_FUNCTIONS_MARKER !in current) return this
-        val expanded = perService + (toolId to supportedFunctionIds)
         return copy(
-            enabledOfficialFunctionIdsByService =
-                enabledOfficialFunctionIdsByService + (serviceId to expanded),
+            enabledOfficialFunctionIds =
+                enabledOfficialFunctionIds + (toolId to supportedFunctionIds),
         )
     }
 
@@ -153,14 +137,14 @@ data class ConversationToolConfiguration(
     )
 
     private fun expandMarker(
-        perService: Map<String, Set<String>>,
+        perTool: Map<String, Set<String>>,
         toolId: String,
         supportedFunctionIds: Set<String>,
     ): Map<String, Set<String>> {
-        val current = perService[toolId] ?: return perService
-        if (ALL_FUNCTIONS_MARKER !in current) return perService
-        if (supportedFunctionIds.isEmpty()) return perService
-        return perService + (toolId to supportedFunctionIds)
+        val current = perTool[toolId] ?: return perTool
+        if (ALL_FUNCTIONS_MARKER !in current) return perTool
+        if (supportedFunctionIds.isEmpty()) return perTool
+        return perTool + (toolId to supportedFunctionIds)
     }
 
     companion object {

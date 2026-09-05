@@ -45,57 +45,6 @@ class ModelAvailabilityTest {
         assertEquals(ApiBaseType.Anthropic, glm.baseType)
         assertEquals("https://open.bigmodel.cn/api/paas/v4/", glm.apiBaseUrl)
         assertEquals("https://open.bigmodel.cn/api/anthropic", glm.anthropicBaseUrl)
-        assertEquals(
-            listOf(GLM_WEB_SEARCH_TOOL_ID),
-            glm.toDomain().supportedOfficialTools,
-        )
-        assertEquals(
-            listOf(GLM_WEB_SEARCH_TOOL_ID),
-            glm.copy(baseType = ApiBaseType.Standard).toDomain().supportedOfficialTools,
-        )
-    }
-
-    @Test
-    fun builtInProvidersDeclareTheirOfficialToolIntegrations() {
-        val providers = LLMModelConfigs.services.associateBy { it.serviceId }
-
-        val miniMax = providers.getValue(LLMModelType.MiniMax.serviceId)
-        assertTrue(miniMax.toDomain().supportedOfficialTools.isEmpty())
-        assertEquals(
-            listOf(WEB_SEARCH_TOOL_ID),
-            miniMax.copy(baseType = ApiBaseType.Anthropic).toDomain().supportedOfficialTools,
-        )
-        assertEquals(
-            listOf(WEB_SEARCH_TOOL_ID),
-            providers.getValue(LLMModelType.Mimo.serviceId).toDomain().supportedOfficialTools,
-        )
-        assertEquals(
-            listOf(KIMI_FORMULAS_TOOL_ID),
-            providers.getValue(LLMModelType.Moonshot.serviceId).toDomain().supportedOfficialTools,
-        )
-        assertTrue(
-            providers.getValue(LLMModelType.Mimo.serviceId)
-                .copy(baseType = ApiBaseType.Anthropic)
-                .toDomain()
-                .supportedOfficialTools
-                .isEmpty(),
-        )
-        assertEquals(
-            listOf(WEB_SEARCH_TOOL_ID),
-            providers.getValue(LLMModelType.Anthropic.serviceId).toDomain().supportedOfficialTools,
-        )
-        assertFalse(
-            providers.getValue(LLMModelType.OpenAI.serviceId)
-                .toDomain()
-                .supportedOfficialTools
-                .isEmpty(),
-        )
-        assertFalse(
-            providers.getValue(LLMModelType.OpenAI.serviceId)
-                .toDomain()
-                .supportedOfficialTools
-                .isEmpty(),
-        )
     }
 
     @Test
@@ -131,7 +80,3 @@ class ModelAvailabilityTest {
         apiBaseUrl = "https://example.com",
     )
 }
-
-private const val WEB_SEARCH_TOOL_ID: String = "web_search"
-private const val KIMI_FORMULAS_TOOL_ID: String = "kimi_formulas"
-private const val GLM_WEB_SEARCH_TOOL_ID: String = "glm_web_search"

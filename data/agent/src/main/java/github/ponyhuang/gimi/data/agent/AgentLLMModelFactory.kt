@@ -6,8 +6,7 @@ import com.google.adk.kt.models.Model
 import com.openai.client.okhttp.OpenAIOkHttpClient
 import github.ponyhuang.gimi.data.agent.model.Claude
 import github.ponyhuang.gimi.data.agent.model.Openai
-import github.ponyhuang.gimi.data.agent.tools.official.anthropic.AnthropicOfficialToolset
-import github.ponyhuang.gimi.data.agent.tools.official.openai.OpenaiOfficialToolset
+import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolRegistry
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedAgentModel
@@ -63,6 +62,7 @@ internal fun ModelConfig.toRuntimeMetadata(): ModelRuntimeMetadata = ModelRuntim
 @Singleton
 class AgentLLMModelFactory @Inject constructor(
     private val modelServices: AgentModelConfigurationSource,
+    private val officialToolRegistry: OfficialToolRegistry,
 ) {
     /**
      * 从 [AgentModelConfigurationSource] 选当前模型配置。
@@ -127,24 +127,17 @@ class AgentLLMModelFactory @Inject constructor(
     /**
      * 当前服务以厂商原生形态执行的官方内置工具名。
      *
-     * 与各 official toolset 的服务门控保持一致：仅 openai/mimo（Standard）和
-     * anthropic/minimax（Anthropic）的 web_search 由厂商远端执行；其余服务的
-     * 同名声明（GLM 本地搜索、Kimi 公式、MCP 工具）都是可执行函数，不得转换。
+     * 与官方工具注册表的服务/协议/模型家族门控保持一致:仅注册表中声明为
+     * [github.ponyhuang.gimi.data.agent.tools.official.OfficialToolBinding.ProviderDeclaration]
+     * 的工具由厂商远端执行;其余同名声明(GLM 本地搜索、Kimi 公式、MCP 工具)
+     * 都是可执行函数,不得转换。
      */
-    private fun ModelConfig.providerBuiltInToolNames(): Set<String> = when (baseType) {
-        ApiProtocol.Standard -> when (serviceId) {
-            "openai", "mimo" -> setOf(OpenaiOfficialToolset.WEB_SEARCH_TOOL_ID)
-            else -> emptySet()
-        }
-
-        ApiProtocol.Anthropic -> when (serviceId) {
-            "anthropic", "minimax" -> setOf(AnthropicOfficialToolset.WEB_SEARCH_TOOL_ID)
-            else -> emptySet()
-        }
-
-        // Gemini 暂无厂商远端执行的官方内置工具。
-        ApiProtocol.Gemini -> emptySet()
-    }
+    private fun ModelConfig.providerBuiltInToolNames(): Set<String> =
+        officialToolRegistry.providerDeclaredWireNames(
+            serviceId = serviceId,
+            protocol = baseType,
+            modelId = modelId,
+        )
 
     fun selectFastModelConfig(): ModelConfig? {
         val resolved = modelServices.resolveChatModel(modelServices.fastSelection.value)

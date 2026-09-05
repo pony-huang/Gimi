@@ -34,7 +34,7 @@ internal data class FormulaDeclaration(
 /**
  * Vendor-neutral fetcher for the Moonshot formula manifest.
  *
- * Used both by [KimiFormulaToolset] (to build ADK `FunctionTool`s) and by the
+ * Used both by the official tool registry (to build ADK `FunctionTool`s) and by the
  * function catalog implementation (to populate the user-selection UI). Network
  * access is parallelised across [FORMULA_URIS] with results deduplicated by
  * tool name; the first occurrence wins so the fiber endpoint URL stays stable

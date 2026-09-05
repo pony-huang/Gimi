@@ -13,12 +13,10 @@ class ConversationToolConfigurationCodecTest {
         val configuration = ConversationToolConfiguration(
             enabledMcpServerIds = setOf("server-1"),
             pendingMcpCredentialServerId = "server-1",
-            enabledOfficialFunctionIdsByService = mapOf(
-                "mimo" to mapOf("web_search" to setOf("web_search")),
-                "kimi" to mapOf(
-                    "kimi_formulas" to setOf(
-                        ConversationToolConfiguration.ALL_FUNCTIONS_MARKER,
-                    ),
+            enabledOfficialFunctionIds = mapOf(
+                "mimo_web_search" to setOf("mimo_web_search"),
+                "kimi_formulas" to setOf(
+                    ConversationToolConfiguration.ALL_FUNCTIONS_MARKER,
                 ),
             ),
             toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,

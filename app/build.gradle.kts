@@ -11,7 +11,7 @@ android {
         // CI 发布流程通过 -P 注入版本（见 .github/workflows/release.yml）；
         // 未注入时使用本地开发默认值。
         versionCode = providers.gradleProperty("releaseVersionCode").map(String::toInt).getOrElse(1)
-        versionName = providers.gradleProperty("releaseVersionName").getOrElse("0.6.3") // x-release-please-version
+        versionName = providers.gradleProperty("releaseVersionName").getOrElse("0.5.0") // x-release-please-version
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

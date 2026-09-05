@@ -20,13 +20,25 @@ class PluginSettingsViewModel @Inject constructor(
     private val repository: PluginRepository,
 ) : ViewModel() {
     private val isRefreshing = MutableStateFlow(false)
+    private val pendingUninstallPluginId = MutableStateFlow<String?>(null)
 
-    val uiState: StateFlow<PluginSettingsUiState> = combine(repository.plugins, isRefreshing) { plugins, refreshing ->
-        PluginSettingsUiState(plugins = plugins, isRefreshing = refreshing)
+    val uiState: StateFlow<PluginSettingsUiState> = combine(
+        repository.plugins,
+        isRefreshing,
+        pendingUninstallPluginId,
+    ) { plugins, refreshing, uninstallId ->
+        PluginSettingsUiState(
+            plugins = plugins,
+            isRefreshing = refreshing,
+            pendingUninstallPluginId = uninstallId,
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = PluginSettingsUiState(repository.plugins.value),
+        initialValue = PluginSettingsUiState(
+            plugins = repository.plugins.value,
+            pendingUninstallPluginId = pendingUninstallPluginId.value,
+        ),
     )
 
     private val mutableEffects = MutableSharedFlow<PluginSettingsEffect>()
@@ -37,6 +49,28 @@ class PluginSettingsViewModel @Inject constructor(
             is PluginSettingsAction.SetEnabled ->
                 repository.setEnabled(action.pluginId, action.enabled)
             PluginSettingsAction.Refresh -> refresh()
+            is PluginSettingsAction.RequestUninstall -> requestUninstall(action.pluginId)
+            PluginSettingsAction.DismissUninstall -> pendingUninstallPluginId.value = null
+            is PluginSettingsAction.ConfirmUninstall -> confirmUninstall(action.pluginId)
+        }
+    }
+
+    /** 标记待卸载插件以弹出确认框；未知插件直接忽略，不弹框。 */
+    private fun requestUninstall(pluginId: String) {
+        if (repository.plugins.value.any { it.id == pluginId }) {
+            pendingUninstallPluginId.value = pluginId
+        }
+    }
+
+    /** 确认卸载：关闭确认框并交由宿主拉起系统卸载页。 */
+    private fun confirmUninstall(pluginId: String) {
+        pendingUninstallPluginId.value = null
+        val packageName = repository.plugins.value
+            .firstOrNull { it.id == pluginId }
+            ?.packageName
+            ?: return
+        viewModelScope.launch {
+            mutableEffects.emit(PluginSettingsEffect.RequestSystemUninstall(packageName))
         }
     }
 

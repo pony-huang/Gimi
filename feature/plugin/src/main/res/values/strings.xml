@@ -9,4 +9,12 @@
     <string name="plugin_action_callback_title">授权</string>
     <string name="plugin_action_callback_unsupported">宿主不支持回调处理器：%1$s</string>
     <string name="plugin_config_no_fields">该插件无需配置。</string>
+    <string name="plugin_row_tools_summary">版本 %1$d · %2$d 个工具</string>
+    <string name="plugin_row_more">更多操作</string>
+    <string name="plugin_uninstall_menu">卸载插件</string>
+    <string name="plugin_uninstall_title">卸载「%1$s」？</string>
+    <string name="plugin_uninstall_message">卸载后将移除该插件提供的 %1$d 个工具，设备上安装的插件包也会一并删除。</string>
+    <string name="plugin_uninstall_confirm">卸载</string>
+    <string name="plugin_uninstall_cancel">取消</string>
+    <string name="plugin_uninstalled_notice">插件已卸载</string>
 </resources>

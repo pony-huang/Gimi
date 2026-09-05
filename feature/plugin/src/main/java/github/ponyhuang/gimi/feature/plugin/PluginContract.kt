@@ -8,6 +8,8 @@ data class PluginSettingsUiState(
     val plugins: List<PluginDescriptor> = emptyList(),
     /** 是否正在重新发现插件，驱动下拉刷新指示器。 */
     val isRefreshing: Boolean = false,
+    /** 等待用户确认卸载的插件 id；非空时显示卸载确认框。 */
+    val pendingUninstallPluginId: String? = null,
 )
 
 sealed interface PluginSettingsAction {
@@ -16,11 +18,27 @@ sealed interface PluginSettingsAction {
 
     /** 重新发现已安装插件（无需重启）。 */
     data object Refresh : PluginSettingsAction
+
+    /** 请求卸载插件；仅弹出确认框，不直接执行。 */
+    data class RequestUninstall(val pluginId: String) : PluginSettingsAction
+
+    /** 用户取消卸载确认框。 */
+    data object DismissUninstall : PluginSettingsAction
+
+    /** 用户确认卸载，交由宿主拉起系统卸载页。 */
+    data class ConfirmUninstall(val pluginId: String) : PluginSettingsAction
 }
 
 sealed interface PluginSettingsEffect {
     /** 发现新安装的插件。 */
     data class ShowPluginAdded(val pluginIds: List<String>) : PluginSettingsEffect
+
+    /**
+     * 请求宿主拉起系统卸载页卸载插件包。
+     *
+     * @property packageName 待卸载的插件 APK 包名。
+     */
+    data class RequestSystemUninstall(val packageName: String) : PluginSettingsEffect
 }
 
 /** 插件配置页状态。 */

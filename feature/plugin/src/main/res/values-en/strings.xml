@@ -9,4 +9,12 @@
     <string name="plugin_action_callback_title">Authorization</string>
     <string name="plugin_action_callback_unsupported">Unsupported callback handler: %1$s</string>
     <string name="plugin_config_no_fields">This plugin has no configurable fields.</string>
+    <string name="plugin_row_tools_summary">Version %1$d · %2$d tools</string>
+    <string name="plugin_row_more">More options</string>
+    <string name="plugin_uninstall_menu">Uninstall plugin</string>
+    <string name="plugin_uninstall_title">Uninstall "%1$s"?</string>
+    <string name="plugin_uninstall_message">Uninstalling removes the %1$d tools this plugin provides and deletes the plugin package installed on this device.</string>
+    <string name="plugin_uninstall_confirm">Uninstall</string>
+    <string name="plugin_uninstall_cancel">Cancel</string>
+    <string name="plugin_uninstalled_notice">Plugin uninstalled</string>
 </resources>

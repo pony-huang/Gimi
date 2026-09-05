@@ -13,6 +13,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -27,6 +28,15 @@ import org.junit.Test
 class PluginSettingsViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
+
+    private val UNINSTALLED_PLUGIN = PluginDescriptor(
+        id = "zhihu",
+        name = "知乎",
+        packageName = "com.example.zhihu",
+        version = 3,
+        toolCount = 4,
+        isEnabled = true,
+    )
 
     @Test
     fun setEnabledDelegatesToRepository() = runTest {
@@ -86,6 +96,70 @@ class PluginSettingsViewModelTest {
         advanceUntilIdle()
 
         assertFalse("刷新结束后应关闭刷新指示器", viewModel.uiState.value.isRefreshing)
+    }
+
+    /** uiState 是 WhileSubscribed 的 stateIn，读取前需要先订阅驱动上游收集。 */
+    private fun TestScope.collectUiState(viewModel: PluginSettingsViewModel) =
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect { }
+        }
+
+    @Test
+    fun requestUninstallMarksPendingPlugin() = runTest {
+        val repository = FakePluginRepository().apply { pluginsFlow.value = listOf(UNINSTALLED_PLUGIN) }
+        val viewModel = PluginSettingsViewModel(repository)
+        collectUiState(viewModel)
+
+        viewModel.onAction(PluginSettingsAction.RequestUninstall("zhihu"))
+        advanceUntilIdle()
+
+        assertEquals("zhihu", viewModel.uiState.value.pendingUninstallPluginId)
+    }
+
+    @Test
+    fun requestUninstallForUnknownPluginIsIgnored() = runTest {
+        val repository = FakePluginRepository()
+        val viewModel = PluginSettingsViewModel(repository)
+        collectUiState(viewModel)
+
+        viewModel.onAction(PluginSettingsAction.RequestUninstall("missing"))
+        advanceUntilIdle()
+
+        assertEquals(null, viewModel.uiState.value.pendingUninstallPluginId)
+    }
+
+    @Test
+    fun confirmUninstallEmitsSystemUninstallAndClearsPending() = runTest {
+        val repository = FakePluginRepository()
+        repository.pluginsFlow.value = listOf(UNINSTALLED_PLUGIN)
+        val viewModel = PluginSettingsViewModel(repository)
+        collectUiState(viewModel)
+
+        viewModel.effects.test {
+            viewModel.onAction(PluginSettingsAction.RequestUninstall("zhihu"))
+            viewModel.onAction(PluginSettingsAction.ConfirmUninstall("zhihu"))
+
+            assertEquals(
+                PluginSettingsEffect.RequestSystemUninstall("com.example.zhihu"),
+                awaitItem(),
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+        advanceUntilIdle()
+        assertEquals(null, viewModel.uiState.value.pendingUninstallPluginId)
+    }
+
+    @Test
+    fun dismissUninstallClearsPending() = runTest {
+        val repository = FakePluginRepository().apply { pluginsFlow.value = listOf(UNINSTALLED_PLUGIN) }
+        val viewModel = PluginSettingsViewModel(repository)
+        collectUiState(viewModel)
+
+        viewModel.onAction(PluginSettingsAction.RequestUninstall("zhihu"))
+        viewModel.onAction(PluginSettingsAction.DismissUninstall)
+        advanceUntilIdle()
+
+        assertEquals(null, viewModel.uiState.value.pendingUninstallPluginId)
     }
 
     private class FakePluginRepository : PluginRepository {

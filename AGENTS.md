@@ -79,6 +79,12 @@ domain/data/core -X-> feature or app
 - Keep loading, testing, refreshing, notices, and other ephemeral business-operation state in the ViewModel.
 - `:core:designsystem` components reference no ViewModels, repositories, domain models, navigation, Toast, network calls, or business coroutines; keep them independently previewable and Compose-testable. Accepted exception: `ui/settings/llmmodel/LLMModelServiceIcon` and its `ic_model_provider_*` drawables are shared brand assets consumed by both `:feature:chat` and `:feature:modelsettings`; they stay in `:core:designsystem` because feature-to-feature dependencies are forbidden.
 
+### Preview-first UI design review
+
+- Any UI adjustment or UI iteration must begin with a preview design draft before implementation: a `@Preview @Composable`-based draft (using fake/fixture data, themable for light and dark) that renders the proposed layout, new states, and interaction entry points.
+- Present the draft to the user for review; implementation work may start only after the user explicitly confirms the design. Do not skip this step for small visual tweaks unless the user says otherwise.
+- Keep the draft isolated from production wiring (no ViewModel/repository changes yet); once approved, merge it into the real screens, wire up state, and delete the draft file and any preview-only dependencies it required.
+
 ### Theming and insets
 
 - Preserve existing theme tokens, dimensions, copy, accessibility semantics, and insets unless explicitly changing them. Use Material 3/design-system tokens instead of hard-coded UI colors.

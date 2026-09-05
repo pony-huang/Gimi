@@ -1,9 +1,15 @@
 package github.ponyhuang.gimi.feature.plugin
 
+import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,17 +23,26 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +52,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -59,6 +75,15 @@ fun PluginSettingsRoute(
     val context = LocalContext.current
     // 进入页面自动重新发现插件，装完新插件 APK 后无需重启即可出现。
     LaunchedEffect(Unit) { viewModel.onAction(PluginSettingsAction.Refresh) }
+    // 卸载走系统卸载页；无论结果如何返回后都重新发现插件，保证列表与设备状态一致。
+    val uninstallLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            Toast.makeText(context, R.string.plugin_uninstalled_notice, Toast.LENGTH_SHORT).show()
+        }
+        viewModel.onAction(PluginSettingsAction.Refresh)
+    }
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
             when (effect) {
@@ -67,6 +92,9 @@ fun PluginSettingsRoute(
                     context.getString(R.string.plugin_added_notice, effect.pluginIds.joinToString()),
                     Toast.LENGTH_SHORT,
                 ).show()
+                is PluginSettingsEffect.RequestSystemUninstall -> uninstallLauncher.launch(
+                    Intent(Intent.ACTION_DELETE, Uri.parse("package:${effect.packageName}")),
+                )
             }
         }
     }
@@ -129,6 +157,9 @@ fun PluginSettingsScreen(
                                     onAction(PluginSettingsAction.SetEnabled(plugin.id, enabled))
                                 },
                                 onClick = { onNavigateToConfig(plugin.id) },
+                                onUninstallClick = {
+                                    onAction(PluginSettingsAction.RequestUninstall(plugin.id))
+                                },
                             )
                         }
                     }
@@ -136,6 +167,16 @@ fun PluginSettingsScreen(
             }
         }
     }
+    // 卸载确认框浮在整个列表上层；pendingUninstallPluginId 由 ViewModel 管理，旋转重建不丢失。
+    state.pendingUninstallPluginId
+        ?.let { id -> state.plugins.firstOrNull { it.id == id } }
+        ?.let { plugin ->
+            UninstallConfirmDialog(
+                plugin = plugin,
+                onConfirm = { onAction(PluginSettingsAction.ConfirmUninstall(plugin.id)) },
+                onDismiss = { onAction(PluginSettingsAction.DismissUninstall) },
+            )
+        }
 }
 
 @Composable
@@ -144,15 +185,17 @@ private fun PluginRow(
     icon: ImageBitmap?,
     onToggle: (Boolean) -> Unit,
     onClick: () -> Unit,
+    onUninstallClick: () -> Unit,
     showDivider: Boolean = false,
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 60.dp)
+                .heightIn(min = 68.dp)
                 .clickable(onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // 统一「应用图标」样式：白底圆角方片 + 居中 logo，宽版 wordmark（如知乎）等比缩放不拉伸。
@@ -183,6 +226,7 @@ private fun PluginRow(
                 modifier = Modifier
                     .weight(1f)
                     .padding(start = 16.dp, end = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(1.dp),
             ) {
                 Text(
                     text = plugin.name,
@@ -190,6 +234,46 @@ private fun PluginRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                Text(
+                    text = stringResource(R.string.plugin_row_tools_summary, plugin.version, plugin.toolCount),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = stringResource(R.string.plugin_row_more),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                ) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = stringResource(R.string.plugin_uninstall_menu),
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Outlined.Delete,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onUninstallClick()
+                        },
+                    )
+                }
             }
             Switch(
                 checked = plugin.isEnabled,
@@ -203,4 +287,33 @@ private fun PluginRow(
             )
         }
     }
+}
+
+@Composable
+private fun UninstallConfirmDialog(
+    plugin: PluginDescriptor,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = stringResource(R.string.plugin_uninstall_title, plugin.name)) },
+        text = {
+            Text(text = stringResource(R.string.plugin_uninstall_message, plugin.toolCount))
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(
+                    text = stringResource(R.string.plugin_uninstall_confirm),
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.plugin_uninstall_cancel))
+            }
+        },
+    )
 }

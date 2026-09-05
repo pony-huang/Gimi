@@ -21,5 +21,7 @@ dependencies {
     implementation(libs.multiplatform.markdown.renderer.coil3)
     implementation(libs.multiplatform.markdown.renderer.code)
 
+    debugImplementation(libs.androidx.compose.ui.tooling)
+
     testImplementation(libs.junit)
 }

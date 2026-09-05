@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -73,7 +74,7 @@ fun ChatTextContent(
     fillAvailableWidth: Boolean = true,
 ) {
     // 桥接路径遇到非前缀覆盖时递增，重建内部流式状态（StreamingMarkdownState 只能 append）。
-    var bridgeEpoch by remember { mutableStateOf(0) }
+    var bridgeEpoch by remember { mutableIntStateOf(0) }
     key(bridgeEpoch) {
         ChatTextContentBody(
             text = text,
@@ -223,5 +224,12 @@ private fun chatContentMarkdownTypography() = markdownTypography(
 @Preview
 @Composable
 private fun ChatTextContentPreview() {
-    ChatTextContent("Hello World", false, null, modifier = Modifier.padding(8.dp))
+    ChatTextContent("""
+        # h1
+        ## h2
+        ### h3
+        ```java
+        var a = 123
+        ```
+    """.trimIndent(), false, null, modifier = Modifier.padding(8.dp))
 }

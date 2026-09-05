@@ -19,11 +19,11 @@
     <string name="chat_attachment_read_failed">Could not read the selected attachment</string>
     <string name="chat_attachment_unsupported">The current model does not support this attachment type</string>
     <string name="chat_attachment_open_failed">No app is available to open this document</string>
-    <string name="chat_tool_access_title">Tool access</string>
-    <string name="chat_tool_access_on_demand">Auto search (Recommended)</string>
-    <string name="chat_tool_access_on_demand_description">Searches and loads tools only when needed, saving context at the cost of more model calls and slightly lower accuracy</string>
-    <string name="chat_tool_access_always">Always available</string>
-    <string name="chat_tool_access_always_description">Loads all tools at the start of a conversation, reducing model calls and improving accuracy at the cost of more context</string>
+    <string name="chat_tool_access_title">Tool loading</string>
+    <string name="chat_tool_access_on_demand">Load on demand (Recommended)</string>
+    <string name="chat_tool_access_on_demand_description">Searches for and loads relevant tools when needed, saving context at the cost of more model calls and slightly lower accuracy</string>
+    <string name="chat_tool_access_always">Load all</string>
+    <string name="chat_tool_access_always_description">Loads all enabled tools at the start of each conversation turn, reducing model calls and improving accuracy at the cost of more context</string>
     <string name="chat_reasoning_effort_title">Reasoning effort</string>
     <string name="chat_reasoning_effort_minimal">Minimal</string>
     <string name="chat_reasoning_effort_minimal_description">Fastest responses for simple questions</string>

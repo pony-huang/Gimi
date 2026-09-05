@@ -21,11 +21,11 @@
     <string name="chat_attachment_read_failed">无法读取所选附件</string>
     <string name="chat_attachment_unsupported">当前模型不支持此类附件</string>
     <string name="chat_attachment_open_failed">没有可用于打开此文档的应用</string>
-    <string name="chat_tool_access_title">工具访问</string>
-    <string name="chat_tool_access_on_demand">自动搜索（推荐）</string>
-    <string name="chat_tool_access_on_demand_description">仅在需要时搜索并加载工具，节省上下文；可能增加模型调用，并略微影响准确性</string>
-    <string name="chat_tool_access_always">始终可用</string>
-    <string name="chat_tool_access_always_description">在对话开始时加载全部工具，减少模型调用并提高准确性；会占用更多上下文</string>
+    <string name="chat_tool_access_title">工具加载</string>
+    <string name="chat_tool_access_on_demand">按需加载（推荐）</string>
+    <string name="chat_tool_access_on_demand_description">需要使用工具时，先搜索再加载相关工具，节省上下文；可能增加模型调用，并略微影响准确性</string>
+    <string name="chat_tool_access_always">全量加载</string>
+    <string name="chat_tool_access_always_description">每轮对话开始时加载全部已启用的工具，减少模型调用并提高准确性；会占用更多上下文</string>
     <string name="chat_reasoning_effort_title">推理强度</string>
     <string name="chat_reasoning_effort_minimal">极简</string>
     <string name="chat_reasoning_effort_minimal_description">最快响应，适合简单问题</string>

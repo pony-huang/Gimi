@@ -13,8 +13,10 @@ import github.ponyhuang.gimi.data.speech.remote.OpenAiCompatibleSpeechRecognitio
 import github.ponyhuang.gimi.data.speech.remote.SpeechRecognitionGateway
 import github.ponyhuang.gimi.data.speech.repository.DefaultSpeechRecognitionRepository
 import github.ponyhuang.gimi.data.speech.repository.DefaultSpeechSynthesisRepository
+import github.ponyhuang.gimi.data.speech.repository.SpeechSettingsPreferences
 import github.ponyhuang.gimi.domain.speech.repository.SpeechPlaybackRepository
 import github.ponyhuang.gimi.domain.speech.repository.SpeechRecognitionRepository
+import github.ponyhuang.gimi.domain.speech.repository.SpeechSettingsRepository
 import github.ponyhuang.gimi.domain.speech.repository.SpeechSynthesisRepository
 import javax.inject.Singleton
 import okhttp3.OkHttpClient
@@ -40,6 +42,12 @@ abstract class SpeechModule {
     abstract fun bindSpeechPlaybackRepository(
         implementation: AndroidSpeechPlaybackRepository,
     ): SpeechPlaybackRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSpeechSettingsRepository(
+        implementation: SpeechSettingsPreferences,
+    ): SpeechSettingsRepository
 
     companion object {
         @Provides

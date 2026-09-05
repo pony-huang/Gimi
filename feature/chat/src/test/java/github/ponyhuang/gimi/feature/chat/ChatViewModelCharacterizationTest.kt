@@ -42,6 +42,7 @@ import github.ponyhuang.gimi.domain.speech.model.VoiceWakeState
 import github.ponyhuang.gimi.domain.speech.model.VoiceWakeStatus
 import github.ponyhuang.gimi.domain.speech.repository.SpeechPlaybackRepository
 import github.ponyhuang.gimi.domain.speech.repository.SpeechRecognitionRepository
+import github.ponyhuang.gimi.domain.speech.repository.SpeechSettingsRepository
 import github.ponyhuang.gimi.domain.speech.repository.VoiceWakeRepository
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
@@ -58,6 +59,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.channels.Channel
@@ -106,6 +109,45 @@ class ChatViewModelCharacterizationTest {
         assertFalse(state.messages[1].partial)
         assertFalse(state.isAgentRunning)
         coVerify { fixture.conversations.refreshConversation("session-1") }
+    }
+
+    @Test
+    fun completedReply_autoSpeaksLatestAssistantMessageWhenEnabled() = runTest {
+        val fixture = fixture(configured = true)
+        assertTrue(fixture.viewModel.uiState.value.autoSpeakEnabled)
+
+        fixture.viewModel.onAction(ChatAction.Send("你好"))
+        advanceUntilIdle()
+
+        val assistant = fixture.viewModel.uiState.value.messages[1]
+        verify { fixture.playback.play(assistant.id, "回复") }
+    }
+
+    @Test
+    fun completedReply_skipsAutoSpeakWhenGloballyDisabled() = runTest {
+        val fixture = fixture(configured = true)
+        fixture.speechSettings.setAutoSpeakEnabled(false)
+
+        fixture.viewModel.onAction(ChatAction.Send("你好"))
+        advanceUntilIdle()
+
+        assertFalse(fixture.viewModel.uiState.value.autoSpeakEnabled)
+        verify(exactly = 0) { fixture.playback.play(any(), any()) }
+    }
+
+    @Test
+    fun toggleAutoSpeakAction_flipsGlobalSwitch() = runTest {
+        val fixture = fixture(configured = true)
+
+        fixture.viewModel.onAction(ChatAction.ToggleAutoSpeak)
+        advanceUntilIdle()
+        assertFalse(fixture.speechSettings.autoSpeakEnabled.value)
+        assertFalse(fixture.viewModel.uiState.value.autoSpeakEnabled)
+
+        fixture.viewModel.onAction(ChatAction.ToggleAutoSpeak)
+        advanceUntilIdle()
+        assertTrue(fixture.speechSettings.autoSpeakEnabled.value)
+        assertTrue(fixture.viewModel.uiState.value.autoSpeakEnabled)
     }
 
     @Test
@@ -762,6 +804,7 @@ class ChatViewModelCharacterizationTest {
             every { state } returns MutableStateFlow(SpeechPlaybackState())
             every { errors } returns MutableSharedFlow()
         }
+        val speechSettings = FakeSpeechSettingsRepository()
         val defaultTools = ConversationToolConfiguration(
             enabledMcpServerIds = setOf("enabled-mcp"),
             enabledOfficialFunctionIds = mapOf(
@@ -857,6 +900,7 @@ class ChatViewModelCharacterizationTest {
                 toolApproval = toolApproval,
                 speechRecognitionRepository = recognition,
                 speechPlaybackController = playback,
+                speechSettings = speechSettings,
                 voiceWake = voiceWake,
                 attachments = attachments,
                 toolAuthorization = toolAuthorization,
@@ -878,6 +922,8 @@ class ChatViewModelCharacterizationTest {
             mcpRepository = mcpRepository,
             voiceWake = voiceWakeState,
             voiceWakeRepository = voiceWake,
+            playback = playback,
+            speechSettings = speechSettings,
         )
     }
 
@@ -949,7 +995,18 @@ class ChatViewModelCharacterizationTest {
         val mcpRepository: McpRepository,
         val voiceWake: MutableStateFlow<VoiceWakeState>,
         val voiceWakeRepository: VoiceWakeRepository,
+        val playback: SpeechPlaybackRepository,
+        val speechSettings: FakeSpeechSettingsRepository,
     )
+}
+
+private class FakeSpeechSettingsRepository : SpeechSettingsRepository {
+    private val _autoSpeakEnabled = MutableStateFlow(true)
+    override val autoSpeakEnabled: StateFlow<Boolean> = _autoSpeakEnabled.asStateFlow()
+
+    override fun setAutoSpeakEnabled(enabled: Boolean) {
+        _autoSpeakEnabled.value = enabled
+    }
 }
 
 private class FakeToolApprovalRepository : ToolApprovalRepository {

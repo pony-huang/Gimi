@@ -68,6 +68,8 @@
     <!-- ChatScreen / ChatTopBar / ToolConfirmationCard -->
     <string name="chat_fab_back_to_latest">回到最新</string>
     <string name="chat_open_drawer">打开历史对话抽屉</string>
+    <string name="chat_auto_speak_on">自动语音播报（已开启）</string>
+    <string name="chat_auto_speak_off">自动语音播报（已关闭）</string>
     <string name="chat_new_conversation">新建对话</string>
     <string name="chat_settings">设置</string>
     <string name="chat_dark_mode_toggle">夜间模式</string>

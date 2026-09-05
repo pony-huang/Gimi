@@ -65,6 +65,8 @@
 
     <string name="chat_fab_back_to_latest">Back to latest</string>
     <string name="chat_open_drawer">Open history drawer</string>
+    <string name="chat_auto_speak_on">Auto voice playback (on)</string>
+    <string name="chat_auto_speak_off">Auto voice playback (off)</string>
     <string name="chat_new_conversation">New conversation</string>
     <string name="chat_settings">Settings</string>
     <string name="chat_dark_mode_toggle">Dark mode</string>

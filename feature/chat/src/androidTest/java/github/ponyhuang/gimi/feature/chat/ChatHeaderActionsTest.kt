@@ -20,9 +20,11 @@ class ChatHeaderActionsTest {
         composeRule.setContent {
             MaterialTheme {
                 ChatHeaderActions(
+                    autoSpeakEnabled = true,
                     onOpenDrawer = { },
                     onNewConversation = { },
                     onOpenSettings = { settingsClicks++ },
+                    onToggleAutoSpeak = { },
                 )
             }
         }

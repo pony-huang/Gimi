@@ -61,6 +61,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -117,6 +118,7 @@ fun ChatScaffold(
     onStop: () -> Unit,
     onTranscribeVoice: suspend (ByteArray) -> String,
     onToggleSpeechPlayback: (String, String) -> Unit,
+    onToggleAutoSpeak: () -> Unit,
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit,
     onOpenLocalFile: (github.ponyhuang.gimi.domain.conversation.model.LocalFileReference) -> Unit,
     onShowAllLocalFiles: (responseId: String) -> Unit,
@@ -252,9 +254,11 @@ fun ChatScaffold(
                         .background(topFadeBrush),
                 )
                 ChatHeaderActions(
+                    autoSpeakEnabled = state.autoSpeakEnabled,
                     onOpenDrawer = onOpenDrawer,
                     onNewConversation = onNewConversation,
                     onOpenSettings = onOpenSettings,
+                    onToggleAutoSpeak = onToggleAutoSpeak,
                 )
                 Box(
                     modifier = Modifier
@@ -544,9 +548,11 @@ private fun ToolConfirmationCard(
 /** Lightweight floating chat actions that keep model and settings controls out of the header. */
 @Composable
 internal fun ChatHeaderActions(
+    autoSpeakEnabled: Boolean,
     onOpenDrawer: () -> Unit,
     onNewConversation: () -> Unit,
     onOpenSettings: () -> Unit,
+    onToggleAutoSpeak: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -577,6 +583,34 @@ internal fun ChatHeaderActions(
             color = MaterialTheme.colorScheme.surface,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // 自动语音播报全局开关：开启态用 primary 高亮，关闭态回到普通前景色。
+                IconButton(
+                    onClick = onToggleAutoSpeak,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .testTag("chat_header_auto_speak"),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.VolumeUp,
+                        contentDescription = stringResource(
+                            if (autoSpeakEnabled) {
+                                R.string.chat_auto_speak_on
+                            } else {
+                                R.string.chat_auto_speak_off
+                            },
+                        ),
+                        modifier = Modifier.size(24.dp),
+                        tint = if (autoSpeakEnabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+                VerticalDivider(
+                    modifier = Modifier.height(24.dp),
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
+                )
                 IconButton(
                     onClick = onNewConversation,
                     modifier = Modifier.size(48.dp),

@@ -35,3 +35,15 @@ interface SpeechPlaybackRepository {
 
     fun clearSession()
 }
+
+/**
+ * 语音播报全局偏好。开关跨会话持久化：开启后每轮 assistant 回复完成时自动朗读，
+ * 不随新会话创建而重置。
+ */
+interface SpeechSettingsRepository {
+    /** 自动语音播报开关；`true` 表示开启（默认值）。 */
+    val autoSpeakEnabled: StateFlow<Boolean>
+
+    /** 写入自动播报开关，立即生效并持久化。 */
+    fun setAutoSpeakEnabled(enabled: Boolean)
+}

@@ -38,6 +38,7 @@ import github.ponyhuang.gimi.domain.memory.model.MemoryOperation
 import github.ponyhuang.gimi.domain.memory.repository.MemoryRuntimeStatus
 import github.ponyhuang.gimi.domain.speech.repository.SpeechRecognitionRepository
 import github.ponyhuang.gimi.domain.speech.repository.SpeechPlaybackRepository
+import github.ponyhuang.gimi.domain.speech.repository.SpeechSettingsRepository
 import github.ponyhuang.gimi.domain.speech.repository.VoiceWakeRepository
 import github.ponyhuang.gimi.domain.speech.usecase.markdownToSpeechText
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
@@ -83,6 +84,7 @@ class ChatViewModel @Inject constructor(
     private val mcpSkipReporter: McpSkipReporter,
     private val speechRecognitionRepository: SpeechRecognitionRepository,
     private val speechPlaybackController: SpeechPlaybackRepository,
+    private val speechSettings: SpeechSettingsRepository,
     private val voiceWake: VoiceWakeRepository,
     private val attachments: ChatAttachmentRepository,
     private val officialFunctionCatalog: OfficialToolFunctionCatalog,
@@ -111,6 +113,8 @@ class ChatViewModel @Inject constructor(
             ChatAction.StopStreaming -> stopStreaming()
             is ChatAction.ToggleSpeechPlayback ->
                 toggleSpeechPlayback(action.messageId, action.markdown)
+            ChatAction.ToggleAutoSpeak ->
+                speechSettings.setAutoSpeakEnabled(!speechSettings.autoSpeakEnabled.value)
             is ChatAction.RespondToToolConfirmation ->
                 respondToToolConfirmation(action.confirmed, action.alwaysAllow)
             is ChatAction.SetFullAccess -> setFullAccess(action.enabled)
@@ -250,6 +254,11 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             speechPlaybackController.state.collect { playback ->
                 _uiState.update { it.copy(speechPlaybackState = playback) }
+            }
+        }
+        viewModelScope.launch {
+            speechSettings.autoSpeakEnabled.collect { enabled ->
+                _uiState.update { it.copy(autoSpeakEnabled = enabled) }
             }
         }
         viewModelScope.launch {
@@ -425,10 +434,32 @@ class ChatViewModel @Inject constructor(
                 } else {
                     SessionResultAttention.COMPLETED
                 }
+            } else {
+                autoSpeakCompletedReply(sessionId, runtime)
             }
             publishRuntime(runtime)
         }
         viewModelScope.launch { flushPendingConversationContentUpdate() }
+    }
+
+    /**
+     * 自动语音播报刚完成的回复。仅对当前前台会话生效（后台完成的会话不打扰用户），
+     * 失败收尾与空文本（纯工具调用轮）跳过；文本与手动播报共用同一条清洗链路。
+     */
+    private fun autoSpeakCompletedReply(sessionId: String, runtime: ChatSessionRuntime) {
+        if (!speechSettings.autoSpeakEnabled.value) return
+        if (runtime.failed) return
+        val state = _uiState.value
+        if (state.sessionId != sessionId) return
+        val reply = state.messages.lastOrNull { message ->
+            message.role == MessageRole.Assistant && !message.partial
+        } ?: return
+        val text = reply.textParts
+            .filterNot { it.thought }
+            .joinToString(separator = "") { it.text }
+            .takeIf(String::isNotBlank)
+            ?: return
+        speechPlaybackController.play(reply.id, markdownToSpeechText(text))
     }
 
     private fun clearToolConfirmationState(runtime: ChatSessionRuntime) {

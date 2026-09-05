@@ -148,6 +148,7 @@ fun ChatRoute(
             onToggleSpeechPlayback = { messageId, markdown ->
                 viewModel.onAction(ChatAction.ToggleSpeechPlayback(messageId, markdown))
             },
+            onToggleAutoSpeak = { viewModel.onAction(ChatAction.ToggleAutoSpeak) },
             onOpenDocument = { attachment ->
                 openDocumentAttachment(context, attachment)
             },

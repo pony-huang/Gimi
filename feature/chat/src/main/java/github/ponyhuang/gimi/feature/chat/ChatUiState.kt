@@ -68,6 +68,12 @@ data class ChatUiState(
     /** 被用户拒绝确认的工具名（内存展示态）；工具 chip 据此显示 ✗ 而非永远悬在"未完成"。 */
     val rejectedToolNames: Set<String> = emptySet(),
     val speechPlaybackState: SpeechPlaybackState = SpeechPlaybackState(),
+    /**
+     * 自动语音播报全局开关；开启时每轮 assistant 回复完成后自动朗读。
+     * 状态由 [github.ponyhuang.gimi.domain.speech.repository.SpeechSettingsRepository] 持久化，
+     * 跨会话保持，不随新会话重置。
+     */
+    val autoSpeakEnabled: Boolean = true,
 )
 
 val ChatUiState.pendingToolConfirmation: PendingToolConfirmation?

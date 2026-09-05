@@ -28,6 +28,9 @@ sealed interface ChatAction {
     /** 播放 / 停止某条消息的语音朗读。 */
     data class ToggleSpeechPlayback(val messageId: String, val markdown: String) : ChatAction
 
+    /** 切换自动语音播报全局开关（持久化，跨会话保持）。 */
+    data object ToggleAutoSpeak : ChatAction
+
     /** 把用户对挂起工具调用的确认 / 拒绝决定送回 runner。 */
     data class RespondToToolConfirmation(
         val confirmed: Boolean,

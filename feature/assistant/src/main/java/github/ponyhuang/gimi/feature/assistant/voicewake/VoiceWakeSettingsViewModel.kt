@@ -1,4 +1,4 @@
-package github.ponyhuang.gimi.feature.voicewake
+package github.ponyhuang.gimi.feature.assistant.voicewake
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope

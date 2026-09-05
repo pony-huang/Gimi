@@ -43,10 +43,22 @@ enum class AssistantSessionPhase {
 enum class AssistantInvocationSource {
     /** 蓝牙唤醒词。 */
     BLUETOOTH_WAKE,
+
+    /** 助手面板内直接发起的追问（语音或键盘输入）。 */
+    ASSISTANT_PANEL,
 }
 
 /** 缺少的配置项。 */
 enum class AssistantConfigIssue {
     MISSING_AGENT_MODEL,
     MISSING_STT,
+}
+
+/** 结果完成后可自动收起的阶段；其它阶段应保持展示等待用户交互。 */
+fun AssistantSessionPhase.isPresentationResultIdle(): Boolean = when (this) {
+    AssistantSessionPhase.FOLLOW_UP_IDLE,
+    AssistantSessionPhase.STOPPED,
+    AssistantSessionPhase.ERROR,
+    -> true
+    else -> false
 }

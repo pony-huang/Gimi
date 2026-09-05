@@ -1,4 +1,4 @@
-package github.ponyhuang.gimi.feature.voicewake
+package github.ponyhuang.gimi.feature.assistant.voicewake
 
 import androidx.compose.runtime.Composable
 import androidx.navigation3.runtime.NavKey

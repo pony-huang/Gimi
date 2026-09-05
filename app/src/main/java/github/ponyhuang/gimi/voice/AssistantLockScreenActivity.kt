@@ -20,11 +20,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import github.ponyhuang.gimi.MainActivity
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
+import github.ponyhuang.gimi.domain.assistant.model.isPresentationResultIdle
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
 import github.ponyhuang.gimi.feature.assistant.AssistantSurface
 import github.ponyhuang.gimi.feature.assistant.AssistantSurfaceMode
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import javax.inject.Inject
+import kotlinx.coroutines.delay
 
 /** 锁屏语音唤醒的轻量界面，只展示当前一轮摘要。 */
 @AndroidEntryPoint
@@ -42,6 +44,12 @@ class AssistantLockScreenActivity : ComponentActivity() {
             val darkThemeOverride by appearanceRepository.darkThemeOverride.collectAsStateWithLifecycle()
             LaunchedEffect(state.presentationVisible) {
                 if (!state.presentationVisible) finish()
+            }
+            LaunchedEffect(state.phase) {
+                if (state.presentationVisible && state.phase.isPresentationResultIdle()) {
+                    delay(AssistantResultStayMs)
+                    coordinator.hidePresentation()
+                }
             }
             if (!state.presentationVisible) {
                 return@setContent
@@ -93,3 +101,5 @@ class AssistantLockScreenActivity : ComponentActivity() {
         finish()
     }
 }
+
+private const val AssistantResultStayMs = 5_000L

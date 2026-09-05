@@ -16,6 +16,7 @@ import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
 import github.ponyhuang.gimi.feature.chat.sharedImageUris
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.voice.AssistantPanelInteractor
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -24,6 +25,8 @@ class MainActivity : ComponentActivity() {
     lateinit var appearanceRepository: AppearanceRepository
     @Inject
     lateinit var assistantSessionCoordinator: AssistantSessionCoordinator
+    @Inject
+    lateinit var assistantPanelInteractor: AssistantPanelInteractor
 
     private val sharedMediaUris = mutableStateOf<List<Uri>>(emptyList())
     private val openChatRequest = mutableStateOf(0)
@@ -43,6 +46,7 @@ class MainActivity : ComponentActivity() {
             AsssistantaiTheme(darkTheme = darkThemeOverride ?: isSystemInDarkTheme()) {
                 MainScreen(
                     assistantSessionCoordinator = assistantSessionCoordinator,
+                    assistantPanelInteractor = assistantPanelInteractor,
                     openChatRequest = openChatRequest.value,
                     sharedMediaUris = sharedMediaUris.value,
                     onSharedMediaConsumed = { sharedMediaUris.value = emptyList() },

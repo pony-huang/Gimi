@@ -1,4 +1,4 @@
-package github.ponyhuang.gimi.feature.voicewake
+package github.ponyhuang.gimi.feature.assistant.voicewake
 
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsEnabled
@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.platform.app.InstrumentationRegistry
+import github.ponyhuang.gimi.feature.assistant.R
 import github.ponyhuang.gimi.domain.speech.model.VoiceWakeState
 import github.ponyhuang.gimi.domain.speech.model.VoiceWakeStatus
 import github.ponyhuang.gimi.domain.speech.model.WakeModelCatalog

@@ -7,7 +7,11 @@ import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionPhase
 import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionState
 import github.ponyhuang.gimi.domain.assistant.model.AssistantTurn
 import github.ponyhuang.gimi.domain.assistant.model.PendingAssistantConfirmation
+import github.ponyhuang.gimi.domain.assistant.model.appendAssistantMessage
+import github.ponyhuang.gimi.domain.assistant.model.appendUserMessage
 import github.ponyhuang.gimi.domain.assistant.model.applyPresentationEvent
+import github.ponyhuang.gimi.domain.assistant.model.failLastAssistantMessage
+import github.ponyhuang.gimi.domain.assistant.model.updateLastAssistantMessage
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantConfirmationHandler
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
@@ -87,12 +91,6 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     override fun updatePresentation(event: AssistantPresentationEvent) {
         presentationHideJob?.cancel()
         _state.update { it.applyPresentationEvent(event) }
-        if (event == AssistantPresentationEvent.Completed || event == AssistantPresentationEvent.Stopped) {
-            presentationHideJob = scope.launch {
-                delay(PRESENTATION_RESULT_DURATION_MS)
-                _state.update { it.copy(presentationVisible = false) }
-            }
-        }
     }
 
     override suspend fun submit(
@@ -156,6 +154,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
         val sessionId = session.sessionId
         val gateSource = when (source) {
             AssistantInvocationSource.BLUETOOTH_WAKE -> AgentTaskSource.BLUETOOTH_VOICE
+            AssistantInvocationSource.ASSISTANT_PANEL -> AgentTaskSource.SYSTEM_ASSISTANT
         }
         val lease = try {
             runtimeGate.acquire(gateSource, sessionId)
@@ -184,7 +183,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                 configIssue = null,
                 taskActive = true,
                 presentationVisible = true,
-            )
+            ).appendUserMessage(text).appendAssistantMessage()
         }
         try {
             collectTurn(
@@ -231,18 +230,19 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                     phase = AssistantSessionPhase.FOLLOW_UP_IDLE,
                     taskActive = false,
                     pendingConfirmation = null,
-                )
+                ).updateLastAssistantMessage()
             }
         } catch (cancelled: CancellationException) {
             _state.update {
                 if (it.phase == AssistantSessionPhase.STOPPED) {
                     it.copy(taskActive = false, pendingConfirmation = null)
+                        .updateLastAssistantMessage()
                 } else {
                     it.copy(
                         phase = AssistantSessionPhase.FOLLOW_UP_IDLE,
                         taskActive = false,
                         pendingConfirmation = null,
-                    )
+                    ).updateLastAssistantMessage()
                 }
             }
             throw cancelled
@@ -253,7 +253,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                     errorMessage = error.message,
                     taskActive = false,
                     pendingConfirmation = null,
-                )
+                ).failLastAssistantMessage(error.message ?: "出现问题")
             }
         } finally {
             confirmationResponse?.response?.cancel()
@@ -281,10 +281,13 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                     it.copy(
                         phase = AssistantSessionPhase.EXECUTING_TOOL,
                         turn = it.turn?.copy(toolNames = run.toolNames),
-                    )
+                    ).updateLastAssistantMessage(toolNames = run.toolNames)
                 }
             } else if (event.functionResponses.isNotEmpty()) {
-                _state.update { it.copy(phase = AssistantSessionPhase.GENERATING) }
+                _state.update {
+                    it.copy(phase = AssistantSessionPhase.GENERATING)
+                        .updateLastAssistantMessage(streaming = true)
+                }
             }
             event.functionCalls.forEach { call ->
                 val confirmationId = call.id ?: return@forEach
@@ -325,7 +328,13 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     private fun publishTurn(run: TaskRun) {
         val response = run.completed.ifBlank { run.partial.toString() }
         _state.update { state ->
-            state.copy(turn = state.turn?.copy(responseText = response))
+            state.copy(
+                turn = state.turn?.copy(responseText = response),
+                messages = state.updateLastAssistantMessage(
+                    text = response,
+                    streaming = run.completed.isBlank(),
+                ).messages,
+            )
         }
     }
 
@@ -361,7 +370,6 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
 
     private companion object {
         const val CONFIRMATION_TIMEOUT_MS = 15_000L
-        const val PRESENTATION_RESULT_DURATION_MS = 5_000L
     }
 }
 

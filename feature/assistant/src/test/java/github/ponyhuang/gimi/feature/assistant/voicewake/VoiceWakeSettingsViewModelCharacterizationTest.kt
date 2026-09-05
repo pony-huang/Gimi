@@ -1,4 +1,4 @@
-package github.ponyhuang.gimi.feature.voicewake
+package github.ponyhuang.gimi.feature.assistant.voicewake
 
 import app.cash.turbine.test
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule

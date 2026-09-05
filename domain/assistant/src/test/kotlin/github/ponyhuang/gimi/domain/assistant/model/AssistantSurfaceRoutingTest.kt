@@ -5,9 +5,9 @@ import org.junit.Test
 
 class AssistantSurfaceRoutingTest {
     @Test
-    fun `chat page keeps wake feedback in composer`() {
+    fun `chat page uses the same in app assistant sheet`() {
         assertEquals(
-            AssistantSurfaceTarget.CHAT_COMPOSER,
+            AssistantSurfaceTarget.IN_APP_SHEET,
             routeAssistantSurface(
                 AssistantSurfaceEnvironment(
                     presentationVisible = true,

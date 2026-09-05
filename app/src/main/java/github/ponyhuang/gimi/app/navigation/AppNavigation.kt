@@ -1,12 +1,19 @@
 package github.ponyhuang.gimi.app.navigation
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -42,22 +49,48 @@ import github.ponyhuang.gimi.feature.skills.SkillsDestination
 import github.ponyhuang.gimi.feature.skills.SkillsEntryProvider
 import github.ponyhuang.gimi.feature.toolauthorization.ToolAuthorizationDestination
 import github.ponyhuang.gimi.feature.toolauthorization.ToolAuthorizationEntryProvider
-import github.ponyhuang.gimi.feature.voicewake.VoiceWakeDestination
-import github.ponyhuang.gimi.feature.voicewake.VoiceWakeEntryProvider
+import github.ponyhuang.gimi.feature.assistant.voicewake.VoiceWakeDestination
+import github.ponyhuang.gimi.feature.assistant.voicewake.VoiceWakeEntryProvider
 import github.ponyhuang.gimi.feature.workfiles.WorkFilesDestination
 import github.ponyhuang.gimi.feature.workfiles.WorkFilesEntryProvider
+import github.ponyhuang.gimi.voice.AssistantPanelInteractor
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 
 /** App-level composition root. Feature modules own destination dispatch and never navigate directly. */
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun MainScreen(
     assistantSessionCoordinator: AssistantSessionCoordinator,
+    assistantPanelInteractor: AssistantPanelInteractor,
     openChatRequest: Int = 0,
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
 ) {
     val backStack = rememberNavBackStack(ChatDestination.Chat)
     val assistantState by assistantSessionCoordinator.state.collectAsStateWithLifecycle()
+    val recording by assistantPanelInteractor.recording.collectAsStateWithLifecycle()
+    val audioLevel by assistantPanelInteractor.audioLevel.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    var micPermissionGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED,
+        )
+    }
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        micPermissionGranted = granted
+        if (granted) assistantPanelInteractor.toggleMic()
+    }
+    val onMicToggle = {
+        if (micPermissionGranted) {
+            assistantPanelInteractor.toggleMic()
+        } else {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
     val goBack: () -> Unit = {
         if (backStack.size > 1) backStack.removeLastOrNull()
     }
@@ -163,21 +196,31 @@ fun MainScreen(
     )
 
     if (
-        assistantState.presentationVisible &&
-        backStack.lastOrNull() != ChatDestination.Chat
+        assistantState.presentationVisible
     ) {
         ModalBottomSheet(
-            onDismissRequest = assistantSessionCoordinator::hidePresentation,
+            onDismissRequest = {
+                assistantPanelInteractor.cancelRecording()
+                assistantSessionCoordinator.hidePresentation()
+            },
         ) {
             AssistantSurface(
                 state = assistantState,
                 mode = AssistantSurfaceMode.SHEET,
-                onDismiss = assistantSessionCoordinator::hidePresentation,
+                onDismiss = {
+                    assistantPanelInteractor.cancelRecording()
+                    assistantSessionCoordinator.hidePresentation()
+                },
                 onStop = assistantSessionCoordinator::stop,
                 onOpenChat = {
+                    assistantPanelInteractor.cancelRecording()
                     assistantSessionCoordinator.hidePresentation()
                     returnToChat()
                 },
+                onMicToggle = onMicToggle,
+                onTextSubmit = assistantPanelInteractor::submitText,
+                recording = recording,
+                audioLevel = audioLevel,
             )
         }
     }

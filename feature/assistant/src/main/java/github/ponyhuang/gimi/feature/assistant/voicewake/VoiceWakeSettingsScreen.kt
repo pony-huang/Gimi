@@ -1,4 +1,4 @@
-package github.ponyhuang.gimi.feature.voicewake
+package github.ponyhuang.gimi.feature.assistant.voicewake
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -66,7 +66,7 @@ import github.ponyhuang.gimi.domain.speech.model.WakeModelSource
 import github.ponyhuang.gimi.domain.speech.model.WakeModelState
 import github.ponyhuang.gimi.domain.speech.model.WakeModelStatus
 import github.ponyhuang.gimi.domain.speech.model.normalizeWakeKeyword
-import github.ponyhuang.gimi.feature.voicewake.R
+import github.ponyhuang.gimi.feature.assistant.R
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard

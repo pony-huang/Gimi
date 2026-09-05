@@ -40,11 +40,7 @@ fun routeAssistantSurface(environment: AssistantSurfaceEnvironment): AssistantSu
         }
     }
     if (environment.appForeground) {
-        return if (environment.chatVisible) {
-            AssistantSurfaceTarget.CHAT_COMPOSER
-        } else {
-            AssistantSurfaceTarget.IN_APP_SHEET
-        }
+        return AssistantSurfaceTarget.IN_APP_SHEET
     }
     return if (environment.overlayPermissionGranted) {
         AssistantSurfaceTarget.SYSTEM_OVERLAY
@@ -85,6 +81,7 @@ fun AssistantSessionState.applyPresentationEvent(
         phase = AssistantSessionPhase.LISTENING,
         source = event.source,
         turn = null,
+        messages = emptyList(),
         pendingConfirmation = null,
         errorMessage = null,
         configIssue = null,

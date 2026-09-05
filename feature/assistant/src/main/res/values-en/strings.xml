@@ -14,4 +14,10 @@
     <string name="assistant_action_close">Close</string>
     <string name="assistant_action_stop">Stop</string>
     <string name="assistant_action_open_chat">Open chat</string>
+    <string name="assistant_voice_start">Start listening</string>
+    <string name="assistant_voice_stop">Stop listening</string>
+    <string name="assistant_voice_idle_hint">Tap to start speaking</string>
+    <string name="assistant_send">Send</string>
+    <string name="assistant_input_placeholder">How can I help?</string>
+    <string name="assistant_tool_running">Using: %1$s</string>
 </resources>

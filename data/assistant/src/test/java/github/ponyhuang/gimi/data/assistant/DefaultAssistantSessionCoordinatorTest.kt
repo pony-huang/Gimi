@@ -281,22 +281,18 @@ class DefaultAssistantSessionCoordinatorTest {
     }
 
     @Test
-    fun `completed presentation hides after five seconds`() = runTest {
+    fun `completed presentation stays visible until host hides it`() = runTest {
         coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
 
         coordinator.updatePresentation(
             AssistantPresentationEvent.CaptureStarted(AssistantInvocationSource.BLUETOOTH_WAKE),
         )
         coordinator.updatePresentation(AssistantPresentationEvent.Completed)
-        runCurrent()
+        advanceUntilIdle()
         assertTrue(coordinator.state.value.presentationVisible)
 
-        advanceTimeBy(4_999)
-        runCurrent()
-        assertTrue(coordinator.state.value.presentationVisible)
-
-        advanceTimeBy(1)
-        runCurrent()
+        coordinator.hidePresentation()
+        advanceUntilIdle()
         assertFalse(coordinator.state.value.presentationVisible)
     }
 

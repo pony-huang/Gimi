@@ -11,6 +11,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
@@ -31,11 +32,13 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.MainActivity
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
+import github.ponyhuang.gimi.domain.assistant.model.isPresentationResultIdle
 import github.ponyhuang.gimi.feature.assistant.AssistantSurface
 import github.ponyhuang.gimi.feature.assistant.AssistantSurfaceMode
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.delay
 
 /** 语音服务持有的底部系统悬浮条；权限缺失时 [show] 安静失败。 */
 @Singleton
@@ -61,6 +64,12 @@ class AssistantOverlayWindow @Inject constructor(
                 val darkThemeOverride by appearanceRepository.darkThemeOverride
                     .collectAsStateWithLifecycle()
                 AsssistantaiTheme(darkTheme = darkThemeOverride ?: isSystemInDarkTheme()) {
+                    LaunchedEffect(state.phase) {
+                        if (state.presentationVisible && state.phase.isPresentationResultIdle()) {
+                            delay(AssistantResultStayMs)
+                            coordinator.hidePresentation()
+                        }
+                    }
                     Box(
                         modifier = Modifier
                             .safeDrawingPadding()
@@ -113,6 +122,8 @@ class AssistantOverlayWindow @Inject constructor(
         )
     }
 }
+
+private const val AssistantResultStayMs = 5_000L
 
 private class OverlayViewTreeOwners : LifecycleOwner, SavedStateRegistryOwner, ViewModelStoreOwner {
     private val lifecycleRegistry = LifecycleRegistry(this)

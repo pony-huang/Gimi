@@ -66,6 +66,7 @@ data class PluginActionUiState(
     val id: String,
     val label: String,
     val running: Boolean = false,
+    val params: Map<String, Any> = emptyMap()
 )
 
 /**

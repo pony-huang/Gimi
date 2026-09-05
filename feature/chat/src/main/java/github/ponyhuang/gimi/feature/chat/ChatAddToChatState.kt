@@ -2,13 +2,6 @@ package github.ponyhuang.gimi.feature.chat
 
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
-import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
-
-enum class SessionToolFilter {
-    ALL,
-    ENABLED,
-    DISABLED,
-}
 
 /**
  * Prevents a list that has reached its lower boundary from forwarding upward motion to the
@@ -34,7 +27,6 @@ internal fun consumeAtLowerScrollBoundary(
 data class ChatAddToChatState(
     val serviceId: String? = null,
     val configuration: ConversationToolConfiguration? = null,
-    val localTools: List<ToolDescriptor> = emptyList(),
     val mcpServers: List<McpServer> = emptyList(),
     val officialTools: List<OfficialToolDescriptor> = emptyList(),
     val isMutationBlocked: Boolean = false,
@@ -42,35 +34,10 @@ data class ChatAddToChatState(
     val fullAccess: Boolean = false,
     val errorMessage: String? = null,
 ) {
-    val enabledLocalToolCount: Int
-        get() = configuration?.enabledLocalToolIds.orEmpty().count { enabledId ->
-            localTools.any { it.id == enabledId }
-        }
-
     val enabledMcpServerCount: Int
         get() = configuration?.enabledMcpServerIds.orEmpty().count { enabledId ->
             mcpServers.any { it.id == enabledId }
         }
-
-    fun visibleLocalTools(
-        query: String,
-        filter: SessionToolFilter,
-    ): List<ToolDescriptor> {
-        val normalizedQuery = query.trim()
-        val enabledIds = configuration?.enabledLocalToolIds.orEmpty()
-        return localTools.filter { tool ->
-            val matchesQuery = normalizedQuery.isEmpty() ||
-                tool.name.contains(normalizedQuery, ignoreCase = true) ||
-                tool.description.contains(normalizedQuery, ignoreCase = true) ||
-                tool.id.contains(normalizedQuery, ignoreCase = true)
-            val matchesFilter = when (filter) {
-                SessionToolFilter.ALL -> true
-                SessionToolFilter.ENABLED -> tool.id in enabledIds
-                SessionToolFilter.DISABLED -> tool.id !in enabledIds
-            }
-            matchesQuery && matchesFilter
-        }
-    }
 
     /**
      * Number of functions the user has selected for [toolId] within the current

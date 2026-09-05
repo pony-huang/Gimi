@@ -124,8 +124,6 @@ class ChatViewModel @Inject constructor(
             ChatAction.RefreshConversations -> refreshConversations()
             is ChatAction.DeleteConversation -> deleteConversation(action.sessionId)
             is ChatAction.SelectModel -> selectModel(action.selection)
-            is ChatAction.SetLocalToolEnabled ->
-                setLocalToolEnabled(action.toolId, action.enabled)
             is ChatAction.SetToolAccessMode -> setToolAccessMode(action.mode)
             is ChatAction.SetReasoningEffort -> setReasoningEffort(action.effort)
             is ChatAction.SetMcpServerEnabled ->
@@ -221,11 +219,6 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             modelServices.observeServices().collect { services ->
                 _uiState.update { it.copy(availableLLMModelSettings = services) }
-            }
-        }
-        viewModelScope.launch {
-            toolAuthorization.tools.collect { tools ->
-                _uiState.update { it.copy(availableLocalTools = tools) }
             }
         }
         viewModelScope.launch {
@@ -955,18 +948,6 @@ class ChatViewModel @Inject constructor(
             }
         } else {
             runtime.toolConfiguration = current
-        }
-    }
-
-    private fun setLocalToolEnabled(toolId: String, enabled: Boolean) {
-        updateToolConfiguration { configuration ->
-            configuration.copy(
-                enabledLocalToolIds = if (enabled) {
-                    configuration.enabledLocalToolIds + toolId
-                } else {
-                    configuration.enabledLocalToolIds - toolId
-                },
-            )
         }
     }
 

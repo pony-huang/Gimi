@@ -129,7 +129,6 @@ fun ChatScaffold(
     onOpenSettings: () -> Unit,
     onConfigureModels: () -> Unit,
     onNewConversation: () -> Unit,
-    onLocalToolEnabledChange: (String, Boolean) -> Unit,
     onToolAccessModeChange: (ToolAccessMode) -> Unit,
     onReasoningEffortChange: (ReasoningEffort) -> Unit,
     onMcpServerEnabledChange: (String, Boolean) -> Unit,
@@ -290,7 +289,6 @@ fun ChatScaffold(
                     addToChatState = ChatAddToChatState(
                         serviceId = state.currentModelSelection?.serviceId,
                         configuration = state.toolConfiguration,
-                        localTools = state.availableLocalTools,
                         mcpServers = state.availableMcpServers,
                         officialTools = state.officialToolDescriptors,
                         isMutationBlocked = state.isAgentRunning,
@@ -302,7 +300,6 @@ fun ChatScaffold(
                         },
                     ),
                     attachmentCapabilities = attachmentCapabilities,
-                    onLocalToolEnabledChange = onLocalToolEnabledChange,
                     onToolAccessModeChange = onToolAccessModeChange,
                     onReasoningEffortChange = onReasoningEffortChange,
                     onMcpServerEnabledChange = onMcpServerEnabledChange,

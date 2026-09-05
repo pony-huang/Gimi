@@ -188,9 +188,6 @@ fun ChatRoute(
             onNewConversation = {
                 viewModel.onAction(ChatAction.NewConversation)
             },
-            onLocalToolEnabledChange = { toolId, enabled ->
-                viewModel.onAction(ChatAction.SetLocalToolEnabled(toolId, enabled))
-            },
             onToolAccessModeChange = { mode ->
                 viewModel.onAction(ChatAction.SetToolAccessMode(mode))
             },

@@ -115,7 +115,6 @@ public fun ChatComposer(
     onExpandedChange: (Boolean) -> Unit = { },
     modelSelectorContent: @Composable () -> Unit = { },
     addToChatState: ChatAddToChatState = ChatAddToChatState(),
-    onLocalToolEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
     onToolAccessModeChange: (ToolAccessMode) -> Unit = { _ -> },
     onReasoningEffortChange: (ReasoningEffort) -> Unit = { _ -> },
     onMcpServerEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
@@ -468,7 +467,6 @@ public fun ChatComposer(
             imagesEnabled = attachmentCapabilities.supportsImages,
             filesEnabled = attachmentCapabilities.supportsAudio ||
                 attachmentCapabilities.supportsDocuments,
-            onLocalToolEnabledChange = onLocalToolEnabledChange,
             onToolAccessModeChange = onToolAccessModeChange,
             onReasoningEffortChange = onReasoningEffortChange,
             onMcpServerEnabledChange = onMcpServerEnabledChange,

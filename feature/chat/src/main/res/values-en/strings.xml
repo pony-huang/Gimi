@@ -20,7 +20,6 @@
     <string name="chat_attachment_read_failed">Could not read the selected attachment</string>
     <string name="chat_attachment_unsupported">The current model does not support this attachment type</string>
     <string name="chat_attachment_open_failed">No app is available to open this document</string>
-    <string name="chat_session_tools_title">Tools</string>
     <string name="chat_tool_access_title">Tool access</string>
     <string name="chat_tool_access_on_demand">Auto search (Recommended)</string>
     <string name="chat_tool_access_on_demand_description">Searches and loads tools only when needed, saving context at the cost of more model calls and slightly lower accuracy</string>
@@ -45,10 +44,6 @@
     <string name="chat_session_tool_save_failed">Could not save this chat\'s tool settings</string>
     <string name="chat_mcp_transport_sse">SSE</string>
     <string name="chat_mcp_transport_streamable_http">Streamable HTTP</string>
-    <string name="chat_session_tools_search">Search tools</string>
-    <string name="chat_session_tools_filter_all">All</string>
-    <string name="chat_session_tools_filter_enabled">Enabled</string>
-    <string name="chat_session_tools_filter_disabled">Disabled</string>
     <string name="chat_session_mcp_empty_title">MCP is not configured</string>
     <string name="chat_session_mcp_empty_description">Add a server from MCP in Settings first.</string>
     <string name="chat_official_tool_web_search">Web search</string>

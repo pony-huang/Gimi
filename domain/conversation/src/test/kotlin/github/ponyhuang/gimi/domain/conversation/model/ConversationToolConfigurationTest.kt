@@ -52,10 +52,7 @@ class ConversationToolConfigurationTest {
 
         val updated = configuration
             .initializeOfficialFunctions("kimi", setOf("kimi_formulas"))
-            .sanitize(
-                availableLocalToolIds = emptySet(),
-                availableMcpServerIds = emptySet(),
-            )
+            .sanitize(availableMcpServerIds = emptySet())
 
         assertEquals(ToolAccessMode.ON_DEMAND, updated.toolAccessMode)
     }
@@ -157,18 +154,15 @@ class ConversationToolConfigurationTest {
     }
 
     @Test
-    fun sanitizeDropsToolsAndServersThatNoLongerExist() {
+    fun sanitizeDropsServersThatNoLongerExist() {
         val configuration = ConversationToolConfiguration(
-            enabledLocalToolIds = setOf("clock", "removed_tool"),
             enabledMcpServerIds = setOf("server-1", "deleted-server"),
         )
 
         val sanitized = configuration.sanitize(
-            availableLocalToolIds = setOf("clock", "location"),
             availableMcpServerIds = setOf("server-1", "server-2"),
         )
 
-        assertEquals(setOf("clock"), sanitized.enabledLocalToolIds)
         assertEquals(setOf("server-1"), sanitized.enabledMcpServerIds)
     }
 }

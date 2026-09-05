@@ -12,14 +12,11 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
-import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
-import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -37,23 +34,15 @@ class DefaultConversationSessionResolverTest {
             McpServer(id = "mcp", name = "MCP", isEnabled = true),
         )
     }
-    private val toolAuthorization = mockk<ToolAuthorizationRepository>(relaxed = true) {
-        every { tools } returns MutableStateFlow(
-            listOf(ToolDescriptor("clock", "Clock", "Clock", true)),
-        )
-        every { enabledToolIds() } returns setOf("clock")
-    }
     private val resolver = DefaultConversationSessionResolver(
         conversations,
         modelCatalog,
         mcpRepository,
-        toolAuthorization,
     )
 
     @Test
     fun resolveCurrentOrCreateUsesCurrentConversationModelAndTools() = runTest {
         val tools = ConversationToolConfiguration(
-            enabledLocalToolIds = setOf("clock"),
             enabledMcpServerIds = setOf("mcp"),
             enabledOfficialFunctionIdsByService = mapOf(
                 "service" to mapOf(
@@ -106,7 +95,6 @@ class DefaultConversationSessionResolverTest {
         val result = resolver.createAndActivate()
 
         assertEquals("new", result.sessionId)
-        assertEquals(setOf("clock"), configuration.captured.enabledLocalToolIds)
         assertEquals(setOf("mcp"), configuration.captured.enabledMcpServerIds)
         assertEquals(
             setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
@@ -117,7 +105,7 @@ class DefaultConversationSessionResolverTest {
     @Test
     fun resolveToolConfigurationDoesNotActivateConversation() = runTest {
         coEvery { conversations.conversationToolConfiguration("background") } returns
-            ConversationToolConfiguration(enabledLocalToolIds = setOf("clock"))
+            ConversationToolConfiguration(enabledMcpServerIds = setOf("mcp"))
         coEvery { conversations.setConversationToolConfiguration(any(), any()) } returns true
 
         resolver.resolveToolConfiguration("background", selection)

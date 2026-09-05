@@ -11,7 +11,6 @@ class ConversationToolConfigurationCodecTest {
     @Test
     fun roundTripPreservesEverySessionSetting() {
         val configuration = ConversationToolConfiguration(
-            enabledLocalToolIds = setOf("clock", "location"),
             enabledMcpServerIds = setOf("server-1"),
             pendingMcpCredentialServerId = "server-1",
             enabledOfficialFunctionIdsByService = mapOf(
@@ -37,7 +36,6 @@ class ConversationToolConfigurationCodecTest {
         val decoded = ConversationToolConfigurationCodec.decode(
             """
             {
-              "enabledLocalToolIds": ["clock"],
               "enabledMcpServerIds": ["server-1"]
             }
             """.trimIndent(),
@@ -48,6 +46,7 @@ class ConversationToolConfigurationCodecTest {
 
     @Test
     fun legacyAutomaticToolAccessDefaultsToAlwaysAvailable() {
+        // 旧版本持久化 payload 含已移除的 enabledLocalToolIds，必须继续可解码。
         val decoded = ConversationToolConfigurationCodec.decode(
             """
             {

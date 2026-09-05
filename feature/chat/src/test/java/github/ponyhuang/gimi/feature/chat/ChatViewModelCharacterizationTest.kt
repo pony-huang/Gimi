@@ -257,8 +257,7 @@ class ChatViewModelCharacterizationTest {
                 any(),
                 true,
                 match { configuration ->
-                    configuration.enabledLocalToolIds == setOf("compose_message") &&
-                        configuration.enabledMcpServerIds == setOf("enabled-mcp")
+                    configuration.enabledMcpServerIds == setOf("enabled-mcp")
                 },
             )
         }
@@ -268,7 +267,6 @@ class ChatViewModelCharacterizationTest {
     fun sendReloadsPersistedToolConfigurationAfterAgentImportsMcpServers() = runTest {
         val fixture = fixture(configured = true)
         val beforeImport = ConversationToolConfiguration(
-            enabledLocalToolIds = setOf("compose_message"),
             enabledMcpServerIds = setOf("mcp-a", "mcp-b", "mcp-c"),
         )
         val afterImport = beforeImport.copy(
@@ -295,8 +293,7 @@ class ChatViewModelCharacterizationTest {
                 "use the new tools",
                 any(),
                 match {
-                    it.enabledLocalToolIds == afterImport.enabledLocalToolIds &&
-                        it.enabledMcpServerIds == afterImport.enabledMcpServerIds
+                    it.enabledMcpServerIds == afterImport.enabledMcpServerIds
                 },
             )
         }
@@ -314,24 +311,6 @@ class ChatViewModelCharacterizationTest {
         advanceUntilIdle()
 
         verify { fixture.appearance.setDarkThemeOverride(true) }
-    }
-
-    @Test
-    fun changingSessionToolPersistsAndReleasesOnlyCurrentRunner() = runTest {
-        val fixture = fixture(configured = true)
-        fixture.viewModel.onAction(ChatAction.NewConversation)
-        advanceUntilIdle()
-
-        fixture.viewModel.onAction(ChatAction.SetLocalToolEnabled("compose_message", enabled = false))
-        advanceUntilIdle()
-
-        coVerify {
-            fixture.conversations.setConversationToolConfiguration(
-                "session-1",
-                match { "compose_message" !in it.enabledLocalToolIds },
-            )
-        }
-        coVerify { fixture.agent.releaseSession("session-1") }
     }
 
     @Test
@@ -783,7 +762,6 @@ class ChatViewModelCharacterizationTest {
             every { errors } returns MutableSharedFlow()
         }
         val defaultTools = ConversationToolConfiguration(
-            enabledLocalToolIds = setOf("compose_message"),
             enabledMcpServerIds = setOf("enabled-mcp"),
             enabledOfficialFunctionIdsByService = mapOf(
                 "service" to mapOf(

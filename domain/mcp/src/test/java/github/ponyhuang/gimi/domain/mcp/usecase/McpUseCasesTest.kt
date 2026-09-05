@@ -77,7 +77,6 @@ class McpUseCasesTest {
         )
         val conversations = FakeConversationRepository(
             storedConfiguration = ConversationToolConfiguration(
-                enabledLocalToolIds = setOf("clock"),
                 enabledMcpServerIds = setOf("mcp-a", "mcp-b", "mcp-c"),
             ),
         )
@@ -91,7 +90,6 @@ class McpUseCasesTest {
         assertEquals(setOf("mcp-d", "mcp-e"), result.importResult.affectedServerIds)
         assertEquals(
             ConversationToolConfiguration(
-                enabledLocalToolIds = setOf("clock"),
                 enabledMcpServerIds = setOf("mcp-a", "mcp-b", "mcp-c", "mcp-d"),
                 pendingMcpCredentialServerId = "mcp-e",
             ),
@@ -164,7 +162,6 @@ class McpUseCasesTest {
     fun configureServerCreatesNewServerAndActivatesForConversation() = runTest {
         val conversations = FakeConversationRepository(
             storedConfiguration = ConversationToolConfiguration(
-                enabledLocalToolIds = setOf("clock"),
                 enabledMcpServerIds = setOf("mcp-a"),
             ),
         )

@@ -56,9 +56,6 @@ sealed interface ChatAction {
     /** 为当前会话选择聊天模型。 */
     data class SelectModel(val selection: ModelSelection) : ChatAction
 
-    /** 启用 / 停用某个本地工具。 */
-    data class SetLocalToolEnabled(val toolId: String, val enabled: Boolean) : ChatAction
-
     /** 设置当前会话向模型声明函数工具的加载方式。 */
     data class SetToolAccessMode(val mode: ToolAccessMode) : ChatAction
 

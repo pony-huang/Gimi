@@ -22,7 +22,6 @@
     <string name="chat_attachment_read_failed">无法读取所选附件</string>
     <string name="chat_attachment_unsupported">当前模型不支持此类附件</string>
     <string name="chat_attachment_open_failed">没有可用于打开此文档的应用</string>
-    <string name="chat_session_tools_title">工具</string>
     <string name="chat_tool_access_title">工具访问</string>
     <string name="chat_tool_access_on_demand">自动搜索（推荐）</string>
     <string name="chat_tool_access_on_demand_description">仅在需要时搜索并加载工具，节省上下文；可能增加模型调用，并略微影响准确性</string>
@@ -47,10 +46,6 @@
     <string name="chat_session_tool_save_failed">无法保存当前会话的工具设置</string>
     <string name="chat_mcp_transport_sse">SSE</string>
     <string name="chat_mcp_transport_streamable_http">Streamable HTTP</string>
-    <string name="chat_session_tools_search">搜索工具</string>
-    <string name="chat_session_tools_filter_all">全部</string>
-    <string name="chat_session_tools_filter_enabled">已启用</string>
-    <string name="chat_session_tools_filter_disabled">已关闭</string>
     <string name="chat_session_mcp_empty_title">尚未配置 MCP</string>
     <string name="chat_session_mcp_empty_description">请先前往设置中的 MCP 页面添加服务器。</string>
     <string name="chat_official_tool_web_search">网页搜索</string>

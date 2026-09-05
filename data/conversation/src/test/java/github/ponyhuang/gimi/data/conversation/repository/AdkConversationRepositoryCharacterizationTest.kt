@@ -77,7 +77,6 @@ class AdkConversationRepositoryCharacterizationTest {
     @Test
     fun conversationToolConfiguration_readsPersistedSnapshot() = runTest {
         val expected = ConversationToolConfiguration(
-            enabledLocalToolIds = setOf("clock"),
             enabledMcpServerIds = setOf("mcp-1"),
         )
         coEvery { metadataDao.get("session-1") } returns ConversationMetadataEntity(
@@ -91,7 +90,7 @@ class AdkConversationRepositoryCharacterizationTest {
     @Test
     fun setConversationToolConfiguration_persistsSnapshotWithoutReplacingOtherMetadata() = runTest {
         val configuration = ConversationToolConfiguration(
-            enabledLocalToolIds = setOf("clock", "location"),
+            enabledMcpServerIds = setOf("mcp-1"),
         )
 
         repository().setConversationToolConfiguration("session-1", configuration)

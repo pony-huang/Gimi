@@ -64,7 +64,6 @@ object ToolAccessModeSerializer : KSerializer<ToolAccessMode> {
  * enabled" — it is expanded to the real id set the moment the catalog becomes
  * available.
  *
- * @property enabledLocalToolIds 当前会话选择的本地工具 ID。
  * @property enabledMcpServerIds 当前会话选择的 MCP server ID。
  * @property pendingMcpCredentialServerId 当前会话最近一次等待补充认证凭据的 MCP server ID。
  * @property enabledOfficialFunctionIdsByService 按模型服务和官方工具分组的函数选择。
@@ -73,7 +72,6 @@ object ToolAccessModeSerializer : KSerializer<ToolAccessMode> {
  */
 @Serializable
 data class ConversationToolConfiguration(
-    val enabledLocalToolIds: Set<String> = emptySet(),
     val enabledMcpServerIds: Set<String> = emptySet(),
     val pendingMcpCredentialServerId: String? = null,
     val enabledOfficialFunctionIdsByService: Map<String, Map<String, Set<String>>> = emptyMap(),
@@ -150,11 +148,7 @@ data class ConversationToolConfiguration(
         )
     }
 
-    fun sanitize(
-        availableLocalToolIds: Set<String>,
-        availableMcpServerIds: Set<String>,
-    ): ConversationToolConfiguration = copy(
-        enabledLocalToolIds = enabledLocalToolIds intersect availableLocalToolIds,
+    fun sanitize(availableMcpServerIds: Set<String>): ConversationToolConfiguration = copy(
         enabledMcpServerIds = enabledMcpServerIds intersect availableMcpServerIds,
     )
 

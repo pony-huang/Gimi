@@ -11,7 +11,6 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
-import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
 
 /**
  * The current UI state of the chat conversation.
@@ -56,7 +55,6 @@ data class ChatUiState(
     val modelCatalogLoadState: CatalogLoadState = CatalogLoadState.Loading,
     val currentModelSelection: ModelSelection? = null,
     val toolConfiguration: ConversationToolConfiguration? = null,
-    val availableLocalTools: List<ToolDescriptor> = emptyList(),
     val availableMcpServers: List<McpServer> = emptyList(),
     val officialToolDescriptors: List<OfficialToolDescriptor> = emptyList(),
     val hasToolConfigurationError: Boolean = false,

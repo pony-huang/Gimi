@@ -21,7 +21,6 @@ class ToolRunMetadataTest {
     @Test
     fun roundTripPreservesTheFullConfiguration() {
         val configuration = ConversationToolConfiguration(
-            enabledLocalToolIds = setOf("clock", "location"),
             enabledMcpServerIds = setOf("github"),
             enabledOfficialFunctionIdsByService = mapOf(
                 "kimi" to mapOf("kimi_formulas" to setOf("translate", "code")),
@@ -100,7 +99,6 @@ class ToolRunMetadataTest {
         val metadata = ToolRunMetadata.of(
             modelRuntime = modelRuntime(),
             toolConfiguration = ConversationToolConfiguration(
-                enabledLocalToolIds = setOf("clock"),
                 enabledMcpServerIds = setOf("github"),
                 enabledOfficialFunctionIdsByService = mapOf(
                     "kimi" to mapOf("kimi_formulas" to setOf("translate")),
@@ -117,8 +115,8 @@ class ToolRunMetadataTest {
             json.getValue("selkie.tool_config.access_mode").jsonPrimitive.content,
         )
         assertEquals(
-            "clock",
-            json.getValue("selkie.tool_config.local_tool_ids").jsonArray.single()
+            "github",
+            json.getValue("selkie.tool_config.mcp_server_ids").jsonArray.single()
                 .jsonPrimitive.content,
         )
         assertFalse(

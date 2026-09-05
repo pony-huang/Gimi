@@ -110,7 +110,7 @@ class DefaultAssistantSessionCoordinatorTest {
     fun `submit reuses the current conversation model and tools`() = runTest {
         coordinator.taskDispatcher = StandardTestDispatcher(testScheduler)
         val currentSelection = ModelSelection("svc", "grp", "current-model")
-        val currentTools = ConversationToolConfiguration(enabledLocalToolIds = setOf("clock"))
+        val currentTools = ConversationToolConfiguration()
         coEvery { sessionResolver.resolveCurrentOrCreate() } returns ConversationSessionSnapshot(
             sessionId = "current-session",
             modelSelection = currentSelection,

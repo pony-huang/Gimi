@@ -9,7 +9,6 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
-import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.sync.Mutex
@@ -21,7 +20,6 @@ class DefaultConversationSessionResolver @Inject constructor(
     private val conversations: ConversationRepository,
     private val modelCatalog: ModelCatalogRepository,
     private val mcpRepository: McpRepository,
-    private val toolAuthorization: ToolAuthorizationRepository,
 ) : ConversationSessionResolver {
     private val mutex = Mutex()
 
@@ -90,10 +88,9 @@ class DefaultConversationSessionResolver @Inject constructor(
         selection: ModelSelection,
     ): ConversationToolConfiguration {
         val stored = conversations.conversationToolConfiguration(sessionId)
-        val availableLocalIds = toolAuthorization.tools.value.mapTo(hashSetOf()) { it.id }
         val availableMcpIds = mcpRepository.currentServers().mapTo(hashSetOf()) { it.id }
         val resolved = (stored ?: defaultToolConfiguration(selection))
-            .sanitize(availableLocalIds, availableMcpIds)
+            .sanitize(availableMcpIds)
             .initializeOfficialFunctions(
                 selection.serviceId,
                 supportedOfficialToolIds(selection),
@@ -108,7 +105,6 @@ class DefaultConversationSessionResolver @Inject constructor(
 
     private fun defaultToolConfiguration(selection: ModelSelection): ConversationToolConfiguration =
         ConversationToolConfiguration(
-            enabledLocalToolIds = toolAuthorization.enabledToolIds(),
             enabledMcpServerIds = mcpRepository.currentServers()
                 .filter { it.isEnabled }
                 .mapTo(linkedSetOf()) { it.id },

@@ -27,7 +27,6 @@ object ToolRunMetadata {
     private const val KEY_MODEL_ID = "selkie.model.id"
     private const val KEY_MODEL_BASE_URL = "selkie.model.base_url"
     private const val KEY_PRESENT = "selkie.tool_config.present"
-    private const val KEY_LOCAL_TOOL_IDS = "selkie.tool_config.local_tool_ids"
     private const val KEY_MCP_SERVER_IDS = "selkie.tool_config.mcp_server_ids"
     private const val KEY_OFFICIAL_FUNCTIONS = "selkie.tool_config.official_functions"
     private const val KEY_TOOL_ACCESS_MODE = "selkie.tool_config.access_mode"
@@ -48,7 +47,6 @@ object ToolRunMetadata {
         )
         if (toolConfiguration != null) {
             metadata[KEY_PRESENT] = true
-            metadata[KEY_LOCAL_TOOL_IDS] = toolConfiguration.enabledLocalToolIds.toList()
             metadata[KEY_MCP_SERVER_IDS] = toolConfiguration.enabledMcpServerIds.toList()
             metadata[KEY_OFFICIAL_FUNCTIONS] =
                 toolConfiguration.enabledOfficialFunctionIdsByService.mapValues { (_, byTool) ->
@@ -93,7 +91,6 @@ object ToolRunMetadata {
             }
             .toMap()
         return ConversationToolConfiguration(
-            enabledLocalToolIds = metadata.stringSet(KEY_LOCAL_TOOL_IDS),
             enabledMcpServerIds = metadata.stringSet(KEY_MCP_SERVER_IDS),
             enabledOfficialFunctionIdsByService = official,
             toolAccessMode = when (metadata[KEY_TOOL_ACCESS_MODE] as? String) {

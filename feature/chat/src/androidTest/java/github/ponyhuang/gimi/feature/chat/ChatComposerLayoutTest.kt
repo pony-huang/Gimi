@@ -34,7 +34,6 @@ import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
-import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
 import org.junit.Rule
 import org.junit.Test
 
@@ -194,11 +193,7 @@ class ChatComposerLayoutTest {
             addToChatState = ChatAddToChatState(
                 serviceId = "service",
                 configuration = ConversationToolConfiguration(
-                    enabledLocalToolIds = setOf("clock"),
                     enabledMcpServerIds = setOf("mcp-1"),
-                ),
-                localTools = listOf(
-                    ToolDescriptor("clock", "Clock", "Read the current time", true),
                 ),
                 mcpServers = listOf(McpServer(id = "mcp-1", name = "Test MCP")),
             ),
@@ -206,11 +201,10 @@ class ChatComposerLayoutTest {
 
         composeRule.onNodeWithTag("chat_composer_add").performClick()
         composeRule.onNodeWithTag("add-to-chat-home").assertIsDisplayed()
-        composeRule.onNodeWithTag("session-tools-nav").performClick()
-        composeRule.onNodeWithTag("session-tools-page").assertIsDisplayed()
-        composeRule.onNodeWithTag("add-to-chat-back").performClick()
         composeRule.onNodeWithTag("session-mcp-nav").performClick()
         composeRule.onNodeWithTag("session-mcp-page").assertIsDisplayed()
+        composeRule.onNodeWithTag("add-to-chat-back").performClick()
+        composeRule.onNodeWithTag("add-to-chat-home").assertIsDisplayed()
     }
 
     @Test

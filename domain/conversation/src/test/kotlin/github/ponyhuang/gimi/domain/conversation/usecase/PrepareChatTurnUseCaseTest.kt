@@ -32,6 +32,7 @@ class PrepareChatTurnUseCaseTest {
     private val runner = object : ChatAgentRepository {
         override suspend fun send(sessionId: String, selection: ModelSelection, text: String, fileAttachments: List<FileAttachment>, toolConfiguration: ConversationToolConfiguration?): Flow<ChatRunEvent> = emptyFlow()
         override suspend fun respondToToolConfirmation(sessionId: String, confirmationCallId: String, confirmed: Boolean): Flow<ChatRunEvent> = emptyFlow()
+        override suspend fun respondToInputRequest(sessionId: String, callId: String, toolName: String, value: String): Flow<ChatRunEvent> = emptyFlow()
         override suspend fun releaseSession(sessionId: String) { calls += "release" }
     }
     private val turns = object : ChatTurnRepository {

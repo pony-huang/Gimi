@@ -57,6 +57,19 @@ class AdkChatAgentRepository @Inject constructor(
         confirmed = confirmed,
     ).map { it.toDomain() }
 
+    override suspend fun respondToInputRequest(
+        sessionId: String,
+        callId: String,
+        toolName: String,
+        value: String,
+    ): Flow<ChatRunEvent> = runner.respondToInputRequest(
+        userId = USER_ID,
+        sessionId = sessionId,
+        callId = callId,
+        toolName = toolName,
+        payload = UserInputToolProtocol.responsePayload(toolName, value),
+    ).map { it.toDomain() }
+
     private fun Event.toDomain() = ChatRunEvent(
         id = id,
         invocationId = invocationId,
@@ -122,7 +135,8 @@ class AdkChatAgentRepository @Inject constructor(
                     .mapKeys { entry -> entry.key.toString() },
             )
         }
-        return ChatFunctionCall(id, name, rawArgs, confirmation)
+        val inputRequest = UserInputToolProtocol.parseRequest(id, name, rawArgs)
+        return ChatFunctionCall(id, name, rawArgs, confirmation, inputRequest)
     }
 
     // success=false 是工具的预期失败路径（如未授权），降为 Info；形状异常才值得 Warn。

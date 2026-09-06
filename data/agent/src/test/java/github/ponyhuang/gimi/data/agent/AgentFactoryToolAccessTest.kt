@@ -12,7 +12,7 @@ import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.ThinkingLevel
 import github.ponyhuang.gimi.data.agent.contribution.LocalToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.McpToolContribution
-import github.ponyhuang.gimi.data.agent.contribution.MemoryToolContribution
+import github.ponyhuang.gimi.data.agent.contribution.BaseToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.ModelCatalogContribution
 import github.ponyhuang.gimi.data.agent.contribution.OfficialToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.PluginToolContribution
@@ -29,7 +29,6 @@ import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolRegistry
 import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolSpec
 import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolBinding
 import github.ponyhuang.gimi.data.agent.tools.system.LocalToolset
-import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
@@ -44,7 +43,6 @@ import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -154,14 +152,17 @@ class AgentFactoryToolAccessTest {
 
         val agent = fixture.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
 
-        // 基础工具按贡献方 id 排序聚合：local 确认续接工具 → mcp 维护工具 → memory 召回工具。
+        // 基础工具按贡献方 id 排序聚合：base 工具 → local 确认续接工具 → mcp 维护工具。
         assertEquals(
             listOf(
+                "preload_memory",
+                "load_memory",
+                "adk_request_input",
+                "get_user_choice",
                 "adjust_media_volume",
                 McpConfigurationTool.NAME,
                 McpAuthorizationTool.NAME,
                 McpManualConfigurationTool.NAME,
-                "preload_memory",
             ),
             agent.tools.map(BaseTool::name),
         )
@@ -181,10 +182,13 @@ class AgentFactoryToolAccessTest {
 
         assertEquals(
             listOf(
+                "preload_memory",
+                "load_memory",
+                "adk_request_input",
+                "get_user_choice",
                 McpConfigurationTool.NAME,
                 McpAuthorizationTool.NAME,
                 McpManualConfigurationTool.NAME,
-                "preload_memory",
             ),
             agent.tools.map(BaseTool::name),
         )
@@ -274,7 +278,7 @@ class AgentFactoryToolAccessTest {
                 OfficialToolContribution(officialToolset, officialRegistry),
                 SkillToolContribution(mockk<SkillSource>(relaxed = true)),
                 PluginToolContribution(pluginRuntimeProvider),
-                MemoryToolContribution(),
+                BaseToolContribution(),
                 ModelCatalogContribution(modelServices),
             ),
         )

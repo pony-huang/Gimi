@@ -172,6 +172,9 @@ fun ChatRoute(
                     ),
                 )
             },
+            onRespondToInputRequest = { callId, value ->
+                viewModel.onAction(ChatAction.RespondToInputRequest(callId, value))
+            },
             onFullAccessChange = { enabled ->
                 viewModel.onAction(ChatAction.SetFullAccess(enabled))
             },

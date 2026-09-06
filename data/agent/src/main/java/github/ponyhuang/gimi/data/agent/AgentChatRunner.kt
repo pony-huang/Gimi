@@ -252,25 +252,63 @@ class AgentChatRunner(
         sessionId: String,
         confirmationCallId: String,
         confirmed: Boolean,
+    ): Flow<Event> = resumeWithFunctionResponse(
+        userId = userId,
+        sessionId = sessionId,
+        response = FunctionResponse(
+            name = FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME,
+            id = confirmationCallId,
+            response = mapOf("confirmed" to confirmed),
+        ),
+    )
+
+    /**
+     * 用用户答复恢复挂起的用户输入请求（`adk_request_input` / `get_user_choice`）。
+     *
+     * @param userId 用户 ID
+     * @param sessionId 会话 ID
+     * @param callId 挂起的 function call ID
+     * @param toolName 触发挂起的工具名（决定 FunctionResponse.name，需与挂起调用一致）
+     * @param payload 答复负载（键约定见 `UserInputToolProtocol`）
+     * @return Event 流
+     */
+    suspend fun respondToInputRequest(
+        userId: String,
+        sessionId: String,
+        callId: String,
+        toolName: String,
+        payload: Map<String, Any?>,
+    ): Flow<Event> = resumeWithFunctionResponse(
+        userId = userId,
+        sessionId = sessionId,
+        response = FunctionResponse(
+            name = toolName,
+            id = callId,
+            response = payload,
+        ),
+    )
+
+    /**
+     * 以 role=user 的 `FunctionResponse` 新消息恢复暂停的 invocation。
+     *
+     * ADK 靠"响应 id 覆盖挂起的长时运行调用 id"判定这是恢复而非新的暂停，
+     * 恢复时挂起工具不重跑，响应直接作为调用结果进入模型上下文。
+     */
+    private suspend fun resumeWithFunctionResponse(
+        userId: String,
+        sessionId: String,
+        response: FunctionResponse,
     ): Flow<Event> {
         val activeTurn = currentTurnForResume(sessionId)
-        val confirmationResponse = Content(
+        val resumeMessage = Content(
             role = Role.USER,
-            parts = listOf(
-                Part(
-                    functionResponse = FunctionResponse(
-                        name = FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME,
-                        id = confirmationCallId,
-                        response = mapOf("confirmed" to confirmed),
-                    ),
-                ),
-            ),
+            parts = listOf(Part(functionResponse = response)),
         )
         return activeTurn.runner.runAsync(
             userId = userId,
             sessionId = sessionId,
             invocationId = null,
-            newMessage = confirmationResponse,
+            newMessage = resumeMessage,
             stateDelta = null,
             // 恢复调用沿用最近一次 send 的工具配置，保证 Toolset 过滤上下文一致。
             runConfig = RunConfig(

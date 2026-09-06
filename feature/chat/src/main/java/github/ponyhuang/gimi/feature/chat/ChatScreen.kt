@@ -65,7 +65,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -78,6 +77,8 @@ import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
+import github.ponyhuang.gimi.domain.conversation.model.UserInputKind
+import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
 import androidx.compose.ui.tooling.preview.Preview
@@ -132,6 +133,7 @@ fun ChatScaffold(
     onShowAllLocalFiles: (responseId: String) -> Unit,
     onToolConfirmation: (Boolean) -> Unit,
     onToolConfirmationAlwaysAllow: () -> Unit,
+    onRespondToInputRequest: (callId: String, value: String) -> Unit = { _, _ -> },
     onFullAccessChange: (Boolean) -> Unit,
     onSelectModel: (github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection) -> Unit,
     onModelSwitchBlocked: () -> Unit,
@@ -167,6 +169,7 @@ fun ChatScaffold(
     val isAgentRunning = state.isAgentRunning
     val speechPlaybackState = state.speechPlaybackState
     val pendingToolConfirmation = state.pendingToolConfirmation
+    val pendingInputRequest = state.pendingInputRequest
     val attachmentCapabilities = remember(
         state.availableLLMModelSettings,
         state.currentModelSelection,
@@ -181,8 +184,11 @@ fun ChatScaffold(
             ?.capabilities
             ?: MultimodalCapabilities()
     }
-    val awaitingConfirmationToolNames = remember(state.pendingToolConfirmations) {
-        state.pendingToolConfirmations.mapTo(HashSet()) { it.toolName }
+    val awaitingConfirmationToolNames = remember(state.pendingToolConfirmations, state.pendingInputRequests) {
+        state.pendingToolConfirmations.mapTo(HashSet()) { it.toolName }.apply {
+            // 挂起的输入请求同样让对应工具 chip 呈现等待态，而不是永远悬空的执行中。
+            state.pendingInputRequests.forEach { add(it.toolName) }
+        }
     }
     // 只要用户仍停留在底部，就让流式内容增长持续跟随；用户向上浏览历史时则停止抢占滚动。
     var shouldFollowLatest by remember { mutableStateOf(true) }
@@ -197,7 +203,7 @@ fun ChatScaffold(
         label = "recommendationHorizontalInset",
     )
 
-    LaunchedEffect(visibleMessages.size, pendingToolConfirmation?.confirmationCallId) {
+    LaunchedEffect(visibleMessages.size, pendingToolConfirmation?.confirmationCallId, pendingInputRequest?.callId) {
         if (state.getCurrentUserMessage() != null) {
             delay(100.milliseconds)
             listState.animateScrollToItem(visibleMessages.size)
@@ -292,7 +298,7 @@ fun ChatScaffold(
                     ),
                 )
             }
-            Column {
+            Column(modifier = Modifier.background(fadeBrush)) {
                 AnimatedVisibility(visible = state.editingFailedTurn) {
                     EditFailedTurnBanner(onCancel = onCancelEditFailedTurn)
                 }
@@ -301,8 +307,35 @@ fun ChatScaffold(
                     // 初始化，编辑失败消息的种子（文字与异步恢复的附件）每次变化都必须
                     // 重建输入框才能生效；仅以 editingFailedTurn 为 key 会漏掉迟到种子。
                     key(state.composerSeed) {
-                        ChatComposer(
-                            modifier = Modifier.background(fadeBrush),
+                        // Agent 挂起等待答复（授权 / 输入 / 选项）时，操作面板**取代**输入
+                        // 胶囊本体 —— 两者互斥共用同一槽位，答复后胶囊恢复；期间普通发送
+                        // 本就被 ViewModel 锁定，胶囊没有可用操作。
+                        AnimatedContent(
+                            targetState = state.pendingComposerAction,
+                            contentKey = { it?.key() ?: "composer" },
+                            label = "pendingComposerAction",
+                        ) { action ->
+                            when (action) {
+                                is PendingComposerAction.Confirmation -> PendingConfirmationPanel(
+                                    request = action.request,
+                                    onConfirm = { onToolConfirmation(true) },
+                                    onReject = { onToolConfirmation(false) },
+                                    onAlwaysAllow = onToolConfirmationAlwaysAllow,
+                                )
+                                is PendingComposerAction.Choice -> PendingChoicePanel(
+                                    request = action.request,
+                                    onRespond = { value ->
+                                        onRespondToInputRequest(action.request.callId, value)
+                                    },
+                                )
+                                is PendingComposerAction.TextInput -> PendingInputPanel(
+                                    request = action.request,
+                                    onRespond = { value ->
+                                        onRespondToInputRequest(action.request.callId, value)
+                                    },
+                                )
+                                null -> ChatComposer(
+                                    modifier = Modifier,
                             messageData = state.composerSeed,
                             onSendClick = { data ->
                                 onSend(data.text, data.attachments)
@@ -348,9 +381,11 @@ fun ChatScaffold(
                                 )
                             },
                         )
+                        }
                     }
                 }
             }
+        }
         },
         floatingActionButton = {
             AnimatedVisibility(
@@ -465,19 +500,6 @@ fun ChatScaffold(
                             }
                         }
                     }
-                    pendingToolConfirmation?.let { request ->
-                        item(
-                            key = "tool-confirmation-${request.confirmationCallId}",
-                            contentType = "tool_confirmation",
-                        ) {
-                            ToolConfirmationCard(
-                                request = request,
-                                onConfirm = { onToolConfirmation(true) },
-                                onReject = { onToolConfirmation(false) },
-                                onAlwaysAllow = onToolConfirmationAlwaysAllow,
-                            )
-                        }
-                    }
                     item(
                         key = "chat-bottom-anchor",
                         contentType = "bottom_anchor",
@@ -496,97 +518,6 @@ fun ChatScaffold(
             onConfirm = { onRepeatExecutionResolve(true) },
             onDismiss = { onRepeatExecutionResolve(false) },
         )
-    }
-}
-
-@Composable
-private fun ToolConfirmationCard(
-    request: PendingToolConfirmation,
-    onConfirm: () -> Unit,
-    onReject: () -> Unit,
-    onAlwaysAllow: () -> Unit,
-) {
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        tonalElevation = 2.dp,
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Build,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp),
-                )
-                Text(
-                    stringResource(R.string.chat_tool_confirmation_title),
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
-            Text(
-                toolDisplayName(request.toolName),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                if (request.description.isBlank()) {
-                    stringResource(R.string.chat_tool_unknown_description)
-                } else {
-                    request.description
-                },
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            if (request.arguments.isNotBlank()) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
-                ) {
-                    Text(
-                        request.arguments,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    )
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // 「总是允许」是带持久副作用的动作，放在行首与一次性动作拉开距离；
-                // 拒绝与总是允许统一为弱化色胶囊，把视觉重量让给主操作「允许」。
-                TextButton(
-                    onClick = onAlwaysAllow,
-                    colors = ButtonDefaults.textButtonColors(
-                        containerColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f),
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-                ) {
-                    Text(
-                        stringResource(R.string.chat_action_always_allow),
-                        maxLines = 1,
-                    )
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                TextButton(
-                    onClick = onReject,
-                    colors = ButtonDefaults.textButtonColors(
-                        containerColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f),
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-                ) { Text(stringResource(R.string.chat_action_reject)) }
-                Button(onClick = onConfirm) { Text(stringResource(R.string.chat_action_allow)) }
-            }
-        }
     }
 }
 
@@ -925,42 +856,6 @@ private fun ChatHeaderActionsPreview() {
             onNewConversation = {},
             onOpenSettings = {},
             onToggleAutoSpeak = {},
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun ToolConfirmationCardPreview() {
-    AsssistantaiTheme {
-        ToolConfirmationCard(
-            request = PendingToolConfirmation(
-                confirmationCallId = "call-1",
-                toolName = "web_search",
-                description = "联网搜索工具，用于查询实时信息",
-                arguments = "query: 上海今天天气\nlimit: 5",
-            ),
-            onConfirm = {},
-            onReject = {},
-            onAlwaysAllow = {},
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun ToolConfirmationCardUnknownDescriptionPreview() {
-    AsssistantaiTheme {
-        ToolConfirmationCard(
-            request = PendingToolConfirmation(
-                confirmationCallId = "call-2",
-                toolName = "unknown_tool",
-                description = "",
-                arguments = "",
-            ),
-            onConfirm = {},
-            onReject = {},
-            onAlwaysAllow = {},
         )
     }
 }

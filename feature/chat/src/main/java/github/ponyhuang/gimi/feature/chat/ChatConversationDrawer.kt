@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
@@ -223,7 +224,8 @@ private fun HistoryDrawerContent(
             ConversationActionSheet(
                 isCurrent = conversation.id == currentSessionId,
                 isActive = conversationTaskStatuses[conversation.id] is ConversationTaskStatus.Running ||
-                    conversationTaskStatuses[conversation.id] is ConversationTaskStatus.WaitingForConfirmation,
+                    conversationTaskStatuses[conversation.id] is ConversationTaskStatus.WaitingForConfirmation ||
+                    conversationTaskStatuses[conversation.id] is ConversationTaskStatus.WaitingForInput,
                 onDismiss = { menuConversation = null },
                 onDeleteClick = {
                     onDeleteClick(conversation)
@@ -261,6 +263,8 @@ private fun ConversationListItem(
             R.string.chat_task_waiting_confirmation,
             taskStatus.count,
         )
+        ConversationTaskStatus.WaitingForInput ->
+            stringResource(R.string.chat_task_waiting_input)
         ConversationTaskStatus.Completed -> stringResource(R.string.chat_task_completed)
         ConversationTaskStatus.Failed -> stringResource(R.string.chat_task_failed)
         null -> ""
@@ -315,6 +319,14 @@ private fun ConversationListItem(
                 modifier = Modifier
                     .padding(start = 12.dp)
                     .semantics { contentDescription = taskContentDescription },
+            )
+            ConversationTaskStatus.WaitingForInput -> Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = taskContentDescription,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .padding(start = 12.dp)
+                    .size(20.dp),
             )
             ConversationTaskStatus.Completed -> Icon(
                 imageVector = Icons.Default.CheckCircle,

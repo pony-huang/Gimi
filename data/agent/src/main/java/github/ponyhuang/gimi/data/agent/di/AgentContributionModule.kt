@@ -8,7 +8,7 @@ import dagger.multibindings.IntoSet
 import github.ponyhuang.gimi.data.agent.AgentContribution
 import github.ponyhuang.gimi.data.agent.contribution.LocalToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.McpToolContribution
-import github.ponyhuang.gimi.data.agent.contribution.MemoryToolContribution
+import github.ponyhuang.gimi.data.agent.contribution.BaseToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.ModelCatalogContribution
 import github.ponyhuang.gimi.data.agent.contribution.OfficialToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.PluginToolContribution
@@ -47,7 +47,7 @@ abstract class AgentContributionModule {
 
     @Binds
     @IntoSet
-    abstract fun bindMemoryToolContribution(implementation: MemoryToolContribution): AgentContribution
+    abstract fun bindMemoryToolContribution(implementation: BaseToolContribution): AgentContribution
 
     @Binds
     @IntoSet

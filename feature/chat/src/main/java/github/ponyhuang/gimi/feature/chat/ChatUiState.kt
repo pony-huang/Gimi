@@ -5,6 +5,8 @@ import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfigura
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
+import github.ponyhuang.gimi.domain.conversation.model.UserInputKind
+import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
@@ -75,6 +77,8 @@ data class ChatUiState(
     val darkThemeOverride: Boolean? = null,
     val isSpeechRecognitionAvailable: Boolean = false,
     val pendingToolConfirmations: List<PendingToolConfirmation> = emptyList(),
+    /** Agent 在用户输入类长时运行工具上挂起、等待用户答复的请求（选择/输入卡片数据源）。 */
+    val pendingInputRequests: List<UserInputRequest> = emptyList(),
     /** Full access 全局开关：开启后所有需要确认的工具调用自动放行。 */
     val fullAccess: Boolean = false,
     /** 被用户拒绝确认的工具名（内存展示态）；工具 chip 据此显示 ✗ 而非永远悬在"未完成"。 */
@@ -91,9 +95,29 @@ data class ChatUiState(
 val ChatUiState.pendingToolConfirmation: PendingToolConfirmation?
     get() = pendingToolConfirmations.firstOrNull()
 
+val ChatUiState.pendingInputRequest: UserInputRequest?
+    get() = pendingInputRequests.firstOrNull()
+
+/**
+ * 输入栏槽位当前应显示的挂起操作（授权 / 选项 / 文本输入），`null` 为正常胶囊。
+ * 授权优先于输入请求；多个请求排队时取最先到达的一个。
+ */
+internal val ChatUiState.pendingComposerAction: PendingComposerAction?
+    get() {
+        pendingToolConfirmations.firstOrNull()?.let {
+            return PendingComposerAction.Confirmation(it)
+        }
+        val request = pendingInputRequests.firstOrNull() ?: return null
+        return when (request.kind) {
+            UserInputKind.CHOICE -> PendingComposerAction.Choice(request)
+            UserInputKind.FREE_TEXT -> PendingComposerAction.TextInput(request)
+        }
+    }
+
 sealed interface ConversationTaskStatus {
     data class Running(val phase: AgentTaskPhase) : ConversationTaskStatus
     data class WaitingForConfirmation(val count: Int) : ConversationTaskStatus
+    data object WaitingForInput : ConversationTaskStatus
     data object Completed : ConversationTaskStatus
     data object Failed : ConversationTaskStatus
 }

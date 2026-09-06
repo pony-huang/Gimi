@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.feature.chat
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
+import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRunLease
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
@@ -28,6 +29,13 @@ internal class ChatSessionRuntime(
     var turnComplete: Boolean = false
     var phase: AgentTaskPhase = AgentTaskPhase.GENERATING
     var pendingToolConfirmations: List<PendingToolConfirmation> = emptyList()
+
+    /**
+     * Agent 在用户输入类长时运行工具（`get_user_choice` / `adk_request_input`）上挂起、
+     * 等待用户答复的请求。与确认卡片分开存放：答复后用同 callId 的 FunctionResponse 恢复运行。
+     * 出错收尾时不清空 —— 挂起调用仍留在 ADK session 中，用户仍可答复。
+     */
+    var pendingInputRequests: List<UserInputRequest> = emptyList()
 
     /**
      * 已按授权策略（完全批准 / 「总是允许」白名单）放行、等待 run 流结束后自动回复 ADK 的确认。
@@ -56,12 +64,14 @@ internal class ChatSessionRuntime(
         get() = job?.isActive == true ||
             isAgentRunning ||
             pendingToolConfirmations.isNotEmpty() ||
+            pendingInputRequests.isNotEmpty() ||
             autoApprovedConfirmations.isNotEmpty()
 
     fun drawerStatus(): ConversationTaskStatus? = when {
         pendingToolConfirmations.isNotEmpty() -> ConversationTaskStatus.WaitingForConfirmation(
             pendingToolConfirmations.size,
         )
+        pendingInputRequests.isNotEmpty() -> ConversationTaskStatus.WaitingForInput
         isActive -> ConversationTaskStatus.Running(phase)
         attention == SessionResultAttention.COMPLETED -> ConversationTaskStatus.Completed
         attention == SessionResultAttention.FAILED -> ConversationTaskStatus.Failed

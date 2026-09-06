@@ -74,6 +74,9 @@
     <string name="chat_action_reject">Reject</string>
     <string name="chat_action_allow">Allow</string>
     <string name="chat_action_always_allow">Always allow</string>
+    <string name="chat_input_request_title">Agent input request</string>
+    <string name="chat_input_request_hint">Type your reply…</string>
+    <string name="chat_input_request_send">Send reply</string>
     <string name="chat_permission_mode_title">Permission mode</string>
     <string name="chat_permission_mode_request">Request approval</string>
     <string name="chat_permission_mode_full">Full approval</string>
@@ -112,6 +115,7 @@
     <string name="chat_drawer_active_session_protected">A running task or pending confirmation must finish first</string>
     <string name="chat_task_running">Task running</string>
     <string name="chat_task_waiting_confirmation">Waiting for %1$d confirmation(s)</string>
+    <string name="chat_task_waiting_input">Waiting for your input</string>
     <string name="chat_task_completed">Task completed</string>
     <string name="chat_task_failed">Task failed</string>
 

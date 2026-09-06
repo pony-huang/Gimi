@@ -50,6 +50,12 @@ sealed interface ChatAction {
         val alwaysAllow: Boolean = false,
     ) : ChatAction
 
+    /** 把用户对挂起输入请求（选项选择 / 自由文本）的答复送回 runner。 */
+    data class RespondToInputRequest(
+        val callId: String,
+        val value: String,
+    ) : ChatAction
+
     /** 切换 Full access：开启后所有需要确认的工具调用自动放行（全局持久化）。 */
     data class SetFullAccess(val enabled: Boolean) : ChatAction
 

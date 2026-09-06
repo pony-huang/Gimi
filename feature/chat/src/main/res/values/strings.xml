@@ -77,6 +77,9 @@
     <string name="chat_action_reject">拒绝</string>
     <string name="chat_action_allow">允许</string>
     <string name="chat_action_always_allow">总是允许</string>
+    <string name="chat_input_request_title">Agent 请求输入</string>
+    <string name="chat_input_request_hint">输入你的回复…</string>
+    <string name="chat_input_request_send">发送答复</string>
     <string name="chat_permission_mode_title">权限模式</string>
     <string name="chat_permission_mode_request">请求批准</string>
     <string name="chat_permission_mode_full">完全批准</string>
@@ -119,6 +122,7 @@
     <string name="chat_drawer_active_session_protected">任务运行或等待确认时不可删除</string>
     <string name="chat_task_running">任务运行中</string>
     <string name="chat_task_waiting_confirmation">等待确认，%1$d 项</string>
+    <string name="chat_task_waiting_input">等待输入</string>
     <string name="chat_task_completed">任务已完成</string>
     <string name="chat_task_failed">任务失败</string>
 

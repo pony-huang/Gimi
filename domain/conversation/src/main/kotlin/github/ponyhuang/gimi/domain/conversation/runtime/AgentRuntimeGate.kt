@@ -12,6 +12,7 @@ enum class AgentTaskPhase {
     GENERATING,
     EXECUTING_TOOL,
     WAITING_FOR_CONFIRMATION,
+    WAITING_FOR_INPUT,
 }
 
 data class ActiveAgentTask(

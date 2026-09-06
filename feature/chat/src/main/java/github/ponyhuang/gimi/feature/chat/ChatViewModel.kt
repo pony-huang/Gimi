@@ -128,6 +128,8 @@ class ChatViewModel @Inject constructor(
                 speechSettings.setAutoSpeakEnabled(!speechSettings.autoSpeakEnabled.value)
             is ChatAction.RespondToToolConfirmation ->
                 respondToToolConfirmation(action.confirmed, action.alwaysAllow)
+            is ChatAction.RespondToInputRequest ->
+                respondToInputRequest(action.callId, action.value)
             is ChatAction.SetFullAccess -> setFullAccess(action.enabled)
             ChatAction.RestoreOrCreateSession -> restoreOrCreateSession()
             ChatAction.NewConversation -> reset()
@@ -220,6 +222,45 @@ class ChatViewModel @Inject constructor(
                         confirmed = confirmed,
                     ).collect { event ->
                         Log.i("chat", "tool confirmation event: $event")
+                        eventReducer.applyEvent(sessionId, event, runToken)
+                    }
+                }.onFailure { failure ->
+                    eventReducer.applyError(sessionId, failure.message ?: failure::class.simpleName ?: "Unknown error")
+                }
+            } finally {
+                finishRunIfOwned(sessionId, runToken)
+                repository.refreshConversation(sessionId)
+            }
+        }
+    }
+
+    /** 把用户对挂起输入请求的答复送回 ADK，恢复暂停的 invocation。 */
+    private fun respondToInputRequest(callId: String, value: String) {
+        val sessionId = _uiState.value.sessionId
+        if (sessionId.isBlank()) return
+        val runtime = runtimeFor(sessionId)
+        val request = runtime.pendingInputRequests.firstOrNull { it.callId == callId } ?: return
+        runtime.pendingInputRequests = runtime.pendingInputRequests.filterNot {
+            it.callId == callId
+        }
+        cancelRun(runtime, releaseLease = false)
+        val runToken = Any()
+        runtime.runToken = runToken
+        runtime.isAgentRunning = true
+        runtime.turnComplete = false
+        runtime.phase = AgentTaskPhase.GENERATING
+        publishRuntime(runtime)
+        runtime.job = viewModelScope.launch {
+            try {
+                cancellationAwareRunCatching {
+                    ensureRunLease(runtime).updatePhase(AgentTaskPhase.GENERATING)
+                    runner.respondToInputRequest(
+                        sessionId = sessionId,
+                        callId = request.callId,
+                        toolName = request.toolName,
+                        value = value,
+                    ).collect { event ->
+                        Log.i("chat", "input request event: $event")
                         eventReducer.applyEvent(sessionId, event, runToken)
                     }
                 }.onFailure { failure ->
@@ -387,6 +428,7 @@ class ChatViewModel @Inject constructor(
                         state.officialToolDescriptors,
                     ),
                     pendingToolConfirmations = runtime.pendingToolConfirmations,
+                    pendingInputRequests = runtime.pendingInputRequests,
                     rejectedToolNames = runtime.rejectedToolNames.toSet(),
                     conversationTaskStatuses = statuses,
                 )
@@ -414,6 +456,7 @@ class ChatViewModel @Inject constructor(
                     state.officialToolDescriptors,
                 ),
                 pendingToolConfirmations = runtime.pendingToolConfirmations,
+                pendingInputRequests = runtime.pendingInputRequests,
                 rejectedToolNames = runtime.rejectedToolNames.toSet(),
                 isInitializing = isInitializing,
             )
@@ -452,7 +495,8 @@ class ChatViewModel @Inject constructor(
         runtime.job = null
         val pending = runtime.pendingToolConfirmations.firstOrNull()
         val autoApproved = runtime.autoApprovedConfirmations.firstOrNull()
-        runtime.isAgentRunning = pending != null || autoApproved != null
+        val pendingInput = runtime.pendingInputRequests.firstOrNull()
+        runtime.isAgentRunning = pending != null || autoApproved != null || pendingInput != null
         when {
             // 用户本轮已手动批准过该工具：后续同工具确认沿用同轮放行通道直接确认。
             pending != null && pending.toolName in runtime.approvedToolsThisTurn -> {
@@ -472,6 +516,12 @@ class ChatViewModel @Inject constructor(
                     it.confirmationCallId == autoApproved.confirmationCallId
                 }
                 respondToConfirmationRequest(sessionId, runtime, autoApproved, confirmed = true)
+            }
+            // 挂起的用户输入请求：保持等待态，等用户在输入卡片上答复后恢复运行。
+            pendingInput != null -> {
+                runtime.phase = AgentTaskPhase.WAITING_FOR_INPUT
+                runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_INPUT)
+                publishRuntime(runtime)
             }
             else -> {
                 runtime.approvedToolsThisTurn.clear()
@@ -639,6 +689,7 @@ class ChatViewModel @Inject constructor(
     fun send(text: String, draftAttachments: List<DraftAttachment> = emptyList()): Boolean {
         if (text.isBlank() && draftAttachments.isEmpty()) return false
         if (_uiState.value.pendingToolConfirmation != null) return false
+        if (_uiState.value.pendingInputRequest != null) return false
         val stateAtSend = _uiState.value
         val editing = stateAtSend.editingFailedTurn
         val failedTurn = stateAtSend.failedTurn
@@ -1465,8 +1516,14 @@ class ChatViewModel @Inject constructor(
         val runtime = sessionRuntimes[sessionId] ?: return
         if (runtime.job?.isActive != true &&
             runtime.pendingToolConfirmations.isEmpty() &&
+            runtime.pendingInputRequests.isEmpty() &&
             runtime.autoApprovedConfirmations.isEmpty()
         ) {
+            return
+        }
+        if (runtime.pendingInputRequests.isNotEmpty()) {
+            // 输入请求没有"拒绝"语义（ADK 协议只认 FunctionResponse 答复），
+            // 停止按钮不消费挂起请求，用户仍可在卡片上答复。
             return
         }
         if (runtime.pendingToolConfirmations.isNotEmpty()) {

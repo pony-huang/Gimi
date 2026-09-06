@@ -74,6 +74,7 @@ internal class AgentEventReducer(
         }
         applyAgentRunEvent(sessionId, event)
         captureToolConfirmation(sessionId, event)
+        capturePendingInputRequest(sessionId, event)
     }
 
     private fun applyAgentRunEvent(sessionId: String, event: ChatRunEvent) {
@@ -139,6 +140,28 @@ internal class AgentEventReducer(
             runtime.pendingToolConfirmations += needsUser.filter {
                             knownIds.add(it.confirmationCallId)
                         }
+        }
+        runtime.isAgentRunning = true
+        publishRuntime(runtime)
+    }
+
+    /**
+     * 捕获用户输入类长时运行工具（`get_user_choice` / `adk_request_input`）的挂起调用。
+     *
+     * 工具返回 `Unit` 后 invocation 在此暂停，run 流会正常结束；捕获只登记请求，
+     * `ChatViewModel.finishRunIfOwned` 在流结束时据此保持等待态并渲染输入卡片。
+     */
+    private fun capturePendingInputRequest(sessionId: String, event: ChatRunEvent) {
+        val runtime = runtimeFor(sessionId)
+        val incoming = event.functionCalls.mapNotNull { it.inputRequest }
+        if (incoming.isEmpty()) return
+        val knownIds = runtime.pendingInputRequests.mapTo(mutableSetOf()) { it.callId }
+        val fresh = incoming.filter { knownIds.add(it.callId) }
+        if (fresh.isEmpty()) return
+        runtime.pendingInputRequests = runtime.pendingInputRequests + fresh
+        runtime.phase = AgentTaskPhase.WAITING_FOR_INPUT
+        scope.launch {
+            runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_INPUT)
         }
         runtime.isAgentRunning = true
         publishRuntime(runtime)

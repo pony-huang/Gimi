@@ -22,6 +22,21 @@ interface ChatAgentRepository {
         confirmed: Boolean,
     ): Flow<ChatRunEvent>
 
+    /**
+     * 用用户的答复恢复挂起的用户输入请求（`get_user_choice` / `adk_request_input`）。
+     *
+     * @param sessionId 会话 ID
+     * @param callId 挂起的 function call id
+     * @param toolName 触发挂起的工具名
+     * @param value 用户的选择或输入文本
+     */
+    suspend fun respondToInputRequest(
+        sessionId: String,
+        callId: String,
+        toolName: String,
+        value: String,
+    ): Flow<ChatRunEvent>
+
     suspend fun releaseSession(sessionId: String)
 }
 

@@ -14,6 +14,8 @@ import github.ponyhuang.gimi.domain.conversation.model.LocalFileSearchResult
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.ToolConfirmationRequest
+import github.ponyhuang.gimi.domain.conversation.model.UserInputKind
+import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatTurnRepository
@@ -137,6 +139,13 @@ class ChatViewModelCharacterizationTest {
                 confirmed: Boolean,
             ): Flow<ChatRunEvent> = flowOf(event())
 
+            override suspend fun respondToInputRequest(
+                sessionId: String,
+                callId: String,
+                toolName: String,
+                value: String,
+            ): Flow<ChatRunEvent> = flowOf(event())
+
             override suspend fun releaseSession(sessionId: String) = Unit
         }
         val fixture = fixture(configured = true, agentOverride = failingAgent)
@@ -172,6 +181,13 @@ class ChatViewModelCharacterizationTest {
                 sessionId: String,
                 confirmationCallId: String,
                 confirmed: Boolean,
+            ): Flow<ChatRunEvent> = flowOf(event())
+
+            override suspend fun respondToInputRequest(
+                sessionId: String,
+                callId: String,
+                toolName: String,
+                value: String,
             ): Flow<ChatRunEvent> = flowOf(event())
 
             override suspend fun releaseSession(sessionId: String) = Unit
@@ -637,6 +653,47 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun inputRequestCaptureAndUserReplyResumeTheRun() = runTest {
+        val agent = ControllableAgent()
+        val fixture = fixture(configured = true, agentOverride = agent)
+        fixture.viewModel.onAction(ChatAction.Send("问个问题"))
+        runCurrent()
+        agent.emit(
+            "session-1",
+            confirmationEvent(
+                ChatFunctionCall(
+                    id = "input-call-1",
+                    name = "get_user_choice",
+                    args = mapOf("options" to listOf("A", "B")),
+                    inputRequest = UserInputRequest(
+                        callId = "input-call-1",
+                        toolName = "get_user_choice",
+                        kind = UserInputKind.CHOICE,
+                        message = "选一个",
+                        options = listOf("A", "B"),
+                    ),
+                ),
+            ),
+        )
+        runCurrent()
+        agent.complete("session-1")
+        advanceUntilIdle()
+
+        val state = fixture.viewModel.uiState.value
+        assertEquals(listOf("input-call-1"), state.pendingInputRequests.map { it.callId })
+        assertEquals(ConversationTaskStatus.WaitingForInput, state.conversationTaskStatuses["session-1"])
+        // 输入请求挂起期间锁定普通发送，避免绕过 FunctionResponse 恢复协议。
+        assertFalse(fixture.viewModel.send("先发别的"))
+
+        fixture.viewModel.onAction(ChatAction.RespondToInputRequest("input-call-1", "A"))
+        advanceUntilIdle()
+
+        assertEquals(listOf("input-call-1" to "A"), agent.inputResponses)
+        assertTrue(fixture.viewModel.uiState.value.pendingInputRequests.isEmpty())
+        assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
+    }
+
+    @Test
     fun alwaysAllowedToolAutoApprovesConfirmationWithoutShowingCard() = runTest {
         val agent = ControllableAgent()
         val fixture = fixture(configured = true, agentOverride = agent)
@@ -888,6 +945,24 @@ class ChatViewModelCharacterizationTest {
             )
         }
 
+        override suspend fun respondToInputRequest(
+            sessionId: String,
+            callId: String,
+            toolName: String,
+            value: String,
+        ): Flow<ChatRunEvent> {
+            inputResponses += callId to value
+            return flowOf(
+                event(
+                    text = "input handled",
+                    invocationId = "input-$sessionId",
+                    partial = false,
+                    turnComplete = true,
+                ),
+            )
+        }
+
+        val inputResponses = mutableListOf<Pair<String, String>>()
         val confirmationResponses = mutableListOf<Pair<String, Boolean>>()
 
         override suspend fun releaseSession(sessionId: String) = Unit

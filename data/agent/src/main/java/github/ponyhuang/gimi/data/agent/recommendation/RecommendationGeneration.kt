@@ -1,21 +1,22 @@
 package github.ponyhuang.gimi.data.agent.recommendation
 
 import com.google.adk.kt.models.LlmRequest
+import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.types.Content
+import com.google.adk.kt.types.FunctionCallingConfig
 import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
-import com.google.adk.kt.types.ThinkingConfig
-import com.google.adk.kt.types.FunctionCallingConfig
-import com.google.adk.kt.types.ToolConfig
 import com.google.adk.kt.types.Schema
+import com.google.adk.kt.types.ThinkingConfig
+import com.google.adk.kt.types.ToolConfig
 import com.google.adk.kt.types.Type
-import com.google.adk.kt.tools.BaseTool
 import github.ponyhuang.gimi.data.agent.AgentContributionRegistry
 import github.ponyhuang.gimi.data.agent.AgentLLMModelFactory
 import github.ponyhuang.gimi.data.agent.AgentPrompts
 import github.ponyhuang.gimi.data.agent.AgentToolCatalogContext
 import github.ponyhuang.gimi.data.agent.ModelConfig
+import github.ponyhuang.gimi.data.agent.recommendation.AgentRecommendationGenerator.Companion.READ_ONLY_STATUS_TOOLS
 import github.ponyhuang.gimi.data.agent.toRuntimeMetadata
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
@@ -23,14 +24,14 @@ import github.ponyhuang.gimi.domain.recommendation.model.RecommendationGeneratio
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationSnapshot
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationGenerator
 import github.ponyhuang.gimi.pluginapi.PluginJson
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /** 构建不含凭据与工具参数 schema 的推荐生成提示。 */
 object RecommendationPromptBuilder {
@@ -50,6 +51,13 @@ object RecommendationPromptBuilder {
         appendLine()
         appendLine("Generate exactly ${RecommendationSnapshot.RECOMMENDATION_COUNT} distinct tasks the user can send directly to this assistant.")
         appendLine("Use the user's locale and only capabilities supported by the information above.")
+        // 引导模型结合时间/位置/最近应用等上下文推测用户当前与接下来的日常活动。
+        appendLine(
+            "Use the context above (especially localDateTime, timeZone, cachedLocation, and recentForegroundApp) " +
+                    "to infer the user's likely current or next everyday activity, such as eating near meal times, " +
+                    "commuting, working, resting, or being out and about, and turn the most helpful of these " +
+                    "predictions into concrete tasks. Keep predictions realistic and grounded in ordinary daily life.",
+        )
         appendLine("Prefer meaningful tasks that produce a useful result, save effort, or support a decision.")
         appendLine("Do not recommend querying directly visible status such as battery level, current time, or network state.")
         appendLine("Prefer concrete multi-step assistance over trivial lookups, generic greetings, or redundant actions.")
@@ -92,7 +100,12 @@ object RecommendationOutputParser {
             .removeSuffix("```")
             .trim()
         val root = runCatching { Json.parseToJsonElement(normalized) }
-            .getOrElse { throw IllegalArgumentException("Recommendation model returned invalid JSON.", it) }
+            .getOrElse {
+                throw IllegalArgumentException(
+                    "Recommendation model returned invalid JSON.",
+                    it
+                )
+            }
         val array = when (root) {
             is JsonArray -> root
             else -> root.jsonObject["recommendations"]?.jsonArray
@@ -116,7 +129,12 @@ object RecommendationOutputParser {
                             ?.uppercase()
                             ?: RecommendationCategory.GENERAL.name,
                     )
-                }.getOrElse { throw IllegalArgumentException("Unknown recommendation category.", it) }
+                }.getOrElse {
+                    throw IllegalArgumentException(
+                        "Unknown recommendation category.",
+                        it
+                    )
+                }
                 add(AgentRecommendation("recommendation-${index + 1}", prompt, category))
             }
         }
@@ -133,6 +151,7 @@ object RecommendationToolResultSanitizer {
         is Map<*, *> -> value.entries.associate { (key, nested) ->
             key.toString() to sanitize(nested)
         }
+
         is Iterable<*> -> value.map(::sanitize)
         else -> PluginJson.toNative(value)
     }
@@ -146,7 +165,8 @@ private class JsonNativeTool(
     override suspend fun run(
         context: com.google.adk.kt.tools.ToolContext,
         args: Map<String, Any?>,
-    ): Any = RecommendationToolResultSanitizer.sanitize(delegate.run(context, args)) ?: emptyMap<String, Any>()
+    ): Any = RecommendationToolResultSanitizer.sanitize(delegate.run(context, args))
+        ?: emptyMap<String, Any>()
 }
 
 /** 使用快速模型优先策略执行无工具、无会话的推荐生成请求。 */
@@ -156,36 +176,37 @@ class AgentRecommendationGenerator @Inject constructor(
     private val contributionRegistry: AgentContributionRegistry,
 ) : RecommendationGenerator {
     override suspend fun generate(input: RecommendationGenerationInput): List<AgentRecommendation> {
-        val resolvedInput = input.copy(systemInstruction = AgentPrompts.defaultAssistantInstruction())
+        val resolvedInput =
+            input.copy(systemInstruction = AgentPrompts.defaultAssistantInstruction())
         val config = modelFactory.selectFastModelConfig() ?: modelFactory.selectModelConfig(null)
         val model = modelFactory.createModel(config)
         val request = LlmRequest(
-                model = model,
-                contents = listOf(
-                    Content(
-                        role = Role.USER,
-                        parts = listOf(Part(text = RecommendationPromptBuilder.build(resolvedInput))),
+            model = model,
+            contents = listOf(
+                Content(
+                    role = Role.USER,
+                    parts = listOf(Part(text = RecommendationPromptBuilder.build(resolvedInput))),
+                ),
+            ),
+            config = GenerateContentConfig(
+                systemInstruction = Content(
+                    parts = listOf(
+                        Part(text = AgentPrompts.defaultAssistantInstruction()),
+                        Part(text = RECOMMENDATION_INSTRUCTION),
                     ),
                 ),
-                config = GenerateContentConfig(
-                    systemInstruction = Content(
-                        parts = listOf(
-                            Part(text = AgentPrompts.defaultAssistantInstruction()),
-                            Part(text = RECOMMENDATION_INSTRUCTION),
-                        ),
-                    ),
-                    temperature = 0.7f,
-                    maxOutputTokens = 1_024,
-                    thinkingConfig = ThinkingConfig(false),
-                    responseMimeType = RecommendationOutputFormat.config.responseMimeType,
-                    responseSchema = RecommendationOutputFormat.config.responseSchema,
-                    toolConfig = ToolConfig(
-                        functionCallingConfig = FunctionCallingConfig(
-                            allowedFunctionNames = READ_ONLY_STATUS_TOOLS,
-                        ),
+                temperature = 0.9f,
+                maxOutputTokens = 1_024,
+                thinkingConfig = ThinkingConfig(false),
+                responseMimeType = RecommendationOutputFormat.config.responseMimeType,
+                responseSchema = RecommendationOutputFormat.config.responseSchema,
+                toolConfig = ToolConfig(
+                    functionCallingConfig = FunctionCallingConfig(
+                        allowedFunctionNames = READ_ONLY_STATUS_TOOLS,
                     ),
                 ),
-            ).appendTools(allRecommendationTools(config))
+            ),
+        ).appendTools(allRecommendationTools(config))
         val responses = model.generateContent(request).toList()
         responses.firstOrNull { !it.errorMessage.isNullOrBlank() }?.errorMessage?.let { message ->
             error("Recommendation model request failed: $message")
@@ -195,6 +216,7 @@ class AgentRecommendationGenerator @Inject constructor(
             ?.mapNotNull { it.text }
             ?.joinToString("")
             ?.takeIf(String::isNotBlank)
+
         val raw = responses.indices.reversed()
             .firstOrNull { !responses[it].partial && responseText(it) != null }
             ?.let(::responseText)
@@ -220,12 +242,21 @@ class AgentRecommendationGenerator @Inject constructor(
     private companion object {
         val RECOMMENDATION_INSTRUCTION = """
             Generate safe, varied suggestions only. Do not execute tools or claim that an action happened.
-            Recommendations must be meaningful and useful in everyday workflows. Avoid trivial queries for
-            directly visible status (for example battery level, current time, or network state), generic greetings,
-            and redundant actions. Prefer concrete multi-step tasks that save effort or support a decision.
-            Return exactly the requested JSON object without Markdown or explanations.
+            Use the authorized read-only context to anticipate everyday life: infer what the user is likely
+            doing right now and what they will plausibly do next from local date, time of day, weekday or
+            weekend, location hints, battery and network state, and the recent foreground app. For example,
+            around meal times suggest dining-related help, being away from home may suggest meals, errands,
+            or navigation, late evening suggests winding down, and workday mornings suggest planning the day.
+            Keep every inference grounded in ordinary daily routines; never invent context the data does not
+            support, and only recommend tasks the available capabilities can actually complete.
+            Avoid trivial queries for directly visible status (for example battery level, current time, or
+            network state), generic greetings, and redundant actions. Prefer concrete multi-step tasks that
+            save effort or support a decision. Return exactly the requested JSON object without Markdown or
+            explanations.
         """.trimIndent()
 
+
+        /** Agent 执行前必须执行的工具， 此处用于获取当前信息状态。 */
         val READ_ONLY_STATUS_TOOLS = listOf(
             "get_current_location",
             "get_current_time",

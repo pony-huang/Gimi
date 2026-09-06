@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.domain.conversation.model
 
+import kotlinx.serialization.Serializable
 import java.io.File
 import java.util.UUID
 import java.security.MessageDigest
@@ -32,6 +33,7 @@ enum class MessageRole {
  * @param turnComplete 当前 turn 是否已结束
  * @param timestamp 毫秒时间戳
  */
+@Serializable
 data class Message(
     val id: String = UUID.randomUUID().toString(),
     val invocationId: String? = null,
@@ -56,6 +58,7 @@ data class Message(
  * restored from an ADK `inlineData` part; keeping bytes off the model lets a long
  * conversation hold thumbnails rather than every original payload.
  */
+@Serializable
 data class FileAttachment(
     val mimeType: String,
     val id: String,
@@ -163,6 +166,7 @@ data class FileAttachment(
  * @param text 文本内容
  * @param thought 是否是思考段；与上一段 `thought` 不同时将开启新的分段
  */
+@Serializable
 data class TextPart(
     val id: String = UUID.randomUUID().toString(),
     val text: String,
@@ -176,6 +180,7 @@ data class TextPart(
  * @param name 工具名
  * @param argsSummary 参数摘要字符串（用于 chip 显示）
  */
+@Serializable
 data class FunctionCallView(
     val id: String,
     val name: String,
@@ -190,6 +195,7 @@ data class FunctionCallView(
  * @param localFileSearchResult 本地文件搜索工具返回的结构化结果
  * @param remoteImageResult 工具响应中可直接展示的远程图片集合
  */
+@Serializable
 data class FunctionResponseView(
     val id: String,
     val name: String,

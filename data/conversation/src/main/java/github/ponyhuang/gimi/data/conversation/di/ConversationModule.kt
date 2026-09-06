@@ -12,13 +12,18 @@ import github.ponyhuang.gimi.data.conversation.ChatDisplayPreferences
 import github.ponyhuang.gimi.data.conversation.ToolApprovalPreferences
 import github.ponyhuang.gimi.data.conversation.attachment.AndroidChatAttachmentRepository
 import github.ponyhuang.gimi.data.conversation.repository.AdkConversationRepository
+import github.ponyhuang.gimi.data.conversation.repository.AdkChatTurnRepository
+import github.ponyhuang.gimi.data.conversation.repository.AdkSessionCheckpointStore
+import github.ponyhuang.gimi.data.conversation.repository.ChatSessionCheckpointStore
 import github.ponyhuang.gimi.data.conversation.repository.DefaultConversationSessionResolver
+import github.ponyhuang.gimi.data.conversation.local.ChatTurnDao
 import github.ponyhuang.gimi.data.conversation.runtime.InMemoryAgentRuntimeGate
 import github.ponyhuang.gimi.data.conversation.local.ConversationMetadataDatabase
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
+import github.ponyhuang.gimi.domain.conversation.repository.ChatTurnRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
@@ -82,4 +87,21 @@ object ConversationModule {
     fun provideConversationSessionResolver(
         implementation: DefaultConversationSessionResolver,
     ): ConversationSessionResolver = implementation
+
+    @Provides
+    @Singleton
+    fun provideTurnCheckpointStore(
+        implementation: AdkSessionCheckpointStore,
+    ): ChatSessionCheckpointStore = implementation
+
+    @Provides
+    @Singleton
+    fun provideChatTurnRepository(
+        implementation: AdkChatTurnRepository,
+    ): ChatTurnRepository = implementation
+
+    @Provides
+    @Singleton
+    fun provideChatTurnDao(database: ConversationMetadataDatabase): ChatTurnDao =
+        database.chatTurnDao()
 }

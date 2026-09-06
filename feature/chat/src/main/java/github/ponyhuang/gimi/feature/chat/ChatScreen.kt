@@ -33,7 +33,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -146,6 +149,10 @@ fun ChatScaffold(
     onSharedMediaConsumed: () -> Unit = {},
     recommendations: List<AgentRecommendation> = emptyList(),
     onRecommendationClick: (String) -> Unit = {},
+    onRetryFailedTurn: () -> Unit = {},
+    onEditFailedTurn: () -> Unit = {},
+    onCancelEditFailedTurn: () -> Unit = {},
+    onRepeatExecutionResolve: (Boolean) -> Unit = {},
 ) {
 
     val listState = rememberLazyListState()
@@ -285,53 +292,64 @@ fun ChatScaffold(
                     ),
                 )
             }
-            key(state.sessionId) {
-                ChatComposer(
-                    modifier = Modifier.background(fadeBrush),
-                    onSendClick = { data ->
-                        onSend(data.text, data.attachments)
-                    },
-                    onStopClick = onStop,
-                    isGenerating = isAgentRunning,
-                    isVoiceInputAvailable = isSpeechRecognitionAvailable,
-                    onTranscribeVoice = onTranscribeVoice,
-                    addToChatState = ChatAddToChatState(
-                        configuration = state.toolConfiguration,
-                        mcpServers = state.availableMcpServers,
-                        officialTools = state.officialToolDescriptors,
-                        isMutationBlocked = state.isAgentRunning,
-                        fullAccess = state.fullAccess,
-                        errorMessage = if (state.hasToolConfigurationError) {
-                            stringResource(R.string.chat_session_tool_save_failed)
-                        } else {
-                            null
-                        },
-                    ),
-                    attachmentCapabilities = attachmentCapabilities,
-                    onToolAccessModeChange = onToolAccessModeChange,
-                    onReasoningEffortChange = onReasoningEffortChange,
-                    onMcpServerEnabledChange = onMcpServerEnabledChange,
-                    onFullAccessChange = onFullAccessChange,
-                    onOfficialToolOpened = onOfficialToolOpened,
-                    onOfficialToolFunctionEnabledChange = onOfficialToolFunctionEnabledChange,
-                    onOfficialToolFunctionsRetry = onOfficialToolFunctionsRetry,
-                    sharedMediaUris = sharedMediaUris,
-                    onSharedMediaConsumed = onSharedMediaConsumed,
-                    retainExpanded = isModelPickerVisible,
-                    onExpandedChange = { isComposerExpanded = it },
-                    modelSelectorContent = {
-                        ModelTitleAndPicker(
-                            services = state.availableLLMModelSettings,
-                            currentSelection = state.currentModelSelection,
-                            loadState = state.modelCatalogLoadState,
-                            isAgentRunning = isAgentRunning,
-                            onConfigureModels = onConfigureModels,
-                            onSelectModel = onSelectModel,
-                            onModelSwitchBlocked = onModelSwitchBlocked,
-                            onPickerVisibilityChange = { isModelPickerVisible = it },
+            Column {
+                AnimatedVisibility(visible = state.editingFailedTurn) {
+                    EditFailedTurnBanner(onCancel = onCancelEditFailedTurn)
+                }
+                key(state.sessionId) {
+                    // 以种子内容为 key：ChatComposer 的内部状态只在组合时从 messageData
+                    // 初始化，编辑失败消息的种子（文字与异步恢复的附件）每次变化都必须
+                    // 重建输入框才能生效；仅以 editingFailedTurn 为 key 会漏掉迟到种子。
+                    key(state.composerSeed) {
+                        ChatComposer(
+                            modifier = Modifier.background(fadeBrush),
+                            messageData = state.composerSeed,
+                            onSendClick = { data ->
+                                onSend(data.text, data.attachments)
+                            },
+                            onStopClick = onStop,
+                            isGenerating = isAgentRunning,
+                            isVoiceInputAvailable = isSpeechRecognitionAvailable,
+                            onTranscribeVoice = onTranscribeVoice,
+                            addToChatState = ChatAddToChatState(
+                                configuration = state.toolConfiguration,
+                                mcpServers = state.availableMcpServers,
+                                officialTools = state.officialToolDescriptors,
+                                isMutationBlocked = state.isAgentRunning,
+                                fullAccess = state.fullAccess,
+                                errorMessage = if (state.hasToolConfigurationError) {
+                                    stringResource(R.string.chat_session_tool_save_failed)
+                                } else {
+                                    null
+                                },
+                            ),
+                            attachmentCapabilities = attachmentCapabilities,
+                            onToolAccessModeChange = onToolAccessModeChange,
+                            onReasoningEffortChange = onReasoningEffortChange,
+                            onMcpServerEnabledChange = onMcpServerEnabledChange,
+                            onFullAccessChange = onFullAccessChange,
+                            onOfficialToolOpened = onOfficialToolOpened,
+                            onOfficialToolFunctionEnabledChange = onOfficialToolFunctionEnabledChange,
+                            onOfficialToolFunctionsRetry = onOfficialToolFunctionsRetry,
+                            sharedMediaUris = sharedMediaUris,
+                            onSharedMediaConsumed = onSharedMediaConsumed,
+                            retainExpanded = isModelPickerVisible,
+                            onExpandedChange = { isComposerExpanded = it },
+                            modelSelectorContent = {
+                                ModelTitleAndPicker(
+                                    services = state.availableLLMModelSettings,
+                                    currentSelection = state.currentModelSelection,
+                                    loadState = state.modelCatalogLoadState,
+                                    isAgentRunning = isAgentRunning,
+                                    onConfigureModels = onConfigureModels,
+                                    onSelectModel = onSelectModel,
+                                    onModelSwitchBlocked = onModelSwitchBlocked,
+                                    onPickerVisibilityChange = { isModelPickerVisible = it },
+                                )
+                            },
                         )
-                    },
-                )
+                    }
+                }
             }
         },
         floatingActionButton = {
@@ -434,6 +452,19 @@ fun ChatScaffold(
                             onShowAllLocalFiles = onShowAllLocalFiles,
                         )
                     }
+                    state.failedTurn?.let { failedTurn ->
+                        if (!state.isAgentRunning && !state.editingFailedTurn) {
+                            item(
+                                key = "failed-turn-actions",
+                                contentType = "failed_turn_actions",
+                            ) {
+                                FailedTurnActions(
+                                    onRetry = onRetryFailedTurn,
+                                    onEdit = onEditFailedTurn,
+                                )
+                            }
+                        }
+                    }
                     pendingToolConfirmation?.let { request ->
                         item(
                             key = "tool-confirmation-${request.confirmationCallId}",
@@ -458,6 +489,13 @@ fun ChatScaffold(
 
         }
 
+    }
+
+    if (state.toolReexecutionPending) {
+        RepeatExecutionDialog(
+            onConfirm = { onRepeatExecutionResolve(true) },
+            onDismiss = { onRepeatExecutionResolve(false) },
+        )
     }
 }
 
@@ -644,6 +682,96 @@ internal fun ChatHeaderActions(
             }
         }
     }
+}
+
+/**
+ * 失败轮次的“编辑/重试”操作行，左对齐贴合助手/错误气泡一侧。
+ */
+@Composable
+private fun FailedTurnActions(
+    onRetry: () -> Unit,
+    onEdit: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextButton(onClick = onEdit, modifier = Modifier.testTag("failed_turn_edit")) {
+            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(
+                stringResource(R.string.chat_failed_turn_edit),
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
+        TextButton(onClick = onRetry, modifier = Modifier.testTag("failed_turn_retry")) {
+            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(
+                stringResource(R.string.chat_failed_turn_retry),
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
+    }
+}
+
+/** 编辑失败消息时输入框上方的一行提示条，带“取消”入口。 */
+@Composable
+private fun EditFailedTurnBanner(
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 16.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp),
+            )
+            Text(
+                text = stringResource(R.string.chat_editing_failed_turn),
+                modifier = Modifier.padding(start = 8.dp),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            TextButton(onClick = onCancel) {
+                Text(stringResource(R.string.chat_cancel_edit))
+            }
+        }
+    }
+}
+
+/** “重新发送可能重复执行工具操作”确认对话框。 */
+@Composable
+private fun RepeatExecutionDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Refresh, contentDescription = null) },
+        title = { Text(stringResource(R.string.chat_repeat_execution_title)) },
+        text = { Text(stringResource(R.string.chat_repeat_execution_body)) },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.chat_cancel_edit))
+            }
+        },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text(stringResource(R.string.chat_repeat_execution_confirm))
+            }
+        },
+    )
 }
 
 /**

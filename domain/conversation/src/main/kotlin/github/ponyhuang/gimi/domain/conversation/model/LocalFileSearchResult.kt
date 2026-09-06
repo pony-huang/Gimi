@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.domain.conversation.model
 
+import kotlinx.serialization.Serializable
 import java.net.URI
 
 /**
@@ -12,6 +13,7 @@ import java.net.URI
  * @property category Search-provider category such as image or document.
  * @property contentUri Read-only content URI used to render or open the file.
  */
+@Serializable
 data class LocalFileReference(
     val displayName: String,
     val mimeType: String,
@@ -31,6 +33,7 @@ data class LocalFileReference(
  * @property query Original file-name query.
  * @property files Valid, ordered content-URI results.
  */
+@Serializable
 data class LocalFileSearchResult(
     val query: String,
     val files: List<LocalFileReference>,

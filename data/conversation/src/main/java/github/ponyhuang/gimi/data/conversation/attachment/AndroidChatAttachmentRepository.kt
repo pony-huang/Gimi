@@ -61,6 +61,46 @@ class AndroidChatAttachmentRepository @Inject constructor(
     }
 
     /**
+     * 重试前校验上次发送的附件仍然可读。仅当附件只有内存内联数据（无文件引用）时跳过文件
+     * 校验；引用文件已被删除或破坏则抛出异常，确保不会把失效资源再次发给模型。
+     */
+    override suspend fun validateSaved(attachments: List<FileAttachment>) {
+        withContext(Dispatchers.IO) {
+            attachments.forEach { attachment ->
+                attachment.payloadReference?.let { reference ->
+                    check(File(reference).isFile) {
+                        "Attachment payload is unavailable: $reference"
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 为编辑建立独立的草稿引用。已持久化的附件复用其文件；仅有内联数据的附件（如从 ADK
+     * inlineData 恢复）会写一份临时草稿文件，方便编辑器展示。取消/删除草稿不会删除历史
+     * 消息已归档的附件。
+     */
+    override suspend fun createDrafts(attachments: List<FileAttachment>): List<DraftAttachment> =
+        withContext(Dispatchers.IO) {
+            attachments.map { attachment ->
+                val reference = attachment.payloadReference ?: run {
+                    val directory = File(context.cacheDir, DRAFT_DIRECTORY).apply { mkdirs() }
+                    val target = File(directory, attachment.id)
+                    if (!target.exists()) target.writeBytes(attachment.inlineData ?: ByteArray(0))
+                    target.absolutePath
+                }
+                DraftAttachment(
+                    reference = reference,
+                    displayName = attachment.displayName,
+                    mimeType = attachment.mimeType,
+                    sizeBytes = attachment.sizeBytes,
+                    category = attachment.category,
+                )
+            }
+        }
+
+    /**
      * Writes the payload into session-owned storage and returns a reference-only attachment.
      *
      * The bytes stay local to this call so that a long conversation holds paths rather than

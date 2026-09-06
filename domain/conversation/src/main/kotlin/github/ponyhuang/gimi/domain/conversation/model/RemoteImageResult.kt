@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.domain.conversation.model
 
+import kotlinx.serialization.Serializable
 import java.net.URI
 
 /**
@@ -9,6 +10,7 @@ import java.net.URI
  * @property width Source width in pixels, or zero when unavailable.
  * @property height Source height in pixels, or zero when unavailable.
  */
+@Serializable
 data class RemoteImageReference(
     val url: String,
     val width: Int = 0,
@@ -20,6 +22,7 @@ data class RemoteImageReference(
  *
  * @property images Valid, deduplicated images in source order.
  */
+@Serializable
 data class RemoteImageResult(
     val images: List<RemoteImageReference>,
 )

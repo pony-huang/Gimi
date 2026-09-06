@@ -137,6 +137,7 @@
     <string name="chat_notice_mcp_server_skipped">MCP server “%1$s” is unreachable and was skipped for this session</string>
     <string name="chat_notice_memory_search_failed">Mem0 search failed; cloud memory will not be used for this turn</string>
     <string name="chat_notice_memory_write_failed">Mem0 could not save this conversation; the response is unaffected</string>
+    <string name="chat_notice_edit_drafts_restore_failed">Couldn\'t restore attachments of the failed message; only the text was restored</string>
 
     <string name="chat_tool_unknown_description">A remote tool is requesting to perform an action</string>
 
@@ -161,4 +162,12 @@
     <string name="chat_recommendation_category_device">Device</string>
     <string name="chat_recommendation_category_productivity">Productivity</string>
     <string name="chat_recommendation_category_general">Idea</string>
+    <!-- Failed message edit/retry -->
+    <string name="chat_failed_turn_edit">Edit</string>
+    <string name="chat_failed_turn_retry">Retry</string>
+    <string name="chat_editing_failed_turn">Editing failed message</string>
+    <string name="chat_cancel_edit">Cancel</string>
+    <string name="chat_repeat_execution_title">Resend this message?</string>
+    <string name="chat_repeat_execution_body">This turn already ran a tool. Resending may repeat that tool operation; actions already done cannot be undone.</string>
+    <string name="chat_repeat_execution_confirm">Resend</string>
 </resources>

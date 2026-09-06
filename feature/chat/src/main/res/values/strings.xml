@@ -146,6 +146,7 @@
     <string name="chat_notice_mcp_server_skipped">MCP 服务器“%1$s”连接失败，本次会话已跳过</string>
     <string name="chat_notice_memory_search_failed">Mem0 记忆搜索失败，本轮将不使用云记忆</string>
     <string name="chat_notice_memory_write_failed">Mem0 记忆保存失败，本轮回答不受影响</string>
+    <string name="chat_notice_edit_drafts_restore_failed">恢复失败消息的附件失败，已仅恢复文字内容</string>
 
     <!-- 工具确认卡片：未在本地目录中找到的工具 -->
     <string name="chat_tool_unknown_description">远程工具请求执行操作</string>
@@ -171,4 +172,12 @@
     <string name="chat_recommendation_category_device">设备</string>
     <string name="chat_recommendation_category_productivity">效率</string>
     <string name="chat_recommendation_category_general">建议</string>
+    <!-- 失败消息的编辑/重试 -->
+    <string name="chat_failed_turn_edit">编辑</string>
+    <string name="chat_failed_turn_retry">重试</string>
+    <string name="chat_editing_failed_turn">正在编辑失败消息</string>
+    <string name="chat_cancel_edit">取消</string>
+    <string name="chat_repeat_execution_title">重新发送这条消息？</string>
+    <string name="chat_repeat_execution_body">本轮已发起工具调用。重新发送可能重复执行本轮工具操作，已完成的操作不会撤销。</string>
+    <string name="chat_repeat_execution_confirm">重新发送</string>
 </resources>

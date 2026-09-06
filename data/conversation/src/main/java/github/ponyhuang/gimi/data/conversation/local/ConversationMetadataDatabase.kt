@@ -80,12 +80,13 @@ interface ConversationMetadataDao {
 }
 
 @Database(
-    entities = [ConversationMetadataEntity::class],
-    version = 1,
+    entities = [ConversationMetadataEntity::class, ChatTurnEntity::class],
+    version = 2,
     exportSchema = false,
 )
 abstract class ConversationMetadataDatabase : RoomDatabase() {
     abstract fun conversationMetadataDao(): ConversationMetadataDao
+    abstract fun chatTurnDao(): ChatTurnDao
 
     companion object {
         const val DATABASE_NAME = "conversation-metadata.db"

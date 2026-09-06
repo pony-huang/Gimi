@@ -69,6 +69,8 @@ fun ChatRoute(
         stringResource(R.string.chat_notice_document_total_size_limit)
     val chatNoticeMemorySearchFailed = stringResource(R.string.chat_notice_memory_search_failed)
     val chatNoticeMemoryWriteFailed = stringResource(R.string.chat_notice_memory_write_failed)
+    val chatNoticeEditDraftsRestoreFailed =
+        stringResource(R.string.chat_notice_edit_drafts_restore_failed)
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
@@ -105,6 +107,7 @@ fun ChatRoute(
                     )
                     ChatNotice.MemorySearchFailed -> chatNoticeMemorySearchFailed
                     ChatNotice.MemoryWriteFailed -> chatNoticeMemoryWriteFailed
+                    ChatNotice.EditDraftsRestoreFailed -> chatNoticeEditDraftsRestoreFailed
                     is ChatNotice.Message -> notice.text
                 }
             }
@@ -223,6 +226,18 @@ fun ChatRoute(
                 currentSessionId.isNotBlank() && !uiState.isInitializing
             }.orEmpty(),
             onSharedMediaConsumed = onSharedMediaConsumed,
+            onRetryFailedTurn = {
+                viewModel.onAction(ChatAction.RetryFailedTurn)
+            },
+            onEditFailedTurn = {
+                viewModel.onAction(ChatAction.EditFailedTurn)
+            },
+            onCancelEditFailedTurn = {
+                viewModel.onAction(ChatAction.CancelEditFailedTurn)
+            },
+            onRepeatExecutionResolve = { proceed ->
+                viewModel.onAction(ChatAction.ResolveRepeatExecution(proceed))
+            },
         )
     }
 }

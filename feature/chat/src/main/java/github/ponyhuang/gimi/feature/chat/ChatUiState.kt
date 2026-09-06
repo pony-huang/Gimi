@@ -4,6 +4,7 @@ import github.ponyhuang.gimi.domain.conversation.model.Conversation
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
+import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
@@ -48,6 +49,17 @@ data class ChatUiState(
     val isAgentRunning: Boolean = false,
     val lastSendFailed: Boolean = false,
     val turnComplete: Boolean = false,
+    /**
+     * 可恢复的最近失败/中断发送轮；非空时在错误区域显示“编辑/重试”。
+     * 一旦用户成功发送新消息或完成当前轮，该字段被清空。
+     */
+    val failedTurn: ChatTurn? = null,
+    /** 输入框当前是否处于“编辑失败消息”状态。 */
+    val editingFailedTurn: Boolean = false,
+    /** 是否展示“重新发送可能重复执行工具操作”确认对话框。 */
+    val toolReexecutionPending: Boolean = false,
+    /** 输入框的外部草稿种子；编辑失败消息时用它回填文字与附件。 */
+    val composerSeed: MessageData = MessageData(),
     val conversations: List<Conversation> = emptyList(),
     val conversationTaskStatuses: Map<String, ConversationTaskStatus> = emptyMap(),
     val isInitializing: Boolean = false,

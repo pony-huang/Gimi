@@ -16,6 +16,13 @@ import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.ToolConfirmationRequest
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
+import github.ponyhuang.gimi.domain.conversation.repository.ChatTurnRepository
+import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
+import github.ponyhuang.gimi.domain.conversation.model.ChatTurnStatus
+import github.ponyhuang.gimi.domain.conversation.model.FunctionCallView
+import github.ponyhuang.gimi.domain.conversation.model.Message
+import github.ponyhuang.gimi.domain.conversation.model.Messages
+import github.ponyhuang.gimi.domain.conversation.usecase.PrepareChatTurnUseCase
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
@@ -56,11 +63,13 @@ import io.mockk.verify
 import io.mockk.verifyOrder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.channels.Channel
@@ -109,6 +118,96 @@ class ChatViewModelCharacterizationTest {
         assertFalse(state.messages[1].partial)
         assertFalse(state.isAgentRunning)
         coVerify { fixture.conversations.refreshConversation("session-1") }
+    }
+
+    @Test
+    fun failedTurn_retry_reusesOriginalUserMessageWithoutDuplication() = runTest {
+        val failingAgent = object : ChatAgentRepository {
+            override suspend fun send(
+                sessionId: String,
+                selection: ModelSelection,
+                text: String,
+                fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
+                toolConfiguration: ConversationToolConfiguration?,
+            ): Flow<ChatRunEvent> = flow { throw java.io.IOException("offline") }
+
+            override suspend fun respondToToolConfirmation(
+                sessionId: String,
+                confirmationCallId: String,
+                confirmed: Boolean,
+            ): Flow<ChatRunEvent> = flowOf(event())
+
+            override suspend fun releaseSession(sessionId: String) = Unit
+        }
+        val fixture = fixture(configured = true, agentOverride = failingAgent)
+        fixture.viewModel.onAction(ChatAction.Send("你好"))
+        advanceUntilIdle()
+
+        val failed = fixture.viewModel.uiState.value.failedTurn
+        assertEquals(ChatTurnStatus.FAILED, failed?.status)
+        assertTrue(failed?.canRetry == true)
+
+        fixture.viewModel.onAction(ChatAction.RetryFailedTurn)
+        advanceUntilIdle()
+
+        val userCount = fixture.viewModel.uiState.value.messages.count { it.role == MessageRole.User }
+        assertEquals(1, userCount)
+    }
+
+    @Test
+    fun manualStop_keepsTurnRetryableWithPartialOutput() = runTest {
+        val hangingAgent = object : ChatAgentRepository {
+            override suspend fun send(
+                sessionId: String,
+                selection: ModelSelection,
+                text: String,
+                fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
+                toolConfiguration: ConversationToolConfiguration?,
+            ): Flow<ChatRunEvent> = flow {
+                emit(event(partial = true, turnComplete = false))
+                awaitCancellation()
+            }
+
+            override suspend fun respondToToolConfirmation(
+                sessionId: String,
+                confirmationCallId: String,
+                confirmed: Boolean,
+            ): Flow<ChatRunEvent> = flowOf(event())
+
+            override suspend fun releaseSession(sessionId: String) = Unit
+        }
+        val fixture = fixture(configured = true, agentOverride = hangingAgent)
+        fixture.viewModel.onAction(ChatAction.Send("你好"))
+        advanceUntilIdle()
+        assertTrue(fixture.viewModel.uiState.value.isAgentRunning)
+
+        fixture.viewModel.onAction(ChatAction.StopStreaming)
+        advanceUntilIdle()
+
+        assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
+        // 手动停止的轮次同样可以编辑/重试，且快照保留已生成的部分回答。
+        val stopped = fixture.viewModel.uiState.value.failedTurn
+        assertEquals(ChatTurnStatus.FAILED, stopped?.status)
+        assertTrue(stopped?.canRetry == true)
+        assertEquals(2, stopped?.messages?.size)
+        assertEquals("回复", stopped?.messages?.last()?.textParts?.single()?.text)
+        assertEquals(1, fixture.turnRepository.savedTurns.size)
+    }
+
+    @Test
+    fun hasToolCallsAfter_onlyCountsToolCallsWithinCurrentTurn() {
+        val toolMessage = Messages.fromAssistant().copy(
+            functionCalls = listOf(FunctionCallView(id = "c1", name = "tool", argsSummary = "{}")),
+        )
+        val firstUser = Messages.fromUser("first")
+        val secondUser = Messages.fromUser("second")
+
+        // 历史轮的工具调用不计入本轮，避免无工具的失败轮误报“重复执行”确认框。
+        assertFalse(listOf(firstUser, toolMessage).hasToolCallsAfter(secondUser.id))
+        // 用户消息之后的本轮工具调用计入。
+        assertTrue(listOf(secondUser, toolMessage).hasToolCallsAfter(secondUser.id))
+        // 找不到本轮用户消息时不误报。
+        assertFalse(listOf(firstUser, toolMessage).hasToolCallsAfter("missing-id"))
     }
 
     @Test
@@ -891,6 +990,8 @@ class ChatViewModelCharacterizationTest {
         }
         val attachments = mockk<ChatAttachmentRepository> {
             coEvery { read(any(), any()) } returns emptyList()
+            coEvery { validateSaved(any()) } returns Unit
+            coEvery { createDrafts(any()) } returns emptyList()
             coEvery { deleteDrafts(any()) } returns Unit
             coEvery { deleteSession(any()) } returns Unit
         }
@@ -925,6 +1026,13 @@ class ChatViewModelCharacterizationTest {
                 coEvery { listFunctions(any()) } returns emptyList()
             }
         val toolApproval = FakeToolApprovalRepository()
+        // 重试/编辑依赖的可恢复轮日志；测试里保持行状态，不影响已有发送断言。
+        val turnRepository = RecordingChatTurnRepository()
+        val prepareChatTurn = PrepareChatTurnUseCase(
+            turns = turnRepository,
+            attachments = attachments,
+            runner = agent,
+        )
         return Fixture(
             viewModel = ChatViewModel(
                 runner = agent,
@@ -940,6 +1048,8 @@ class ChatViewModelCharacterizationTest {
                 speechSettings = speechSettings,
                 voiceWake = voiceWake,
                 attachments = attachments,
+                prepareChatTurn = prepareChatTurn,
+                turnRepository = turnRepository,
                 toolAuthorization = toolAuthorization,
                 mcpRepository = mcpRepository,
                 mcpSkipReporter = mockk {
@@ -953,6 +1063,7 @@ class ChatViewModelCharacterizationTest {
             conversations = conversations,
             sessionResolver = sessionResolver,
             agent = agent,
+            turnRepository = turnRepository,
             display = display,
             appearance = appearance,
             toolApproval = toolApproval,
@@ -1026,6 +1137,7 @@ class ChatViewModelCharacterizationTest {
         val conversations: ConversationRepository,
         val sessionResolver: ConversationSessionResolver,
         val agent: ChatAgentRepository,
+        val turnRepository: RecordingChatTurnRepository,
         val display: ChatDisplayRepository,
         val appearance: AppearanceRepository,
         val toolApproval: FakeToolApprovalRepository,
@@ -1035,6 +1147,41 @@ class ChatViewModelCharacterizationTest {
         val playback: SpeechPlaybackRepository,
         val speechSettings: FakeSpeechSettingsRepository,
     )
+}
+
+/** 记录型轮次日志：验证 ViewModel 对恢复轮的保存与结束时机（失败/停止保存、成功 finish）。 */
+private class RecordingChatTurnRepository : ChatTurnRepository {
+    private var counter = 0
+    val savedTurns = mutableListOf<ChatTurn>()
+    val finishedTurns = mutableListOf<String>()
+
+    override suspend fun recover(sessionId: String): ChatTurn? = null
+
+    override suspend fun begin(
+        sessionId: String,
+        userMessage: Message,
+        history: List<Message>,
+        retryTurnId: String?,
+    ): ChatTurn {
+        counter++
+        return ChatTurn(
+            id = retryTurnId ?: "turn-$counter",
+            attemptId = "attempt-$counter",
+            sessionId = sessionId,
+            userMessage = userMessage,
+            messages = history + userMessage,
+        )
+    }
+
+    override suspend fun save(turn: ChatTurn) {
+        savedTurns += turn
+    }
+
+    override suspend fun finish(sessionId: String, attemptId: String) {
+        finishedTurns += attemptId
+    }
+
+    override suspend fun delete(sessionId: String) = Unit
 }
 
 private class FakeSpeechSettingsRepository : SpeechSettingsRepository {

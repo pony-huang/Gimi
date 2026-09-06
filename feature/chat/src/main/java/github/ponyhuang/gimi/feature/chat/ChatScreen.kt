@@ -7,12 +7,13 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.calculateEndPadding
@@ -25,18 +26,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -61,29 +67,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
+import github.ponyhuang.gimi.domain.conversation.model.ChatTurnStatus
+import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
-import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
-import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
+import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
-import github.ponyhuang.gimi.domain.conversation.model.UserInputKind
-import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
+import github.ponyhuang.gimi.domain.conversation.model.TextPart
+import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
-import androidx.compose.ui.tooling.preview.Preview
-import github.ponyhuang.gimi.domain.conversation.model.Messages
-import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -184,12 +183,13 @@ fun ChatScaffold(
             ?.capabilities
             ?: MultimodalCapabilities()
     }
-    val awaitingConfirmationToolNames = remember(state.pendingToolConfirmations, state.pendingInputRequests) {
-        state.pendingToolConfirmations.mapTo(HashSet()) { it.toolName }.apply {
-            // 挂起的输入请求同样让对应工具 chip 呈现等待态，而不是永远悬空的执行中。
-            state.pendingInputRequests.forEach { add(it.toolName) }
+    val awaitingConfirmationToolNames =
+        remember(state.pendingToolConfirmations, state.pendingInputRequests) {
+            state.pendingToolConfirmations.mapTo(HashSet()) { it.toolName }.apply {
+                // 挂起的输入请求同样让对应工具 chip 呈现等待态，而不是永远悬空的执行中。
+                state.pendingInputRequests.forEach { add(it.toolName) }
+            }
         }
-    }
     // 只要用户仍停留在底部，就让流式内容增长持续跟随；用户向上浏览历史时则停止抢占滚动。
     var shouldFollowLatest by remember { mutableStateOf(true) }
     var isModelPickerVisible by remember { mutableStateOf(false) }
@@ -203,7 +203,11 @@ fun ChatScaffold(
         label = "recommendationHorizontalInset",
     )
 
-    LaunchedEffect(visibleMessages.size, pendingToolConfirmation?.confirmationCallId, pendingInputRequest?.callId) {
+    LaunchedEffect(
+        visibleMessages.size,
+        pendingToolConfirmation?.confirmationCallId,
+        pendingInputRequest?.callId
+    ) {
         if (state.getCurrentUserMessage() != null) {
             delay(100.milliseconds)
             listState.animateScrollToItem(visibleMessages.size)
@@ -322,70 +326,75 @@ fun ChatScaffold(
                                     onReject = { onToolConfirmation(false) },
                                     onAlwaysAllow = onToolConfirmationAlwaysAllow,
                                 )
+
                                 is PendingComposerAction.Choice -> PendingChoicePanel(
                                     request = action.request,
                                     onRespond = { value ->
                                         onRespondToInputRequest(action.request.callId, value)
                                     },
                                 )
+
                                 is PendingComposerAction.TextInput -> PendingInputPanel(
                                     request = action.request,
                                     onRespond = { value ->
                                         onRespondToInputRequest(action.request.callId, value)
                                     },
                                 )
+
                                 null -> ChatComposer(
                                     modifier = Modifier,
-                            messageData = state.composerSeed,
-                            onSendClick = { data ->
-                                onSend(data.text, data.attachments)
-                            },
-                            onStopClick = onStop,
-                            isGenerating = isAgentRunning,
-                            isVoiceInputAvailable = isSpeechRecognitionAvailable,
-                            onTranscribeVoice = onTranscribeVoice,
-                            addToChatState = ChatAddToChatState(
-                                configuration = state.toolConfiguration,
-                                mcpServers = state.availableMcpServers,
-                                officialTools = state.officialToolDescriptors,
-                                isMutationBlocked = state.isAgentRunning,
-                                fullAccess = state.fullAccess,
-                                errorMessage = if (state.hasToolConfigurationError) {
-                                    stringResource(R.string.chat_session_tool_save_failed)
-                                } else {
-                                    null
-                                },
-                            ),
-                            attachmentCapabilities = attachmentCapabilities,
-                            onToolAccessModeChange = onToolAccessModeChange,
-                            onReasoningEffortChange = onReasoningEffortChange,
-                            onMcpServerEnabledChange = onMcpServerEnabledChange,
-                            onFullAccessChange = onFullAccessChange,
-                            onOfficialToolOpened = onOfficialToolOpened,
-                            onOfficialToolFunctionEnabledChange = onOfficialToolFunctionEnabledChange,
-                            onOfficialToolFunctionsRetry = onOfficialToolFunctionsRetry,
-                            sharedMediaUris = sharedMediaUris,
-                            onSharedMediaConsumed = onSharedMediaConsumed,
-                            retainExpanded = isModelPickerVisible,
-                            onExpandedChange = { isComposerExpanded = it },
-                            modelSelectorContent = {
-                                ModelTitleAndPicker(
-                                    services = state.availableLLMModelSettings,
-                                    currentSelection = state.currentModelSelection,
-                                    loadState = state.modelCatalogLoadState,
-                                    isAgentRunning = isAgentRunning,
-                                    onConfigureModels = onConfigureModels,
-                                    onSelectModel = onSelectModel,
-                                    onModelSwitchBlocked = onModelSwitchBlocked,
-                                    onPickerVisibilityChange = { isModelPickerVisible = it },
+                                    messageData = state.composerSeed,
+                                    onSendClick = { data ->
+                                        onSend(data.text, data.attachments)
+                                    },
+                                    onStopClick = onStop,
+                                    isGenerating = isAgentRunning,
+                                    isVoiceInputAvailable = isSpeechRecognitionAvailable,
+                                    onTranscribeVoice = onTranscribeVoice,
+                                    addToChatState = ChatAddToChatState(
+                                        configuration = state.toolConfiguration,
+                                        mcpServers = state.availableMcpServers,
+                                        officialTools = state.officialToolDescriptors,
+                                        isMutationBlocked = state.isAgentRunning,
+                                        fullAccess = state.fullAccess,
+                                        errorMessage = if (state.hasToolConfigurationError) {
+                                            stringResource(R.string.chat_session_tool_save_failed)
+                                        } else {
+                                            null
+                                        },
+                                    ),
+                                    attachmentCapabilities = attachmentCapabilities,
+                                    onToolAccessModeChange = onToolAccessModeChange,
+                                    onReasoningEffortChange = onReasoningEffortChange,
+                                    onMcpServerEnabledChange = onMcpServerEnabledChange,
+                                    onFullAccessChange = onFullAccessChange,
+                                    onOfficialToolOpened = onOfficialToolOpened,
+                                    onOfficialToolFunctionEnabledChange = onOfficialToolFunctionEnabledChange,
+                                    onOfficialToolFunctionsRetry = onOfficialToolFunctionsRetry,
+                                    sharedMediaUris = sharedMediaUris,
+                                    onSharedMediaConsumed = onSharedMediaConsumed,
+                                    retainExpanded = isModelPickerVisible,
+                                    onExpandedChange = { isComposerExpanded = it },
+                                    modelSelectorContent = {
+                                        ModelTitleAndPicker(
+                                            services = state.availableLLMModelSettings,
+                                            currentSelection = state.currentModelSelection,
+                                            loadState = state.modelCatalogLoadState,
+                                            isAgentRunning = isAgentRunning,
+                                            onConfigureModels = onConfigureModels,
+                                            onSelectModel = onSelectModel,
+                                            onModelSwitchBlocked = onModelSwitchBlocked,
+                                            onPickerVisibilityChange = {
+                                                isModelPickerVisible = it
+                                            },
+                                        )
+                                    },
                                 )
-                            },
-                        )
+                            }
                         }
                     }
                 }
             }
-        }
         },
         floatingActionButton = {
             AnimatedVisibility(
@@ -416,7 +425,7 @@ fun ChatScaffold(
             end = innerPadding.calculateEndPadding(layoutDirection) + 12.dp,
             // 推荐面板要紧贴胶囊，省掉消息流才需要的那点呼吸位。
             bottom = innerPadding.calculateBottomPadding() +
-                if (showsRecommendations) 0.dp else 8.dp,
+                    if (showsRecommendations) 0.dp else 8.dp,
         )
 
         AnimatedContent(
@@ -618,7 +627,8 @@ internal fun ChatHeaderActions(
 }
 
 /**
- * 失败轮次的“编辑/重试”操作行，左对齐贴合助手/错误气泡一侧。
+ * 失败轮次的“编辑/重试”操作行：居右的单胶囊组合，与顶栏操作簇同构；
+ * 胶囊内两个入口各自独立可点，用竖分隔线隔开。
  */
 @Composable
 private fun FailedTurnActions(
@@ -627,59 +637,103 @@ private fun FailedTurnActions(
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier.padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.End,
     ) {
-        TextButton(onClick = onEdit, modifier = Modifier.testTag("failed_turn_edit")) {
-            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-            Text(
-                stringResource(R.string.chat_failed_turn_edit),
-                modifier = Modifier.padding(start = 6.dp),
-            )
-        }
-        TextButton(onClick = onRetry, modifier = Modifier.testTag("failed_turn_retry")) {
-            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-            Text(
-                stringResource(R.string.chat_failed_turn_retry),
-                modifier = Modifier.padding(start = 6.dp),
-            )
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier
+                        .testTag("failed_turn_edit")
+                        .clickable(onClick = onEdit)
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        stringResource(R.string.chat_failed_turn_edit),
+                        modifier = Modifier.padding(start = 6.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                VerticalDivider(
+                    modifier = Modifier.height(20.dp),
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
+                )
+                Row(
+                    modifier = Modifier
+                        .testTag("failed_turn_retry")
+                        .clickable(onClick = onRetry)
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        stringResource(R.string.chat_failed_turn_retry),
+                        modifier = Modifier.padding(start = 6.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
         }
     }
 }
 
-/** 编辑失败消息时输入框上方的一行提示条，带“取消”入口。 */
+/** 编辑失败消息时输入框上方悬浮的 Snackbar 式胶囊提示，带“取消”入口。 */
 @Composable
 private fun EditFailedTurnBanner(
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 0.dp,
-    ) {
-        Row(
-            modifier = Modifier.padding(start = 16.dp, end = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    Column(modifier = modifier.fillMaxWidth()) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shadowElevation = 3.dp,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(horizontal = 16.dp),
         ) {
-            Icon(
-                imageVector = Icons.Default.Edit,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
-            Text(
-                text = stringResource(R.string.chat_editing_failed_turn),
-                modifier = Modifier.padding(start = 8.dp),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            TextButton(onClick = onCancel) {
-                Text(stringResource(R.string.chat_cancel_edit))
+            Row(
+                modifier = Modifier.padding(start = 16.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(
+                    text = stringResource(R.string.chat_editing_failed_turn),
+                    modifier = Modifier.padding(start = 8.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                TextButton(onClick = onCancel) {
+                    Text(stringResource(R.string.chat_cancel_edit))
+                }
             }
         }
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
 
@@ -856,6 +910,172 @@ private fun ChatHeaderActionsPreview() {
             onNewConversation = {},
             onOpenSettings = {},
             onToggleAutoSpeak = {},
+        )
+    }
+}
+
+/** 构造一个可重试的失败轮次，供失败态相关 Preview 使用。 */
+private fun previewFailedTurn(): ChatTurn = ChatTurn(
+    id = "preview-turn-1",
+    attemptId = "preview-attempt-1",
+    sessionId = "preview-session",
+    userMessage = Messages.fromUser("帮我查一下今天上海的天气"),
+    messages = listOf(Messages.fromUser("帮我查一下今天上海的天气")),
+    status = ChatTurnStatus.FAILED,
+)
+
+@Preview(showBackground = true)
+@Composable
+private fun FailedTurnActionsPreview() {
+    AsssistantaiTheme {
+        FailedTurnActions(
+            onRetry = {},
+            onEdit = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun EditFailedTurnBannerPreview() {
+    AsssistantaiTheme {
+        EditFailedTurnBanner(
+            onCancel = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun RepeatExecutionDialogPreview() {
+    AsssistantaiTheme {
+        RepeatExecutionDialog(
+            onConfirm = {},
+            onDismiss = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun MessageRowUserPreview() {
+    AsssistantaiTheme {
+        MessageRow(
+            message = Messages.fromUser("帮我查一下今天上海的天气"),
+            partChannelProvider = { null },
+            showToolActivity = true,
+            isAgentRunning = false,
+            rejectedToolNames = emptySet(),
+            awaitingConfirmationToolNames = emptySet(),
+            speechPlaybackState = github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState(),
+            onToggleSpeechPlayback = { _, _ -> },
+            onOpenDocument = {},
+            onOpenLocalFile = {},
+            onShowAllLocalFiles = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun MessageRowAssistantPreview() {
+    AsssistantaiTheme {
+        MessageRow(
+            message = Message(
+                author = "DefaultAssistant",
+                role = MessageRole.Assistant,
+                textParts = listOf(TextPart(text = "上海今天晴，28°C，适合出门。")),
+            ),
+            partChannelProvider = { null },
+            showToolActivity = true,
+            isAgentRunning = false,
+            rejectedToolNames = emptySet(),
+            awaitingConfirmationToolNames = emptySet(),
+            speechPlaybackState = github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState(),
+            onToggleSpeechPlayback = { _, _ -> },
+            onOpenDocument = {},
+            onOpenLocalFile = {},
+            onShowAllLocalFiles = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ChatScaffoldFailedTurnPreview() {
+    AsssistantaiTheme {
+        ChatScaffold(
+            state = ChatUiState(
+                sessionId = "preview-session",
+                messages = listOf(Messages.fromUser("帮我查一下今天上海的天气")),
+                failedTurn = previewFailedTurn(),
+            ),
+            partChannelProvider = { null },
+            onSend = { _, _ -> true },
+            onStop = {},
+            onTranscribeVoice = { "" },
+            onToggleSpeechPlayback = { _, _ -> },
+            onToggleAutoSpeak = {},
+            onOpenDocument = {},
+            onOpenLocalFile = {},
+            onShowAllLocalFiles = {},
+            onToolConfirmation = {},
+            onToolConfirmationAlwaysAllow = {},
+            onFullAccessChange = {},
+            onSelectModel = {},
+            onModelSwitchBlocked = {},
+            onOpenDrawer = {},
+            onOpenSettings = {},
+            onConfigureModels = {},
+            onNewConversation = {},
+            onToolAccessModeChange = {},
+            onReasoningEffortChange = {},
+            onMcpServerEnabledChange = { _, _ -> },
+            onOfficialToolOpened = {},
+            onOfficialToolFunctionEnabledChange = { _, _, _ -> },
+            onOfficialToolFunctionsRetry = {},
+            recommendations = previewChatRecommendations(),
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ChatScaffoldEditingFailedTurnPreview() {
+    AsssistantaiTheme {
+        ChatScaffold(
+            state = ChatUiState(
+                sessionId = "preview-session",
+                messages = listOf(Messages.fromUser("帮我查一下今天上海的天气")),
+                failedTurn = previewFailedTurn(),
+                editingFailedTurn = true,
+                composerSeed = MessageData(text = "帮我查一下今天上海的天气"),
+            ),
+            partChannelProvider = { null },
+            onSend = { _, _ -> true },
+            onStop = {},
+            onTranscribeVoice = { "" },
+            onToggleSpeechPlayback = { _, _ -> },
+            onToggleAutoSpeak = {},
+            onOpenDocument = {},
+            onOpenLocalFile = {},
+            onShowAllLocalFiles = {},
+            onToolConfirmation = {},
+            onToolConfirmationAlwaysAllow = {},
+            onFullAccessChange = {},
+            onSelectModel = {},
+            onModelSwitchBlocked = {},
+            onOpenDrawer = {},
+            onOpenSettings = {},
+            onConfigureModels = {},
+            onNewConversation = {},
+            onToolAccessModeChange = {},
+            onReasoningEffortChange = {},
+            onMcpServerEnabledChange = { _, _ -> },
+            onOfficialToolOpened = {},
+            onOfficialToolFunctionEnabledChange = { _, _, _ -> },
+            onOfficialToolFunctionsRetry = {},
+            recommendations = previewChatRecommendations(),
         )
     }
 }

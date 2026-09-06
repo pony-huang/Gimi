@@ -27,6 +27,12 @@ internal class ChatSessionRuntime(
     var turnComplete: Boolean = false
     var phase: AgentTaskPhase = AgentTaskPhase.GENERATING
     var pendingToolConfirmations: List<PendingToolConfirmation> = emptyList()
+
+    /**
+     * 已按授权策略（完全批准 / 「总是允许」白名单）放行、等待 run 流结束后自动回复 ADK 的确认。
+     * 与 [pendingToolConfirmations] 分开存放：这条通道不进 UI state，不渲染确认卡片。
+     */
+    var autoApprovedConfirmations: List<PendingToolConfirmation> = emptyList()
     val approvedToolsThisTurn: MutableSet<String> = mutableSetOf()
 
     /**
@@ -43,7 +49,10 @@ internal class ChatSessionRuntime(
     private val partChannels = mutableMapOf<String, Channel<String>>()
 
     val isActive: Boolean
-        get() = job?.isActive == true || isAgentRunning || pendingToolConfirmations.isNotEmpty()
+        get() = job?.isActive == true ||
+            isAgentRunning ||
+            pendingToolConfirmations.isNotEmpty() ||
+            autoApprovedConfirmations.isNotEmpty()
 
     fun drawerStatus(): ConversationTaskStatus? = when {
         pendingToolConfirmations.isNotEmpty() -> ConversationTaskStatus.WaitingForConfirmation(

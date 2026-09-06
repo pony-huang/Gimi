@@ -527,6 +527,8 @@ class ChatViewModelCharacterizationTest {
             confirmationEvent(confirmation("confirm-1", "compose_message", emptyMap())),
         )
         runCurrent()
+        // 流进行中（确认事件已到、run 流未结束）卡片也不得出现，否则会闪一下再消失。
+        assertTrue(fixture.viewModel.uiState.value.pendingToolConfirmations.isEmpty())
         agent.complete("session-1")
         advanceUntilIdle()
 
@@ -547,11 +549,46 @@ class ChatViewModelCharacterizationTest {
             confirmationEvent(confirmation("confirm-1", "compose_message", emptyMap())),
         )
         runCurrent()
+        assertTrue(fixture.viewModel.uiState.value.pendingToolConfirmations.isEmpty())
         agent.complete("session-1")
         advanceUntilIdle()
 
         assertTrue(fixture.viewModel.uiState.value.pendingToolConfirmations.isEmpty())
         assertEquals(listOf("confirm-1" to true), agent.confirmationResponses)
+    }
+
+    @Test
+    fun mixedConfirmationQueuesOnlyUserApprovalToolForTheCard() = runTest {
+        val agent = ControllableAgent()
+        val fixture = fixture(configured = true, agentOverride = agent)
+        fixture.toolApproval.setAlwaysAllowed("compose_message")
+        fixture.viewModel.onAction(ChatAction.Send("执行工具"))
+        runCurrent()
+        agent.emit(
+            "session-1",
+            confirmationEvent(
+                confirmation("confirm-1", "compose_message", emptyMap()),
+                confirmation("confirm-2", "read_file", emptyMap()),
+            ),
+        )
+        runCurrent()
+        agent.complete("session-1")
+        advanceUntilIdle()
+
+        // 白名单命中的 confirm-1 不进卡片，只有未放行的 confirm-2 等用户决策。
+        assertEquals(
+            listOf("confirm-2"),
+            fixture.viewModel.uiState.value.pendingToolConfirmations.map { it.confirmationCallId },
+        )
+
+        fixture.viewModel.onAction(ChatAction.RespondToToolConfirmation(confirmed = false))
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf("confirm-2" to false, "confirm-1" to true),
+            agent.confirmationResponses,
+        )
+        assertTrue(fixture.viewModel.uiState.value.pendingToolConfirmations.isEmpty())
     }
 
     @Test

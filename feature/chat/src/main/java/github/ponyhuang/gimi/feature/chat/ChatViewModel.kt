@@ -167,15 +167,30 @@ class ChatViewModel @Inject constructor(
     ) {
         val runtime = runtimeFor(sessionId)
         val request = runtime.pendingToolConfirmations.firstOrNull() ?: return
+        runtime.pendingToolConfirmations = runtime.pendingToolConfirmations.filterNot {
+            it.confirmationCallId == request.confirmationCallId
+        }
+        respondToConfirmationRequest(sessionId, runtime, request, confirmed, alwaysAllow)
+    }
+
+    /**
+     * 确认响应核心：用户确认卡片路径与自动放行通道共用。
+     * `request` 由调用方先从对应队列（[ChatSessionRuntime.pendingToolConfirmations] /
+     * [ChatSessionRuntime.autoApprovedConfirmations]）摘除，这里只负责落授权状态并发起恢复 run。
+     */
+    private fun respondToConfirmationRequest(
+        sessionId: String,
+        runtime: ChatSessionRuntime,
+        request: PendingToolConfirmation,
+        confirmed: Boolean,
+        alwaysAllow: Boolean = false,
+    ) {
         if (confirmed) {
             if (alwaysAllow) toolApproval.setAlwaysAllowed(request.toolName)
             runtime.approvedToolsThisTurn += request.toolName
         } else {
             runtime.approvedToolsThisTurn.clear()
             runtime.rejectedToolNames += request.toolName
-        }
-        runtime.pendingToolConfirmations = runtime.pendingToolConfirmations.filterNot {
-            it.confirmationCallId == request.confirmationCallId
         }
         cancelRun(runtime, releaseLease = false)
         val runToken = Any()
@@ -417,27 +432,42 @@ class ChatViewModel @Inject constructor(
         if (runtime.runToken !== runToken) return
         runtime.job = null
         val pending = runtime.pendingToolConfirmations.firstOrNull()
-        runtime.isAgentRunning = pending != null
-        if (pending != null && pending.toolName in runtime.approvedToolsThisTurn) {
-            runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
-            publishRuntime(runtime)
-            respondToToolConfirmation(sessionId, confirmed = true)
-        } else if (pending != null) {
-            runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
-            publishRuntime(runtime)
-        } else {
-            runtime.approvedToolsThisTurn.clear()
-            releaseRunLease(runtime)
-            if (_uiState.value.sessionId != sessionId) {
-                runtime.attention = if (runtime.failed) {
-                    SessionResultAttention.FAILED
-                } else {
-                    SessionResultAttention.COMPLETED
+        val autoApproved = runtime.autoApprovedConfirmations.firstOrNull()
+        runtime.isAgentRunning = pending != null || autoApproved != null
+        when {
+            // 用户本轮已手动批准过该工具：后续同工具确认沿用同轮放行通道直接确认。
+            pending != null && pending.toolName in runtime.approvedToolsThisTurn -> {
+                runtime.pendingToolConfirmations = runtime.pendingToolConfirmations.filterNot {
+                    it.confirmationCallId == pending.confirmationCallId
                 }
-            } else {
-                autoSpeakCompletedReply(sessionId, runtime)
+                respondToConfirmationRequest(sessionId, runtime, pending, confirmed = true)
             }
-            publishRuntime(runtime)
+            // 有用户卡片在等决策时先不排空自动放行队列，保持"用户答复优先"的旧顺序。
+            pending != null -> {
+                runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
+                publishRuntime(runtime)
+            }
+            // 自动放行通道：不弹卡片，run 流暂停后静默回复 ADK confirmed=true。
+            autoApproved != null -> {
+                runtime.autoApprovedConfirmations = runtime.autoApprovedConfirmations.filterNot {
+                    it.confirmationCallId == autoApproved.confirmationCallId
+                }
+                respondToConfirmationRequest(sessionId, runtime, autoApproved, confirmed = true)
+            }
+            else -> {
+                runtime.approvedToolsThisTurn.clear()
+                releaseRunLease(runtime)
+                if (_uiState.value.sessionId != sessionId) {
+                    runtime.attention = if (runtime.failed) {
+                        SessionResultAttention.FAILED
+                    } else {
+                        SessionResultAttention.COMPLETED
+                    }
+                } else {
+                    autoSpeakCompletedReply(sessionId, runtime)
+                }
+                publishRuntime(runtime)
+            }
         }
         viewModelScope.launch { flushPendingConversationContentUpdate() }
     }
@@ -465,6 +495,7 @@ class ChatViewModel @Inject constructor(
     private fun clearToolConfirmationState(runtime: ChatSessionRuntime) {
         runtime.approvedToolsThisTurn.clear()
         runtime.pendingToolConfirmations = emptyList()
+        runtime.autoApprovedConfirmations = emptyList()
         publishRuntime(runtime)
     }
 
@@ -1204,10 +1235,22 @@ class ChatViewModel @Inject constructor(
     private fun stopStreaming() {
         val sessionId = _uiState.value.sessionId
         val runtime = sessionRuntimes[sessionId] ?: return
-        if (runtime.job?.isActive != true && runtime.pendingToolConfirmations.isEmpty()) return
+        if (runtime.job?.isActive != true &&
+            runtime.pendingToolConfirmations.isEmpty() &&
+            runtime.autoApprovedConfirmations.isEmpty()
+        ) {
+            return
+        }
         if (runtime.pendingToolConfirmations.isNotEmpty()) {
             runtime.approvedToolsThisTurn.clear()
             respondToToolConfirmation(sessionId, confirmed = false)
+            return
+        }
+        if (runtime.autoApprovedConfirmations.isNotEmpty()) {
+            // 中断仍在流式中的自动放行轮，沿用"停止 = 拒绝挂起确认"的旧语义。
+            val request = runtime.autoApprovedConfirmations.first()
+            runtime.autoApprovedConfirmations = runtime.autoApprovedConfirmations.drop(1)
+            respondToConfirmationRequest(sessionId, runtime, request, confirmed = false)
             return
         }
         cancelRun(runtime)

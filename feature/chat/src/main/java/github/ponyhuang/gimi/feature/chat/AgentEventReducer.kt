@@ -122,20 +122,23 @@ internal class AgentEventReducer(
             )
         }
         if (incoming.isEmpty()) return
-        // Full access 或「总是允许」白名单命中的工具：预置进 approvedToolsThisTurn，
-        // run 流结束时 finishRunIfOwned 会走既有的同轮自动放行通道直接 confirmed=true，
-        // 不再弹出确认卡片。
-        incoming.filter { isAutoApproved(it.toolName) }
-            .forEach { runtime.approvedToolsThisTurn += it.toolName }
-        runtime.phase = AgentTaskPhase.WAITING_FOR_CONFIRMATION
-        scope.launch {
-            runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
-        }
-        val knownIds = runtime.pendingToolConfirmations.mapTo(mutableSetOf()) {
-            it.confirmationCallId
-        }
-        runtime.pendingToolConfirmations = runtime.pendingToolConfirmations + incoming.filter {
-            knownIds.add(it.confirmationCallId)
+        // 完全批准或「总是允许」白名单命中的确认走自动放行通道：只记入 autoApprovedConfirmations
+        // 等流结束后静默回复 ADK；绝不能进 pendingToolConfirmations——它直接驱动确认卡片渲染，
+        // 混进去会出现"卡片闪一下再自动关闭"的观感。
+        val (autoApproved, needsUser) = incoming.partition { isAutoApproved(it.toolName) }
+        runtime.autoApprovedConfirmations = (runtime.autoApprovedConfirmations + autoApproved)
+            .distinctBy { it.confirmationCallId }
+        if (needsUser.isNotEmpty()) {
+            runtime.phase = AgentTaskPhase.WAITING_FOR_CONFIRMATION
+            scope.launch {
+                runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
+            }
+            val knownIds = runtime.pendingToolConfirmations.mapTo(mutableSetOf()) {
+                it.confirmationCallId
+            }
+            runtime.pendingToolConfirmations += needsUser.filter {
+                            knownIds.add(it.confirmationCallId)
+                        }
         }
         runtime.isAgentRunning = true
         publishRuntime(runtime)
@@ -154,6 +157,7 @@ internal class AgentEventReducer(
     private fun clearToolConfirmationState(runtime: ChatSessionRuntime) {
         runtime.approvedToolsThisTurn.clear()
         runtime.pendingToolConfirmations = emptyList()
+        runtime.autoApprovedConfirmations = emptyList()
         publishRuntime(runtime)
     }
 

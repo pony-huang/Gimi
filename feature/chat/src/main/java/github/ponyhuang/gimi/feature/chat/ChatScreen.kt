@@ -563,10 +563,11 @@ private fun ToolConfirmationCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // 「总是允许」是带持久副作用的动作，放在行首与一次性动作拉开距离；
-                // 拒绝是次要动作：弱化颜色，把视觉重量让给主操作「允许」。
+                // 拒绝与总是允许统一为弱化色胶囊，把视觉重量让给主操作「允许」。
                 TextButton(
                     onClick = onAlwaysAllow,
                     colors = ButtonDefaults.textButtonColors(
+                        containerColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f),
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
                 ) {
@@ -579,6 +580,7 @@ private fun ToolConfirmationCard(
                 TextButton(
                     onClick = onReject,
                     colors = ButtonDefaults.textButtonColors(
+                        containerColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f),
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
                 ) { Text(stringResource(R.string.chat_action_reject)) }

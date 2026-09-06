@@ -4,7 +4,6 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
@@ -27,6 +26,7 @@ import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskSource
 import github.ponyhuang.gimi.domain.conversation.model.Message
+import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
@@ -243,6 +243,16 @@ class ChatViewModel @Inject constructor(
         runtime.pendingInputRequests = runtime.pendingInputRequests.filterNot {
             it.callId == callId
         }
+        // ADK 恢复运行只把用户 FunctionResponse 落盘、不作为事件回流，实时消息流里
+        // 永远收不到这条工具结果 —— 本地补一条响应消息，调用 chip 才能按 id 立即
+        // 配对成 ✓（重启后由历史回放提供同样信息，见 EventMapper 的同规则处理）。
+        runtime.messages += Messages.fromAssistant(
+                    id = "input-response-${request.callId}",
+                ).copy(
+                    functionResponses = listOf(
+                        FunctionResponseView(id = request.callId, name = request.toolName),
+                    ),
+                )
         cancelRun(runtime, releaseLease = false)
         val runToken = Any()
         runtime.runToken = runToken

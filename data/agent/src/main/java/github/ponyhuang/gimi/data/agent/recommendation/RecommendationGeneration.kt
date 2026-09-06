@@ -228,10 +228,7 @@ class AgentRecommendationGenerator @Inject constructor(
 
         val READ_ONLY_STATUS_TOOLS = listOf(
             "get_current_location",
-            "is_location_enabled",
             "get_current_time",
-            "get_screen_brightness",
-            "get_screen_timeout",
             "list_installed_apps",
         )
     }

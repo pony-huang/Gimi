@@ -691,6 +691,11 @@ class ChatViewModelCharacterizationTest {
         assertEquals(listOf("input-call-1" to "A"), agent.inputResponses)
         assertTrue(fixture.viewModel.uiState.value.pendingInputRequests.isEmpty())
         assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
+        // ADK 不把用户 FunctionResponse 作为事件回流 —— 实时路径必须本地补响应消息，
+        // 调用 chip 才能立即按 id 配对成 ✓ 而不是任务结束后误显 ✗。
+        val responseMessage = fixture.viewModel.uiState.value.messages
+            .single { it.functionResponses.any { response -> response.id == "input-call-1" } }
+        assertEquals("input-response-input-call-1", responseMessage.id)
     }
 
     @Test

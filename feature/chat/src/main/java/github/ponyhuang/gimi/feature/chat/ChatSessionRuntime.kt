@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.feature.chat
 
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRunLease
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
@@ -39,6 +40,9 @@ internal class ChatSessionRuntime(
     var runToken: Any? = null
     var failed: Boolean = false
     var attention: SessionResultAttention = SessionResultAttention.NONE
+
+    /** 最近一次发送尝试（RUNNING/FAILED/INTERRUPTED）；驱动重试与编辑入口。 */
+    var lastTurn: ChatTurn? = null
 
     private val partChannels = mutableMapOf<String, Channel<String>>()
 

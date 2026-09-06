@@ -22,6 +22,18 @@ sealed interface ChatAction {
         val draftAttachments: List<DraftAttachment> = emptyList(),
     ) : ChatAction
 
+    /** 用原始请求重新发送最近失败轮次。 */
+    data object RetryFailedTurn : ChatAction
+
+    /** 编辑最近失败轮次：把原始文字与附件带回输入框。 */
+    data object EditFailedTurn : ChatAction
+
+    /** 取消编辑，恢复编辑前的草稿，不改动历史。 */
+    data object CancelEditFailedTurn : ChatAction
+
+    /** 工具重复执行确认：proceed=true 时真正重新发送，false 时取消。 */
+    data class ResolveRepeatExecution(val proceed: Boolean) : ChatAction
+
     /** 用户主动中断当前 turn（点击 composer 上的停止按钮）。 */
     data object StopStreaming : ChatAction
 
@@ -126,6 +138,9 @@ sealed interface ChatNotice {
 
     /** 会话勾选的 MCP 服务器连接失败，本轮已跳过。 */
     data class McpServerSkipped(val serverName: String) : ChatNotice
+
+    /** 编辑失败消息时无法恢复其附件草稿，仅恢复了文字内容。 */
+    data object EditDraftsRestoreFailed : ChatNotice
 
     /** Mem0 记忆搜索失败，本轮继续但不注入云记忆。 */
     data object MemorySearchFailed : ChatNotice

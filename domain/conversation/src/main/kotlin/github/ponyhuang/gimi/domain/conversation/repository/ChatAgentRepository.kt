@@ -51,6 +51,12 @@ interface ChatAgentRepository {
  * data 层。
  */
 interface ChatAttachmentRepository {
+    /** 校验归档附件仍可读，重试直接复用文件，避免重复压缩图片。 */
+    suspend fun validateSaved(attachments: List<FileAttachment>)
+
+    /** 为编辑建立独立草稿副本，移除草稿不得删除历史消息附件。 */
+    suspend fun createDrafts(attachments: List<FileAttachment>): List<DraftAttachment>
+
     /**
      * 读取并准备本轮要发送的附件。
      *

@@ -1,10 +1,13 @@
 package github.ponyhuang.gimi.domain.conversation.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Lightweight reference to an attachment copied into application-owned draft storage.
  *
  * Payload bytes are deliberately excluded so Compose saved state and Room rows stay small.
  */
+@Serializable
 data class DraftAttachment(
     val reference: String,
     val displayName: String,

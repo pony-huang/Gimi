@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.chat
 
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -25,6 +26,7 @@ fun ErrorBubble(
 ) {
     ChatMessageBubble(role = message.role.toChatBubbleRole(), modifier = modifier) {
         Surface(
+            modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.errorContainer,
             contentColor = MaterialTheme.colorScheme.onErrorContainer,
             shape = MaterialTheme.shapes.small,

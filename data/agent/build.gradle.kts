@@ -65,6 +65,15 @@ dependencies {
     ksp(libs.google.adk.kotlin.processor)
     kapt(libs.objectbox.processor)
 
+    // 仅 debug 变体携带 ADK Development WebServer（Ktor/Netty 服务端 + Dev UI 静态资源），
+    // 供 PC 浏览器经局域网观察 agent 会话；release 构建不含任何 webserver 类。
+    // webserver 把 opentelemetry-sdk 声明为 runtime scope，补 debug 编译期依赖以消除
+    // ApiServerSpanExporter 超类型不可见的告警。
+    debugImplementation(libs.google.adk.kotlin.webserver) {
+        exclude(group = "io.modelcontextprotocol.sdk")
+    }
+    debugImplementation(libs.opentelemetry.sdk)
+
     testImplementation(project(":core:testing"))
     testImplementation(libs.google.adk.kotlin.webserver) {
         exclude(group = "io.modelcontextprotocol.sdk")

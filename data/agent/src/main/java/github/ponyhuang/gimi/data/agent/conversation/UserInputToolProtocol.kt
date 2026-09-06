@@ -1,5 +1,7 @@
 package github.ponyhuang.gimi.data.agent.conversation
 
+import github.ponyhuang.gimi.domain.conversation.model.AdkRequestInputToolName
+import github.ponyhuang.gimi.domain.conversation.model.GetUserChoiceToolName
 import github.ponyhuang.gimi.domain.conversation.model.UserInputKind
 import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
 
@@ -13,11 +15,11 @@ import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
  */
 internal object UserInputToolProtocol {
 
-    /** ADK `RequestInputTool` 的 function call 名（字面量复制，data 层外不可见）。 */
-    const val REQUEST_INPUT_NAME: String = "adk_request_input"
+    /** ADK `RequestInputTool` 的 function call 名（真源在 domain 层 [AdkRequestInputToolName]）。 */
+    const val REQUEST_INPUT_NAME: String = AdkRequestInputToolName
 
-    /** ADK `GetUserChoiceTool` 的 function call 名。 */
-    const val GET_USER_CHOICE_NAME: String = "get_user_choice"
+    /** ADK `GetUserChoiceTool` 的 function call 名（真源在 domain 层 [GetUserChoiceToolName]）。 */
+    const val GET_USER_CHOICE_NAME: String = GetUserChoiceToolName
 
     /**
      * 从 function call 参数解析挂起的用户输入请求。

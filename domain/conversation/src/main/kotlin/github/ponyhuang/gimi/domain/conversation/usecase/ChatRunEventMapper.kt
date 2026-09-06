@@ -8,6 +8,7 @@ import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.Messages
+import github.ponyhuang.gimi.domain.conversation.model.UserInputToolCallNames
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
 
 object ChatRunEventMapper {
@@ -28,7 +29,23 @@ object ChatRunEventMapper {
             event.functionCalls.isEmpty() &&
             event.functionResponses.isNotEmpty()
         ) {
-            return null
+            // 确认协议的回执不是工具结果（真结果稍后由模型侧返回），按旧规则忽略；
+            // 用户输入工具（get_user_choice / adk_request_input）的回执本身就是工具
+            // 结果，丢弃会让调用 chip 永远配不到响应而显示 ✗ —— 保留成响应消息，
+            // 由展示层折叠进前面的调用消息完成配对。
+            val inputResponses = event.functionResponses.filter { it.name in UserInputToolCallNames }
+            if (inputResponses.isEmpty()) {
+                return null
+            }
+            return Messages.fromAssistant(
+                id = event.id,
+                invocationId = event.invocationId,
+                author = event.author,
+                timestamp = event.timestamp,
+            ).copy(
+                functionResponses = inputResponses.map(ChatFunctionResponse::toView),
+                turnComplete = true,
+            )
         }
         if (event.author == "user") {
             val text = event.parts.firstNotNullOfOrNull { it.text?.takeIf(String::isNotEmpty) }.orEmpty()

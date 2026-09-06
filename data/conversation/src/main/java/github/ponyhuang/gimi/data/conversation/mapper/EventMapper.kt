@@ -15,6 +15,7 @@ import github.ponyhuang.gimi.domain.conversation.model.isLocalFileSearchTool
 import github.ponyhuang.gimi.domain.conversation.model.parseLocalFileSearchResult
 import github.ponyhuang.gimi.domain.conversation.model.parseRemoteImageResult
 import github.ponyhuang.gimi.domain.conversation.model.Messages
+import github.ponyhuang.gimi.domain.conversation.model.UserInputToolCallNames
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import java.io.File
 
@@ -67,13 +68,28 @@ object EventMapper {
 
         // ADK 工具确认的选择以 role=user 的 FunctionResponse 回送给 runner。
         // 它不是用户可读的聊天内容；若仍构造 User Message，聊天气泡会因固定内边距
-        // 被绘制成没有内容的灰色圆角块。只含 function response 的 user event 直接忽略。
+        // 被绘制成没有内容的灰色圆角块。确认协议回执直接忽略。
+        // 用户输入工具（get_user_choice / adk_request_input）的回执本身就是工具结果，
+        // 必须保留成响应消息，供 chip 按 id 与前面的调用配对成 ✓（与流式路径同规则）。
         if (event.author == "user" &&
             parts.all { it.text.isNullOrEmpty() && it.inlineData == null } &&
             calls.isEmpty() &&
             responses.isNotEmpty()
         ) {
-            return null
+            val inputResponses = responses.filter { it.name in UserInputToolCallNames }
+            if (inputResponses.isEmpty()) {
+                return null
+            }
+            return Messages.fromAssistant(
+                id = event.id,
+                invocationId = event.invocationId,
+                author = event.author,
+                timestamp = event.timestamp,
+            ).copy(
+                functionResponses = inputResponses.map { it.toView() },
+                partial = false,
+                turnComplete = true,
+            )
         }
 
         return if (event.author == "user") {

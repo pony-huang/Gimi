@@ -76,3 +76,18 @@ data class ToolConfirmationRequest(
     val toolName: String,
     val args: Map<String, Any?>,
 )
+
+/** ADK `adk_request_input`（内容输入）的 function call 名。 */
+const val AdkRequestInputToolName = "adk_request_input"
+
+/** ADK `get_user_choice`（选项选择）的 function call 名。 */
+const val GetUserChoiceToolName = "get_user_choice"
+
+/**
+ * 用户输入类长时运行工具名集合。
+ *
+ * 这两个工具的调用结果由用户以 role=user 的 `FunctionResponse` 回送（ADK 恢复协议），
+ * 且回执本身就是工具结果 —— 事件映射层必须保留它供 chip 按 id 配对成 ✓，
+ * 不能像确认协议回执那样按"user 纯响应事件"丢弃。
+ */
+val UserInputToolCallNames = setOf(AdkRequestInputToolName, GetUserChoiceToolName)

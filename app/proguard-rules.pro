@@ -164,6 +164,18 @@
 -keep class github.ponyhuang.gimi.pluginapi.** { *; }
 
 # ---------------------------------------------------------------------------
+# ADK 会话检查点编解码（反射桥接 internal JsonConverters）
+#
+# data:conversation 的 AdkEventCodec 通过 Class.forName + getMethod 反射调用
+# com.google.adk.kt.sessions.room.JsonConverters 的 eventToJson/eventFromJson
+# （Kotlin internal、仅 JVM public）。ADK 自身只直接调用 fromStateJson/toStateJson，
+# R8 看不到反射链，release 收缩会剥掉 eventToJson/eventFromJson，导致
+# AdkEventCodec 的 object 初始化抛 NoSuchMethodException，对话恢复时表现为
+# ExceptionInInitializerError。全局已 -dontobfuscate，这条主要防收缩。
+# ---------------------------------------------------------------------------
+-keep class com.google.adk.kt.sessions.room.JsonConverters { *; }
+
+# ---------------------------------------------------------------------------
 # Kotlin / coroutines ABI 桥接（插件运行时从 host 解析）
 #
 # 插件 APK 自带 kotlin-stdlib，但 DexClassLoader 是 parent-first：只要 host 里同名

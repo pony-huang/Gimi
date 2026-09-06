@@ -284,6 +284,21 @@ class VoiceWakeSettingsViewModelCharacterizationTest {
     }
 
     @Test
+    fun disablingStillStopsRepositoryWhenStateReportsError() = runTest {
+        // 运行时可能在 Error 后自动恢复监听；UI 状态不可作为是否下发停止的依据。
+        val voiceState = voiceState(ready = true).apply {
+            value = value.copy(status = VoiceWakeStatus.Error)
+        }
+        val voiceRepository = voiceRepository(voiceState)
+        val viewModel = viewModel(modelRepository(), voiceRepository)
+
+        advanceUntilIdle()
+        viewModel.onAction(VoiceWakeSettingsAction.ToggleListening(enabled = false))
+
+        verify(exactly = 1) { voiceRepository.stop() }
+    }
+
+    @Test
     fun missingSelectedSpeechModelKeepsConfigurationBlocked() = runTest {
         val repository = modelRepository(speechSelection = null)
         val voiceRepository = voiceRepository(ready = true)

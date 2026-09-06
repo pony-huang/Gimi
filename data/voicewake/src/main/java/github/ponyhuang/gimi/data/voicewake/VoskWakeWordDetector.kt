@@ -11,6 +11,8 @@ class VoskWakeWordDetector(
     private val model: Model,
     private val recognitionPhrase: String,
 ) : Closeable {
+    // 每个音频块都会比对关键词，规范化结果在会话期内不变，缓存避免逐块重复正则。
+    private val normalizedKeyword = normalizeWakeText(recognitionPhrase)
     private var recognizer = createRecognizer()
 
     @Synchronized
@@ -23,7 +25,6 @@ class VoskWakeWordDetector(
                 ?.asString
                 .orEmpty()
         }.getOrDefault("")
-        val normalizedKeyword = normalizeWakeText(recognitionPhrase)
         return normalizedKeyword.isNotEmpty() && normalizeWakeText(text).contains(normalizedKeyword)
     }
 

@@ -263,9 +263,11 @@ class VoiceWakeSettingsViewModel @Inject constructor(
 
     private fun toggleListening(enabled: Boolean) {
         if (!enabled) {
-            val wasRunning = uiState.value.voiceState.isRunning
+            // 无条件下发停止：UI 状态可能滞后于运行时（如 Error 期间管线会自动恢复监听），
+            // 依据 isRunning 过滤会在状态不一致时静默跳过停止，导致麦克风继续占用。
+            // stop 幂等：服务未运行时只是短暂的空服务启停。
             localState.update { it.copy(isStartPending = false) }
-            if (wasRunning) manageVoiceWake.stop()
+            manageVoiceWake.stop()
             return
         }
 

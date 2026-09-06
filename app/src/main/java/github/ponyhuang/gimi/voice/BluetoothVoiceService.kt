@@ -13,6 +13,7 @@ import android.content.pm.ServiceInfo
 import android.media.AudioManager
 import android.os.IBinder
 import android.provider.Settings
+import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -77,12 +78,16 @@ class BluetoothVoiceService : Service() {
         }
     }
 
+    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action ?: BluetoothVoiceController.BLUETOOTH_VOICE_ACTION_START) {
+        when (intent?.action) {
             BluetoothVoiceController.BLUETOOTH_VOICE_ACTION_STOP -> stopCompletely()
             BluetoothVoiceController.BLUETOOTH_VOICE_ACTION_PAUSE -> pipeline.pause()
             BluetoothVoiceController.BLUETOOTH_VOICE_ACTION_RESUME -> pipeline.resume()
             BluetoothVoiceController.BLUETOOTH_VOICE_ACTION_START -> startForegroundAndListen()
+            // 系统/OEM 可能以空 Intent 重建服务；绝不能默认当作启动监听，
+            // 否则用户关闭唤醒后服务被意外拉起会重新占用麦克风。
+            null -> stopSelf()
         }
         return START_NOT_STICKY
     }

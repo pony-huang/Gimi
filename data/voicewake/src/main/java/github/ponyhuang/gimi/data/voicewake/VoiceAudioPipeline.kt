@@ -78,6 +78,7 @@ class VoiceAudioPipeline @Inject constructor(
     private var detector: VoskWakeWordDetector? = null
     private var preRoll = PcmPreRollBuffer()
     private var capture: VoiceCommandCapture? = null
+    private val energyGate = WakeEnergyGate()
     private var processingJob: Job? = null
     private var recoveryJob: Job? = null
     private var recoveryAttempts = 0
@@ -287,6 +288,8 @@ class VoiceAudioPipeline @Inject constructor(
         synchronized(audioLock) {
             preRoll.append(chunk)
             val activeCapture = capture
+            // 唤醒等待期跳过纯静音块的 Vosk 解码以省电；命令采集期间必须全量喂入。
+            if (activeCapture == null && !energyGate.shouldFeed(chunk)) return
             if (activeCapture != null) {
                 // 提示音保护窗内的采样不能进入指令，避免提示音被 ASR 当成用户输入。
                 if (now < cueActiveUntilMs) return
@@ -520,6 +523,7 @@ class VoiceAudioPipeline @Inject constructor(
             detector?.close()
             detector = null
             capture = null
+            energyGate.reset()
             preRoll = PcmPreRollBuffer()
         }
         if (releaseRoute) {

@@ -18,11 +18,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.conversation.model.FunctionCallView
 import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
+import github.ponyhuang.gimi.domain.conversation.model.GetUserChoiceToolName
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /**
@@ -31,7 +33,11 @@ import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
  */
 private val McpNamePrefix = Regex("^mcp_[A-Za-z0-9_-]{8}_")
 
-internal fun toolDisplayName(rawName: String): String = rawName.replace(McpNamePrefix, "")
+@Composable
+internal fun toolDisplayName(rawName: String): String = when (rawName) {
+    GetUserChoiceToolName -> stringResource(R.string.chat_tool_get_user_choice)
+    else -> rawName.replace(McpNamePrefix, "")
+}
 
 /**
  * 工具调用 chip — 一次调用只占一行，并内联表达执行状态（优先级从高到低）：

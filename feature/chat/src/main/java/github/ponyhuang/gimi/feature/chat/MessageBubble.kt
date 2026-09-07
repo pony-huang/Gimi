@@ -61,10 +61,10 @@ internal fun MessageRole.toChatBubbleRole(): ChatBubbleRole = when (this) {
  * 消息气泡 — 把 [Message] 渲染到 [ChatMessageBubble] 的 content slot 里。
  *
  * 渲染顺序：
- * 1. 工具活动 chip 行（call/response 按 id 配对为单 chip，确认协议信令已过滤）
- * 2. 每个 [TextPart]：
+ * 1. 每个 [TextPart]：
  *    - `thought == true` → 走 [ThoughtBubble]（同样支持流式渲染）
  *    - 否则 → 流式 Markdown（经由 [ChatTextContent] 收口）
+ * 2. 工具活动 chip 行（call/response 按 id 配对为单 chip，确认协议信令已过滤）
  *
  * @param partChannelProvider reducer 暴露的"按 TextPart.id 取 chunk channel"函数。
  *        Composable 拿到 channel 后用 `for (chunk in channel) streamingState.append(chunk)`
@@ -90,6 +90,20 @@ fun MessageBubble(
     val fillsBubbleWidth = role != MessageRole.User
     ChatMessageBubble(role = role.toChatBubbleRole(), modifier = modifier) {
         Column(modifier = if (fillsBubbleWidth) Modifier.fillMaxWidth() else Modifier) {
+            if (message.textParts.isNotEmpty() ||
+                message.functionCalls.isNotEmpty() ||
+                message.functionResponses.isNotEmpty()
+            ) {
+                message.textParts.forEach { part ->
+                    RenderTextPart(
+                        part = part,
+                        partial = message.partial,
+                        chunkChannel = partChannelProvider(part.id),
+                        fillAvailableWidth = fillsBubbleWidth,
+                    )
+                }
+            }
+
             // 工具活动 chip 行：call/response 按 id 配对成单个状态 chip（见 ToolCallChip），
             // 确认协议信令（adk_request_confirmation）在 visibleFunction* 里已过滤。
             if (showToolActivity) {
@@ -146,20 +160,6 @@ fun MessageBubble(
                 }
                 response.remoteImageResult?.takeIf { it.images.isNotEmpty() }?.let { result ->
                     RemoteImageCarousel(result = result)
-                }
-            }
-
-            if (message.textParts.isNotEmpty() ||
-                message.functionCalls.isNotEmpty() ||
-                message.functionResponses.isNotEmpty()
-            ) {
-                message.textParts.forEach { part ->
-                    RenderTextPart(
-                        part = part,
-                        partial = message.partial,
-                        chunkChannel = partChannelProvider(part.id),
-                        fillAvailableWidth = fillsBubbleWidth,
-                    )
                 }
             }
 

@@ -4,9 +4,9 @@
 
 # Gimi
 
-**一个随身的 AI 助手。**
+**Android 本地 BYOK AI 助手（类似豆包、元宝、文小言等通用对话助手）。**
 
-像 Claude、豆包、元宝一样自然地聊天和语音对话；再把闹钟、日程、文件、音乐、插件与 MCP 工具真正接到手机上。
+提供文本对话、语音交互，以及闹钟、日程、文件、媒体、插件和 MCP 工具的调用能力。
 
 [![CI](https://github.com/pony-huang/Gimi/actions/workflows/ci.yml/badge.svg)](https://github.com/pony-huang/Gimi/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/pony-huang/Gimi)](https://github.com/pony-huang/Gimi/releases/latest)
@@ -27,7 +27,7 @@
   <img src="doc/assert/dad67e7e0bd1e7045ec58d4282ce2627.jpg" width="24%" alt="设置" />
 </p>
 
-## Demo 展示
+## 演示视频
 
 <div align="center">
   <video src="https://github.com/user-attachments/assets/855737f5-61e6-4e77-88f4-bfe5385009eb" controls playsinline width="320">
@@ -35,21 +35,25 @@
   </video>
 </div>
 
-## 能干什么
+## 功能概述
 
-填入自己的 API Key 后，Gimi 就能在你的授权范围内帮你操作设备：设闹钟、看日程、播放媒体、调节屏幕亮度、访问指定文件夹，还能使用你接入的插件和外部工具。
+配置自己的 API Key 后，Gimi 把聊天、语音和手机上的常用操作放到同一个入口：查日程、设闹钟、播放媒体、调节亮度、搜索已授权文件夹，也能调用你接入的插件和外部工具。
 
-## 功能
+## 功能说明
 
 ### 聊天
 
-流式回复，支持拍照或相册发图，也能从其他应用分享图片和文档。图片可直接在对话中预览；本地文件搜索结果直接呈现在对话里。可选择显示每一次工具调用及其返回结果。
+流式回复，支持拍照或相册发图，也能从其他应用分享图片和文档。图片可直接在对话中预览；本地文件搜索结果直接呈现在对话里。可选择显示每一次工具调用及其返回结果，也能一键自动朗读完整回复。
+
+每个会话可单独选择模型、MCP 连接、官方工具、推理强度和工具加载方式（按需加载或全量加载），并选择“请求批准”或“完全批准”的工具权限模式。Agent 需要补充信息时，会在输入栏中请求文字回复或让你从选项中选择。
+
+最新一轮因失败、中断或手动停止而未完成时，可编辑原消息或重试；若这一轮已调用工具，重新发送前会提醒你操作可能再次执行，已完成的操作不会撤销。
 
 空会话可展示由 Agent 根据已启用工具、插件和你允许提供的上下文生成的任务建议，点一下即可开始；可在设置中关闭、立即刷新或调整后台更新间隔。
 
 ### 语音
 
-点按说话，或者设唤醒词后台待命。连接蓝牙耳机后，Gimi 用离线唤醒模型在后台监听 —— 说声「吉米」再报出任务，不动手机就能执行。
+点按说话，或者设唤醒词后台待命。可为已安装的离线唤醒模型自定义唤醒词；Gimi 会优先使用已连接的蓝牙耳机，也可通过手机麦克风和扬声器工作。说出唤醒词再报出任务，不动手机就能执行。
 
 ### 内置工具
 
@@ -110,27 +114,27 @@
 
 *设置 → 检查更新*，有新版本直接应用内下载安装。版本发布自 GitHub。
 
-### 掌控权在你
+### 授权与数据
 
-- 敏感操作暂停等你允许或拒绝。
-- 只开放你想用的工具。
-- 权限页说清楚每项权限干什么用。
-- API Key 存在本机，不经过第三方。
+- 需要确认的敏感操作会暂停，等待允许或拒绝。
+- 每个会话可选择“请求批准”或“完全批准”；后者会自动放行需要确认的工具调用。
+- 本地工具和系统权限均由用户单独启用或授权。
+- 权限管理页面说明每项权限的用途。
+- API Key 保存在设备本地，不经过第三方服务。
 
 ## 模型服务
 
-自带 API Key。Gimi 内置以下服务商的预设，也兼容任何 OpenAI 兼容或 Anthropic 协议的端点。
+自带 API Key。Gimi 内置以下服务商的预设，也兼容任何 OpenAI API 或 Anthropic API 端点。
 
 | 服务商                                                                                              | 接口协议                |
 |-----------------------------------------------------------------------------------------------------|-------------------------|
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/openai.svg" width="16" alt="OpenAI" /> **OpenAI** | OpenAI 兼容 |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/openai.svg" width="16" alt="OpenAI" /> **OpenAI** | OpenAI API |
 | <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/anthropic.svg" width="16" alt="Anthropic" /> **Anthropic** | Anthropic API |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/deepseek-color.svg" width="16" alt="DeepSeek" /> **DeepSeek** | OpenAI 兼容 / Anthropic 协议 |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/kimi-color.svg" width="16" alt="Moonshot" /> **月之暗面 Kimi** | OpenAI 兼容 / Anthropic 协议 |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/zhipu-color.svg" width="16" alt="GLM" /> **智谱 GLM** | OpenAI 兼容 / Anthropic 协议 |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/minimax-color.svg" width="16" alt="MiniMax" /> **MiniMax** | OpenAI 兼容 / Anthropic 协议 |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/xiaomimimo.svg" width="16" alt="MiMo" /> **小米 MiMo** | OpenAI 兼容 / Anthropic 协议 |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/gemini-color.svg" width="16" alt="Gemini" /> **Gemini** | 暂不支持：ADK Kotlin 禁止在 Android 使用 API Key / GoogleCredentials（[官方说明](https://github.com/google/adk-kotlin)） |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/deepseek-color.svg" width="16" alt="DeepSeek" /> **DeepSeek** | OpenAI API / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/kimi-color.svg" width="16" alt="Moonshot" /> **月之暗面 Kimi** | OpenAI API / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/zhipu-color.svg" width="16" alt="GLM" /> **智谱 GLM** | OpenAI API / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/minimax-color.svg" width="16" alt="MiniMax" /> **MiniMax** | OpenAI API / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/xiaomimimo.svg" width="16" alt="MiMo" /> **小米 MiMo** | OpenAI API / Anthropic API |
 
 可配置：快速模型（会话标题）、语音识别模型、语音合成模型。
 
@@ -144,7 +148,7 @@
 6. 可选：在 *设置 → 记忆* 配置本地或 Mem0 记忆，在 *设置 → 智能推荐* 管理空会话任务建议。
 7. 开始聊。
 
-想扩展的话：开语音唤醒、加 MCP 服务器、装插件或技能、授权工作文件夹。
+可选扩展：启用语音唤醒、添加 MCP 服务器、安装插件或技能，以及授权工作文件夹。
 
 ## 隐私
 

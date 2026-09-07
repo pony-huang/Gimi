@@ -4,9 +4,9 @@
 
 # Gimi
 
-**An AI assistant that travels with you.**
+**A local BYOK AI assistant for Android, similar to general-purpose conversational assistants such as Gemini, ChatGPT, and Claude.**
 
-Chat or talk naturally, then put your phone's alarms, calendar, files, music, plugins, and MCP tools to work.
+Provides text chat, voice interaction, and access to alarms, calendar, files, media, plugins, and MCP tools.
 
 [![CI](https://github.com/pony-huang/Gimi/actions/workflows/ci.yml/badge.svg)](https://github.com/pony-huang/Gimi/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/pony-huang/Gimi)](https://github.com/pony-huang/Gimi/releases/latest)
@@ -35,19 +35,28 @@ Chat or talk naturally, then put your phone's alarms, calendar, files, music, pl
   </video>
 </div>
 
-## What it does
+## Overview
 
-Add your own API key, and Gimi can help with your device within the permissions you choose: set
-alarms, check your calendar, play media, adjust screen brightness, access folders you select, and
-use the plugins and external tools you connect.
+Configure your own API key, and Gimi brings chat, voice, and everyday phone tasks into one place:
+check your calendar, set alarms, play media, adjust brightness, search folders you authorize, and use
+the plugins and external tools you connect.
 
-## Features
+## Feature reference
 
 ### Chat
 
 Stream replies. Attach photos from camera or gallery, or share images and documents from other apps.
 Images can be previewed directly in chat and local file search results render in the conversation.
-Choose whether to show each tool call and its result.
+Choose whether to show each tool call and its result, or automatically read complete replies aloud.
+
+Configure each conversation independently: choose its model, MCP connections, official tools, reasoning
+effort, and tool-loading mode (on demand or all at once); choose whether tool calls request approval or
+receive full approval. When it needs more information, the Agent can ask for typed input or offer choices
+right in the composer.
+
+If the latest turn fails, is interrupted, or is stopped, edit the original message or retry it. If that
+turn already called a tool, Gimi warns that resending may run the operation again; completed actions are
+not undone.
 
 In an empty conversation, Agent-generated task suggestions can use enabled tools, plugins, and the
 context you allow. Tap one to start; turn them off, refresh them now, or set their background update
@@ -55,9 +64,9 @@ interval in Settings.
 
 ### Voice
 
-Tap-to-talk, or set a wake word for hands-free use. Paired with a Bluetooth headset, Gimi listens in
-the background with an offline wake-word model — say "Gimi" and speak a task, and it runs without
-touching the screen.
+Tap-to-talk, or set a wake word for hands-free use. Customize the wake word for an installed offline
+wake model. Gimi prefers a connected Bluetooth headset and can also use the phone microphone and speaker:
+say the wake word, then speak a task, and it runs without touching the screen.
 
 ### Built-in tools
 
@@ -129,28 +138,29 @@ Pick folders for the assistant to search. Only folders you authorize are visible
 Check for new versions and install in place from *Settings → Check for updates*. Releases ship from
 GitHub.
 
-### You're in control
+### Authorization and data
 
-- Sensitive actions pause and wait for Allow/Reject.
-- Enable only the tools you want.
-- Permissions page explains what each one does.
-- API keys stay on-device; never pass through third parties.
+- Sensitive actions pause and wait for approval or rejection.
+- Each conversation can use either request approval or full approval; the latter automatically allows tool
+  calls that require confirmation.
+- Local tools and system permissions are enabled or granted individually by the user.
+- The Permissions page describes the purpose of each permission.
+- API keys remain on the device and do not pass through third-party services.
 
 ## Model services
 
 Bring your own API key. Gimi ships with presets for the providers below, and works with any
-OpenAI-compatible or Anthropic-style endpoint.
+OpenAI API or Anthropic API endpoint.
 
 | Provider                                                                                             | API protocol            |
 |------------------------------------------------------------------------------------------------------|-------------------------|
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/openai.svg" width="16" alt="OpenAI" /> **OpenAI** | OpenAI-compatible |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/openai.svg" width="16" alt="OpenAI" /> **OpenAI** | OpenAI API |
 | <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/anthropic.svg" width="16" alt="Anthropic" /> **Anthropic** | Anthropic API |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/deepseek-color.svg" width="16" alt="DeepSeek" /> **DeepSeek** | OpenAI & Anthropic |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/kimi-color.svg" width="16" alt="Moonshot" /> **Moonshot (Kimi)** | OpenAI & Anthropic |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/zhipu-color.svg" width="16" alt="GLM" /> **GLM (Zhipu)** | OpenAI & Anthropic |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/minimax-color.svg" width="16" alt="MiniMax" /> **MiniMax** | OpenAI & Anthropic |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/xiaomimimo.svg" width="16" alt="MiMo" /> **MiMo (Xiaomi)** | OpenAI & Anthropic |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/gemini-color.svg" width="16" alt="Gemini" /> **Gemini** | Temporarily unsupported: ADK Kotlin prevents API Key / GoogleCredentials usage on Android ([official notice](https://github.com/google/adk-kotlin)) |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/deepseek-color.svg" width="16" alt="DeepSeek" /> **DeepSeek** | OpenAI API / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/kimi-color.svg" width="16" alt="Moonshot" /> **Moonshot (Kimi)** | OpenAI API / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/zhipu-color.svg" width="16" alt="GLM" /> **GLM (Zhipu)** | OpenAI API / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/minimax-color.svg" width="16" alt="MiniMax" /> **MiniMax** | OpenAI API / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/xiaomimimo.svg" width="16" alt="MiMo" /> **MiMo (Xiaomi)** | OpenAI API / Anthropic API |
 
 Also configurable: a quick model for conversation titles, a speech recognition model, and a speech
 synthesis model.
@@ -166,7 +176,7 @@ synthesis model.
    suggestions in *Settings → Smart recommendations*.
 7. Start chatting.
 
-Optional: enable voice wake, add MCP servers, install plugins or skills, authorize working folders.
+Optional extensions include voice wake, MCP servers, plugins or skills, and authorized working folders.
 
 ## Privacy
 

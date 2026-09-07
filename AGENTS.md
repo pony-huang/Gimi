@@ -124,9 +124,9 @@ Android Studio may run the `app` debug configuration on a device or emulator.
 
 ### Testing rules
 
-- Pure text-only changes, including documentation, comments, user-facing copy, and prompt wording, are exempt from TDD and do not require adding or updating automated tests. This exception applies when the change does not also modify Kotlin control flow, parsing or interpolation logic, tool definitions, structured output contracts, resources wiring, or UI behavior. Review the diff and use only lightweight, directly relevant validation; do not run broad builds or test suites solely for these text-only edits.
+- Pure text-only changes, including documentation, comments, user-facing copy, and prompt wording, do not require adding or updating automated tests. This applies when the change does not also modify Kotlin control flow, parsing or interpolation logic, tool definitions, structured output contracts, resources wiring, or UI behavior. Review the diff and use only lightweight, directly relevant validation; do not run broad builds or test suites solely for these text-only edits.
 - Use JUnit 4 in the owning module's `src/test`; use behavior-based `*Test.kt` names. Put Android/Compose interaction coverage in `src/androidTest`.
-- Add characterization tests before behavior-preserving refactors of ViewModel transitions or externally visible repository behavior.
+- Behavior-preserving refactors of ViewModel transitions or externally visible repository behavior require characterization test coverage.
 - Changed business rules require domain/use-case or ViewModel tests. Gateways/repositories require applicable success, failure, exception, and mapping coverage.
 - Meaningfully interactive or conditional stateless Compose components require UI coverage when practical. Pure visual-only changes may use compilation plus screenshot/device verification when behavior is unchanged.
 - Tests use fakes, MockWebServer, or mocked gateways, never live model APIs or real credentials.

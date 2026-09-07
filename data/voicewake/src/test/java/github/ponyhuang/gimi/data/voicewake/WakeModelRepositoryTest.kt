@@ -2,6 +2,9 @@ package github.ponyhuang.gimi.data.voicewake
 
 import android.content.Context
 import github.ponyhuang.gimi.core.network.HttpFileDownloader
+import github.ponyhuang.gimi.core.storage.FileSystemAppDirectoryResolver
+import github.ponyhuang.gimi.core.storage.StorageRegistry
+import github.ponyhuang.gimi.core.storage.StorageRoots
 import github.ponyhuang.gimi.data.voicewake.notification.WakeModelNotifier
 import github.ponyhuang.gimi.domain.speech.model.WakeModelCatalog
 import github.ponyhuang.gimi.domain.speech.model.WakeModelInfo
@@ -44,6 +47,17 @@ class WakeModelRepositoryTest {
             context,
             HttpFileDownloader(client),
             NoOpWakeModelNotifier,
+            StorageRegistry(
+                setOf(VoiceWakeStorage.Models, VoiceWakeStorage.Downloads),
+                FileSystemAppDirectoryResolver(
+                    StorageRoots(
+                        files = File(temporaryFolder.root, "files"),
+                        cache = File(temporaryFolder.root, "cache"),
+                        codeCache = File(temporaryFolder.root, "code-cache"),
+                        externalFiles = null,
+                    ),
+                ),
+            ),
         )
     }
 

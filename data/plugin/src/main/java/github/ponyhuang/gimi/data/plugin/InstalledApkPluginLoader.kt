@@ -8,6 +8,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dalvik.system.DexClassLoader
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import github.ponyhuang.gimi.pluginapi.PluginApi
+import github.ponyhuang.gimi.core.storage.StorageRegistry
 import java.io.File
 import javax.inject.Inject
 
@@ -28,7 +29,10 @@ import javax.inject.Inject
 class InstalledApkPluginLoader @Inject constructor(
     @ApplicationContext private val context: Context,
     private val configStore: PluginConfigStore,
+    storageRegistry: StorageRegistry,
 ) : PluginLoader {
+
+    private val optimizedRoot = storageRegistry.resolve(PluginStorage.OPTIMIZED_ROOT_ID, create = true)
 
     /**
      * 加载并缓存结果。缓存为「包名 → 插件」映射，[refresh] 只增删不改实例：
@@ -95,7 +99,7 @@ class InstalledApkPluginLoader @Inject constructor(
             val sourceDir = appInfo.sourceDir
                 ?: error("Missing sourceDir for $packageName")
 
-            val optimizedDir = File(context.codeCacheDir, "plugins/$packageName").apply { mkdirs() }
+            val optimizedDir = pluginOptimizedDirectory(optimizedRoot, packageName).apply { mkdirs() }
             val dexClassLoader = DexClassLoader(
                 sourceDir,
                 optimizedDir.absolutePath,

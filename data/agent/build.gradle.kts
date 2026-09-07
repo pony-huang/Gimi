@@ -32,6 +32,7 @@ android {
 dependencies {
     implementation(project(":domain:recommendation"))
     implementation(project(":core:common"))
+    implementation(project(":core:storage"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:mcp"))
     implementation(project(":domain:modelcatalog"))

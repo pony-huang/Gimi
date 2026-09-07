@@ -4,9 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.provider.Settings
-import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.gimi.core.storage.ShareableFileUriFactory
 import java.io.File
 import java.security.MessageDigest
 import javax.inject.Inject
@@ -14,6 +14,7 @@ import javax.inject.Inject
 /** APK 安装相关系统交互：未知来源权限、安装 Intent、签名比对。 */
 class ApkInstaller @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val shareableFileUriFactory: ShareableFileUriFactory,
 ) {
     fun canRequestPackageInstalls(): Boolean = context.packageManager.canRequestPackageInstalls()
 
@@ -25,11 +26,7 @@ class ApkInstaller @Inject constructor(
 
     /** 调起系统安装器。 */
     fun installIntent(apk: File): Intent {
-        val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            apk,
-        )
+        val uri = shareableFileUriFactory.uriFor(apk)
         return Intent(Intent.ACTION_VIEW)
             .setDataAndType(uri, "application/vnd.android.package-archive")
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)

@@ -9,6 +9,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:storage"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:mcp"))
     implementation(project(":domain:modelcatalog"))

@@ -1,110 +1,154 @@
 package github.ponyhuang.gimi.data.workfiles.repository
 
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.provider.DocumentsContract
-import androidx.core.content.edit
-import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.domain.workfiles.model.WorkDirectory
-import github.ponyhuang.gimi.domain.workfiles.repository.WorkDirectoryRepository
 import github.ponyhuang.gimi.domain.workfiles.repository.WorkDirectoryOperationResult
+import github.ponyhuang.gimi.domain.workfiles.repository.WorkDirectoryRepository
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** Persists the document-tree grants explicitly selected by the user. */
+/** Persists and validates the document-tree grants explicitly selected by the user. */
 @Singleton
 class DocumentDirectoryRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
+    private val configStore: WorkDirectoryConfigStore,
+    private val gateway: DocumentTreeGateway,
 ) : WorkDirectoryRepository {
-    private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
-    private val directories = MutableStateFlow(readDirectories())
     private val mutationMutex = Mutex()
 
-    override fun observeDirectories() = directories
-        .map { values -> values.map { it.toDomain() } }
-        .distinctUntilChanged()
-
-    override fun currentDirectories(): List<WorkDirectory> =
-        directories.value.map { it.toDomain() }
+    override fun observeDirectories(): Flow<List<WorkDirectory>> = configStore.directories
 
     override suspend fun addDirectory(uri: String): WorkDirectoryOperationResult {
-        val parsed = uri.toUriOrNull()
+        val info = gateway.inspect(uri)
             ?: return WorkDirectoryOperationResult.Failure.InvalidDirectory
-        if (!DocumentsContract.isTreeUri(parsed)) {
-            return WorkDirectoryOperationResult.Failure.InvalidDirectory
-        }
-        val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-        try {
-            context.contentResolver.takePersistableUriPermission(parsed, flags)
-        } catch (_: SecurityException) {
-            return WorkDirectoryOperationResult.Failure.PermissionDenied
-        } catch (_: IllegalArgumentException) {
-            return WorkDirectoryOperationResult.Failure.InvalidDirectory
-        }
         return mutationMutex.withLock {
-            val updated = (directories.value + parsed).distinct()
-            persist(updated)
-            directories.value = updated
-            WorkDirectoryOperationResult.Success
-        }
-    }
-
-    override suspend fun removeDirectory(uri: String): WorkDirectoryOperationResult {
-        val parsed = uri.toUriOrNull()
-            ?: return WorkDirectoryOperationResult.Failure.InvalidDirectory
-        try {
-            context.contentResolver.releasePersistableUriPermission(
-                parsed,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            val current = configStore.current()
+            if (current.any { it.treeUri == info.treeUri }) {
+                return@withLock WorkDirectoryOperationResult.Failure.DuplicateDirectory
+            }
+            val conflict = current.firstOrNull { directory ->
+                gateway.relationship(directory.treeUri, info.treeUri) !=
+                    DocumentTreeRelationship.DISJOINT
+            }
+            if (conflict != null) {
+                return@withLock if (conflict.treeUri == info.treeUri) {
+                    WorkDirectoryOperationResult.Failure.DuplicateDirectory
+                } else {
+                    WorkDirectoryOperationResult.Failure.OverlappingDirectory(conflict.id)
+                }
+            }
+            if (!gateway.takeReadPermission(info.treeUri)) {
+                return@withLock WorkDirectoryOperationResult.Failure.PermissionDenied
+            }
+            val directory = WorkDirectory(
+                id = UUID.randomUUID().toString(),
+                treeUri = info.treeUri,
+                displayName = info.displayName,
+                authority = info.authority,
+                enabled = true,
+                accessStatus = gateway.accessStatus(info.treeUri),
+                addedAtEpochMillis = System.currentTimeMillis(),
             )
-        } catch (_: SecurityException) {
-            // The platform may have already revoked the grant. Local removal must still succeed.
-        }
-        return mutationMutex.withLock {
-            val updated = directories.value - parsed
-            persist(updated)
-            directories.value = updated
+            if (!replaceSafely(current + directory)) {
+                gateway.releaseReadPermission(info.treeUri)
+                return@withLock WorkDirectoryOperationResult.Failure.PersistenceFailed
+            }
             WorkDirectoryOperationResult.Success
         }
     }
 
-    /** True only for a file which belongs to one of the persisted tree grants. */
-    override fun contains(uri: String): Boolean {
-        val parsed = uri.toUriOrNull() ?: return false
-        return directories.value.any { treeUri ->
-            runCatching {
-                DocumentsContract.isChildDocument(context.contentResolver, treeUri, parsed)
-            }.getOrDefault(false)
+    override suspend fun removeDirectory(id: String): WorkDirectoryOperationResult =
+        mutationMutex.withLock {
+            val current = configStore.current()
+            val removed = current.firstOrNull { it.id == id }
+                ?: return@withLock WorkDirectoryOperationResult.Failure.NotFound
+            if (!replaceSafely(current.filterNot { it.id == id })) {
+                return@withLock WorkDirectoryOperationResult.Failure.PersistenceFailed
+            }
+            gateway.releaseReadPermission(removed.treeUri)
+            WorkDirectoryOperationResult.Success
+        }
+
+    override suspend fun setEnabled(
+        id: String,
+        enabled: Boolean,
+    ): WorkDirectoryOperationResult = mutationMutex.withLock {
+        val current = configStore.current()
+        if (current.none { it.id == id }) {
+            return@withLock WorkDirectoryOperationResult.Failure.NotFound
+        }
+        val updated = current.map { directory ->
+            if (directory.id == id) directory.copy(enabled = enabled) else directory
+        }
+        if (replaceSafely(updated)) {
+            WorkDirectoryOperationResult.Success
+        } else {
+            WorkDirectoryOperationResult.Failure.PersistenceFailed
         }
     }
 
-    private fun readDirectories(): List<Uri> = preferences.getStringSet(DIRECTORIES_KEY, emptySet())
-        .orEmpty()
-        .mapNotNull { it.toUriOrNull() }
-        .filter(DocumentsContract::isTreeUri)
-
-    private fun persist(uris: List<Uri>) {
-        preferences.edit {
-            putStringSet(DIRECTORIES_KEY, uris.map(Uri::toString).toSet())
+    override suspend fun reauthorize(
+        id: String,
+        uri: String,
+    ): WorkDirectoryOperationResult {
+        val info = gateway.inspect(uri)
+            ?: return WorkDirectoryOperationResult.Failure.InvalidDirectory
+        return mutationMutex.withLock {
+            val current = configStore.current()
+            val existing = current.firstOrNull { it.id == id }
+                ?: return@withLock WorkDirectoryOperationResult.Failure.NotFound
+            val conflict = current.firstOrNull { directory ->
+                directory.id != id && gateway.relationship(directory.treeUri, info.treeUri) !=
+                    DocumentTreeRelationship.DISJOINT
+            }
+            if (conflict != null) {
+                return@withLock if (conflict.treeUri == info.treeUri) {
+                    WorkDirectoryOperationResult.Failure.DuplicateDirectory
+                } else {
+                    WorkDirectoryOperationResult.Failure.OverlappingDirectory(conflict.id)
+                }
+            }
+            if (!gateway.takeReadPermission(info.treeUri)) {
+                return@withLock WorkDirectoryOperationResult.Failure.PermissionDenied
+            }
+            val replacement = existing.copy(
+                treeUri = info.treeUri,
+                displayName = info.displayName,
+                authority = info.authority,
+                accessStatus = gateway.accessStatus(info.treeUri),
+            )
+            val updated = current.map { directory ->
+                if (directory.id == id) replacement else directory
+            }
+            if (!replaceSafely(updated)) {
+                gateway.releaseReadPermission(info.treeUri)
+                return@withLock WorkDirectoryOperationResult.Failure.PersistenceFailed
+            }
+            if (existing.treeUri != info.treeUri) {
+                gateway.releaseReadPermission(existing.treeUri)
+            }
+            WorkDirectoryOperationResult.Success
         }
     }
 
-    private fun Uri.toDomain() = WorkDirectory(
-        uri = toString(),
-        displayName = lastPathSegment ?: toString(),
-        authority = authority.orEmpty(),
-    )
+    override suspend fun refreshAccess() = mutationMutex.withLock {
+        val current = configStore.current()
+        val updated = current.map { directory ->
+            directory.copy(accessStatus = gateway.accessStatus(directory.treeUri))
+        }
+        replaceSafely(updated)
+        Unit
+    }
 
-    private fun String.toUriOrNull(): Uri? = runCatching(Uri::parse).getOrNull()
-
-    private companion object {
-        const val PREFERENCES_NAME = "document_search_directories_v1"
-        const val DIRECTORIES_KEY = "tree_uris"
+    private suspend fun replaceSafely(directories: List<WorkDirectory>): Boolean = try {
+        configStore.replace(directories)
+        true
+    } catch (exception: CancellationException) {
+        throw exception
+    } catch (_: Exception) {
+        false
     }
 }

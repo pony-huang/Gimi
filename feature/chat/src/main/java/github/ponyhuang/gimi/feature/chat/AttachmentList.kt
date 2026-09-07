@@ -54,6 +54,7 @@ import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import java.io.File
+import github.ponyhuang.gimi.core.storage.AndroidAppDirectoryResolver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -294,7 +295,8 @@ private fun PersistedFileAttachment(
 private fun FileAttachment.playbackPath(context: Context): String? {
     payloadReference?.let { return it }
     val bytes = inlineData ?: return null
-    val directory = File(context.cacheDir, "message-attachments").apply { mkdirs() }
+    val root = AndroidAppDirectoryResolver(context).resolve(chatShareableDirectorySpec, create = true)
+    val directory = File(root, "playback").apply { mkdirs() }
     val safeName = displayName.replace(Regex("""[^\w.\-]"""), "_")
     val file = File(directory, "$id-$safeName")
     if (!file.exists()) file.writeBytes(bytes)

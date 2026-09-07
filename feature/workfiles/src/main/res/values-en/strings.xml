@@ -10,4 +10,27 @@
     <string name="workfiles_error_invalid">The selected location is not a valid working folder.</string>
     <string name="workfiles_error_permission">Folder access could not be retained. Select it again.</string>
     <string name="workfiles_error_persistence">The working folder could not be saved. Try again.</string>
+    <string name="workfiles_error_duplicate">This working folder has already been added.</string>
+    <string name="workfiles_error_overlap">The selected folder overlaps an existing working folder.</string>
+    <string name="workfiles_error_not_found">This working folder no longer exists. Refresh and try again.</string>
+    <string name="workfiles_storage_section">App storage</string>
+    <string name="workfiles_storage_loading">Calculating storage use…</string>
+    <string name="workfiles_storage_total">%1$s used</string>
+    <string name="workfiles_storage_breakdown">Persistent data %1$s · Cache and temporary files %2$s</string>
+    <string name="workfiles_storage_cache">Cache</string>
+    <string name="workfiles_storage_cache_value">%1$s · Can be regenerated</string>
+    <string name="workfiles_storage_temporary">Temporary files</string>
+    <string name="workfiles_storage_temporary_value">%1$s · Drafts and downloads</string>
+    <string name="workfiles_storage_clear">Clear %1$s</string>
+    <string name="workfiles_storage_retry">Recalculate storage use</string>
+    <string name="workfiles_storage_unreadable">%1$d directories are temporarily unreadable and were not included.</string>
+    <string name="workfiles_storage_clear_success">Freed %1$s.</string>
+    <string name="workfiles_storage_clear_partial">Cleared %1$d directories; %2$d directories could not be cleared.</string>
+    <string name="workfiles_empty_description">After adding one, the assistant searches only folders you explicitly authorize and enable.</string>
+    <string name="workfiles_status_available">Available for search</string>
+    <string name="workfiles_status_disabled">Disabled</string>
+    <string name="workfiles_status_permission_lost">Access permission lost</string>
+    <string name="workfiles_status_provider_unavailable">Storage provider unavailable</string>
+    <string name="workfiles_reauthorize_action">Authorize again</string>
+    <string name="workfiles_access_warning">Some folders need authorization again and will not be searched until restored.</string>
 </resources>

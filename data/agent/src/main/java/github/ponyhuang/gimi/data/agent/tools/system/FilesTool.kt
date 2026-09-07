@@ -5,12 +5,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.provider.DocumentsContract
 import android.provider.MediaStore
 import com.google.adk.kt.annotations.Param
 import com.google.adk.kt.annotations.Tool
 import dagger.hilt.android.qualifiers.ApplicationContext
-import github.ponyhuang.gimi.domain.workfiles.repository.WorkDirectoryRepository
+import github.ponyhuang.gimi.domain.workfiles.model.WorkFileSearchResult
+import github.ponyhuang.gimi.domain.workfiles.repository.DocumentSearchRepository
 import github.ponyhuang.gimi.data.agent.permission.MediaPermissionActivity
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,7 +25,7 @@ import androidx.core.net.toUri
 class FilesTool @Inject constructor(
     @ApplicationContext private val context: Context,
     private val queue: IntentActionQueue,
-    private val documentDirectories: WorkDirectoryRepository,
+    private val documentSearch: DocumentSearchRepository,
 ) {
     // ---------- 文件选择 ----------
 
@@ -114,26 +114,18 @@ class FilesTool @Inject constructor(
             "Summarize the outcome without repeating the complete file-name list.",
         requireConfirmation = true,
     )
-    fun searchDocuments(@Param("A non-blank file-name query.") query: String): Map<String, Any> {
+    suspend fun searchDocuments(@Param("A non-blank file-name query.") query: String): Map<String, Any> {
         val value = query.trim()
         if (value.isEmpty()) return error("query must not be blank.")
-        val trees = documentDirectories.currentDirectories().map { Uri.parse(it.uri) }
-        if (trees.isEmpty()) return error(
-            "No document search directory is configured. Ask the user to add one in Settings > Document search directories.",
-        )
-        val results = mutableListOf<Map<String, Any>>()
-        trees.forEach { treeUri ->
-            val rootId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull()
-            if (rootId != null) searchTree(treeUri, rootId, listOf(value), results)
-        }
+        var results = documentSearch.search(value, MAX_RESULTS)
         // 精确短语零结果时按分词放宽（任一词命中），与 queryMedia 的兜底策略保持一致。
         if (results.isEmpty()) {
             val tokens = relaxedQueryTokens(value)
             if (tokens.size > 1) {
-                trees.forEach { treeUri ->
-                    val rootId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull()
-                    if (rootId != null) searchTree(treeUri, rootId, tokens, results)
-                }
+                results = tokens.flatMap { token -> documentSearch.search(token, MAX_RESULTS) }
+                    .distinctBy(WorkFileSearchResult::contentUri)
+                    .sortedByDescending(WorkFileSearchResult::modifiedTimeMillis)
+                    .take(MAX_RESULTS)
             }
         }
         return documentResponse(value, results)
@@ -144,9 +136,9 @@ class FilesTool @Inject constructor(
         description = "Opens a file found by a local search in a compatible app for preview. The identifier must come from search_media_files or search_documents.",
         requireConfirmation = true,
     )
-    fun openLocalFile(@Param("The file identifier returned by search_mediaFiles or searchDocuments.") contentUri: String): Map<String, Any> {
+    suspend fun openLocalFile(@Param("The file identifier returned by search_mediaFiles or searchDocuments.") contentUri: String): Map<String, Any> {
         val uri = runCatching { contentUri.toUri() }.getOrNull() ?: return error("contentUri is invalid.")
-        if (uri.scheme != "content" || !isAllowedUri(uri)) return error(
+        if (uri.scheme != "content" || !isAllowedUri(uri, contentUri)) return error(
             "contentUri is not an accessible media result or a file from an authorized document directory.",
         )
         val mimeType = context.contentResolver.getType(uri) ?: "*/*"
@@ -213,44 +205,6 @@ class FilesTool @Inject constructor(
         }.getOrDefault(emptyList())
     }
 
-    private fun searchTree(
-        treeUri: Uri,
-        parentId: String,
-        patterns: List<String>,
-        results: MutableList<Map<String, Any>>,
-    ) {
-        if (results.size >= MAX_RESULTS) return
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId)
-        val projection = arrayOf(
-            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-            DocumentsContract.Document.COLUMN_MIME_TYPE,
-            DocumentsContract.Document.COLUMN_SIZE,
-            DocumentsContract.Document.COLUMN_LAST_MODIFIED,
-        )
-        runCatching {
-            context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                while (cursor.moveToNext() && results.size < MAX_RESULTS) {
-                    val documentId = cursor.getString(0) ?: continue
-                    val displayName = cursor.getString(1).orEmpty()
-                    val mimeType = cursor.getString(2).orEmpty()
-                    if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) {
-                        searchTree(treeUri, documentId, patterns, results)
-                    } else if (patterns.any { displayName.contains(it, ignoreCase = true) }) {
-                        results += fileResult(
-                            uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId),
-                            displayName = displayName,
-                            mimeType = mimeType,
-                            sizeBytes = cursor.getLong(3),
-                            modifiedTimeMillis = cursor.getLong(4),
-                            category = "document",
-                        )
-                    }
-                }
-            }
-        }
-    }
-
     // 零结果时明确告知模型“已搜过但文件名不含该词”，推动它换关键字重试而不是直接放弃。
     private fun mediaResponse(
         query: String,
@@ -266,11 +220,20 @@ class FilesTool @Inject constructor(
         }
     }
 
-    private fun documentResponse(query: String, unsorted: List<Map<String, Any>>): Map<String, Any> = buildMap {
+    private fun documentResponse(query: String, results: List<WorkFileSearchResult>): Map<String, Any> = buildMap {
         put("success", true)
         put("query", query)
-        put("results", unsorted.sortedByDescending { it["modifiedTimeMillis"] as Long }.take(MAX_RESULTS))
-        if (unsorted.isEmpty()) {
+        put("results", results.map { result ->
+            mapOf(
+                "displayName" to result.displayName,
+                "mimeType" to result.mimeType,
+                "sizeBytes" to result.sizeBytes,
+                "modifiedTimeMillis" to result.modifiedTimeMillis,
+                "category" to "document",
+                "contentUri" to result.contentUri,
+            )
+        })
+        if (results.isEmpty()) {
             put("hint", NO_RESULT_HINT)
         }
     }
@@ -294,11 +257,18 @@ class FilesTool @Inject constructor(
     private fun hasPermission(permission: String): Boolean =
         context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
 
-    private fun isAllowedUri(uri: Uri): Boolean =
-        uri.authority == MediaStore.AUTHORITY || documentDirectories.contains(uri.toString())
+    private suspend fun isAllowedUri(uri: Uri, originalValue: String): Boolean =
+        uri.authority == MediaStore.AUTHORITY || documentSearch.isAuthorized(originalValue)
 
     private fun error(message: String): Map<String, Any> = mapOf("success" to false, "error" to message)
 
+    /**
+     * 一类可查询的系统媒体集合及其运行时权限。
+     *
+     * @property type 返回给模型的媒体类别。
+     * @property uri MediaStore 集合 URI。
+     * @property permission 查询该集合所需的权限。
+     */
     private data class MediaCollection(val type: String, val uri: Uri, val permission: String)
 
     private companion object {

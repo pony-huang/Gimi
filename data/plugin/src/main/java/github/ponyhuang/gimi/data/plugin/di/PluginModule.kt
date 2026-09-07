@@ -14,6 +14,7 @@ import github.ponyhuang.gimi.data.plugin.PluginManager
 import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
+import github.ponyhuang.gimi.core.storage.StorageRegistry
 import javax.inject.Singleton
 
 /** 提供动态插件加载器的进程级单例绑定。 */
@@ -26,7 +27,8 @@ object PluginModule {
     fun providePluginLoader(
         @ApplicationContext context: Context,
         configStore: PluginConfigStore,
-    ): PluginLoader = InstalledApkPluginLoader(context, configStore)
+        storageRegistry: StorageRegistry,
+    ): PluginLoader = InstalledApkPluginLoader(context, configStore, storageRegistry)
 }
 
 /** 把插件管理契约绑定到 [PluginManager]。 */

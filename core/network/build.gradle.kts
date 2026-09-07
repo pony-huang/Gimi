@@ -8,6 +8,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:storage"))
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.okhttp)
     testImplementation(libs.junit)

@@ -11,6 +11,7 @@ android {
 dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:network"))
+    implementation(project(":core:storage"))
     implementation(project(":domain:appupdate"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.javax.inject)

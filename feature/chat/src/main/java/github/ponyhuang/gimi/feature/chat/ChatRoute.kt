@@ -17,7 +17,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.core.content.FileProvider
+import github.ponyhuang.gimi.core.storage.AndroidAppDirectoryResolver
+import github.ponyhuang.gimi.core.storage.ShareableFileUriFactory
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -247,7 +248,11 @@ fun ChatRoute(
 
 private fun openDocumentAttachment(context: Context, attachment: FileAttachment) {
     runCatching {
-        val directory = File(context.cacheDir, "message-attachments").apply { mkdirs() }
+        val shareableRoot = AndroidAppDirectoryResolver(context).resolve(
+            chatShareableDirectorySpec,
+            create = true,
+        )
+        val directory = File(shareableRoot, "previews").apply { mkdirs() }
         val safeName = attachment.displayName.replace(Regex("""[^\w.\-]"""), "_")
         val file = File(directory, "${attachment.id}-$safeName")
         if (!file.exists()) {
@@ -260,11 +265,7 @@ private fun openDocumentAttachment(context: Context, attachment: FileAttachment)
                 )
             }
         }
-        val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file,
-        )
+        val uri = ShareableFileUriFactory.uriFor(context, file, chatShareableDirectorySpec)
         context.startActivity(
             Intent(Intent.ACTION_VIEW)
                 .setDataAndType(uri, attachment.mimeType)

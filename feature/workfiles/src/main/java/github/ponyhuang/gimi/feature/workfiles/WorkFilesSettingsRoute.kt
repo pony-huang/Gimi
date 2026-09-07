@@ -21,9 +21,7 @@ fun WorkFilesSettingsRoute(
     val documentTreeLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
     ) { uri ->
-        uri?.let {
-            viewModel.onAction(WorkFilesSettingsAction.DirectorySelected(it.toString()))
-        }
+        viewModel.onAction(WorkFilesSettingsAction.DirectorySelected(uri?.toString()))
     }
 
     LaunchedEffect(state.directoryPickerRequestId) {

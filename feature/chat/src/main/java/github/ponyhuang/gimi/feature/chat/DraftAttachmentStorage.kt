@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.feature.chat
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
+import github.ponyhuang.gimi.core.storage.AndroidAppDirectoryResolver
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import java.io.File
@@ -28,7 +29,10 @@ internal fun importDraftAttachment(context: Context, uri: Uri): DraftAttachment 
         ?: throw IllegalArgumentException("Unsupported attachment type")
     val category = AttachmentCategory.from(mimeType, displayName)
         ?: throw IllegalArgumentException("Unsupported attachment type")
-    val directory = File(context.cacheDir, DRAFT_DIRECTORY).apply { mkdirs() }
+    val directory = AndroidAppDirectoryResolver(context).resolve(
+        chatComposerDraftDirectorySpec,
+        create = true,
+    )
     val target = File(directory, UUID.randomUUID().toString())
     try {
         val input = if (uri.scheme == "file") {
@@ -53,11 +57,11 @@ internal fun importDraftAttachment(context: Context, uri: Uri): DraftAttachment 
     }
 }
 
-internal fun deleteManagedDrafts(attachments: Iterable<DraftAttachment>) {
+internal fun deleteManagedDrafts(context: Context, attachments: Iterable<DraftAttachment>) {
+    val root = AndroidAppDirectoryResolver(context).resolve(chatComposerDraftDirectorySpec).canonicalFile
     attachments.forEach { attachment ->
-        val file = File(attachment.reference)
-        if (file.parentFile?.name == DRAFT_DIRECTORY) file.delete()
+        val file = runCatching { File(attachment.reference).canonicalFile }.getOrNull()
+            ?: return@forEach
+        if (file.parentFile == root) file.delete()
     }
 }
-
-private const val DRAFT_DIRECTORY = "chat-drafts"

@@ -18,5 +18,23 @@ class AddWorkDirectoryUseCase @Inject constructor(
 class RemoveWorkDirectoryUseCase @Inject constructor(
     private val repository: WorkDirectoryRepository,
 ) {
-    suspend operator fun invoke(uri: String) = repository.removeDirectory(uri)
+    suspend operator fun invoke(id: String) = repository.removeDirectory(id)
+}
+
+class SetWorkDirectoryEnabledUseCase @Inject constructor(
+    private val repository: WorkDirectoryRepository,
+) {
+    suspend operator fun invoke(id: String, enabled: Boolean) = repository.setEnabled(id, enabled)
+}
+
+class RefreshWorkDirectoryAccessUseCase @Inject constructor(
+    private val repository: WorkDirectoryRepository,
+) {
+    suspend operator fun invoke() = repository.refreshAccess()
+}
+
+class ReauthorizeWorkDirectoryUseCase @Inject constructor(
+    private val repository: WorkDirectoryRepository,
+) {
+    suspend operator fun invoke(id: String, uri: String) = repository.reauthorize(id, uri)
 }

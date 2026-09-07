@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.data.voicewake
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.core.network.HttpFileDownloader
+import github.ponyhuang.gimi.core.storage.StorageRegistry
 import github.ponyhuang.gimi.data.voicewake.R
 import github.ponyhuang.gimi.data.voicewake.notification.WakeModelNotifier
 import github.ponyhuang.gimi.domain.speech.model.WakeModelCatalog
@@ -36,10 +37,12 @@ class WakeModelRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     fileDownloader: HttpFileDownloader,
     private val notifier: WakeModelNotifier,
+    storageRegistry: StorageRegistry,
 ) {
     private val downloader = WakeModelDownloader(fileDownloader)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val rootDir = File(context.filesDir, "voice/wake-model")
+    private val rootDir = storageRegistry.resolve(VoiceWakeStorage.MODELS_ID)
+    private val downloadsDir = storageRegistry.resolve(VoiceWakeStorage.DOWNLOADS_ID)
     private val fileStore = WakeModelFileStore(rootDir)
     private val _states = MutableStateFlow(initialStates())
     private val installJobs = ConcurrentHashMap<String, Job>()
@@ -113,7 +116,7 @@ class WakeModelRepository @Inject constructor(
     }
 
     private suspend fun installInternal(info: WakeModelInfo) {
-        val archive = File(context.cacheDir, "${info.id}.archive")
+        val archive = File(downloadsDir, "${info.id}.archive")
         val extracting = File(rootDir, "${info.id}.extracting")
         try {
             rootDir.mkdirs()

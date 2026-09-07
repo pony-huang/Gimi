@@ -8,6 +8,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:storage"))
     implementation(project(":domain:skills"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.google.adk.kotlin.core) {

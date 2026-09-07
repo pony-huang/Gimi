@@ -9,6 +9,8 @@ import android.net.Uri
 import android.webkit.MimeTypeMap
 import androidx.exifinterface.media.ExifInterface
 import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.gimi.core.storage.StorageRegistry
+import github.ponyhuang.gimi.domain.conversation.model.ConversationStorageIds
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
@@ -22,8 +24,18 @@ import androidx.core.graphics.scale
 
 class AndroidChatAttachmentRepository @Inject constructor(
     @ApplicationContext private val context: Context,
+    storageRegistry: StorageRegistry,
 ) : ChatAttachmentRepository {
     private val resolver = context.contentResolver
+    private val attachmentRoot = storageRegistry.resolve(
+        ConversationStorageIds.ATTACHMENTS,
+        create = true,
+    )
+    private val draftRoots = listOf(
+        storageRegistry.resolve(ConversationStorageIds.REPOSITORY_DRAFTS, create = true),
+        storageRegistry.resolve(ConversationStorageIds.COMPOSER_DRAFTS, create = true),
+    )
+    private val draftRoot = draftRoots.first()
 
     override suspend fun read(
         sessionId: String,
@@ -45,18 +57,15 @@ class AndroidChatAttachmentRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             attachments.forEach { attachment ->
                 val file = File(attachment.reference)
-                val draftDirectory = File(context.cacheDir, DRAFT_DIRECTORY).canonicalFile
                 val candidate = runCatching { file.canonicalFile }.getOrNull() ?: return@forEach
-                if (candidate.parentFile == draftDirectory) candidate.delete()
+                if (draftRoots.any { candidate.parentFile == it.canonicalFile }) candidate.delete()
             }
         }
     }
 
     override suspend fun deleteSession(sessionId: String) {
         withContext(Dispatchers.IO) {
-            val root = File(context.filesDir, ATTACHMENT_DIRECTORY).canonicalFile
-            val directory = File(root, safeSessionId(sessionId)).canonicalFile
-            if (directory.parentFile == root) directory.deleteRecursively()
+            conversationSessionDirectory(attachmentRoot, sessionId).deleteRecursively()
         }
     }
 
@@ -85,8 +94,7 @@ class AndroidChatAttachmentRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             attachments.map { attachment ->
                 val reference = attachment.payloadReference ?: run {
-                    val directory = File(context.cacheDir, DRAFT_DIRECTORY).apply { mkdirs() }
-                    val target = File(directory, attachment.id)
+                    val target = File(draftRoot, attachment.id)
                     if (!target.exists()) target.writeBytes(attachment.inlineData ?: ByteArray(0))
                     target.absolutePath
                 }
@@ -110,10 +118,7 @@ class AndroidChatAttachmentRepository @Inject constructor(
      * type instead of `application/octet-stream`.
      */
     private fun persist(sessionId: String, payload: PreparedPayload): FileAttachment {
-        val directory = File(
-            File(context.filesDir, ATTACHMENT_DIRECTORY),
-            safeSessionId(sessionId),
-        ).apply { mkdirs() }
+        val directory = conversationSessionDirectory(attachmentRoot, sessionId).apply { mkdirs() }
         val id = FileAttachment.stableAttachmentId(
             payload.mimeType,
             payload.displayName,
@@ -139,9 +144,6 @@ class AndroidChatAttachmentRepository @Inject constructor(
             .getExtensionFromMimeType(mimeType.lowercase().substringBefore(';'))
             ?.takeIf(String::isNotEmpty)
     }
-
-    private fun safeSessionId(sessionId: String): String =
-        sessionId.replace(Regex("""[^A-Za-z0-9._-]"""), "_")
 
     private fun prepareImage(attachment: DraftAttachment): PreparedPayload {
         val file = File(attachment.reference)
@@ -261,8 +263,6 @@ class AndroidChatAttachmentRepository @Inject constructor(
     }
 
     private companion object {
-        const val DRAFT_DIRECTORY = "chat-drafts"
-        const val ATTACHMENT_DIRECTORY = "chat-attachments"
         const val MAX_DIMENSION_PX = 1280
         const val MAX_BYTES = 512 * 1024
         const val INITIAL_JPEG_QUALITY = 85
@@ -270,4 +270,11 @@ class AndroidChatAttachmentRepository @Inject constructor(
         const val JPEG_QUALITY_STEP = 10
         const val MAX_RESIZE_ATTEMPTS = 4
     }
+}
+
+internal fun conversationSessionDirectory(root: File, sessionId: String): File {
+    val safeSessionId = sessionId.replace(Regex("""[^A-Za-z0-9._-]"""), "_")
+    val directory = File(root.canonicalFile, safeSessionId).canonicalFile
+    check(directory.parentFile == root.canonicalFile) { "Invalid conversation session directory" }
+    return directory
 }

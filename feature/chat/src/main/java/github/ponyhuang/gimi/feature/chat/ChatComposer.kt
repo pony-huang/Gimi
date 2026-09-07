@@ -167,7 +167,7 @@ public fun ChatComposer(
             }
             mergeAttachmentSelection(messageData.attachments, imported)
         }.getOrElse { failure ->
-            deleteManagedDrafts(imported)
+            deleteManagedDrafts(context, imported)
             Toast.makeText(
                 context,
                 failure.message ?: attachmentReadFailedMessage,
@@ -177,12 +177,12 @@ public fun ChatComposer(
         }
         when (result) {
             is AttachmentSelectionResult.MixedTypes -> {
-                deleteManagedDrafts(imported)
+                deleteManagedDrafts(context, imported)
                 Toast.makeText(context, mixedAttachmentMessage, Toast.LENGTH_SHORT).show()
             }
             is AttachmentSelectionResult.Accepted -> {
-                deleteManagedDrafts(result.replaced)
-                deleteManagedDrafts(imported.filterNot { it in result.attachments })
+                deleteManagedDrafts(context, result.replaced)
+                deleteManagedDrafts(context, imported.filterNot { it in result.attachments })
                 messageData = messageData.copy(attachments = result.attachments)
             }
         }
@@ -293,7 +293,7 @@ public fun ChatComposer(
             voiceRecorder.release()
             voiceAudio.reset()
             deletePendingCameraAttachment(pendingCameraPath)
-            deleteManagedDrafts(messageData.attachments)
+            deleteManagedDrafts(context, messageData.attachments)
         }
     }
 
@@ -413,7 +413,7 @@ public fun ChatComposer(
                                     messageData = messageData.copy(
                                         attachments = messageData.attachments - uri,
                                     )
-                                    deleteManagedDrafts(listOf(uri))
+                                    deleteManagedDrafts(context, listOf(uri))
                                 },
                                 onSendClick = handleSendClick,
                                 onStopClick = onStopClick,

@@ -5,11 +5,17 @@ import androidx.room.Room
 import com.google.adk.kt.sessions.SessionService
 import dagger.Module
 import dagger.Provides
+import dagger.multibindings.IntoSet
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import github.ponyhuang.gimi.core.storage.ManagedDirectorySpec
+import github.ponyhuang.gimi.core.storage.FileTreeStorageMaintenanceHandler
+import github.ponyhuang.gimi.core.storage.StorageMaintenanceHandler
 import github.ponyhuang.gimi.data.conversation.ChatDisplayPreferences
 import github.ponyhuang.gimi.data.conversation.ToolApprovalPreferences
+import github.ponyhuang.gimi.data.conversation.conversationAttachmentDirectorySpec
+import github.ponyhuang.gimi.data.conversation.conversationDraftDirectorySpec
 import github.ponyhuang.gimi.data.conversation.attachment.AndroidChatAttachmentRepository
 import github.ponyhuang.gimi.data.conversation.repository.AdkConversationRepository
 import github.ponyhuang.gimi.data.conversation.repository.AdkChatTurnRepository
@@ -32,6 +38,21 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object ConversationModule {
+
+    @Provides
+    @IntoSet
+    fun provideConversationAttachmentDirectorySpec(): ManagedDirectorySpec =
+        conversationAttachmentDirectorySpec
+
+    @Provides
+    @IntoSet
+    fun provideConversationDraftDirectorySpec(): ManagedDirectorySpec =
+        conversationDraftDirectorySpec
+
+    @Provides
+    @IntoSet
+    fun provideStorageMaintenanceHandler(): StorageMaintenanceHandler =
+        FileTreeStorageMaintenanceHandler("data:conversation")
 
     @Provides
     @Singleton

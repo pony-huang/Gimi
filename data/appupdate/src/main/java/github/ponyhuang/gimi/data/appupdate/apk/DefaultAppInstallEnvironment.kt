@@ -1,8 +1,8 @@
 package github.ponyhuang.gimi.data.appupdate.apk
 
 import android.content.Context
-import androidx.core.content.FileProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.gimi.core.storage.ShareableFileUriFactory
 import github.ponyhuang.gimi.domain.appupdate.repository.AppInstallEnvironment
 import java.io.File
 import javax.inject.Inject
@@ -13,6 +13,7 @@ import javax.inject.Inject
  */
 class DefaultAppInstallEnvironment @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val shareableFileUriFactory: ShareableFileUriFactory,
 ) : AppInstallEnvironment {
 
     override fun canRequestPackageInstalls(): Boolean =
@@ -23,10 +24,6 @@ class DefaultAppInstallEnvironment @Inject constructor(
     }.getOrNull()
 
     override fun apkContentUri(apkPath: String): String? = runCatching {
-        FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            File(apkPath),
-        ).toString()
+        shareableFileUriFactory.uriFor(File(apkPath)).toString()
     }.getOrNull()
 }

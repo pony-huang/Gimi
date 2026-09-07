@@ -12,9 +12,15 @@ import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.gimi.data.skills.FileSkillRepository
 import github.ponyhuang.gimi.data.skills.SkillArchiveReader
 import github.ponyhuang.gimi.data.skills.SkillArchiveStore
+import github.ponyhuang.gimi.data.skills.SkillsStorage
+import github.ponyhuang.gimi.core.storage.ManagedDirectorySpec
+import github.ponyhuang.gimi.core.storage.FileTreeStorageMaintenanceHandler
+import github.ponyhuang.gimi.core.storage.StorageMaintenanceHandler
+import github.ponyhuang.gimi.core.storage.StorageRegistry
 import github.ponyhuang.gimi.domain.skills.repository.SkillRepository
 import java.io.File
 import javax.inject.Singleton
+import dagger.multibindings.IntoSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,11 +33,24 @@ object SkillsModule {
     @Provides
     @Singleton
     internal fun providePaths(
-        @ApplicationContext context: Context,
+        registry: StorageRegistry,
     ): SkillStoragePaths = SkillStoragePaths(
-        skillsRoot = File(context.filesDir, "skills"),
-        stagingRoot = File(context.cacheDir, "skill-imports"),
+        skillsRoot = registry.resolve(SkillsStorage.INSTALLED_ID),
+        stagingRoot = registry.resolve(SkillsStorage.IMPORTS_ID),
     )
+
+    @Provides
+    @IntoSet
+    internal fun provideInstalledDirectorySpec(): ManagedDirectorySpec = SkillsStorage.Installed
+
+    @Provides
+    @IntoSet
+    internal fun provideImportsDirectorySpec(): ManagedDirectorySpec = SkillsStorage.Imports
+
+    @Provides
+    @IntoSet
+    internal fun provideStorageMaintenanceHandler(): StorageMaintenanceHandler =
+        FileTreeStorageMaintenanceHandler("skills")
 
     @Provides
     @Singleton
@@ -61,6 +80,12 @@ object SkillsModule {
     }
 }
 
+/**
+ * 技能仓储使用的已安装目录与导入暂存目录。
+ *
+ * @property skillsRoot 已安装技能的持久目录。
+ * @property stagingRoot 导入和解包过程使用的临时目录。
+ */
 internal data class SkillStoragePaths(
     val skillsRoot: File,
     val stagingRoot: File,

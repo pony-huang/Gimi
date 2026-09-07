@@ -17,6 +17,7 @@ import github.ponyhuang.gimi.data.agent.AdkMcpConnectionTester
 import github.ponyhuang.gimi.data.agent.AdkMcpSkipReporter
 import github.ponyhuang.gimi.data.agent.AgentChatRunner
 import github.ponyhuang.gimi.data.agent.AgentBuildConfigurationSnapshot
+import github.ponyhuang.gimi.data.agent.AgentStorage
 import github.ponyhuang.gimi.data.agent.AgentContributionRegistry
 import github.ponyhuang.gimi.data.agent.AgentFactory
 import github.ponyhuang.gimi.data.agent.AgentLLMModelFactory
@@ -39,7 +40,9 @@ import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import github.ponyhuang.gimi.domain.toolauthorization.repository.LocalToolDefinitionSource
 import io.objectbox.Box
 import io.objectbox.BoxStore
-import java.io.File
+import github.ponyhuang.gimi.core.storage.ManagedDirectorySpec
+import github.ponyhuang.gimi.core.storage.StorageRegistry
+import dagger.multibindings.IntoSet
 import javax.inject.Singleton
 
 /**
@@ -53,7 +56,7 @@ import javax.inject.Singleton
  * - [AgentChatRunner] — 聊天运行器，组合上述所有服务
  *
  * 文件 artifact 根目录：优先 `<externalFilesDir>/adk/artifacts`，
- * 外置存储不可用时退到 `<filesDir>/adk/artifacts`。
+ * 外置存储不可用时由统一 storage resolver 回退到应用内部受管目录。
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -62,6 +65,10 @@ object AgentModule {
     private const val TAG: String = "AgentModule"
     private const val LEGACY_TOOL_VECTOR_STORE_NAME: String = "tool-vector-search"
     private const val TOOL_VECTOR_STORE_NAME: String = "tool-vector-search-use-v1"
+
+    @Provides
+    @IntoSet
+    fun provideArtifactsDirectorySpec(): ManagedDirectorySpec = AgentStorage.Artifacts
 
     @Provides
     @Singleton
@@ -127,9 +134,9 @@ object AgentModule {
     @Provides
     @Singleton
     fun provideArtifactService(
-        @ApplicationContext context: Context,
+        storageRegistry: StorageRegistry,
     ): ArtifactService {
-        val root = pickArtifactsRoot(context)
+        val root = storageRegistry.resolve(AgentStorage.ARTIFACTS_ID, create = true).path
         Log.i(TAG, "FileArtifactService root: $root")
         return FileArtifactService(root)
     }
@@ -169,16 +176,4 @@ object AgentModule {
         },
     )
 
-    /**
-     * 选 artifact 根目录：优先外置存储，失败时退到内部 files dir。
-     */
-    private fun pickArtifactsRoot(context: Context): String {
-        val externalDir = context.getExternalFilesDir(null)
-        return if (externalDir != null) {
-            File(externalDir, FileArtifactService.DEFAULT_ARTIFACTS_SUBDIR).path
-        } else {
-            Log.w(TAG, "External files dir unavailable; using internal files dir for artifacts.")
-            File(context.filesDir, FileArtifactService.DEFAULT_ARTIFACTS_SUBDIR).path
-        }
-    }
 }

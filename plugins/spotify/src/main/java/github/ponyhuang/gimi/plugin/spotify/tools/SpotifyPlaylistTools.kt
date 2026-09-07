@@ -134,12 +134,3 @@ internal fun playlistTools(api: SpotifyApi): List<BaseTool> = listOf(
 /** 普通 ID 统一成 spotify:track:{id} URI；已是 URI 则原样返回。 */
 private fun spotifyTrackUri(id: String): String =
     if (id.startsWith("spotify:")) id else "spotify:track:$id"
-
-/** string 数组参数 schema。 */
-private fun stringListParam(description: String, maxItems: Int): Schema = Schema(
-    type = Type.ARRAY,
-    description = description,
-    items = Schema(type = Type.STRING),
-    minItems = 1,
-    maxItems = maxItems.toLong(),
-)

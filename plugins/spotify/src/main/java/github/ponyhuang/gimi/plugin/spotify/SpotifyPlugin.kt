@@ -29,8 +29,8 @@ class SpotifyPlugin : AgentPlugin {
 
     override val pluginId: String = "spotify"
     override val displayName: String = "Spotify"
-    override val version: Int = 1
-    override val toolCount: Int = 29
+    override val version: Int = 2
+    override val toolCount: Int = 35
 
     override val config: PluginConfig = PluginConfig(
         fields = listOf(

@@ -45,6 +45,26 @@ class SpotifyApiTest {
     }
 
     @Test
+    fun spotifyUnauthorizedMessageDirectsUserToReauthorize() {
+        val body = """{"error":{"status":401,"message":"The access token expired"}}"""
+
+        val message = spotifyErrorMessage(401, body)
+
+        assertTrue(message.contains("The access token expired"))
+        assertTrue(message.contains("spotify_login"))
+    }
+
+    @Test
+    fun spotifyRateLimitMessageSurfacesRetryExhaustion() {
+        val body = """{"error":{"status":429,"message":"Rate limit exceeded"}}"""
+
+        val message = spotifyErrorMessage(429, body)
+
+        assertTrue(message.contains("429"))
+        assertTrue(message.contains("rate limit"))
+    }
+
+    @Test
     fun toJsonNativeRecursivelyConverts() {
         val json = JSONObject()
             .put("a", "x")

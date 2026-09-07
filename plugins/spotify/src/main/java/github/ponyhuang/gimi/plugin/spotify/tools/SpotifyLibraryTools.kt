@@ -172,6 +172,61 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
         )
         mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json?.optJSONArray("items") ?: JSONArray()))
     },
+    spotifyTool(
+        name = "spotify_save_to_library",
+        description =
+            "Save one or more items (tracks, albums, episodes, shows, audiobooks) to the user's library. " +
+                "Accepts Spotify IDs or URIs; up to 40 per call. Equivalent to liking tracks / saving albums.",
+        parameters = objectSchema(
+            "ids" to stringListParam(
+                "Spotify IDs or URIs to save (max 40). Mix tracks, albums, episodes, shows, audiobooks.",
+                maxItems = 40,
+            ),
+            required = listOf("ids"),
+        ),
+    ) { args ->
+        val uris = listArg(args, "ids").take(40).map(::spotifyAnyUri)
+        if (uris.isEmpty()) throw IllegalStateException("ids must not be empty")
+        api.put("/me/library", body = JSONObject().put("uris", JSONArray().apply { uris.forEach(::put) }))
+        mapOf(SpotifyTool.RESULT_KEY to "Saved ${uris.size} item(s) to library")
+    },
+    spotifyTool(
+        name = "spotify_remove_from_library",
+        description =
+            "Remove one or more items (tracks, albums, episodes, shows, audiobooks) from the user's library. " +
+                "Accepts Spotify IDs or URIs; up to 40 per call.",
+        parameters = objectSchema(
+            "ids" to stringListParam(
+                "Spotify IDs or URIs to remove (max 40).",
+                maxItems = 40,
+            ),
+            required = listOf("ids"),
+        ),
+    ) { args ->
+        val uris = listArg(args, "ids").take(40).map(::spotifyAnyUri)
+        if (uris.isEmpty()) throw IllegalStateException("ids must not be empty")
+        api.delete("/me/library", body = JSONObject().put("uris", JSONArray().apply { uris.forEach(::put) }))
+        mapOf(SpotifyTool.RESULT_KEY to "Removed ${uris.size} item(s) from library")
+    },
+    spotifyTool(
+        name = "spotify_check_library",
+        description =
+            "Check whether the given tracks, albums, episodes, shows, audiobooks, artists, or playlists " +
+                "are saved in the user's library. Returns a parallel array of booleans (true = saved).",
+        parameters = objectSchema(
+            "ids" to stringListParam(
+                "Spotify IDs or URIs to check (max 40).",
+                maxItems = 40,
+            ),
+            required = listOf("ids"),
+        ),
+    ) { args ->
+        val uris = listArg(args, "ids").take(40).map(::spotifyAnyUri)
+        if (uris.isEmpty()) throw IllegalStateException("ids must not be empty")
+        val json = api.get("/me/library/contains", mapOf("uris" to uris.joinToString(",")))
+            ?: throw IllegalStateException("Failed to check library")
+        mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json))
+    },
 )
 
 /** 分页 limit + offset 参数对（默认 50、最大 50）。 */
@@ -182,3 +237,21 @@ private fun pagingParams(
     add("limit" to intParam(limitDescription, min = 0, max = 50))
     if (includeOffset) add("offset" to intParam("Pagination offset (default 0)", min = 0))
 }.toTypedArray()
+
+/** string 数组参数 schema（与 playlist 工具共用）。 */
+internal fun stringListParam(description: String, maxItems: Int): Schema = Schema(
+    type = Type.ARRAY,
+    description = description,
+    items = Schema(type = Type.STRING),
+    minItems = 1,
+    maxItems = maxItems.toLong(),
+)
+
+/**
+ * 把普通 ID 转成 `spotify:<type>:<id>` URI；已是 URI 则原样返回。
+ *
+ * 不像 playlist 工具限定 track — 库接口支持 track/album/episode/show/audiobook/artist/playlist，
+ * 默认无前缀 ID 按 track 处理（有歧义时由调用方显式传 URI 即可）。
+ */
+internal fun spotifyAnyUri(id: String): String =
+    if (id.startsWith("spotify:")) id else "spotify:track:$id"

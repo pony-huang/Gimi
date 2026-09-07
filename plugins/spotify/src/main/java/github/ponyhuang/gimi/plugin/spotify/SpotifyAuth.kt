@@ -52,6 +52,20 @@ internal class SpotifyAuth(
         if (refresh.isNullOrBlank() || !needsRefresh(tokenStore.expiresAt, System.currentTimeMillis(), REFRESH_BUFFER_MS)) {
             return access
         }
+        return refreshAndStore(refresh)
+    }
+
+    /**
+     * 强制刷新一次 access token（忽略过期判断）。用于 API 返回 401/access token 被吊销的兜底；
+     * 调用方需已确认持有 refresh token。返回新写入的 access token。
+     */
+    fun forceRefresh(): String {
+        val refresh = tokenStore.refreshToken
+            ?: throw IllegalStateException("Spotify login expired, please authorize again")
+        return refreshAndStore(refresh)
+    }
+
+    private fun refreshAndStore(refresh: String): String {
         val (clientId, clientSecret) = credentials()
         return try {
             val body = "grant_type=refresh_token&refresh_token=${enc(refresh)}"

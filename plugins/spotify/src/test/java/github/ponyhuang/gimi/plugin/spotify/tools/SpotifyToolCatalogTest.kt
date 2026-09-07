@@ -26,7 +26,7 @@ class SpotifyToolCatalogTest {
     fun catalogExposesFullToolset() {
         val names = allToolNames()
 
-        // 完整 29 个工具全部在册。
+        // 完整 35 个工具全部在册。
         val expected = listOf(
             // 认证
             "spotify_login",
@@ -49,6 +49,9 @@ class SpotifyToolCatalogTest {
             "spotify_get_devices",
             "spotify_get_top_tracks",
             "spotify_get_top_artists",
+            "spotify_save_to_library",
+            "spotify_remove_from_library",
+            "spotify_check_library",
             // 播放控制
             "spotify_play",
             "spotify_pause",
@@ -56,6 +59,9 @@ class SpotifyToolCatalogTest {
             "spotify_previous",
             "spotify_set_volume",
             "spotify_add_to_queue",
+            "spotify_seek",
+            "spotify_set_repeat",
+            "spotify_set_shuffle",
             // 歌单编辑
             "spotify_create_playlist",
             "spotify_add_tracks_to_playlist",
@@ -98,13 +104,27 @@ class SpotifyToolCatalogTest {
 
         val search = searchTools(api).single { it.name == "spotify_search" }
         val searchLimit = requireNotNull(search.declaration()).parameters?.properties?.get("limit")
-        assertEquals(50.0, searchLimit?.maximum)
-        assertTrue(searchLimit?.description?.contains("default 50") == true)
+        // Spotify 的 /search 接口 limit 上限是 10（>10 返回 400），不是 50。
+        assertEquals(10.0, searchLimit?.maximum)
+        assertTrue(searchLimit?.description?.contains("default 10") == true)
+
+        // search 不再默认塞 market=from_token（Spotify 会 403），改提供可选 market 入参。
+        assertNotNull(requireNotNull(search.declaration()).parameters?.properties?.get("market"))
 
         // spotify_create_playlist：官方 body 支持 collaborative。
         val create = playlistTools(api).single { it.name == "spotify_create_playlist" }
         val createParams = requireNotNull(create.declaration()).parameters
         assertNotNull(createParams?.properties?.get("collaborative"))
+
+        // spotify_set_repeat：enum 覆盖 off/context/track。
+        val repeat = playbackTools(api).single { it.name == "spotify_set_repeat" }
+        val repeatState = requireNotNull(repeat.declaration()).parameters?.properties?.get("state")
+        assertEquals(listOf("off", "context", "track"), repeatState?.enum)
+
+        // 库工具走 /me/library 路径，最多 40 个 URI。
+        val save = libraryTools(api).single { it.name == "spotify_save_to_library" }
+        val saveIds = requireNotNull(save.declaration()).parameters?.properties?.get("ids")
+        assertEquals(40L, saveIds?.maxItems)
     }
 
     private fun allToolNames(): List<String> {

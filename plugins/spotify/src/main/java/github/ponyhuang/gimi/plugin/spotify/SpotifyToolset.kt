@@ -39,5 +39,8 @@ private val SPOTIFY_INSTRUCTIONS: String = """
       when the target is ambiguous or playback reports that no device is available.
     - Treat create, update, reorder, add, remove, playback, queue, and volume calls as mutations. Report success only
       after the corresponding tool succeeds, and surface its error or prerequisite when it fails.
+    - Library save/remove use the unified `/me/library` endpoint and accept mixed Spotify URI types
+      (track, album, episode, show, audiobook). Pass raw IDs without a prefix only when the item is a track;
+      pass full URIs (e.g. `spotify:album:...`) for other types.
     </spotify>
 """.trimIndent()

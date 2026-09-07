@@ -34,9 +34,9 @@ class SpotifyPluginTest {
         val plugin = SpotifyPlugin().apply { onAttach(context) }
 
         assertTrue(plugin.tools().isEmpty())
-        assertEquals(29, plugin.toolCount)
+        assertEquals(35, plugin.toolCount)
         val toolset = plugin.toolSets().single()
-        assertEquals(29, toolset.getTools(null).size)
+        assertEquals(35, toolset.getTools(null).size)
         assertEquals("spotify_login", toolset.getTools(null).first().name)
 
         val processed = toolset.processLlmRequest(mockk<ToolContext>(), requestWith("Base instruction"))

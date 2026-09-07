@@ -17,7 +17,8 @@ internal fun searchTools(api: SpotifyApi): List<BaseTool> = listOf(
         description =
             "Search Spotify for a concrete song, album, or artist name and return matching items with IDs. " +
                 "Do not use for charts, popularity, recommendations, or listening history; " +
-                "use spotify_get_top_tracks for those requests.",
+                "use spotify_get_top_tracks for those requests. " +
+                "Pick the type: 'track' for a specific song, 'album' for a record, 'artist' for a performer.",
         parameters = objectSchema(
             "query" to stringParam("Search term, required"),
             "type" to stringParam(
@@ -25,30 +26,36 @@ internal fun searchTools(api: SpotifyApi): List<BaseTool> = listOf(
                 enum = SEARCH_TYPES,
             ),
             "limit" to intParam(
-                "Number of results to return (default 50, max 50)",
-                min = 0,
-                max = 50,
+                "Number of results to return (default 10, max 10). " +
+                    "Spotify's /search endpoint caps limit at 10 and returns 400 for higher values.",
+                min = 1,
+                max = 10,
             ),
             "offset" to intParam(
-                "Pagination offset (default 0, max 1000)",
+                "Pagination offset (default 0, max 999). " +
+                    "Spotify's /search endpoint caps offset below 1000.",
                 min = 0,
-                max = 1000,
+                max = 999,
+            ),
+            "market" to stringParam(
+                "Optional ISO 3166-1 alpha-2 country code (e.g. US, HK) to filter results by availability. " +
+                    "Omit to return all markets. Do NOT pass 'from_token' — Spotify rejects it on /search.",
             ),
             required = listOf("query"),
         ),
     ) { args ->
         val query = strArg(args, "query") ?: throw IllegalStateException("Missing parameter query")
         val type = strArg(args, "type")?.takeIf { it in SEARCH_TYPES } ?: "track"
-        val json = api.get(
-            "/search",
-            mapOf(
-                "q" to query,
-                "type" to type,
-                "limit" to intArg(args, "limit", 50),
-                "offset" to intArg(args, "offset", 0),
-                "market" to "from_token",
-            ),
-        )
+        val queryParams = buildMap<String, Any?> {
+            put("q", query)
+            put("type", type)
+            put("limit", intArg(args, "limit", 10))
+            put("offset", intArg(args, "offset", 0))
+            // market omitted by default: Spotify rejects `from_token` on /search,
+            // and an explicit code restricts to one region. Caller may opt in.
+            strArg(args, "market")?.let { put("market", it) }
+        }
+        val json = api.get("/search", queryParams)
         val items = json?.optJSONObject(type)?.optJSONArray("items") ?: JSONArray()
         if (items.length() == 0) {
             mapOf(
@@ -65,11 +72,18 @@ internal fun searchTools(api: SpotifyApi): List<BaseTool> = listOf(
         description = "Get a single track's details (title, artists, album, duration, URL, etc.).",
         parameters = objectSchema(
             "track_id" to stringParam("Spotify track ID"),
+            "market" to stringParam(
+                "Optional ISO 3166-1 alpha-2 country code to filter track availability.",
+            ),
             required = listOf("track_id"),
         ),
     ) { args ->
         val id = strArg(args, "track_id") ?: throw IllegalStateException("Missing parameter track_id")
-        val json = api.get("/tracks/$id", mapOf("market" to "from_token"))
+        val query = buildMap<String, Any?> {
+            // Spotify rejects `market=from_token` here; only accept explicit codes.
+            strArg(args, "market")?.let { put("market", it) }
+        }
+        val json = api.get("/tracks/$id", query)
             ?: throw IllegalStateException("Track not found")
         mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json))
     },
@@ -78,11 +92,17 @@ internal fun searchTools(api: SpotifyApi): List<BaseTool> = listOf(
         description = "Get an album's details (name, artists, release date, type, etc.).",
         parameters = objectSchema(
             "album_id" to stringParam("Spotify album ID"),
+            "market" to stringParam(
+                "Optional ISO 3166-1 alpha-2 country code to filter album availability.",
+            ),
             required = listOf("album_id"),
         ),
     ) { args ->
         val id = strArg(args, "album_id") ?: throw IllegalStateException("Missing parameter album_id")
-        val json = api.get("/albums/$id", mapOf("market" to "from_token"))
+        val query = buildMap<String, Any?> {
+            strArg(args, "market")?.let { put("market", it) }
+        }
+        val json = api.get("/albums/$id", query)
             ?: throw IllegalStateException("Album not found")
         mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json))
     },
@@ -109,18 +129,19 @@ internal fun searchTools(api: SpotifyApi): List<BaseTool> = listOf(
                 max = 50,
             ),
             "offset" to intParam("Pagination offset (default 0)", min = 0),
+            "market" to stringParam(
+                "Optional ISO 3166-1 alpha-2 country code to filter track availability.",
+            ),
             required = listOf("album_id"),
         ),
     ) { args ->
         val id = strArg(args, "album_id") ?: throw IllegalStateException("Missing parameter album_id")
-        val json = api.get(
-            "/albums/$id/tracks",
-            mapOf(
-                "limit" to intArg(args, "limit", 50),
-                "offset" to intArg(args, "offset", 0),
-                "market" to "from_token",
-            ),
-        )
+        val query = buildMap<String, Any?> {
+            put("limit", intArg(args, "limit", 50))
+            put("offset", intArg(args, "offset", 0))
+            strArg(args, "market")?.let { put("market", it) }
+        }
+        val json = api.get("/albums/$id/tracks", query)
         mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json?.optJSONArray("items") ?: JSONArray()))
     },
 )

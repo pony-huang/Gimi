@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.plugin.spotify.tools
 
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.types.Schema
+import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.plugin.spotify.SpotifyApi
 import org.json.JSONArray
 import org.json.JSONObject
@@ -106,6 +107,71 @@ internal fun playbackTools(api: SpotifyApi): List<BaseTool> = listOf(
         val uri = strArg(args, "uri") ?: throw IllegalStateException("Missing parameter uri")
         api.post("/me/player/queue", mapOf("uri" to uri, "device_id" to (strArg(args, "device_id") ?: "")))
         mapOf(SpotifyTool.RESULT_KEY to "Added to queue: $uri")
+    },
+    spotifyTool(
+        name = "spotify_seek",
+        description = "Seek to a position (in milliseconds) within the currently playing track. Requires Premium.",
+        parameters = objectSchema(
+            "position_ms" to intParam(
+                "Target position in milliseconds (must be non-negative)",
+                min = 0,
+            ),
+            "device_id" to stringParam("Target device ID; auto-selected if omitted"),
+            required = listOf("position_ms"),
+        ),
+    ) { args ->
+        val position = intArg(args, "position_ms", -1)
+        if (position < 0) throw IllegalStateException("position_ms must be non-negative")
+        api.post(
+            "/me/player/seek",
+            mapOf(
+                "position_ms" to position,
+                "device_id" to (strArg(args, "device_id") ?: ""),
+            ),
+        )
+        mapOf(SpotifyTool.RESULT_KEY to "Seeked to ${position}ms")
+    },
+    spotifyTool(
+        name = "spotify_set_repeat",
+        description = "Set repeat mode for playback. Requires Premium.",
+        parameters = objectSchema(
+            "state" to stringParam(
+                "Repeat mode: off / context (repeat the current album/playlist) / track (repeat current track)",
+                enum = listOf("off", "context", "track"),
+            ),
+            "device_id" to stringParam("Target device ID; auto-selected if omitted"),
+            required = listOf("state"),
+        ),
+    ) { args ->
+        val state = strArg(args, "state")
+            ?: throw IllegalStateException("Missing parameter state")
+        if (state !in listOf("off", "context", "track")) {
+            throw IllegalStateException("state must be one of off/context/track")
+        }
+        api.post(
+            "/me/player/repeat",
+            mapOf("state" to state, "device_id" to (strArg(args, "device_id") ?: "")),
+        )
+        mapOf(SpotifyTool.RESULT_KEY to "Repeat set to $state")
+    },
+    spotifyTool(
+        name = "spotify_set_shuffle",
+        description = "Enable or disable shuffle for playback. Requires Premium.",
+        parameters = objectSchema(
+            "state" to Schema(
+                type = Type.BOOLEAN,
+                description = "Whether shuffle is enabled",
+            ),
+            "device_id" to stringParam("Target device ID; auto-selected if omitted"),
+            required = listOf("state"),
+        ),
+    ) { args ->
+        val state = boolArg(args, "state", false)
+        api.post(
+            "/me/player/shuffle",
+            mapOf("state" to state, "device_id" to (strArg(args, "device_id") ?: "")),
+        )
+        mapOf(SpotifyTool.RESULT_KEY to "Shuffle ${if (state) "enabled" else "disabled"}")
     },
 )
 

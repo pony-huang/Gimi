@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
-import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
@@ -137,7 +136,6 @@ class ChatViewModel @Inject constructor(
             ChatAction.RefreshConversations -> refreshConversations()
             is ChatAction.DeleteConversation -> deleteConversation(action.sessionId)
             is ChatAction.SelectModel -> selectModel(action.selection)
-            is ChatAction.SetToolAccessMode -> setToolAccessMode(action.mode)
             is ChatAction.SetReasoningEffort -> setReasoningEffort(action.effort)
             is ChatAction.SetMcpServerEnabled ->
                 setMcpServerEnabled(action.serverId, action.enabled)
@@ -1316,12 +1314,6 @@ class ChatViewModel @Inject constructor(
             }
         } else {
             runtime.toolConfiguration = current
-        }
-    }
-
-    private fun setToolAccessMode(mode: ToolAccessMode) {
-        updateToolConfiguration { configuration ->
-            configuration.copy(toolAccessMode = mode)
         }
     }
 

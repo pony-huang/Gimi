@@ -12,9 +12,15 @@
     <string name="toolauth_search_label">Search tools</string>
     <string name="toolauth_empty_state">No configurable local tools</string>
     <string name="toolauth_no_match">No matching tools</string>
+    <string name="toolauth_tool_access_label">Tool loading</string>
+    <string name="toolauth_tool_access_on_demand_description">Load on demand, saves context</string>
+    <string name="toolauth_tool_access_always_description">Load all, ready each turn</string>
+    <string name="toolauth_tool_access_notice">Switching may cause errors in existing conversations; start a new conversation</string>
+    <string name="toolauth_chat_display_title">Show tool details</string>
+    <string name="toolauth_chat_display_subtitle">Show tool call progress and results in chat</string>
 
-    <!-- Tool authorization screen title (consumed by :app SettingsScaffold) -->
-    <string name="toolauth_screen_title">Tool authorization</string>
+    <!-- Tool management screen title (consumed by :app SettingsScaffold) -->
+    <string name="toolauth_screen_title">Tool management</string>
 
     <string name="toolauth_agent_mutation_blocked">An agent task is running. Please stop it before making changes.</string>
 </resources>

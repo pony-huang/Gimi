@@ -9,11 +9,14 @@ import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmReaderTool
 import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmWebSearchTool
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
+import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -203,7 +206,7 @@ class DefaultOfficialToolsetTest {
         )
 
         assertTrue(
-            DefaultOfficialToolset(registry)
+            DefaultOfficialToolset(registry, FakeToolAccessRepository())
                 .resolveTools(config(serviceId = "glm", modelId = "glm-4.6"), selection = null)
                 .isEmpty(),
         )
@@ -281,12 +284,11 @@ class DefaultOfficialToolsetTest {
             enabledOfficialFunctionIds = mapOf(
                 "kimi_formulas" to setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
             ),
-            toolAccessMode = ToolAccessMode.ON_DEMAND,
         )
 
         // ON_DEMAND 模式下标记为检索候选的声明不再直接注入,由 tool_search 按需暴露。
         assertTrue(
-            toolset(manifestClient(200, MANIFEST_BODY))
+            toolset(manifestClient(200, MANIFEST_BODY), toolAccessMode = ToolAccessMode.ON_DEMAND)
                 .resolveTools(config(serviceId = "kimi", modelId = "kimi-k2.5"), selection)
                 .isEmpty(),
         )
@@ -298,10 +300,10 @@ class DefaultOfficialToolsetTest {
             enabledOfficialFunctionIds = mapOf(
                 "openai_web_search" to setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
             ),
-            toolAccessMode = ToolAccessMode.ON_DEMAND,
         )
 
-        val tools = toolset().resolveTools(config(serviceId = "openai"), selection)
+        val tools = toolset(toolAccessMode = ToolAccessMode.ON_DEMAND)
+            .resolveTools(config(serviceId = "openai"), selection)
 
         assertEquals(listOf("web_search"), tools.map { it.name })
     }
@@ -328,8 +330,10 @@ class DefaultOfficialToolsetTest {
     private fun toolset(
         httpClient: OkHttpClient = testHttpClient(),
         credential: String = "key",
+        toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
     ): DefaultOfficialToolset = DefaultOfficialToolset(
         registry(httpClient, credential),
+        FakeToolAccessRepository(toolAccessMode),
     )
 
     private fun registry(
@@ -369,6 +373,17 @@ class DefaultOfficialToolsetTest {
         modelId = modelId,
         fullBaseUrl = "https://example.com",
     )
+
+    private class FakeToolAccessRepository(
+        initial: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
+    ) : ToolAccessRepository {
+        private val mutable = MutableStateFlow(initial)
+        override val defaultToolAccessMode: StateFlow<ToolAccessMode> = mutable
+
+        override fun setDefaultToolAccessMode(mode: ToolAccessMode) {
+            mutable.value = mode
+        }
+    }
 
     private companion object {
         const val MANIFEST_BODY =

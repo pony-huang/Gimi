@@ -11,7 +11,6 @@ import github.ponyhuang.gimi.domain.conversation.model.ChatFunctionResponse
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.LocalFileReference
 import github.ponyhuang.gimi.domain.conversation.model.LocalFileSearchResult
-import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.ToolConfirmationRequest
 import github.ponyhuang.gimi.domain.conversation.model.UserInputKind
@@ -564,24 +563,6 @@ class ChatViewModelCharacterizationTest {
         advanceUntilIdle()
 
         verify { fixture.appearance.setDarkThemeOverride(true) }
-    }
-
-    @Test
-    fun changingToolAccessModePersistsAndReleasesOnlyCurrentRunner() = runTest {
-        val fixture = fixture(configured = true)
-        fixture.viewModel.onAction(ChatAction.NewConversation)
-        advanceUntilIdle()
-
-        fixture.viewModel.onAction(ChatAction.SetToolAccessMode(ToolAccessMode.ON_DEMAND))
-        advanceUntilIdle()
-
-        coVerify {
-            fixture.conversations.setConversationToolConfiguration(
-                "session-1",
-                match { it.toolAccessMode == ToolAccessMode.ON_DEMAND },
-            )
-        }
-        coVerify { fixture.agent.releaseSession("session-1") }
     }
 
     @Test

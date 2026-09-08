@@ -3,7 +3,6 @@ package github.ponyhuang.gimi.data.agent.tools
 import com.google.adk.kt.agents.ReadonlyContext
 import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
-import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 
 /**
@@ -29,7 +28,6 @@ object ToolRunMetadata {
     private const val KEY_PRESENT = "selkie.tool_config.present"
     private const val KEY_MCP_SERVER_IDS = "selkie.tool_config.mcp_server_ids"
     private const val KEY_OFFICIAL_FUNCTIONS = "selkie.tool_config.official_functions"
-    private const val KEY_TOOL_ACCESS_MODE = "selkie.tool_config.access_mode"
     private const val KEY_ALLOW_CONFIRMATION_TOOLS = "selkie.allow_confirmation_required_tools"
 
     /** 编码为 JSON-native metadata；[toolConfiguration] 为 null 时不写任何配置 key。 */
@@ -50,7 +48,6 @@ object ToolRunMetadata {
             metadata[KEY_MCP_SERVER_IDS] = toolConfiguration.enabledMcpServerIds.toList()
             metadata[KEY_OFFICIAL_FUNCTIONS] =
                 toolConfiguration.enabledOfficialFunctionIds.mapValues { (_, ids) -> ids.toList() }
-            metadata[KEY_TOOL_ACCESS_MODE] = toolConfiguration.toolAccessMode.name
         }
         return metadata
     }
@@ -85,11 +82,6 @@ object ToolRunMetadata {
         return ConversationToolConfiguration(
             enabledMcpServerIds = metadata.stringSet(KEY_MCP_SERVER_IDS),
             enabledOfficialFunctionIds = official,
-            toolAccessMode = when (metadata[KEY_TOOL_ACCESS_MODE] as? String) {
-                ToolAccessMode.ON_DEMAND.name -> ToolAccessMode.ON_DEMAND
-                ToolAccessMode.ALWAYS_AVAILABLE.name -> ToolAccessMode.ALWAYS_AVAILABLE
-                else -> ToolAccessMode.ALWAYS_AVAILABLE
-            },
         )
     }
 

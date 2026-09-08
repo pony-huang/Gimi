@@ -31,7 +31,6 @@ import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
-import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
 import org.junit.Rule
@@ -229,29 +228,6 @@ class ChatComposerLayoutTest {
     }
 
     @Test
-    fun addToChatSheetOpensToolAccessPageAndSelectsMode() {
-        var selectedMode: ToolAccessMode? = null
-        setComposer(
-            addToChatState = ChatAddToChatState(
-                configuration = ConversationToolConfiguration(),
-            ),
-            onToolAccessModeChange = { selectedMode = it },
-        )
-
-        composeRule.onNodeWithTag("chat_composer_add").performClick()
-        composeRule.onNodeWithTag("tool-access-nav").performClick()
-        composeRule.onNodeWithTag("tool-access-page").assertIsDisplayed()
-        composeRule.onNodeWithTag("tool-access-auto").assertDoesNotExist()
-        composeRule.onNodeWithTag("tool-access-always").assertIsSelected()
-        composeRule.onNodeWithTag("tool-access-on-demand").assertIsEnabled().performClick()
-        composeRule.runOnIdle {
-            assert(selectedMode == ToolAccessMode.ON_DEMAND)
-        }
-        composeRule.onNodeWithTag("add-to-chat-back").performClick()
-        composeRule.onNodeWithTag("add-to-chat-home").assertIsDisplayed()
-    }
-
-    @Test
     fun sessionConfigurationGroupsMcpWithToolOptions() {
         setComposer(
             addToChatState = ChatAddToChatState(
@@ -360,21 +336,6 @@ class ChatComposerLayoutTest {
     }
 
     @Test
-    fun toolAccessModesAreDisabledWhileAgentRuns() {
-        setComposer(
-            addToChatState = ChatAddToChatState(
-                configuration = ConversationToolConfiguration(),
-                isMutationBlocked = true,
-            ),
-        )
-
-        composeRule.onNodeWithTag("chat_composer_add").performClick()
-        composeRule.onNodeWithTag("tool-access-nav").performClick()
-        composeRule.onNodeWithTag("tool-access-on-demand").assertIsNotEnabled()
-        composeRule.onNodeWithTag("tool-access-always").assertIsNotEnabled()
-    }
-
-    @Test
     fun bareEnterTriggersSendWithEnteredText() {
         var sent: MessageData? = null
         setComposer(onSendClick = { sent = it; true })
@@ -410,7 +371,6 @@ class ChatComposerLayoutTest {
         isGenerating: Boolean = false,
         addToChatState: ChatAddToChatState = ChatAddToChatState(),
         retainExpanded: Boolean = false,
-        onToolAccessModeChange: (ToolAccessMode) -> Unit = {},
         onSendClick: (MessageData) -> Boolean = { true },
     ) {
         composeRule.setContent {
@@ -423,7 +383,6 @@ class ChatComposerLayoutTest {
                     isVoiceInputAvailable = true,
                     retainExpanded = retainExpanded,
                     addToChatState = addToChatState,
-                    onToolAccessModeChange = onToolAccessModeChange,
                     modelSelectorContent = {
                         Text(
                             text = "Test model",

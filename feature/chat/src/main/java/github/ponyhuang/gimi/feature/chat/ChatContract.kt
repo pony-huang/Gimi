@@ -1,7 +1,6 @@
 package github.ponyhuang.gimi.feature.chat
 
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
-import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 
@@ -79,9 +78,6 @@ sealed interface ChatAction {
 
     /** 为当前会话选择聊天模型。 */
     data class SelectModel(val selection: ModelSelection) : ChatAction
-
-    /** 设置当前会话向模型声明函数工具的加载方式。 */
-    data class SetToolAccessMode(val mode: ToolAccessMode) : ChatAction
 
     /** 设置当前会话发给模型的推理强度。 */
     data class SetReasoningEffort(val effort: ReasoningEffort) : ChatAction

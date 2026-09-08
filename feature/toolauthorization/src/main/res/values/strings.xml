@@ -1,6 +1,6 @@
 <resources>
     <!-- ToolAuthorizationScreen -->
-    <string name="toolauth_screen_title">工具授权</string>
+    <string name="toolauth_screen_title">工具管理</string>
     <string name="toolauth_count_label">已启用 %1$d / %2$d</string>
     <string name="toolauth_customize_label">自定义工具</string>
     <string name="toolauth_customize_description">开启后可选择允许助手使用的工具；关闭则全部可用</string>
@@ -14,6 +14,12 @@
     <string name="toolauth_search_label">搜索工具</string>
     <string name="toolauth_empty_state">暂无可配置的本地工具</string>
     <string name="toolauth_no_match">没有匹配的工具</string>
+    <string name="toolauth_tool_access_label">工具加载</string>
+    <string name="toolauth_tool_access_on_demand_description">按需加载，节省上下文</string>
+    <string name="toolauth_tool_access_always_description">全量加载，随轮就绪</string>
+    <string name="toolauth_tool_access_notice">切换后旧会话可能存在错误，请使用新会话</string>
+    <string name="toolauth_chat_display_title">显示工具详情</string>
+    <string name="toolauth_chat_display_subtitle">在聊天中显示工具调用过程和结果</string>
 
     <!-- 共享：Agent 任务进行中 -->
     <string name="toolauth_agent_mutation_blocked">Agent 任务进行中，请先停止任务后再修改。</string>

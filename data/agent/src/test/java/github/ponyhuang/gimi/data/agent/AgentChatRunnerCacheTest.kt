@@ -8,6 +8,7 @@ import com.google.adk.kt.sessions.SessionKey
 import com.google.adk.kt.sessions.SessionService
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
+import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import android.util.Log
@@ -18,6 +19,8 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -59,6 +62,7 @@ class AgentChatRunnerCacheTest {
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
             memoryService = InMemoryMemoryService(),
+            toolAccessRepository = FakeToolAccessRepository(),
         )
         val selection = ModelSelection("service", "group", "model")
 
@@ -96,6 +100,7 @@ class AgentChatRunnerCacheTest {
             sessionService = sessions,
             artifactService = null,
             memoryService = InMemoryMemoryService(),
+            toolAccessRepository = FakeToolAccessRepository(),
         )
 
         runner.send(
@@ -122,6 +127,7 @@ class AgentChatRunnerCacheTest {
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
             memoryService = InMemoryMemoryService(),
+            toolAccessRepository = FakeToolAccessRepository(),
             configuration = {
                 AgentBuildConfigurationSnapshot(
                     revision = revision,
@@ -158,6 +164,7 @@ class AgentChatRunnerCacheTest {
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
             memoryService = InMemoryMemoryService(),
+            toolAccessRepository = FakeToolAccessRepository(),
             configuration = {
                 AgentBuildConfigurationSnapshot(
                     revision = listOf(7L),
@@ -187,6 +194,7 @@ class AgentChatRunnerCacheTest {
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
             memoryService = InMemoryMemoryService(),
+            toolAccessRepository = FakeToolAccessRepository(),
         )
 
         fun selection(index: Int) = ModelSelection("service", "group", "model-$index")
@@ -210,6 +218,7 @@ class AgentChatRunnerCacheTest {
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
             memoryService = InMemoryMemoryService(),
+            toolAccessRepository = FakeToolAccessRepository(),
         )
         val selection = ModelSelection("service", "group", "model")
         val githubOnly = ConversationToolConfiguration(enabledMcpServerIds = setOf("github"))
@@ -228,6 +237,7 @@ class AgentChatRunnerCacheTest {
     @Test
     fun toolAccessModeChangeCreatesNewSharedRuntime() = runTest {
         var creations = 0
+        val toolAccess = FakeToolAccessRepository()
         val runner = AgentChatRunner(
             factory = { spec ->
                 creations += 1
@@ -236,26 +246,22 @@ class AgentChatRunnerCacheTest {
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
             memoryService = InMemoryMemoryService(),
+            toolAccessRepository = toolAccess,
         )
         val selection = ModelSelection("service", "group", "model")
 
         runner.send(
             "user", "session-a", selection, "a",
-            toolConfiguration = ConversationToolConfiguration(
-                toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
-            ),
+            toolConfiguration = ConversationToolConfiguration(),
         )
         runner.send(
             "user", "session-b", selection, "b",
-            toolConfiguration = ConversationToolConfiguration(
-                toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
-            ),
+            toolConfiguration = ConversationToolConfiguration(),
         )
+        toolAccess.setDefaultToolAccessMode(ToolAccessMode.ON_DEMAND)
         runner.send(
             "user", "session-a", selection, "a2",
-            toolConfiguration = ConversationToolConfiguration(
-                toolAccessMode = ToolAccessMode.ON_DEMAND,
-            ),
+            toolConfiguration = ConversationToolConfiguration(),
         )
 
         assertEquals(2, creations)
@@ -272,6 +278,7 @@ class AgentChatRunnerCacheTest {
             sessionService = mockk<SessionService>(relaxed = true),
             artifactService = null,
             memoryService = InMemoryMemoryService(),
+            toolAccessRepository = FakeToolAccessRepository(),
         )
         val selection = ModelSelection("service", "group", "model")
 
@@ -292,4 +299,15 @@ class AgentChatRunnerCacheTest {
             fullBaseUrl = "https://example.com",
         ),
     )
+
+    private class FakeToolAccessRepository(
+        initial: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
+    ) : ToolAccessRepository {
+        private val mutable = MutableStateFlow(initial)
+        override val defaultToolAccessMode: StateFlow<ToolAccessMode> = mutable
+
+        override fun setDefaultToolAccessMode(mode: ToolAccessMode) {
+            mutable.value = mode
+        }
+    }
 }

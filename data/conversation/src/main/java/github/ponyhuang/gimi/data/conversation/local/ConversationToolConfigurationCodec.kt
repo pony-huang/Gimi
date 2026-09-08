@@ -20,8 +20,8 @@ internal object ConversationToolConfigurationCodec {
 
     fun decode(payload: String?): ConversationToolConfiguration? {
         if (payload.isNullOrBlank()) return null
-        // ToolAccessMode 的 "AUTO"/未知历史值由 ToolAccessModeSerializer 收敛到 ALWAYS_AVAILABLE；
-        // 真正 malformed 的 JSON 在此被兜底为未初始化。
+        // 全局工具加载已移出 ConversationToolConfiguration；旧会话 JSON 中的
+        // "toolAccessMode" 字段由 ignoreUnknownKeys 忽略。真正 malformed 的 JSON 在此兜底。
         return runCatching {
             json.decodeFromString<ConversationToolConfiguration>(payload)
         }.getOrNull()

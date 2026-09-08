@@ -41,7 +41,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -73,7 +72,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
-import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
@@ -91,7 +89,6 @@ private const val COMPACT_SHEET_ITEM_LIMIT: Int = 3
 
 private enum class AddToChatPage {
     HOME,
-    TOOL_ACCESS,
     PERMISSION_MODE,
     REASONING_EFFORT,
     MCP,
@@ -107,7 +104,6 @@ internal fun ChatAddToChatSheet(
     onChooseFiles: () -> Unit,
     imagesEnabled: Boolean,
     filesEnabled: Boolean,
-    onToolAccessModeChange: (ToolAccessMode) -> Unit,
     onReasoningEffortChange: (ReasoningEffort) -> Unit,
     onMcpServerEnabledChange: (String, Boolean) -> Unit,
     onFullAccessChange: (Boolean) -> Unit,
@@ -172,8 +168,6 @@ internal fun ChatAddToChatSheet(
                         GimiBottomSheetHeader(
                             title = when (currentPage) {
                                 AddToChatPage.HOME -> stringResource(R.string.chat_add_to_chat_title)
-                                AddToChatPage.TOOL_ACCESS ->
-                                    stringResource(R.string.chat_tool_access_title)
                                 AddToChatPage.PERMISSION_MODE ->
                                     stringResource(R.string.chat_permission_mode_title)
                                 AddToChatPage.REASONING_EFFORT ->
@@ -214,7 +208,6 @@ internal fun ChatAddToChatSheet(
                                 onChooseFiles = onChooseFiles,
                                 imagesEnabled = imagesEnabled,
                                 filesEnabled = filesEnabled,
-                                onOpenToolAccess = { page = AddToChatPage.TOOL_ACCESS },
                                 onOpenReasoningEffort = { page = AddToChatPage.REASONING_EFFORT },
                                 onOpenMcp = { page = AddToChatPage.MCP },
                                 onOpenPermissionMode = { page = AddToChatPage.PERMISSION_MODE },
@@ -224,10 +217,6 @@ internal fun ChatAddToChatSheet(
                                     }
                                     page = AddToChatPage.OFFICIAL_TOOL
                                 },
-                            )
-                            AddToChatPage.TOOL_ACCESS -> ToolAccessPage(
-                                state = state,
-                                onModeChange = onToolAccessModeChange,
                             )
                             AddToChatPage.PERMISSION_MODE -> PermissionModePage(
                                 fullAccess = state.fullAccess,
@@ -262,7 +251,6 @@ private fun AddToChatHome(
     onChooseFiles: () -> Unit,
     imagesEnabled: Boolean,
     filesEnabled: Boolean,
-    onOpenToolAccess: () -> Unit,
     onOpenReasoningEffort: () -> Unit,
     onOpenMcp: () -> Unit,
     onOpenOfficialTools: () -> Unit,
@@ -318,19 +306,6 @@ private fun AddToChatHome(
         }
         item {
             GroupedCard(modifier = Modifier.testTag("session-configuration-group")) {
-                NavigationRow(
-                    icon = Icons.Default.Tune,
-                    title = stringResource(R.string.chat_tool_access_title),
-                    subtitle = toolAccessModeLabel(
-                        state.configuration?.toolAccessMode ?: ToolAccessMode.ALWAYS_AVAILABLE,
-                    ),
-                    onClick = onOpenToolAccess,
-                    testTag = "tool-access-nav",
-                )
-                HorizontalDivider(
-                    modifier = Modifier.padding(start = 66.dp, end = 16.dp),
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                )
                 NavigationRow(
                     icon = Icons.Default.Lock,
                     title = stringResource(R.string.chat_permission_mode_title),
@@ -486,55 +461,6 @@ private fun permissionModeLabel(fullAccess: Boolean): String = stringResource(
     if (fullAccess) R.string.chat_permission_mode_full
     else R.string.chat_permission_mode_request,
 )
-
-@Composable
-private fun ToolAccessPage(
-    state: ChatAddToChatState,
-    onModeChange: (ToolAccessMode) -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .wrapContentHeight()
-            .testTag("tool-access-page"),
-    ) {
-        PageStatus(state)
-        LazyColumn(
-            contentPadding = PaddingValues(bottom = 24.dp),
-            modifier = Modifier.wrapContentHeight(),
-        ) {
-            items(ToolAccessMode.entries, key = ToolAccessMode::name) { mode ->
-                ToolAccessModeRow(
-                    mode = mode,
-                    selected = state.configuration?.toolAccessMode == mode,
-                    enabled = state.configuration != null && !state.isMutationBlocked,
-                    onClick = { onModeChange(mode) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ToolAccessModeRow(
-    mode: ToolAccessMode,
-    selected: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    GimiBottomSheetOptionRow(
-        selected = selected,
-        enabled = enabled,
-        onClick = onClick,
-        label = toolAccessModeLabel(mode),
-        description = toolAccessModeDescription(mode),
-        modifier = Modifier.testTag(
-            when (mode) {
-                ToolAccessMode.ON_DEMAND -> "tool-access-on-demand"
-                ToolAccessMode.ALWAYS_AVAILABLE -> "tool-access-always"
-            },
-        ),
-    )
-}
 
 @Composable
 private fun ReasoningEffortPage(
@@ -990,22 +916,6 @@ private fun enabledCountText(count: Int, isMcp: Boolean): String =
     }
 
 @Composable
-private fun toolAccessModeLabel(mode: ToolAccessMode): String = stringResource(
-    when (mode) {
-        ToolAccessMode.ON_DEMAND -> R.string.chat_tool_access_on_demand
-        ToolAccessMode.ALWAYS_AVAILABLE -> R.string.chat_tool_access_always
-    },
-)
-
-@Composable
-private fun toolAccessModeDescription(mode: ToolAccessMode): String = stringResource(
-    when (mode) {
-        ToolAccessMode.ON_DEMAND -> R.string.chat_tool_access_on_demand_description
-        ToolAccessMode.ALWAYS_AVAILABLE -> R.string.chat_tool_access_always_description
-    },
-)
-
-@Composable
 private fun reasoningEffortLabel(effort: ReasoningEffort): String = stringResource(
     when (effort) {
         ReasoningEffort.MINIMAL -> R.string.chat_reasoning_effort_minimal
@@ -1120,7 +1030,6 @@ private fun ChatAddToChatHomePreview() {
             onChooseFiles = {},
             imagesEnabled = true,
             filesEnabled = true,
-            onOpenToolAccess = {},
             onOpenReasoningEffort = {},
             onOpenMcp = {},
             onOpenOfficialTools = {},
@@ -1140,22 +1049,10 @@ private fun ChatAddToChatHomeWithErrorPreview() {
             onChooseFiles = {},
             imagesEnabled = true,
             filesEnabled = false,
-            onOpenToolAccess = {},
             onOpenReasoningEffort = {},
             onOpenMcp = {},
             onOpenOfficialTools = {},
             onOpenPermissionMode = {},
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun ChatAddToChatToolAccessPagePreview() {
-    AsssistantaiTheme {
-        ToolAccessPage(
-            state = previewAddToChatState(),
-            onModeChange = {},
         )
     }
 }

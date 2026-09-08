@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.domain.conversation.repository
 import github.ponyhuang.gimi.domain.conversation.model.Conversation
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.Message
+import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -45,4 +46,19 @@ interface ChatDisplayRepository {
     val showToolActivity: StateFlow<Boolean>
 
     fun setShowToolActivity(show: Boolean)
+}
+
+/**
+ * Global tool loading preference applied to every conversation.
+ *
+ * This replaced the former per-conversation [ConversationToolConfiguration.toolAccessMode]:
+ * tool loading is now a settings-level switch (on = load all enabled tools each turn, off =
+ * search and load tools on demand).
+ */
+interface ToolAccessRepository {
+    /** The currently selected global tool loading mode. */
+    val defaultToolAccessMode: StateFlow<ToolAccessMode>
+
+    /** Persist and publish the global tool loading mode. */
+    fun setDefaultToolAccessMode(mode: ToolAccessMode)
 }

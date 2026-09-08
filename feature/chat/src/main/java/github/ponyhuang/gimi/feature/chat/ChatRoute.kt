@@ -198,9 +198,6 @@ fun ChatRoute(
             onNewConversation = {
                 viewModel.onAction(ChatAction.NewConversation)
             },
-            onToolAccessModeChange = { mode ->
-                viewModel.onAction(ChatAction.SetToolAccessMode(mode))
-            },
             onReasoningEffortChange = { effort ->
                 viewModel.onAction(ChatAction.SetReasoningEffort(effort))
             },

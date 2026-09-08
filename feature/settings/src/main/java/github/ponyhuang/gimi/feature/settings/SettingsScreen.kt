@@ -16,8 +16,6 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -84,20 +82,6 @@ fun SettingsScreen(
             item { PreferenceSectionTitle(stringResource(R.string.settings_group_tools)) }
             item {
                 PreferenceGroupCard {
-                    PreferenceListItem(
-                        icon = Icons.Default.Visibility,
-                        title = stringResource(R.string.settings_chat_display_title),
-                        subtitle = stringResource(R.string.settings_chat_display_subtitle),
-                        showDivider = true,
-                        trailingContent = {
-                            Switch(
-                                checked = state.showToolActivity,
-                                onCheckedChange = {
-                                    onAction(SettingsAction.SetToolActivityVisible(it))
-                                },
-                            )
-                        },
-                    )
                     PreferenceNavigationCard(
                         icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
                         title = stringResource(R.string.settings_mcp_title),
@@ -200,7 +184,7 @@ private fun SettingsHomePreview() {
     AsssistantaiTheme {
         PreferenceScaffold(title = stringResource(R.string.settings_title), onBack = {}) { modifier ->
             SettingsScreen(
-                state = SettingsUiState(showToolActivity = true),
+                state = SettingsUiState(),
                 appVersionName = "1.0",
                 onAction = {},
                 modifier = modifier,

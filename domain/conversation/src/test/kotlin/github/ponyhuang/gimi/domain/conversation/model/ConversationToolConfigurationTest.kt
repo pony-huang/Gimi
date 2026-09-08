@@ -29,35 +29,6 @@ class ConversationToolConfigurationTest {
     }
 
     @Test
-    fun newConversationsDefaultToAlwaysAvailableToolAccess() {
-        assertEquals(
-            ToolAccessMode.ALWAYS_AVAILABLE,
-            ConversationToolConfiguration().toolAccessMode,
-        )
-    }
-
-    @Test
-    fun toolAccessModesOnlyContainExplicitLoadingPolicies() {
-        assertEquals(
-            listOf(ToolAccessMode.ON_DEMAND, ToolAccessMode.ALWAYS_AVAILABLE),
-            ToolAccessMode.entries,
-        )
-    }
-
-    @Test
-    fun toolAccessModeSurvivesOtherConfigurationUpdates() {
-        val configuration = ConversationToolConfiguration(
-            toolAccessMode = ToolAccessMode.ON_DEMAND,
-        )
-
-        val updated = configuration
-            .initializeOfficialFunctions(setOf("kimi_formulas"))
-            .sanitize(availableMcpServerIds = emptySet())
-
-        assertEquals(ToolAccessMode.ON_DEMAND, updated.toolAccessMode)
-    }
-
-    @Test
     fun officialFunctionsDefaultToTheAllMarkerForUnseenTools() {
         val configuration = ConversationToolConfiguration()
 

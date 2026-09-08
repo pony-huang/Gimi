@@ -1,11 +1,14 @@
 package github.ponyhuang.gimi.feature.toolauthorization
 
+import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
 
 data class ToolAuthorizationUiState(
     val isCustomizationEnabled: Boolean = false,
     val tools: List<ToolDescriptor> = emptyList(),
     val isMutationBlocked: Boolean = false,
+    val toolAccessMode: ToolAccessMode = ToolAccessMode.ON_DEMAND,
+    val showToolActivity: Boolean = true,
 ) {
     val enabledCount: Int get() = tools.count(ToolDescriptor::isEnabled)
     val totalCount: Int get() = tools.size
@@ -13,6 +16,8 @@ data class ToolAuthorizationUiState(
 
 sealed interface ToolAuthorizationAction {
     data class SetCustomizationEnabled(val enabled: Boolean) : ToolAuthorizationAction
+    data class SetToolAccessMode(val mode: ToolAccessMode) : ToolAuthorizationAction
+    data class SetShowToolActivity(val visible: Boolean) : ToolAuthorizationAction
 }
 
 sealed interface ToolAuthorizationMessage {

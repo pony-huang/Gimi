@@ -3,27 +3,16 @@ package github.ponyhuang.gimi.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 @HiltViewModel
-class SettingsViewModel @Inject constructor(
-    private val chatDisplayRepository: ChatDisplayRepository,
-) : ViewModel() {
-    val uiState: StateFlow<SettingsUiState> = chatDisplayRepository.showToolActivity
-        .map(::SettingsUiState)
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = SettingsUiState(chatDisplayRepository.showToolActivity.value),
-        )
+class SettingsViewModel @Inject constructor() : ViewModel() {
+    val uiState: StateFlow<SettingsUiState> = MutableStateFlow(SettingsUiState())
 
     private val mutableEffects = MutableSharedFlow<SettingsEffect>()
     val effects: SharedFlow<SettingsEffect> = mutableEffects
@@ -45,8 +34,6 @@ class SettingsViewModel @Inject constructor(
             SettingsAction.OpenMemory -> emitEffect(SettingsEffect.NavigateToMemory)
             SettingsAction.OpenProjectPage ->
                 emitEffect(SettingsEffect.OpenProjectPage)
-            is SettingsAction.SetToolActivityVisible ->
-                chatDisplayRepository.setShowToolActivity(action.visible)
         }
     }
 

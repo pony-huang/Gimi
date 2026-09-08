@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.conversation.runtime.isBusy
+import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
+import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
 import github.ponyhuang.gimi.domain.toolauthorization.usecase.SetToolAuthorizationUseCase
 import github.ponyhuang.gimi.domain.toolauthorization.usecase.ToolAuthorizationMutationResult
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
@@ -20,6 +22,8 @@ import kotlinx.coroutines.launch
 class ToolAuthorizationViewModel @Inject constructor(
     private val repository: ToolAuthorizationRepository,
     private val setToolAuthorization: SetToolAuthorizationUseCase,
+    private val toolAccessRepository: ToolAccessRepository,
+    private val chatDisplayRepository: ChatDisplayRepository,
 ) : ViewModel() {
     private val _effects = MutableSharedFlow<ToolAuthorizationEffect>(extraBufferCapacity = 8)
     val effects: SharedFlow<ToolAuthorizationEffect> = _effects.asSharedFlow()
@@ -28,11 +32,15 @@ class ToolAuthorizationViewModel @Inject constructor(
         repository.isCustomizationEnabled,
         repository.tools,
         setToolAuthorization.agentRuntimeState,
-    ) { customizationEnabled, tools, runtimeState ->
+        toolAccessRepository.defaultToolAccessMode,
+        chatDisplayRepository.showToolActivity,
+    ) { customizationEnabled, tools, runtimeState, toolAccessMode, showToolActivity ->
         ToolAuthorizationUiState(
             isCustomizationEnabled = customizationEnabled,
             tools = tools,
             isMutationBlocked = runtimeState.isBusy,
+            toolAccessMode = toolAccessMode,
+            showToolActivity = showToolActivity,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -40,6 +48,8 @@ class ToolAuthorizationViewModel @Inject constructor(
         initialValue = ToolAuthorizationUiState(
             isCustomizationEnabled = repository.isCustomizationEnabled.value,
             tools = repository.tools.value,
+            toolAccessMode = toolAccessRepository.defaultToolAccessMode.value,
+            showToolActivity = chatDisplayRepository.showToolActivity.value,
         ),
     )
 
@@ -51,6 +61,10 @@ class ToolAuthorizationViewModel @Inject constructor(
                     _effects.emit(ToolAuthorizationEffect.ShowMessage(ToolAuthorizationMessage.AgentBusy))
                 }
             }
+            is ToolAuthorizationAction.SetToolAccessMode ->
+                toolAccessRepository.setDefaultToolAccessMode(action.mode)
+            is ToolAuthorizationAction.SetShowToolActivity ->
+                chatDisplayRepository.setShowToolActivity(action.visible)
         }
     }
 }

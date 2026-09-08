@@ -6,16 +6,15 @@ import org.junit.Test
 
 class SettingsScreenStructureTest {
     @Test
-    fun toolCallDetailsIsTheFirstItemInTools() {
+    fun mcpPrecedesToolAuthorizationWithinToolsGroup() {
         val source = File("src/main/java/github/ponyhuang/gimi/feature/settings/SettingsScreen.kt").readText()
         val toolsGroup = source.indexOf("settings_group_tools")
         val generalGroup = source.indexOf("settings_group_general")
-        val toolActivity = source.indexOf("settings_chat_display_title")
         val mcp = source.indexOf("settings_mcp_title")
         val customTools = source.indexOf("settings_tool_authorization_title")
 
-        assertTrue(toolActivity in toolsGroup until generalGroup)
-        assertTrue(toolActivity < mcp)
+        assertTrue(mcp in toolsGroup until generalGroup)
+        assertTrue(customTools in toolsGroup until generalGroup)
         assertTrue(mcp < customTools)
     }
 }

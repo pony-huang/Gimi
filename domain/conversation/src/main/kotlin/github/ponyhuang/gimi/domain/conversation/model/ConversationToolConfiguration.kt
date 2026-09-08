@@ -1,12 +1,6 @@
 package github.ponyhuang.gimi.domain.conversation.model
 
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.PrimitiveKind
-import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
-import kotlinx.serialization.descriptors.SerialDescriptor
-import kotlinx.serialization.encoding.Decoder
-import kotlinx.serialization.encoding.Encoder
 
 /**
  * 会话把已启用工具暴露给模型的方式。
@@ -14,7 +8,6 @@ import kotlinx.serialization.encoding.Encoder
  * [ON_DEMAND] 始终先检索；[ALWAYS_AVAILABLE] 从当前用户轮次的第一次模型请求起
  * 加载全部已启用工具。
  */
-@Serializable(with = ToolAccessModeSerializer::class)
 enum class ToolAccessMode {
     ON_DEMAND,
     ALWAYS_AVAILABLE,
@@ -35,25 +28,6 @@ enum class ReasoningEffort {
 }
 
 /**
- * 兼容历史持久化数据：旧版本曾把该字段写成 `"AUTO"`，未知值回退到 [ToolAccessMode.ALWAYS_AVAILABLE]。
- * kotlinx 默认对未知枚举名抛异常，这里用自定义 serializer 保留 codec 的归一化语义。
- */
-object ToolAccessModeSerializer : KSerializer<ToolAccessMode> {
-    override val descriptor: SerialDescriptor =
-        PrimitiveSerialDescriptor("ToolAccessMode", PrimitiveKind.STRING)
-
-    override fun serialize(encoder: Encoder, value: ToolAccessMode) {
-        encoder.encodeString(value.name)
-    }
-
-    override fun deserialize(decoder: Decoder): ToolAccessMode {
-        val name = decoder.decodeString()
-        return ToolAccessMode.entries.firstOrNull { it.name == name }
-            ?: ToolAccessMode.ALWAYS_AVAILABLE
-    }
-}
-
-/**
  * Persistent, per-conversation tool selection state.
  *
  * Official tool selection is stored at function granularity. Tool ids are
@@ -67,7 +41,6 @@ object ToolAccessModeSerializer : KSerializer<ToolAccessMode> {
  * @property enabledMcpServerIds 当前会话选择的 MCP server ID。
  * @property pendingMcpCredentialServerId 当前会话最近一次等待补充认证凭据的 MCP server ID。
  * @property enabledOfficialFunctionIds 按官方工具(厂商唯一 ID)分组的函数选择。
- * @property toolAccessMode 当前会话采用的工具声明加载模式。
  * @property reasoningEffort 当前会话请求模型时采用的推理强度。
  */
 @Serializable
@@ -75,7 +48,6 @@ data class ConversationToolConfiguration(
     val enabledMcpServerIds: Set<String> = emptySet(),
     val pendingMcpCredentialServerId: String? = null,
     val enabledOfficialFunctionIds: Map<String, Set<String>> = emptyMap(),
-    val toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
     val reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM,
 ) {
     fun enabledOfficialFunctionIds(toolId: String): Set<String> =

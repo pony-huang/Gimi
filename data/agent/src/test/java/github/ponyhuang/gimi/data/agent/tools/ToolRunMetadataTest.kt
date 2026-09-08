@@ -4,7 +4,6 @@ import github.ponyhuang.gimi.data.agent.ModelConfig
 import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
 import github.ponyhuang.gimi.data.agent.toRuntimeMetadata
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
-import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -25,7 +24,6 @@ class ToolRunMetadataTest {
             enabledOfficialFunctionIds = mapOf(
                 "kimi_formulas" to setOf("translate", "code"),
             ),
-            toolAccessMode = ToolAccessMode.ON_DEMAND,
         )
 
         val decoded = ToolRunMetadata.toolConfiguration(
@@ -64,18 +62,6 @@ class ToolRunMetadataTest {
     }
 
     @Test
-    fun legacyAutomaticAccessMetadataDefaultsToAlwaysAvailable() {
-        val decoded = ToolRunMetadata.toolConfiguration(
-            mapOf(
-                "selkie.tool_config.present" to true,
-                "selkie.tool_config.access_mode" to "AUTO",
-            ),
-        )
-
-        assertEquals(ToolAccessMode.ALWAYS_AVAILABLE, decoded?.toolAccessMode)
-    }
-
-    @Test
     fun allowConfirmationFlagDefaultsToTrue() {
         assertTrue(ToolRunMetadata.allowConfirmationRequiredTools(null))
         assertTrue(ToolRunMetadata.allowConfirmationRequiredTools(emptyMap()))
@@ -103,17 +89,12 @@ class ToolRunMetadataTest {
                 enabledOfficialFunctionIds = mapOf(
                     "kimi_formulas" to setOf("translate"),
                 ),
-                toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
             ),
             allowConfirmationRequiredTools = false,
         )
 
         val json = Json.parseToJsonElement(Json.encodeToString(toJsonElement(metadata))).jsonObject
 
-        assertEquals(
-            "ALWAYS_AVAILABLE",
-            json.getValue("selkie.tool_config.access_mode").jsonPrimitive.content,
-        )
         assertEquals(
             "github",
             json.getValue("selkie.tool_config.mcp_server_ids").jsonArray.single()

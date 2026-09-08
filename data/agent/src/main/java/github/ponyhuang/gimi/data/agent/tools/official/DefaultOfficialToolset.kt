@@ -4,6 +4,7 @@ import com.google.adk.kt.tools.BaseTool
 import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
+import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -23,13 +24,14 @@ import javax.inject.Singleton
  */
 class DefaultOfficialToolset @Inject constructor(
     private val registry: OfficialToolRegistry,
+    private val toolAccessRepository: ToolAccessRepository,
 ) : OfficialToolset {
 
     override suspend fun resolveTools(
         config: ModelRuntimeMetadata,
         selection: ConversationToolConfiguration?,
     ): List<BaseTool> {
-        val onDemand = selection?.toolAccessMode == ToolAccessMode.ON_DEMAND
+        val onDemand = toolAccessRepository.defaultToolAccessMode.value == ToolAccessMode.ON_DEMAND
         return registry.specsFor(
             serviceId = config.serviceId,
             protocol = config.baseType,

@@ -80,7 +80,6 @@ import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
-import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
@@ -140,7 +139,6 @@ fun ChatScaffold(
     onOpenSettings: () -> Unit,
     onConfigureModels: () -> Unit,
     onNewConversation: () -> Unit,
-    onToolAccessModeChange: (ToolAccessMode) -> Unit,
     onReasoningEffortChange: (ReasoningEffort) -> Unit,
     onMcpServerEnabledChange: (String, Boolean) -> Unit,
     onOfficialToolOpened: (String) -> Unit,
@@ -364,7 +362,6 @@ fun ChatScaffold(
                                         },
                                     ),
                                     attachmentCapabilities = attachmentCapabilities,
-                                    onToolAccessModeChange = onToolAccessModeChange,
                                     onReasoningEffortChange = onReasoningEffortChange,
                                     onMcpServerEnabledChange = onMcpServerEnabledChange,
                                     onFullAccessChange = onFullAccessChange,
@@ -845,7 +842,6 @@ private fun ChatScaffoldEmptyPreview() {
             onOpenSettings = {},
             onConfigureModels = {},
             onNewConversation = {},
-            onToolAccessModeChange = {},
             onReasoningEffortChange = {},
             onMcpServerEnabledChange = { _, _ -> },
             onOfficialToolOpened = {},
@@ -890,7 +886,6 @@ private fun ChatScaffoldWithMessagesPreview() {
             onOpenSettings = {},
             onConfigureModels = {},
             onNewConversation = {},
-            onToolAccessModeChange = {},
             onReasoningEffortChange = {},
             onMcpServerEnabledChange = { _, _ -> },
             onOfficialToolOpened = {},
@@ -1027,7 +1022,6 @@ private fun ChatScaffoldFailedTurnPreview() {
             onOpenSettings = {},
             onConfigureModels = {},
             onNewConversation = {},
-            onToolAccessModeChange = {},
             onReasoningEffortChange = {},
             onMcpServerEnabledChange = { _, _ -> },
             onOfficialToolOpened = {},
@@ -1071,7 +1065,6 @@ private fun ChatScaffoldEditingFailedTurnPreview() {
             onOpenSettings = {},
             onConfigureModels = {},
             onNewConversation = {},
-            onToolAccessModeChange = {},
             onReasoningEffortChange = {},
             onMcpServerEnabledChange = { _, _ -> },
             onOfficialToolOpened = {},

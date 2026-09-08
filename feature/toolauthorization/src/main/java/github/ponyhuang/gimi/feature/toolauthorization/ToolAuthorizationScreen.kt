@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Rule
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
@@ -27,6 +28,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
@@ -71,6 +73,54 @@ fun ToolAuthorizationScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
+            item {
+                PreferenceGroupCard {
+                    PreferenceListItem(
+                        icon = Icons.Default.Tune,
+                        title = stringResource(R.string.toolauth_tool_access_label),
+                        subtitle = toolAccessModeDescription(state.toolAccessMode),
+                        showDivider = true,
+                        trailingContent = {
+                            Switch(
+                                checked = state.toolAccessMode == ToolAccessMode.ALWAYS_AVAILABLE,
+                                onCheckedChange = { on ->
+                                    onAction(
+                                        ToolAuthorizationAction.SetToolAccessMode(
+                                            if (on) {
+                                                ToolAccessMode.ALWAYS_AVAILABLE
+                                            } else {
+                                                ToolAccessMode.ON_DEMAND
+                                            },
+                                        ),
+                                    )
+                                },
+                                enabled = !state.isMutationBlocked,
+                            )
+                        },
+                    )
+                    PreferenceListItem(
+                        icon = Icons.Default.Visibility,
+                        title = stringResource(R.string.toolauth_chat_display_title),
+                        subtitle = stringResource(R.string.toolauth_chat_display_subtitle),
+                        trailingContent = {
+                            Switch(
+                                checked = state.showToolActivity,
+                                onCheckedChange = { on ->
+                                    onAction(ToolAuthorizationAction.SetShowToolActivity(on))
+                                },
+                                enabled = !state.isMutationBlocked,
+                            )
+                        },
+                    )
+                }
+            }
+            item {
+                PreferenceBanner(
+                    text = stringResource(R.string.toolauth_tool_access_notice),
+                    tone = PreferenceBannerTone.Info,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+                )
+            }
             item {
                 val configurationEnabled = state.isCustomizationEnabled && !state.isMutationBlocked
                 PreferenceGroupCard {
@@ -147,6 +197,14 @@ internal fun ToolAuthorizationEffects(effects: SharedFlow<ToolAuthorizationEffec
     }
 }
 
+@Composable
+private fun toolAccessModeDescription(mode: ToolAccessMode): String = stringResource(
+    when (mode) {
+        ToolAccessMode.ON_DEMAND -> R.string.toolauth_tool_access_on_demand_description
+        ToolAccessMode.ALWAYS_AVAILABLE -> R.string.toolauth_tool_access_always_description
+    },
+)
+
 @Preview(showBackground = true)
 @Composable
 private fun ToolAuthorizationScreenCustomizationEnabledPreview() {
@@ -158,6 +216,18 @@ private fun ToolAuthorizationScreenCustomizationEnabledPreview() {
                     ToolDescriptor(id = "web_search", name = "web_search", description = "搜索互联网。", isEnabled = true),
                 ),
             ),
+            onAction = {},
+            onNavigateToConfiguration = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ToolAuthorizationScreenToolAccessAlwaysPreview() {
+    AsssistantaiTheme {
+        ToolAuthorizationScreen(
+            state = ToolAuthorizationUiState(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE),
             onAction = {},
             onNavigateToConfiguration = {},
         )

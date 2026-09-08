@@ -27,6 +27,7 @@ import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.repository.ChatSessionRewindException
+import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
@@ -74,6 +75,7 @@ class AgentChatRunner(
         )
     },
     private val plugins: (PluginRuntimeSnapshot<AgentPlugin>) -> List<Plugin> = { emptyList() },
+    private val toolAccessRepository: ToolAccessRepository,
 ) {
     /**
      * Agent 构建的唯一缓存键。
@@ -202,7 +204,7 @@ class AgentChatRunner(
         val activeTurn = currentTurnForNewMessage(
             sessionId,
             selection,
-            toolConfiguration?.toolAccessMode ?: ToolAccessMode.ALWAYS_AVAILABLE,
+            toolAccessRepository.defaultToolAccessMode.value,
             toolConfiguration?.reasoningEffort ?: ReasoningEffort.MEDIUM,
             allowConfirmationRequiredTools,
             toolConfiguration,

@@ -63,7 +63,6 @@ import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.feature.chat.R
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
-import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import java.io.ByteArrayOutputStream
@@ -115,7 +114,6 @@ public fun ChatComposer(
     onExpandedChange: (Boolean) -> Unit = { },
     modelSelectorContent: @Composable () -> Unit = { },
     addToChatState: ChatAddToChatState = ChatAddToChatState(),
-    onToolAccessModeChange: (ToolAccessMode) -> Unit = { _ -> },
     onReasoningEffortChange: (ReasoningEffort) -> Unit = { _ -> },
     onMcpServerEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
     onFullAccessChange: (Boolean) -> Unit = { _ -> },
@@ -468,7 +466,6 @@ public fun ChatComposer(
             imagesEnabled = attachmentCapabilities.supportsImages,
             filesEnabled = attachmentCapabilities.supportsAudio ||
                 attachmentCapabilities.supportsDocuments,
-            onToolAccessModeChange = onToolAccessModeChange,
             onReasoningEffortChange = onReasoningEffortChange,
             onMcpServerEnabledChange = onMcpServerEnabledChange,
             onFullAccessChange = onFullAccessChange,

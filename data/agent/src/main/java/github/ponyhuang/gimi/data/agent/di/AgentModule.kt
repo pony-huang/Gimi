@@ -32,6 +32,7 @@ import github.ponyhuang.gimi.data.agent.tools.search.ToolEmbeddingModel
 import github.ponyhuang.gimi.data.agent.tools.search.ToolVectorEntity
 import github.ponyhuang.gimi.data.agent.tools.search.ToolVectorSearch
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
+import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
 import github.ponyhuang.gimi.domain.mcp.repository.McpConnectionTester
 import github.ponyhuang.gimi.domain.mcp.repository.McpSkipReporter
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
@@ -152,6 +153,7 @@ object AgentModule {
         agentLLMModelFactory: AgentLLMModelFactory,
         contributionRegistry: AgentContributionRegistry,
         pluginRuntimeProvider: PluginRuntimeProvider<AgentPlugin>,
+        toolAccessRepository: ToolAccessRepository,
     ): AgentChatRunner = AgentChatRunner(
         factory = { spec ->
             modelServices.awaitReady()
@@ -174,6 +176,7 @@ object AgentModule {
                 addAll(pluginRuntime.enabledPlugins)
             }
         },
+        toolAccessRepository = toolAccessRepository,
     )
 
 }

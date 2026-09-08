@@ -1,13 +1,7 @@
 package github.ponyhuang.gimi.feature.settings
 
-/**
- * 设置首页状态。
- *
- * @property showToolActivity 是否显示聊天工具过程。
- */
-data class SettingsUiState(
-    val showToolActivity: Boolean = false,
-)
+/** 设置首页状态。 */
+class SettingsUiState
 
 sealed interface SettingsAction {
     data object OpenModelService : SettingsAction
@@ -23,7 +17,6 @@ sealed interface SettingsAction {
     data object OpenMemory : SettingsAction
     /** 在浏览器中打开 GitHub 项目页。 */
     data object OpenProjectPage : SettingsAction
-    data class SetToolActivityVisible(val visible: Boolean) : SettingsAction
 }
 
 sealed interface SettingsEffect {

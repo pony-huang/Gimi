@@ -31,6 +31,7 @@ import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolBinding
 import github.ponyhuang.gimi.data.agent.tools.system.LocalToolset
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
+import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
@@ -41,6 +42,7 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -156,7 +158,7 @@ class AgentFactoryToolAccessTest {
         assertEquals(
             listOf(
                 "preload_memory",
-                "load_memory",
+                "load_artifacts",
                 "adk_request_input",
                 "get_user_choice",
                 "adjust_media_volume",
@@ -183,7 +185,7 @@ class AgentFactoryToolAccessTest {
         assertEquals(
             listOf(
                 "preload_memory",
-                "load_memory",
+                "load_artifacts",
                 "adk_request_input",
                 "get_user_choice",
                 McpConfigurationTool.NAME,
@@ -263,7 +265,7 @@ class AgentFactoryToolAccessTest {
         val plugin = FakeAgentPlugin("test", pluginToolsets = pluginToolsets)
         val pluginRuntimeProvider = FakePluginRuntimeProvider(plugins = listOf(plugin))
 
-        val officialToolset = DefaultOfficialToolset(officialRegistry)
+        val officialToolset = DefaultOfficialToolset(officialRegistry, FakeToolAccessRepository())
         val registry = AgentContributionRegistry(
             setOf(
                 LocalToolContribution(localToolCatalog, localToolset, toolAuthorization),
@@ -324,6 +326,17 @@ class AgentFactoryToolAccessTest {
     ) : Toolset {
         override suspend fun getTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
             listOf(declarationTool(toolName))
+    }
+
+    private class FakeToolAccessRepository(
+        initial: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
+    ) : ToolAccessRepository {
+        private val mutable = MutableStateFlow(initial)
+        override val defaultToolAccessMode: StateFlow<ToolAccessMode> = mutable
+
+        override fun setDefaultToolAccessMode(mode: ToolAccessMode) {
+            mutable.value = mode
+        }
     }
 
     private companion object {

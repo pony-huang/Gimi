@@ -57,8 +57,8 @@ sealed interface AssistantPresentationEvent {
     /** 正在将录音转写为文本。 */
     data object Transcribing : AssistantPresentationEvent
 
-    /** 已获得本轮用户指令。 */
-    data class TranscriptReady(val text: String) : AssistantPresentationEvent
+    /** 已获得本轮用户指令；文本由随后提交负责写入唯一消息状态。 */
+    data object TranscriptReady : AssistantPresentationEvent
 
     /** 正在播报回答。 */
     data object Speaking : AssistantPresentationEvent
@@ -83,19 +83,16 @@ fun AssistantSessionState.applyPresentationEvent(
     is AssistantPresentationEvent.CaptureStarted -> copy(
         phase = AssistantSessionPhase.LISTENING,
         source = event.source,
-        turn = null,
         messages = emptyList(),
         pendingConfirmation = null,
         errorMessage = null,
-        configIssue = null,
         presentationVisible = true,
     )
     AssistantPresentationEvent.Transcribing -> copy(
         phase = AssistantSessionPhase.TRANSCRIBING,
     )
-    is AssistantPresentationEvent.TranscriptReady -> copy(
+    AssistantPresentationEvent.TranscriptReady -> copy(
         phase = AssistantSessionPhase.PREPARING,
-        turn = (turn ?: AssistantTurn()).copy(userText = event.text),
     )
     AssistantPresentationEvent.Speaking -> copy(
         phase = AssistantSessionPhase.SPEAKING,
@@ -113,7 +110,7 @@ fun AssistantSessionState.applyPresentationEvent(
     AssistantPresentationEvent.CaptureAbandoned -> copy(
         phase = AssistantSessionPhase.STOPPED,
         taskActive = false,
-        turn = null,
+        messages = emptyList(),
         pendingConfirmation = null,
         presentationVisible = false,
     )

@@ -10,7 +10,6 @@ class AssistantSessionMessageTest {
     @Test
     fun captureStartedStartsANewEmptySession() {
         val state = AssistantSessionState(
-            turn = AssistantTurn(userText = "旧指令", responseText = "旧回答"),
             messages = listOf(
                 AssistantMessage(1, AssistantMessageAuthor.USER, "旧指令"),
                 AssistantMessage(2, AssistantMessageAuthor.ASSISTANT, "旧回答"),

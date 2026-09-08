@@ -11,7 +11,7 @@ fun VoicePipelineEvent.assistantPresentationEvent(): AssistantPresentationEvent?
     BluetoothVoiceStatus.Transcribing -> AssistantPresentationEvent.Transcribing
     BluetoothVoiceStatus.RunningAgent -> lastCommand
         ?.takeIf(String::isNotBlank)
-        ?.let(AssistantPresentationEvent::TranscriptReady)
+        ?.let { AssistantPresentationEvent.TranscriptReady }
     BluetoothVoiceStatus.Speaking -> AssistantPresentationEvent.Speaking
     BluetoothVoiceStatus.Error -> AssistantPresentationEvent.Failed(message)
     BluetoothVoiceStatus.Listening -> when {

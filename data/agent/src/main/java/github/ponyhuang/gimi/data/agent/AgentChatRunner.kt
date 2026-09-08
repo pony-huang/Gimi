@@ -197,7 +197,6 @@ class AgentChatRunner(
         fileAttachments: List<FileAttachment> = emptyList(),
         allowConfirmationRequiredTools: Boolean = true,
         toolConfiguration: ConversationToolConfiguration? = null,
-        invocationId: String? = null,
         rewindBeforeInvocationId: String? = null,
     ): Flow<Event> {
         val activeTurn = currentTurnForNewMessage(
@@ -242,7 +241,10 @@ class AgentChatRunner(
         return activeTurn.runner.runAsync(
             userId = userId,
             sessionId = sessionId,
-            invocationId = invocationId,
+            // ADK 0.8.0 在 isResumable=true 下：非空 invocationId 会被当成"恢复既有 invocation"，
+            // 恢复分支要求 session 已有事件；全新会话首条消息会因此抛 "Session ... has no events to resume"。
+            // 新消息必须传 null 让 ADK 自建 invocation；真实 id 由事件回流携带，用作失败轮回退边界。
+            invocationId = null,
             newMessage = newMessage,
             stateDelta = null,
             runConfig = RunConfig(

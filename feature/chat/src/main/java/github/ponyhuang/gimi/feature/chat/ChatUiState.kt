@@ -1,10 +1,10 @@
 package github.ponyhuang.gimi.feature.chat
 
+import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
 import github.ponyhuang.gimi.domain.conversation.model.Conversation
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
-import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
 import github.ponyhuang.gimi.domain.conversation.model.UserInputKind
 import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
@@ -27,11 +27,6 @@ import github.ponyhuang.gimi.domain.mcp.model.McpServer
  * @param sessionId 当前激活的会话 id；空串表示还没建立会话
  * @param isAgentRunning Agent turn 是否仍在进行（包括思考、流式输出和工具执行）。
  *                       用于显示思考/停止状态并锁定会话级操作。
- * @param turnComplete 当前 turn 是否收到过 `event.turnComplete = true` 的收尾事件。
- *                     与 [isAgentRunning] 的差异：`isAgentRunning` 在收到工具调用响应、
- *                     仍可能继续产流的事件时会保持 true；而 [turnComplete] 仅在
- *                     `Event.turnComplete = true` 的最终事件到达时翻为 true。
- *                     当前没有 UI 消费方，预留给 "Turn complete" 提示 chip / 状态徽章。
  * @param conversations 会话列表 — 直接转发自 `ConversationRepository.conversations`，
  *                     仅供 [HistoryDrawer] 渲染。
  * @param isInitializing 当前是否处于会话/历史初始化阶段 — 启动期
@@ -49,17 +44,13 @@ data class ChatUiState(
     val messages: List<Message> = emptyList(),
     val sessionId: String = "",
     val isAgentRunning: Boolean = false,
-    val lastSendFailed: Boolean = false,
-    val turnComplete: Boolean = false,
     /**
      * 可恢复的最近失败/中断发送轮；非空时在错误区域显示“编辑/重试”。
      * 一旦用户成功发送新消息或完成当前轮，该字段被清空。
      */
     val failedTurn: ChatTurn? = null,
-    /** 输入框当前是否处于“编辑失败消息”状态。 */
-    val editingFailedTurn: Boolean = false,
-    /** 是否展示“重新发送可能重复执行工具操作”确认对话框。 */
-    val toolReexecutionPending: Boolean = false,
+    /** 失败轮编辑、重试与重复执行确认的唯一交互状态。 */
+    val failedTurnRecovery: FailedTurnRecoveryState = FailedTurnRecoveryState.Idle,
     /** 输入框的外部草稿种子；编辑失败消息时用它回填文字与附件。 */
     val composerSeed: MessageData = MessageData(),
     val conversations: List<Conversation> = emptyList(),
@@ -91,6 +82,60 @@ data class ChatUiState(
      */
     val autoSpeakEnabled: Boolean = true,
 )
+
+/** 失败轮恢复交互的封闭状态，避免多个布尔值与 pending 字段形成非法组合。 */
+sealed interface FailedTurnRecoveryState {
+    /** 当前没有编辑或重复执行确认。 */
+    data object Idle : FailedTurnRecoveryState
+
+    /**
+     * 正在编辑失败轮。
+     *
+     * @property sessionId 编辑所属的 conversation session。
+     * @property previousDraft 进入编辑前的普通输入草稿，用户显式取消时恢复。
+     */
+    data class Editing(
+        val sessionId: String,
+        val previousDraft: MessageData,
+    ) : FailedTurnRecoveryState
+
+    /**
+     * 等待用户确认可能重复执行工具的重发请求。
+     *
+     * @property request 确认后要执行的原样重试或编辑提交。
+     * @property previousDraft 编辑提交前的普通输入草稿；原样重试时为 null。
+     */
+    data class AwaitingRepeatConfirmation(
+        val request: FailedTurnResendRequest,
+        val previousDraft: MessageData? = null,
+    ) : FailedTurnRecoveryState
+}
+
+/** 用户确认后可执行的失败轮重发请求。 */
+sealed interface FailedTurnResendRequest {
+    /** 原样重试失败轮的用户消息和附件。 */
+    data object RetryOriginal : FailedTurnResendRequest
+
+    /**
+     * 提交编辑后的失败轮内容。
+     *
+     * @property message 编辑后的文字与草稿附件。
+     */
+    data class SubmitEdit(val message: MessageData) : FailedTurnResendRequest
+}
+
+/** 当前是否仍处于失败轮编辑流程（包含编辑提交的重复执行确认）。 */
+val ChatUiState.editingFailedTurn: Boolean
+    get() = when (val recovery = failedTurnRecovery) {
+        is FailedTurnRecoveryState.Editing -> true
+        is FailedTurnRecoveryState.AwaitingRepeatConfirmation ->
+            recovery.request is FailedTurnResendRequest.SubmitEdit
+        FailedTurnRecoveryState.Idle -> false
+    }
+
+/** 当前是否需要展示重复执行工具确认。 */
+val ChatUiState.toolReexecutionPending: Boolean
+    get() = failedTurnRecovery is FailedTurnRecoveryState.AwaitingRepeatConfirmation
 
 val ChatUiState.pendingToolConfirmation: PendingToolConfirmation?
     get() = pendingToolConfirmations.firstOrNull()

@@ -88,15 +88,10 @@ internal class AgentEventReducer(
             runtime.phase = phase
             scope.launch { runtime.lease?.updatePhase(phase) }
         }
-        val status = AgentRunStatus(
-            isRunning = runtime.isAgentRunning,
-            turnComplete = runtime.turnComplete,
-        ).afterEvent(
-            partial = event.partial,
-            turnComplete = event.turnComplete,
-        )
-        runtime.isAgentRunning = status.isRunning
-        runtime.turnComplete = status.turnComplete
+        when {
+            event.turnComplete -> runtime.isAgentRunning = false
+            event.partial -> runtime.isAgentRunning = true
+        }
         publishRuntime(runtime)
         if (event.turnComplete) {
             scope.launch { repository.refreshConversation(sessionId) }
@@ -172,7 +167,6 @@ internal class AgentEventReducer(
         clearToolConfirmationState(runtime)
         runtime.messages = runtime.messages + Messages.fromError(error = message, invocationId = invocationId)
         runtime.isAgentRunning = false
-        runtime.turnComplete = false
         runtime.failed = true
         publishRuntime(runtime)
     }

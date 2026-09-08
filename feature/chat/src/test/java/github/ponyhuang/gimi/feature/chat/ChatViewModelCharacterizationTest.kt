@@ -19,11 +19,8 @@ import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatSessionRewindException
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
-import github.ponyhuang.gimi.domain.conversation.repository.ChatTurnRepository
-import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurnStatus
 import github.ponyhuang.gimi.domain.conversation.model.FunctionCallView
-import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.usecase.PrepareChatTurnUseCase
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
@@ -82,6 +79,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -132,7 +130,6 @@ class ChatViewModelCharacterizationTest {
                 text: String,
                 fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
                 toolConfiguration: ConversationToolConfiguration?,
-                invocationId: String?,
                 rewindBeforeInvocationId: String?,
             ): Flow<ChatRunEvent> = flow { throw java.io.IOException("offline") }
 
@@ -158,14 +155,17 @@ class ChatViewModelCharacterizationTest {
         val failed = fixture.viewModel.uiState.value.failedTurn
         assertEquals(ChatTurnStatus.FAILED, failed?.status)
         assertTrue(failed?.canRetry == true)
-        assertEquals("attempt-1", failed?.rewindBeforeInvocationId)
+        // 首轮在 ADK 事件回流前即失败，没有可回退的真实 invocation id。
+        assertNull(failed?.rewindBeforeInvocationId)
 
         fixture.viewModel.onAction(ChatAction.RetryFailedTurn)
         advanceUntilIdle()
 
         val userCount = fixture.viewModel.uiState.value.messages.count { it.role == MessageRole.User }
         assertEquals(1, userCount)
-        assertEquals("attempt-2", fixture.viewModel.uiState.value.failedTurn?.rewindBeforeInvocationId)
+        val retried = fixture.viewModel.uiState.value.failedTurn
+        // 重试仍失败且未产生事件，同样没有可回退的真实 invocation id。
+        assertNull(retried?.rewindBeforeInvocationId)
     }
 
     @Test
@@ -178,11 +178,14 @@ class ChatViewModelCharacterizationTest {
                 text: String,
                 fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
                 toolConfiguration: ConversationToolConfiguration?,
-                invocationId: String?,
                 rewindBeforeInvocationId: String?,
             ): Flow<ChatRunEvent> = flow {
                 callCount++
-                if (callCount == 1) throw java.io.IOException("offline")
+                if (callCount == 1) {
+                    // 先流出带真实 ADK invocationId 的部分回答，再失败，从而建立待回退边界。
+                    emit(event(partial = true, turnComplete = false))
+                    throw java.io.IOException("offline")
+                }
                 throw ChatSessionRewindException(IllegalStateException("missing invocation"))
             }
 
@@ -207,7 +210,9 @@ class ChatViewModelCharacterizationTest {
         fixture.viewModel.onAction(ChatAction.RetryFailedTurn)
         advanceUntilIdle()
 
-        assertEquals("attempt-1", fixture.viewModel.uiState.value.failedTurn?.rewindBeforeInvocationId)
+        val retried = fixture.viewModel.uiState.value.failedTurn
+        // rewind 失败时保留上一轮真实 invocation 边界，不被错误地替换。
+        assertEquals("invocation-1", retried?.rewindBeforeInvocationId)
     }
 
     @Test
@@ -219,7 +224,6 @@ class ChatViewModelCharacterizationTest {
                 text: String,
                 fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
                 toolConfiguration: ConversationToolConfiguration?,
-                invocationId: String?,
                 rewindBeforeInvocationId: String?,
             ): Flow<ChatRunEvent> = flow {
                 emit(event(partial = true, turnComplete = false))
@@ -256,7 +260,49 @@ class ChatViewModelCharacterizationTest {
         assertTrue(stopped?.canRetry == true)
         assertEquals(2, stopped?.messages?.size)
         assertEquals("回复", stopped?.messages?.last()?.textParts?.single()?.text)
-        assertEquals(1, fixture.turnRepository.savedTurns.size)
+    }
+
+    @Test
+    fun switchingSessionCancelsFailedTurnEditingImmediately() = runTest {
+        val fixture = fixture(configured = true, agentOverride = alwaysFailingAgent())
+        fixture.viewModel.onAction(ChatAction.Send("待编辑"))
+        advanceUntilIdle()
+        fixture.viewModel.onAction(ChatAction.EditFailedTurn)
+        advanceUntilIdle()
+        assertTrue(fixture.viewModel.uiState.value.editingFailedTurn)
+
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-2"))
+
+        assertEquals(FailedTurnRecoveryState.Idle, fixture.viewModel.uiState.value.failedTurnRecovery)
+        assertEquals(MessageData(), fixture.viewModel.uiState.value.composerSeed)
+    }
+
+    @Test
+    fun startingNewConversationCancelsFailedTurnEditingImmediately() = runTest {
+        val fixture = fixture(configured = true, agentOverride = alwaysFailingAgent())
+        fixture.viewModel.onAction(ChatAction.Send("待编辑"))
+        advanceUntilIdle()
+        fixture.viewModel.onAction(ChatAction.EditFailedTurn)
+        advanceUntilIdle()
+
+        fixture.viewModel.onAction(ChatAction.NewConversation)
+
+        assertEquals(FailedTurnRecoveryState.Idle, fixture.viewModel.uiState.value.failedTurnRecovery)
+        assertEquals(MessageData(), fixture.viewModel.uiState.value.composerSeed)
+    }
+
+    @Test
+    fun leavingChatCancelsFailedTurnEditingImmediately() = runTest {
+        val fixture = fixture(configured = true, agentOverride = alwaysFailingAgent())
+        fixture.viewModel.onAction(ChatAction.Send("待编辑"))
+        advanceUntilIdle()
+        fixture.viewModel.onAction(ChatAction.EditFailedTurn)
+        advanceUntilIdle()
+
+        fixture.viewModel.onAction(ChatAction.LeaveChat)
+
+        assertEquals(FailedTurnRecoveryState.Idle, fixture.viewModel.uiState.value.failedTurnRecovery)
+        assertEquals(MessageData(), fixture.viewModel.uiState.value.composerSeed)
     }
 
     @Test
@@ -325,7 +371,7 @@ class ChatViewModelCharacterizationTest {
         advanceUntilIdle()
 
         assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
-        coVerify(exactly = 0) { fixture.agent.send(any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { fixture.agent.send(any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -446,7 +492,7 @@ class ChatViewModelCharacterizationTest {
                 awaitItem(),
             )
             assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
-            coVerify(exactly = 0) { fixture.agent.send(any(), any(), any(), any(), any(), any(), any()) }
+            coVerify(exactly = 0) { fixture.agent.send(any(), any(), any(), any(), any(), any()) }
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -501,7 +547,6 @@ class ChatViewModelCharacterizationTest {
                 match {
                     it.enabledMcpServerIds == afterImport.enabledMcpServerIds
                 },
-                any(),
                 any(),
             )
         }
@@ -983,7 +1028,6 @@ class ChatViewModelCharacterizationTest {
             text: String,
             fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
             toolConfiguration: ConversationToolConfiguration?,
-            invocationId: String?,
             rewindBeforeInvocationId: String?,
         ): Flow<ChatRunEvent> = events(sessionId).receiveAsFlow()
 
@@ -1058,7 +1102,7 @@ class ChatViewModelCharacterizationTest {
         }
         val agent = agentOverride ?: mockk<ChatAgentRepository>(relaxed = true) {
             coEvery {
-                send(any(), any(), any(), any(), any(), any(), any())
+                send(any(), any(), any(), any(), any(), any())
             } returns flowOf(*events.toTypedArray())
         }
         val display = mockk<ChatDisplayRepository> {
@@ -1161,10 +1205,7 @@ class ChatViewModelCharacterizationTest {
                 coEvery { listFunctions(any()) } returns emptyList()
             }
         val toolApproval = FakeToolApprovalRepository()
-        // 重试/编辑依赖的可恢复轮日志；测试里保持行状态，不影响已有发送断言。
-        val turnRepository = RecordingChatTurnRepository()
         val prepareChatTurn = PrepareChatTurnUseCase(
-            turns = turnRepository,
             attachments = attachments,
             runner = agent,
         )
@@ -1184,7 +1225,6 @@ class ChatViewModelCharacterizationTest {
                 voiceWake = voiceWake,
                 attachments = attachments,
                 prepareChatTurn = prepareChatTurn,
-                turnRepository = turnRepository,
                 toolAuthorization = toolAuthorization,
                 mcpRepository = mcpRepository,
                 mcpSkipReporter = mockk {
@@ -1198,7 +1238,6 @@ class ChatViewModelCharacterizationTest {
             conversations = conversations,
             sessionResolver = sessionResolver,
             agent = agent,
-            turnRepository = turnRepository,
             display = display,
             appearance = appearance,
             toolApproval = toolApproval,
@@ -1228,6 +1267,32 @@ class ChatViewModelCharacterizationTest {
         errorMessage = null,
         timestamp = 1L,
     )
+
+    private fun alwaysFailingAgent(): ChatAgentRepository = object : ChatAgentRepository {
+        override suspend fun send(
+            sessionId: String,
+            selection: ModelSelection,
+            text: String,
+            fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
+            toolConfiguration: ConversationToolConfiguration?,
+            rewindBeforeInvocationId: String?,
+        ): Flow<ChatRunEvent> = flow { throw java.io.IOException("offline") }
+
+        override suspend fun respondToToolConfirmation(
+            sessionId: String,
+            confirmationCallId: String,
+            confirmed: Boolean,
+        ): Flow<ChatRunEvent> = flowOf(event())
+
+        override suspend fun respondToInputRequest(
+            sessionId: String,
+            callId: String,
+            toolName: String,
+            value: String,
+        ): Flow<ChatRunEvent> = flowOf(event())
+
+        override suspend fun releaseSession(sessionId: String) = Unit
+    }
 
     private fun confirmationEvent(vararg calls: ChatFunctionCall) = ChatRunEvent(
         id = "confirmation-event",
@@ -1272,7 +1337,6 @@ class ChatViewModelCharacterizationTest {
         val conversations: ConversationRepository,
         val sessionResolver: ConversationSessionResolver,
         val agent: ChatAgentRepository,
-        val turnRepository: RecordingChatTurnRepository,
         val display: ChatDisplayRepository,
         val appearance: AppearanceRepository,
         val toolApproval: FakeToolApprovalRepository,
@@ -1282,45 +1346,6 @@ class ChatViewModelCharacterizationTest {
         val playback: SpeechPlaybackRepository,
         val speechSettings: FakeSpeechSettingsRepository,
     )
-}
-
-/** 记录型轮次日志：验证 ViewModel 对恢复轮的保存与结束时机（失败/停止保存、成功 finish）。 */
-private class RecordingChatTurnRepository : ChatTurnRepository {
-    private var counter = 0
-    val savedTurns = mutableListOf<ChatTurn>()
-    val finishedTurns = mutableListOf<String>()
-
-    override suspend fun recover(sessionId: String): ChatTurn? = null
-
-    override suspend fun begin(
-        sessionId: String,
-        userMessage: Message,
-        history: List<Message>,
-        retryTurnId: String?,
-    ): ChatTurn {
-        counter++
-        return ChatTurn(
-            id = retryTurnId ?: "turn-$counter",
-            attemptId = "attempt-$counter",
-            sessionId = sessionId,
-            userMessage = userMessage,
-            messages = history + userMessage,
-            rewindBeforeInvocationId = retryTurnId?.let {
-                savedTurns.lastOrNull()?.rewindBeforeInvocationId
-                    ?: savedTurns.lastOrNull()?.attemptId
-            },
-        )
-    }
-
-    override suspend fun save(turn: ChatTurn) {
-        savedTurns += turn
-    }
-
-    override suspend fun finish(sessionId: String, attemptId: String) {
-        finishedTurns += attemptId
-    }
-
-    override suspend fun delete(sessionId: String) = Unit
 }
 
 private class FakeSpeechSettingsRepository : SpeechSettingsRepository {

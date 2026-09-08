@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.data.conversation.repository
 import github.ponyhuang.gimi.domain.conversation.model.Conversation
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
+import github.ponyhuang.gimi.domain.conversation.repository.NoAvailableAssistantModelException
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
@@ -20,6 +21,7 @@ import io.mockk.mockk
 import io.mockk.slot
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DefaultConversationSessionResolverTest {
@@ -114,6 +116,17 @@ class DefaultConversationSessionResolverTest {
         resolver.resolveToolConfiguration("background", selection)
 
         coVerify(exactly = 0) { conversations.activateConversation(any(), any()) }
+    }
+
+    @Test
+    fun createWithoutUsableModelThrowsTypedConfigurationFailure() = runTest {
+        every { modelCatalog.currentAssistantSelection() } returns null
+        every { modelCatalog.currentServices() } returns emptyList()
+
+        val failure = runCatching { resolver.createAndActivate() }.exceptionOrNull()
+
+        assertTrue(failure is NoAvailableAssistantModelException)
+        coVerify(exactly = 0) { conversations.createConversation(any(), any(), any()) }
     }
 
     private fun service() = LLMModelSetting(

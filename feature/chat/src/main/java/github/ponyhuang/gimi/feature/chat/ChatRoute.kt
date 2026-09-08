@@ -77,7 +77,10 @@ fun ChatRoute(
 
     LifecycleResumeEffect(viewModel) {
         viewModel.setCurrentChatVisible(true)
-        onPauseOrDispose { viewModel.setCurrentChatVisible(false) }
+        onPauseOrDispose {
+            viewModel.setCurrentChatVisible(false)
+            viewModel.onAction(ChatAction.LeaveChat)
+        }
     }
 
     LaunchedEffect(viewModel) {

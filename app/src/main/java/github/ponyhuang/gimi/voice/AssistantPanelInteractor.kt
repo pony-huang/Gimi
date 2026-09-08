@@ -1,7 +1,6 @@
 package github.ponyhuang.gimi.voice
 
 import github.ponyhuang.gimi.core.audio.VoiceAudioRecorder
-import github.ponyhuang.gimi.domain.assistant.model.AssistantConfigIssue
 import github.ponyhuang.gimi.domain.assistant.model.AssistantInvocationSource
 import github.ponyhuang.gimi.domain.assistant.model.AssistantPresentationEvent
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
@@ -36,9 +35,6 @@ class AssistantPanelInteractor @Inject constructor(
 
     private val _audioLevel = MutableStateFlow(0f)
     val audioLevel: StateFlow<Float> = _audioLevel.asStateFlow()
-
-    /** 检查执行所需配置；返回 null 表示可执行。 */
-    suspend fun configurationIssue(): AssistantConfigIssue? = coordinator.configurationIssue()
 
     /** 切换麦克风：空闲时开始采集，录音中则停止并转写提交。 */
     fun toggleMic() {

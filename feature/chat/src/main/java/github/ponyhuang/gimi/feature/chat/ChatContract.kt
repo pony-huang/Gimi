@@ -31,6 +31,9 @@ sealed interface ChatAction {
     /** 取消编辑，恢复编辑前的草稿，不改动历史。 */
     data object CancelEditFailedTurn : ChatAction
 
+    /** 离开聊天页；丢弃当前失败轮编辑态和编辑草稿，不影响失败轮本身。 */
+    data object LeaveChat : ChatAction
+
     /** 工具重复执行确认：proceed=true 时真正重新发送，false 时取消。 */
     data class ResolveRepeatExecution(val proceed: Boolean) : ChatAction
 

@@ -16,6 +16,10 @@ data class ConversationSessionSnapshot(
     val toolConfiguration: ConversationToolConfiguration,
 )
 
+/** 当前模型目录中没有可用于普通聊天或助手任务的模型。 */
+class NoAvailableAssistantModelException :
+    IllegalStateException("No available assistant model.")
+
 /** 统一恢复、创建和初始化聊天当前会话。 */
 interface ConversationSessionResolver {
     /** 恢复当前会话；没有可用会话时按普通聊天默认配置创建一个。 */

@@ -12,7 +12,6 @@ import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatSessionRewindException
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
-import github.ponyhuang.gimi.domain.conversation.repository.ChatTurnRepository
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurnStatus
 import github.ponyhuang.gimi.domain.conversation.usecase.PrepareChatTurnUseCase
@@ -94,7 +93,6 @@ class ChatViewModel @Inject constructor(
     private val voiceWake: VoiceWakeRepository,
     private val attachments: ChatAttachmentRepository,
     private val prepareChatTurn: PrepareChatTurnUseCase,
-    private val turnRepository: ChatTurnRepository,
     private val officialFunctionCatalog: OfficialToolFunctionCatalog,
     private val memoryRuntimeStatus: MemoryRuntimeStatus,
 ) : ViewModel() {
@@ -121,6 +119,7 @@ class ChatViewModel @Inject constructor(
             ChatAction.RetryFailedTurn -> retryFailedTurn()
             ChatAction.EditFailedTurn -> editFailedTurn()
             ChatAction.CancelEditFailedTurn -> cancelEditFailedTurn()
+            ChatAction.LeaveChat -> cancelFailedTurnEdit(restorePreviousDraft = false)
             is ChatAction.ResolveRepeatExecution -> resolveRepeatExecution(action.proceed)
             ChatAction.StopStreaming -> stopStreaming()
             is ChatAction.ToggleSpeechPlayback ->
@@ -210,7 +209,6 @@ class ChatViewModel @Inject constructor(
         val runToken = Any()
         runtime.runToken = runToken
         runtime.isAgentRunning = true
-        runtime.turnComplete = false
         runtime.phase = AgentTaskPhase.GENERATING
         publishRuntime(runtime)
         runtime.job = viewModelScope.launch {
@@ -258,7 +256,6 @@ class ChatViewModel @Inject constructor(
         val runToken = Any()
         runtime.runToken = runToken
         runtime.isAgentRunning = true
-        runtime.turnComplete = false
         runtime.phase = AgentTaskPhase.GENERATING
         publishRuntime(runtime)
         runtime.job = viewModelScope.launch {
@@ -411,12 +408,6 @@ class ChatViewModel @Inject constructor(
     private var activeSessionLoadToken: Any? = null
     private var loadingSessionId: String? = null
     private var pendingContentRefreshSessionId: String? = null
-    /** 待用户确认的“重试”意图；仅在工具已执行时置位。 */
-    private var pendingRetryRun = false
-    /** 待确认的“编辑后发送”内容；仅在工具已执行时置位。 */
-    private var pendingEditSend: MessageData? = null
-    /** 进入编辑前暂存的输入框草稿；取消编辑时恢复。 */
-    private var pendingPriorComposerDraft: MessageData? = null
     private fun runtimeFor(sessionId: String): ChatSessionRuntime =
         sessionRuntimes.getOrPut(sessionId) { ChatSessionRuntime(sessionId) }
 
@@ -429,9 +420,7 @@ class ChatViewModel @Inject constructor(
                 state.copy(
                     messages = runtime.messages,
                     isAgentRunning = runtime.isAgentRunning,
-                    lastSendFailed = runtime.failed,
                     failedTurn = runtime.failedRecoverableTurn(),
-                    turnComplete = runtime.turnComplete,
                     currentModelSelection = runtime.modelSelection,
                     toolConfiguration = runtime.toolConfiguration,
                     officialToolDescriptors = buildOfficialToolDescriptors(
@@ -457,9 +446,7 @@ class ChatViewModel @Inject constructor(
                 sessionId = sessionId,
                 messages = runtime.messages,
                 isAgentRunning = runtime.isAgentRunning,
-                lastSendFailed = runtime.failed,
                 failedTurn = runtime.failedRecoverableTurn(),
-                turnComplete = runtime.turnComplete,
                 currentModelSelection = runtime.modelSelection,
                 toolConfiguration = runtime.toolConfiguration,
                 officialToolDescriptors = buildOfficialToolDescriptors(
@@ -666,7 +653,6 @@ class ChatViewModel @Inject constructor(
         ) {
             runtime.messages = messages
             runtime.isLoaded = true
-            runtime.turnComplete = false
             publishRuntime(runtime)
         }
     }
@@ -702,16 +688,26 @@ class ChatViewModel @Inject constructor(
         if (_uiState.value.pendingToolConfirmation != null) return false
         if (_uiState.value.pendingInputRequest != null) return false
         val stateAtSend = _uiState.value
-        val editing = stateAtSend.editingFailedTurn
-        val failedTurn = stateAtSend.failedTurn
-        // 编辑失败消息且工具已执行时，先弹出重复执行确认，不直接发送。
-        if (editing && failedTurn?.hasToolCalls == true && !stateAtSend.toolReexecutionPending) {
-            pendingEditSend = MessageData(text = text, attachments = draftAttachments)
-            pendingPriorComposerDraft = stateAtSend.composerSeed
-            _uiState.update { it.copy(toolReexecutionPending = true) }
+        if (stateAtSend.failedTurnRecovery is FailedTurnRecoveryState.AwaitingRepeatConfirmation) {
             return false
         }
-        val retry = if (editing) failedTurn else null
+        val editing = stateAtSend.failedTurnRecovery as? FailedTurnRecoveryState.Editing
+        val failedTurn = stateAtSend.failedTurn
+        // 编辑失败消息且工具已执行时，先弹出重复执行确认，不直接发送。
+        if (editing != null && failedTurn?.hasToolCalls == true) {
+            _uiState.update {
+                it.copy(
+                    failedTurnRecovery = FailedTurnRecoveryState.AwaitingRepeatConfirmation(
+                        request = FailedTurnResendRequest.SubmitEdit(
+                            MessageData(text = text, attachments = draftAttachments),
+                        ),
+                        previousDraft = editing.previousDraft,
+                    ),
+                )
+            }
+            return false
+        }
+        val retry = if (editing != null) failedTurn else null
         val sessionId = _uiState.value.sessionId
         val usableSelection = _uiState.value.currentModelSelection
             ?.takeIf(::isUsableChatSelection)
@@ -740,13 +736,14 @@ class ChatViewModel @Inject constructor(
                     runtime.isLoaded = true
                 }
                 showRuntime(snapshot.sessionId)
-                startSend(
+                val accepted = startSend(
                     snapshot.sessionId,
                     snapshot.modelSelection,
                     text,
                     draftAttachments,
                     retry = retry,
                 )
+                if (accepted && editing != null) finishFailedTurnEdit()
             }
             return true
         }
@@ -755,16 +752,7 @@ class ChatViewModel @Inject constructor(
             return false
         }
         val accepted = startSend(sessionId, usableSelection, text, draftAttachments, retry = retry)
-        if (accepted && editing) {
-            // 编辑提交成功：退出编辑态并清空输入框。
-            pendingPriorComposerDraft = null
-            _uiState.update {
-                it.copy(
-                    editingFailedTurn = false,
-                    composerSeed = MessageData(),
-                )
-            }
-        }
+        if (accepted && editing != null) finishFailedTurnEdit()
         return accepted
     }
 
@@ -787,7 +775,6 @@ class ChatViewModel @Inject constructor(
         runtime.runToken = runToken
         runtime.modelSelection = selection
         runtime.isAgentRunning = true
-        runtime.turnComplete = false
         runtime.phase = AgentTaskPhase.GENERATING
         runtime.failed = false
         runtime.attention = SessionResultAttention.NONE
@@ -838,7 +825,6 @@ class ChatViewModel @Inject constructor(
                         text = sendText,
                         fileAttachments = turn.userMessage.fileAttachments,
                         toolConfiguration = runtime.toolConfiguration,
-                        invocationId = turn.attemptId,
                         rewindBeforeInvocationId = turn.rewindBeforeInvocationId,
                     ).collect { event ->
                         eventReducer.applyEvent(sessionId, event, runToken)
@@ -846,7 +832,6 @@ class ChatViewModel @Inject constructor(
                 }.onSuccess {
                     if (!runtime.failed) {
                         attachments.deleteDrafts(draftAttachments)
-                        turnRepository.finish(sessionId, turn.attemptId)
                         runtime.lastTurn = null
                     }
                 }.onFailure { failure ->
@@ -875,65 +860,44 @@ class ChatViewModel @Inject constructor(
             rewindBeforeInvocationId = if (failure is ChatSessionRewindException) {
                 turn.rewindBeforeInvocationId
             } else {
-                turn.attemptId
+                // ADK 0.8.0 自建 invocation id；回退边界必须是该 id（由事件回流携带），
+                // 而不是领域层随机 attemptId —— 否则重试时 rewindAsync 找不到对应事件。
+                runtime.messages.lastOrNull { it.invocationId != null }?.invocationId
             },
         )
         runtime.lastTurn = failed
         publishRuntime(runtime)
-        viewModelScope.launch {
-            runCatching { turnRepository.save(failed) }
-                .onFailure { Log.w(TAG, "Failed to persist turn record for retry", it) }
-        }
-    }
-
-    /**
-     * 会话加载时恢复失败的发送轮：把中断/失败轮回填为 runtime 的当前展示与可恢复记录，
-     * 重启后用户仍能“编辑/重试”。恢复失败不阻断对话加载。
-     */
-    private suspend fun applyRecoverableTurn(sessionId: String, runtime: ChatSessionRuntime) {
-        runCatching { turnRepository.recover(sessionId) }
-            .onSuccess { recovered ->
-                if (recovered != null) {
-                    runtime.lastTurn = recovered
-                    runtime.messages = recovered.messages
-                }
-            }
-            .onFailure { Log.w(TAG, "Failed to recover turn record for session $sessionId", it) }
     }
 
     /** 重新发送最近失败轮次；若工具已执行则先请求用户确认。 */
     private fun retryFailedTurn() {
         val state = _uiState.value
         val failedTurn = state.failedTurn ?: return
-        if (state.isAgentRunning || state.editingFailedTurn) return
-        val sessionId = state.sessionId
-        val selection = state.currentModelSelection?.takeIf(::isUsableChatSelection) ?: run {
-            emitNotice(ChatNotice.ConfigureChatModel)
-            return
-        }
+        if (state.isAgentRunning || state.failedTurnRecovery !is FailedTurnRecoveryState.Idle) return
         if (failedTurn.hasToolCalls) {
-            pendingRetryRun = true
-            _uiState.update { it.copy(toolReexecutionPending = true) }
+            _uiState.update {
+                it.copy(
+                    failedTurnRecovery = FailedTurnRecoveryState.AwaitingRepeatConfirmation(
+                        FailedTurnResendRequest.RetryOriginal,
+                    ),
+                )
+            }
             return
         }
-        startSend(
-            sessionId = sessionId,
-            selection = selection,
-            text = failedTurn.userMessage.textParts.joinToString("") { it.text },
-            draftAttachments = emptyList(),
-            retry = failedTurn,
-            reuseOriginal = true,
-        )
+        executeFailedTurnResend(failedTurn, FailedTurnResendRequest.RetryOriginal)
     }
 
     /** 编辑失败消息：把原始文字与附件回填输入框，进入编辑态。 */
     private fun editFailedTurn() {
         val state = _uiState.value
         val failedTurn = state.failedTurn ?: return
-        if (state.isAgentRunning || state.editingFailedTurn) return
+        if (state.isAgentRunning || state.failedTurnRecovery !is FailedTurnRecoveryState.Idle) return
         val text = failedTurn.userMessage.textParts.joinToString("") { it.text }
-        pendingPriorComposerDraft = state.composerSeed
-        _uiState.update { it.copy(editingFailedTurn = true) }
+        val editing = FailedTurnRecoveryState.Editing(
+            sessionId = state.sessionId,
+            previousDraft = state.composerSeed,
+        )
+        _uiState.update { it.copy(failedTurnRecovery = editing) }
         viewModelScope.launch {
             val draftAttachments = runCatching {
                 attachments.createDrafts(failedTurn.userMessage.fileAttachments)
@@ -941,6 +905,10 @@ class ChatViewModel @Inject constructor(
                 emitNotice(ChatNotice.EditDraftsRestoreFailed)
                 Log.w(TAG, "Failed to create edit drafts", failure)
                 emptyList()
+            }
+            if (_uiState.value.failedTurnRecovery != editing) {
+                if (draftAttachments.isNotEmpty()) attachments.deleteDrafts(draftAttachments)
+                return@launch
             }
             _uiState.update {
                 it.copy(
@@ -952,16 +920,31 @@ class ChatViewModel @Inject constructor(
 
     /** 取消编辑：恢复进入编辑前的草稿，不改动历史；编辑专用草稿副本一并清理。 */
     private fun cancelEditFailedTurn() {
-        pendingEditSend = null
-        val editDrafts = _uiState.value.composerSeed.attachments
+        cancelFailedTurnEdit(restorePreviousDraft = true)
+    }
+
+    /** 统一结束编辑状态；会话切换/离开页面时不把旧草稿带到目标会话。 */
+    private fun cancelFailedTurnEdit(restorePreviousDraft: Boolean) {
+        val state = _uiState.value
+        val recovery = state.failedTurnRecovery
+        if (recovery is FailedTurnRecoveryState.Idle) return
+        val previousDraft = when (recovery) {
+            is FailedTurnRecoveryState.Editing -> recovery.previousDraft
+            is FailedTurnRecoveryState.AwaitingRepeatConfirmation -> recovery.previousDraft
+            FailedTurnRecoveryState.Idle -> null
+        }
+        val pendingEditDrafts = (
+            recovery as? FailedTurnRecoveryState.AwaitingRepeatConfirmation
+        )?.request.let { request ->
+            (request as? FailedTurnResendRequest.SubmitEdit)?.message?.attachments.orEmpty()
+        }
+        val editDrafts = (state.composerSeed.attachments + pendingEditDrafts).distinctBy { it.reference }
         _uiState.update {
             it.copy(
-                editingFailedTurn = false,
-                toolReexecutionPending = false,
-                composerSeed = pendingPriorComposerDraft ?: MessageData(),
+                failedTurnRecovery = FailedTurnRecoveryState.Idle,
+                composerSeed = if (restorePreviousDraft) previousDraft ?: MessageData() else MessageData(),
             )
         }
-        pendingPriorComposerDraft = null
         if (editDrafts.isNotEmpty()) {
             viewModelScope.launch {
                 // deleteDrafts 只删除草稿目录内的临时副本，不会误删已归档的历史附件。
@@ -974,52 +957,75 @@ class ChatViewModel @Inject constructor(
     /** 处理“重试可能重复执行工具”确认对话框。 */
     private fun resolveRepeatExecution(proceed: Boolean) {
         val state = _uiState.value
+        val pending = state.failedTurnRecovery as? FailedTurnRecoveryState.AwaitingRepeatConfirmation
+            ?: return
         if (!proceed) {
-            pendingRetryRun = false
-            pendingEditSend = null
-            _uiState.update { it.copy(toolReexecutionPending = false) }
-            return
-        }
-        val edit = pendingEditSend
-        if (edit != null) {
-            pendingEditSend = null
-            pendingRetryRun = false
-            _uiState.update { it.copy(toolReexecutionPending = false) }
-            val failedTurn = state.failedTurn
-            val selection = state.currentModelSelection?.takeIf(::isUsableChatSelection)
-            val sessionId = state.sessionId
-            if (failedTurn == null || selection == null || sessionId.isBlank()) return
-            val accepted = startSend(
-                sessionId = sessionId,
-                selection = selection,
-                text = edit.text,
-                draftAttachments = edit.attachments,
-                retry = failedTurn,
-                reuseOriginal = false,
-            )
-            if (accepted) {
-                pendingPriorComposerDraft = null
-                _uiState.update {
-                    it.copy(
-                        editingFailedTurn = false,
-                        composerSeed = MessageData(),
-                    )
-                }
+            _uiState.update {
+                it.copy(
+                    failedTurnRecovery = when (pending.request) {
+                        FailedTurnResendRequest.RetryOriginal -> FailedTurnRecoveryState.Idle
+                        is FailedTurnResendRequest.SubmitEdit -> FailedTurnRecoveryState.Editing(
+                            sessionId = state.sessionId,
+                            previousDraft = pending.previousDraft ?: MessageData(),
+                        )
+                    },
+                )
             }
             return
         }
-        if (pendingRetryRun) {
-            pendingRetryRun = false
-            _uiState.update { it.copy(toolReexecutionPending = false) }
-            val failedTurn = state.failedTurn ?: return
-            val selection = state.currentModelSelection?.takeIf(::isUsableChatSelection) ?: return
-            startSend(
+        val failedTurn = state.failedTurn ?: return
+        _uiState.update {
+            it.copy(
+                failedTurnRecovery = when (pending.request) {
+                    FailedTurnResendRequest.RetryOriginal -> FailedTurnRecoveryState.Idle
+                    is FailedTurnResendRequest.SubmitEdit -> FailedTurnRecoveryState.Editing(
+                        sessionId = state.sessionId,
+                        previousDraft = pending.previousDraft ?: MessageData(),
+                    )
+                },
+            )
+        }
+        executeFailedTurnResend(failedTurn, pending.request)
+    }
+
+    /** 原样重试和编辑提交的唯一执行入口。 */
+    private fun executeFailedTurnResend(
+        failedTurn: ChatTurn,
+        request: FailedTurnResendRequest,
+    ): Boolean {
+        val state = _uiState.value
+        val selection = state.currentModelSelection?.takeIf(::isUsableChatSelection) ?: run {
+            emitNotice(ChatNotice.ConfigureChatModel)
+            return false
+        }
+        if (state.sessionId.isBlank()) return false
+        val accepted = when (request) {
+            FailedTurnResendRequest.RetryOriginal -> startSend(
                 sessionId = state.sessionId,
                 selection = selection,
                 text = failedTurn.userMessage.textParts.joinToString("") { it.text },
                 draftAttachments = emptyList(),
                 retry = failedTurn,
                 reuseOriginal = true,
+            )
+            is FailedTurnResendRequest.SubmitEdit -> startSend(
+                sessionId = state.sessionId,
+                selection = selection,
+                text = request.message.text,
+                draftAttachments = request.message.attachments,
+                retry = failedTurn,
+                reuseOriginal = false,
+            )
+        }
+        if (accepted && request is FailedTurnResendRequest.SubmitEdit) finishFailedTurnEdit()
+        return accepted
+    }
+
+    private fun finishFailedTurnEdit() {
+        _uiState.update {
+            it.copy(
+                failedTurnRecovery = FailedTurnRecoveryState.Idle,
+                composerSeed = MessageData(),
             )
         }
     }
@@ -1084,7 +1090,6 @@ class ChatViewModel @Inject constructor(
                     val history = repository.loadMessages(snapshot.sessionId).orEmpty()
                     val runtime = runtimeFor(snapshot.sessionId)
                     runtime.messages = history
-                    applyRecoverableTurn(snapshot.sessionId, runtime)
                     runtime.modelSelection = snapshot.modelSelection
                     runtime.toolConfiguration = snapshot.toolConfiguration
                     runtime.isLoaded = true
@@ -1109,6 +1114,7 @@ class ChatViewModel @Inject constructor(
      * 上一会话遗留的 [partChannels]，避免 channel 跨"空 session"残留。
      */
     private fun reset() {
+        cancelFailedTurnEdit(restorePreviousDraft = false)
         viewModelScope.launch {
             modelServices.awaitReady()
             val newId = createConversationWithDefaults()
@@ -1131,6 +1137,7 @@ class ChatViewModel @Inject constructor(
     private fun switchSessionUnchecked(sessionId: String) {
         if (sessionId.isBlank()) return
         if (sessionId == _uiState.value.sessionId && !_uiState.value.isInitializing) return
+        cancelFailedTurnEdit(restorePreviousDraft = false)
         sessionRuntimes[_uiState.value.sessionId]?.closePartChannels()
         sessionLoadJob?.cancel()
         speechPlaybackController.clearSession()
@@ -1138,7 +1145,6 @@ class ChatViewModel @Inject constructor(
         activeSessionLoadToken = loadToken
         loadingSessionId = sessionId
         if (pendingContentRefreshSessionId != sessionId) pendingContentRefreshSessionId = null
-        // isAgentRunning=false 解锁输入；turnComplete=false 重置上一轮的徽章；isInitializing=true
         // 让 MainScreen 中央 spinner 立刻接管，避免 history commit 之前旧 messages 残留闪烁。
         val targetRuntime = runtimeFor(sessionId)
         showRuntime(sessionId, isInitializing = !targetRuntime.isLoaded)
@@ -1177,11 +1183,8 @@ class ChatViewModel @Inject constructor(
                         // 命中：history 非空 = 旧 session；history 空 = 刚建的空 session。
                         // 一次性 commit sessionId + messages + isInitializing=false，
                         // 避免两次 messages 写导致两帧渲染。
-                        if (activeSessionLoadToken !== loadToken) return@launch
                         targetRuntime.messages = messages
-                        applyRecoverableTurn(sessionId, targetRuntime)
                         targetRuntime.isLoaded = true
-                        targetRuntime.turnComplete = false
                         targetRuntime.attention = SessionResultAttention.NONE
                         targetRuntime.reseedPartialChannels()
                         showRuntime(sessionId)
@@ -1518,8 +1521,6 @@ class ChatViewModel @Inject constructor(
      * 提前在取消的同一帧更新 state 让 stop 按钮 → 输入框 enable 的过渡即时可见。
      *
      * `partial = false` 让未完成的 assistant message 在 UI 上结束流式渲染。
-     * 用户取消不是正常完成，所以 `turnComplete` 保持 false。
-     *
      * 同步把仍在 `partial` 状态的 assistant message 翻成 `partial = false`：因为是用户主动
      * 中断,不会有 final non-partial event 到达来触发 [appendCompleteEvent] 的就地翻标志位;
      * 如果不在这里手动翻,那条 message 会一直停留在 `partial = true`,用户后续滚动离开再
@@ -1565,7 +1566,6 @@ class ChatViewModel @Inject constructor(
             }
         }
         runtime.isAgentRunning = false
-        runtime.turnComplete = false
         runtime.attention = SessionResultAttention.NONE
         // 用户主动停止的轮次同样保留“编辑/重试”：把已生成的部分回答一并落盘为可恢复轮，
         // 重试/编辑时交给 ADK Runner 回退到本轮 invocation 之前（与失败轮语义一致）。
@@ -1592,11 +1592,9 @@ private fun List<LLMModelSetting>.isUsableChatSelection(selection: ModelSelectio
     return !model.isStt && !model.isTts
 }
 
-/** 最近一轮若处于失败/中断态，则可作为“编辑/重试”的可恢复轮。 */
+/** 最近一轮若处于失败态，则可作为当前进程内“编辑/重试”的可恢复轮。 */
 private fun ChatSessionRuntime.failedRecoverableTurn(): ChatTurn? =
-    lastTurn?.takeIf {
-        it.status == ChatTurnStatus.FAILED || it.status == ChatTurnStatus.INTERRUPTED
-    }
+    lastTurn?.takeIf { it.status == ChatTurnStatus.FAILED }
 
 /**
  * 判断本轮（指定用户消息之后的消息）是否发起过实际工具调用；工具调用只挂在

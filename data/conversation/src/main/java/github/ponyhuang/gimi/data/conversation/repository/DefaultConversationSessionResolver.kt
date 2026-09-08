@@ -4,6 +4,7 @@ import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfigura
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionSnapshot
+import github.ponyhuang.gimi.domain.conversation.repository.NoAvailableAssistantModelException
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
@@ -51,7 +52,7 @@ class DefaultConversationSessionResolver @Inject constructor(
     private suspend fun resolveExisting(sessionId: String): ConversationSessionSnapshot? {
         if (conversations.loadMessages(sessionId) == null) return null
         val fallback = defaultSelection()
-            ?: error("No available assistant model.")
+            ?: throw NoAvailableAssistantModelException()
         val storedPayload = conversations.activateConversation(
             sessionId,
             ModelSelectionCodec.encode(fallback),
@@ -67,7 +68,7 @@ class DefaultConversationSessionResolver @Inject constructor(
 
     private suspend fun create(): ConversationSessionSnapshot {
         val selection = defaultSelection()
-            ?: error("No available assistant model.")
+            ?: throw NoAvailableAssistantModelException()
         val tools = defaultToolConfiguration(selection)
         val sessionId = conversations.createConversation(
             initialModel = ModelSelectionCodec.encode(selection),

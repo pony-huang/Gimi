@@ -22,7 +22,7 @@ class AssistantPresentationMappingTest {
             VoicePipelineEvent(BluetoothVoiceStatus.Transcribing, "识别中").assistantPresentationEvent(),
         )
         assertEquals(
-            AssistantPresentationEvent.TranscriptReady("打开地图"),
+            AssistantPresentationEvent.TranscriptReady,
             VoicePipelineEvent(
                 BluetoothVoiceStatus.RunningAgent,
                 "运行中",

@@ -14,7 +14,6 @@ interface ChatAgentRepository {
         text: String,
         fileAttachments: List<FileAttachment>,
         toolConfiguration: ConversationToolConfiguration? = null,
-        invocationId: String? = null,
         rewindBeforeInvocationId: String? = null,
     ): Flow<ChatRunEvent>
 

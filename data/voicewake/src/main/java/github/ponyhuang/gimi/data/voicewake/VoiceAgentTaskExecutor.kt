@@ -4,9 +4,9 @@ import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.data.voicewake.R
 import github.ponyhuang.gimi.domain.assistant.model.AssistantInvocationSource
-import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionPhase
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantConfirmationHandler
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
+import github.ponyhuang.gimi.domain.assistant.repository.AssistantSubmissionResult
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -59,23 +59,27 @@ class VoiceAgentTaskExecutor @Inject constructor(
                 ),
             )
         }
-        coordinator.submit(command, AssistantInvocationSource.BLUETOOTH_WAKE, handler)
-        val state = coordinator.state.value
-        when (state.phase) {
-            AssistantSessionPhase.ERROR ->
-                error(state.errorMessage ?: context.getString(R.string.bluetooth_voice_status_task_failed))
-            AssistantSessionPhase.MISSING_CONFIG ->
-                error(context.getString(R.string.bluetooth_voice_no_agent_model))
-            AssistantSessionPhase.BUSY ->
+        return when (val result = coordinator.submit(
+            command,
+            AssistantInvocationSource.BLUETOOTH_WAKE,
+            handler,
+        )) {
+            is AssistantSubmissionResult.Completed -> VoiceAgentResult(
+                sessionId = result.sessionId,
+                responseText = result.responseText.takeIf(String::isNotBlank)
+                    ?: context.getString(R.string.bluetooth_voice_task_completed),
+            )
+            is AssistantSubmissionResult.Busy ->
                 error(context.getString(R.string.bluetooth_voice_current_conversation_busy))
-            AssistantSessionPhase.STOPPED -> throw VoiceAgentTaskStoppedException()
-            else -> Unit
+            AssistantSubmissionResult.MissingConfiguration ->
+                error(context.getString(R.string.bluetooth_voice_no_agent_model))
+            AssistantSubmissionResult.Stopped -> throw VoiceAgentTaskStoppedException()
+            is AssistantSubmissionResult.Failed -> error(
+                result.message.ifBlank {
+                    context.getString(R.string.bluetooth_voice_status_task_failed)
+                },
+            )
         }
-        return VoiceAgentResult(
-            sessionId = state.sessionId.orEmpty(),
-            responseText = state.turn?.responseText?.takeIf(String::isNotBlank)
-                ?: context.getString(R.string.bluetooth_voice_task_completed),
-        )
     }
 
     /** 取消共享语音会话的当前任务（服务暂停/停止时调用）。 */

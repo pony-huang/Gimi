@@ -117,4 +117,23 @@ class AgentEventReducerInputRequestTest {
 
         assertFalse(runtime.pendingInputRequests.isNotEmpty())
     }
+
+    @Test
+    fun nonFinalToolEventKeepsRunActiveUntilTurnCompleteArrives() = runTest {
+        val reducer = reducer()
+        val runToken = Any()
+        runtime.runToken = runToken
+        runtime.isAgentRunning = true
+        val nonFinal = inputCallEvent("tool-call", toolName = "web_search")
+
+        reducer.applyEvent(runtime.sessionId, nonFinal, runToken)
+        assertTrue(runtime.isAgentRunning)
+
+        reducer.applyEvent(
+            runtime.sessionId,
+            nonFinal.copy(id = "final", functionCalls = emptyList(), turnComplete = true),
+            runToken,
+        )
+        assertFalse(runtime.isAgentRunning)
+    }
 }

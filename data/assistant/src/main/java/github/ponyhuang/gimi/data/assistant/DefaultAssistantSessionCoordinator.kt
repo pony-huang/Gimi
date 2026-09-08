@@ -1,11 +1,9 @@
 package github.ponyhuang.gimi.data.assistant
 
-import github.ponyhuang.gimi.domain.assistant.model.AssistantConfigIssue
 import github.ponyhuang.gimi.domain.assistant.model.AssistantInvocationSource
 import github.ponyhuang.gimi.domain.assistant.model.AssistantPresentationEvent
 import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionPhase
 import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionState
-import github.ponyhuang.gimi.domain.assistant.model.AssistantTurn
 import github.ponyhuang.gimi.domain.assistant.model.PendingAssistantConfirmation
 import github.ponyhuang.gimi.domain.assistant.model.appendAssistantMessage
 import github.ponyhuang.gimi.domain.assistant.model.appendUserMessage
@@ -14,19 +12,17 @@ import github.ponyhuang.gimi.domain.assistant.model.failLastAssistantMessage
 import github.ponyhuang.gimi.domain.assistant.model.updateLastAssistantMessage
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantConfirmationHandler
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
+import github.ponyhuang.gimi.domain.assistant.repository.AssistantSubmissionResult
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
+import github.ponyhuang.gimi.domain.conversation.repository.NoAvailableAssistantModelException
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionBusyException
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskSource
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
-import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
-import github.ponyhuang.gimi.domain.speech.repository.SpeechRecognitionRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
@@ -36,30 +32,27 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.NonCancellable
 
 /**
  * [AssistantSessionCoordinator] 的进程级实现。
  *
- * 同一语音会话的任务经 [submitMutex] 串行；任务在协调器自有作用域执行，
+ * 同一助手展示只允许一个活动任务；竞争提交立即返回 busy。任务在协调器自有作用域执行，
  * [stop] 只取消任务协程，展示界面关闭（[hidePresentation]）不影响任务。
  */
 @Singleton
 class DefaultAssistantSessionCoordinator @Inject constructor(
     private val conversations: ConversationRepository,
     private val chatAgent: ChatAgentRepository,
-    private val modelCatalog: ModelCatalogRepository,
-    private val speechRecognition: SpeechRecognitionRepository,
     private val runtimeGate: AgentRuntimeGate,
     private val sessionResolver: ConversationSessionResolver,
     private val toolApproval: ToolApprovalRepository,
@@ -71,25 +64,16 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     private val scope by lazy { CoroutineScope(SupervisorJob() + taskDispatcher) }
     private val submitMutex = Mutex()
     private var runningJob: Job? = null
-    private var presentationHideJob: Job? = null
     private var confirmationResponse: PendingConfirmationResponse? = null
 
     private val _state = MutableStateFlow(AssistantSessionState())
     override val state: StateFlow<AssistantSessionState> = _state.asStateFlow()
-
-    override suspend fun configurationIssue(): AssistantConfigIssue? {
-        modelCatalog.awaitReady()
-        if (defaultSelection() == null) return AssistantConfigIssue.MISSING_AGENT_MODEL
-        if (!speechRecognition.availability.first()) return AssistantConfigIssue.MISSING_STT
-        return null
-    }
 
     override fun noteInvocation(source: AssistantInvocationSource) {
         updatePresentation(AssistantPresentationEvent.CaptureStarted(source))
     }
 
     override fun updatePresentation(event: AssistantPresentationEvent) {
-        presentationHideJob?.cancel()
         _state.update { it.applyPresentationEvent(event) }
     }
 
@@ -97,15 +81,29 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
         text: String,
         source: AssistantInvocationSource,
         confirmationHandler: AssistantConfirmationHandler?,
-    ) {
-        submitMutex.withLock {
-            val job = scope.launch { runTask(text, source, confirmationHandler) }
-            runningJob = job
+    ): AssistantSubmissionResult {
+        if (!submitMutex.tryLock()) {
+            return AssistantSubmissionResult.Busy(_state.value.sessionId)
+        }
+        val result = CompletableDeferred<AssistantSubmissionResult>()
+        val job = scope.launch {
             try {
-                job.join()
-            } finally {
-                if (runningJob === job) runningJob = null
+                result.complete(runTask(text, source, confirmationHandler))
+            } catch (cancelled: CancellationException) {
+                result.complete(AssistantSubmissionResult.Stopped)
+                throw cancelled
             }
+        }
+        runningJob = job
+        return try {
+            result.await()
+        } catch (cancelled: CancellationException) {
+            job.cancel()
+            throw cancelled
+        } finally {
+            withContext(NonCancellable) { job.join() }
+            if (runningJob === job) runningJob = null
+            submitMutex.unlock()
         }
     }
 
@@ -128,7 +126,6 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     }
 
     override fun hidePresentation() {
-        presentationHideJob?.cancel()
         _state.update { it.copy(presentationVisible = false) }
     }
 
@@ -136,21 +133,32 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
         text: String,
         source: AssistantInvocationSource,
         confirmationHandler: AssistantConfirmationHandler?,
-    ) {
-        modelCatalog.awaitReady()
-        val selection = defaultSelection()
-        if (selection == null) {
+    ): AssistantSubmissionResult {
+        val session = try {
+            sessionResolver.resolveCurrentOrCreate()
+        } catch (_: NoAvailableAssistantModelException) {
             _state.update {
                 it.copy(
                     phase = AssistantSessionPhase.MISSING_CONFIG,
                     source = source,
-                    configIssue = AssistantConfigIssue.MISSING_AGENT_MODEL,
                     taskActive = false,
                 )
             }
-            return
+            return AssistantSubmissionResult.MissingConfiguration
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            val message = error.message ?: "无法准备会话"
+            _state.update {
+                it.copy(
+                    phase = AssistantSessionPhase.ERROR,
+                    source = source,
+                    errorMessage = message,
+                    taskActive = false,
+                )
+            }
+            return AssistantSubmissionResult.Failed(message)
         }
-        val session = sessionResolver.resolveCurrentOrCreate()
         val sessionId = session.sessionId
         val gateSource = when (source) {
             AssistantInvocationSource.BLUETOOTH_WAKE -> AgentTaskSource.BLUETOOTH_VOICE
@@ -169,7 +177,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                     errorMessage = null,
                 )
             }
-            return
+            return AssistantSubmissionResult.Busy(sessionId)
         }
         val run = TaskRun()
         _state.update {
@@ -177,10 +185,8 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                 sessionId = sessionId,
                 phase = AssistantSessionPhase.GENERATING,
                 source = source,
-                turn = AssistantTurn(userText = text),
                 pendingConfirmation = null,
                 errorMessage = null,
-                configIssue = null,
                 taskActive = true,
                 presentationVisible = true,
             ).appendUserMessage(text).appendAssistantMessage()
@@ -232,6 +238,10 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                     pendingConfirmation = null,
                 ).updateLastAssistantMessage()
             }
+            return AssistantSubmissionResult.Completed(
+                sessionId = sessionId,
+                responseText = run.responseText(),
+            )
         } catch (cancelled: CancellationException) {
             _state.update {
                 if (it.phase == AssistantSessionPhase.STOPPED) {
@@ -247,14 +257,16 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
             }
             throw cancelled
         } catch (error: Throwable) {
+            val message = error.message ?: "出现问题"
             _state.update {
                 it.copy(
                     phase = AssistantSessionPhase.ERROR,
-                    errorMessage = error.message,
+                    errorMessage = message,
                     taskActive = false,
                     pendingConfirmation = null,
-                ).failLastAssistantMessage(error.message ?: "出现问题")
+                ).failLastAssistantMessage(message)
             }
+            return AssistantSubmissionResult.Failed(message)
         } finally {
             confirmationResponse?.response?.cancel()
             confirmationResponse = null
@@ -280,7 +292,6 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                 _state.update {
                     it.copy(
                         phase = AssistantSessionPhase.EXECUTING_TOOL,
-                        turn = it.turn?.copy(toolNames = run.toolNames),
                     ).updateLastAssistantMessage(toolNames = run.toolNames)
                 }
             } else if (event.functionResponses.isNotEmpty()) {
@@ -326,32 +337,12 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     }
 
     private fun publishTurn(run: TaskRun) {
-        val response = run.completed.ifBlank { run.partial.toString() }
-        _state.update { state ->
-            state.copy(
-                turn = state.turn?.copy(responseText = response),
-                messages = state.updateLastAssistantMessage(
-                    text = response,
-                    streaming = run.completed.isBlank(),
-                ).messages,
+        _state.update {
+            it.updateLastAssistantMessage(
+                text = run.responseText(),
+                streaming = run.completed.isBlank(),
             )
         }
-    }
-
-    private fun defaultSelection(): ModelSelection? {
-        val services = modelCatalog.currentServices()
-        val saved = modelCatalog.currentAssistantSelection()
-        if (saved != null && services.isUsable(saved)) return saved
-        return services.asSequence()
-            .filter { it.isEnabled && it.apiKey.isNotBlank() }
-            .flatMap { service ->
-                service.groups.asSequence().flatMap { group ->
-                    group.models.asSequence()
-                        .filter { !it.isStt && !it.isTts }
-                        .map { ModelSelection(service.id, group.id, it.id) }
-                }
-            }
-            .firstOrNull()
     }
 
     private class TaskRun {
@@ -361,6 +352,8 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
         val pendingConfirmations = ArrayDeque<PendingAssistantConfirmation>()
         val seenConfirmationIds = mutableSetOf<String>()
         val approvedTools = mutableSetOf<String>()
+
+        fun responseText(): String = completed.ifBlank { partial.toString() }
     }
 
     private data class PendingConfirmationResponse(
@@ -371,12 +364,4 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     private companion object {
         const val CONFIRMATION_TIMEOUT_MS = 15_000L
     }
-}
-
-private fun List<LLMModelSetting>.isUsable(selection: ModelSelection): Boolean {
-    val service = firstOrNull { it.id == selection.serviceId } ?: return false
-    if (!service.isEnabled || service.apiKey.isBlank()) return false
-    val group = service.groups.firstOrNull { it.id == selection.groupId } ?: return false
-    val model = group.models.firstOrNull { it.id == selection.modelId } ?: return false
-    return !model.isStt && !model.isTts
 }

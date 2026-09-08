@@ -10,7 +10,7 @@ class AssistantPresentationEventTest {
     fun `wake capture starts a fresh visible turn`() {
         val state = AssistantSessionState(
             phase = AssistantSessionPhase.FOLLOW_UP_IDLE,
-            turn = AssistantTurn("旧问题", "旧回答"),
+            messages = listOf(AssistantMessage(1, AssistantMessageAuthor.USER, "旧问题")),
             presentationVisible = false,
         ).applyPresentationEvent(
             AssistantPresentationEvent.CaptureStarted(AssistantInvocationSource.BLUETOOTH_WAKE),
@@ -18,24 +18,21 @@ class AssistantPresentationEventTest {
 
         assertEquals(AssistantSessionPhase.LISTENING, state.phase)
         assertEquals(AssistantInvocationSource.BLUETOOTH_WAKE, state.source)
-        assertEquals(null, state.turn)
+        assertTrue(state.messages.isEmpty())
         assertTrue(state.presentationVisible)
     }
 
     @Test
-    fun `transcript and speaking update the same turn`() {
+    fun `transcript and speaking only update presentation phase`() {
         val transcribed = AssistantSessionState()
             .applyPresentationEvent(
                 AssistantPresentationEvent.CaptureStarted(AssistantInvocationSource.BLUETOOTH_WAKE),
             )
             .applyPresentationEvent(AssistantPresentationEvent.Transcribing)
-            .applyPresentationEvent(AssistantPresentationEvent.TranscriptReady("打开地图"))
-        val speaking = transcribed
-            .copy(turn = transcribed.turn?.copy(responseText = "已经打开地图"))
-            .applyPresentationEvent(AssistantPresentationEvent.Speaking)
+            .applyPresentationEvent(AssistantPresentationEvent.TranscriptReady)
+        val speaking = transcribed.applyPresentationEvent(AssistantPresentationEvent.Speaking)
 
-        assertEquals("打开地图", speaking.turn?.userText)
-        assertEquals("已经打开地图", speaking.turn?.responseText)
+        assertTrue(speaking.messages.isEmpty())
         assertEquals(AssistantSessionPhase.SPEAKING, speaking.phase)
         assertTrue(speaking.presentationVisible)
     }

@@ -10,8 +10,6 @@ android {
 dependencies {
     implementation(project(":domain:assistant"))
     implementation(project(":domain:conversation"))
-    implementation(project(":domain:modelcatalog"))
-    implementation(project(":domain:speech"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.core)
 

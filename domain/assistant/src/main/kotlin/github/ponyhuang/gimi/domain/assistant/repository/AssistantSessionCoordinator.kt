@@ -1,6 +1,5 @@
 package github.ponyhuang.gimi.domain.assistant.repository
 
-import github.ponyhuang.gimi.domain.assistant.model.AssistantConfigIssue
 import github.ponyhuang.gimi.domain.assistant.model.AssistantInvocationSource
 import github.ponyhuang.gimi.domain.assistant.model.AssistantPresentationEvent
 import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionState
@@ -12,6 +11,40 @@ fun interface AssistantConfirmationHandler {
     suspend fun confirm(request: PendingAssistantConfirmation): Boolean
 }
 
+/** 一次助手提交的独立结果；调用方无需在完成后反查共享展示状态。 */
+sealed interface AssistantSubmissionResult {
+    /**
+     * Agent 已完成本次提交。
+     *
+     * @property sessionId 本次任务实际绑定的 conversation session。
+     * @property responseText 本次任务最终用于播报或后续处理的回答文本。
+     */
+    data class Completed(
+        val sessionId: String,
+        val responseText: String,
+    ) : AssistantSubmissionResult
+
+    /**
+     * 当前助手或目标 conversation session 已有活动任务。
+     *
+     * @property sessionId 已知的冲突 session；尚未解析时为 null。
+     */
+    data class Busy(val sessionId: String?) : AssistantSubmissionResult
+
+    /** 当前没有可用的助理模型。 */
+    data object MissingConfiguration : AssistantSubmissionResult
+
+    /** 用户主动停止了本次任务。 */
+    data object Stopped : AssistantSubmissionResult
+
+    /**
+     * 本次任务执行失败。
+     *
+     * @property message 面向上层的失败原因。
+     */
+    data class Failed(val message: String) : AssistantSubmissionResult
+}
+
 /**
  * 进程级助理会话协调器：统一系统浮层与蓝牙语音任务，并把请求提交到当前聊天会话。
  *
@@ -21,9 +54,6 @@ interface AssistantSessionCoordinator {
     /** 单一可观察状态源；浮层重建时从此恢复。 */
     val state: StateFlow<AssistantSessionState>
 
-    /** 检查执行所需配置；返回 null 表示可执行。 */
-    suspend fun configurationIssue(): AssistantConfigIssue?
-
     /** 记录一次唤起：恢复浮层可见性，不启动新任务、不重置进行中的任务。 */
     fun noteInvocation(source: AssistantInvocationSource)
 
@@ -31,10 +61,10 @@ interface AssistantSessionCoordinator {
     fun updatePresentation(event: AssistantPresentationEvent)
 
     /**
-     * 提交一条用户指令到当前聊天会话并挂起直到任务结束（完成/失败/被取消）。
-     * 助手入口的请求按提交顺序串行执行。
+     * 提交一条用户指令到当前聊天会话并挂起直到任务结束。
      *
-     * 等待方协程被取消（如浮层销毁）不会取消任务本身；取消任务必须调用 [stop]。
+     * 已有助手提交时立即返回 [AssistantSubmissionResult.Busy]，不会排队或覆盖活动任务。
+     * 等待方协程取消会同步取消其内部任务；用户主动停止必须调用 [stop]。
      *
      * @param confirmationHandler 敏感工具确认通道；为 null 时通过状态流暴露确认请求，
      * 由调用方使用 [respondToConfirmation] 答复（15 秒超时自动拒绝）。
@@ -43,7 +73,7 @@ interface AssistantSessionCoordinator {
         text: String,
         source: AssistantInvocationSource,
         confirmationHandler: AssistantConfirmationHandler? = null,
-    )
+    ): AssistantSubmissionResult
 
     /** 取消当前任务并释放运行时租约。 */
     fun stop()

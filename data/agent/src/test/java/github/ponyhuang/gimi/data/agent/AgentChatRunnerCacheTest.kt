@@ -103,7 +103,6 @@ class AgentChatRunnerCacheTest {
             sessionId = "session",
             selection = ModelSelection("service", "group", "model"),
             text = "retry",
-            invocationId = "attempt-2",
             rewindBeforeInvocationId = "attempt-1",
         )
 

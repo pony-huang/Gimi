@@ -37,14 +37,6 @@ data class PendingAssistantConfirmation(
     val deadlineEpochMs: Long,
 )
 
-/** 助理会话的当前一轮问答。新唤起默认只展示当前轮。 */
-data class AssistantTurn(
-    val userText: String = "",
-    val responseText: String = "",
-    /** 本轮已调用/正在调用的工具名（去重、按出现顺序）。 */
-    val toolNames: List<String> = emptyList(),
-)
-
 /** 助理会话的可观察状态。 */
 data class AssistantSessionState(
     /** 当前任务绑定的聊天会话 id；尚未提交任务时为 null。 */
@@ -52,11 +44,8 @@ data class AssistantSessionState(
     val phase: AssistantSessionPhase = AssistantSessionPhase.PREPARING,
     /** 最近一次唤起来源。 */
     val source: AssistantInvocationSource? = null,
-    /** 当前轮问答；无活动轮次时为 null。 */
-    val turn: AssistantTurn? = null,
     val pendingConfirmation: PendingAssistantConfirmation? = null,
     val errorMessage: String? = null,
-    val configIssue: AssistantConfigIssue? = null,
     /** 是否有已提交且仍在执行的任务（关闭浮层不取消）。 */
     val taskActive: Boolean = false,
     /** 当前语音交互是否需要展示；具体承载界面由运行环境决定。 */
@@ -70,11 +59,11 @@ data class AssistantSessionState(
 }
 
 /**
- * 是否应展开会话面板：存在轮次、消息或待确认工具时展开为对话面板，
+ * 是否应展开会话面板：存在消息或待确认工具时展开为对话面板，
  * 否则保持悬浮胶囊态（刚唤醒、仅采集指令的阶段）。
  */
 val AssistantSessionState.shouldShowConversation: Boolean
-    get() = turn != null || messages.isNotEmpty() || pendingConfirmation != null
+    get() = messages.isNotEmpty() || pendingConfirmation != null
 
 /** 追加一条用户输入气泡。 */
 fun AssistantSessionState.appendUserMessage(text: String): AssistantSessionState {
@@ -121,7 +110,7 @@ fun AssistantSessionState.updateLastAssistantMessage(
 /** 终止最后一条助手气泡为流式错误。 */
 fun AssistantSessionState.failLastAssistantMessage(message: String): AssistantSessionState {
     val lastAssistantIndex = messages.indexOfLast { it.author == AssistantMessageAuthor.ASSISTANT }
-    if (lastAssistantIndex < 0) return copy()
+    if (lastAssistantIndex < 0) return this
     val current = messages[lastAssistantIndex]
     val updated = current.copy(text = message, streaming = false, isError = true)
     return copy(messages = messages.updated(lastAssistantIndex, updated))

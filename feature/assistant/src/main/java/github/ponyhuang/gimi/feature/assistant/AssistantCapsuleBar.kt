@@ -55,7 +55,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.domain.assistant.model.AssistantConfigIssue
 import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionPhase
 import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionState
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
@@ -81,7 +80,8 @@ internal fun AssistantCapsuleOverlay(
     ) {
         // 该阶段没有消息气泡可承载反馈，提示落在胶囊上方。
         val hint = when {
-            state.configIssue != null -> stringResource(R.string.assistant_status_missing_config)
+            state.phase == AssistantSessionPhase.MISSING_CONFIG ->
+                stringResource(R.string.assistant_status_missing_config)
             state.phase == AssistantSessionPhase.BUSY -> stringResource(R.string.assistant_status_busy)
             else -> state.errorMessage
         }
@@ -375,7 +375,6 @@ private fun AssistantCapsuleOverlayMissingConfigPreview() {
         AssistantCapsuleOverlay(
             state = AssistantSessionState(
                 phase = AssistantSessionPhase.MISSING_CONFIG,
-                configIssue = AssistantConfigIssue.MISSING_AGENT_MODEL,
             ),
             onDismiss = {},
             onMicToggle = {},

@@ -5,7 +5,7 @@ enum class AssistantSessionPhase {
     /** 唤起后正在准备（恢复状态或等待首次交互）。 */
     PREPARING,
 
-    /** 缺少必要配置（默认助理模型或 STT），无法执行任务。 */
+    /** 缺少可用助理模型，无法执行任务。 */
     MISSING_CONFIG,
 
     /** 当前聊天会话已有任务，无法并发写入。 */
@@ -46,12 +46,6 @@ enum class AssistantInvocationSource {
 
     /** 助手面板内直接发起的追问（语音或键盘输入）。 */
     ASSISTANT_PANEL,
-}
-
-/** 缺少的配置项。 */
-enum class AssistantConfigIssue {
-    MISSING_AGENT_MODEL,
-    MISSING_STT,
 }
 
 /** 结果完成后可自动收起的阶段；其它阶段应保持展示等待用户交互。 */

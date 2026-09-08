@@ -30,17 +30,17 @@ class AssistantSessionStateTest {
     }
 
     @Test
-    fun transcriptReadyExpandsConversationPanel() {
+    fun transcriptReadyKeepsCapsuleCollapsedUntilSubmitAddsMessages() {
         val state = AssistantSessionState().applyPresentationEvent(
-            AssistantPresentationEvent.TranscriptReady("今天天气怎么样"),
+            AssistantPresentationEvent.TranscriptReady,
         )
-        assertTrue(state.shouldShowConversation)
+        assertFalse(state.shouldShowConversation)
     }
 
     @Test
     fun generatingAndFollowUpKeepConversationExpanded() {
         val generating = AssistantSessionState()
-            .applyPresentationEvent(AssistantPresentationEvent.TranscriptReady("讲个笑话"))
+            .applyPresentationEvent(AssistantPresentationEvent.TranscriptReady)
             .appendUserMessage("讲个笑话")
             .appendAssistantMessage()
         assertTrue(generating.shouldShowConversation)
@@ -64,7 +64,7 @@ class AssistantSessionStateTest {
     @Test
     fun newCaptureAfterConversationCollapsesAgain() {
         val conversing = AssistantSessionState()
-            .applyPresentationEvent(AssistantPresentationEvent.TranscriptReady("讲个笑话"))
+            .applyPresentationEvent(AssistantPresentationEvent.TranscriptReady)
             .appendUserMessage("讲个笑话")
             .appendAssistantMessage()
         assertTrue(conversing.shouldShowConversation)

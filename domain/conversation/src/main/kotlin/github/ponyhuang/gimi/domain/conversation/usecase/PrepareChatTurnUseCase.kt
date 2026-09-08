@@ -7,12 +7,11 @@ import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
-import github.ponyhuang.gimi.domain.conversation.repository.ChatTurnRepository
+import java.util.UUID
 import javax.inject.Inject
 
-/** 在持有会话运行锁时准备请求，先验证附件，最后持久化 ADK invocation 回滚边界。 */
+/** 在持有会话运行锁时准备请求，验证附件并构造当前进程内的 ADK 回滚边界。 */
 class PrepareChatTurnUseCase @Inject constructor(
-    private val turns: ChatTurnRepository,
     private val attachments: ChatAttachmentRepository,
     private val runner: ChatAgentRepository,
 ) {
@@ -26,7 +25,8 @@ class PrepareChatTurnUseCase @Inject constructor(
      * - 首次发送（[retry] 为空）：按草稿读取附件并新建用户消息。
      *
      * 附件读取/校验失败或协程取消会直接向上抛出，不会释放会话绑定或记录新尝试；
-     * 只有成功后才调用 [ChatAgentRepository.releaseSession] 丢弃旧绑定的生命周期。
+     * 只有成功后才调用 [ChatAgentRepository.releaseSession] 丢弃旧绑定的生命周期，
+     * 并在进程内构造新的 attempt；失败轮不再写入独立持久化存储。
      */
     suspend operator fun invoke(
         sessionId: String,
@@ -56,11 +56,12 @@ class PrepareChatTurnUseCase @Inject constructor(
             effectiveHistory = retry?.history ?: history
         }
         runner.releaseSession(sessionId)
-        return turns.begin(
+        return ChatTurn(
+            id = retry?.id ?: UUID.randomUUID().toString(),
             sessionId = sessionId,
             userMessage = userMessage,
-            history = effectiveHistory,
-            retryTurnId = retry?.id,
+            messages = effectiveHistory + userMessage,
+            rewindBeforeInvocationId = retry?.rewindBeforeInvocationId,
         )
     }
 }

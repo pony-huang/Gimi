@@ -50,7 +50,7 @@ class AdkChatAgentRepositoryMappingTest {
             isTurnComplete = true,
         )
         coEvery {
-            runner.send(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            runner.send(any(), any(), any(), any(), any(), any(), any(), any())
         } returns flowOf(event)
 
         val events = repository.send("session-1", selection, "现在几点", emptyList(), null).toList()
@@ -92,7 +92,7 @@ class AdkChatAgentRepositoryMappingTest {
     @Test
     fun retryDelegatesStableInvocationIdsToTheAdkRunner() = runTest {
         coEvery {
-            runner.send(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            runner.send(any(), any(), any(), any(), any(), any(), any(), any())
         } returns flowOf(adkEvent())
 
         repository.send(
@@ -100,7 +100,6 @@ class AdkChatAgentRepositoryMappingTest {
             selection = selection,
             text = "retry",
             fileAttachments = emptyList(),
-            invocationId = "attempt-2",
             rewindBeforeInvocationId = "attempt-1",
         ).toList()
 
@@ -112,7 +111,6 @@ class AdkChatAgentRepositoryMappingTest {
                 text = "retry",
                 fileAttachments = emptyList(),
                 toolConfiguration = null,
-                invocationId = "attempt-2",
                 rewindBeforeInvocationId = "attempt-1",
             )
         }
@@ -192,7 +190,7 @@ class AdkChatAgentRepositoryMappingTest {
             ),
         )
         coEvery {
-            runner.send(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            runner.send(any(), any(), any(), any(), any(), any(), any(), any())
         } returns flowOf(event)
 
         val mapped = repository.send("session-1", selection, "查看图片", emptyList(), null)

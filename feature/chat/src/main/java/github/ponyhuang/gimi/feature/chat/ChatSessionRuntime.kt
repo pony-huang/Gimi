@@ -26,7 +26,6 @@ internal class ChatSessionRuntime(
     var toolConfiguration: ConversationToolConfiguration? = null
     var isLoaded: Boolean = false
     var isAgentRunning: Boolean = false
-    var turnComplete: Boolean = false
     var phase: AgentTaskPhase = AgentTaskPhase.GENERATING
     var pendingToolConfirmations: List<PendingToolConfirmation> = emptyList()
 
@@ -55,7 +54,7 @@ internal class ChatSessionRuntime(
     var failed: Boolean = false
     var attention: SessionResultAttention = SessionResultAttention.NONE
 
-    /** 最近一次发送尝试（RUNNING/FAILED/INTERRUPTED）；驱动重试与编辑入口。 */
+    /** 最近一次发送尝试（RUNNING/FAILED）；驱动当前进程内的重试与编辑入口。 */
     var lastTurn: ChatTurn? = null
 
     private val partChannels = mutableMapOf<String, Channel<String>>()

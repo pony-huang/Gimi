@@ -917,7 +917,6 @@ private fun ChatHeaderActionsPreview() {
 /** 构造一个可重试的失败轮次，供失败态相关 Preview 使用。 */
 private fun previewFailedTurn(): ChatTurn = ChatTurn(
     id = "preview-turn-1",
-    attemptId = "preview-attempt-1",
     sessionId = "preview-session",
     userMessage = Messages.fromUser("帮我查一下今天上海的天气"),
     messages = listOf(Messages.fromUser("帮我查一下今天上海的天气")),
@@ -1048,7 +1047,10 @@ private fun ChatScaffoldEditingFailedTurnPreview() {
                 sessionId = "preview-session",
                 messages = listOf(Messages.fromUser("帮我查一下今天上海的天气")),
                 failedTurn = previewFailedTurn(),
-                editingFailedTurn = true,
+                failedTurnRecovery = FailedTurnRecoveryState.Editing(
+                    sessionId = "preview-session",
+                    previousDraft = MessageData(),
+                ),
                 composerSeed = MessageData(text = "帮我查一下今天上海的天气"),
             ),
             partChannelProvider = { null },

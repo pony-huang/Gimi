@@ -1,13 +1,11 @@
 package github.ponyhuang.gimi.data.voicewake
 
 import android.content.Context
-import github.ponyhuang.gimi.domain.assistant.model.AssistantConfigIssue
 import github.ponyhuang.gimi.domain.assistant.model.AssistantInvocationSource
-import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionPhase
 import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionState
-import github.ponyhuang.gimi.domain.assistant.model.AssistantTurn
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantConfirmationHandler
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
+import github.ponyhuang.gimi.domain.assistant.repository.AssistantSubmissionResult
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,13 +26,7 @@ class VoiceAgentTaskExecutorTest {
 
     @Test
     fun `execute submits through coordinator with bluetooth source and maps result`() = runTest {
-        coordinator.onSubmit = {
-            coordinatorState.value = AssistantSessionState(
-                sessionId = "voice-1",
-                phase = AssistantSessionPhase.FOLLOW_UP_IDLE,
-                turn = AssistantTurn(userText = "指令", responseText = "回答"),
-            )
-        }
+        coordinator.submitResult = AssistantSubmissionResult.Completed("voice-1", "回答")
 
         val result = executor.execute("指令") { true }
 
@@ -45,13 +37,7 @@ class VoiceAgentTaskExecutorTest {
 
     @Test
     fun `voice confirmation handler is forwarded to coordinator handler`() = runTest {
-        coordinator.onSubmit = {
-            coordinatorState.value = AssistantSessionState(
-                sessionId = "voice-1",
-                phase = AssistantSessionPhase.FOLLOW_UP_IDLE,
-                turn = AssistantTurn(responseText = "完成"),
-            )
-        }
+        coordinator.submitResult = AssistantSubmissionResult.Completed("voice-1", "完成")
 
         executor.execute("指令") { request ->
             assertEquals("call-1", request.callId)
@@ -65,21 +51,14 @@ class VoiceAgentTaskExecutorTest {
 
     @Test(expected = IllegalStateException::class)
     fun `coordinator error surfaces as exception`() = runTest {
-        coordinator.onSubmit = {
-            coordinatorState.value = AssistantSessionState(
-                phase = AssistantSessionPhase.ERROR,
-                errorMessage = "网络失败",
-            )
-        }
+        coordinator.submitResult = AssistantSubmissionResult.Failed("网络失败")
 
         executor.execute("指令") { true }
     }
 
     @Test
     fun `busy current conversation surfaces localized error`() = runTest {
-        coordinator.onSubmit = {
-            coordinatorState.value = AssistantSessionState(phase = AssistantSessionPhase.BUSY)
-        }
+        coordinator.submitResult = AssistantSubmissionResult.Busy("voice-1")
 
         val error = runCatching { executor.execute("指令") { true } }.exceptionOrNull()
 
@@ -89,9 +68,7 @@ class VoiceAgentTaskExecutorTest {
 
     @Test
     fun `stopped coordinator task surfaces a typed cancellation`() = runTest {
-        coordinator.onSubmit = {
-            coordinatorState.value = AssistantSessionState(phase = AssistantSessionPhase.STOPPED)
-        }
+        coordinator.submitResult = AssistantSubmissionResult.Stopped
 
         val error = runCatching { executor.execute("指令") { true } }.exceptionOrNull()
 
@@ -102,8 +79,7 @@ class VoiceAgentTaskExecutorTest {
         override val state: MutableStateFlow<AssistantSessionState>,
     ) : AssistantSessionCoordinator {
         val submissions = mutableListOf<Pair<AssistantInvocationSource, AssistantConfirmationHandler?>>()
-        var onSubmit: () -> Unit = {}
-        override suspend fun configurationIssue(): AssistantConfigIssue? = null
+        var submitResult: AssistantSubmissionResult = AssistantSubmissionResult.Completed("voice-1", "")
 
         override fun noteInvocation(source: AssistantInvocationSource) = Unit
 
@@ -111,9 +87,9 @@ class VoiceAgentTaskExecutorTest {
             text: String,
             source: AssistantInvocationSource,
             confirmationHandler: AssistantConfirmationHandler?,
-        ) {
+        ): AssistantSubmissionResult {
             submissions += source to confirmationHandler
-            onSubmit()
+            return submitResult
         }
 
         override fun stop() = Unit

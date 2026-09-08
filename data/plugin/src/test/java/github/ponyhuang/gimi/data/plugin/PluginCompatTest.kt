@@ -16,4 +16,9 @@ class PluginCompatTest {
     fun mismatchedApiVersionIsRejected() {
         assertFalse(PluginCompat.isCompatible(PluginApi.VERSION + 1))
     }
+
+    @Test
+    fun adkZeroEightPluginApiVersionIsRejected() {
+        assertFalse(PluginCompat.isCompatible(3))
+    }
 }

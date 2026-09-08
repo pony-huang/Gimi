@@ -122,11 +122,11 @@ class AdkChatAgentRepository @Inject constructor(
     )
 
     private fun FunctionCall.toDomain(): ChatFunctionCall {
-        val rawArgs = args.mapKeys { it.key.toString() }
+        val rawArgs = args.mapKeys { it.key }
         val confirmation = takeIf {
             name == FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME
         }?.let {
-            val original = args[FunctionCall.ORIGINAL_FUNCTION_CALL_KEY] as? Map<*, *>
+            val original = args["originalFunctionCall"] as? Map<*, *>
             val toolName = original?.get("name") as? String
             if (toolName == null) null else ToolConfirmationRequest(
                 toolName = toolName,

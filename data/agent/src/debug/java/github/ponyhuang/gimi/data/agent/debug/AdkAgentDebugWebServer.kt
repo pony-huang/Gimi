@@ -3,20 +3,17 @@ package github.ponyhuang.gimi.data.agent.debug
 import android.util.Log
 import com.google.adk.kt.agents.BaseAgent
 import com.google.adk.kt.artifacts.ArtifactService
-import com.google.adk.kt.webserver.AdkWebServer
+import com.google.adk.kt.sessions.SessionService
+import com.google.adk.kt.webserver.AdkServerConfig
+import com.google.adk.kt.webserver.dev.AdkDevServer
 import com.google.adk.kt.webserver.loaders.AgentLoader
 import com.google.adk.kt.webserver.telemetry.ApiServerSpanExporter
 import github.ponyhuang.gimi.data.agent.AgentBuildSpec
 import github.ponyhuang.gimi.data.agent.AgentFactory
+import github.ponyhuang.gimi.data.agent.debug.AdkAgentDebugWebServer.Companion.STARTING_MARKER
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
-import com.google.adk.kt.sessions.SessionService
-import java.net.InetAddress
-import java.net.NetworkInterface
-import java.util.concurrent.atomic.AtomicReference
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,9 +22,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.net.NetworkInterface
+import java.util.concurrent.atomic.AtomicReference
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
- * [AgentDebugWebServer] 的 debug 实现 — 在手机上启动 ADK `AdkWebServer`（Ktor/Netty），
+ * [AgentDebugWebServer] 的 debug 实现 — 在手机上启动 ADK [AdkDevServer]（Ktor/Netty），
  * 供 PC 浏览器经局域网访问 Development UI（`/dev-ui`）。
  *
  * 设计要点：
@@ -39,7 +40,7 @@ import kotlinx.coroutines.sync.withLock
  *   内容；仅在 debug 构建启用，存在 PII 记录风险，正式包不含此代码。
  * - 插件列表传空：标题生成/记忆持久化等业务插件只服务 App 内聊天链路，Dev UI 观察不需要。
  *
- * 线程模型：[stateRef] 用 `null / STARTING_MARKER / AdkWebServer` 三态原子引用防止
+ * 线程模型：[stateRef] 用 `null / STARTING_MARKER / AdkDevServer` 三态原子引用防止
  * 并发重复启动；[stop] 可从任意线程调用。
  */
 @Singleton
@@ -53,21 +54,23 @@ class AdkAgentDebugWebServer @Inject constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    /** null = 未启动；[STARTING_MARKER] = 启动中；[AdkWebServer] = 运行中。 */
+    /** null = 未启动；[STARTING_MARKER] = 启动中；[AdkDevServer] = 运行中。 */
     private val stateRef = AtomicReference<Any?>(null)
 
     override fun start() {
         if (!stateRef.compareAndSet(null, STARTING_MARKER)) return
         scope.launch {
             try {
-                val webServer = AdkWebServer(
-                    port = AgentDebugWebServer.DEFAULT_PORT,
-                    sessionService = sessionService,
-                    artifactService = artifactService,
-                    agentLoader = LazySingleAgentLoader(::buildAgent),
-                    apiServerSpanExporter = ApiServerSpanExporter(),
-                    captureMessageContent = true,
-                    plugins = emptyList(),
+                val webServer = AdkDevServer(
+                    AdkServerConfig(
+                        port = AgentDebugWebServer.DEFAULT_PORT,
+                        sessionService = sessionService,
+                        artifactService = artifactService,
+                        agentLoader = LazySingleAgentLoader(::buildAgent),
+                        apiServerSpanExporter = ApiServerSpanExporter(),
+                        captureMessageContent = true,
+                        plugins = emptyList(),
+                    )
                 )
                 webServer.start()
                 stateRef.set(webServer)
@@ -84,7 +87,7 @@ class AdkAgentDebugWebServer @Inject constructor(
     }
 
     override fun stop() {
-        (stateRef.getAndSet(null) as? AdkWebServer)?.let { server ->
+        (stateRef.getAndSet(null) as? AdkDevServer)?.let { server ->
             runCatching { server.stop() }
                 .onFailure { Log.w(TAG, "ADK debug webserver stop failed", it) }
             Log.i(TAG, "ADK debug webserver stopped")
@@ -151,7 +154,7 @@ class AdkAgentDebugWebServer @Inject constructor(
     }
 
     companion object {
-        private const val TAG: String = "AdkAgentDebugWebServer"
+        private const val TAG: String = "DebugWebServer"
 
         /** [stateRef] 的「启动中」占位标记。 */
         private val STARTING_MARKER = Any()

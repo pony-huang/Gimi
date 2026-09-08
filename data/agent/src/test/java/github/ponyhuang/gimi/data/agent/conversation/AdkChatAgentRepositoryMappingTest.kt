@@ -93,7 +93,7 @@ class AdkChatAgentRepositoryMappingTest {
             id = "confirm-1",
             name = FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME,
             args = mapOf(
-                FunctionCall.ORIGINAL_FUNCTION_CALL_KEY to mapOf(
+                "originalFunctionCall" to mapOf(
                     "name" to "brightness_set",
                     "args" to mapOf("level" to 80),
                 ),

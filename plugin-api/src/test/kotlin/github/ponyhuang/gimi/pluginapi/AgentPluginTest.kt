@@ -9,8 +9,8 @@ import org.junit.Test
 class AgentPluginTest {
 
     @Test
-    fun actionCallbackContractBumpsPluginApiVersion() {
-        assertEquals(3, PluginApi.VERSION)
+    fun adkOneContractBumpsPluginApiVersion() {
+        assertEquals(4, PluginApi.VERSION)
     }
 
     @Test

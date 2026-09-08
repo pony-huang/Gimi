@@ -2,7 +2,7 @@ package github.ponyhuang.gimi.data.agent.contribution
 
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.GetUserChoiceTool
-import com.google.adk.kt.tools.LoadMemoryTool
+import com.google.adk.kt.tools.LoadArtifactsTool
 import com.google.adk.kt.tools.PreloadMemoryTool
 import com.google.adk.kt.tools.RequestInputTool
 import github.ponyhuang.gimi.data.agent.AgentBuildSpec
@@ -21,7 +21,7 @@ class BaseToolContribution @Inject constructor() : AgentContribution {
     override fun revision(): Any? = null
 
     override fun tools(spec: AgentBuildSpec): List<BaseTool> =
-        listOf(PreloadMemoryTool(), LoadMemoryTool(), RequestInputTool(), GetUserChoiceTool())
+        listOf(PreloadMemoryTool(), LoadArtifactsTool(), RequestInputTool(), GetUserChoiceTool())
 
     private companion object {
         const val ID: String = "base"

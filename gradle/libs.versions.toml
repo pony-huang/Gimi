@@ -2,7 +2,7 @@
 agp = "9.2.1"
 anthropicJava = "2.44.1"
 coreKtx = "1.19.0"
-googleAdk = "0.8.0"
+googleAdk = "1.0.0"
 gson = "2.14.0"
 hilt = "2.60"
 androidxHilt = "1.4.0"
@@ -56,8 +56,6 @@ google-adk-kotlin-core = { module = "com.google.adk:google-adk-kotlin-core", ver
 google-adk-kotlin-processor = { module = "com.google.adk:google-adk-kotlin-processor", version.ref = "googleAdk" }
 google-adk-kotlin-webserver = { module = "com.google.adk:google-adk-kotlin-webserver", version.ref = "googleAdk" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
-hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
-hilt-android-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hilt" }
 androidx-hilt-lifecycle-viewmodel-compose = { module = "androidx.hilt:hilt-lifecycle-viewmodel-compose", version.ref = "androidxHilt" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 org-json = { module = "org.json:json", version.ref = "orgJson" }

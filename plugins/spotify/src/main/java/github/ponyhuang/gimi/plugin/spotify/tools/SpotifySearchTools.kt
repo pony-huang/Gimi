@@ -11,6 +11,17 @@ import org.json.JSONArray
  */
 private val SEARCH_TYPES: List<String> = listOf("track", "album", "artist")
 
+/**
+ * /search 的请求 type 与响应顶层 key 的映射。Spotify 的请求参数是单数（`type=track`），
+ * 但响应体里的搜索结果字段是复数（`tracks`/`albums`/`artists`）。早先用单数 type 直接
+ * 查 JSON key 导致 items 永远是空数组——这是插件「搜索数据为空」的根因。
+ */
+internal val SEARCH_RESPONSE_KEY: Map<String, String> = mapOf(
+    "track" to "tracks",
+    "album" to "albums",
+    "artist" to "artists",
+)
+
 internal fun searchTools(api: SpotifyApi): List<BaseTool> = listOf(
     spotifyTool(
         name = "spotify_search",
@@ -56,7 +67,8 @@ internal fun searchTools(api: SpotifyApi): List<BaseTool> = listOf(
             strArg(args, "market")?.let { put("market", it) }
         }
         val json = api.get("/search", queryParams)
-        val items = json?.optJSONObject(type)?.optJSONArray("items") ?: JSONArray()
+        val responseKey = SEARCH_RESPONSE_KEY[type] ?: type
+        val items = json?.optJSONObject(responseKey)?.optJSONArray("items") ?: JSONArray()
         if (items.length() == 0) {
             mapOf(
                 SpotifyTool.RESULT_KEY to emptyList<Any>(),

@@ -116,6 +116,12 @@ class SpotifyToolCatalogTest {
         val createParams = requireNotNull(create.declaration()).parameters
         assertNotNull(createParams?.properties?.get("collaborative"))
 
+        // 关键回归：Spotify /search 响应里 type 用的是复数 key (tracks/albums/artists)，
+        // 早前用单数 type 直接查导致 items 永远是空数组。
+        assertEquals("tracks", SEARCH_RESPONSE_KEY["track"])
+        assertEquals("albums", SEARCH_RESPONSE_KEY["album"])
+        assertEquals("artists", SEARCH_RESPONSE_KEY["artist"])
+
         // spotify_set_repeat：enum 覆盖 off/context/track。
         val repeat = playbackTools(api).single { it.name == "spotify_set_repeat" }
         val repeatState = requireNotNull(repeat.declaration()).parameters?.properties?.get("state")

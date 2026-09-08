@@ -81,7 +81,7 @@ interface ConversationMetadataDao {
 
 @Database(
     entities = [ConversationMetadataEntity::class, ChatTurnEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class ConversationMetadataDatabase : RoomDatabase() {

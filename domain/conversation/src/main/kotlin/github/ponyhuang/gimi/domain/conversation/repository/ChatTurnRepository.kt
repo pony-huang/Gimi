@@ -3,12 +3,12 @@ package github.ponyhuang.gimi.domain.conversation.repository
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
 import github.ponyhuang.gimi.domain.conversation.model.Message
 
-/** 失败轮次日志与会话检查点；所有恢复操作都必须在持有会话运行锁时执行。 */
+/** 失败轮次日志与 ADK invocation 回滚边界；所有恢复操作都必须在持有会话运行锁时执行。 */
 interface ChatTurnRepository {
     /** 加载并恢复被进程终止中断的轮次；不发送网络请求。 */
     suspend fun recover(sessionId: String): ChatTurn?
 
-    /** 先持久化请求和检查点，再返回可开始运行的尝试。重试必须校验轮次仍为最新。 */
+    /** 先持久化请求和 invocation ID，再返回可开始运行的尝试。重试必须校验轮次仍为最新。 */
     suspend fun begin(
         sessionId: String,
         userMessage: Message,

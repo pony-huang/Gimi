@@ -14,6 +14,8 @@ interface ChatAgentRepository {
         text: String,
         fileAttachments: List<FileAttachment>,
         toolConfiguration: ConversationToolConfiguration? = null,
+        invocationId: String? = null,
+        rewindBeforeInvocationId: String? = null,
     ): Flow<ChatRunEvent>
 
     suspend fun respondToToolConfirmation(
@@ -39,6 +41,10 @@ interface ChatAgentRepository {
 
     suspend fun releaseSession(sessionId: String)
 }
+
+/** 官方 ADK Runner 在恢复历史调用边界时失败，且新的 invocation 尚未启动。 */
+class ChatSessionRewindException(cause: Throwable) :
+    IllegalStateException("Failed to rewind the ADK session.", cause)
 
 /**
  * 管理聊天附件从“输入栏草稿”到“可发送消息附件”的生命周期。

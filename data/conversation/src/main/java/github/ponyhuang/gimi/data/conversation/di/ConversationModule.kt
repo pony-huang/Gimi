@@ -19,8 +19,6 @@ import github.ponyhuang.gimi.data.conversation.conversationDraftDirectorySpec
 import github.ponyhuang.gimi.data.conversation.attachment.AndroidChatAttachmentRepository
 import github.ponyhuang.gimi.data.conversation.repository.AdkConversationRepository
 import github.ponyhuang.gimi.data.conversation.repository.AdkChatTurnRepository
-import github.ponyhuang.gimi.data.conversation.repository.AdkSessionCheckpointStore
-import github.ponyhuang.gimi.data.conversation.repository.ChatSessionCheckpointStore
 import github.ponyhuang.gimi.data.conversation.repository.DefaultConversationSessionResolver
 import github.ponyhuang.gimi.data.conversation.local.ChatTurnDao
 import github.ponyhuang.gimi.data.conversation.runtime.InMemoryAgentRuntimeGate
@@ -108,12 +106,6 @@ object ConversationModule {
     fun provideConversationSessionResolver(
         implementation: DefaultConversationSessionResolver,
     ): ConversationSessionResolver = implementation
-
-    @Provides
-    @Singleton
-    fun provideTurnCheckpointStore(
-        implementation: AdkSessionCheckpointStore,
-    ): ChatSessionCheckpointStore = implementation
 
     @Provides
     @Singleton

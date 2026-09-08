@@ -1,6 +1,10 @@
 package github.ponyhuang.gimi.data.agent
 
 import com.google.adk.kt.agents.LlmAgent
+import com.google.adk.kt.events.Event
+import com.google.adk.kt.events.EventActions
+import com.google.adk.kt.sessions.InMemorySessionService
+import com.google.adk.kt.sessions.SessionKey
 import com.google.adk.kt.sessions.SessionService
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
@@ -18,6 +22,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 
@@ -71,6 +76,39 @@ class AgentChatRunnerCacheTest {
         runner.releaseSession("session-a")
         runner.send("user", "session-a", selection, "a3")
         assertEquals(1, createdSelections.size)
+    }
+
+    @Test
+    fun retryUsesAdkRewindBeforeStartingTheNewInvocation() = runTest {
+        val sessions = InMemorySessionService()
+        val key = SessionKey(AgentChatRunner.APP_NAME, "user", "session")
+        val session = sessions.createSession(key)
+        sessions.appendEvent(
+            session,
+            Event(
+                invocationId = "attempt-1",
+                author = "agent",
+                actions = EventActions(stateDelta = mutableMapOf<String, Any>("result" to "partial")),
+            ),
+        )
+        val runner = AgentChatRunner(
+            factory = { runtime() },
+            sessionService = sessions,
+            artifactService = null,
+            memoryService = InMemoryMemoryService(),
+        )
+
+        runner.send(
+            userId = "user",
+            sessionId = "session",
+            selection = ModelSelection("service", "group", "model"),
+            text = "retry",
+            invocationId = "attempt-2",
+            rewindBeforeInvocationId = "attempt-1",
+        )
+
+        val rewound = sessions.getSession(key)!!
+        assertNull(rewound.state["result"])
     }
 
     @Test

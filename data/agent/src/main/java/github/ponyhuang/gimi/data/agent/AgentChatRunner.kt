@@ -26,10 +26,12 @@ import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfigura
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
+import github.ponyhuang.gimi.domain.conversation.repository.ChatSessionRewindException
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
@@ -195,6 +197,8 @@ class AgentChatRunner(
         fileAttachments: List<FileAttachment> = emptyList(),
         allowConfirmationRequiredTools: Boolean = true,
         toolConfiguration: ConversationToolConfiguration? = null,
+        invocationId: String? = null,
+        rewindBeforeInvocationId: String? = null,
     ): Flow<Event> {
         val activeTurn = currentTurnForNewMessage(
             sessionId,
@@ -225,10 +229,20 @@ class AgentChatRunner(
             role = Role.USER,
             parts = parts,
         )
+        rewindBeforeInvocationId?.let { rewindInvocationId ->
+            try {
+                activeTurn.runner.rewindAsync(userId, sessionId, rewindInvocationId)
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (failure: Exception) {
+                // 回滚失败发生在 runAsync 之前，不能把尚未创建的新 invocation 当成下次回滚点。
+                throw ChatSessionRewindException(failure)
+            }
+        }
         return activeTurn.runner.runAsync(
             userId = userId,
             sessionId = sessionId,
-            invocationId = null,
+            invocationId = invocationId,
             newMessage = newMessage,
             stateDelta = null,
             runConfig = RunConfig(

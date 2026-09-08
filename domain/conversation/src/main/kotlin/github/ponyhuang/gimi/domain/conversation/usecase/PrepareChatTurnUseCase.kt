@@ -10,7 +10,7 @@ import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentReposi
 import github.ponyhuang.gimi.domain.conversation.repository.ChatTurnRepository
 import javax.inject.Inject
 
-/** 在持有会话运行锁时准备请求，先验证附件，最后持久化并恢复检查点。 */
+/** 在持有会话运行锁时准备请求，先验证附件，最后持久化 ADK invocation 回滚边界。 */
 class PrepareChatTurnUseCase @Inject constructor(
     private val turns: ChatTurnRepository,
     private val attachments: ChatAttachmentRepository,

@@ -33,6 +33,8 @@ class AdkChatAgentRepository @Inject constructor(
         text: String,
         fileAttachments: List<FileAttachment>,
         toolConfiguration: ConversationToolConfiguration?,
+        invocationId: String?,
+        rewindBeforeInvocationId: String?,
     ): Flow<ChatRunEvent> = runner.send(
         userId = USER_ID,
         sessionId = sessionId,
@@ -40,6 +42,8 @@ class AdkChatAgentRepository @Inject constructor(
         text = text,
         fileAttachments = fileAttachments,
         toolConfiguration = toolConfiguration,
+        invocationId = invocationId,
+        rewindBeforeInvocationId = rewindBeforeInvocationId,
     ).map { it.toDomain() }
 
     override suspend fun releaseSession(sessionId: String) {

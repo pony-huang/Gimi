@@ -18,7 +18,6 @@ import androidx.room.Query
  * @property turnId 稳定轮标识；重试/编辑沿用同一个 id，新发送生成新 id。
  * @property attemptId 本次尝试标识；串行化发送，用于拒绝旧协程的迟到写回。
  * @property turnJson [ChatTurn] 的 JSON。
- * @property checkpointJson 本轮的预发送会话检查点 JSON；重试时恢复到该状态。
  */
 @Entity(tableName = "chat_turns")
 data class ChatTurnEntity(
@@ -26,7 +25,6 @@ data class ChatTurnEntity(
     val turnId: String,
     val attemptId: String,
     val turnJson: String,
-    val checkpointJson: String,
 ) {
     fun copyForAttempt(attemptId: String, turnJson: String): ChatTurnEntity =
         copy(attemptId = attemptId, turnJson = turnJson)

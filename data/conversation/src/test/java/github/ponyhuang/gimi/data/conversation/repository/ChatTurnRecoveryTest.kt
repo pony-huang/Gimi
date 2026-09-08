@@ -34,48 +34,37 @@ class ChatTurnRecoveryTest {
         }
     }
 
-    private class FakeCheckpoints : ChatSessionCheckpointStore {
-        var snapshot = ChatSessionCheckpoint(
-            sessionId = "session",
-            stateJson = "{\"count\":1}",
-            createTime = 1,
-            updateTime = 1,
-            events = emptyList(),
-        )
-        var restoreFails = false
-        var restoreCalls = 0
-
-        override suspend fun capture(sessionId: String): ChatSessionCheckpoint = snapshot
-
-        override suspend fun restore(checkpoint: ChatSessionCheckpoint) {
-            restoreCalls++
-            if (restoreFails) throw java.io.IOException("storage unavailable")
-            snapshot = checkpoint
-        }
-    }
-
     private val dao = FakeDao()
-    private val checkpoints = FakeCheckpoints()
     private val user = Messages.fromUser("hello")
-    private fun repository() = AdkChatTurnRepository(dao, checkpoints)
+    private fun repository() = AdkChatTurnRepository(dao)
 
     @Test
-    fun retryRestoresCheckpointAndDoesNotDuplicateUserMessage() = runTest {
+    fun retryPreservesRewindBoundaryAndDoesNotDuplicateUserMessage() = runTest {
         val first = repository().begin("session", user, emptyList(), null)
-        repository().save(first.copy(status = ChatTurnStatus.FAILED))
-        // 模拟失败轮往会话里追加了内容（如错误事件），检查点快照因此前进。
-        checkpoints.snapshot = checkpoints.snapshot.copy(
-            stateJson = "{\"count\":2}",
-            events = listOf(CheckpointEvent("error", "inv", 2, "{}")),
+        repository().save(
+            first.copy(
+                status = ChatTurnStatus.FAILED,
+                rewindBeforeInvocationId = "failed-invocation",
+            ),
         )
 
         val retry = repository().begin("session", user, emptyList(), first.id)
 
-        assertEquals("{\"count\":1}", checkpoints.snapshot.stateJson)
-        assertEquals(emptyList<CheckpointEvent>(), checkpoints.snapshot.events)
         assertEquals(first.id, retry.id)
         assertNotEquals(first.attemptId, retry.attemptId)
         assertEquals(listOf(user), retry.messages)
+        assertEquals("failed-invocation", retry.rewindBeforeInvocationId)
+    }
+
+    @Test
+    fun interruptedTurnCarriesItsInvocationAsTheAdkRewindBoundary() = runTest {
+        val first = repository().begin("session", user, emptyList(), null)
+        val interrupted = repository().recover("session")
+
+        val retry = repository().begin("session", user, emptyList(), first.id)
+
+        assertEquals(first.attemptId, interrupted?.rewindBeforeInvocationId)
+        assertEquals(first.attemptId, retry.rewindBeforeInvocationId)
     }
 
     @Test
@@ -113,8 +102,8 @@ class ChatTurnRecoveryTest {
         try {
             repo.begin("session", user, emptyList(), first.id)
             fail("Expected stale turn exception")
-        } catch (expected: StaleChatTurnException) {
-            assertEquals(0, checkpoints.restoreCalls)
+        } catch (_: StaleChatTurnException) {
+            // Expected: a newer turn owns the session row.
         }
     }
 
@@ -131,20 +120,4 @@ class ChatTurnRecoveryTest {
         assertEquals(second.attemptId, repository().recover("session")?.attemptId)
     }
 
-    @Test
-    fun restoreFailureLeavesRowIntactForAnotherRetry() = runTest {
-        val repo = repository()
-        val first = repo.begin("session", user, emptyList(), null)
-        repo.save(first.copy(status = ChatTurnStatus.FAILED))
-        checkpoints.restoreFails = true
-        try {
-            repo.begin("session", user, emptyList(), first.id)
-            fail("Expected restore failure")
-        } catch (expected: java.io.IOException) {
-            assertEquals(ChatTurnStatus.FAILED, repository().recover("session")?.status)
-        }
-        checkpoints.restoreFails = false
-        val recovered = repository().begin("session", user, emptyList(), first.id)
-        assertEquals(first.id, recovered.id)
-    }
 }

@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 /** 最近一轮发送的持久状态；恢复中的请求不会自动调用模型。 */
 @Serializable
-enum class ChatTurnStatus { RUNNING, RESTORING, FAILED, INTERRUPTED }
+enum class ChatTurnStatus { RUNNING, FAILED, INTERRUPTED }
 
 /**
  * 可恢复的最近发送轮次，消息快照包含尚未被上游保存的流式内容。
@@ -14,6 +14,7 @@ enum class ChatTurnStatus { RUNNING, RESTORING, FAILED, INTERRUPTED }
  * @property userMessage 原始或编辑后的用户请求，附件均已归档。
  * @property messages 当前展示快照，包含之前的历史和本轮输出。
  * @property hasToolCalls 是否可能已经执行工具；重试前需要用户确认。
+ * @property rewindBeforeInvocationId 重试时交给 ADK Runner 的回滚边界。
  */
 @Serializable
 data class ChatTurn(
@@ -24,6 +25,7 @@ data class ChatTurn(
     val messages: List<Message>,
     val status: ChatTurnStatus = ChatTurnStatus.RUNNING,
     val hasToolCalls: Boolean = false,
+    val rewindBeforeInvocationId: String? = null,
 ) {
     val canRetry: Boolean get() = status == ChatTurnStatus.FAILED || status == ChatTurnStatus.INTERRUPTED
     val history: List<Message> get() = messages.takeWhile { it.id != userMessage.id }

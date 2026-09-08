@@ -10,6 +10,7 @@ import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
+import github.ponyhuang.gimi.domain.conversation.repository.ChatSessionRewindException
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatTurnRepository
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
@@ -837,6 +838,8 @@ class ChatViewModel @Inject constructor(
                         text = sendText,
                         fileAttachments = turn.userMessage.fileAttachments,
                         toolConfiguration = runtime.toolConfiguration,
+                        invocationId = turn.attemptId,
+                        rewindBeforeInvocationId = turn.rewindBeforeInvocationId,
                     ).collect { event ->
                         eventReducer.applyEvent(sessionId, event, runToken)
                     }
@@ -848,7 +851,7 @@ class ChatViewModel @Inject constructor(
                     }
                 }.onFailure { failure ->
                     eventReducer.applyError(sessionId, failure.message ?: failure::class.simpleName ?: "Unknown error")
-                    saveFailedTurn(sessionId, turn)
+                    saveFailedTurn(sessionId, turn, failure)
                 }
             } finally {
                 finishRunIfOwned(sessionId, runToken)
@@ -860,15 +863,20 @@ class ChatViewModel @Inject constructor(
 
     /**
      * 把发送轮落盘为可恢复的 FAILED 轮次（保留部分输出与附件），供错误区的“编辑/重试”恢复。
-     * 流式失败与用户主动停止都走这里；重试/编辑时按检查点回退到本轮之前。
+     * 流式失败与用户主动停止都走这里；重试/编辑时通过 ADK invocation 边界回退到本轮之前。
      */
-    private fun saveFailedTurn(sessionId: String, turn: ChatTurn) {
+    private fun saveFailedTurn(sessionId: String, turn: ChatTurn, failure: Throwable? = null) {
         val runtime = runtimeFor(sessionId)
         val executedTool = runtime.messages.hasToolCallsAfter(turn.userMessage.id)
         val failed = turn.copy(
             status = ChatTurnStatus.FAILED,
             hasToolCalls = executedTool,
             messages = runtime.messages,
+            rewindBeforeInvocationId = if (failure is ChatSessionRewindException) {
+                turn.rewindBeforeInvocationId
+            } else {
+                turn.attemptId
+            },
         )
         runtime.lastTurn = failed
         publishRuntime(runtime)
@@ -1560,7 +1568,7 @@ class ChatViewModel @Inject constructor(
         runtime.turnComplete = false
         runtime.attention = SessionResultAttention.NONE
         // 用户主动停止的轮次同样保留“编辑/重试”：把已生成的部分回答一并落盘为可恢复轮，
-        // 重试/编辑时按检查点回退到本轮之前（与失败轮语义一致）。
+        // 重试/编辑时交给 ADK Runner 回退到本轮 invocation 之前（与失败轮语义一致）。
         runtime.lastTurn?.takeIf { it.status == ChatTurnStatus.RUNNING }?.let { stopped ->
             saveFailedTurn(sessionId, stopped)
         }

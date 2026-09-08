@@ -49,7 +49,9 @@ class AdkChatAgentRepositoryMappingTest {
             isPartial = false,
             isTurnComplete = true,
         )
-        coEvery { runner.send(any(), any(), any(), any(), any(), any()) } returns flowOf(event)
+        coEvery {
+            runner.send(any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns flowOf(event)
 
         val events = repository.send("session-1", selection, "现在几点", emptyList(), null).toList()
 
@@ -85,6 +87,35 @@ class AdkChatAgentRepositoryMappingTest {
         assertNull(mapped.errorCode)
         assertNull(mapped.errorMessage)
         assertEquals(123L, mapped.timestamp)
+    }
+
+    @Test
+    fun retryDelegatesStableInvocationIdsToTheAdkRunner() = runTest {
+        coEvery {
+            runner.send(any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns flowOf(adkEvent())
+
+        repository.send(
+            sessionId = "session-1",
+            selection = selection,
+            text = "retry",
+            fileAttachments = emptyList(),
+            invocationId = "attempt-2",
+            rewindBeforeInvocationId = "attempt-1",
+        ).toList()
+
+        coVerify {
+            runner.send(
+                userId = AgentSessionIdentity.DEFAULT_USER_ID,
+                sessionId = "session-1",
+                selection = selection,
+                text = "retry",
+                fileAttachments = emptyList(),
+                toolConfiguration = null,
+                invocationId = "attempt-2",
+                rewindBeforeInvocationId = "attempt-1",
+            )
+        }
     }
 
     @Test
@@ -160,7 +191,9 @@ class AdkChatAgentRepositoryMappingTest {
                 ),
             ),
         )
-        coEvery { runner.send(any(), any(), any(), any(), any(), any()) } returns flowOf(event)
+        coEvery {
+            runner.send(any(), any(), any(), any(), any(), any(), any(), any(), any())
+        } returns flowOf(event)
 
         val mapped = repository.send("session-1", selection, "查看图片", emptyList(), null)
             .toList()

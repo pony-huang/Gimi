@@ -14,13 +14,9 @@ import github.ponyhuang.gimi.domain.conversation.model.Conversation
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
@@ -45,22 +41,15 @@ class AdkConversationRepository(
     private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
     override val conversations: StateFlow<List<Conversation>> = _conversations.asStateFlow()
 
-    /**
-     * Process-local invalidations for session content written outside [ChatViewModel].
-     *
-     * ADK's [SessionService] persists events but does not expose an observable event stream. The
-     * background voice runner therefore publishes the changed session id here after a complete
-     * turn, allowing an already-open chat screen to reload that session from Room.
-     */
-    private val _conversationContentUpdates = MutableSharedFlow<String>(
-        extraBufferCapacity = 1,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST,
-    )
-    override val conversationContentUpdates: SharedFlow<String> = _conversationContentUpdates.asSharedFlow()
+    private val _conversationContentRevisions = MutableStateFlow<Map<String, Long>>(emptyMap())
+    override val conversationContentRevisions: StateFlow<Map<String, Long>> =
+        _conversationContentRevisions.asStateFlow()
 
     override fun notifyConversationContentChanged(sessionId: String) {
         if (sessionId.isBlank()) return
-        _conversationContentUpdates.tryEmit(sessionId)
+        _conversationContentRevisions.update { revisions ->
+            revisions + (sessionId to ((revisions[sessionId] ?: 0L) + 1L))
+        }
     }
 
     /**
@@ -188,6 +177,7 @@ class AdkConversationRepository(
         if (sessionId.isBlank()) return
         try {
             metadataDao.delete(sessionId)
+            _conversationContentRevisions.update { it - sessionId }
         } catch (t: Throwable) {
             recover(t, "discardConversationMetadata($sessionId)", Unit)
         }
@@ -250,6 +240,7 @@ class AdkConversationRepository(
         try {
             sessionService.deleteSession(key)
             metadataDao.delete(sessionId)
+            _conversationContentRevisions.update { it - sessionId }
         } catch (t: Throwable) {
             recover(t, "deleteConversation($sessionId)", Unit)
         }

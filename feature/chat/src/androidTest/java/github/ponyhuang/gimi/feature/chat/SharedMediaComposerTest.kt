@@ -19,7 +19,7 @@ class SharedMediaComposerTest {
         composeRule.setContent {
             MaterialTheme {
                 ChatComposer(
-                    onSendClick = { true },
+                    onSendClick = { _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
                     onStopClick = {},
                     isGenerating = false,
                     sharedMediaUris = listOf(Uri.parse("content://missing")),
@@ -39,7 +39,7 @@ class SharedMediaComposerTest {
         composeRule.setContent {
             MaterialTheme {
                 ChatComposer(
-                    onSendClick = { true },
+                    onSendClick = { _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
                     onStopClick = {},
                     isGenerating = false,
                     sharedMediaUris = emptyList(),

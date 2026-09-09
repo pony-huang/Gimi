@@ -15,6 +15,7 @@ import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import java.io.File
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ToolConfirmationRequest
+import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentExecution
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
@@ -27,50 +28,42 @@ import kotlinx.coroutines.flow.map
 class AdkChatAgentRepository @Inject constructor(
     private val runner: AgentChatRunner,
 ) : ChatAgentRepository {
-    override suspend fun send(
+    override suspend fun createExecution(
         sessionId: String,
         selection: ModelSelection,
-        text: String,
-        fileAttachments: List<FileAttachment>,
         toolConfiguration: ConversationToolConfiguration?,
-        rewindBeforeInvocationId: String?,
-    ): Flow<ChatRunEvent> = runner.send(
-        userId = USER_ID,
-        sessionId = sessionId,
-        selection = selection,
-        text = text,
-        fileAttachments = fileAttachments,
-        toolConfiguration = toolConfiguration,
-        rewindBeforeInvocationId = rewindBeforeInvocationId,
-    ).map { it.toDomain() }
+    ): ChatAgentExecution {
+        val execution = runner.createExecution(
+            userId = USER_ID,
+            sessionId = sessionId,
+            selection = selection,
+            toolConfiguration = toolConfiguration,
+        )
+        return object : ChatAgentExecution {
+            override suspend fun send(
+                text: String,
+                fileAttachments: List<FileAttachment>,
+                rewindBeforeInvocationId: String?,
+            ): Flow<ChatRunEvent> = execution.send(
+                text, fileAttachments, rewindBeforeInvocationId,
+            ).map { it.toDomain() }
 
-    override suspend fun releaseSession(sessionId: String) {
-        runner.releaseSession(sessionId)
+            override suspend fun respondToToolConfirmation(
+                confirmationCallId: String,
+                confirmed: Boolean,
+            ): Flow<ChatRunEvent> = execution.respondToToolConfirmation(
+                confirmationCallId, confirmed,
+            ).map { it.toDomain() }
+
+            override suspend fun respondToInputRequest(
+                callId: String,
+                toolName: String,
+                value: String,
+            ): Flow<ChatRunEvent> = execution.respondToInputRequest(
+                callId, toolName, UserInputToolProtocol.responsePayload(toolName, value),
+            ).map { it.toDomain() }
+        }
     }
-
-    override suspend fun respondToToolConfirmation(
-        sessionId: String,
-        confirmationCallId: String,
-        confirmed: Boolean,
-    ): Flow<ChatRunEvent> = runner.respondToToolConfirmation(
-        userId = USER_ID,
-        sessionId = sessionId,
-        confirmationCallId = confirmationCallId,
-        confirmed = confirmed,
-    ).map { it.toDomain() }
-
-    override suspend fun respondToInputRequest(
-        sessionId: String,
-        callId: String,
-        toolName: String,
-        value: String,
-    ): Flow<ChatRunEvent> = runner.respondToInputRequest(
-        userId = USER_ID,
-        sessionId = sessionId,
-        callId = callId,
-        toolName = toolName,
-        payload = UserInputToolProtocol.responsePayload(toolName, value),
-    ).map { it.toDomain() }
 
     private fun Event.toDomain() = ChatRunEvent(
         id = id,

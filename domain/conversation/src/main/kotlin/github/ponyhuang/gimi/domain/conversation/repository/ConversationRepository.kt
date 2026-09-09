@@ -4,7 +4,6 @@ import github.ponyhuang.gimi.domain.conversation.model.Conversation
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -16,7 +15,8 @@ import kotlinx.coroutines.flow.StateFlow
  */
 interface ConversationRepository {
     val conversations: StateFlow<List<Conversation>>
-    val conversationContentUpdates: SharedFlow<String>
+    /** 进程内各会话的内容版本；慢订阅者或暂未展示的会话也不会丢失失效信息。 */
+    val conversationContentRevisions: StateFlow<Map<String, Long>>
 
     suspend fun refresh()
     suspend fun refreshConversation(sessionId: String)
@@ -38,7 +38,7 @@ interface ConversationRepository {
     ): String
     suspend fun deleteConversation(sessionId: String)
 
-    /** Publish only after an out-of-process-style writer has persisted a complete turn. */
+    /** 外部执行入口退出时使历史缓存失效，包含失败或取消前已经落盘的部分结果。 */
     fun notifyConversationContentChanged(sessionId: String)
 }
 

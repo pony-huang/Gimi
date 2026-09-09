@@ -7,6 +7,7 @@ import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRunLease
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentExecution
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ReceiveChannel
@@ -25,6 +26,8 @@ internal class ChatSessionRuntime(
     var modelSelection: ModelSelection? = null
     var toolConfiguration: ConversationToolConfiguration? = null
     var isLoaded: Boolean = false
+    /** 上次历史加载开始时观察到的外部写入版本，加载期间的新版本留待下一次刷新。 */
+    var loadedContentRevision: Long = -1L
     var isAgentRunning: Boolean = false
     var phase: AgentTaskPhase = AgentTaskPhase.GENERATING
     var pendingToolConfirmations: List<PendingToolConfirmation> = emptyList()
@@ -49,8 +52,11 @@ internal class ChatSessionRuntime(
      */
     val rejectedToolNames: MutableSet<String> = mutableSetOf()
     var job: Job? = null
+    /** 新发送创建，挂起期间保留，终止时释放引用；不跟随全局设置变化。 */
+    var execution: ChatAgentExecution? = null
     var lease: AgentRunLease? = null
-    var runToken: Any? = null
+    /** 每次开始或取消都更新身份，历史读取不会把“运行再停止”误认为没有发生变化。 */
+    var runToken: Any = Any()
     var failed: Boolean = false
     var attention: SessionResultAttention = SessionResultAttention.NONE
 

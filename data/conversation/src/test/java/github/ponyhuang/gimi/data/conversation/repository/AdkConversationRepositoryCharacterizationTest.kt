@@ -41,15 +41,14 @@ class AdkConversationRepositoryCharacterizationTest {
     }
 
     @Test
-    fun contentUpdate_ignoresBlankId_andPublishesCompletedSessionId() = runTest {
+    fun contentRevisionsRetainEverySessionBeforeSubscription() = runTest {
         val repository = repository()
-
-        repository.conversationContentUpdates.test {
-            repository.notifyConversationContentChanged("")
-            expectNoEvents()
-
-            repository.notifyConversationContentChanged("session-1")
-            assertEquals("session-1", awaitItem())
+        repository.notifyConversationContentChanged("")
+        repository.notifyConversationContentChanged("session-1")
+        repository.notifyConversationContentChanged("session-2")
+        repository.notifyConversationContentChanged("session-1")
+        repository.conversationContentRevisions.test {
+            assertEquals(mapOf("session-1" to 2L, "session-2" to 1L), awaitItem())
         }
     }
 

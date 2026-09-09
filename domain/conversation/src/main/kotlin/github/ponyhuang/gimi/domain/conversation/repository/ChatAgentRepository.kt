@@ -7,38 +7,34 @@ import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfigura
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import kotlinx.coroutines.flow.Flow
 
+/** 构建一次会话执行；缓存及 SDK 对象由 data 层封装。 */
 interface ChatAgentRepository {
-    suspend fun send(
+    suspend fun createExecution(
         sessionId: String,
         selection: ModelSelection,
+        toolConfiguration: ConversationToolConfiguration? = null,
+    ): ChatAgentExecution
+}
+
+/** 一轮消息及其确认/输入恢复共用的执行上下文，由会话运行状态持有。 */
+interface ChatAgentExecution {
+    suspend fun send(
         text: String,
         fileAttachments: List<FileAttachment>,
-        toolConfiguration: ConversationToolConfiguration? = null,
         rewindBeforeInvocationId: String? = null,
     ): Flow<ChatRunEvent>
 
     suspend fun respondToToolConfirmation(
-        sessionId: String,
         confirmationCallId: String,
         confirmed: Boolean,
     ): Flow<ChatRunEvent>
 
-    /**
-     * 用用户的答复恢复挂起的用户输入请求（`get_user_choice` / `adk_request_input`）。
-     *
-     * @param sessionId 会话 ID
-     * @param callId 挂起的 function call id
-     * @param toolName 触发挂起的工具名
-     * @param value 用户的选择或输入文本
-     */
+    /** 答复挂起的输入工具，沿用本轮 Agent 和工具配置。 */
     suspend fun respondToInputRequest(
-        sessionId: String,
         callId: String,
         toolName: String,
         value: String,
     ): Flow<ChatRunEvent>
-
-    suspend fun releaseSession(sessionId: String)
 }
 
 /** 官方 ADK Runner 在恢复历史调用边界时失败，且新的 invocation 尚未启动。 */

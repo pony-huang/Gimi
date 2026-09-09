@@ -30,7 +30,10 @@ import org.junit.Test
  */
 class AdkChatAgentRepositoryMappingTest {
 
-    private val runner = mockk<AgentChatRunner>()
+    private val execution = mockk<AgentChatRunner.Execution>()
+    private val runner = mockk<AgentChatRunner> {
+        coEvery { createExecution(any(), any(), any(), any(), any()) } returns execution
+    }
     private val repository = AdkChatAgentRepository(runner)
     private val selection = ModelSelection(serviceId = "svc", groupId = "grp", modelId = "mdl")
 
@@ -50,20 +53,19 @@ class AdkChatAgentRepositoryMappingTest {
             isTurnComplete = true,
         )
         coEvery {
-            runner.send(any(), any(), any(), any(), any(), any(), any(), any())
+            execution.send(any(), any(), any())
         } returns flowOf(event)
 
-        val events = repository.send("session-1", selection, "现在几点", emptyList(), null).toList()
+        val events = repository.createExecution("session-1", selection).send("现在几点", emptyList()).toList()
 
         coVerify {
-            runner.send(
+            runner.createExecution(
                 userId = AgentSessionIdentity.DEFAULT_USER_ID,
                 sessionId = "session-1",
                 selection = selection,
-                text = "现在几点",
-                fileAttachments = emptyList(),
                 toolConfiguration = null,
             )
+            execution.send("现在几点", emptyList())
         }
         val mapped = events.single()
         assertEquals("evt-1", mapped.id)
@@ -92,25 +94,19 @@ class AdkChatAgentRepositoryMappingTest {
     @Test
     fun retryDelegatesStableInvocationIdsToTheAdkRunner() = runTest {
         coEvery {
-            runner.send(any(), any(), any(), any(), any(), any(), any(), any())
+            execution.send(any(), any(), any())
         } returns flowOf(adkEvent())
 
-        repository.send(
-            sessionId = "session-1",
-            selection = selection,
+        repository.createExecution("session-1", selection).send(
             text = "retry",
             fileAttachments = emptyList(),
             rewindBeforeInvocationId = "attempt-1",
         ).toList()
 
         coVerify {
-            runner.send(
-                userId = AgentSessionIdentity.DEFAULT_USER_ID,
-                sessionId = "session-1",
-                selection = selection,
+            execution.send(
                 text = "retry",
                 fileAttachments = emptyList(),
-                toolConfiguration = null,
                 rewindBeforeInvocationId = "attempt-1",
             )
         }
@@ -129,17 +125,15 @@ class AdkChatAgentRepositoryMappingTest {
             ),
         )
         coEvery {
-            runner.respondToToolConfirmation(any(), any(), any(), any())
+            execution.respondToToolConfirmation(any(), any())
         } returns flowOf(adkEvent(calls = listOf(confirmationCall)))
 
-        val events = repository
-            .respondToToolConfirmation("session-1", "confirm-1", confirmed = true)
+        val events = repository.createExecution("session-1", selection)
+            .respondToToolConfirmation("confirm-1", confirmed = true)
             .toList()
 
         coVerify {
-            runner.respondToToolConfirmation(
-                userId = AgentSessionIdentity.DEFAULT_USER_ID,
-                sessionId = "session-1",
+            execution.respondToToolConfirmation(
                 confirmationCallId = "confirm-1",
                 confirmed = true,
             )
@@ -147,15 +141,6 @@ class AdkChatAgentRepositoryMappingTest {
         val confirmation = events.single().functionCalls.single().confirmationRequest
         assertEquals("brightness_set", confirmation?.toolName)
         assertEquals(mapOf("level" to 80), confirmation?.args)
-    }
-
-    @Test
-    fun releaseSessionDelegatesToRunner() = runTest {
-        coEvery { runner.releaseSession(any()) } returns Unit
-
-        repository.releaseSession("session-9")
-
-        coVerify { runner.releaseSession("session-9") }
     }
 
     private fun adkEvent(
@@ -190,10 +175,10 @@ class AdkChatAgentRepositoryMappingTest {
             ),
         )
         coEvery {
-            runner.send(any(), any(), any(), any(), any(), any(), any(), any())
+            execution.send(any(), any(), any())
         } returns flowOf(event)
 
-        val mapped = repository.send("session-1", selection, "查看图片", emptyList(), null)
+        val mapped = repository.createExecution("session-1", selection).send("查看图片", emptyList())
             .toList()
             .single()
 

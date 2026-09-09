@@ -79,6 +79,11 @@ class VoiceAgentTaskExecutor @Inject constructor(
                     context.getString(R.string.bluetooth_voice_status_task_failed)
                 },
             )
+            is AssistantSubmissionResult.AwaitingInput -> error(
+                result.message.ifBlank {
+                    context.getString(R.string.bluetooth_voice_status_task_failed)
+                },
+            )
         }
     }
 

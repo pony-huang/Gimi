@@ -5,14 +5,11 @@ import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
-import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.conversation.usecase.ChatRunEventMapper
 import github.ponyhuang.gimi.domain.conversation.usecase.summarizeValue
 import github.ponyhuang.gimi.domain.conversation.usecase.toView
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
 /**
  * 单条工具确认请求在确认卡片上展示的数据。
@@ -40,8 +37,6 @@ data class PendingToolConfirmation(
  * @property runtimeFor 取运行时，缺失时创建。
  * @property publishRuntime 把运行时发布到 UI state。
  * @property emitPartDelta 把 partial 文本增量推给对应 [TextPart] 的 channel。
- * @property scope 用于派发 lease 阶段更新与会话刷新等副作用。
- * @property repository 会话仓库，turn 完成后刷新会话内容。
  * @property toolAuthorization 工具授权仓库，提供工具描述。
  * @property isAutoApproved 工具是否在本轮自动放行。
  */
@@ -50,8 +45,6 @@ internal class AgentEventReducer(
     private val runtimeFor: (String) -> ChatSessionRuntime,
     private val publishRuntime: (ChatSessionRuntime) -> Unit,
     private val emitPartDelta: (sessionId: String, partId: String, delta: String) -> Unit,
-    private val scope: CoroutineScope,
-    private val repository: ConversationRepository,
     private val toolAuthorization: ToolAuthorizationRepository,
     private val isAutoApproved: (String) -> Boolean,
 ) {
@@ -86,16 +79,13 @@ internal class AgentEventReducer(
         }
         if (phase != null) {
             runtime.phase = phase
-            scope.launch { runtime.lease?.updatePhase(phase) }
+            runtime.lease?.updatePhase(phase)
         }
         when {
             event.turnComplete -> runtime.isAgentRunning = false
             event.partial -> runtime.isAgentRunning = true
         }
         publishRuntime(runtime)
-        if (event.turnComplete) {
-            scope.launch { repository.refreshConversation(sessionId) }
-        }
     }
 
     /** Extracts queued ADK confirmation requests without allowing later calls to overwrite them. */
@@ -126,9 +116,7 @@ internal class AgentEventReducer(
             .distinctBy { it.confirmationCallId }
         if (needsUser.isNotEmpty()) {
             runtime.phase = AgentTaskPhase.WAITING_FOR_CONFIRMATION
-            scope.launch {
-                runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
-            }
+            runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
             val knownIds = runtime.pendingToolConfirmations.mapTo(mutableSetOf()) {
                 it.confirmationCallId
             }
@@ -155,9 +143,7 @@ internal class AgentEventReducer(
         if (fresh.isEmpty()) return
         runtime.pendingInputRequests = runtime.pendingInputRequests + fresh
         runtime.phase = AgentTaskPhase.WAITING_FOR_INPUT
-        scope.launch {
-            runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_INPUT)
-        }
+        runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_INPUT)
         runtime.isAgentRunning = true
         publishRuntime(runtime)
     }

@@ -134,7 +134,7 @@ class ChatComposerLayoutTest {
             focusManager = LocalFocusManager.current
             MaterialTheme {
                 ChatComposer(
-                    onSendClick = { true },
+                    onSendClick = { _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
                     onStopClick = { },
                     isGenerating = false,
                     isVoiceInputAvailable = true,
@@ -211,7 +211,6 @@ class ChatComposerLayoutTest {
     fun addButtonOpensSessionConfigurationSheetAndNavigatesWithinIt() {
         setComposer(
             addToChatState = ChatAddToChatState(
-                serviceId = "service",
                 configuration = ConversationToolConfiguration(
                     enabledMcpServerIds = setOf("mcp-1"),
                 ),
@@ -246,7 +245,6 @@ class ChatComposerLayoutTest {
     fun officialAndMcpToolsUseCompactSharedSwitchRows() {
         setComposer(
             addToChatState = ChatAddToChatState(
-                serviceId = "service",
                 configuration = ConversationToolConfiguration(),
                 mcpServers = listOf(McpServer(id = "mcp-1", name = "Test MCP")),
                 officialTools = listOf(
@@ -338,7 +336,7 @@ class ChatComposerLayoutTest {
     @Test
     fun bareEnterTriggersSendWithEnteredText() {
         var sent: MessageData? = null
-        setComposer(onSendClick = { sent = it; true })
+        setComposer(onSendClick = { data, reply -> sent = data; reply(ChatSubmissionResult.ACCEPTED) })
 
         composeRule.onNodeWithTag("chat_composer_text_field")
             .performTextInput("Hello")
@@ -351,7 +349,7 @@ class ChatComposerLayoutTest {
     @Test
     fun shiftEnterDoesNotTriggerSendAndKeepsDraft() {
         var sent: MessageData? = null
-        setComposer(onSendClick = { sent = it; true })
+        setComposer(onSendClick = { data, reply -> sent = data; reply(ChatSubmissionResult.ACCEPTED) })
 
         composeRule.onNodeWithTag("chat_composer_text_field")
             .performTextInput("Hello")
@@ -366,12 +364,26 @@ class ChatComposerLayoutTest {
         composeRule.onNodeWithTag("chat_composer_text_field").assertTextContains("Hello")
     }
 
+    @Test
+    fun asynchronousReceiptKeepsDraftUntilAccepted() {
+        var reply: ((ChatSubmissionResult) -> Unit)? = null
+        setComposer(onSendClick = { _, onResult -> reply = onResult })
+        composeRule.onNodeWithTag("chat_composer_text_field").performTextInput("待发送")
+        composeRule.onNodeWithTag("chat_composer_text_field").performKeyInput { pressKey(Key.Enter) }
+        composeRule.onNodeWithTag("chat_composer_text_field").assertTextContains("待发送").assertIsNotEnabled()
+        composeRule.runOnIdle { reply!!(ChatSubmissionResult.REJECTED) }
+        composeRule.onNodeWithTag("chat_composer_text_field").assertTextContains("待发送").assertIsEnabled()
+        composeRule.onNodeWithTag("chat_composer_text_field").performKeyInput { pressKey(Key.Enter) }
+        composeRule.runOnIdle { reply!!(ChatSubmissionResult.ACCEPTED) }
+        composeRule.onNodeWithTag("chat_composer_text_field").assertTextContains("")
+    }
+
     private fun setComposer(
         messageData: MessageData = MessageData(),
         isGenerating: Boolean = false,
         addToChatState: ChatAddToChatState = ChatAddToChatState(),
         retainExpanded: Boolean = false,
-        onSendClick: (MessageData) -> Boolean = { true },
+        onSendClick: (MessageData, (ChatSubmissionResult) -> Unit) -> Unit = { _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
     ) {
         composeRule.setContent {
             MaterialTheme {

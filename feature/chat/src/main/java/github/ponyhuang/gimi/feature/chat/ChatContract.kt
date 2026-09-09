@@ -9,18 +9,11 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
  * [ChatViewModel.onAction] 进入，ViewModel 内部按 action 分发到现有逻辑。
  *
  * 返回值式 API 不完全走 action 语义：
- * - `send(text, attachments)`：返回值（是否接受发送）驱动 composer 的草稿清除
- *   （`consumeDraftForSend`），因此输入框路径直接调用；[Send] action 供发后即忘场景使用；
+ * - `send(text, attachments, onResult)`：异步接管回执驱动草稿清理；所有发送使用同一入口；
  * - `transcribeVoice(pcm16)`：suspend 请求-响应调用，由语音输入组件 await 结果；
  * - `partChannelFor(partId)`：渲染期同步查询流式文本增量 channel。
  */
 sealed interface ChatAction {
-    /** 发送用户消息（可附带草稿附件）。 */
-    data class Send(
-        val text: String,
-        val draftAttachments: List<DraftAttachment> = emptyList(),
-    ) : ChatAction
-
     /** 用原始请求重新发送最近失败轮次。 */
     data object RetryFailedTurn : ChatAction
 

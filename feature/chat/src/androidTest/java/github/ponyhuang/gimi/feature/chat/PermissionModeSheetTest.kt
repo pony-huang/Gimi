@@ -29,7 +29,6 @@ class PermissionModeSheetTest {
                     onChooseFiles = {},
                     imagesEnabled = true,
                     filesEnabled = true,
-                    onLocalToolEnabledChange = { _, _ -> },
                     onReasoningEffortChange = {},
                     onMcpServerEnabledChange = { _, _ -> },
                     onFullAccessChange = {

@@ -388,7 +388,7 @@ class McpUseCasesTest {
         var savedConfiguration: ConversationToolConfiguration? = null
 
         override val conversations: StateFlow<List<Conversation>> = MutableStateFlow(emptyList())
-        override val conversationContentUpdates: SharedFlow<String> = MutableSharedFlow()
+        override val conversationContentRevisions = MutableStateFlow<Map<String, Long>>(emptyMap())
 
         override suspend fun refresh() = Unit
         override suspend fun refreshConversation(sessionId: String) = Unit

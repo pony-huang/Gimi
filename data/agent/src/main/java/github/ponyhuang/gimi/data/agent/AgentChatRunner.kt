@@ -52,12 +52,11 @@ import kotlinx.coroutines.sync.withLock
  * - 会话级工具勾选、确认工具开关通过 `RunConfig.customMetadata`（[ToolRunMetadata]）
  *   按请求透传给各 Toolset 自行过滤，均不参与缓存键 —— 切换勾选或确认开关不会触发
  *   Agent 重建。
- * - 每个会话仅保存轻量 [SessionBinding]（最近使用的 key + metadata），供
- *   [respondToToolConfirmation] 恢复暂停的调用时复用。
+ * - 每轮返回显式 [Execution]，直接持有 runner 和配置；缓存淘汰不影响等待中的恢复。
  * - 构造期由 [AgentModule] 通过 Hilt 注入 [sessionService]、[artifactService]、[plugins]
  *   及 [configuration]；不持有 in-memory 默认实现。
  * - [factory] 仅在缓存未命中时按需调用，保证模型/访问模式切换立即生效。当前正在
- *   `runAsync` 中的会话不受影响（[send] 入口处已快照 runner 引用）。
+ *   `runAsync` 中的会话不受影响（[createExecution] 入口处已快照 runner 引用）。
  * - 不对 `Event` 做任何加工；Event → UI 渲染的合并工作由 `ChatViewModel` 的 reducer 完成。
  * - `runConfig` 默认开启 SSE 流式，便于 UI 端做打字机效果。
  *
@@ -104,25 +103,7 @@ class AgentChatRunner(
         val runner: InMemoryRunner,
     )
 
-    /**
-     * 会话的轻量绑定：最近一轮使用的缓存键与 RunConfig metadata。
-     *
-     * @property key 最近一轮使用的 [AgentKey]。
-     * @property customMetadata 最近一次请求的 RunConfig metadata，供确认恢复复用。
-     */
-    private data class SessionBinding(
-        val key: AgentKey,
-        val customMetadata: Map<String, Any>,
-    )
-
-    /** 一次 send/resume 的执行快照：共享 runner + 本会话 metadata。 */
-    private data class ActiveTurn(
-        val runner: InMemoryRunner,
-        val customMetadata: Map<String, Any>,
-    )
-
     private val runtimes = LinkedHashMap<AgentKey, SharedRuntime>(16, 0.75f, true)
-    private val sessionBindings = LinkedHashMap<String, SessionBinding>(16, 0.75f, true)
     private val runnerMutex = Mutex()
 
     private fun buildRunner(
@@ -142,208 +123,16 @@ class AgentChatRunner(
         memoryService = memoryService
     )
 
-    /**
-     * 清空所有缓存的运行时与会话绑定。
-     *
-     * 下次 [send] 时 [factory] 会被重新调用以使用最新的模型/工具配置构建 agent。
-     * 当前正在 `runAsync` 中的会话不受影响。
-     */
-    suspend fun recreate() {
-        runnerMutex.withLock {
-            runtimes.clear()
-            sessionBindings.clear()
-        }
-    }
-
-    /**
-     * 清空所有缓存的运行时与会话绑定，不创建替代。
-     *
-     * 当没有可用模型时调用，确保已禁用或删除的模型不会被后续请求使用。
-     */
-    suspend fun invalidate() {
-        runnerMutex.withLock {
-            runtimes.clear()
-            sessionBindings.clear()
-        }
-    }
-
-    /**
-     * 释放指定会话的绑定。
-     *
-     * 共享运行时可能仍被其它会话使用，不在此处移除，由 LRU 自行淘汰。
-     *
-     * @param sessionId 要释放的会话 ID
-     */
-    suspend fun releaseSession(sessionId: String) {
-        runnerMutex.withLock { sessionBindings.remove(sessionId) }
-    }
-
-    /**
-     * 把用户输入发送给 Agent，返回 Event 流。
-     *
-     * @param userId 用户 ID（用于会话归属）
-     * @param sessionId 会话 ID（同会话的历史会一并送入 LLM）
-     * @param selection 模型选择；为 null 时使用默认模型
-     * @param text 用户输入文本（可为空，仅当包含图片时）
-     * @param fileAttachments 文件附件，作为 ADK inline data 传给模型
-     * @param allowConfirmationRequiredTools 是否允许需要用户确认的工具调用
-     * @param toolConfiguration 会话工具配置（启用的工具/MCP 服务器列表）；
-     *   经 `RunConfig.customMetadata` 透传，由各 Toolset 按请求过滤
-     * @return Event 流，通过 SSE 流式输出
-     */
-    suspend fun send(
+    /** 固定一轮的构建配置和工具元数据；调用方持有句柄直到完成或取消。 */
+    suspend fun createExecution(
         userId: String,
         sessionId: String,
         selection: ModelSelection? = null,
-        text: String,
-        fileAttachments: List<FileAttachment> = emptyList(),
         allowConfirmationRequiredTools: Boolean = true,
         toolConfiguration: ConversationToolConfiguration? = null,
-        rewindBeforeInvocationId: String? = null,
-    ): Flow<Event> {
-        val activeTurn = currentTurnForNewMessage(
-            sessionId,
-            selection,
-            toolAccessRepository.defaultToolAccessMode.value,
-            toolConfiguration?.reasoningEffort ?: ReasoningEffort.MEDIUM,
-            allowConfirmationRequiredTools,
-            toolConfiguration,
-        )
-        val parts = buildList {
-            text.takeIf(String::isNotBlank)?.let { add(Part(text = it)) }
-            fileAttachments.forEach { attachment ->
-                add(
-                    Part(
-                        fileData = FileData(
-                            mimeType = attachment.mimeType,
-                            displayName = attachment.displayName,
-                            fileUri = requireNotNull(attachment.payloadReference) {
-                                "Managed attachment reference is missing"
-                            },
-                        ),
-                    ),
-                )
-            }
-            attachmentPathManifest(fileAttachments)?.let { add(Part(text = it)) }
-        }
-        val newMessage = Content(
-            role = Role.USER,
-            parts = parts,
-        )
-        rewindBeforeInvocationId?.let { rewindInvocationId ->
-            try {
-                activeTurn.runner.rewindAsync(userId, sessionId, rewindInvocationId)
-            } catch (failure: CancellationException) {
-                throw failure
-            } catch (failure: Exception) {
-                // 回滚失败发生在 runAsync 之前，不能把尚未创建的新 invocation 当成下次回滚点。
-                throw ChatSessionRewindException(failure)
-            }
-        }
-        return activeTurn.runner.runAsync(
-            userId = userId,
-            sessionId = sessionId,
-            // ADK 0.8.0 在 isResumable=true 下：非空 invocationId 会被当成"恢复既有 invocation"，
-            // 恢复分支要求 session 已有事件；全新会话首条消息会因此抛 "Session ... has no events to resume"。
-            // 新消息必须传 null 让 ADK 自建 invocation；真实 id 由事件回流携带，用作失败轮回退边界。
-            invocationId = null,
-            newMessage = newMessage,
-            stateDelta = null,
-            runConfig = RunConfig(
-                streamingMode = StreamingMode.SSE,
-                customMetadata = activeTurn.customMetadata,
-            ),
-        ).flowOn(Dispatchers.IO)
-    }
-
-    /**
-     * 恢复暂停的 ADK 工具确认请求。
-     *
-     * @param userId 用户 ID
-     * @param sessionId 会话 ID
-     * @param confirmationCallId 工具确认的调用 ID
-     * @param confirmed 用户是否确认
-     * @return Event 流
-     */
-    suspend fun respondToToolConfirmation(
-        userId: String,
-        sessionId: String,
-        confirmationCallId: String,
-        confirmed: Boolean,
-    ): Flow<Event> = resumeWithFunctionResponse(
-        userId = userId,
-        sessionId = sessionId,
-        response = FunctionResponse(
-            name = FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME,
-            id = confirmationCallId,
-            response = mapOf("confirmed" to confirmed),
-        ),
-    )
-
-    /**
-     * 用用户答复恢复挂起的用户输入请求（`adk_request_input` / `get_user_choice`）。
-     *
-     * @param userId 用户 ID
-     * @param sessionId 会话 ID
-     * @param callId 挂起的 function call ID
-     * @param toolName 触发挂起的工具名（决定 FunctionResponse.name，需与挂起调用一致）
-     * @param payload 答复负载（键约定见 `UserInputToolProtocol`）
-     * @return Event 流
-     */
-    suspend fun respondToInputRequest(
-        userId: String,
-        sessionId: String,
-        callId: String,
-        toolName: String,
-        payload: Map<String, Any?>,
-    ): Flow<Event> = resumeWithFunctionResponse(
-        userId = userId,
-        sessionId = sessionId,
-        response = FunctionResponse(
-            name = toolName,
-            id = callId,
-            response = payload,
-        ),
-    )
-
-    /**
-     * 以 role=user 的 `FunctionResponse` 新消息恢复暂停的 invocation。
-     *
-     * ADK 靠"响应 id 覆盖挂起的长时运行调用 id"判定这是恢复而非新的暂停，
-     * 恢复时挂起工具不重跑，响应直接作为调用结果进入模型上下文。
-     */
-    private suspend fun resumeWithFunctionResponse(
-        userId: String,
-        sessionId: String,
-        response: FunctionResponse,
-    ): Flow<Event> {
-        val activeTurn = currentTurnForResume(sessionId)
-        val resumeMessage = Content(
-            role = Role.USER,
-            parts = listOf(Part(functionResponse = response)),
-        )
-        return activeTurn.runner.runAsync(
-            userId = userId,
-            sessionId = sessionId,
-            invocationId = null,
-            newMessage = resumeMessage,
-            stateDelta = null,
-            // 恢复调用沿用最近一次 send 的工具配置，保证 Toolset 过滤上下文一致。
-            runConfig = RunConfig(
-                streamingMode = StreamingMode.SSE,
-                customMetadata = activeTurn.customMetadata,
-            ),
-        ).flowOn(Dispatchers.IO)
-    }
-
-    private suspend fun currentTurnForNewMessage(
-        sessionId: String,
-        selection: ModelSelection?,
-        toolAccessMode: ToolAccessMode,
-        reasoningEffort: ReasoningEffort,
-        allowConfirmationRequiredTools: Boolean,
-        toolConfiguration: ConversationToolConfiguration?,
-    ): ActiveTurn {
+    ): Execution {
+        val toolAccessMode = toolAccessRepository.defaultToolAccessMode.value
+        val reasoningEffort = toolConfiguration?.reasoningEffort ?: ReasoningEffort.MEDIUM
         val buildConfiguration = configuration()
         val key = AgentKey(selection, toolAccessMode, reasoningEffort, buildConfiguration.revision)
         return runnerMutex.withLock {
@@ -368,31 +157,141 @@ class AgentChatRunner(
                 toolConfiguration = toolConfiguration,
                 allowConfirmationRequiredTools = allowConfirmationRequiredTools,
             )
-            sessionBindings[sessionId] = SessionBinding(key, metadata)
-            while (sessionBindings.size > MAX_SESSION_BINDINGS) {
-                sessionBindings.remove(sessionBindings.entries.first().key)
-            }
-            ActiveTurn(runtime.runner, metadata)
+            Execution(userId, sessionId, runtime.runner, metadata)
         }
     }
 
-    private suspend fun currentTurnForResume(sessionId: String): ActiveTurn =
-        runnerMutex.withLock {
-            val binding = sessionBindings[sessionId]
-                ?: error("No active runner is available for session $sessionId.")
-            val runtime = runtimes[binding.key]
-                ?: error("No active runner is available for session $sessionId.")
-            ActiveTurn(runtime.runner, binding.customMetadata)
+    /** 单轮执行句柄，恢复只使用创建时的 Runner 与元数据，不访问全局配置或 LRU。 */
+    class Execution internal constructor(
+        private val userId: String,
+        private val sessionId: String,
+        private val runner: InMemoryRunner,
+        private val customMetadata: Map<String, Any>,
+    ) {
+        /** 把新用户消息发送给本轮 Agent。 */
+        suspend fun send(
+            text: String,
+            fileAttachments: List<FileAttachment> = emptyList(),
+            rewindBeforeInvocationId: String? = null,
+        ): Flow<Event> {
+            val parts = buildList {
+                text.takeIf(String::isNotBlank)?.let { add(Part(text = it)) }
+                fileAttachments.forEach { attachment ->
+                    add(
+                        Part(
+                            fileData = FileData(
+                                mimeType = attachment.mimeType,
+                                displayName = attachment.displayName,
+                                fileUri = requireNotNull(attachment.payloadReference) {
+                                    "Managed attachment reference is missing"
+                                },
+                            ),
+                        ),
+                    )
+                }
+                attachmentPathManifest(fileAttachments)?.let { add(Part(text = it)) }
+            }
+            val newMessage = Content(
+                role = Role.USER,
+                parts = parts,
+            )
+            rewindBeforeInvocationId?.let { rewindInvocationId ->
+                try {
+                    runner.rewindAsync(userId, sessionId, rewindInvocationId)
+                } catch (failure: CancellationException) {
+                    throw failure
+                } catch (failure: Exception) {
+                    // 回滚失败发生在 runAsync 之前，不能把尚未创建的新 invocation 当成下次回滚点。
+                    throw ChatSessionRewindException(failure)
+                }
+            }
+            return runner.runAsync(
+                userId = userId,
+                sessionId = sessionId,
+                // ADK 0.8.0 在 isResumable=true 下：非空 invocationId 会被当成"恢复既有 invocation"，
+                // 恢复分支要求 session 已有事件；全新会话首条消息会因此抛 "Session ... has no events to resume"。
+                // 新消息必须传 null 让 ADK 自建 invocation；真实 id 由事件回流携带，用作失败轮回退边界。
+                invocationId = null,
+                newMessage = newMessage,
+                stateDelta = null,
+                runConfig = RunConfig(
+                    streamingMode = StreamingMode.SSE,
+                    customMetadata = customMetadata,
+                ),
+            ).flowOn(Dispatchers.IO)
         }
+
+        /**
+         * 恢复暂停的 ADK 工具确认请求。
+         *
+         * @param confirmationCallId 工具确认的调用 ID
+         * @param confirmed 用户是否确认
+         * @return Event 流
+         */
+        suspend fun respondToToolConfirmation(
+            confirmationCallId: String,
+            confirmed: Boolean,
+        ): Flow<Event> = resumeWithFunctionResponse(
+            response = FunctionResponse(
+                name = FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME,
+                id = confirmationCallId,
+                response = mapOf("confirmed" to confirmed),
+            ),
+        )
+
+        /**
+         * 用用户答复恢复挂起的用户输入请求（`adk_request_input` / `get_user_choice`）。
+         *
+         * @param callId 挂起的 function call ID
+         * @param toolName 触发挂起的工具名（决定 FunctionResponse.name，需与挂起调用一致）
+         * @param payload 答复负载（键约定见 `UserInputToolProtocol`）
+         * @return Event 流
+         */
+        suspend fun respondToInputRequest(
+            callId: String,
+            toolName: String,
+            payload: Map<String, Any?>,
+        ): Flow<Event> = resumeWithFunctionResponse(
+            response = FunctionResponse(
+                name = toolName,
+                id = callId,
+                response = payload,
+            ),
+        )
+
+        /**
+         * 以 role=user 的 `FunctionResponse` 新消息恢复暂停的 invocation。
+         *
+         * ADK 靠"响应 id 覆盖挂起的长时运行调用 id"判定这是恢复而非新的暂停，
+         * 恢复时挂起工具不重跑，响应直接作为调用结果进入模型上下文。
+         */
+        private suspend fun resumeWithFunctionResponse(
+            response: FunctionResponse,
+        ): Flow<Event> {
+            val resumeMessage = Content(
+                role = Role.USER,
+                parts = listOf(Part(functionResponse = response)),
+            )
+            return runner.runAsync(
+                userId = userId,
+                sessionId = sessionId,
+                invocationId = null,
+                newMessage = resumeMessage,
+                stateDelta = null,
+                // 恢复调用沿用最近一次 send 的工具配置，保证 Toolset 过滤上下文一致。
+                runConfig = RunConfig(
+                    streamingMode = StreamingMode.SSE,
+                    customMetadata = customMetadata,
+                ),
+            ).flowOn(Dispatchers.IO)
+        }
+    }
 
     companion object {
         const val APP_NAME: String = AgentSessionIdentity.APP_NAME
 
         /** 共享运行时（Agent + Runner）的 LRU 上限，按 [AgentKey] 计数。 */
         const val MAX_CACHED_RUNTIMES: Int = 10
-
-        /** 会话绑定的 LRU 上限；绑定很轻量，保留比运行时更长的历史以支持确认恢复。 */
-        const val MAX_SESSION_BINDINGS: Int = 50
     }
 }
 

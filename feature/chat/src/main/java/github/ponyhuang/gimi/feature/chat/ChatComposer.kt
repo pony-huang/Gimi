@@ -99,7 +99,7 @@ import kotlinx.coroutines.launch
  */
 @Composable
 public fun ChatComposer(
-    onSendClick: (data: MessageData) -> Boolean,
+    onSendClick: (MessageData, (ChatSubmissionResult) -> Unit) -> Unit,
     onStopClick: () -> Unit,
     isGenerating: Boolean,
     modifier: Modifier = Modifier,
@@ -127,6 +127,8 @@ public fun ChatComposer(
     var messageData by rememberSaveable(stateSaver = MessageData.Saver) {
         mutableStateOf(messageData)
     }
+    var isSubmitting by remember { mutableStateOf(false) }
+    var disposed by remember { mutableStateOf(false) }
     var showAttachmentOptions by rememberSaveable { mutableStateOf(false) }
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCameraPath by rememberSaveable { mutableStateOf<String?>(null) }
@@ -147,7 +149,7 @@ public fun ChatComposer(
     val attachmentUnsupportedMessage = stringResource(R.string.chat_attachment_unsupported)
 
     fun acceptSelection(uris: List<Uri>) {
-        if (uris.isEmpty()) return
+        if (uris.isEmpty() || isSubmitting) return
         val imported = mutableListOf<DraftAttachment>()
         val result = runCatching {
             uris.forEach { uri ->
@@ -190,7 +192,7 @@ public fun ChatComposer(
         if (
             voiceInputState != VoiceInputUiState.Idle ||
             !isVoiceInputAvailable ||
-            isGenerating
+            isGenerating || isSubmitting
         ) {
             return
         }
@@ -288,23 +290,36 @@ public fun ChatComposer(
 
     DisposableEffect(Unit) {
         onDispose {
+            disposed = true
             voiceRecorder.release()
             voiceAudio.reset()
             deletePendingCameraAttachment(pendingCameraPath)
-            deleteManagedDrafts(context, messageData.attachments)
+            // 准备中的附件仍由发送读取，等待回执后再清理离开页面的草稿。
+            if (!isSubmitting) deleteManagedDrafts(context, messageData.attachments)
         }
     }
 
-    LaunchedEffect(sharedMediaUris) {
-        if (sharedMediaUris.isNotEmpty()) {
+    LaunchedEffect(sharedMediaUris, isSubmitting) {
+        if (sharedMediaUris.isNotEmpty() && !isSubmitting) {
             acceptSelection(sharedMediaUris)
             onSharedMediaConsumed()
         }
     }
 
-    val handleSendClick = {
-        keyboardController?.hide()
-        messageData = consumeDraftForSend(messageData, onSendClick)
+    val handleSendClick: () -> Unit = {
+        if (!isSubmitting) {
+            keyboardController?.hide()
+            val submitted = messageData
+            isSubmitting = true
+            onSendClick(submitted) { result ->
+                isSubmitting = false
+                if (disposed) {
+                    deleteManagedDrafts(context, submitted.attachments)
+                } else if (result == ChatSubmissionResult.ACCEPTED) {
+                    messageData = consumeAcceptedDraft(messageData, submitted)
+                }
+            }
+        }
     }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -400,14 +415,15 @@ public fun ChatComposer(
                         ComposerInputContent(
                             ComposerInputContentParams(
                                 messageData = messageData,
-                                isGenerating = isGenerating,
+                                isGenerating = isGenerating || isSubmitting,
                                 configurationReady = addToChatState.configuration != null,
                                 voiceInputState = voiceInputState,
                                 isVoiceInputAvailable = isVoiceInputAvailable,
                                 voiceErrorMessage = voiceErrorMessage,
                                 onVoiceErrorShown = { voiceErrorMessage = null },
                                 onTextChange = { messageData = messageData.copy(text = it) },
-                                onRemoveAttachment = { uri ->
+                                onRemoveAttachment = remove@{ uri ->
+                                    if (isSubmitting) return@remove
                                     messageData = messageData.copy(
                                         attachments = messageData.attachments - uri,
                                     )
@@ -418,7 +434,7 @@ public fun ChatComposer(
                                 onVoiceInputStart = ::startVoiceInput,
                                 retainExpanded = retainExpanded,
                                 onExpandedChange = { isComposerExpanded = it },
-                                onAttachmentsClick = { showAttachmentOptions = true },
+                                onAttachmentsClick = { if (!isSubmitting) showAttachmentOptions = true },
                                 modelSelectorContent = modelSelectorContent,
                             ),
                         )
@@ -483,10 +499,6 @@ internal fun appendTranscript(draft: String, transcript: String): String {
     return "${draft.trimEnd()} $recognized"
 }
 
-internal fun consumeDraftForSend(
-    draft: MessageData,
-    onSend: (MessageData) -> Boolean,
-): MessageData = if (onSend(draft)) MessageData() else draft
 
 /** 胶囊收起时的横向内缩。聚焦放大后归零，推荐列表复用同一数值保持边缘对齐。 */
 internal val ComposerCollapsedHorizontalInset = 20.dp
@@ -570,7 +582,7 @@ public data class MessageData(
 @Composable
 internal fun ChatComposerEmpty() {
     ChatComposer(
-        onSendClick = { true },
+        onSendClick = { _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
         onStopClick = {},
         isGenerating = false,
     )
@@ -580,7 +592,7 @@ internal fun ChatComposerEmpty() {
 internal fun ChatComposerFilled() {
     ChatComposer(
         messageData = MessageData(text = "What is Stream Chat?"),
-        onSendClick = { true },
+        onSendClick = { _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
         onStopClick = {},
         isGenerating = false,
     )
@@ -590,7 +602,7 @@ internal fun ChatComposerFilled() {
 internal fun ChatComposerLongFilled() {
     ChatComposer(
         messageData = MessageData(text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit."),
-        onSendClick = { true },
+        onSendClick = { _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
         onStopClick = {},
         isGenerating = false,
     )
@@ -605,7 +617,7 @@ internal fun ChatComposerWithAttachments() {
                 DraftAttachment("1", "one.jpg", "image/jpeg", 1, AttachmentCategory.IMAGE),
             ),
         ),
-        onSendClick = { true },
+        onSendClick = { _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
         onStopClick = {},
         isGenerating = false,
     )
@@ -614,7 +626,7 @@ internal fun ChatComposerWithAttachments() {
 @Composable
 internal fun ChatComposerGenerating() {
     ChatComposer(
-        onSendClick = { true },
+        onSendClick = { _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
         onStopClick = {},
         isGenerating = true,
     )

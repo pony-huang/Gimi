@@ -121,7 +121,7 @@ import kotlin.time.Duration.Companion.milliseconds
 fun ChatScaffold(
     state: ChatUiState,
     partChannelProvider: (String) -> ReceiveChannel<String>?,
-    onSend: (String, List<DraftAttachment>) -> Boolean,
+    onSend: (String, List<DraftAttachment>, (ChatSubmissionResult) -> Unit) -> Unit,
     onStop: () -> Unit,
     onTranscribeVoice: suspend (ByteArray) -> String,
     onToggleSpeechPlayback: (String, String) -> Unit,
@@ -342,8 +342,8 @@ fun ChatScaffold(
                                 null -> ChatComposer(
                                     modifier = Modifier,
                                     messageData = state.composerSeed,
-                                    onSendClick = { data ->
-                                        onSend(data.text, data.attachments)
+                                    onSendClick = { data, onResult ->
+                                        onSend(data.text, data.attachments, onResult)
                                     },
                                     onStopClick = onStop,
                                     isGenerating = isAgentRunning,
@@ -825,7 +825,7 @@ private fun ChatScaffoldEmptyPreview() {
         ChatScaffold(
             state = ChatUiState(sessionId = "preview-session"),
             partChannelProvider = { null },
-            onSend = { _, _ -> true },
+            onSend = { _, _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
             onStop = {},
             onTranscribeVoice = { "" },
             onToggleSpeechPlayback = { _, _ -> },
@@ -869,7 +869,7 @@ private fun ChatScaffoldWithMessagesPreview() {
                 ),
             ),
             partChannelProvider = { null },
-            onSend = { _, _ -> true },
+            onSend = { _, _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
             onStop = {},
             onTranscribeVoice = { "" },
             onToggleSpeechPlayback = { _, _ -> },
@@ -1005,7 +1005,7 @@ private fun ChatScaffoldFailedTurnPreview() {
                 failedTurn = previewFailedTurn(),
             ),
             partChannelProvider = { null },
-            onSend = { _, _ -> true },
+            onSend = { _, _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
             onStop = {},
             onTranscribeVoice = { "" },
             onToggleSpeechPlayback = { _, _ -> },
@@ -1048,7 +1048,7 @@ private fun ChatScaffoldEditingFailedTurnPreview() {
                 composerSeed = MessageData(text = "帮我查一下今天上海的天气"),
             ),
             partChannelProvider = { null },
-            onSend = { _, _ -> true },
+            onSend = { _, _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
             onStop = {},
             onTranscribeVoice = { "" },
             onToggleSpeechPlayback = { _, _ -> },

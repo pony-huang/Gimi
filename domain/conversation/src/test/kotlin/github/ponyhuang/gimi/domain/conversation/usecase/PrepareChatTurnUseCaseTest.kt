@@ -2,10 +2,7 @@ package github.ponyhuang.gimi.domain.conversation.usecase
 
 import github.ponyhuang.gimi.domain.conversation.model.*
 import github.ponyhuang.gimi.domain.conversation.repository.*
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
@@ -29,17 +26,11 @@ class PrepareChatTurnUseCaseTest {
         override suspend fun deleteDrafts(attachments: List<DraftAttachment>) = Unit
         override suspend fun deleteSession(sessionId: String) = Unit
     }
-    private val runner = object : ChatAgentRepository {
-        override suspend fun send(sessionId: String, selection: ModelSelection, text: String, fileAttachments: List<FileAttachment>, toolConfiguration: ConversationToolConfiguration?, rewindBeforeInvocationId: String?): Flow<ChatRunEvent> = emptyFlow()
-        override suspend fun respondToToolConfirmation(sessionId: String, confirmationCallId: String, confirmed: Boolean): Flow<ChatRunEvent> = emptyFlow()
-        override suspend fun respondToInputRequest(sessionId: String, callId: String, toolName: String, value: String): Flow<ChatRunEvent> = emptyFlow()
-        override suspend fun releaseSession(sessionId: String) { calls += "release" }
-    }
-    private val prepare = PrepareChatTurnUseCase(attachments, runner)
+    private val prepare = PrepareChatTurnUseCase(attachments)
 
     @Test fun retryValidatesBeforeRewindingAndKeepsOneOriginalUserMessage() = runBlocking {
         val result = prepare("session", "ignored", emptyList(), listOf(original), failed, true)
-        assertEquals(listOf("validate", "release"), calls)
+        assertEquals(listOf("validate"), calls)
         assertEquals(listOf(original), result.messages)
         assertEquals(failed.id, result.id)
         assertEquals(failed.rewindBeforeInvocationId, result.rewindBeforeInvocationId)
@@ -49,7 +40,7 @@ class PrepareChatTurnUseCaseTest {
         val result = prepare("session", "edited", emptyList(), emptyList(), failed)
         assertEquals(original.id, result.userMessage.id)
         assertEquals("edited", result.userMessage.textParts.single().text)
-        assertEquals(listOf("read", "release"), calls)
+        assertEquals(listOf("read"), calls)
     }
 
     @Test fun unreadableAttachmentNeverChangesHistory() = runBlocking {

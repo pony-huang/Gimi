@@ -1,43 +1,41 @@
 package github.ponyhuang.gimi.feature.chat
 
-import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
-import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class MessageDraftSubmissionTest {
-
     @Test
-    fun acceptedSendImmediatelyConsumesTextAndAttachments() {
-        val draft = MessageData(
-            text = "请分析附件",
-            attachments = listOf(
-                DraftAttachment(
-                    reference = "draft/audio.mp3",
-                    displayName = "audio.mp3",
-                    mimeType = "audio/mpeg",
-                    sizeBytes = 128,
-                    category = AttachmentCategory.AUDIO,
-                ),
-            ),
-        )
-        var submitted: MessageData? = null
-
-        val nextDraft = consumeDraftForSend(draft) {
-            submitted = it
-            true
+    fun pendingOrRejectedSubmissionKeepsTheDraft() {
+        val draft = MessageData(text = "尚未发送")
+        var current = draft
+        val submission = ChatSubmission { result ->
+            if (result == ChatSubmissionResult.ACCEPTED) current = consumeAcceptedDraft(current, draft)
         }
-
-        assertEquals(draft, submitted)
-        assertEquals(MessageData(), nextDraft)
+        assertEquals(draft, current)
+        submission.complete(ChatSubmissionResult.REJECTED)
+        assertEquals(draft, current)
     }
 
     @Test
-    fun rejectedSendKeepsCurrentDraft() {
-        val draft = MessageData(text = "尚未发送")
+    fun acceptedReceiptConsumesOnlyTheSubmittedSnapshotAndIsDeliveredOnce() {
+        val draft = MessageData(text = "请求")
+        var current = draft
+        var deliveries = 0
+        val submission = ChatSubmission {
+            deliveries++
+            if (it == ChatSubmissionResult.ACCEPTED) current = consumeAcceptedDraft(current, draft)
+        }
+        submission.complete(ChatSubmissionResult.ACCEPTED)
+        assertEquals(MessageData(), current)
+        current = MessageData(text = "新的输入")
+        submission.complete(ChatSubmissionResult.REJECTED)
+        assertEquals(1, deliveries)
+        assertEquals("新的输入", current.text)
+    }
 
-        val nextDraft = consumeDraftForSend(draft) { false }
-
-        assertEquals(draft, nextDraft)
+    @Test
+    fun lateReceiptDoesNotClearNewerText() {
+        val current = MessageData(text = "后来编辑的内容")
+        assertEquals(current, consumeAcceptedDraft(current, MessageData(text = "旧请求")))
     }
 }

@@ -8,7 +8,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 /**
  * 模型运行信息与会话工具配置的 RunConfig 透传编解码。
  *
- * `AgentChatRunner.send` 把配置拍平进 `RunConfig.customMetadata`，各 Toolset/BaseTool
+ * `AgentChatRunner.createExecution` 把配置拍平进 `RunConfig.customMetadata`，各 Toolset/BaseTool
  * 在 `getTools(readonlyContext)` / `processLlmRequest(toolContext, ...)` 时按请求读取并
  * 自行过滤 —— 因此 Agent 构建期不再绑定会话工具选择，勾选变化不会触发 Agent 重建。
  *

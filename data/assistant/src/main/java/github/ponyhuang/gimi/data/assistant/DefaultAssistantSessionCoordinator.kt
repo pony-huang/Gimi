@@ -14,6 +14,7 @@ import github.ponyhuang.gimi.domain.assistant.repository.AssistantConfirmationHa
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSubmissionResult
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
+import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
@@ -192,16 +193,12 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
             ).appendUserMessage(text).appendAssistantMessage()
         }
         try {
-            collectTurn(
-                chatAgent.send(
-                    sessionId,
-                    session.modelSelection,
-                    text,
-                    emptyList(),
-                    session.toolConfiguration,
-                ),
-                run,
+            val execution = chatAgent.createExecution(
+                sessionId, session.modelSelection, session.toolConfiguration,
             )
+            collectTurn(execution.send(text, emptyList()), run)
+            run.error?.let { return finishFailed(it) }
+            run.pendingInputRequest?.let { return finishAwaitingInput(it) }
             while (run.pendingConfirmations.isNotEmpty()) {
                 lease.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
                 val request = run.pendingConfirmations.removeFirst()
@@ -221,16 +218,16 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                     )
                 }
                 collectTurn(
-                    chatAgent.respondToToolConfirmation(
-                        sessionId = sessionId,
+                    execution.respondToToolConfirmation(
                         confirmationCallId = request.confirmationCallId,
                         confirmed = confirmed,
                     ),
                     run,
                 )
+                run.error?.let { return finishFailed(it) }
+                run.pendingInputRequest?.let { return finishAwaitingInput(it) }
             }
             conversations.refreshConversation(sessionId)
-            conversations.notifyConversationContentChanged(sessionId)
             _state.update {
                 it.copy(
                     phase = AssistantSessionPhase.FOLLOW_UP_IDLE,
@@ -271,12 +268,16 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
             confirmationResponse?.response?.cancel()
             confirmationResponse = null
             lease.release()
+            conversations.notifyConversationContentChanged(sessionId)
         }
     }
 
     /** 收集一轮事件流：归并回答文本、推导工具阶段、提取确认请求。 */
     private suspend fun collectTurn(events: Flow<ChatRunEvent>, run: TaskRun) {
         events.collect { event ->
+            if (run.error != null) return@collect
+            event.errorMessage?.let { run.error = it; return@collect }
+            event.errorCode?.let { run.error = it; return@collect }
             if (event.author != "user") {
                 val text = event.parts
                     .filter { !it.thought && it.text != null }
@@ -301,6 +302,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                 }
             }
             event.functionCalls.forEach { call ->
+                call.inputRequest?.let { run.pendingInputRequest = it }
                 val confirmationId = call.id ?: return@forEach
                 val request = call.confirmationRequest ?: return@forEach
                 if (!run.seenConfirmationIds.add(confirmationId)) return@forEach
@@ -345,9 +347,35 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
         }
     }
 
+    private fun finishFailed(message: String): AssistantSubmissionResult {
+        _state.update {
+            it.copy(
+                phase = AssistantSessionPhase.ERROR,
+                errorMessage = message,
+                taskActive = false,
+                pendingConfirmation = null,
+            ).failLastAssistantMessage(message)
+        }
+        return AssistantSubmissionResult.Failed(message)
+    }
+
+    private fun finishAwaitingInput(request: UserInputRequest): AssistantSubmissionResult {
+        val message = request.message.ifBlank { "需要你的输入。" }
+        _state.update {
+            it.copy(
+                phase = AssistantSessionPhase.AWAITING_INPUT,
+                taskActive = false,
+                pendingConfirmation = null,
+            ).updateLastAssistantMessage(text = message, streaming = false)
+        }
+        return AssistantSubmissionResult.AwaitingInput(message)
+    }
+
     private class TaskRun {
         val partial = StringBuilder()
         var completed = ""
+        var error: String? = null
+        var pendingInputRequest: UserInputRequest? = null
         val toolNames = mutableListOf<String>()
         val pendingConfirmations = ArrayDeque<PendingAssistantConfirmation>()
         val seenConfirmationIds = mutableSetOf<String>()

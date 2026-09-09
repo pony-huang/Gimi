@@ -66,19 +66,19 @@ class AgentChatRunnerCacheTest {
         )
         val selection = ModelSelection("service", "group", "model")
 
-        runner.send("user", "session-a", selection, "a")
-        runner.send("user", "session-a", selection, "a2")
-        runner.send("user", "session-b", selection, "b")
+        val execution = runner.createExecution("user", "session-a", selection)
+        execution.send("a")
+        runner.createExecution("user", "session-a", selection).send("a2")
+        runner.createExecution("user", "session-b", selection).send("b")
 
         // 相同模型 + 访问模式的会话共享同一份 Agent/Runner，只构建一次。
         assertEquals(listOf(selection), createdSelections)
 
-        runner.respondToToolConfirmation("user", "session-a", "confirmation", true)
+        execution.respondToToolConfirmation("confirmation", true)
         assertEquals(1, createdSelections.size)
 
-        // 释放会话只移除绑定；共享运行时仍可复用，不触发重建。
-        runner.releaseSession("session-a")
-        runner.send("user", "session-a", selection, "a3")
+        // 新一轮执行仍复用相同的构建产物。
+        runner.createExecution("user", "session-a", selection).send("a3")
         assertEquals(1, createdSelections.size)
     }
 
@@ -103,10 +103,11 @@ class AgentChatRunnerCacheTest {
             toolAccessRepository = FakeToolAccessRepository(),
         )
 
-        runner.send(
+        runner.createExecution(
             userId = "user",
             sessionId = "session",
             selection = ModelSelection("service", "group", "model"),
+        ).send(
             text = "retry",
             rewindBeforeInvocationId = "attempt-1",
         )
@@ -138,14 +139,14 @@ class AgentChatRunnerCacheTest {
         val first = ModelSelection("service", "group", "first")
         val second = ModelSelection("service", "group", "second")
 
-        runner.send("user", "session-a", first, "a")
-        runner.send("user", "session-b", first, "b")
-        runner.send("user", "session-a", second, "a2")
+        runner.createExecution("user", "session-a", first).send("a")
+        runner.createExecution("user", "session-b", first).send("b")
+        runner.createExecution("user", "session-a", second).send("a2")
         // first 配置两个会话共享（1 次），切换到 second 新建（共 2 次）。
         assertEquals(2, creations)
 
         revision += 1
-        runner.send("user", "session-b", first, "b2")
+        runner.createExecution("user", "session-b", first).send("b2")
         assertEquals(3, creations)
     }
 
@@ -177,7 +178,7 @@ class AgentChatRunnerCacheTest {
             },
         )
 
-        runner.send("user", "session", ModelSelection("service", "group", "model"), "message")
+        runner.createExecution("user", "session", ModelSelection("service", "group", "model")).send("message")
 
         assertSame(snapshot, factorySnapshot)
         assertSame(snapshot, pluginSnapshot)
@@ -200,9 +201,9 @@ class AgentChatRunnerCacheTest {
         fun selection(index: Int) = ModelSelection("service", "group", "model-$index")
 
         repeat(AgentChatRunner.MAX_CACHED_RUNTIMES + 1) { index ->
-            runner.send("user", "session-$index", selection(index), text = "message")
+            runner.createExecution("user", "session-$index", selection(index)).send("message")
         }
-        runner.send("user", "session-0", selection(0), text = "again")
+        runner.createExecution("user", "session-0", selection(0)).send("again")
 
         assertEquals(AgentChatRunner.MAX_CACHED_RUNTIMES + 2, creations)
     }
@@ -226,10 +227,10 @@ class AgentChatRunnerCacheTest {
             enabledMcpServerIds = setOf("github", "filesystem"),
         )
 
-        runner.send("user", "session-a", selection, "a", toolConfiguration = githubOnly)
-        runner.send("user", "session-b", selection, "b", toolConfiguration = githubOnly)
+        runner.createExecution("user", "session-a", selection, toolConfiguration = githubOnly).send("a")
+        runner.createExecution("user", "session-b", selection, toolConfiguration = githubOnly).send("b")
         // 会话内工具勾选变化经 RunConfig metadata 透传，不触发 Agent 重建。
-        runner.send("user", "session-a", selection, "a2", toolConfiguration = githubAndFilesystem)
+        runner.createExecution("user", "session-a", selection, toolConfiguration = githubAndFilesystem).send("a2")
 
         assertEquals(1, creations)
     }
@@ -250,19 +251,19 @@ class AgentChatRunnerCacheTest {
         )
         val selection = ModelSelection("service", "group", "model")
 
-        runner.send(
-            "user", "session-a", selection, "a",
+        runner.createExecution(
+            "user", "session-a", selection,
             toolConfiguration = ConversationToolConfiguration(),
-        )
-        runner.send(
-            "user", "session-b", selection, "b",
+        ).send("a")
+        runner.createExecution(
+            "user", "session-b", selection,
             toolConfiguration = ConversationToolConfiguration(),
-        )
+        ).send("b")
         toolAccess.setDefaultToolAccessMode(ToolAccessMode.ON_DEMAND)
-        runner.send(
-            "user", "session-a", selection, "a2",
+        runner.createExecution(
+            "user", "session-a", selection,
             toolConfiguration = ConversationToolConfiguration(),
-        )
+        ).send("a2")
 
         assertEquals(2, creations)
     }
@@ -282,12 +283,48 @@ class AgentChatRunnerCacheTest {
         )
         val selection = ModelSelection("service", "group", "model")
 
-        runner.send("user", "session-a", selection, "a", allowConfirmationRequiredTools = true)
+        runner.createExecution("user", "session-a", selection, allowConfirmationRequiredTools = true).send("a")
         // 确认工具开关经 RunConfig metadata 透传，不参与缓存键，不触发重建。
-        runner.send("user", "session-a", selection, "a2", allowConfirmationRequiredTools = false)
-        runner.send("user", "session-b", selection, "b", allowConfirmationRequiredTools = false)
+        runner.createExecution("user", "session-a", selection, allowConfirmationRequiredTools = false).send("a2")
+        runner.createExecution("user", "session-b", selection, allowConfirmationRequiredTools = false).send("b")
 
         assertEquals(1, creations)
+    }
+
+    @Test
+    fun pendingExecutionSurvivesCacheEvictionAndConfigurationChanges() = runTest {
+        var revision = 0
+        var configurationReads = 0
+        var creations = 0
+        val runner = AgentChatRunner(
+            factory = { spec ->
+                creations++
+                runtime(spec.selection)
+            },
+            sessionService = mockk<SessionService>(relaxed = true),
+            artifactService = null,
+            memoryService = InMemoryMemoryService(),
+            toolAccessRepository = FakeToolAccessRepository(),
+            configuration = {
+                configurationReads++
+                AgentBuildConfigurationSnapshot(revision, PluginRuntimeSnapshot(0L, emptyList()))
+            },
+        )
+        val pending = runner.createExecution("user", "waiting", ModelSelection("svc", "group", "original"))
+        pending.send("start")
+        // 不同配置填满缓存，且同一 sessionId 也可以产生下一轮独立的上下文。
+        repeat(AgentChatRunner.MAX_CACHED_RUNTIMES + 1) {
+            revision++
+            runner.createExecution("user", "waiting", ModelSelection("svc", "group", "new-$it"))
+        }
+        val readsBeforeResume = configurationReads
+        val creationsBeforeResume = creations
+
+        pending.respondToToolConfirmation("confirmation", true)
+        pending.respondToInputRequest("input", "get_user_choice", mapOf("value" to "yes"))
+
+        assertEquals(readsBeforeResume, configurationReads)
+        assertEquals(creationsBeforeResume, creations)
     }
 
     private fun runtime(selection: ModelSelection? = null) = AgentRuntime(

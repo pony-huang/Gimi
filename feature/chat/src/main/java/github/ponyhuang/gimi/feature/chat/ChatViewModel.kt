@@ -46,7 +46,12 @@ import github.ponyhuang.gimi.domain.speech.repository.VoiceWakeRepository
 import github.ponyhuang.gimi.domain.speech.usecase.markdownToSpeechText
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -68,7 +73,7 @@ import javax.inject.Inject
  * 持久化层：`buildMessageFromParts` 改走 `EventMapper.fromEvent(event)`，保证 streaming 与历史回放共用 `Event.id → Message.id` 映射。
  * 会话管理：通过 [ConversationRepository] 完成"新建 / 切换 / 删除 / 拉取会话列表"；`reset()` 与 `switchSession()` 都走 repository。
  *
- * 取消语义：每次 `send` 取消 `currentJob`，避免 partial 流交错。
+ * 取消语义：每个会话以 runToken 隔离事件，已接管的任务可在切换会话后继续。
  *
  * DI：通过 Hilt 注入 [ChatAgentRepository] / [ConversationRepository]；UI 端用
  * `hiltViewModel()` 直接拿到实例，不再走原先的 `ChatViewModel.factory(context)`。
@@ -99,6 +104,11 @@ class ChatViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
+    private val sessionRuntimes = linkedMapOf<String, ChatSessionRuntime>()
+    private var sessionLoadJob: Job? = null
+    private var activeSessionLoadToken: Any? = null
+    private var loadingSessionId: String? = null
+
     private val _effects = MutableSharedFlow<ChatEffect>(extraBufferCapacity = 8)
 
     /** 一次性 UI 反馈通道（Toast 等），由 Route 消费；见 [ChatEffect]。 */
@@ -114,7 +124,6 @@ class ChatViewModel @Inject constructor(
      */
     fun onAction(action: ChatAction) {
         when (action) {
-            is ChatAction.Send -> send(action.text, action.draftAttachments)
             ChatAction.RetryFailedTurn -> retryFailedTurn()
             ChatAction.EditFailedTurn -> editFailedTurn()
             ChatAction.CancelEditFailedTurn -> cancelEditFailedTurn()
@@ -203,30 +212,14 @@ class ChatViewModel @Inject constructor(
             runtime.approvedToolsThisTurn.clear()
             runtime.rejectedToolNames += request.toolName
         }
-        cancelRun(runtime, releaseLease = false)
-        val runToken = Any()
-        runtime.runToken = runToken
-        runtime.isAgentRunning = true
-        runtime.phase = AgentTaskPhase.GENERATING
-        publishRuntime(runtime)
-        runtime.job = viewModelScope.launch {
-            try {
-                cancellationAwareRunCatching {
-                    ensureRunLease(runtime).updatePhase(AgentTaskPhase.GENERATING)
-                    runner.respondToToolConfirmation(
-                        sessionId = sessionId,
-                        confirmationCallId = request.confirmationCallId,
-                        confirmed = confirmed,
-                    ).collect { event ->
-                        Log.i("chat", "tool confirmation event: $event")
-                        eventReducer.applyEvent(sessionId, event, runToken)
-                    }
-                }.onFailure { failure ->
-                    eventReducer.applyError(sessionId, failure.message ?: failure::class.simpleName ?: "Unknown error")
-                }
-            } finally {
-                finishRunIfOwned(sessionId, runToken)
-                repository.refreshConversation(sessionId)
+        val previousJob = cancelRun(runtime, releaseLease = false)
+        launchRun(runtime) { runToken ->
+            previousJob?.join()
+            checkNotNull(runtime.execution) { "No active conversation execution" }.respondToToolConfirmation(
+                confirmationCallId = request.confirmationCallId,
+                confirmed = confirmed,
+            ).collect { event ->
+                eventReducer.applyEvent(sessionId, event, runToken)
             }
         }
     }
@@ -250,31 +243,15 @@ class ChatViewModel @Inject constructor(
                         FunctionResponseView(id = request.callId, name = request.toolName),
                     ),
                 )
-        cancelRun(runtime, releaseLease = false)
-        val runToken = Any()
-        runtime.runToken = runToken
-        runtime.isAgentRunning = true
-        runtime.phase = AgentTaskPhase.GENERATING
-        publishRuntime(runtime)
-        runtime.job = viewModelScope.launch {
-            try {
-                cancellationAwareRunCatching {
-                    ensureRunLease(runtime).updatePhase(AgentTaskPhase.GENERATING)
-                    runner.respondToInputRequest(
-                        sessionId = sessionId,
-                        callId = request.callId,
-                        toolName = request.toolName,
-                        value = value,
-                    ).collect { event ->
-                        Log.i("chat", "input request event: $event")
-                        eventReducer.applyEvent(sessionId, event, runToken)
-                    }
-                }.onFailure { failure ->
-                    eventReducer.applyError(sessionId, failure.message ?: failure::class.simpleName ?: "Unknown error")
-                }
-            } finally {
-                finishRunIfOwned(sessionId, runToken)
-                repository.refreshConversation(sessionId)
+        val previousJob = cancelRun(runtime, releaseLease = false)
+        launchRun(runtime) { runToken ->
+            previousJob?.join()
+            checkNotNull(runtime.execution) { "No active conversation execution" }.respondToInputRequest(
+                callId = request.callId,
+                toolName = request.toolName,
+                value = value,
+            ).collect { event ->
+                eventReducer.applyEvent(sessionId, event, runToken)
             }
         }
     }
@@ -335,8 +312,8 @@ class ChatViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            repository.conversationContentUpdates.collect { sessionId ->
-                handleConversationContentUpdate(sessionId)
+            repository.conversationContentRevisions.collect {
+                refreshVisibleHistoryIfStale()
             }
         }
         viewModelScope.launch {
@@ -394,18 +371,11 @@ class ChatViewModel @Inject constructor(
             runtimeFor = ::runtimeFor,
             publishRuntime = ::publishRuntime,
             emitPartDelta = ::emitPartDelta,
-            scope = viewModelScope,
-            repository = repository,
             toolAuthorization = toolAuthorization,
             isAutoApproved = toolApproval::isAutoApproved,
         )
     }
 
-    private val sessionRuntimes = linkedMapOf<String, ChatSessionRuntime>()
-    private var sessionLoadJob: Job? = null
-    private var activeSessionLoadToken: Any? = null
-    private var loadingSessionId: String? = null
-    private var pendingContentRefreshSessionId: String? = null
     private fun runtimeFor(sessionId: String): ChatSessionRuntime =
         sessionRuntimes.getOrPut(sessionId) { ChatSessionRuntime(sessionId) }
 
@@ -437,6 +407,8 @@ class ChatViewModel @Inject constructor(
         scheduleMarkerExpansion()
     }
 
+    private var navigationVersion = 0L
+
     private fun showRuntime(sessionId: String, isInitializing: Boolean = false) {
         val runtime = runtimeFor(sessionId)
         _uiState.update { state ->
@@ -461,23 +433,36 @@ class ChatViewModel @Inject constructor(
         publishRuntime(runtime)
     }
 
-    private fun cancelRun(runtime: ChatSessionRuntime, releaseLease: Boolean = true) {
-        runtime.runToken = null
-        runtime.job?.cancel()
+    private fun cancelRun(runtime: ChatSessionRuntime, releaseLease: Boolean = true): Job? {
+        runtime.runToken = Any()
+        val job = runtime.job
+        job?.cancel()
         runtime.job = null
         if (releaseLease) {
+            runtime.execution = null
             val lease = runtime.lease
             runtime.lease = null
-            lease?.release()
+            // 取消请求不等于执行已终止；旧 Job 真正结束前仍阻止同会话的新任务。
+            if (job == null) lease?.release() else job.invokeOnCompletion { lease?.release() }
         }
+        return job
     }
 
-    private suspend fun ensureRunLease(runtime: ChatSessionRuntime): AgentRunLease {
+    private suspend fun ensureRunLease(runtime: ChatSessionRuntime, token: Any): AgentRunLease {
         runtime.lease?.let { return it }
-        return agentRuntimeGate.acquire(
+        val lease = agentRuntimeGate.acquire(
             source = AgentTaskSource.CHAT,
             sessionId = runtime.sessionId,
-        ).also { runtime.lease = it }
+        )
+        try {
+            currentCoroutineContext().ensureActive()
+            if (runtime.runToken !== token) throw CancellationException("Superseded lease")
+            runtime.lease = lease
+            return lease
+        } catch (cancelled: CancellationException) {
+            lease.release()
+            throw cancelled
+        }
     }
 
     private fun releaseRunLease(runtime: ChatSessionRuntime) {
@@ -485,7 +470,52 @@ class ChatViewModel @Inject constructor(
         runtime.lease = null
     }
 
-    private suspend fun finishRunIfOwned(sessionId: String, runToken: Any) {
+    /** 三种执行入口共同持有一次协程所有权，准备失败、取消和恢复都从同一处收尾。 */
+    private fun launchRun(
+        runtime: ChatSessionRuntime,
+        onFailure: (Throwable) -> Unit = { failure ->
+            runtime.lastTurn?.let { saveFailedTurn(runtime.sessionId, it, failure) }
+        },
+        execute: suspend (Any) -> Unit,
+    ): Job {
+        val token = Any()
+        runtime.runToken = token
+        runtime.isAgentRunning = true
+        runtime.phase = AgentTaskPhase.GENERATING
+        publishRuntime(runtime)
+        // 先登记 job 再执行，避免 Main.immediate 同步结束后把已完成 job 写回 runtime。
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            var completedNormally = false
+            try {
+                ensureRunLease(runtime, token).updatePhase(AgentTaskPhase.GENERATING)
+                execute(token)
+                completedNormally = true
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: AgentSessionBusyException) {
+                if (runtime.runToken === token) emitNotice(ChatNotice.CurrentConversationBusy)
+            } catch (failure: Exception) {
+                if (runtime.runToken === token) {
+                    eventReducer.applyError(
+                        runtime.sessionId,
+                        failure.message ?: failure::class.simpleName ?: "Unknown error",
+                    )
+                    if (_uiState.value.sessionId.isBlank()) {
+                        emitNotice(ChatNotice.Message(failure.message ?: "Unknown error"))
+                    }
+                    onFailure(failure)
+                }
+            } finally {
+                finishRunIfOwned(runtime.sessionId, token, completedNormally)
+                repository.refreshConversation(runtime.sessionId)
+            }
+        }
+        runtime.job = job
+        job.start()
+        return job
+    }
+
+    private suspend fun finishRunIfOwned(sessionId: String, runToken: Any, completedNormally: Boolean) {
         val runtime = runtimeFor(sessionId)
         if (runtime.runToken !== runToken) return
         runtime.job = null
@@ -520,21 +550,28 @@ class ChatViewModel @Inject constructor(
                 publishRuntime(runtime)
             }
             else -> {
+                runtime.execution = null
+                if (runtime.failed) {
+                    runtime.lastTurn?.takeIf { it.status != ChatTurnStatus.FAILED }
+                        ?.let { saveFailedTurn(sessionId, it) }
+                } else {
+                    runtime.lastTurn = null
+                }
                 runtime.approvedToolsThisTurn.clear()
                 releaseRunLease(runtime)
                 if (_uiState.value.sessionId != sessionId) {
-                    runtime.attention = if (runtime.failed) {
-                        SessionResultAttention.FAILED
-                    } else {
-                        SessionResultAttention.COMPLETED
+                    runtime.attention = when {
+                        runtime.failed -> SessionResultAttention.FAILED
+                        completedNormally -> SessionResultAttention.COMPLETED
+                        else -> SessionResultAttention.NONE
                     }
-                } else {
+                } else if (completedNormally) {
                     autoSpeakCompletedReply(sessionId, runtime)
                 }
                 publishRuntime(runtime)
             }
         }
-        viewModelScope.launch { flushPendingConversationContentUpdate() }
+        viewModelScope.launch { refreshVisibleHistoryIfStale() }
     }
 
     /**
@@ -566,8 +603,7 @@ class ChatViewModel @Inject constructor(
 
     override fun onCleared() {
         sessionRuntimes.values.forEach { runtime ->
-            runtime.job?.cancel()
-            runtime.lease?.release()
+            cancelRun(runtime)
             runtime.closePartChannels()
         }
         speechPlaybackController.clearSession()
@@ -598,100 +634,55 @@ class ChatViewModel @Inject constructor(
         sessionRuntimes[sessionId]?.closePartChannels()
     }
 
-    /**
-     * Reloads a session changed by the background voice runner when that session is visible.
-     *
-     * A foreground turn owns the in-memory partial reducer, while a session switch owns the
-     * initial history snapshot. In either case replacing [ChatUiState.messages] immediately would
-     * lose newer UI state, so the invalidation is retained and flushed by the owner on completion.
-     */
-    private suspend fun handleConversationContentUpdate(sessionId: String) {
-        val loadingId = loadingSessionId
-        if (loadingId != null) {
-            if (loadingId == sessionId) pendingContentRefreshSessionId = sessionId
-            return
-        }
+    private fun contentRevision(sessionId: String): Long =
+        repository.conversationContentRevisions.value[sessionId] ?: 0L
 
-        val state = _uiState.value
-        if (state.sessionId != sessionId) return
-        if (state.isAgentRunning || state.isInitializing) {
-            pendingContentRefreshSessionId = sessionId
-            return
-        }
-        reloadConversationMessages(sessionId)
-    }
+    /** 历史只在该会话无执行者时更新；版本留在仓库中，后台会话不依赖瞬时通知。 */
+    private suspend fun refreshVisibleHistoryIfStale() {
+        val sessionId = _uiState.value.sessionId
+        val runtime = sessionRuntimes[sessionId] ?: return
+        fun canReload(): Boolean = _uiState.value.sessionId == sessionId &&
+            !_uiState.value.isInitializing && loadingSessionId == null && !runtime.isActive
 
-    private suspend fun reloadConversationMessages(sessionId: String) {
-        val beforeLoad = _uiState.value
-        if (beforeLoad.sessionId != sessionId || beforeLoad.isAgentRunning ||
-            beforeLoad.isInitializing || loadingSessionId != null
-        ) {
-            if (beforeLoad.sessionId == sessionId || loadingSessionId == sessionId) {
-                pendingContentRefreshSessionId = sessionId
-            }
-            return
-        }
-
-        val messages = repository.loadMessages(sessionId) ?: return
-        val afterLoad = _uiState.value
-        if (afterLoad.sessionId != sessionId || afterLoad.isAgentRunning ||
-            afterLoad.isInitializing || loadingSessionId != null
-        ) {
-            if (afterLoad.sessionId == sessionId || loadingSessionId == sessionId) {
-                pendingContentRefreshSessionId = sessionId
-            }
-            return
-        }
-
-        val runtime = runtimeFor(sessionId)
-        runtime.closePartChannels()
-        val current = _uiState.value
-        if (current.sessionId == sessionId && !current.isAgentRunning &&
-            !current.isInitializing && loadingSessionId == null
-        ) {
+        while (canReload()) {
+            val revision = contentRevision(sessionId)
+            if (!runtime.isLoaded || runtime.loadedContentRevision >= revision) return
+            val runToken = runtime.runToken
+            val messages = repository.loadMessages(sessionId) ?: return
+            // 加载期间即使一次新任务已经完成，也不能用旧读取覆盖它的内存结果。
+            if (!canReload() || runtime.runToken !== runToken) return
+            if (runtime.loadedContentRevision > revision) return
+            runtime.closePartChannels()
             runtime.messages = messages
-            runtime.isLoaded = true
+            runtime.loadedContentRevision = revision
             publishRuntime(runtime)
         }
     }
 
-    private suspend fun flushPendingConversationContentUpdate(expectedSessionId: String? = null) {
-        val pendingId = pendingContentRefreshSessionId ?: return
-        if (expectedSessionId != null && pendingId != expectedSessionId) return
+    private var resolvingSubmission = false
 
+    /** 发送只回报真实接管结果；准备过程属于 ViewModel，不依赖输入框协程的生命周期。 */
+    fun send(
+        text: String,
+        draftAttachments: List<DraftAttachment> = emptyList(),
+        onResult: (ChatSubmissionResult) -> Unit = {},
+    ) {
+        var ownsResolution = false
+        val submission = ChatSubmission { result ->
+            if (ownsResolution) resolvingSubmission = false
+            onResult(result)
+        }
         val state = _uiState.value
-        if (loadingSessionId != null || state.isAgentRunning || state.isInitializing) return
-        if (state.sessionId != pendingId) {
-            pendingContentRefreshSessionId = null
+        if (text.isBlank() && draftAttachments.isEmpty() ||
+            state.pendingToolConfirmation != null || state.pendingInputRequest != null ||
+            state.isInitializing || loadingSessionId != null ||
+            state.failedTurnRecovery is FailedTurnRecoveryState.AwaitingRepeatConfirmation
+        ) {
+            submission.complete(ChatSubmissionResult.REJECTED)
             return
         }
-
-        pendingContentRefreshSessionId = null
-        reloadConversationMessages(pendingId)
-    }
-
-    /**
-     * 发送用户消息。
-     *
-     * 行为：
-     * - 取消当前进行中的 send。
-     * - 立刻在消息列表尾部追加一条 `User` 消息（乐观 UI）。
-     * - 兜底确保 [sessionId] 有值 — 若为空（首次安装还没建过会话），先调
-     *   [ConversationRepository.createConversation] 建一个再走 [ChatAgentRepository.send]，
-     *   避免 ADK `createSession(SessionKey(id = ""))` 抛 "SessionKey.id must not be blank"。
-     * - 启动协程调用 [ChatAgentRepository.send]，把每个 `Event` 送入 [applyEvent]。
-     */
-    fun send(text: String, draftAttachments: List<DraftAttachment> = emptyList()): Boolean {
-        if (text.isBlank() && draftAttachments.isEmpty()) return false
-        if (_uiState.value.pendingToolConfirmation != null) return false
-        if (_uiState.value.pendingInputRequest != null) return false
-        val stateAtSend = _uiState.value
-        if (stateAtSend.failedTurnRecovery is FailedTurnRecoveryState.AwaitingRepeatConfirmation) {
-            return false
-        }
-        val editing = stateAtSend.failedTurnRecovery as? FailedTurnRecoveryState.Editing
-        val failedTurn = stateAtSend.failedTurn
-        // 编辑失败消息且工具已执行时，先弹出重复执行确认，不直接发送。
+        val editing = state.failedTurnRecovery as? FailedTurnRecoveryState.Editing
+        val failedTurn = state.failedTurn
         if (editing != null && failedTurn?.hasToolCalls == true) {
             _uiState.update {
                 it.copy(
@@ -703,55 +694,50 @@ class ChatViewModel @Inject constructor(
                     ),
                 )
             }
-            return false
+            submission.complete(ChatSubmissionResult.REJECTED)
+            return
         }
-        val retry = if (editing != null) failedTurn else null
-        val sessionId = _uiState.value.sessionId
-        val usableSelection = _uiState.value.currentModelSelection
-            ?.takeIf(::isUsableChatSelection)
-        if (sessionId.isBlank() || usableSelection == null) {
-            viewModelScope.launch {
-                val snapshot = runCatching {
-                    if (sessionId.isBlank()) {
-                        sessionResolver.resolveCurrentOrCreate()
-                    } else {
-                        sessionResolver.activate(sessionId)
-                            ?: sessionResolver.resolveCurrentOrCreate()
-                    }
-                }.getOrElse {
-                    emitNotice(ChatNotice.ConfigureChatModel)
-                    return@launch
+        val retry = failedTurn.takeIf { editing != null }
+        val selection = state.currentModelSelection?.takeIf(::isUsableChatSelection)
+        if (state.sessionId.isNotBlank() && selection != null) {
+            startSend(state.sessionId, selection, text, draftAttachments, retry, submission = submission)
+            return
+        }
+        if (resolvingSubmission) {
+            submission.complete(ChatSubmissionResult.REJECTED)
+            return
+        }
+        resolvingSubmission = true
+        ownsResolution = true
+        val navigationAtSend = navigationVersion
+        var handedOff = false
+        val job = viewModelScope.launch {
+            try {
+                val snapshot = if (state.sessionId.isBlank()) {
+                    sessionResolver.resolveCurrentOrCreate()
+                } else {
+                    sessionResolver.activate(state.sessionId) ?: sessionResolver.resolveCurrentOrCreate()
                 }
-                validateAttachments(snapshot.modelSelection, draftAttachments)?.let { notice ->
-                    emitNotice(notice)
-                    return@launch
-                }
-                val runtime = runtimeFor(snapshot.sessionId)
-                runtime.modelSelection = snapshot.modelSelection
-                runtime.toolConfiguration = snapshot.toolConfiguration
-                if (!runtime.isLoaded) {
-                    runtime.messages = repository.loadMessages(snapshot.sessionId).orEmpty()
-                    runtime.isLoaded = true
-                }
-                showRuntime(snapshot.sessionId)
-                val accepted = startSend(
-                    snapshot.sessionId,
-                    snapshot.modelSelection,
-                    text,
-                    draftAttachments,
-                    retry = retry,
+                currentCoroutineContext().ensureActive()
+                // 会话解析期间用户已导航，不把旧发送强行切回当前页面。
+                if (navigationVersion != navigationAtSend || loadingSessionId != null) return@launch
+                handedOff = true
+                startSend(
+                    snapshot.sessionId, snapshot.modelSelection, text, draftAttachments, retry,
+                    submission = submission,
+                    showAfterAcceptance = true,
                 )
-                if (accepted && editing != null) finishFailedTurnEdit()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                emitNotice(ChatNotice.ConfigureChatModel)
+            } finally {
+                if (!handedOff) submission.complete(ChatSubmissionResult.REJECTED)
             }
-            return true
         }
-        validateAttachments(usableSelection, draftAttachments)?.let { notice ->
-            emitNotice(notice)
-            return false
+        job.invokeOnCompletion {
+            if (!handedOff) submission.complete(ChatSubmissionResult.REJECTED)
         }
-        val accepted = startSend(sessionId, usableSelection, text, draftAttachments, retry = retry)
-        if (accepted && editing != null) finishFailedTurnEdit()
-        return accepted
     }
 
     private fun startSend(
@@ -761,87 +747,81 @@ class ChatViewModel @Inject constructor(
         draftAttachments: List<DraftAttachment>,
         retry: ChatTurn? = null,
         reuseOriginal: Boolean = false,
-    ): Boolean {
+        submission: ChatSubmission = ChatSubmission {},
+        showAfterAcceptance: Boolean = false,
+    ) {
         val runtime = runtimeFor(sessionId)
-        if (runtime.isActive) return false
-        if (sessionRuntimes.values.count { it.isActive } >= MAX_PARALLEL_TASKS) {
-            emitNotice(ChatNotice.ParallelTaskLimitReached)
-            return false
+        if (runtime.isActive || loadingSessionId != null ||
+            sessionRuntimes.values.count { it.isActive } >= MAX_PARALLEL_TASKS
+        ) {
+            if (!runtime.isActive && loadingSessionId == null) {
+                emitNotice(ChatNotice.ParallelTaskLimitReached)
+            }
+            submission.complete(ChatSubmissionResult.REJECTED)
+            return
+        }
+        validateAttachments(selection, draftAttachments)?.let {
+            emitNotice(it)
+            submission.complete(ChatSubmissionResult.REJECTED)
+            return
         }
         clearToolConfirmationState(runtime)
-        val runToken = Any()
-        runtime.runToken = runToken
         runtime.modelSelection = selection
-        runtime.isAgentRunning = true
-        runtime.phase = AgentTaskPhase.GENERATING
         runtime.failed = false
         runtime.attention = SessionResultAttention.NONE
-        publishRuntime(runtime)
-
-        runtime.job = viewModelScope.launch {
+        val navigationAtSend = navigationVersion
+        var preparedTurn: ChatTurn? = null
+        val job = launchRun(runtime, onFailure = { failure ->
+            preparedTurn?.let { saveFailedTurn(sessionId, it, failure) }
+        }) { runToken ->
             try {
-                ensureRunLease(runtime).updatePhase(AgentTaskPhase.GENERATING)
-            } catch (_: AgentSessionBusyException) {
-                emitNotice(ChatNotice.CurrentConversationBusy)
-                finishRunIfOwned(sessionId, runToken)
-                return@launch
-            }
-            // Agent 工具可能在上一轮直接更新了当前会话的 MCP 选择；发送前以持久化配置
-            // 为准，避免把旧的内存快照继续传给下一轮 Runner。
-            loadOrInitializeToolConfiguration(sessionId, selection)
-            publishRuntime(runtime)
-            val turn = try {
-                prepareChatTurn(
+                // 准备必须在 lease 内完成；配置读取失败不能悄悄沿用旧配置启动。
+                val configuration = sessionResolver.resolveToolConfiguration(sessionId, selection)
+                val revision = contentRevision(sessionId)
+                val history = if (runtime.isLoaded &&
+                    runtime.loadedContentRevision >= revision
+                ) runtime.messages else repository.loadMessages(sessionId).orEmpty()
+                val turn = prepareChatTurn(
                     sessionId = sessionId,
                     text = text,
                     drafts = draftAttachments,
-                    history = runtime.messages,
+                    history = history,
                     retry = retry,
                     reuseOriginal = reuseOriginal,
                 )
-            } catch (failure: Throwable) {
-                if (failure is CancellationException) throw failure
-                eventReducer.applyError(
-                    sessionId,
-                    failure.message ?: failure::class.simpleName ?: "Cannot prepare message",
-                )
-                finishRunIfOwned(sessionId, runToken)
-                return@launch
-            }
-            runtime.lastTurn = turn
-            runtime.messages = turn.messages
-            runtime.isLoaded = true
-            runtime.failed = false
-            publishRuntime(runtime)
-
-            val sendText = turn.userMessage.textParts.joinToString("") { it.text }
-            try {
-                cancellationAwareRunCatching {
-                    runner.send(
-                        sessionId = sessionId,
-                        selection = selection,
-                        text = sendText,
-                        fileAttachments = turn.userMessage.fileAttachments,
-                        toolConfiguration = runtime.toolConfiguration,
-                        rewindBeforeInvocationId = turn.rewindBeforeInvocationId,
-                    ).collect { event ->
-                        eventReducer.applyEvent(sessionId, event, runToken)
-                    }
-                }.onSuccess {
-                    if (!runtime.failed) {
-                        attachments.deleteDrafts(draftAttachments)
-                        runtime.lastTurn = null
-                    }
-                }.onFailure { failure ->
-                    eventReducer.applyError(sessionId, failure.message ?: failure::class.simpleName ?: "Unknown error")
-                    saveFailedTurn(sessionId, turn, failure)
+                val execution = runner.createExecution(sessionId, selection, configuration)
+                currentCoroutineContext().ensureActive()
+                if (runtime.runToken !== runToken) throw CancellationException("Superseded preparation")
+                // 未接管前的导航取消发送；已接管的后台任务则继续执行。
+                if (navigationVersion != navigationAtSend) throw CancellationException("Navigation changed")
+                runtime.execution = execution
+                runtime.toolConfiguration = configuration
+                preparedTurn = turn
+                runtime.lastTurn = turn
+                runtime.messages = turn.messages
+                runtime.loadedContentRevision = revision
+                runtime.isLoaded = true
+                runtime.failed = false
+                submission.complete(ChatSubmissionResult.ACCEPTED)
+                if (showAfterAcceptance) showRuntime(sessionId) else publishRuntime(runtime)
+                if (retry != null && !reuseOriginal && _uiState.value.sessionId == sessionId) {
+                    finishFailedTurnEdit()
                 }
+                execution.send(
+                    text = turn.userMessage.textParts.joinToString("") { it.text },
+                    fileAttachments = turn.userMessage.fileAttachments,
+                    rewindBeforeInvocationId = turn.rewindBeforeInvocationId,
+                ).collect { event -> eventReducer.applyEvent(sessionId, event, runToken) }
             } finally {
-                finishRunIfOwned(sessionId, runToken)
-                repository.refreshConversation(sessionId)
+                submission.complete(ChatSubmissionResult.REJECTED)
+                if (submission.result == ChatSubmissionResult.ACCEPTED) {
+                    // 输入已归档，网络失败和取消也可清理原草稿；重试使用归档副本。
+                    withContext(NonCancellable) { attachments.deleteDrafts(draftAttachments) }
+                }
             }
         }
-        return true
+        // 覆盖协程尚未开始就被取消的情况。
+        job.invokeOnCompletion { submission.complete(ChatSubmissionResult.REJECTED) }
     }
 
     /**
@@ -990,14 +970,14 @@ class ChatViewModel @Inject constructor(
     private fun executeFailedTurnResend(
         failedTurn: ChatTurn,
         request: FailedTurnResendRequest,
-    ): Boolean {
+    ) {
         val state = _uiState.value
         val selection = state.currentModelSelection?.takeIf(::isUsableChatSelection) ?: run {
             emitNotice(ChatNotice.ConfigureChatModel)
-            return false
+            return
         }
-        if (state.sessionId.isBlank()) return false
-        val accepted = when (request) {
+        if (state.sessionId.isBlank()) return
+        when (request) {
             FailedTurnResendRequest.RetryOriginal -> startSend(
                 sessionId = state.sessionId,
                 selection = selection,
@@ -1015,8 +995,6 @@ class ChatViewModel @Inject constructor(
                 reuseOriginal = false,
             )
         }
-        if (accepted && request is FailedTurnResendRequest.SubmitEdit) finishFailedTurnEdit()
-        return accepted
     }
 
     private fun finishFailedTurnEdit() {
@@ -1076,33 +1054,39 @@ class ChatViewModel @Inject constructor(
      * 避免依赖 `send()` 的兜底分支。仅在进程级（`_uiState.value.sessionId` 为空）执行一次；同一 ViewModel 实例内多次调用安全。
      */
     private fun restoreOrCreateSession() {
-        if (_uiState.value.sessionId.isNotBlank()) return
-        // 同步先把 isInitializing 置 true：让 MainScreen 在第一次 collect 时就拿到
-        // 加载态，避免 history commit 之前出现"旧 messages 残留 → 新 history"的
-        // 单帧闪烁。三个分支都在 commit / 兜底结束时各自把它置回 false。
+        if (_uiState.value.sessionId.isNotBlank() || _uiState.value.isInitializing) return
+        val loadToken = Any()
+        activeSessionLoadToken = loadToken
         _uiState.update { it.copy(isInitializing = true) }
-        viewModelScope.launch {
-            modelServices.awaitReady()
-            runCatching { sessionResolver.resolveCurrentOrCreate() }
-                .onSuccess { snapshot ->
-                    val history = repository.loadMessages(snapshot.sessionId).orEmpty()
-                    val runtime = runtimeFor(snapshot.sessionId)
-                    runtime.messages = history
-                    runtime.modelSelection = snapshot.modelSelection
-                    runtime.toolConfiguration = snapshot.toolConfiguration
-                    runtime.isLoaded = true
-                    showRuntime(snapshot.sessionId)
-                    Log.i(
-                        TAG,
-                        "restoreOrCreateSession: resolved current id=${snapshot.sessionId} " +
-                            "(events=${history.size}).",
-                    )
-                }
-                .onFailure { error ->
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            try {
+                val snapshot = sessionResolver.resolveCurrentOrCreate()
+                val revision = contentRevision(snapshot.sessionId)
+                val history = repository.loadMessages(snapshot.sessionId).orEmpty()
+                currentCoroutineContext().ensureActive()
+                if (activeSessionLoadToken !== loadToken) return@launch
+                val runtime = runtimeFor(snapshot.sessionId)
+                runtime.messages = history
+                runtime.modelSelection = snapshot.modelSelection
+                runtime.toolConfiguration = snapshot.toolConfiguration
+                runtime.isLoaded = true
+                runtime.loadedContentRevision = revision
+                showRuntime(snapshot.sessionId)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: Exception) {
+                Log.w(TAG, "Unable to restore current conversation", failure)
+            } finally {
+                if (activeSessionLoadToken === loadToken) {
+                    activeSessionLoadToken = null
+                    sessionLoadJob = null
                     _uiState.update { it.copy(isInitializing = false) }
-                    Log.w(TAG, "restoreOrCreateSession: unable to resolve current conversation.", error)
+                    refreshVisibleHistoryIfStale()
                 }
+            }
         }
+        sessionLoadJob = job
+        job.start()
     }
 
     /**
@@ -1112,10 +1096,12 @@ class ChatViewModel @Inject constructor(
      * 上一会话遗留的 [partChannels]，避免 channel 跨"空 session"残留。
      */
     private fun reset() {
+        navigationVersion++
+        val navigationAtReset = navigationVersion
         cancelFailedTurnEdit(restorePreviousDraft = false)
         viewModelScope.launch {
-            modelServices.awaitReady()
             val newId = createConversationWithDefaults()
+            if (navigationAtReset != navigationVersion) return@launch
             if (newId.isNotBlank()) {
                 switchSessionUnchecked(newId)
             } else {
@@ -1135,6 +1121,7 @@ class ChatViewModel @Inject constructor(
     private fun switchSessionUnchecked(sessionId: String) {
         if (sessionId.isBlank()) return
         if (sessionId == _uiState.value.sessionId && !_uiState.value.isInitializing) return
+        navigationVersion++
         cancelFailedTurnEdit(restorePreviousDraft = false)
         sessionRuntimes[_uiState.value.sessionId]?.closePartChannels()
         sessionLoadJob?.cancel()
@@ -1142,20 +1129,25 @@ class ChatViewModel @Inject constructor(
         val loadToken = Any()
         activeSessionLoadToken = loadToken
         loadingSessionId = sessionId
-        if (pendingContentRefreshSessionId != sessionId) pendingContentRefreshSessionId = null
         // 让 MainScreen 中央 spinner 立刻接管，避免 history commit 之前旧 messages 残留闪烁。
         val targetRuntime = runtimeFor(sessionId)
         showRuntime(sessionId, isInitializing = !targetRuntime.isLoaded)
-        sessionLoadJob = viewModelScope.launch {
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
-                modelServices.awaitReady()
-                targetRuntime.modelSelection = activateConversationSettings(sessionId)
-                if (targetRuntime.isLoaded) {
+                val snapshot = sessionResolver.activate(sessionId)
+                currentCoroutineContext().ensureActive()
+                if (activeSessionLoadToken !== loadToken) return@launch
+                targetRuntime.modelSelection = snapshot?.modelSelection
+                targetRuntime.toolConfiguration = snapshot?.toolConfiguration
+                if (targetRuntime.isLoaded && (targetRuntime.isActive ||
+                    targetRuntime.loadedContentRevision >= contentRevision(sessionId))
+                ) {
                     targetRuntime.attention = SessionResultAttention.NONE
                     targetRuntime.reseedPartialChannels()
                     showRuntime(sessionId)
                     return@launch
                 }
+                val revision = contentRevision(sessionId)
                 val messages = repository.loadMessages(sessionId)
                 if (activeSessionLoadToken !== loadToken) return@launch
                 when {
@@ -1166,7 +1158,6 @@ class ChatViewModel @Inject constructor(
                         if (activeSessionLoadToken !== loadToken) return@launch
                         if (newId.isNotBlank()) {
                             val newRuntime = runtimeFor(newId)
-                            newRuntime.modelSelection = activateConversationSettings(newId)
                             newRuntime.isLoaded = true
                             if (activeSessionLoadToken !== loadToken) return@launch
                             showRuntime(newId)
@@ -1183,6 +1174,7 @@ class ChatViewModel @Inject constructor(
                         // 避免两次 messages 写导致两帧渲染。
                         targetRuntime.messages = messages
                         targetRuntime.isLoaded = true
+                        targetRuntime.loadedContentRevision = revision
                         targetRuntime.attention = SessionResultAttention.NONE
                         targetRuntime.reseedPartialChannels()
                         showRuntime(sessionId)
@@ -1193,10 +1185,12 @@ class ChatViewModel @Inject constructor(
                     activeSessionLoadToken = null
                     loadingSessionId = null
                     sessionLoadJob = null
-                    flushPendingConversationContentUpdate(expectedSessionId = sessionId)
+                    refreshVisibleHistoryIfStale()
                 }
             }
         }
+        sessionLoadJob = job
+        job.start()
     }
 
     /**
@@ -1225,7 +1219,6 @@ class ChatViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            runner.releaseSession(sessionId)
             repository.deleteConversation(sessionId)
             attachments.deleteSession(sessionId)
             sessionRuntimes.remove(sessionId)?.closePartChannels()
@@ -1244,7 +1237,6 @@ class ChatViewModel @Inject constructor(
             repository.setConversationModel(sessionId, ModelSelectionCodec.encode(selection))
             runtime.modelSelection = selection
             initializeOfficialFunctionsForSelection(sessionId, runtime, selection)
-            runner.releaseSession(sessionId)
             publishRuntime(runtime)
         }
     }
@@ -1255,17 +1247,6 @@ class ChatViewModel @Inject constructor(
      * 已保存且仍可用的模型优先；新会话或模型已失效时使用当前默认模型。若没有任何
      * 可用模型，则清空运行时选择和旧 runner，保留空会话等待用户完成模型配置。
      */
-    private suspend fun activateConversationSettings(sessionId: String): ModelSelection? {
-        val snapshot = sessionResolver.activate(sessionId)
-        if (snapshot == null) {
-            runner.releaseSession(sessionId)
-            Log.w(TAG, "activateConversationSettings($sessionId): conversation is unavailable.")
-            return null
-        }
-        runtimeFor(sessionId).toolConfiguration = snapshot.toolConfiguration
-        return snapshot.modelSelection
-    }
-
     private suspend fun createConversationWithDefaults(): String {
         val snapshot = sessionResolver.createAndActivate()
         runtimeFor(snapshot.sessionId).apply {
@@ -1273,25 +1254,6 @@ class ChatViewModel @Inject constructor(
             toolConfiguration = snapshot.toolConfiguration
         }
         return snapshot.sessionId
-    }
-
-    private suspend fun loadOrInitializeToolConfiguration(
-        sessionId: String,
-        selection: ModelSelection?,
-    ) {
-        val runtime = runtimeFor(sessionId)
-        if (selection == null) {
-            runtime.toolConfiguration = ConversationToolConfiguration()
-            return
-        }
-        runCatching {
-            sessionResolver.resolveToolConfiguration(sessionId, selection)
-        }.onSuccess { configuration ->
-            runtime.toolConfiguration = configuration
-            _uiState.update { it.copy(hasToolConfigurationError = false) }
-        }.onFailure {
-            _uiState.update { it.copy(hasToolConfigurationError = true) }
-        }
     }
 
     private suspend fun initializeOfficialFunctionsForSelection(
@@ -1479,7 +1441,6 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             if (repository.setConversationToolConfiguration(sessionId, updated)) {
                 runtime.toolConfiguration = updated
-                runner.releaseSession(sessionId)
                 _uiState.update { it.copy(hasToolConfigurationError = false) }
                 publishRuntime(runtime)
             } else {

@@ -15,6 +15,7 @@ import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.ToolConfirmationRequest
 import github.ponyhuang.gimi.domain.conversation.model.UserInputKind
 import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
+import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentExecution
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatSessionRewindException
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
@@ -61,6 +62,9 @@ import io.mockk.unmockkStatic
 import io.mockk.verify
 import io.mockk.verifyOrder
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -103,9 +107,42 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun cancellationWhilePreparingAttachmentsReleasesLeaseAndRunningState() = runTest {
+        val gate = FakeAgentRuntimeGate()
+        val fixture = fixture(
+            configured = true,
+            agentRuntimeGate = gate,
+            attachmentReadFailure = CancellationException("preparation cancelled"),
+        )
+        fixture.viewModel.send("带附件的请求")
+        advanceUntilIdle()
+        assertEquals(1, gate.acquisitions.size)
+        assertEquals(1, gate.releaseCount)
+        assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
+    }
+
+    @Test
+    fun failureWhilePreparingAttachmentsReleasesLeaseAndReportsError() = runTest {
+        val gate = FakeAgentRuntimeGate()
+        val fixture = fixture(
+            configured = true,
+            agentRuntimeGate = gate,
+            attachmentReadFailure = java.io.IOException("attachment missing"),
+        )
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        fixture.viewModel.send("请求")
+        advanceUntilIdle()
+        assertEquals(1, gate.releaseCount)
+        assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
+        assertEquals("attachment missing", fixture.viewModel.uiState.value.messages.last().error)
+    }
+
+    @Test
     fun send_preservesOptimisticUserMessage_andCompletesAssistantPartial() = runTest {
         val fixture = fixture(configured = true)
-        fixture.viewModel.onAction(ChatAction.Send("你好"))
+        fixture.viewModel.send("你好")
 
         advanceUntilIdle()
 
@@ -123,32 +160,32 @@ class ChatViewModelCharacterizationTest {
     @Test
     fun failedTurn_retry_reusesOriginalUserMessageWithoutDuplication() = runTest {
         val failingAgent = object : ChatAgentRepository {
-            override suspend fun send(
+            override suspend fun createExecution(
                 sessionId: String,
                 selection: ModelSelection,
-                text: String,
-                fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
                 toolConfiguration: ConversationToolConfiguration?,
-                rewindBeforeInvocationId: String?,
-            ): Flow<ChatRunEvent> = flow { throw java.io.IOException("offline") }
+            ): ChatAgentExecution = object : ChatAgentExecution {
+                override suspend fun send(
+                    text: String,
+                    fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
+                    rewindBeforeInvocationId: String?,
+                ): Flow<ChatRunEvent> = flow { throw java.io.IOException("offline") }
 
-            override suspend fun respondToToolConfirmation(
-                sessionId: String,
-                confirmationCallId: String,
-                confirmed: Boolean,
-            ): Flow<ChatRunEvent> = flowOf(event())
+                override suspend fun respondToToolConfirmation(
+                    confirmationCallId: String,
+                    confirmed: Boolean,
+                ): Flow<ChatRunEvent> = flowOf(event())
 
-            override suspend fun respondToInputRequest(
-                sessionId: String,
-                callId: String,
-                toolName: String,
-                value: String,
-            ): Flow<ChatRunEvent> = flowOf(event())
+                override suspend fun respondToInputRequest(
+                    callId: String,
+                    toolName: String,
+                    value: String,
+                ): Flow<ChatRunEvent> = flowOf(event())
 
-            override suspend fun releaseSession(sessionId: String) = Unit
+            }
         }
         val fixture = fixture(configured = true, agentOverride = failingAgent)
-        fixture.viewModel.onAction(ChatAction.Send("你好"))
+        fixture.viewModel.send("你好")
         advanceUntilIdle()
 
         val failed = fixture.viewModel.uiState.value.failedTurn
@@ -171,40 +208,40 @@ class ChatViewModelCharacterizationTest {
     fun failedOfficialRewind_keepsThePreviousInvocationBoundary() = runTest {
         var callCount = 0
         val failingAgent = object : ChatAgentRepository {
-            override suspend fun send(
+            override suspend fun createExecution(
                 sessionId: String,
                 selection: ModelSelection,
-                text: String,
-                fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
                 toolConfiguration: ConversationToolConfiguration?,
-                rewindBeforeInvocationId: String?,
-            ): Flow<ChatRunEvent> = flow {
-                callCount++
-                if (callCount == 1) {
-                    // 先流出带真实 ADK invocationId 的部分回答，再失败，从而建立待回退边界。
-                    emit(event(partial = true, turnComplete = false))
-                    throw java.io.IOException("offline")
+            ): ChatAgentExecution = object : ChatAgentExecution {
+                override suspend fun send(
+                    text: String,
+                    fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
+                    rewindBeforeInvocationId: String?,
+                ): Flow<ChatRunEvent> = flow {
+                    callCount++
+                    if (callCount == 1) {
+                        // 先流出带真实 ADK invocationId 的部分回答，再失败，从而建立待回退边界。
+                        emit(event(partial = true, turnComplete = false))
+                        throw java.io.IOException("offline")
+                    }
+                    throw ChatSessionRewindException(IllegalStateException("missing invocation"))
                 }
-                throw ChatSessionRewindException(IllegalStateException("missing invocation"))
+
+                override suspend fun respondToToolConfirmation(
+                    confirmationCallId: String,
+                    confirmed: Boolean,
+                ): Flow<ChatRunEvent> = flowOf(event())
+
+                override suspend fun respondToInputRequest(
+                    callId: String,
+                    toolName: String,
+                    value: String,
+                ): Flow<ChatRunEvent> = flowOf(event())
+
             }
-
-            override suspend fun respondToToolConfirmation(
-                sessionId: String,
-                confirmationCallId: String,
-                confirmed: Boolean,
-            ): Flow<ChatRunEvent> = flowOf(event())
-
-            override suspend fun respondToInputRequest(
-                sessionId: String,
-                callId: String,
-                toolName: String,
-                value: String,
-            ): Flow<ChatRunEvent> = flowOf(event())
-
-            override suspend fun releaseSession(sessionId: String) = Unit
         }
         val fixture = fixture(configured = true, agentOverride = failingAgent)
-        fixture.viewModel.onAction(ChatAction.Send("你好"))
+        fixture.viewModel.send("你好")
         advanceUntilIdle()
         fixture.viewModel.onAction(ChatAction.RetryFailedTurn)
         advanceUntilIdle()
@@ -217,35 +254,35 @@ class ChatViewModelCharacterizationTest {
     @Test
     fun manualStop_keepsTurnRetryableWithPartialOutput() = runTest {
         val hangingAgent = object : ChatAgentRepository {
-            override suspend fun send(
+            override suspend fun createExecution(
                 sessionId: String,
                 selection: ModelSelection,
-                text: String,
-                fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
                 toolConfiguration: ConversationToolConfiguration?,
-                rewindBeforeInvocationId: String?,
-            ): Flow<ChatRunEvent> = flow {
-                emit(event(partial = true, turnComplete = false))
-                awaitCancellation()
+            ): ChatAgentExecution = object : ChatAgentExecution {
+                override suspend fun send(
+                    text: String,
+                    fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
+                    rewindBeforeInvocationId: String?,
+                ): Flow<ChatRunEvent> = flow {
+                    emit(event(partial = true, turnComplete = false))
+                    awaitCancellation()
+                }
+
+                override suspend fun respondToToolConfirmation(
+                    confirmationCallId: String,
+                    confirmed: Boolean,
+                ): Flow<ChatRunEvent> = flowOf(event())
+
+                override suspend fun respondToInputRequest(
+                    callId: String,
+                    toolName: String,
+                    value: String,
+                ): Flow<ChatRunEvent> = flowOf(event())
+
             }
-
-            override suspend fun respondToToolConfirmation(
-                sessionId: String,
-                confirmationCallId: String,
-                confirmed: Boolean,
-            ): Flow<ChatRunEvent> = flowOf(event())
-
-            override suspend fun respondToInputRequest(
-                sessionId: String,
-                callId: String,
-                toolName: String,
-                value: String,
-            ): Flow<ChatRunEvent> = flowOf(event())
-
-            override suspend fun releaseSession(sessionId: String) = Unit
         }
         val fixture = fixture(configured = true, agentOverride = hangingAgent)
-        fixture.viewModel.onAction(ChatAction.Send("你好"))
+        fixture.viewModel.send("你好")
         advanceUntilIdle()
         assertTrue(fixture.viewModel.uiState.value.isAgentRunning)
 
@@ -264,7 +301,7 @@ class ChatViewModelCharacterizationTest {
     @Test
     fun switchingSessionCancelsFailedTurnEditingImmediately() = runTest {
         val fixture = fixture(configured = true, agentOverride = alwaysFailingAgent())
-        fixture.viewModel.onAction(ChatAction.Send("待编辑"))
+        fixture.viewModel.send("待编辑")
         advanceUntilIdle()
         fixture.viewModel.onAction(ChatAction.EditFailedTurn)
         advanceUntilIdle()
@@ -279,7 +316,7 @@ class ChatViewModelCharacterizationTest {
     @Test
     fun startingNewConversationCancelsFailedTurnEditingImmediately() = runTest {
         val fixture = fixture(configured = true, agentOverride = alwaysFailingAgent())
-        fixture.viewModel.onAction(ChatAction.Send("待编辑"))
+        fixture.viewModel.send("待编辑")
         advanceUntilIdle()
         fixture.viewModel.onAction(ChatAction.EditFailedTurn)
         advanceUntilIdle()
@@ -293,7 +330,7 @@ class ChatViewModelCharacterizationTest {
     @Test
     fun leavingChatCancelsFailedTurnEditingImmediately() = runTest {
         val fixture = fixture(configured = true, agentOverride = alwaysFailingAgent())
-        fixture.viewModel.onAction(ChatAction.Send("待编辑"))
+        fixture.viewModel.send("待编辑")
         advanceUntilIdle()
         fixture.viewModel.onAction(ChatAction.EditFailedTurn)
         advanceUntilIdle()
@@ -325,7 +362,7 @@ class ChatViewModelCharacterizationTest {
         val fixture = fixture(configured = true)
         assertTrue(fixture.viewModel.uiState.value.autoSpeakEnabled)
 
-        fixture.viewModel.onAction(ChatAction.Send("你好"))
+        fixture.viewModel.send("你好")
         advanceUntilIdle()
 
         val assistant = fixture.viewModel.uiState.value.messages[1]
@@ -337,7 +374,7 @@ class ChatViewModelCharacterizationTest {
         val fixture = fixture(configured = true)
         fixture.speechSettings.setAutoSpeakEnabled(false)
 
-        fixture.viewModel.onAction(ChatAction.Send("你好"))
+        fixture.viewModel.send("你好")
         advanceUntilIdle()
 
         assertFalse(fixture.viewModel.uiState.value.autoSpeakEnabled)
@@ -366,11 +403,11 @@ class ChatViewModelCharacterizationTest {
         }
         val fixture = fixture(configured = true, agentRuntimeGate = gate)
 
-        fixture.viewModel.onAction(ChatAction.Send("你好"))
+        fixture.viewModel.send("你好")
         advanceUntilIdle()
 
         assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
-        coVerify(exactly = 0) { fixture.agent.send(any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
     }
 
     @Test
@@ -434,7 +471,7 @@ class ChatViewModelCharacterizationTest {
         )
         val fixture = fixture(configured = true, events = events)
 
-        fixture.viewModel.onAction(ChatAction.Send("你好"))
+        fixture.viewModel.send("你好")
         advanceUntilIdle()
 
         val assistant = fixture.viewModel.uiState.value.messages.last { it.role == MessageRole.Assistant }
@@ -456,7 +493,7 @@ class ChatViewModelCharacterizationTest {
         )
         val fixture = fixture(configured = true, events = events)
 
-        fixture.viewModel.onAction(ChatAction.Send("你好"))
+        fixture.viewModel.send("你好")
         advanceUntilIdle()
 
         val assistant = fixture.viewModel.uiState.value.messages.last { it.role == MessageRole.Assistant }
@@ -483,7 +520,7 @@ class ChatViewModelCharacterizationTest {
         val fixture = fixture(configured = false)
 
         fixture.viewModel.effects.test {
-            fixture.viewModel.onAction(ChatAction.Send("你好"))
+            fixture.viewModel.send("你好")
             advanceUntilIdle()
 
             assertEquals(
@@ -491,7 +528,7 @@ class ChatViewModelCharacterizationTest {
                 awaitItem(),
             )
             assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
-            coVerify(exactly = 0) { fixture.agent.send(any(), any(), any(), any(), any(), any()) }
+            coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -534,20 +571,18 @@ class ChatViewModelCharacterizationTest {
 
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
-        fixture.viewModel.onAction(ChatAction.Send("use the new tools"))
+        fixture.viewModel.send("use the new tools")
         advanceUntilIdle()
 
         coVerify {
-            fixture.agent.send(
+            fixture.agent.createExecution(
                 "session-1",
-                any(),
-                "use the new tools",
                 any(),
                 match {
                     it.enabledMcpServerIds == afterImport.enabledMcpServerIds
                 },
-                any(),
             )
+            fixture.execution.send("use the new tools", any(), any())
         }
         assertEquals(
             afterImport.enabledMcpServerIds,
@@ -577,7 +612,7 @@ class ChatViewModelCharacterizationTest {
             ),
         )
 
-        fixture.viewModel.onAction(ChatAction.Send("执行工具"))
+        fixture.viewModel.send("执行工具")
         advanceUntilIdle()
 
         val state = fixture.viewModel.uiState.value
@@ -585,6 +620,75 @@ class ChatViewModelCharacterizationTest {
         assertTrue(state.pendingToolConfirmations.first().arguments.contains("••••"))
         assertFalse(state.pendingToolConfirmations.first().arguments.contains("13800138000"))
         assertTrue(state.isAgentRunning)
+    }
+
+    @Test
+    fun externalWriteToCachedBackgroundConversationReloadsWhenOpened() = runTest {
+        val revisions = MutableStateFlow<Map<String, Long>>(emptyMap())
+        val fixture = fixture(configured = true, contentRevisions = revisions)
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
+        advanceUntilIdle()
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-b"))
+        advanceUntilIdle()
+
+        val external = Messages.fromAssistant().copy(textParts = listOf(
+            github.ponyhuang.gimi.domain.conversation.model.TextPart(text = "外部回答"),
+        ))
+        coEvery { fixture.conversations.loadMessages("session-a") } returns listOf(external)
+        revisions.value = mapOf("session-a" to 1L)
+        advanceUntilIdle()
+        assertTrue(fixture.viewModel.uiState.value.messages.isEmpty())
+
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
+        advanceUntilIdle()
+        assertEquals(listOf(external), fixture.viewModel.uiState.value.messages)
+    }
+
+    @Test
+    fun externalWriteDuringHistoryReloadIsNotAcknowledgedByOlderSnapshot() = runTest {
+        val revisions = MutableStateFlow<Map<String, Long>>(emptyMap())
+        val fixture = fixture(configured = true, contentRevisions = revisions)
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
+        advanceUntilIdle()
+        val old = Messages.fromUser(text = "旧快照")
+        val latest = Messages.fromUser(text = "最新快照")
+        var loads = 0
+        coEvery { fixture.conversations.loadMessages("session-a") } coAnswers {
+            loads++
+            if (loads == 1) {
+                revisions.value = mapOf("session-a" to 2L)
+                listOf(old)
+            } else {
+                listOf(latest)
+            }
+        }
+        revisions.value = mapOf("session-a" to 1L)
+        advanceUntilIdle()
+        assertEquals(listOf(latest), fixture.viewModel.uiState.value.messages)
+        assertEquals(2, loads)
+    }
+
+    @Test
+    fun externalRevisionWaitsUntilForegroundRunFinishes() = runTest {
+        val revisions = MutableStateFlow<Map<String, Long>>(emptyMap())
+        val agent = ControllableAgent()
+        val fixture = fixture(configured = true, agentOverride = agent, contentRevisions = revisions)
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
+        advanceUntilIdle()
+        fixture.viewModel.send("问题")
+        runCurrent()
+        agent.emit("session-a", event(text = "流式回答"))
+        runCurrent()
+        val persisted = Messages.fromUser(text = "更新后的历史")
+        coEvery { fixture.conversations.loadMessages("session-a") } returns listOf(persisted)
+        revisions.value = mapOf("session-a" to 1L)
+        runCurrent()
+        assertTrue(fixture.viewModel.uiState.value.messages.any {
+            it.textParts.any { part -> part.text == "流式回答" }
+        })
+        agent.complete("session-a")
+        advanceUntilIdle()
+        assertEquals(listOf(persisted), fixture.viewModel.uiState.value.messages)
     }
 
     @Test
@@ -598,14 +702,14 @@ class ChatViewModelCharacterizationTest {
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
 
-        fixture.viewModel.onAction(ChatAction.Send("ask-a"))
+        fixture.viewModel.send("ask-a")
         runCurrent()
         agent.emit("session-a", event(text = "answer-a", invocationId = "inv-a"))
         runCurrent()
 
         fixture.viewModel.onAction(ChatAction.NewConversation)
         advanceUntilIdle()
-        fixture.viewModel.onAction(ChatAction.Send("ask-b"))
+        fixture.viewModel.send("ask-b")
         runCurrent()
         agent.emit("session-b", event(text = "answer-b", invocationId = "inv-b"))
         runCurrent()
@@ -643,14 +747,14 @@ class ChatViewModelCharacterizationTest {
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
         repeat(3) { index ->
-            fixture.viewModel.onAction(ChatAction.Send("task-$index"))
+            fixture.viewModel.send("task-$index")
             runCurrent()
             fixture.viewModel.onAction(ChatAction.NewConversation)
             advanceUntilIdle()
         }
 
         fixture.viewModel.effects.test {
-            fixture.viewModel.onAction(ChatAction.Send("task-4"))
+            fixture.viewModel.send("task-4")
             runCurrent()
             assertEquals(
                 ChatEffect.ShowNotice(ChatNotice.ParallelTaskLimitReached),
@@ -678,7 +782,7 @@ class ChatViewModelCharacterizationTest {
         )
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
-        fixture.viewModel.onAction(ChatAction.Send("tool-a"))
+        fixture.viewModel.send("tool-a")
         runCurrent()
         agent.emit(
             "session-a",
@@ -688,7 +792,7 @@ class ChatViewModelCharacterizationTest {
 
         fixture.viewModel.onAction(ChatAction.NewConversation)
         advanceUntilIdle()
-        fixture.viewModel.onAction(ChatAction.Send("task-b"))
+        fixture.viewModel.send("task-b")
         runCurrent()
         assertEquals(null, fixture.viewModel.uiState.value.pendingToolConfirmation)
         assertTrue(
@@ -712,7 +816,7 @@ class ChatViewModelCharacterizationTest {
         val agent = ControllableAgent()
         val fixture = fixture(configured = true, agentOverride = agent)
         fixture.toolApproval.setFullAccess(true)
-        fixture.viewModel.onAction(ChatAction.Send("执行工具"))
+        fixture.viewModel.send("执行工具")
         runCurrent()
         agent.emit(
             "session-1",
@@ -733,7 +837,7 @@ class ChatViewModelCharacterizationTest {
     fun inputRequestCaptureAndUserReplyResumeTheRun() = runTest {
         val agent = ControllableAgent()
         val fixture = fixture(configured = true, agentOverride = agent)
-        fixture.viewModel.onAction(ChatAction.Send("问个问题"))
+        fixture.viewModel.send("问个问题")
         runCurrent()
         agent.emit(
             "session-1",
@@ -760,7 +864,9 @@ class ChatViewModelCharacterizationTest {
         assertEquals(listOf("input-call-1"), state.pendingInputRequests.map { it.callId })
         assertEquals(ConversationTaskStatus.WaitingForInput, state.conversationTaskStatuses["session-1"])
         // 输入请求挂起期间锁定普通发送，避免绕过 FunctionResponse 恢复协议。
-        assertFalse(fixture.viewModel.send("先发别的"))
+        var rejection: ChatSubmissionResult? = null
+        fixture.viewModel.send("先发别的") { rejection = it }
+        assertEquals(ChatSubmissionResult.REJECTED, rejection)
 
         fixture.viewModel.onAction(ChatAction.RespondToInputRequest("input-call-1", "A"))
         advanceUntilIdle()
@@ -776,11 +882,65 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun pendingInputRequestSurvivesSessionSwitchAndReply() = runTest {
+        val agent = ControllableAgent()
+        val fixture = fixture(
+            configured = true,
+            agentOverride = agent,
+            sessionIds = listOf("session-a", "session-b"),
+        )
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        fixture.viewModel.send("问个问题")
+        runCurrent()
+        agent.emit(
+            "session-a",
+            confirmationEvent(
+                ChatFunctionCall(
+                    id = "input-call-a",
+                    name = "get_user_choice",
+                    args = mapOf("options" to listOf("A", "B")),
+                    inputRequest = UserInputRequest(
+                        callId = "input-call-a",
+                        toolName = "get_user_choice",
+                        kind = UserInputKind.CHOICE,
+                        message = "选一个",
+                        options = listOf("A", "B"),
+                    ),
+                ),
+            ),
+        )
+        runCurrent()
+        agent.complete("session-a")
+        advanceUntilIdle()
+        assertEquals(
+            listOf("input-call-a"),
+            fixture.viewModel.uiState.value.pendingInputRequests.map { it.callId },
+        )
+
+        fixture.viewModel.onAction(ChatAction.NewConversation)
+        advanceUntilIdle()
+        assertTrue(fixture.viewModel.uiState.value.pendingInputRequests.isEmpty())
+
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
+        advanceUntilIdle()
+        assertEquals(
+            listOf("input-call-a"),
+            fixture.viewModel.uiState.value.pendingInputRequests.map { it.callId },
+        )
+
+        fixture.viewModel.onAction(ChatAction.RespondToInputRequest("input-call-a", "A"))
+        advanceUntilIdle()
+        assertEquals(listOf("input-call-a" to "A"), agent.inputResponses)
+        assertTrue(fixture.viewModel.uiState.value.pendingInputRequests.isEmpty())
+    }
+
+    @Test
     fun alwaysAllowedToolAutoApprovesConfirmationWithoutShowingCard() = runTest {
         val agent = ControllableAgent()
         val fixture = fixture(configured = true, agentOverride = agent)
         fixture.toolApproval.setAlwaysAllowed("compose_message")
-        fixture.viewModel.onAction(ChatAction.Send("执行工具"))
+        fixture.viewModel.send("执行工具")
         runCurrent()
         agent.emit(
             "session-1",
@@ -800,7 +960,7 @@ class ChatViewModelCharacterizationTest {
         val agent = ControllableAgent()
         val fixture = fixture(configured = true, agentOverride = agent)
         fixture.toolApproval.setAlwaysAllowed("compose_message")
-        fixture.viewModel.onAction(ChatAction.Send("执行工具"))
+        fixture.viewModel.send("执行工具")
         runCurrent()
         agent.emit(
             "session-1",
@@ -837,7 +997,7 @@ class ChatViewModelCharacterizationTest {
                 confirmationEvent(confirmation("confirm-1", "compose_message", emptyMap())),
             ),
         )
-        fixture.viewModel.onAction(ChatAction.Send("执行工具"))
+        fixture.viewModel.send("执行工具")
         advanceUntilIdle()
         assertEquals(
             "confirm-1",
@@ -857,7 +1017,7 @@ class ChatViewModelCharacterizationTest {
     fun enablingFullAccessReleasesAlreadyPendingConfirmation() = runTest {
         val agent = ControllableAgent()
         val fixture = fixture(configured = true, agentOverride = agent)
-        fixture.viewModel.onAction(ChatAction.Send("执行工具"))
+        fixture.viewModel.send("执行工具")
         runCurrent()
         agent.emit(
             "session-1",
@@ -889,7 +1049,7 @@ class ChatViewModelCharacterizationTest {
         )
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
-        fixture.viewModel.onAction(ChatAction.Send("first"))
+        fixture.viewModel.send("first")
         runCurrent()
         fixture.viewModel.onAction(ChatAction.NewConversation)
         advanceUntilIdle()
@@ -909,7 +1069,7 @@ class ChatViewModelCharacterizationTest {
         advanceUntilIdle()
         assertEquals(null, fixture.viewModel.uiState.value.conversationTaskStatuses["session-a"])
 
-        fixture.viewModel.onAction(ChatAction.Send("second"))
+        fixture.viewModel.send("second")
         runCurrent()
         fixture.viewModel.onAction(ChatAction.SwitchSession("session-b"))
         advanceUntilIdle()
@@ -938,7 +1098,7 @@ class ChatViewModelCharacterizationTest {
         )
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
-        fixture.viewModel.onAction(ChatAction.Send("running-a"))
+        fixture.viewModel.send("running-a")
         runCurrent()
         fixture.viewModel.onAction(ChatAction.NewConversation)
         advanceUntilIdle()
@@ -989,7 +1149,139 @@ class ChatViewModelCharacterizationTest {
         assertEquals(null, descriptor.loadError)
     }
 
+    @Test
+    fun confirmationResumeFailureKeepsTheOriginalTurnRetryable() = runTest {
+        val agent = ControllableAgent()
+        val fixture = fixture(configured = true, agentOverride = agent)
+        fixture.viewModel.send("工具请求")
+        runCurrent()
+        agent.emit("session-1", confirmationEvent(confirmation("confirm", "clock", emptyMap())))
+        agent.complete("session-1")
+        advanceUntilIdle()
+        assertTrue(fixture.viewModel.uiState.value.pendingToolConfirmation != null)
+        assertNull(fixture.viewModel.uiState.value.failedTurn)
+
+        agent.resumeFailure = java.io.IOException("resume failed")
+        fixture.viewModel.onAction(ChatAction.RespondToToolConfirmation(confirmed = true))
+        advanceUntilIdle()
+
+        val failed = fixture.viewModel.uiState.value.failedTurn
+        assertTrue(failed?.canRetry == true)
+        assertEquals("工具请求", failed?.userMessage?.textParts?.single()?.text)
+        assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
+    }
+
+    @Test
+    fun errorEventKeepsTheTurnRetryableWithoutAThrownException() = runTest {
+        val fixture = fixture(
+            configured = true,
+            events = listOf(event().copy(errorCode = "provider_error", errorMessage = "request failed")),
+        )
+        fixture.viewModel.send("问题")
+        advanceUntilIdle()
+
+        assertTrue(fixture.viewModel.uiState.value.failedTurn?.canRetry == true)
+        assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
+    }
+
+    @Test
+    fun submissionWaitsForAgentPreparationAndRejectsDuplicateSend() = runTest {
+        val fixture = fixture(configured = true)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        val ready = CompletableDeferred<Unit>()
+        coEvery { fixture.agent.createExecution(any(), any(), any()) } coAnswers {
+            ready.await()
+            fixture.execution
+        }
+        val results = mutableListOf<ChatSubmissionResult>()
+        fixture.viewModel.send("第一条", onResult = results::add)
+        runCurrent()
+        assertTrue(results.isEmpty())
+        assertFalse(fixture.viewModel.uiState.value.messages.any { it.role == MessageRole.User })
+        fixture.viewModel.send("重复提交", onResult = results::add)
+        assertEquals(listOf(ChatSubmissionResult.REJECTED), results)
+
+        ready.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(listOf(ChatSubmissionResult.REJECTED, ChatSubmissionResult.ACCEPTED), results)
+        coVerify(exactly = 1) { fixture.execution.send("第一条", any(), any()) }
+    }
+
+    @Test
+    fun failedPreparationDoesNotConsumeInputOrPublishAUserMessage() = runTest {
+        val fixture = fixture(configured = true, attachmentReadFailure = java.io.IOException("missing"))
+        val results = mutableListOf<ChatSubmissionResult>()
+        fixture.viewModel.send("保留输入", onResult = results::add)
+        advanceUntilIdle()
+        assertEquals(listOf(ChatSubmissionResult.REJECTED), results)
+        assertFalse(fixture.viewModel.uiState.value.messages.any { it.role == MessageRole.User })
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
+    }
+
+    @Test
+    fun configurationFailureRejectsInsteadOfReusingOldTools() = runTest {
+        val fixture = fixture(configured = true)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        coEvery { fixture.conversations.conversationToolConfiguration(any()) } throws java.io.IOException("configuration unavailable")
+        val results = mutableListOf<ChatSubmissionResult>()
+        fixture.viewModel.send("请求", onResult = results::add)
+        advanceUntilIdle()
+        assertEquals(listOf(ChatSubmissionResult.REJECTED), results)
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
+    }
+
+    @Test
+    fun cancellationDoesNotReleaseLeaseOrAcceptInputBeforePreparationReallyStops() = runTest {
+        val gate = FakeAgentRuntimeGate()
+        val fixture = fixture(configured = true, agentRuntimeGate = gate)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        val ready = CompletableDeferred<Unit>()
+        coEvery { fixture.agent.createExecution(any(), any(), any()) } coAnswers {
+            withContext(NonCancellable) { ready.await() }
+            fixture.execution
+        }
+        val results = mutableListOf<ChatSubmissionResult>()
+        fixture.viewModel.send("不能晚到后再发送", onResult = results::add)
+        runCurrent()
+        fixture.viewModel.onAction(ChatAction.StopStreaming)
+        runCurrent()
+        assertEquals(0, gate.releaseCount)
+        ready.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(1, gate.releaseCount)
+        assertEquals(listOf(ChatSubmissionResult.REJECTED), results)
+        coVerify(exactly = 0) { fixture.execution.send(any(), any(), any()) }
+    }
+
+    @Test
+    fun navigationDuringPreparationRejectsTheOldSubmission() = runTest {
+        val fixture = fixture(configured = true)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        val ready = CompletableDeferred<Unit>()
+        coEvery { fixture.agent.createExecution(any(), any(), any()) } coAnswers {
+            ready.await()
+            fixture.execution
+        }
+        val results = mutableListOf<ChatSubmissionResult>()
+        fixture.viewModel.send("旧页面请求", onResult = results::add)
+        runCurrent()
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-2"))
+        runCurrent()
+        ready.complete(Unit)
+        advanceUntilIdle()
+        assertEquals("session-2", fixture.viewModel.uiState.value.sessionId)
+        assertEquals(listOf(ChatSubmissionResult.REJECTED), results)
+        coVerify(exactly = 0) { fixture.execution.send(any(), any(), any()) }
+    }
+
     private inner class ControllableAgent : ChatAgentRepository {
+        var resumeFailure: Exception? = null
+        val inputResponses = mutableListOf<Pair<String, String>>()
+        val confirmationResponses = mutableListOf<Pair<String, Boolean>>()
         private val eventChannels = mutableMapOf<String, Channel<ChatRunEvent>>()
 
         private fun events(sessionId: String): Channel<ChatRunEvent> =
@@ -1003,52 +1295,51 @@ class ChatViewModelCharacterizationTest {
             eventChannels.remove(sessionId)?.close()
         }
 
-        override suspend fun send(
+        override suspend fun createExecution(
             sessionId: String,
             selection: ModelSelection,
-            text: String,
-            fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
             toolConfiguration: ConversationToolConfiguration?,
-            rewindBeforeInvocationId: String?,
-        ): Flow<ChatRunEvent> = events(sessionId).receiveAsFlow()
+        ): ChatAgentExecution = object : ChatAgentExecution {
+            override suspend fun send(
+                text: String,
+                fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
+                rewindBeforeInvocationId: String?,
+            ): Flow<ChatRunEvent> = events(sessionId).receiveAsFlow()
 
-        override suspend fun respondToToolConfirmation(
-            sessionId: String,
-            confirmationCallId: String,
-            confirmed: Boolean,
-        ): Flow<ChatRunEvent> {
-            confirmationResponses += confirmationCallId to confirmed
-            return flowOf(
-                event(
-                    text = "confirmation handled",
-                    invocationId = "confirm-$sessionId",
-                    partial = false,
-                    turnComplete = true,
-                ),
-            )
+            override suspend fun respondToToolConfirmation(
+                confirmationCallId: String,
+                confirmed: Boolean,
+            ): Flow<ChatRunEvent> {
+                resumeFailure?.let { throw it }
+                confirmationResponses += confirmationCallId to confirmed
+                return flowOf(
+                    event(
+                        text = "confirmation handled",
+                        invocationId = "confirm-$sessionId",
+                        partial = false,
+                        turnComplete = true,
+                    ),
+                )
+            }
+
+            override suspend fun respondToInputRequest(
+                callId: String,
+                toolName: String,
+                value: String,
+            ): Flow<ChatRunEvent> {
+                resumeFailure?.let { throw it }
+                inputResponses += callId to value
+                return flowOf(
+                    event(
+                        text = "input handled",
+                        invocationId = "input-$sessionId",
+                        partial = false,
+                        turnComplete = true,
+                    ),
+                )
+            }
+
         }
-
-        override suspend fun respondToInputRequest(
-            sessionId: String,
-            callId: String,
-            toolName: String,
-            value: String,
-        ): Flow<ChatRunEvent> {
-            inputResponses += callId to value
-            return flowOf(
-                event(
-                    text = "input handled",
-                    invocationId = "input-$sessionId",
-                    partial = false,
-                    turnComplete = true,
-                ),
-            )
-        }
-
-        val inputResponses = mutableListOf<Pair<String, String>>()
-        val confirmationResponses = mutableListOf<Pair<String, Boolean>>()
-
-        override suspend fun releaseSession(sessionId: String) = Unit
     }
 
     private fun fixture(
@@ -1062,6 +1353,8 @@ class ChatViewModelCharacterizationTest {
         officialCatalogOverride: OfficialToolFunctionCatalog? = null,
         memoryFailures: MutableSharedFlow<MemoryRuntimeFailure> = MutableSharedFlow(),
         agentRuntimeGate: FakeAgentRuntimeGate = FakeAgentRuntimeGate(),
+        contentRevisions: MutableStateFlow<Map<String, Long>> = MutableStateFlow(emptyMap()),
+        attachmentReadFailure: Exception? = null,
     ): Fixture {
         val selection = ModelSelection("service", "chat", "model")
         val services = if (configured) listOf(service()) else emptyList()
@@ -1074,17 +1367,18 @@ class ChatViewModelCharacterizationTest {
         }
         val conversations = mockk<ConversationRepository>(relaxed = true) {
             every { this@mockk.conversations } returns MutableStateFlow(emptyList())
-            every { conversationContentUpdates } returns MutableSharedFlow()
+            every { conversationContentRevisions } returns contentRevisions
             coEvery { createConversation(any(), any(), any()) } returnsMany sessionIds
             coEvery { activateConversation(any(), any()) } returns ModelSelectionCodec.encode(selection)
             coEvery { loadMessages(any()) } returns emptyList()
             coEvery { conversationToolConfiguration(any()) } returns null
             coEvery { setConversationToolConfiguration(any(), any()) } returns true
         }
-        val agent = agentOverride ?: mockk<ChatAgentRepository>(relaxed = true) {
-            coEvery {
-                send(any(), any(), any(), any(), any(), any())
-            } returns flowOf(*events.toTypedArray())
+        val execution = mockk<ChatAgentExecution>(relaxed = true) {
+            coEvery { send(any(), any(), any()) } returns flowOf(*events.toTypedArray())
+        }
+        val agent = agentOverride ?: mockk<ChatAgentRepository> {
+            coEvery { createExecution(any(), any(), any()) } returns execution
         }
         val display = mockk<ChatDisplayRepository> {
             every { showToolActivity } returns MutableStateFlow(true)
@@ -1149,7 +1443,10 @@ class ChatViewModelCharacterizationTest {
             every { state } returns voiceWakeState
         }
         val attachments = mockk<ChatAttachmentRepository> {
-            coEvery { read(any(), any()) } returns emptyList()
+            coEvery { read(any(), any()) } coAnswers {
+                attachmentReadFailure?.let { throw it }
+                emptyList()
+            }
             coEvery { validateSaved(any()) } returns Unit
             coEvery { createDrafts(any()) } returns emptyList()
             coEvery { deleteDrafts(any()) } returns Unit
@@ -1188,7 +1485,6 @@ class ChatViewModelCharacterizationTest {
         val toolApproval = FakeToolApprovalRepository()
         val prepareChatTurn = PrepareChatTurnUseCase(
             attachments = attachments,
-            runner = agent,
         )
         return Fixture(
             viewModel = ChatViewModel(
@@ -1218,6 +1514,7 @@ class ChatViewModelCharacterizationTest {
             ),
             conversations = conversations,
             sessionResolver = sessionResolver,
+            execution = execution,
             agent = agent,
             display = display,
             appearance = appearance,
@@ -1250,29 +1547,29 @@ class ChatViewModelCharacterizationTest {
     )
 
     private fun alwaysFailingAgent(): ChatAgentRepository = object : ChatAgentRepository {
-        override suspend fun send(
+        override suspend fun createExecution(
             sessionId: String,
             selection: ModelSelection,
-            text: String,
-            fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
             toolConfiguration: ConversationToolConfiguration?,
-            rewindBeforeInvocationId: String?,
-        ): Flow<ChatRunEvent> = flow { throw java.io.IOException("offline") }
+        ): ChatAgentExecution = object : ChatAgentExecution {
+            override suspend fun send(
+                text: String,
+                fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
+                rewindBeforeInvocationId: String?,
+            ): Flow<ChatRunEvent> = flow { throw java.io.IOException("offline") }
 
-        override suspend fun respondToToolConfirmation(
-            sessionId: String,
-            confirmationCallId: String,
-            confirmed: Boolean,
-        ): Flow<ChatRunEvent> = flowOf(event())
+            override suspend fun respondToToolConfirmation(
+                confirmationCallId: String,
+                confirmed: Boolean,
+            ): Flow<ChatRunEvent> = flowOf(event())
 
-        override suspend fun respondToInputRequest(
-            sessionId: String,
-            callId: String,
-            toolName: String,
-            value: String,
-        ): Flow<ChatRunEvent> = flowOf(event())
+            override suspend fun respondToInputRequest(
+                callId: String,
+                toolName: String,
+                value: String,
+            ): Flow<ChatRunEvent> = flowOf(event())
 
-        override suspend fun releaseSession(sessionId: String) = Unit
+        }
     }
 
     private fun confirmationEvent(vararg calls: ChatFunctionCall) = ChatRunEvent(
@@ -1317,6 +1614,7 @@ class ChatViewModelCharacterizationTest {
         val viewModel: ChatViewModel,
         val conversations: ConversationRepository,
         val sessionResolver: ConversationSessionResolver,
+        val execution: ChatAgentExecution,
         val agent: ChatAgentRepository,
         val display: ChatDisplayRepository,
         val appearance: AppearanceRepository,

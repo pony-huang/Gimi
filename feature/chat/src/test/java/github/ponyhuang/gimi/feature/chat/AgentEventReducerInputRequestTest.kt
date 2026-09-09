@@ -4,12 +4,9 @@ import github.ponyhuang.gimi.domain.conversation.model.ChatFunctionCall
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.gimi.domain.conversation.model.UserInputKind
 import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
-import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import io.mockk.mockk
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -25,8 +22,6 @@ class AgentEventReducerInputRequestTest {
         runtimeFor = { runtime },
         publishRuntime = {},
         emitPartDelta = { _, _, _ -> },
-        scope = CoroutineScope(StandardTestDispatcher()),
-        repository = mockk<ConversationRepository>(relaxed = true),
         toolAuthorization = mockk<ToolAuthorizationRepository>(relaxed = true),
         isAutoApproved = { false },
     )

@@ -43,6 +43,13 @@ sealed interface AssistantSubmissionResult {
      * @property message 面向上层的失败原因。
      */
     data class Failed(val message: String) : AssistantSubmissionResult
+
+    /**
+     * Agent 在需要用户输入的工具上挂起（尚未完成）。
+     *
+     * @property message 面向用户的待答复提示；当前助手环境未实现该交互时的能力提示。
+     */
+    data class AwaitingInput(val message: String) : AssistantSubmissionResult
 }
 
 /**

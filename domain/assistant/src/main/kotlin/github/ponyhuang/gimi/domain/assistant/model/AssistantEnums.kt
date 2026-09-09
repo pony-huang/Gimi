@@ -26,6 +26,9 @@ enum class AssistantSessionPhase {
     /** 等待用户确认敏感工具调用。 */
     AWAITING_CONFIRMATION,
 
+    /** Agent 在需用户输入的工具上挂起（`get_user_choice` / `adk_request_input`），等待答复。 */
+    AWAITING_INPUT,
+
     /** 正在播报回答。 */
     SPEAKING,
 
@@ -53,6 +56,7 @@ fun AssistantSessionPhase.isPresentationResultIdle(): Boolean = when (this) {
     AssistantSessionPhase.FOLLOW_UP_IDLE,
     AssistantSessionPhase.STOPPED,
     AssistantSessionPhase.ERROR,
+    AssistantSessionPhase.AWAITING_INPUT,
     -> true
     else -> false
 }

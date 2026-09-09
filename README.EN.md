@@ -4,7 +4,7 @@
 
 # Gimi
 
-**A local BYOK AI assistant for Android, similar to general-purpose conversational assistants such as Gemini, ChatGPT, and Claude.**
+**A local AI assistant for Android, similar to general-purpose conversational assistants such as Gemini, ChatGPT, and Claude.**
 
 Provides text chat, voice interaction, and access to alarms, calendar, files, media, plugins, and MCP tools.
 

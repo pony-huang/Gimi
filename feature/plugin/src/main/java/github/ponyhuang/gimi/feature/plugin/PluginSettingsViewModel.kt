@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
 import javax.inject.Inject
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -41,7 +42,14 @@ class PluginSettingsViewModel @Inject constructor(
         ),
     )
 
-    private val mutableEffects = MutableSharedFlow<PluginSettingsEffect>()
+    // 使用 SharedFlow + 缓冲实现一次性 UI 事件，避免默认参数下「无订阅者时 emit 挂起」导致事件丢失：
+    // - extraBufferCapacity：缓存若干待发事件，订阅者重新挂载时不会丢；
+    // - onBufferOverflow.DROP_OLDEST：缓冲满时丢弃最旧的事件，保证内存有界（UI 事件短暂过期即可）。
+    private val mutableEffects = MutableSharedFlow<PluginSettingsEffect>(
+        replay = 0,
+        extraBufferCapacity = 8,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
     val effects: SharedFlow<PluginSettingsEffect> = mutableEffects.asSharedFlow()
 
     fun onAction(action: PluginSettingsAction) {

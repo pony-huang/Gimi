@@ -5,6 +5,12 @@ plugins {
 
 android {
     namespace = "github.ponyhuang.gimi.data.plugin"
+    // BroadcastReceiver/IntentFilter 的方法在 JVM 单测里未被打桩，启用默认值避免抛错。
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {

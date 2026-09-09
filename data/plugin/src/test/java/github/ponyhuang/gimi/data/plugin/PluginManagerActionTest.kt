@@ -86,7 +86,9 @@ class PluginManagerActionTest {
     private fun manager(plugin: AgentPlugin): PluginManager {
         val preferences = mockk<SharedPreferences>(relaxed = true)
         every { preferences.getStringSet(any(), any()) } returns emptySet()
-        val context = mockk<Context>()
+        // PluginManager init { } 会向 Context 注册包变化 BroadcastReceiver；
+        // 这里的 Context 只需满足 getSharedPreferences / registerReceiver 等桩调用。
+        val context = mockk<Context>(relaxed = true)
         every { context.getSharedPreferences(any(), any()) } returns preferences
         val loader = object : PluginLoader {
             override fun load(): List<LoadedPlugin> = listOf(LoadedPlugin("test.package", plugin))

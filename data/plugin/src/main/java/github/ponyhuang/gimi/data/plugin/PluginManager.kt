@@ -1,6 +1,9 @@
 package github.ponyhuang.gimi.data.plugin
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import androidx.core.content.edit
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.Toolset
@@ -19,11 +22,16 @@ import github.ponyhuang.gimi.pluginapi.PluginConfigActionExecution
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 动态插件管理器 — 宿主侧唯一入口。
@@ -53,6 +61,34 @@ class PluginManager @Inject constructor(
         pluginId = AgentPlugin::pluginId,
     )
 
+    // 监听宿主以外的插件 APK 增删（系统设置里安装/卸载、adb install 等），强制重新发现，
+    // 避免 PackageManager 状态短暂滞后导致 UI 列表与运行时快照与设备实际状态不一致。
+    //
+    // PACKAGE_REPLACED 在某些设备上触发时系统底层 LoadedApk 缓存尚未完全刷新，
+    // 立刻查询可能命中旧 APK；按 Android 插件热更新的实践，延迟 ~200ms 再 refresh 更稳妥。
+    private val packageScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val packageChangeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val action = intent.action ?: return
+            if (action == Intent.ACTION_PACKAGE_ADDED ||
+                action == Intent.ACTION_PACKAGE_REMOVED ||
+                action == Intent.ACTION_PACKAGE_REPLACED
+            ) {
+                packageScope.launch { delay(REFRESH_DELAY_MS.milliseconds); refresh() }
+            }
+        }
+    }
+
+    init {
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addDataScheme("package")
+        }
+        context.registerReceiver(packageChangeReceiver, filter)
+    }
+
     override val runtime: StateFlow<PluginRuntimeSnapshot<AgentPlugin>> = runtimeState.runtime
 
     private val _revision = MutableStateFlow(0L)
@@ -81,13 +117,19 @@ class PluginManager @Inject constructor(
     fun enabledPluginToolsets(): List<Toolset> = enabledPlugins().flatMap { it.toolSets() }
 
     override suspend fun refresh(): List<String> = withContext(Dispatchers.IO) {
+        // 重新发现已安装插件 APK 后必须无条件把最新快照灌入内部状态：
+        // - 卸载场景下 loader.refresh() 只清缓存不返回任何条目，依赖「added 非空」会跳过加载；
+        // - 仅当 added 非空才刷新 loaded，会让同包名升级等场景下插件滞后进入 Agent；
+        // 因此每次刷新都按全量最新发现重建 loaded 与运行时快照，让 Agent 缓存失效与 UI 列表
+        // 与设备实际安装状态保持一致。
         val added = loader.refresh()
-        if (added.isEmpty()) return@withContext emptyList()
         loaded = loader.load()
-        runtimeState.replacePlugins(loaded.map { it.plugin })
-        _plugins.value = descriptors()
-        // 递增 revision → Agent 运行时缓存失效，下次消息重建并带上新插件的工具/回调。
-        synchronizeRevision()
+        val runtimeChanged = runtimeState.replacePlugins(loaded.map { it.plugin })
+        updateDescriptors()
+        if (runtimeChanged) {
+            // 递增 revision → Agent 运行时缓存失效，下次消息重建并带上新插件的工具/回调。
+            synchronizeRevision()
+        }
         added.map { it.plugin.pluginId }
     }
 
@@ -164,8 +206,21 @@ class PluginManager @Inject constructor(
         )
     }
 
+    /** 仅在描述符发生变化时回填 _plugins，避免无意义的 collect 唤醒。 */
+    private fun updateDescriptors() {
+        val fresh = descriptors()
+        if (_plugins.value != fresh) {
+            _plugins.value = fresh
+        }
+    }
+
     private fun synchronizeRevision() {
-        _revision.value = runtime.value.revision
+        // 始终把宿主可见的 revision 抬到运行时快照的最新值，保证 Agent 缓存键在插件
+        // 增删或配置变更后立即失效。仅在数值真不一致时写入，避免无意义的 collect 唤醒。
+        val target = runtime.value.revision
+        if (_revision.value != target) {
+            _revision.value = target
+        }
     }
 
     private fun PluginConfigActionExecution.toDomainExecution(): PluginActionExecution = when (this) {
@@ -183,5 +238,8 @@ class PluginManager @Inject constructor(
     private companion object {
         const val PREFS_NAME: String = "plugin_state"
         const val DISABLED_IDS_KEY: String = "disabled_ids_v1"
+
+        // PACKAGE_* 广播到 PackageManager 缓存完全刷新之间的安全延迟。
+        const val REFRESH_DELAY_MS: Long = 200L
     }
 }

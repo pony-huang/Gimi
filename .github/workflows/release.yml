@@ -35,7 +35,7 @@ jobs:
       RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # 版本来源优先级：手动输入 > 当前标签名（去掉 v 前缀）> GitHub 最新 tag > build.gradle.kts 当前默认版本。
       - name: Resolve version

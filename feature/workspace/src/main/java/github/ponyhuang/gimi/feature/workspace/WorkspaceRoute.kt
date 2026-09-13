@@ -51,6 +51,7 @@ fun WorkspaceRoute(
         state = state,
         onAction = viewModel::onAction,
         onOpenFile = { openWorkspaceFile(context, it) },
+        onBack = onBack,
         modifier = modifier,
     )
 

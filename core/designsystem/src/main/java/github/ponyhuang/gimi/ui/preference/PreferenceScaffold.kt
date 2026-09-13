@@ -20,13 +20,19 @@ import androidx.compose.ui.tooling.preview.Preview
 import github.ponyhuang.gimi.core.designsystem.R
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
-/** Shared settings-page shell that preserves the existing app-bar and back behavior. */
+/**
+ * Shared settings-page shell that preserves the existing app-bar and back behavior.
+ *
+ * @param navigationIcon 左侧图标槽位；为 null 时使用默认返回箭头。页面进入多选等非线性
+ *   返回语义的状态时可覆盖它（例如换成关闭图标），应用栏样式仍与画布保持一致。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PreferenceScaffold(
     title: String,
     onBack: () -> Unit,
     actions: @Composable () -> Unit = {},
+    navigationIcon: (@Composable () -> Unit)? = null,
     content: @Composable (Modifier) -> Unit,
 ) {
     Scaffold(
@@ -40,7 +46,7 @@ fun PreferenceScaffold(
                     titleContentColor = MaterialTheme.colorScheme.onBackground,
                     navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
                 ),
-                navigationIcon = {
+                navigationIcon = navigationIcon ?: {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,

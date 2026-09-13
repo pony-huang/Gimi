@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.ui.preference
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -127,6 +128,7 @@ fun PreferenceGroupCard(
  * @property iconContainer 图标圆形底色，默认主题蓝。
  * @property iconTint 圆底上的字形色，默认白色；禁用等特殊态可改为灰色组合。
  * @property iconSize 图标本身的尺寸；品牌图标可使用与容器相同的尺寸以保留原始外观。
+ * @property onLongClick 长按行为；提供后行改为 combinedClickable，用于进入多选等模式。
  */
 @Composable
 fun PreferenceListItem(
@@ -135,6 +137,7 @@ fun PreferenceListItem(
     subtitle: String? = null,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
     iconContainer: Color = MaterialTheme.colorScheme.primary,
     iconTint: Color = Color.White,
     iconSize: Dp = 20.dp,
@@ -147,10 +150,14 @@ fun PreferenceListItem(
                 .fillMaxWidth()
                 .heightIn(min = 60.dp)
                 .then(
-                    if (onClick != null) {
-                        Modifier.clickable(role = Role.Button, onClick = onClick)
-                    } else {
-                        Modifier
+                    when {
+                        onClick == null -> Modifier
+                        onLongClick == null -> Modifier.clickable(role = Role.Button, onClick = onClick)
+                        else -> Modifier.combinedClickable(
+                            role = Role.Button,
+                            onClick = onClick,
+                            onLongClick = onLongClick,
+                        )
                     },
                 )
                 .padding(horizontal = 16.dp, vertical = 8.dp),

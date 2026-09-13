@@ -34,7 +34,6 @@ internal fun Message.isVisibleInChat(showToolActivity: Boolean): Boolean =
         textParts.isNotEmpty() ||
         fileAttachments.isNotEmpty() ||
         functionResponses.any { it.localFileSearchResult?.files?.isNotEmpty() == true } ||
-        functionResponses.any { it.remoteImageResult?.images?.isNotEmpty() == true } ||
         (showToolActivity && (visibleFunctionCalls().isNotEmpty() || visibleFunctionResponses().isNotEmpty()))
 
 /**
@@ -63,8 +62,8 @@ internal fun List<Message>.foldToolResponses(): List<Message> {
                 } else if (hasStructuredResult(response)) {
                     // 确认流程下占位响应（confirmation-required 的 error 占位）与真实结果
                     // 共用同一 call id；占位先到会被上面的去重保留。真实结构化结果
-                    // （本地文件轮播/远程图片轮播的数据源）到达时必须反向替换占位，
-                    // 否则用户只看得到 ✓ chip，永远等不到图片。
+                    // （本地文件轮播的数据源）到达时必须反向替换占位，
+                    // 否则用户只看得到 ✓ chip，永远等不到文件列表。
                     val responses = merged.functionResponses.toMutableList()
                     val index = responses.indexOfFirst {
                         (it.id to it.name) == key && !hasStructuredResult(it)
@@ -92,10 +91,9 @@ internal fun List<Message>.foldToolResponses(): List<Message> {
     return result
 }
 
-/** 该响应是否携带可渲染的结构化内容（本地文件列表或远程图片列表）。 */
+/** 该响应是否携带可渲染的结构化内容（本地文件列表）。 */
 private fun hasStructuredResult(response: FunctionResponseView): Boolean =
-    response.localFileSearchResult?.files?.isNotEmpty() == true ||
-        response.remoteImageResult?.images?.isNotEmpty() == true
+    response.localFileSearchResult?.files?.isNotEmpty() == true
 
 /** 除工具响应外没有任何可渲染内容（折叠候选）。 */
 private fun Message.isFunctionResponseOnly(): Boolean =

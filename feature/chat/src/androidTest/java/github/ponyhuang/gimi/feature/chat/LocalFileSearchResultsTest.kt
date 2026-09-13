@@ -7,8 +7,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import github.ponyhuang.gimi.domain.conversation.model.LocalFileReference
 import github.ponyhuang.gimi.domain.conversation.model.LocalFileSearchResult
-import github.ponyhuang.gimi.domain.conversation.model.RemoteImageReference
-import github.ponyhuang.gimi.domain.conversation.model.RemoteImageResult
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -70,25 +68,6 @@ class LocalFileSearchResultsTest {
 
         composeRule.onNodeWithTag("local_file_search_item_photo.jpg").performClick()
 
-        composeRule.onNodeWithTag("chat_image_preview").assertIsDisplayed()
-    }
-
-    @Test
-    fun remoteImageCarouselDisplaysStructuredImagesAndOpensPreview() {
-        composeRule.setContent {
-            MaterialTheme {
-                RemoteImageCarousel(
-                    result = RemoteImageResult(
-                        images = listOf(
-                            RemoteImageReference("https://example.com/photo"),
-                        ),
-                    ),
-                )
-            }
-        }
-
-        composeRule.onNodeWithTag("remote_image_carousel").assertIsDisplayed()
-        composeRule.onNodeWithTag("remote_image_item_0").performClick()
         composeRule.onNodeWithTag("chat_image_preview").assertIsDisplayed()
     }
 

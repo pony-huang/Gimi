@@ -6,8 +6,6 @@ import github.ponyhuang.gimi.domain.conversation.model.LocalFileReference
 import github.ponyhuang.gimi.domain.conversation.model.LocalFileSearchResult
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
-import github.ponyhuang.gimi.domain.conversation.model.RemoteImageReference
-import github.ponyhuang.gimi.domain.conversation.model.RemoteImageResult
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -15,23 +13,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatMessageVisibilityTest {
-
-    @Test
-    fun `remote image results stay visible when tool activity is hidden`() {
-        val message = assistantMessage(
-            functionResponses = listOf(
-                FunctionResponseView(
-                    id = "images-1",
-                    name = "image_tool",
-                    remoteImageResult = RemoteImageResult(
-                        images = listOf(RemoteImageReference("https://example.com/photo")),
-                    ),
-                ),
-            ),
-        )
-
-        assertTrue(message.isVisibleInChat(showToolActivity = false))
-    }
 
     @Test
     fun `local file search results stay visible when tool activity is hidden`() {
@@ -200,8 +181,18 @@ class ChatMessageVisibilityTest {
                 FunctionResponseView(
                     id = "c1",
                     name = "search_media_files",
-                    remoteImageResult = RemoteImageResult(
-                        images = listOf(RemoteImageReference("https://example.com/a.png")),
+                    localFileSearchResult = LocalFileSearchResult(
+                        query = "screen",
+                        files = listOf(
+                            LocalFileReference(
+                                displayName = "screen.png",
+                                mimeType = "image/png",
+                                sizeBytes = 1L,
+                                modifiedTimeMillis = 2L,
+                                category = "image",
+                                contentUri = "content://media/screen",
+                            ),
+                        ),
                     ),
                 ),
             ),
@@ -212,7 +203,7 @@ class ChatMessageVisibilityTest {
         assertEquals(1, folded.size)
         val responses = folded[0].functionResponses
         assertEquals(1, responses.size)
-        assertEquals("https://example.com/a.png", responses.single().remoteImageResult?.images?.single()?.url)
+        assertEquals("screen.png", responses.single().localFileSearchResult?.files?.single()?.displayName)
     }
 
     @Test

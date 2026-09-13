@@ -158,9 +158,6 @@ fun MessageBubble(
                         onShowAll = onShowAllLocalFiles,
                     )
                 }
-                response.remoteImageResult?.takeIf { it.images.isNotEmpty() }?.let { result ->
-                    RemoteImageCarousel(result = result)
-                }
             }
 
             assistantReplyTextForCopy(message)?.let { text ->

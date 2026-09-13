@@ -8,7 +8,6 @@ import github.ponyhuang.gimi.domain.conversation.model.ChatFunctionCall
 import github.ponyhuang.gimi.domain.conversation.model.ChatFunctionResponse
 import github.ponyhuang.gimi.domain.conversation.model.isLocalFileSearchTool
 import github.ponyhuang.gimi.domain.conversation.model.parseLocalFileSearchResult
-import github.ponyhuang.gimi.domain.conversation.model.parseRemoteImageResult
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunPart
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
@@ -106,7 +105,6 @@ class AdkChatAgentRepository @Inject constructor(
                 id = it.id,
                 name = it.name,
                 localFileSearchResult = parsed,
-                remoteImageResult = parseRemoteImageResult(it.response),
             )
         },
         partial = partial,

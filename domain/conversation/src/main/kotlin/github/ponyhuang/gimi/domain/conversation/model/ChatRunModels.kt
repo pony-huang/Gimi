@@ -63,13 +63,11 @@ data class UserInputRequest(
  * @property id Identifier paired with the originating tool call.
  * @property name Tool function name.
  * @property localFileSearchResult Validated local files for supported search tools.
- * @property remoteImageResult Validated remote images exposed by the tool response.
  */
 data class ChatFunctionResponse(
     val id: String?,
     val name: String,
     val localFileSearchResult: LocalFileSearchResult? = null,
-    val remoteImageResult: RemoteImageResult? = null,
 )
 
 data class ToolConfirmationRequest(

@@ -13,7 +13,6 @@ import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.isLocalFileSearchTool
 import github.ponyhuang.gimi.domain.conversation.model.parseLocalFileSearchResult
-import github.ponyhuang.gimi.domain.conversation.model.parseRemoteImageResult
 import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.model.UserInputToolCallNames
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
@@ -242,7 +241,6 @@ object EventMapper {
             id = id.orEmpty(),
             name = name,
             localFileSearchResult = parsed,
-            remoteImageResult = parseRemoteImageResult(response),
         )
     }
 

@@ -163,31 +163,6 @@ class AdkChatAgentRepositoryMappingTest {
         every { timestamp } returns 123L
     }
 
-    @Test
-    fun mapsStructuredRemoteImagesFromLiveFunctionResponse() = runTest {
-        val event = adkEvent(
-            responses = listOf(
-                FunctionResponse(
-                    id = "call-images",
-                    name = "get_feed_detail",
-                    response = remoteImageResponse(),
-                ),
-            ),
-        )
-        coEvery {
-            execution.send(any(), any(), any())
-        } returns flowOf(event)
-
-        val mapped = repository.createExecution("session-1", selection).send("查看图片", emptyList())
-            .toList()
-            .single()
-
-        assertEquals(
-            "https://images.example.com/photo",
-            mapped.functionResponses.single().remoteImageResult?.images?.single()?.url,
-        )
-    }
-
     private fun localFileResponse(): Map<String, Any?> = mapOf(
         "result" to mapOf(
             "success" to true,
@@ -200,16 +175,6 @@ class AdkChatAgentRepositoryMappingTest {
                     "modifiedTimeMillis" to 2L,
                     "category" to "image",
                     "contentUri" to "content://media/photo",
-                ),
-            ),
-        ),
-    )
-
-    private fun remoteImageResponse(): Map<String, Any?> = mapOf(
-        "data" to mapOf(
-            "note" to mapOf(
-                "imageList" to listOf(
-                    mapOf("urlDefault" to "https://images.example.com/photo"),
                 ),
             ),
         ),

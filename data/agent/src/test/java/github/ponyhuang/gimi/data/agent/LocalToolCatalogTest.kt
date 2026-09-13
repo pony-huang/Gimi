@@ -11,6 +11,7 @@ import github.ponyhuang.gimi.data.agent.tools.system.LaunchersTool
 import github.ponyhuang.gimi.data.agent.tools.system.LocationTool
 import github.ponyhuang.gimi.data.agent.tools.system.MediaTool
 import github.ponyhuang.gimi.data.agent.tools.system.PeopleTool
+import github.ponyhuang.gimi.data.agent.tools.system.ReadLocalFileTool
 import github.ponyhuang.gimi.data.agent.tools.system.SettingsTool
 import github.ponyhuang.gimi.data.agent.tools.system.WebTool
 import io.mockk.mockk
@@ -48,6 +49,7 @@ class LocalToolCatalogTest {
             "get_upcoming_calendar_events",
             "get_current_location",
             "list_active_media_sessions",
+            "read_local_file",
         )
 
         sensitiveNames.forEach { name ->
@@ -94,6 +96,8 @@ class LocalToolCatalogTest {
         locationTool = mockk<LocationTool>(relaxed = true),
         mediaTool = mockk<MediaTool>(relaxed = true),
         peopleTool = mockk<PeopleTool>(relaxed = true),
+        // 真实实例：手写 FunctionTool 无 KSP 生成物，relaxed mock 的 name/确认门无法参与断言。
+        readLocalFileTool = ReadLocalFileTool(mockk(relaxed = true), mockk(relaxed = true)),
         settingsTool = mockk<SettingsTool>(relaxed = true),
         webTool = mockk<WebTool>(relaxed = true),
     )

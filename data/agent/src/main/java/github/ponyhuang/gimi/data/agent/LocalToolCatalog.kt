@@ -12,6 +12,7 @@ import github.ponyhuang.gimi.data.agent.tools.system.LaunchersTool
 import github.ponyhuang.gimi.data.agent.tools.system.LocationTool
 import github.ponyhuang.gimi.data.agent.tools.system.MediaTool
 import github.ponyhuang.gimi.data.agent.tools.system.PeopleTool
+import github.ponyhuang.gimi.data.agent.tools.system.ReadLocalFileTool
 import github.ponyhuang.gimi.data.agent.tools.system.SettingsTool
 import github.ponyhuang.gimi.data.agent.tools.system.WebTool
 import github.ponyhuang.gimi.data.agent.tools.system.generatedTools
@@ -39,6 +40,7 @@ class LocalToolCatalog @Inject constructor(
     locationTool: LocationTool,
     mediaTool: MediaTool,
     peopleTool: PeopleTool,
+    readLocalFileTool: ReadLocalFileTool,
     settingsTool: SettingsTool,
     webTool: WebTool,
 ) : LocalToolDefinitionSource {
@@ -50,6 +52,8 @@ class LocalToolCatalog @Inject constructor(
         addAll(communicationTool.generatedTools().registeredAs(LocalToolCategory.COMMUNICATION))
         addAll(deviceTool.generatedTools().registeredAs(LocalToolCategory.DEVICE))
         addAll(filesTool.generatedTools().registeredAs(LocalToolCategory.FILES))
+        // 手写 FunctionTool（@Tool 注解无法生成 processLlmRequest 注入逻辑），与搜索工具同属文件域。
+        add(RegisteredLocalTool(category = LocalToolCategory.FILES, tool = readLocalFileTool))
         addAll(launchersTool.generatedTools().registeredAs(LocalToolCategory.LAUNCHERS))
         addAll(locationTool.generatedTools().registeredAs(LocalToolCategory.LOCATION))
         addAll(mediaTool.generatedTools().registeredAs(LocalToolCategory.MEDIA))

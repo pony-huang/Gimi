@@ -158,7 +158,8 @@ class ReadLocalFileToolTest {
         val tool = authorizedDocumentTool("content://docs/doc/photo")
         every { contentResolver.getType(any()) } returns "image/png"
         val pngBytes = byteArrayOf(1, 2, 3, 4)
-        every { contentResolver.openInputStream(any()) } returns ByteArrayInputStream(pngBytes)
+        // execute 与注入阶段各读一次：answers 保证每次拿到未消费的新流。
+        every { contentResolver.openInputStream(any()) } answers { ByteArrayInputStream(pngBytes) }
         val payload = responseOf(tool.execute(mockk(), args("content://docs/doc/photo")))
 
         val request = LlmRequest(contents = listOf(readResponseContent(payload)))

@@ -14,7 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Rule
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
@@ -79,7 +78,6 @@ fun ToolAuthorizationScreen(
                         icon = Icons.Default.Tune,
                         title = stringResource(R.string.toolauth_tool_access_label),
                         subtitle = toolAccessModeDescription(state.toolAccessMode),
-                        showDivider = true,
                         trailingContent = {
                             Switch(
                                 checked = state.toolAccessMode == ToolAccessMode.ALWAYS_AVAILABLE,
@@ -93,20 +91,6 @@ fun ToolAuthorizationScreen(
                                             },
                                         ),
                                     )
-                                },
-                                enabled = !state.isMutationBlocked,
-                            )
-                        },
-                    )
-                    PreferenceListItem(
-                        icon = Icons.Default.Visibility,
-                        title = stringResource(R.string.toolauth_chat_display_title),
-                        subtitle = stringResource(R.string.toolauth_chat_display_subtitle),
-                        trailingContent = {
-                            Switch(
-                                checked = state.showToolActivity,
-                                onCheckedChange = { on ->
-                                    onAction(ToolAuthorizationAction.SetShowToolActivity(on))
                                 },
                                 enabled = !state.isMutationBlocked,
                             )

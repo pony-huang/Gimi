@@ -15,7 +15,6 @@ import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurnStatus
 import github.ponyhuang.gimi.domain.conversation.usecase.PrepareChatTurnUseCase
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
-import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
@@ -85,7 +84,6 @@ class ChatViewModel @Inject constructor(
     private val repository: ConversationRepository,
     private val sessionResolver: ConversationSessionResolver,
     private val modelServices: ModelCatalogRepository,
-    private val chatDisplayPreferences: ChatDisplayRepository,
     private val appearanceRepository: AppearanceRepository,
     private val toolApproval: ToolApprovalRepository,
     private val toolAuthorization: ToolAuthorizationRepository,
@@ -134,6 +132,7 @@ class ChatViewModel @Inject constructor(
                 toggleSpeechPlayback(action.messageId, action.markdown)
             ChatAction.ToggleAutoSpeak ->
                 speechSettings.setAutoSpeakEnabled(!speechSettings.autoSpeakEnabled.value)
+            is ChatAction.ToggleTimeline -> toggleTimeline(action.turnId)
             is ChatAction.RespondToToolConfirmation ->
                 respondToToolConfirmation(action.confirmed, action.alwaysAllow)
             is ChatAction.RespondToInputRequest ->
@@ -173,6 +172,14 @@ class ChatViewModel @Inject constructor(
         speechPlaybackController.toggle(messageId, markdownToSpeechText(markdown))
     }
 
+    private fun toggleTimeline(turnId: String) {
+        _uiState.update { state ->
+            val expanded = state.expandedTimelineIds.toMutableSet()
+            if (!expanded.add(turnId)) expanded.remove(turnId)
+            state.copy(expandedTimelineIds = expanded)
+        }
+    }
+
     /** Sends the user's decision back to ADK, which then either runs or rejects the paused tool. */
     private fun respondToToolConfirmation(confirmed: Boolean, alwaysAllow: Boolean = false) {
         val sessionId = _uiState.value.sessionId
@@ -208,9 +215,12 @@ class ChatViewModel @Inject constructor(
         if (confirmed) {
             if (alwaysAllow) toolApproval.setAlwaysAllowed(request.toolName)
             runtime.approvedToolsThisTurn += request.toolName
+            runtime.toolStatuses[ToolCallKey(request.originalCallId, request.toolName)] =
+                ToolCallStatus.Running
         } else {
             runtime.approvedToolsThisTurn.clear()
-            runtime.rejectedToolNames += request.toolName
+            runtime.toolStatuses[ToolCallKey(request.originalCallId, request.toolName)] =
+                ToolCallStatus.Rejected
         }
         val previousJob = cancelRun(runtime, releaseLease = false)
         launchRun(runtime) { runToken ->
@@ -279,11 +289,6 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             modelServices.observeLoadState().collect { state ->
                 _uiState.update { it.copy(modelCatalogLoadState = state) }
-            }
-        }
-        viewModelScope.launch {
-            chatDisplayPreferences.showToolActivity.collect { show ->
-                _uiState.update { it.copy(showToolActivity = show) }
             }
         }
         viewModelScope.launch {
@@ -387,6 +392,7 @@ class ChatViewModel @Inject constructor(
             if (state.sessionId == runtime.sessionId) {
                 state.copy(
                     messages = runtime.messages,
+                    listItems = runtime.toChatListItems(),
                     isAgentRunning = runtime.isAgentRunning,
                     failedTurn = runtime.failedRecoverableTurn(),
                     currentModelSelection = runtime.modelSelection,
@@ -397,7 +403,6 @@ class ChatViewModel @Inject constructor(
                     ),
                     pendingToolConfirmations = runtime.pendingToolConfirmations,
                     pendingInputRequests = runtime.pendingInputRequests,
-                    rejectedToolNames = runtime.rejectedToolNames.toSet(),
                     conversationTaskStatuses = statuses,
                 )
             } else {
@@ -415,6 +420,7 @@ class ChatViewModel @Inject constructor(
             state.copy(
                 sessionId = sessionId,
                 messages = runtime.messages,
+                listItems = runtime.toChatListItems(),
                 isAgentRunning = runtime.isAgentRunning,
                 failedTurn = runtime.failedRecoverableTurn(),
                 currentModelSelection = runtime.modelSelection,
@@ -425,7 +431,6 @@ class ChatViewModel @Inject constructor(
                 ),
                 pendingToolConfirmations = runtime.pendingToolConfirmations,
                 pendingInputRequests = runtime.pendingInputRequests,
-                rejectedToolNames = runtime.rejectedToolNames.toSet(),
                 isInitializing = isInitializing,
             )
         }
@@ -598,6 +603,7 @@ class ChatViewModel @Inject constructor(
         runtime.approvedToolsThisTurn.clear()
         runtime.pendingToolConfirmations = emptyList()
         runtime.autoApprovedConfirmations = emptyList()
+        runtime.toolStatuses.clear()
         publishRuntime(runtime)
     }
 
@@ -1538,6 +1544,15 @@ class ChatViewModel @Inject constructor(
         private const val MAX_DOCUMENT_REQUEST_BYTES: Long = 50L * 1024 * 1024
     }
 }
+
+/** 为 UI 发布当前会话的可展示轮次，同时保留 [ChatSessionRuntime.messages] 原始真相。 */
+private fun ChatSessionRuntime.toChatListItems(): List<ChatListItem> =
+    messages.toChatListItems(
+        TimelineActivityState(
+            isAgentRunning = isAgentRunning,
+            toolStatuses = toolStatuses,
+        ),
+    )
 
 private fun List<LLMModelSetting>.isUsableChatSelection(selection: ModelSelection): Boolean {
     val service = firstOrNull { it.id == selection.serviceId } ?: return false

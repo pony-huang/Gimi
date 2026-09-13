@@ -8,6 +8,7 @@ import com.google.adk.kt.types.Part
 import android.util.Log
 import github.ponyhuang.gimi.domain.conversation.model.FunctionCallView
 import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
+import github.ponyhuang.gimi.domain.conversation.model.AdkRequestConfirmationToolName
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
@@ -75,8 +76,10 @@ object EventMapper {
             calls.isEmpty() &&
             responses.isNotEmpty()
         ) {
-            val inputResponses = responses.filter { it.name in UserInputToolCallNames }
-            if (inputResponses.isEmpty()) {
+            val protocolResponses = responses.filter {
+                it.name in UserInputToolCallNames || it.name == AdkRequestConfirmationToolName
+            }
+            if (protocolResponses.isEmpty()) {
                 return null
             }
             return Messages.fromAssistant(
@@ -85,7 +88,7 @@ object EventMapper {
                 author = event.author,
                 timestamp = event.timestamp,
             ).copy(
-                functionResponses = inputResponses.map { it.toView() },
+                functionResponses = protocolResponses.map { it.toView() },
                 partial = false,
                 turnComplete = true,
             )
@@ -224,7 +227,14 @@ object EventMapper {
     // ── ADK 类型 → UI 视图 ──────────────────────────────────────────────
     private fun FunctionCall.toView(): FunctionCallView {
         if (name == FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME) {
-            return FunctionCallView(id = id.orEmpty(), name = name, argsSummary = "")
+            val original = args["originalFunctionCall"] as? Map<*, *>
+            return FunctionCallView(
+                id = id.orEmpty(),
+                name = name,
+                argsSummary = "",
+                confirmationOriginalCallId = original?.get("id") as? String,
+                confirmationOriginalToolName = original?.get("name") as? String,
+            )
         }
         val argsText = if (args.isEmpty()) "" else args.entries.joinToString(
             prefix = "(",
@@ -244,6 +254,11 @@ object EventMapper {
             id = id.orEmpty(),
             name = name,
             localFileSearchResult = parsed,
+            confirmationApproved = if (name == FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME) {
+                response["confirmed"] as? Boolean
+            } else {
+                null
+            },
         )
     }
 

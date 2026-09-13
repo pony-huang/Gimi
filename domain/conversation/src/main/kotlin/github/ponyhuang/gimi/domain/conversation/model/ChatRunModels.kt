@@ -63,17 +63,30 @@ data class UserInputRequest(
  * @property id Identifier paired with the originating tool call.
  * @property name Tool function name.
  * @property localFileSearchResult Validated local files for supported search tools.
+ * @property confirmationApproved User decision carried by a confirmation protocol response.
  */
 data class ChatFunctionResponse(
     val id: String?,
     val name: String,
     val localFileSearchResult: LocalFileSearchResult? = null,
+    val confirmationApproved: Boolean? = null,
 )
 
+/**
+ * ADK 工具确认协议信令携带的原始调用信息。
+ *
+ * @property originalCallId 被确认的原始工具调用 id，用于按调用实例关联状态。
+ * @property toolName 被确认的原始工具名。
+ * @property args 被确认的原始工具参数。
+ */
 data class ToolConfirmationRequest(
+    val originalCallId: String,
     val toolName: String,
     val args: Map<String, Any?>,
 )
+
+/** ADK `adk_request_confirmation`（工具确认协议）的 function call 名。 */
+const val AdkRequestConfirmationToolName = "adk_request_confirmation"
 
 /** ADK `adk_request_input`（内容输入）的 function call 名。 */
 const val AdkRequestInputToolName = "adk_request_input"

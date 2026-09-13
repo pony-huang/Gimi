@@ -10,7 +10,6 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.gimi.core.storage.ManagedDirectorySpec
-import github.ponyhuang.gimi.data.conversation.ChatDisplayPreferences
 import github.ponyhuang.gimi.data.conversation.ToolAccessPreferences
 import github.ponyhuang.gimi.data.conversation.ToolApprovalPreferences
 import github.ponyhuang.gimi.data.conversation.conversationAttachmentDirectorySpec
@@ -21,7 +20,6 @@ import github.ponyhuang.gimi.data.conversation.repository.DefaultConversationSes
 import github.ponyhuang.gimi.data.conversation.runtime.InMemoryAgentRuntimeGate
 import github.ponyhuang.gimi.data.conversation.local.ConversationMetadataDatabase
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
-import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
@@ -55,12 +53,6 @@ object ConversationModule {
     fun provideChatAttachmentRepository(
         implementation: AndroidChatAttachmentRepository,
     ): ChatAttachmentRepository = implementation
-
-    @Provides
-    @Singleton
-    fun provideChatDisplayRepository(
-        implementation: ChatDisplayPreferences,
-    ): ChatDisplayRepository = implementation
 
     @Provides
     @Singleton

@@ -46,11 +46,8 @@ internal class ChatSessionRuntime(
     var autoApprovedConfirmations: List<PendingToolConfirmation> = emptyList()
     val approvedToolsThisTurn: MutableSet<String> = mutableSetOf()
 
-    /**
-     * 本次会话里被用户拒绝确认的工具名（纯内存展示态，不进 Room/session）。
-     * 拒绝后 ADK 不会再补发原始工具的 FunctionResponse，chip 只能靠这个集合显示 ✗。
-     */
-    val rejectedToolNames: MutableSet<String> = mutableSetOf()
+    /** 当前进程可证明的工具状态，按调用 id 与工具名隔离。 */
+    val toolStatuses: MutableMap<ToolCallKey, ToolCallStatus> = mutableMapOf()
     var job: Job? = null
     /** 新发送创建，挂起期间保留，终止时释放引用；不跟随全局设置变化。 */
     var execution: ChatAgentExecution? = null

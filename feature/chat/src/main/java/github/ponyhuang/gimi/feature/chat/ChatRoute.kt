@@ -165,6 +165,9 @@ fun ChatRoute(
             onShowAllLocalFiles = { responseId ->
                 onShowAllLocalFiles(currentSessionId, responseId)
             },
+            onToggleTimeline = { turnId ->
+                viewModel.onAction(ChatAction.ToggleTimeline(turnId))
+            },
             onToolConfirmation = { confirmed ->
                 viewModel.onAction(ChatAction.RespondToToolConfirmation(confirmed))
             },

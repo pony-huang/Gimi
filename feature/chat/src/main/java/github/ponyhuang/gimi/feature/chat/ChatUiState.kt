@@ -23,7 +23,9 @@ import github.ponyhuang.gimi.domain.mcp.model.McpServer
  * 造成的重复 collect。所有字段均有默认值，既方便作为 `stateIn` 的初始值，
  * 也方便 `@Preview` 桩与测试 override。
  *
- * @param messages 已渲染的消息列表（含 partial / 工具调用 / 错误消息）
+ * @param messages 未损失的原始消息列表，供搜索、朗读和滚动定位等非时间线消费者使用
+ * @param listItems 按用户轮次派生的聊天列表展示元素
+ * @param expandedTimelineIds 用户手动展开的已完成时间线 turn id
  * @param sessionId 当前激活的会话 id；空串表示还没建立会话
  * @param isAgentRunning Agent turn 是否仍在进行（包括思考、流式输出和工具执行）。
  *                       用于显示思考/停止状态并锁定会话级操作。
@@ -42,6 +44,8 @@ import github.ponyhuang.gimi.domain.mcp.model.McpServer
  */
 data class ChatUiState(
     val messages: List<Message> = emptyList(),
+    val listItems: List<ChatListItem> = emptyList(),
+    val expandedTimelineIds: Set<String> = emptySet(),
     val sessionId: String = "",
     val isAgentRunning: Boolean = false,
     /**
@@ -63,7 +67,6 @@ data class ChatUiState(
     val availableMcpServers: List<McpServer> = emptyList(),
     val officialToolDescriptors: List<OfficialToolDescriptor> = emptyList(),
     val hasToolConfigurationError: Boolean = false,
-    val showToolActivity: Boolean = true,
     /** 夜间模式覆盖值；`null` 表示跟随系统。由抽屉里的开关写入，MainActivity 据此解析主题。 */
     val darkThemeOverride: Boolean? = null,
     val isSpeechRecognitionAvailable: Boolean = false,
@@ -72,8 +75,6 @@ data class ChatUiState(
     val pendingInputRequests: List<UserInputRequest> = emptyList(),
     /** Full access 全局开关：开启后所有需要确认的工具调用自动放行。 */
     val fullAccess: Boolean = false,
-    /** 被用户拒绝确认的工具名（内存展示态）；工具 chip 据此显示 ✗ 而非永远悬在"未完成"。 */
-    val rejectedToolNames: Set<String> = emptySet(),
     val speechPlaybackState: SpeechPlaybackState = SpeechPlaybackState(),
     /**
      * 自动语音播报全局开关；开启时每轮 assistant 回复完成后自动朗读。

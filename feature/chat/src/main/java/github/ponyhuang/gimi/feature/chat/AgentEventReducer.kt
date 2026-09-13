@@ -15,12 +15,14 @@ import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizati
  * 单条工具确认请求在确认卡片上展示的数据。
  *
  * @property confirmationCallId ADK function call 的 id，回复确认时用于定位请求。
+ * @property originalCallId 被确认的原始工具调用 id，用于精确更新对应时间线条目。
  * @property toolName 被确认的工具名。
  * @property description 工具描述（来自工具授权仓库，缺失时为空串）。
  * @property arguments 参数摘要（多行 `key: value`，敏感键遮蔽为 `••••`）。
  */
 data class PendingToolConfirmation(
     val confirmationCallId: String,
+    val originalCallId: String,
     val toolName: String,
     val description: String,
     val arguments: String,
@@ -72,6 +74,18 @@ internal class AgentEventReducer(
 
     private fun applyAgentRunEvent(sessionId: String, event: ChatRunEvent) {
         val runtime = runtimeFor(sessionId)
+        event.functionCalls.forEach { call ->
+            val callId = call.id?.takeIf(String::isNotBlank) ?: return@forEach
+            if (call.confirmationRequest == null) {
+                runtime.toolStatuses[ToolCallKey(callId, call.name)] = ToolCallStatus.Running
+            }
+        }
+        event.functionResponses.forEach { response ->
+            val callId = response.id?.takeIf(String::isNotBlank) ?: return@forEach
+            if (response.name != ConfirmationToolName) {
+                runtime.toolStatuses[ToolCallKey(callId, response.name)] = ToolCallStatus.Completed
+            }
+        }
         val phase = when {
             event.functionCalls.any { it.confirmationRequest == null } -> AgentTaskPhase.EXECUTING_TOOL
             event.functionResponses.isNotEmpty() -> AgentTaskPhase.GENERATING
@@ -100,6 +114,7 @@ internal class AgentEventReducer(
                 ?: ""
             PendingToolConfirmation(
                 confirmationCallId = confirmationId,
+                originalCallId = request.originalCallId,
                 toolName = request.toolName,
                 description = description,
                 arguments = request.args.entries.joinToString(separator = "\n") { (key, value) ->
@@ -112,6 +127,14 @@ internal class AgentEventReducer(
         // 等流结束后静默回复 ADK；绝不能进 pendingToolConfirmations——它直接驱动确认卡片渲染，
         // 混进去会出现"卡片闪一下再自动关闭"的观感。
         val (autoApproved, needsUser) = incoming.partition { isAutoApproved(it.toolName) }
+        autoApproved.forEach { request ->
+            runtime.toolStatuses[ToolCallKey(request.originalCallId, request.toolName)] =
+                ToolCallStatus.Running
+        }
+        needsUser.forEach { request ->
+            runtime.toolStatuses[ToolCallKey(request.originalCallId, request.toolName)] =
+                ToolCallStatus.AwaitingConfirmation
+        }
         runtime.autoApprovedConfirmations = (runtime.autoApprovedConfirmations + autoApproved)
             .distinctBy { it.confirmationCallId }
         if (needsUser.isNotEmpty()) {
@@ -227,6 +250,7 @@ internal class AgentEventReducer(
                 it[mergeIndex] = old.copy(
                     partial = false,
                     turnComplete = message.turnComplete,
+                    timestamp = maxOf(old.timestamp, message.timestamp),
                     functionCalls = old.functionCalls + message.functionCalls.filter { call ->
                         old.functionCalls.none { it.id == call.id && it.name == call.name }
                     },

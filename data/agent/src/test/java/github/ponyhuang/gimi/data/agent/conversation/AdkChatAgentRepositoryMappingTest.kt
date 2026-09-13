@@ -120,6 +120,7 @@ class AdkChatAgentRepositoryMappingTest {
             args = mapOf(
                 "originalFunctionCall" to mapOf(
                     "name" to "brightness_set",
+                    "id" to "brightness-call-1",
                     "args" to mapOf("level" to 80),
                 ),
             ),
@@ -139,8 +140,30 @@ class AdkChatAgentRepositoryMappingTest {
             )
         }
         val confirmation = events.single().functionCalls.single().confirmationRequest
+        assertEquals("brightness-call-1", confirmation?.originalCallId)
         assertEquals("brightness_set", confirmation?.toolName)
         assertEquals(mapOf("level" to 80), confirmation?.args)
+    }
+
+    @Test
+    fun mapsConfirmationResponseDecision() = runTest {
+        val response = FunctionResponse(
+            id = "confirm-1",
+            name = FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME,
+            response = mapOf("confirmed" to false),
+        )
+        coEvery {
+            execution.respondToToolConfirmation(any(), any())
+        } returns flowOf(adkEvent(responses = listOf(response)))
+
+        val mapped = repository.createExecution("session-1", selection)
+            .respondToToolConfirmation("confirm-1", confirmed = false)
+            .toList()
+            .single()
+            .functionResponses
+            .single()
+
+        assertEquals(false, mapped.confirmationApproved)
     }
 
     private fun adkEvent(

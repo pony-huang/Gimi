@@ -5,7 +5,6 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,9 +31,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.domain.conversation.model.FunctionCallView
-import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
-import github.ponyhuang.gimi.domain.conversation.model.LocalFileReference
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.Messages
@@ -60,11 +56,8 @@ internal fun MessageRole.toChatBubbleRole(): ChatBubbleRole = when (this) {
 /**
  * 消息气泡 — 把 [Message] 渲染到 [ChatMessageBubble] 的 content slot 里。
  *
- * 渲染顺序：
- * 1. 每个 [TextPart]：
- *    - `thought == true` → 走 [ThoughtBubble]（同样支持流式渲染）
- *    - 否则 → 流式 Markdown（经由 [ChatTextContent] 收口）
- * 2. 工具活动 chip 行（call/response 按 id 配对为单 chip，确认协议信令已过滤）
+ * 这里只渲染最终回答文本、附件、错误与回答操作。thought 和工具活动统一由
+ * [TurnTimelinePanel] 呈现，避免同一过程信息在正文气泡里重复出现。
  *
  * @param partChannelProvider reducer 暴露的"按 TextPart.id 取 chunk channel"函数。
  *        Composable 拿到 channel 后用 `for (chunk in channel) streamingState.append(chunk)`
@@ -74,27 +67,18 @@ internal fun MessageRole.toChatBubbleRole(): ChatBubbleRole = when (this) {
 fun MessageBubble(
     message: Message,
     partChannelProvider: (partId: String) -> ReceiveChannel<String>?,
-    showToolActivity: Boolean = true,
-    isAgentRunning: Boolean = false,
-    rejectedToolNames: Set<String> = emptySet(),
-    awaitingConfirmationToolNames: Set<String> = emptySet(),
     speechPlaybackState: SpeechPlaybackState = SpeechPlaybackState(),
     onToggleSpeechPlayback: (messageId: String, text: String) -> Unit = { _, _ -> },
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit =
         {},
-    onOpenLocalFile: (LocalFileReference) -> Unit = {},
-    onShowAllLocalFiles: (responseId: String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val role = message.role
     val fillsBubbleWidth = role != MessageRole.User
     ChatMessageBubble(role = role.toChatBubbleRole(), modifier = modifier) {
         Column(modifier = if (fillsBubbleWidth) Modifier.fillMaxWidth() else Modifier) {
-            if (message.textParts.isNotEmpty() ||
-                message.functionCalls.isNotEmpty() ||
-                message.functionResponses.isNotEmpty()
-            ) {
-                message.textParts.forEach { part ->
+            if (message.textParts.isNotEmpty()) {
+                message.textParts.filterNot { it.thought }.forEach { part ->
                     RenderTextPart(
                         part = part,
                         partial = message.partial,
@@ -104,61 +88,10 @@ fun MessageBubble(
                 }
             }
 
-            // 工具活动 chip 行：call/response 按 id 配对成单个状态 chip（见 ToolCallChip），
-            // 确认协议信令（adk_request_confirmation）在 visibleFunction* 里已过滤。
-            if (showToolActivity) {
-                val calls = message.visibleFunctionCalls()
-                val responses = message.visibleFunctionResponses()
-                if (calls.isNotEmpty() || responses.isNotEmpty()) {
-                    val respondedIds = responses.mapTo(HashSet()) { it.id }
-                    val calledIds = calls.mapTo(HashSet()) { it.id }
-                    ChipRow(fillAvailableWidth = fillsBubbleWidth) {
-                        calls.forEach { call ->
-                            // id 为空时无法可靠配对，保守按"未完成"处理，避免误标 ✓。
-                            val completed = call.id.isNotEmpty() && call.id in respondedIds
-                            // 显式拒绝（内存态）优先；任务已结束（非流式、未在跑）而响应
-                            // 始终未到的，视为未执行/被中断，同样给 ✗ 而不是永远悬着。
-                            val rejected = !completed &&
-                                (call.name in rejectedToolNames ||
-                                    (!message.partial && !isAgentRunning))
-                            val awaitingConfirmation = !completed && !rejected &&
-                                call.name in awaitingConfirmationToolNames
-                            ToolCallChip(
-                                call = call,
-                                completed = completed,
-                                inProgress = !completed && !rejected && !awaitingConfirmation,
-                                rejected = rejected,
-                                awaitingConfirmation = awaitingConfirmation,
-                                modifier = Modifier.weight(1f, fill = false),
-                            )
-                        }
-                        responses.forEach { response ->
-                            if (response.id.isEmpty() || response.id !in calledIds) {
-                                ToolResponseChip(
-                                    response = response,
-                                    modifier = Modifier.weight(1f, fill = false),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
             MessageAttachments(
                 attachments = message.fileAttachments,
                 onOpenDocument = onOpenDocument,
             )
-
-            message.functionResponses.forEach { response ->
-                response.localFileSearchResult?.takeIf { it.files.isNotEmpty() }?.let { result ->
-                    LocalFileSearchCarousel(
-                        responseId = response.id,
-                        result = result,
-                        onOpenFile = onOpenLocalFile,
-                        onShowAll = onShowAllLocalFiles,
-                    )
-                }
-            }
 
             assistantReplyTextForCopy(message)?.let { text ->
                 AssistantMessageActions(
@@ -265,21 +198,6 @@ private fun AssistantMessageActions(
     }
 }
 
-@Composable
-private fun ChipRow(
-    fillAvailableWidth: Boolean,
-    content: @Composable RowScope.() -> Unit,
-) {
-    Row(
-        modifier = (if (fillAvailableWidth) Modifier.fillMaxWidth() else Modifier)
-            .padding(bottom = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        content()
-    }
-}
-
 /**
  * 流式渲染一段普通 markdown 文本。
  *
@@ -325,31 +243,7 @@ private fun MessageBubblePreview() {
                     author = "DefaultAssistant",
                     role = MessageRole.Assistant,
                     textParts = listOf(
-                        TextPart(text = "需要先查天气才能给建议。", thought = true),
-                    ),
-                    partial = true,
-                ),
-                partChannelProvider = { null },
-            )
-            MessageBubble(
-                message = Message(
-                    author = "DefaultAssistant",
-                    role = MessageRole.Assistant,
-                    textParts = listOf(
                         TextPart(text = "上海今天晴，28°C。", thought = false),
-                    ),
-                    functionCalls = listOf(
-                        FunctionCallView(
-                            id = "c1",
-                            name = "getCurrentWeather",
-                            argsSummary = "(city=\"上海\")"
-                        )
-                    ),
-                    functionResponses = listOf(
-                        FunctionResponseView(
-                            id = "c1",
-                            name = "getCurrentWeather"
-                        )
                     ),
                 ),
                 partChannelProvider = { null },

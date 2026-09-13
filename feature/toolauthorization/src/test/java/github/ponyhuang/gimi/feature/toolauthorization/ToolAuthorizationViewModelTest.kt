@@ -4,7 +4,6 @@ import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import app.cash.turbine.test
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
-import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import github.ponyhuang.gimi.domain.toolauthorization.usecase.SetToolAuthorizationUseCase
@@ -20,7 +19,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -83,21 +81,10 @@ class ToolAuthorizationViewModelTest {
         assertEquals(ToolAccessMode.ALWAYS_AVAILABLE, toolAccess.defaultToolAccessMode.value)
     }
 
-    @Test
-    fun showToolActivitySwitchWritesToDisplayRepository() = runTest {
-        val display = FakeChatDisplayRepository()
-        val viewModel = viewModel(repository(), busy = false, chatDisplayRepository = display)
-
-        viewModel.onAction(ToolAuthorizationAction.SetShowToolActivity(false))
-
-        assertFalse(display.showToolActivity.value)
-    }
-
     private fun viewModel(
         repository: ToolAuthorizationRepository,
         busy: Boolean,
         toolAccessRepository: ToolAccessRepository = FakeToolAccessRepository(),
-        chatDisplayRepository: ChatDisplayRepository = FakeChatDisplayRepository(),
     ) = ToolAuthorizationViewModel(
         repository,
         SetToolAuthorizationUseCase(
@@ -107,7 +94,6 @@ class ToolAuthorizationViewModelTest {
             ),
         ),
         toolAccessRepository,
-        chatDisplayRepository,
     )
 
     private fun repository(): ToolAuthorizationRepository = mockk(relaxed = true) {
@@ -129,12 +115,4 @@ class ToolAuthorizationViewModelTest {
         }
     }
 
-    private class FakeChatDisplayRepository : ChatDisplayRepository {
-        private val mutable = MutableStateFlow(true)
-        override val showToolActivity: StateFlow<Boolean> = mutable
-
-        override fun setShowToolActivity(show: Boolean) {
-            mutable.value = show
-        }
-    }
 }

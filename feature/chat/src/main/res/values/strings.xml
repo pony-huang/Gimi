@@ -182,4 +182,16 @@
     <string name="chat_repeat_execution_title">重新发送这条消息？</string>
     <string name="chat_repeat_execution_body">本轮已发起工具调用。重新发送可能重复执行本轮工具操作，已完成的操作不会撤销。</string>
     <string name="chat_repeat_execution_confirm">重新发送</string>
+    <string name="chat_timeline_worked_duration">已工作 %1$s</string>
+    <string name="chat_timeline_step_count">共 %1$d 步</string>
+    <string name="chat_timeline_duration_minutes_seconds">%1$d 分 %2$d 秒</string>
+    <string name="chat_timeline_duration_seconds">%1$d 秒</string>
+    <string name="chat_timeline_expand">展开工作过程</string>
+    <string name="chat_timeline_collapse">收起工作过程</string>
+    <string name="chat_timeline_file_count">找到 %1$d 个文件</string>
+    <string name="chat_timeline_tool_running">执行中</string>
+    <string name="chat_timeline_tool_completed">已完成</string>
+    <string name="chat_timeline_tool_rejected">已拒绝</string>
+    <string name="chat_timeline_tool_awaiting_confirmation">等待确认</string>
+    <string name="chat_timeline_tool_unknown">状态未知</string>
 </resources>

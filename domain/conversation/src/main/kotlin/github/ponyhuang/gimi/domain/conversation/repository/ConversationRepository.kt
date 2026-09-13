@@ -42,12 +42,6 @@ interface ConversationRepository {
     fun notifyConversationContentChanged(sessionId: String)
 }
 
-interface ChatDisplayRepository {
-    val showToolActivity: StateFlow<Boolean>
-
-    fun setShowToolActivity(show: Boolean)
-}
-
 /**
  * Global tool loading preference applied to every conversation.
  *

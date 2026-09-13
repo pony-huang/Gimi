@@ -105,6 +105,13 @@ class AdkChatAgentRepository @Inject constructor(
                 id = it.id,
                 name = it.name,
                 localFileSearchResult = parsed,
+                confirmationApproved = if (
+                    it.name == FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME
+                ) {
+                    it.response["confirmed"] as? Boolean
+                } else {
+                    null
+                },
             )
         },
         partial = partial,
@@ -120,8 +127,10 @@ class AdkChatAgentRepository @Inject constructor(
             name == FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME
         }?.let {
             val original = args["originalFunctionCall"] as? Map<*, *>
+            val originalCallId = original?.get("id") as? String
             val toolName = original?.get("name") as? String
-            if (toolName == null) null else ToolConfirmationRequest(
+            if (originalCallId == null || toolName == null) null else ToolConfirmationRequest(
+                originalCallId = originalCallId,
                 toolName = toolName,
                 args = (original["args"] as? Map<*, *>)
                     .orEmpty()

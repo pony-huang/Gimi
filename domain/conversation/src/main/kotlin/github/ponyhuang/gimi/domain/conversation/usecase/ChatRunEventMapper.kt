@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.domain.conversation.usecase
 import github.ponyhuang.gimi.domain.conversation.model.ChatFunctionCall
 import github.ponyhuang.gimi.domain.conversation.model.ChatFunctionResponse
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
+import github.ponyhuang.gimi.domain.conversation.model.AdkRequestConfirmationToolName
 import github.ponyhuang.gimi.domain.conversation.model.FunctionCallView
 import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
 import github.ponyhuang.gimi.domain.conversation.model.Message
@@ -33,8 +34,10 @@ object ChatRunEventMapper {
             // 用户输入工具（get_user_choice / adk_request_input）的回执本身就是工具
             // 结果，丢弃会让调用 chip 永远配不到响应而显示 ✗ —— 保留成响应消息，
             // 由展示层折叠进前面的调用消息完成配对。
-            val inputResponses = event.functionResponses.filter { it.name in UserInputToolCallNames }
-            if (inputResponses.isEmpty()) {
+            val protocolResponses = event.functionResponses.filter {
+                it.name in UserInputToolCallNames || it.name == AdkRequestConfirmationToolName
+            }
+            if (protocolResponses.isEmpty()) {
                 return null
             }
             return Messages.fromAssistant(
@@ -43,7 +46,7 @@ object ChatRunEventMapper {
                 author = event.author,
                 timestamp = event.timestamp,
             ).copy(
-                functionResponses = inputResponses.map(ChatFunctionResponse::toView),
+                functionResponses = protocolResponses.map(ChatFunctionResponse::toView),
                 turnComplete = true,
             )
         }
@@ -96,6 +99,8 @@ fun ChatFunctionCall.toView(): FunctionCallView = FunctionCallView(
         postfix = ")",
         separator = ", ",
     ) { (key, value) -> "$key=${summarizeValue(value)}" },
+    confirmationOriginalCallId = confirmationRequest?.originalCallId,
+    confirmationOriginalToolName = confirmationRequest?.toolName,
 )
 
 fun ChatFunctionResponse.toView(): FunctionResponseView =
@@ -103,6 +108,7 @@ fun ChatFunctionResponse.toView(): FunctionResponseView =
         id = id.orEmpty(),
         name = name,
         localFileSearchResult = localFileSearchResult,
+        confirmationApproved = confirmationApproved,
     )
 
 fun summarizeValue(value: Any?): String = when (value) {

@@ -554,7 +554,7 @@ class DefaultAssistantSessionCoordinatorTest {
                 id = callId,
                 name = "adk_request_confirmation",
                 args = emptyMap(),
-                confirmationRequest = ToolConfirmationRequest(toolName, emptyMap()),
+                confirmationRequest = ToolConfirmationRequest("original-$callId", toolName, emptyMap()),
             ),
         ),
         functionResponses = emptyList(),

@@ -24,7 +24,6 @@ import github.ponyhuang.gimi.domain.conversation.model.FunctionCallView
 import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.usecase.PrepareChatTurnUseCase
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
-import github.ponyhuang.gimi.domain.conversation.repository.ChatDisplayRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionSnapshot
@@ -394,6 +393,17 @@ class ChatViewModelCharacterizationTest {
         advanceUntilIdle()
         assertTrue(fixture.speechSettings.autoSpeakEnabled.value)
         assertTrue(fixture.viewModel.uiState.value.autoSpeakEnabled)
+    }
+
+    @Test
+    fun toggleTimelineAction_updatesExpandedTurnIds() = runTest {
+        val fixture = fixture(configured = true)
+
+        fixture.viewModel.onAction(ChatAction.ToggleTimeline("turn-1"))
+        assertEquals(setOf("turn-1"), fixture.viewModel.uiState.value.expandedTimelineIds)
+
+        fixture.viewModel.onAction(ChatAction.ToggleTimeline("turn-1"))
+        assertTrue(fixture.viewModel.uiState.value.expandedTimelineIds.isEmpty())
     }
 
     @Test
@@ -1380,9 +1390,6 @@ class ChatViewModelCharacterizationTest {
         val agent = agentOverride ?: mockk<ChatAgentRepository> {
             coEvery { createExecution(any(), any(), any()) } returns execution
         }
-        val display = mockk<ChatDisplayRepository> {
-            every { showToolActivity } returns MutableStateFlow(true)
-        }
         val appearance = mockk<AppearanceRepository> {
             every { darkThemeOverride } returns MutableStateFlow(null)
             every { setDarkThemeOverride(any()) } returns Unit
@@ -1493,7 +1500,6 @@ class ChatViewModelCharacterizationTest {
                 repository = conversations,
                 sessionResolver = sessionResolver,
                 modelServices = catalog,
-                chatDisplayPreferences = display,
                 appearanceRepository = appearance,
                 toolApproval = toolApproval,
                 speechRecognitionRepository = recognition,
@@ -1516,7 +1522,6 @@ class ChatViewModelCharacterizationTest {
             sessionResolver = sessionResolver,
             execution = execution,
             agent = agent,
-            display = display,
             appearance = appearance,
             toolApproval = toolApproval,
             mcpRepository = mcpRepository,
@@ -1590,7 +1595,11 @@ class ChatViewModelCharacterizationTest {
         id = id,
         name = "adk_request_confirmation",
         args = emptyMap(),
-        confirmationRequest = ToolConfirmationRequest(toolName = toolName, args = args),
+        confirmationRequest = ToolConfirmationRequest(
+            originalCallId = "original-$id",
+            toolName = toolName,
+            args = args,
+        ),
     )
 
     private fun service() = LLMModelSetting(
@@ -1616,7 +1625,6 @@ class ChatViewModelCharacterizationTest {
         val sessionResolver: ConversationSessionResolver,
         val execution: ChatAgentExecution,
         val agent: ChatAgentRepository,
-        val display: ChatDisplayRepository,
         val appearance: AppearanceRepository,
         val toolApproval: FakeToolApprovalRepository,
         val mcpRepository: McpRepository,

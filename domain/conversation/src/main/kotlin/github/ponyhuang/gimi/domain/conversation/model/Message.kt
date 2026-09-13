@@ -185,12 +185,16 @@ data class TextPart(
  * @param id 工具调用 id（与 FunctionResponse 配对）
  * @param name 工具名
  * @param argsSummary 参数摘要字符串（用于 chip 显示）
+ * @param confirmationOriginalCallId 确认协议信令所指向的原始工具调用 id
+ * @param confirmationOriginalToolName 确认协议信令所指向的原始工具名
  */
 @Serializable
 data class FunctionCallView(
     val id: String,
     val name: String,
     val argsSummary: String,
+    val confirmationOriginalCallId: String? = null,
+    val confirmationOriginalToolName: String? = null,
 )
 
 /**
@@ -199,12 +203,14 @@ data class FunctionCallView(
  * @param id 工具调用 id（与 FunctionCall 配对）
  * @param name 工具名
  * @param localFileSearchResult 本地文件搜索工具返回的结构化结果
+ * @param confirmationApproved 确认协议中的用户决定；非确认响应为 null
  */
 @Serializable
 data class FunctionResponseView(
     val id: String,
     val name: String,
     val localFileSearchResult: LocalFileSearchResult? = null,
+    val confirmationApproved: Boolean? = null,
 )
 
 /**

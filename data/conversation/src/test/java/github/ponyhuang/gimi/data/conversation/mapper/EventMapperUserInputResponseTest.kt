@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.data.conversation.mapper
 
 import com.google.adk.kt.events.Event
 import com.google.adk.kt.types.Content
+import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.FunctionResponse
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
@@ -9,7 +10,6 @@ import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
@@ -39,16 +39,40 @@ class EventMapperUserInputResponseTest {
     }
 
     @Test
-    fun `confirmation protocol response is still ignored`() {
+    fun `confirmation protocol response is preserved as hidden status evidence`() {
         val event = userResponseEvent(
             FunctionResponse(
                 name = "adk_request_confirmation",
                 id = "confirm-1",
-                response = mapOf("confirmed" to true),
+                response = mapOf("confirmed" to false),
             ),
         )
 
-        assertNull(EventMapper.fromEvent(event))
+        val response = EventMapper.fromEvent(event)?.functionResponses?.single()
+
+        assertEquals("confirm-1", response?.id)
+        assertEquals(false, response?.confirmationApproved)
+    }
+
+    @Test
+    fun `confirmation request preserves original call identity for history`() {
+        val call = FunctionCall(
+            name = "adk_request_confirmation",
+            id = "confirm-1",
+            args = mapOf(
+                "originalFunctionCall" to mapOf(
+                    "id" to "original-1",
+                    "name" to "delete_file",
+                    "args" to emptyMap<String, Any?>(),
+                ),
+            ),
+        )
+        val event = assistantCallEvent(call)
+
+        val mapped = EventMapper.fromEvent(event)?.functionCalls?.single()
+
+        assertEquals("original-1", mapped?.confirmationOriginalCallId)
+        assertEquals("delete_file", mapped?.confirmationOriginalToolName)
     }
 
     private fun userResponseEvent(vararg responses: FunctionResponse): Event = mockk {
@@ -63,5 +87,19 @@ class EventMapperUserInputResponseTest {
         every { errorCode } returns null
         every { errorMessage } returns null
         every { timestamp } returns 123L
+    }
+
+    private fun assistantCallEvent(call: FunctionCall): Event = mockk {
+        every { id } returns "event-call"
+        every { invocationId } returns "invocation-call"
+        every { author } returns "assistant"
+        every { content } returns Content(role = Role.MODEL, parts = listOf(Part()))
+        every { functionCalls() } returns listOf(call)
+        every { functionResponses() } returns emptyList()
+        every { partial } returns false
+        every { turnComplete } returns false
+        every { errorCode } returns null
+        every { errorMessage } returns null
+        every { timestamp } returns 100L
     }
 }

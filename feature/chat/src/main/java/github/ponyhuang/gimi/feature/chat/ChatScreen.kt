@@ -129,6 +129,7 @@ fun ChatScaffold(
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit,
     onOpenLocalFile: (github.ponyhuang.gimi.domain.conversation.model.LocalFileReference) -> Unit,
     onShowAllLocalFiles: (responseId: String) -> Unit,
+    onToggleTimeline: (turnId: String) -> Unit = {},
     onToolConfirmation: (Boolean) -> Unit,
     onToolConfirmationAlwaysAllow: () -> Unit,
     onRespondToInputRequest: (callId: String, value: String) -> Unit = { _, _ -> },
@@ -156,13 +157,8 @@ fun ChatScaffold(
 
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    val messages = state.messages
-    val showToolActivity = state.showToolActivity
+    val listItems = state.listItems
     val isSpeechRecognitionAvailable = state.isSpeechRecognitionAvailable
-    val visibleMessages = remember(messages, showToolActivity) {
-        messages.filter { message -> message.isVisibleInChat(showToolActivity) }
-            .foldToolResponses()
-    }
     val isAgentRunning = state.isAgentRunning
     val speechPlaybackState = state.speechPlaybackState
     val pendingToolConfirmation = state.pendingToolConfirmation
@@ -181,19 +177,20 @@ fun ChatScaffold(
             ?.capabilities
             ?: MultimodalCapabilities()
     }
-    val awaitingConfirmationToolNames =
-        remember(state.pendingToolConfirmations, state.pendingInputRequests) {
-            state.pendingToolConfirmations.mapTo(HashSet()) { it.toolName }.apply {
-                // 挂起的输入请求同样让对应工具 chip 呈现等待态，而不是永远悬空的执行中。
-                state.pendingInputRequests.forEach { add(it.toolName) }
-            }
-        }
     // 只要用户仍停留在底部，就让流式内容增长持续跟随；用户向上浏览历史时则停止抢占滚动。
     var shouldFollowLatest by remember { mutableStateOf(true) }
     var isModelPickerVisible by remember { mutableStateOf(false) }
     var isComposerExpanded by remember { mutableStateOf(false) }
-    val latestItemIndex by rememberUpdatedState(visibleMessages.size)
-    val showsRecommendations = visibleMessages.isEmpty() && recommendations.isNotEmpty()
+    val renderedItemCount = remember(listItems) {
+        listItems.sumOf { item ->
+            when (item) {
+                is ChatListItem.UserMessage -> 1
+                is ChatListItem.AssistantTurn -> 1 + item.timeline.answerMessages.size
+            }
+        }
+    }
+    val latestItemIndex by rememberUpdatedState(renderedItemCount)
+    val showsRecommendations = listItems.isEmpty() && recommendations.isNotEmpty()
     // 推荐卡片跟着胶囊一起收放，聚焦放大后两者左右边缘刚好对齐。
     val recommendationHorizontalInset by animateDpAsState(
         targetValue = if (isComposerExpanded) 0.dp else ComposerCollapsedHorizontalInset,
@@ -202,13 +199,13 @@ fun ChatScaffold(
     )
 
     LaunchedEffect(
-        visibleMessages.size,
+        renderedItemCount,
         pendingToolConfirmation?.confirmationCallId,
         pendingInputRequest?.callId
     ) {
         if (state.getCurrentUserMessage() != null) {
             delay(100.milliseconds)
-            listState.animateScrollToItem(visibleMessages.size)
+            listState.animateScrollToItem(renderedItemCount)
         }
     }
 
@@ -403,7 +400,7 @@ fun ChatScaffold(
                     onClick = {
                         shouldFollowLatest = true
                         scope.launch {
-                            listState.animateScrollToItem(visibleMessages.size)
+                            listState.animateScrollToItem(renderedItemCount)
                         }
                     },
                 ) {
@@ -467,31 +464,57 @@ fun ChatScaffold(
                             )
                         }
                     }
-                    items(
-                        items = visibleMessages,
-                        key = { it.id },
-                        contentType = { msg ->
-                            when {
-                                msg.error != null -> "error"
-                                msg.role == MessageRole.User -> "user"
-                                msg.partial -> "assistant_streaming"
-                                else -> "assistant_complete"
+                    listItems.forEach { listItem ->
+                        when (listItem) {
+                            is ChatListItem.UserMessage -> item(
+                                key = "user:${listItem.message.id}",
+                                contentType = "user",
+                            ) {
+                                MessageRow(
+                                    message = listItem.message,
+                                    partChannelProvider = partChannelProvider,
+                                    speechPlaybackState = speechPlaybackState,
+                                    onToggleSpeechPlayback = onToggleSpeechPlayback,
+                                    onOpenDocument = onOpenDocument,
+                                )
                             }
-                        },
-                    ) { msg ->
-                        MessageRow(
-                            message = msg,
-                            partChannelProvider = partChannelProvider,
-                            showToolActivity = showToolActivity,
-                            isAgentRunning = isAgentRunning,
-                            rejectedToolNames = state.rejectedToolNames,
-                            awaitingConfirmationToolNames = awaitingConfirmationToolNames,
-                            speechPlaybackState = speechPlaybackState,
-                            onToggleSpeechPlayback = onToggleSpeechPlayback,
-                            onOpenDocument = onOpenDocument,
-                            onOpenLocalFile = onOpenLocalFile,
-                            onShowAllLocalFiles = onShowAllLocalFiles,
-                        )
+                            is ChatListItem.AssistantTurn -> {
+                                val timeline = listItem.timeline
+                                item(
+                                    key = "timeline:${timeline.turnId}",
+                                    contentType = "timeline",
+                                ) {
+                                    TurnTimelinePanel(
+                                        timeline = timeline,
+                                        expanded = timeline.isRunning ||
+                                            timeline.turnId in state.expandedTimelineIds,
+                                        onToggle = { onToggleTimeline(timeline.turnId) },
+                                        onOpenLocalFile = onOpenLocalFile,
+                                        onShowAllLocalFiles = onShowAllLocalFiles,
+                                    )
+                                }
+                                timeline.answerMessages.forEach { message ->
+                                    item(
+                                        key = "answer:${timeline.turnId}:${message.id}",
+                                        contentType = if (message.error != null) {
+                                            "error"
+                                        } else if (message.partial) {
+                                            "answer_streaming"
+                                        } else {
+                                            "answer"
+                                        },
+                                    ) {
+                                        MessageRow(
+                                            message = message,
+                                            partChannelProvider = partChannelProvider,
+                                            speechPlaybackState = speechPlaybackState,
+                                            onToggleSpeechPlayback = onToggleSpeechPlayback,
+                                            onOpenDocument = onOpenDocument,
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                     state.failedTurn?.let { failedTurn ->
                         if (!state.isAgentRunning && !state.editingFailedTurn) {
@@ -769,15 +792,9 @@ private fun RepeatExecutionDialog(
 private fun MessageRow(
     message: Message,
     partChannelProvider: (partId: String) -> ReceiveChannel<String>?,
-    showToolActivity: Boolean,
-    isAgentRunning: Boolean,
-    rejectedToolNames: Set<String>,
-    awaitingConfirmationToolNames: Set<String>,
     speechPlaybackState: github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState,
     onToggleSpeechPlayback: (messageId: String, text: String) -> Unit,
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit,
-    onOpenLocalFile: (github.ponyhuang.gimi.domain.conversation.model.LocalFileReference) -> Unit,
-    onShowAllLocalFiles: (responseId: String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (message.error != null) {
@@ -786,15 +803,9 @@ private fun MessageRow(
         MessageBubble(
             message = message,
             partChannelProvider = partChannelProvider,
-            showToolActivity = showToolActivity,
-            isAgentRunning = isAgentRunning,
-            rejectedToolNames = rejectedToolNames,
-            awaitingConfirmationToolNames = awaitingConfirmationToolNames,
             speechPlaybackState = speechPlaybackState,
             onToggleSpeechPlayback = onToggleSpeechPlayback,
             onOpenDocument = onOpenDocument,
-            onOpenLocalFile = onOpenLocalFile,
-            onShowAllLocalFiles = onShowAllLocalFiles,
             modifier = modifier
         )
     }
@@ -856,17 +867,19 @@ private fun ChatScaffoldEmptyPreview() {
 @Composable
 private fun ChatScaffoldWithMessagesPreview() {
     AsssistantaiTheme {
+        val messages = listOf(
+            Messages.fromUser("帮我查一下今天上海的天气"),
+            Message(
+                author = "DefaultAssistant",
+                role = MessageRole.Assistant,
+                textParts = listOf(TextPart(text = "上海今天晴，28°C，适合出门。")),
+            ),
+        )
         ChatScaffold(
             state = ChatUiState(
                 sessionId = "preview-session",
-                messages = listOf(
-                    Messages.fromUser("帮我查一下今天上海的天气"),
-                    Message(
-                        author = "DefaultAssistant",
-                        role = MessageRole.Assistant,
-                        textParts = listOf(TextPart(text = "上海今天晴，28°C，适合出门。")),
-                    ),
-                ),
+                messages = messages,
+                listItems = messages.toChatListItems(TimelineActivityState()),
             ),
             partChannelProvider = { null },
             onSend = { _, _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
@@ -957,15 +970,9 @@ private fun MessageRowUserPreview() {
         MessageRow(
             message = Messages.fromUser("帮我查一下今天上海的天气"),
             partChannelProvider = { null },
-            showToolActivity = true,
-            isAgentRunning = false,
-            rejectedToolNames = emptySet(),
-            awaitingConfirmationToolNames = emptySet(),
             speechPlaybackState = github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState(),
             onToggleSpeechPlayback = { _, _ -> },
             onOpenDocument = {},
-            onOpenLocalFile = {},
-            onShowAllLocalFiles = {},
         )
     }
 }
@@ -981,15 +988,9 @@ private fun MessageRowAssistantPreview() {
                 textParts = listOf(TextPart(text = "上海今天晴，28°C，适合出门。")),
             ),
             partChannelProvider = { null },
-            showToolActivity = true,
-            isAgentRunning = false,
-            rejectedToolNames = emptySet(),
-            awaitingConfirmationToolNames = emptySet(),
             speechPlaybackState = github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState(),
             onToggleSpeechPlayback = { _, _ -> },
             onOpenDocument = {},
-            onOpenLocalFile = {},
-            onShowAllLocalFiles = {},
         )
     }
 }
@@ -998,10 +999,12 @@ private fun MessageRowAssistantPreview() {
 @Composable
 private fun ChatScaffoldFailedTurnPreview() {
     AsssistantaiTheme {
+        val messages = listOf(Messages.fromUser("帮我查一下今天上海的天气"))
         ChatScaffold(
             state = ChatUiState(
                 sessionId = "preview-session",
-                messages = listOf(Messages.fromUser("帮我查一下今天上海的天气")),
+                messages = messages,
+                listItems = messages.toChatListItems(TimelineActivityState()),
                 failedTurn = previewFailedTurn(),
             ),
             partChannelProvider = { null },
@@ -1036,10 +1039,12 @@ private fun ChatScaffoldFailedTurnPreview() {
 @Composable
 private fun ChatScaffoldEditingFailedTurnPreview() {
     AsssistantaiTheme {
+        val messages = listOf(Messages.fromUser("帮我查一下今天上海的天气"))
         ChatScaffold(
             state = ChatUiState(
                 sessionId = "preview-session",
-                messages = listOf(Messages.fromUser("帮我查一下今天上海的天气")),
+                messages = messages,
+                listItems = messages.toChatListItems(TimelineActivityState()),
                 failedTurn = previewFailedTurn(),
                 failedTurnRecovery = FailedTurnRecoveryState.Editing(
                     sessionId = "preview-session",

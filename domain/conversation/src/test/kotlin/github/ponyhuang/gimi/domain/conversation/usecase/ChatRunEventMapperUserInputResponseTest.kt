@@ -4,7 +4,6 @@ import github.ponyhuang.gimi.domain.conversation.model.ChatFunctionResponse
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
@@ -28,12 +27,19 @@ class ChatRunEventMapperUserInputResponseTest {
     }
 
     @Test
-    fun `confirmation protocol response is still ignored`() {
+    fun `confirmation protocol response is preserved as hidden status evidence`() {
         val event = userResponseEvent(
-            ChatFunctionResponse(id = "confirm-1", name = "adk_request_confirmation"),
+            ChatFunctionResponse(
+                id = "confirm-1",
+                name = "adk_request_confirmation",
+                confirmationApproved = false,
+            ),
         )
 
-        assertNull(ChatRunEventMapper.fromEvent(event))
+        val response = ChatRunEventMapper.fromEvent(event)?.functionResponses?.single()
+
+        assertEquals("confirm-1", response?.id)
+        assertEquals(false, response?.confirmationApproved)
     }
 
     private fun userResponseEvent(vararg responses: ChatFunctionResponse) = ChatRunEvent(

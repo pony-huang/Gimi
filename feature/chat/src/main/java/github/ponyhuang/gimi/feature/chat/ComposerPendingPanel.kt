@@ -339,6 +339,7 @@ private fun PendingConfirmationPanelPreview() {
         PendingConfirmationPanel(
             request = PendingToolConfirmation(
                 confirmationCallId = "call-1",
+                originalCallId = "original-call-1",
                 toolName = "web_search",
                 description = "联网搜索工具，用于查询实时信息",
                 arguments = "query: 上海今天天气\nlimit: 5",
@@ -357,6 +358,7 @@ private fun PendingConfirmationPanelMinimalPreview() {
         PendingConfirmationPanel(
             request = PendingToolConfirmation(
                 confirmationCallId = "call-2",
+                originalCallId = "original-call-2",
                 toolName = "unknown_tool",
                 description = "",
                 arguments = "",

@@ -73,6 +73,7 @@
     <string name="chat_action_reject">拒绝</string>
     <string name="chat_action_allow">允许</string>
     <string name="chat_action_always_allow">总是允许</string>
+    <string name="chat_choice_request_title">请选择一个选项</string>
     <string name="chat_input_request_title">Agent 请求输入</string>
     <string name="chat_input_request_hint">输入你的回复…</string>
     <string name="chat_input_request_send">发送答复</string>

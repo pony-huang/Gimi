@@ -70,6 +70,7 @@
     <string name="chat_action_reject">Reject</string>
     <string name="chat_action_allow">Allow</string>
     <string name="chat_action_always_allow">Always allow</string>
+    <string name="chat_choice_request_title">Choose an option</string>
     <string name="chat_input_request_title">Agent input request</string>
     <string name="chat_input_request_hint">Type your reply…</string>
     <string name="chat_input_request_send">Send reply</string>

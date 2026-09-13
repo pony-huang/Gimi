@@ -79,8 +79,10 @@ internal fun PendingChoicePanel(
     onRespond: (String) -> Unit,
 ) {
     PendingPanelContainer {
+        // get_user_choice 调用没有 message 参数（ADK 工具 schema 只有 options），
+        // 标题恒为固定引导语；“Agent 请求输入”会让点选被误解成打字，故选项面板用专属文案。
         PendingPanelHeader(text = request.message.ifBlank {
-            stringResource(R.string.chat_input_request_title)
+            stringResource(R.string.chat_choice_request_title)
         })
         request.options.forEachIndexed { index, option ->
             Row(

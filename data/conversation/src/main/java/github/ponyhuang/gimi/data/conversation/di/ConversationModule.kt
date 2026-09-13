@@ -10,8 +10,6 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.gimi.core.storage.ManagedDirectorySpec
-import github.ponyhuang.gimi.core.storage.FileTreeStorageMaintenanceHandler
-import github.ponyhuang.gimi.core.storage.StorageMaintenanceHandler
 import github.ponyhuang.gimi.data.conversation.ChatDisplayPreferences
 import github.ponyhuang.gimi.data.conversation.ToolAccessPreferences
 import github.ponyhuang.gimi.data.conversation.ToolApprovalPreferences
@@ -45,11 +43,6 @@ object ConversationModule {
     @IntoSet
     fun provideConversationDraftDirectorySpec(): ManagedDirectorySpec =
         conversationDraftDirectorySpec
-
-    @Provides
-    @IntoSet
-    fun provideStorageMaintenanceHandler(): StorageMaintenanceHandler =
-        FileTreeStorageMaintenanceHandler("data:conversation")
 
     @Provides
     @Singleton

@@ -5,8 +5,6 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.workfiles.repository.WorkDirectoryOperationResult
 import github.ponyhuang.gimi.domain.workfiles.usecase.AddWorkDirectoryUseCase
-import github.ponyhuang.gimi.domain.workfiles.usecase.ClearReclaimableStorageUseCase
-import github.ponyhuang.gimi.domain.workfiles.usecase.LoadAppStorageSummaryUseCase
 import github.ponyhuang.gimi.domain.workfiles.usecase.ObserveWorkDirectoriesUseCase
 import github.ponyhuang.gimi.domain.workfiles.usecase.ReauthorizeWorkDirectoryUseCase
 import github.ponyhuang.gimi.domain.workfiles.usecase.RefreshWorkDirectoryAccessUseCase
@@ -28,8 +26,6 @@ class WorkFilesSettingsViewModel @Inject constructor(
     private val setDirectoryEnabled: SetWorkDirectoryEnabledUseCase,
     private val reauthorizeDirectory: ReauthorizeWorkDirectoryUseCase,
     private val refreshDirectoryAccess: RefreshWorkDirectoryAccessUseCase,
-    private val loadStorageSummary: LoadAppStorageSummaryUseCase,
-    private val clearReclaimableStorage: ClearReclaimableStorageUseCase,
 ) : ViewModel() {
     private val mutableUiState = MutableStateFlow(WorkFilesSettingsUiState())
     val uiState: StateFlow<WorkFilesSettingsUiState> = mutableUiState.asStateFlow()
@@ -43,7 +39,6 @@ class WorkFilesSettingsViewModel @Inject constructor(
             }
         }
         viewModelScope.launch { refreshDirectoryAccess() }
-        refreshStorage()
     }
 
     fun onAction(action: WorkFilesSettingsAction) {
@@ -61,10 +56,8 @@ class WorkFilesSettingsViewModel @Inject constructor(
                     mutableUiState.update { it.copy(directoryPickerRequestId = null) }
                 }
             }
-            WorkFilesSettingsAction.RefreshStorage -> refreshStorage()
-            WorkFilesSettingsAction.ClearReclaimableStorage -> clearStorage()
             WorkFilesSettingsAction.ClearOperationFeedback ->
-                mutableUiState.update { it.copy(operationError = null, lastClearResult = null) }
+                mutableUiState.update { it.copy(operationError = null) }
         }
     }
 
@@ -92,54 +85,6 @@ class WorkFilesSettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val error = operation() as? WorkDirectoryOperationResult.Failure
             mutableUiState.update { it.copy(operationError = error) }
-            if (error == null) refreshStorage()
-        }
-    }
-
-    private fun refreshStorage() {
-        viewModelScope.launch {
-            mutableUiState.update { it.copy(isStorageLoading = true, storageLoadFailed = false) }
-            try {
-                val summary = loadStorageSummary()
-                mutableUiState.update {
-                    it.copy(
-                        storageSummary = summary,
-                        isStorageLoading = false,
-                        storageLoadFailed = false,
-                    )
-                }
-            } catch (exception: CancellationException) {
-                throw exception
-            } catch (_: Exception) {
-                mutableUiState.update {
-                    it.copy(isStorageLoading = false, storageLoadFailed = true)
-                }
-            }
-        }
-    }
-
-    private fun clearStorage() {
-        if (mutableUiState.value.isClearingStorage) return
-        viewModelScope.launch {
-            mutableUiState.update { it.copy(isClearingStorage = true, lastClearResult = null) }
-            try {
-                val result = clearReclaimableStorage()
-                mutableUiState.update { it.copy(isClearingStorage = false, lastClearResult = result) }
-                refreshStorage()
-            } catch (exception: CancellationException) {
-                throw exception
-            } catch (_: Exception) {
-                mutableUiState.update {
-                    it.copy(
-                        isClearingStorage = false,
-                        lastClearResult = github.ponyhuang.gimi.domain.workfiles.model.StorageClearSummary(
-                            clearedDirectoryCount = 0,
-                            failedDirectoryCount = 1,
-                            reclaimedBytes = 0L,
-                        ),
-                    )
-                }
-            }
         }
     }
 }

@@ -166,10 +166,11 @@ Rendering never base64-encodes; that happens only in the provider adapters
 - **Drafts** are deleted under a directory fence (the file's parent must equal a draft
   root, so workspace files can never be removed by draft cleanup): on removal,
   replacement, leaving the composer, and after send ACCEPTED.
-- **Workspace payloads** are the user's assets: they are never deleted automatically — not
-  by conversation deletion, not by the manual "clear reclaimable storage" action
-  (PERSISTENT lifecycle). The only deletion path is the user's explicit action in the
-  workspace management UI (`:data:workspace` guards deletes to the workspace root).
+- **Workspace payloads** are the user's assets: they are never deleted automatically —
+  not by conversation deletion, and there is no app-wide cleanup entry (the former
+  "clear reclaimable storage" section was removed). The only deletion path is the user's
+  explicit action in the workspace management UI (`:data:workspace` guards deletes to the
+  workspace root).
 - **Legacy session directories** (`files/conversation/attachments/<sessionId>/`) belong to
   pre-workspace data only; deleting such a conversation removes its legacy directory, so
   the legacy tree shrinks naturally.

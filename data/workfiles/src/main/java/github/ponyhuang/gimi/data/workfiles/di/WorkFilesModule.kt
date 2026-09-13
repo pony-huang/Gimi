@@ -13,7 +13,6 @@ import github.ponyhuang.gimi.data.workfiles.WORKFILES_CONFIG_DIRECTORY_ID
 import github.ponyhuang.gimi.data.workfiles.repository.AndroidDocumentTreeGateway
 import github.ponyhuang.gimi.data.workfiles.repository.AndroidDocumentSearchGateway
 import github.ponyhuang.gimi.data.workfiles.repository.DefaultDocumentSearchRepository
-import github.ponyhuang.gimi.data.workfiles.repository.DefaultAppStorageManagementRepository
 import github.ponyhuang.gimi.data.workfiles.repository.DocumentSearchGateway
 import github.ponyhuang.gimi.data.workfiles.repository.DocumentDirectoryRepository
 import github.ponyhuang.gimi.data.workfiles.repository.DocumentTreeGateway
@@ -21,7 +20,6 @@ import github.ponyhuang.gimi.data.workfiles.repository.WorkDirectoryConfigSerial
 import github.ponyhuang.gimi.data.workfiles.repository.WorkDirectoryConfigStore
 import github.ponyhuang.gimi.data.workfiles.workFilesConfigDirectorySpec
 import github.ponyhuang.gimi.domain.workfiles.repository.DocumentSearchRepository
-import github.ponyhuang.gimi.domain.workfiles.repository.AppStorageManagementRepository
 import github.ponyhuang.gimi.domain.workfiles.repository.WorkDirectoryRepository
 import java.io.File
 import javax.inject.Singleton
@@ -55,12 +53,6 @@ abstract class WorkFilesModule {
     abstract fun bindDocumentSearchRepository(
         implementation: DefaultDocumentSearchRepository,
     ): DocumentSearchRepository
-
-    @Binds
-    @Singleton
-    abstract fun bindAppStorageManagementRepository(
-        implementation: DefaultAppStorageManagementRepository,
-    ): AppStorageManagementRepository
 
     companion object {
         @Provides

@@ -1,16 +1,11 @@
 package github.ponyhuang.gimi.feature.workfiles
 
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
-import github.ponyhuang.gimi.domain.workfiles.model.AppStorageSummary
-import github.ponyhuang.gimi.domain.workfiles.model.StorageClearSummary
 import github.ponyhuang.gimi.domain.workfiles.model.WorkDirectory
 import github.ponyhuang.gimi.domain.workfiles.model.WorkDirectoryAccessStatus
-import github.ponyhuang.gimi.domain.workfiles.repository.AppStorageManagementRepository
 import github.ponyhuang.gimi.domain.workfiles.repository.WorkDirectoryOperationResult
 import github.ponyhuang.gimi.domain.workfiles.repository.WorkDirectoryRepository
 import github.ponyhuang.gimi.domain.workfiles.usecase.AddWorkDirectoryUseCase
-import github.ponyhuang.gimi.domain.workfiles.usecase.ClearReclaimableStorageUseCase
-import github.ponyhuang.gimi.domain.workfiles.usecase.LoadAppStorageSummaryUseCase
 import github.ponyhuang.gimi.domain.workfiles.usecase.ObserveWorkDirectoriesUseCase
 import github.ponyhuang.gimi.domain.workfiles.usecase.ReauthorizeWorkDirectoryUseCase
 import github.ponyhuang.gimi.domain.workfiles.usecase.RefreshWorkDirectoryAccessUseCase
@@ -34,18 +29,15 @@ class WorkFilesSettingsViewModelCharacterizationTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     @Test
-    fun initialStateLoadsDirectoriesAccessHealthAndStorageSummary() = runTest {
+    fun initialStateLoadsDirectoriesAndRefreshesAccessHealth() = runTest {
         val directory = directory("work")
-        val directoryRepository = directoryRepository(listOf(directory))
-        val storageRepository = storageRepository()
+        val repository = directoryRepository(listOf(directory))
 
-        val viewModel = viewModel(directoryRepository, storageRepository)
+        val viewModel = viewModel(repository)
         advanceUntilIdle()
 
         assertEquals(listOf(directory), viewModel.uiState.value.directories)
-        assertEquals(STORAGE_SUMMARY, viewModel.uiState.value.storageSummary)
-        coVerify(exactly = 1) { directoryRepository.refreshAccess() }
-        coVerify(exactly = 1) { storageRepository.loadSummary() }
+        coVerify(exactly = 1) { repository.refreshAccess() }
     }
 
     @Test
@@ -92,25 +84,6 @@ class WorkFilesSettingsViewModelCharacterizationTest {
     }
 
     @Test
-    fun clearActionPublishesResultAndReloadsStorageSummary() = runTest {
-        val storageRepository = storageRepository()
-        coEvery { storageRepository.clearReclaimable() } returns StorageClearSummary(
-            clearedDirectoryCount = 3,
-            failedDirectoryCount = 1,
-            reclaimedBytes = 72L,
-        )
-        val viewModel = viewModel(directoryRepository(), storageRepository)
-        advanceUntilIdle()
-
-        viewModel.onAction(WorkFilesSettingsAction.ClearReclaimableStorage)
-        advanceUntilIdle()
-
-        assertEquals(3, viewModel.uiState.value.lastClearResult?.clearedDirectoryCount)
-        assertEquals(1, viewModel.uiState.value.lastClearResult?.failedDirectoryCount)
-        coVerify(exactly = 2) { storageRepository.loadSummary() }
-    }
-
-    @Test
     fun repositoryFailureIsExposedInUiState() = runTest {
         val repository = directoryRepository()
         coEvery { repository.addDirectory(any()) } returns
@@ -128,7 +101,6 @@ class WorkFilesSettingsViewModelCharacterizationTest {
 
     private fun viewModel(
         directoryRepository: WorkDirectoryRepository,
-        storageRepository: AppStorageManagementRepository = storageRepository(),
     ) = WorkFilesSettingsViewModel(
         observeDirectories = ObserveWorkDirectoriesUseCase(directoryRepository),
         addDirectory = AddWorkDirectoryUseCase(directoryRepository),
@@ -136,8 +108,6 @@ class WorkFilesSettingsViewModelCharacterizationTest {
         setDirectoryEnabled = SetWorkDirectoryEnabledUseCase(directoryRepository),
         reauthorizeDirectory = ReauthorizeWorkDirectoryUseCase(directoryRepository),
         refreshDirectoryAccess = RefreshWorkDirectoryAccessUseCase(directoryRepository),
-        loadStorageSummary = LoadAppStorageSummaryUseCase(storageRepository),
-        clearReclaimableStorage = ClearReclaimableStorageUseCase(storageRepository),
     )
 
     private fun directoryRepository(
@@ -150,11 +120,6 @@ class WorkFilesSettingsViewModelCharacterizationTest {
         coEvery { reauthorize(any(), any()) } returns WorkDirectoryOperationResult.Success
     }
 
-    private fun storageRepository(): AppStorageManagementRepository = mockk {
-        coEvery { loadSummary() } returns STORAGE_SUMMARY
-        coEvery { clearReclaimable() } returns StorageClearSummary(0, 0, 0L)
-    }
-
     private fun directory(id: String) = WorkDirectory(
         id = id,
         treeUri = "content://documents/tree/$id",
@@ -164,14 +129,4 @@ class WorkFilesSettingsViewModelCharacterizationTest {
         accessStatus = WorkDirectoryAccessStatus.AVAILABLE,
         addedAtEpochMillis = 1L,
     )
-
-    private companion object {
-        val STORAGE_SUMMARY = AppStorageSummary(
-            totalBytes = 286L,
-            persistentBytes = 214L,
-            cacheBytes = 48L,
-            temporaryBytes = 24L,
-            unreadableDirectoryCount = 0,
-        )
-    }
 }

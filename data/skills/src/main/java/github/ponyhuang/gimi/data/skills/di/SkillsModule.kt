@@ -14,8 +14,6 @@ import github.ponyhuang.gimi.data.skills.SkillArchiveReader
 import github.ponyhuang.gimi.data.skills.SkillArchiveStore
 import github.ponyhuang.gimi.data.skills.SkillsStorage
 import github.ponyhuang.gimi.core.storage.ManagedDirectorySpec
-import github.ponyhuang.gimi.core.storage.FileTreeStorageMaintenanceHandler
-import github.ponyhuang.gimi.core.storage.StorageMaintenanceHandler
 import github.ponyhuang.gimi.core.storage.StorageRegistry
 import github.ponyhuang.gimi.domain.skills.repository.SkillRepository
 import java.io.File
@@ -47,10 +45,6 @@ object SkillsModule {
     @IntoSet
     internal fun provideImportsDirectorySpec(): ManagedDirectorySpec = SkillsStorage.Imports
 
-    @Provides
-    @IntoSet
-    internal fun provideStorageMaintenanceHandler(): StorageMaintenanceHandler =
-        FileTreeStorageMaintenanceHandler("skills")
 
     @Provides
     @Singleton

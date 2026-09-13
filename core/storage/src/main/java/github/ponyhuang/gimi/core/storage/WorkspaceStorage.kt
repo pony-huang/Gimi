@@ -21,10 +21,9 @@ object WorkspaceStorageIds {
 /**
  * 全局共享附件工作区的受管目录声明。
  *
- * 平铺目录（无子目录），归档文件名内嵌显示名便于用户辨认。PERSISTENT 使其不受
- * "清理可回收空间"影响——工作区文件永不自动删除，只能由用户在工作区管理界面显式删除。
- * owner 标记为 workspace 能力；实际的清理责任在用户，见
- * `openspec/changes/shared-attachment-workspace` 的存储模型决策。
+ * 平铺目录（无子目录），归档文件名内嵌显示名便于用户辨认。PERSISTENT 表示永不自动
+ * 删除——工作区文件没有应用内清理入口，只能由用户在工作区管理界面显式删除。
+ * owner 标记为 workspace 能力，见 `openspec/specs/attachment-workspace/spec.md`。
  */
 val workspaceDirectorySpec = ManagedDirectorySpec(
     id = WorkspaceStorageIds.WORKSPACE,

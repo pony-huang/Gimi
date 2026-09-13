@@ -7,8 +7,6 @@ import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 import github.ponyhuang.gimi.core.storage.BackupPolicy
 import github.ponyhuang.gimi.core.storage.ManagedDirectorySpec
-import github.ponyhuang.gimi.core.storage.FileTreeStorageMaintenanceHandler
-import github.ponyhuang.gimi.core.storage.StorageMaintenanceHandler
 import github.ponyhuang.gimi.core.storage.SharingPolicy
 import github.ponyhuang.gimi.core.storage.StorageArea
 import github.ponyhuang.gimi.core.storage.StorageLifecycle
@@ -45,8 +43,4 @@ object PluginStorageModule {
     @IntoSet
     fun provideOptimizedRootDirectorySpec(): ManagedDirectorySpec = PluginStorage.OptimizedRoot
 
-    @Provides
-    @IntoSet
-    fun provideStorageMaintenanceHandler(): StorageMaintenanceHandler =
-        FileTreeStorageMaintenanceHandler("plugin")
 }

@@ -51,7 +51,7 @@
     <string name="update_error_no_compatible_apk">No installer package matches this device</string>
     <string name="update_error_checksum">Package verification failed, please retry</string>
     <string name="update_available_title">New version %1$s</string>
-    <string name="update_available_body">Current version %1$s\n\n%2$s</string>
+    <string name="update_changelog_section">What\'s new</string>
     <string name="update_changelog_empty">No release notes</string>
     <string name="update_download_now">Update now</string>
     <string name="update_cancel">Cancel</string>

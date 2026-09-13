@@ -1,11 +1,15 @@
 package github.ponyhuang.gimi.feature.settings.update
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
@@ -50,21 +54,10 @@ private fun AvailableDialog(
         onDismissRequest = { onAction(UpdateAction.DismissDialog) },
         title = { Text(stringResource(R.string.update_available_title, status.info.tagName)) },
         text = {
-            SelectionContainer {
-                Text(
-                    text = stringResource(
-                        R.string.update_available_body,
-                        state.currentVersionName,
-                        status.info.changelog.ifBlank {
-                            stringResource(R.string.update_changelog_empty)
-                        },
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier
-                        .heightIn(max = 320.dp)
-                        .verticalScroll(rememberScrollState()),
-                )
-            }
+            UpdateChangelogBody(
+                currentVersionName = state.currentVersionName,
+                changelog = status.info.changelog,
+            )
         },
         confirmButton = {
             TextButton(onClick = { onAction(UpdateAction.StartDownload) }) {
@@ -77,6 +70,67 @@ private fun AvailableDialog(
             }
         },
     )
+}
+
+/** 「发现新版本」弹窗正文：当前版本行 + 更新内容小节 + 平铺提交列表。 */
+@Composable
+private fun UpdateChangelogBody(
+    currentVersionName: String,
+    changelog: String,
+) {
+    Column {
+        Text(
+            text = stringResource(R.string.update_subtitle_current, currentVersionName),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = stringResource(R.string.update_changelog_section),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        if (changelog.isBlank()) {
+            Text(
+                text = stringResource(R.string.update_changelog_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .heightIn(max = 280.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                ChangelogEntries(changelog)
+            }
+        }
+    }
+}
+
+/** 逐行解析 changelog，去掉平铺列表前缀后按「• 文本」渲染。 */
+@Composable
+private fun ChangelogEntries(changelog: String) {
+    val entries = changelog.lines()
+        .map { it.trim().removePrefix("-").removePrefix("*").trim() }
+        .filter { it.isNotEmpty() }
+    entries.forEach { entry ->
+        Row {
+            Text(
+                text = "•",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = entry,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
 }
 
 @Composable

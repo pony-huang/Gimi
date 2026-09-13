@@ -36,6 +36,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # changelog 生成需要 tag 间完整历史，浅克隆拿不到。
+          fetch-depth: 0
 
       # 版本来源优先级：手动输入 > 当前标签名（去掉 v 前缀）> GitHub 最新 tag > build.gradle.kts 当前默认版本。
       - name: Resolve version
@@ -66,6 +69,20 @@ jobs:
             *)   echo "auto_prerelease=false" >> "$GITHUB_OUTPUT" ;;
           esac
           echo "Release version: $V"
+
+      # 生成「上一个 tag -> 本次 tag」的提交平铺列表，作为 Release body；
+      # 应用内更新弹窗读取的就是这份内容。COMMIT 模式适配无 PR 的直接推送工作流。
+      - name: Build changelog
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v6
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          mode: 'COMMIT'
+          # fromTag 省略：action 自动按语义化版本取上一个 tag。
+          toTag: 'v${{ steps.version.outputs.value }}'
+          configuration: '.github/release-changelog-configuration.json'
+          token: ${{ github.token }}
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -123,14 +140,15 @@ jobs:
 
       # 发布策略：本工作流由 v* tag 推送或手动触发，构建完成后：
       #   - 若 Release 已存在 -> 仅上传 APK，保留其已有更新日志，避免覆盖；
-      #   - 若 Release 不存在（手动打 tag 的常规路径）-> 用 GitHub 自动生成的
-      #     更新日志（--generate-notes）创建 Release；应用内更新检查读取的
-      #     就是这个 Release body。
+      #   - 若 Release 不存在（手动打 tag 的常规路径）-> 用「上个 tag -> 本次
+      #     tag」的提交列表（Build changelog 步骤产出）创建 Release；应用内
+      #     更新检查读取的就是这个 Release body。
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.value }}
           AUTO_PRERELEASE: ${{ steps.version.outputs.auto_prerelease }}
+          CHANGELOG: ${{ steps.changelog.outputs.changelog }}
         run: |
           set -euo pipefail
           TAG="v${VERSION}"
@@ -155,7 +173,10 @@ jobs:
             echo "Release ${TAG} already exists; uploading APKs without changing its notes"
             gh release upload "${TAG}" dist/* --clobber --repo "${{ github.repository }}"
           else
-            echo "Release ${TAG} does not exist; creating it with auto-generated notes"
+            echo "Release ${TAG} does not exist; creating it with the generated changelog"
+            echo "----- Changelog -----"
+            echo "${CHANGELOG}"
+            echo "---------------------"
             PRERELEASE_FLAG=""
             if [ "${IS_PRERELEASE}" = "true" ]; then
               PRERELEASE_FLAG="--prerelease"
@@ -163,7 +184,7 @@ jobs:
             gh release create "${TAG}" \
               --repo "${{ github.repository }}" \
               --title "${TAG}" \
-              --generate-notes \
+              --notes "${CHANGELOG}" \
               ${PRERELEASE_FLAG} \
               dist/*
           fi

@@ -188,7 +188,7 @@ class DefaultAppUpdateRepository @Inject constructor(
             version = remoteVersion,
             tagName = release.tagName,
             title = release.name ?: release.tagName,
-            changelog = release.body.orEmpty(),
+            changelog = ReleaseBodyCleaner.clean(release.body),
             assets = release.assets.orEmpty().map { asset ->
                 ApkAsset(
                     name = asset.name,

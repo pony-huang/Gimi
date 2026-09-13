@@ -1,0 +1,14 @@
+{
+  "_comment": "release.yml Build changelog 步骤的配置：COMMIT 模式下每个提交渲染为平铺条目。占位符按 action 约定写作 #{{...}}。Merge/chore(release) 提交通过 label_extractor 打标后由 ignore_labels 排除。",
+  "template": "#{{CHANGELOG}}\n\n**Full Changelog**: https://github.com/pony-huang/Gimi/compare/#{{FROM_TAG}}...#{{TO_TAG}}",
+  "commit_template": "- #{{TITLE}}",
+  "empty_template": "- 本次发布没有记录到提交",
+  "label_extractor": [
+    {
+      "pattern": "^(Merge (branch|pull request|tag)|chore\\(release\\))",
+      "on_property": "title",
+      "target": "internal"
+    }
+  ],
+  "ignore_labels": ["internal"]
+}

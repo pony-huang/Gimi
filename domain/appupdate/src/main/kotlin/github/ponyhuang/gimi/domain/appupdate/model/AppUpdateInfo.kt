@@ -17,7 +17,7 @@ data class AppUpdateInfo(
     /** 原始 tag，如 "v0.2.0"。 */
     val tagName: String,
     val title: String,
-    /** 更新日志（markdown 原文，按纯文本展示）。 */
+    /** 更新日志（markdown 平铺列表，如 "- feat: xxx"；可能为空，弹窗需做空态兜底）。 */
     val changelog: String,
     val assets: List<ApkAsset>,
     val publishedAt: String?,

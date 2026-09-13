@@ -6,8 +6,10 @@ import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FileData
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
+import com.google.adk.kt.sessions.Session
 import io.mockk.every
 import io.mockk.mockk
+import java.io.File
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -40,7 +42,53 @@ class EventMapperAttachmentTest {
         assertEquals(id, attachment?.id)
         assertEquals(payload.absolutePath, attachment?.payloadReference)
         assertEquals(4L, attachment?.sizeBytes)
+        assertEquals(false, attachment?.isMissing)
         assertNull(attachment?.inlineData)
+    }
+
+    @Test
+    fun `maps a missing payload file to an isMissing placeholder instead of throwing`() {
+        val missing = File(temporaryFolder.root, "gone/missing-payload.jpg")
+        val event = userEvent(
+            Part(
+                fileData = FileData(
+                    mimeType = "image/jpeg",
+                    displayName = "photo.jpg",
+                    fileUri = missing.absolutePath,
+                ),
+            ),
+        )
+
+        val attachment = EventMapper.fromEvent(event)?.fileAttachments?.single()
+
+        assertEquals(true, attachment?.isMissing)
+        assertEquals(missing.absolutePath, attachment?.payloadReference)
+        assertEquals("missing-payload", attachment?.id)
+        assertEquals("photo.jpg", attachment?.displayName)
+        assertNull(attachment?.inlineData)
+    }
+
+    @Test
+    fun `fromSession keeps messages whose attachment files are missing`() {
+        val missing = File(temporaryFolder.root, "also-missing.pdf")
+        val session = mockk<Session> {
+            every { events } returns mutableListOf(
+                userEvent(
+                    Part(
+                        fileData = FileData(
+                            mimeType = "application/pdf",
+                            displayName = "doc.pdf",
+                            fileUri = missing.absolutePath,
+                        ),
+                    ),
+                ),
+            )
+        }
+
+        val messages = EventMapper.fromSession(session)
+
+        assertEquals(1, messages.size)
+        assertEquals(true, messages.single().fileAttachments.single().isMissing)
     }
 
     @Test

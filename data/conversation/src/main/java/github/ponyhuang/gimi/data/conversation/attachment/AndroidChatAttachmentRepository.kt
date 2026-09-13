@@ -10,6 +10,7 @@ import android.webkit.MimeTypeMap
 import androidx.exifinterface.media.ExifInterface
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.core.storage.StorageRegistry
+import github.ponyhuang.gimi.core.storage.WorkspaceStorageIds
 import github.ponyhuang.gimi.domain.conversation.model.ConversationStorageIds
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
@@ -17,7 +18,6 @@ import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -32,6 +32,12 @@ class AndroidChatAttachmentRepository @Inject constructor(
         ConversationStorageIds.ATTACHMENTS,
         create = true,
     )
+
+    // 全局共享工作区：所有会话的附件统一归档于此，文件不随会话删除（用户自管）。
+    private val workspaceRoot = storageRegistry.resolve(
+        WorkspaceStorageIds.WORKSPACE,
+        create = true,
+    )
     private val draftRoots = listOf(
         storageRegistry.resolve(ConversationStorageIds.REPOSITORY_DRAFTS, create = true),
         storageRegistry.resolve(ConversationStorageIds.COMPOSER_DRAFTS, create = true),
@@ -43,14 +49,15 @@ class AndroidChatAttachmentRepository @Inject constructor(
         attachments: List<DraftAttachment>,
     ): List<FileAttachment> =
         withContext(Dispatchers.IO) {
+            // 归档目的地是全局共享工作区，与会话无关；sessionId 仅为接口兼容保留。
             attachments.map { attachment ->
                 when (attachment.category) {
-                    AttachmentCategory.IMAGE -> persist(sessionId, prepareImage(attachment))
+                    AttachmentCategory.IMAGE -> persist(prepareImage(attachment))
                     AttachmentCategory.AUDIO,
                     AttachmentCategory.DOCUMENT,
                     -> archiveDraftAttachment(
-                        root = attachmentRoot,
-                        sessionId = sessionId,
+                        workspaceRoot = workspaceRoot,
+                        legacyArchiveRoot = attachmentRoot,
                         attachment = attachment,
                         extension = extensionFor(attachment.displayName, attachment.mimeType),
                     )
@@ -70,6 +77,7 @@ class AndroidChatAttachmentRepository @Inject constructor(
 
     override suspend fun deleteSession(sessionId: String) {
         withContext(Dispatchers.IO) {
+            // 仅清理遗留的按会话归档目录（旧版本数据）；工作区文件永不随会话删除。
             conversationSessionDirectory(attachmentRoot, sessionId).deleteRecursively()
         }
     }
@@ -114,27 +122,32 @@ class AndroidChatAttachmentRepository @Inject constructor(
         }
 
     /**
-     * Writes the re-encoded image payload into session-owned storage and returns a
+     * Writes the re-encoded image payload into the shared workspace and returns a
      * reference-only attachment.
      *
-     * Only images take this path: they must be decoded and compressed before sending, so the
-     * archived bytes are new content, named `<id>.<ext>` — the content-addressed id keeps
-     * identical images deduplicating onto the same file, while the extension lets consumers
-     * that infer a type from the file name — such as the Xiaohongshu plugin's upload bridge —
-     * see the real MIME type instead of `application/octet-stream`. Audio and document
-     * drafts skip this copy and are moved into the session directory by
-     * [archiveDraftAttachment] instead.
+     * Only images take this path: they must be decoded and compressed before sending. The
+     * archive name embeds the sanitized display name plus a content-addressed suffix
+     * (`<显示名>-<sha256 前 16 位>.<ext>`)，so identical images with the same name reuse
+     * the same file across sessions, while the extension lets consumers that infer a type
+     * from the file name — such as the Xiaohongshu plugin's upload bridge — see the real
+     * MIME type. Audio and document drafts skip this path and are moved into the workspace
+     * by [archiveDraftAttachment] instead. The attachment id remains the full stable
+     * content hash, unchanged from the previous session-scoped layout.
      */
-    private fun persist(sessionId: String, payload: PreparedPayload): FileAttachment {
-        val directory = conversationSessionDirectory(attachmentRoot, sessionId).apply { mkdirs() }
+    private fun persist(payload: PreparedPayload): FileAttachment {
         val id = FileAttachment.stableAttachmentId(
             payload.mimeType,
             payload.displayName,
             payload.bytes,
         )
         val extension = extensionFor(payload.displayName, payload.mimeType)
-        val target = File(directory, if (extension == null) id else "$id.$extension")
-        if (!target.exists()) target.writeBytes(payload.bytes)
+        val target = writeWorkspaceImage(
+            workspaceRoot = workspaceRoot,
+            baseName = archiveBaseName(payload.displayName),
+            contentSuffix = id.take(IMAGE_SUFFIX_CHARS),
+            extension = extension,
+            bytes = payload.bytes,
+        )
         return FileAttachment(
             mimeType = payload.mimeType,
             id = id,
@@ -264,6 +277,7 @@ class AndroidChatAttachmentRepository @Inject constructor(
         const val MIN_JPEG_QUALITY = 45
         const val JPEG_QUALITY_STEP = 10
         const val MAX_RESIZE_ATTEMPTS = 4
+        const val IMAGE_SUFFIX_CHARS = 16
     }
 }
 
@@ -275,21 +289,22 @@ internal fun conversationSessionDirectory(root: File, sessionId: String): File {
 }
 
 /**
- * 把音频/文档草稿移动进会话归档目录，以零拷贝方式建立持久载荷引用。
+ * 把音频/文档草稿移动进全局共享工作区，以零拷贝方式建立持久载荷引用。
  *
  * 草稿位于 cache 草稿目录：系统存储紧张时可能被回收，发送成功后也会被清理，不能直接
  * 作为历史消息的载荷引用。用移动（rename）代替复制归档，同一份数据不再产生第二份副
- * 本。两个约定：
- * - 草稿引用本就是归档文件（编辑重发路径复用 FileAttachment.payloadReference）时，
- *   原路径仍被历史事件引用，必须原样返回引用，不能改名，否则旧事件路径悬空；
+ * 本。归档名 `<清洗显示名>-<12 位随机后缀>.<ext>`，撞名时重新生成后缀。三个约定：
+ * - [workspaceRoot] 内的引用原样返回：工作区文件本就是最终归档，改名毫无意义；
+ * - [legacyArchiveRoot] 的会话子目录内的引用也原样返回——旧版本按会话归档的文件仍被
+ *   旧历史事件引用，编辑重发路径复用它们时不能改名，否则旧事件路径悬空；
  * - [extension] 由调用方解析并校验合法性（displayName 扩展名优先，MimeTypeMap 兜底），
  *   归档名保留扩展名，供知乎等上传桥按文件名推断 Content-Type。
  *
  * rename 失败（跨卷挂载等罕见场景）时回退为复制后删除，成本回落到旧的复制归档。
  */
 internal fun archiveDraftAttachment(
-    root: File,
-    sessionId: String,
+    workspaceRoot: File,
+    legacyArchiveRoot: File,
     attachment: DraftAttachment,
     extension: String?,
 ): FileAttachment {
@@ -299,20 +314,20 @@ internal fun archiveDraftAttachment(
         "The selected attachment changed before it could be sent"
     }
     val canonicalSource = source.canonicalFile
-    if (canonicalSource.parentFile?.parentFile == root.canonicalFile) {
+    val alreadyArchived = canonicalSource.parentFile == workspaceRoot.canonicalFile ||
+        canonicalSource.parentFile?.parentFile == legacyArchiveRoot.canonicalFile
+    if (alreadyArchived) {
         return FileAttachment.fromFile(
             file = source,
             mimeType = attachment.mimeType,
             displayName = attachment.displayName,
         )
     }
-    val directory = conversationSessionDirectory(root, sessionId).apply { mkdirs() }
-    val target = File(
-        directory,
-        buildString {
-            append(UUID.randomUUID())
-            if (extension != null) append('.').append(extension)
-        },
+    workspaceRoot.mkdirs()
+    val target = resolveWorkspaceArchiveTarget(
+        workspaceRoot = workspaceRoot,
+        baseName = archiveBaseName(attachment.displayName),
+        extension = extension,
     )
     if (!source.renameTo(target)) {
         source.copyTo(target, overwrite = false)

@@ -28,6 +28,8 @@
 
     <string name="settings_work_files_title">Folders</string>
     <string name="settings_work_files_subtitle">Authorize folders the assistant can search</string>
+    <string name="settings_workspace_title">Workspace</string>
+    <string name="settings_workspace_subtitle">View and manage chat attachment files</string>
 
     <string name="settings_tool_authorization_title">Tools</string>
     <string name="settings_tool_authorization_subtitle">Choose which local tools the assistant may use</string>

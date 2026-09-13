@@ -9,6 +9,7 @@ import org.junit.Test
 
 class PrepareChatTurnUseCaseTest {
     private val calls = mutableListOf<String>()
+    private val validatedLists = mutableListOf<List<FileAttachment>>()
     private val original = Messages.fromUser("original")
     private val failed = ChatTurn("turn", "session", original, listOf(original), ChatTurnStatus.FAILED)
     private var attachmentFailure: Exception? = null
@@ -20,6 +21,7 @@ class PrepareChatTurnUseCaseTest {
         }
         override suspend fun validateSaved(attachments: List<FileAttachment>) {
             calls += "validate"
+            validatedLists += attachments
             attachmentFailure?.let { throw it }
         }
         override suspend fun createDrafts(attachments: List<FileAttachment>) = emptyList<DraftAttachment>()
@@ -34,6 +36,24 @@ class PrepareChatTurnUseCaseTest {
         assertEquals(listOf(original), result.messages)
         assertEquals(failed.id, result.id)
         assertEquals(failed.rewindBeforeInvocationId, result.rewindBeforeInvocationId)
+    }
+
+    @Test fun retryDropsMissingAttachmentsInsteadOfResendingBrokenPaths() = runBlocking {
+        val missing = FileAttachment(
+            mimeType = "image/jpeg",
+            id = "missing",
+            sizeBytes = 0L,
+            payloadReference = "/nonexistent/missing.jpg",
+            isMissing = true,
+        )
+        val present = FileAttachment.fromBytes("image/png", byteArrayOf(1, 2), "ok.png")
+        val withAttachments = Messages.fromUser("with attachments", listOf(missing, present))
+        val turn = ChatTurn("turn-2", "session", withAttachments, listOf(withAttachments), ChatTurnStatus.FAILED)
+
+        val result = prepare("session", "ignored", emptyList(), emptyList(), turn, true)
+
+        assertEquals(listOf(present), validatedLists.single())
+        assertEquals(listOf(present), result.userMessage.fileAttachments)
     }
 
     @Test fun editingPreservesMessageIdentityAndReplacesItsText() = runBlocking {

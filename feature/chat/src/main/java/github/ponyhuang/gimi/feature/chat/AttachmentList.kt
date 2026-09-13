@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -49,7 +50,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
-import coil3.compose.AsyncImage
+import coil3.compose.SubcomposeAsyncImage
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
@@ -106,10 +107,15 @@ internal fun MessageAttachments(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         images.forEach { image ->
-            InlineImage(
-                image = image,
-                onClick = { previewImage = image },
-            )
+            if (image.isMissing) {
+                // 载荷文件已丢失：只渲染缺失占位，不提供点击预览。
+                MissingImageTile()
+            } else {
+                InlineImage(
+                    image = image,
+                    onClick = { previewImage = image },
+                )
+            }
         }
     }
 
@@ -160,12 +166,42 @@ private fun InlineImage(
                 .matchParentSize()
                 .background(MaterialTheme.colorScheme.surfaceDim),
         )
-        AsyncImage(
+        SubcomposeAsyncImage(
             model = image.imageModel,
             contentDescription = stringResource(R.string.chat_attachment_sent_image),
             modifier = Modifier.matchParentSize(),
             contentScale = ContentScale.Crop,
+            // 加载期失败（文件损坏、解码异常等）与映射期缺失是两层：文件存在但读不出来
+            // 时也要给出明确占位，而不是渲染成空白块。
+            error = { AttachmentPlaceholder() },
         )
+    }
+}
+
+/** 缺失图片附件的降级占位：只提示文件已丢失，不提供任何依赖载荷的操作。 */
+@Composable
+private fun MissingImageTile() {
+    AttachmentTile(size = 88.dp) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(MaterialTheme.colorScheme.surfaceDim),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    painter = painterResource(R.drawable.stream_ai_compose_ic_image_placeholder),
+                    tint = MaterialTheme.colorScheme.surfaceVariant,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                )
+                Text(
+                    text = stringResource(R.string.chat_attachment_file_missing),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
@@ -236,6 +272,10 @@ private fun PersistedFileAttachment(
     attachment: FileAttachment,
     onOpenDocument: (FileAttachment) -> Unit,
 ) {
+    if (attachment.isMissing) {
+        MissingFileAttachmentRow(attachment)
+        return
+    }
     val context = LocalContext.current
     var isPlaying by remember(attachment.id) { mutableStateOf(false) }
     val mediaPlayer = remember(attachment.id) {
@@ -288,11 +328,47 @@ private fun PersistedFileAttachment(
     }
 }
 
+/** 缺失文档/音频附件的降级行：仅展示文件名与缺失标记，禁用预览、播放等依赖文件的操作。 */
+@Composable
+private fun MissingFileAttachmentRow(attachment: FileAttachment) {
+    Row(
+        modifier = Modifier
+            .padding(top = 8.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = if (attachment.category == AttachmentCategory.AUDIO) {
+                Icons.Default.AudioFile
+            } else {
+                Icons.Default.Description
+            },
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = attachment.displayName,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier
+                .padding(start = 8.dp)
+                .weight(1f, fill = false),
+            maxLines = 1,
+        )
+        Text(
+            text = stringResource(R.string.chat_attachment_file_missing),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 8.dp),
+        )
+    }
+}
+
 /**
  * A filesystem path MediaPlayer can open. The persisted payload is used directly; only
  * attachments that carry inline bytes need a cache copy.
- */
-private fun FileAttachment.playbackPath(context: Context): String? {
+ */private fun FileAttachment.playbackPath(context: Context): String? {
     payloadReference?.let { return it }
     val bytes = inlineData ?: return null
     val root = AndroidAppDirectoryResolver(context).resolve(chatShareableDirectorySpec, create = true)

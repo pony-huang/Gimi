@@ -11,6 +11,8 @@ sealed interface SettingsAction {
     data object OpenPlugins : SettingsAction
     data object OpenSkills : SettingsAction
     data object OpenWorkFiles : SettingsAction
+    /** 打开附件工作区管理页。 */
+    data object OpenWorkspace : SettingsAction
     data object OpenPermissions : SettingsAction
     data object OpenToolAuthorization : SettingsAction
     data object OpenRecommendations : SettingsAction
@@ -27,6 +29,8 @@ sealed interface SettingsEffect {
     data object NavigateToPlugins : SettingsEffect
     data object NavigateToSkills : SettingsEffect
     data object NavigateToWorkFiles : SettingsEffect
+    /** 跳转附件工作区管理页。 */
+    data object NavigateToWorkspace : SettingsEffect
     data object NavigateToPermissions : SettingsEffect
     data object NavigateToToolAuthorization : SettingsEffect
     data object NavigateToRecommendations : SettingsEffect

@@ -1,13 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+   API ≤30 全量备份规则（API 31+ 走 data_extraction_rules.xml）。
+   附件字节不进系统自动备份：工作区与遗留按会话归档目录由用户自管，体量不受
+   25MB 自动备份配额约束，也不应默认上传云端。
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="file" path="workspace" />
+    <exclude domain="file" path="conversation/attachments" />
 </full-backup-content>

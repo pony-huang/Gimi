@@ -146,12 +146,15 @@ object EventMapper {
             val mimeType = requireNotNull(file.mimeType) { "Attachment MIME type is missing" }
             val reference = requireNotNull(file.fileUri) { "Attachment reference is missing" }
             val payload = File(reference.removePrefix("file://"))
-            require(payload.isFile) { "Attachment payload is unavailable: $reference" }
-            return FileAttachment.fromFile(
+            // per-part 降级：文件缺失时仍映射出带 isMissing 标记的附件，由 UI 渲染占位。
+            // 不能在这里 require 抛异常——loadMessages 的 catch-all 会把整个 session 的
+            // 历史吞成空列表，一个丢失的载荷文件就能让全会话渲染成空白。
+            val attachment = FileAttachment.fromFile(
                 file = payload,
                 mimeType = mimeType,
                 displayName = file.displayName.orEmpty(),
             )
+            return if (payload.isFile) attachment else attachment.copy(isMissing = true)
         }
         return null
     }

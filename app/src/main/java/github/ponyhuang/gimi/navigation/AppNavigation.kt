@@ -60,6 +60,8 @@ import github.ponyhuang.gimi.feature.assistant.voicewake.VoiceWakeDestination
 import github.ponyhuang.gimi.feature.assistant.voicewake.VoiceWakeEntryProvider
 import github.ponyhuang.gimi.feature.workfiles.WorkFilesDestination
 import github.ponyhuang.gimi.feature.workfiles.WorkFilesEntryProvider
+import github.ponyhuang.gimi.feature.workspace.WorkspaceDestination
+import github.ponyhuang.gimi.feature.workspace.WorkspaceEntryProvider
 import github.ponyhuang.gimi.voice.AssistantPanelInteractor
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -160,6 +162,7 @@ fun MainScreen(
                         onNavigateToPlugins = { navigate(PluginDestination.Settings) },
                         onNavigateToSkills = { navigate(SkillsDestination.Settings) },
                         onNavigateToWorkFiles = { navigate(WorkFilesDestination.Settings) },
+                        onNavigateToWorkspace = { navigate(WorkspaceDestination.Manager) },
                         onNavigateToPermissions = { navigate(PermissionDestination.Settings) },
                         onNavigateToToolAuthorization = {
                             navigate(ToolAuthorizationDestination.Settings)
@@ -182,7 +185,8 @@ fun MainScreen(
                     PermissionEntryProvider(destination, goBack) ||
                     SkillsEntryProvider(destination, goBack) ||
                     VoiceWakeEntryProvider(destination, goBack) ||
-                    WorkFilesEntryProvider(destination, goBack)
+                    WorkFilesEntryProvider(destination, goBack) ||
+                    WorkspaceEntryProvider(destination, goBack)
 
                 check(handled) { "No feature entry provider for $destination" }
             }

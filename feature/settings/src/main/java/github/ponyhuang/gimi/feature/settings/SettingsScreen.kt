@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Psychology
@@ -115,6 +116,13 @@ fun SettingsScreen(
                         title = stringResource(R.string.settings_work_files_title),
                         subtitle = stringResource(R.string.settings_work_files_subtitle),
                         onClick = { onAction(SettingsAction.OpenWorkFiles) },
+                        showDivider = true,
+                    )
+                    PreferenceNavigationCard(
+                        icon = Icons.Default.FolderOpen,
+                        title = stringResource(R.string.settings_workspace_title),
+                        subtitle = stringResource(R.string.settings_workspace_subtitle),
+                        onClick = { onAction(SettingsAction.OpenWorkspace) },
                     )
                 }
             }

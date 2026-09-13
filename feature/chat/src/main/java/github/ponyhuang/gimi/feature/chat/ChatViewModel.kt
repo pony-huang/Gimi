@@ -877,8 +877,10 @@ class ChatViewModel @Inject constructor(
         )
         _uiState.update { it.copy(failedTurnRecovery = editing) }
         viewModelScope.launch {
+            // 缺失附件没有可用载荷，不能回填输入栏参与重发；从编辑草稿中剔除。
+            val resendable = failedTurn.userMessage.fileAttachments.filterNot { it.isMissing }
             val draftAttachments = runCatching {
-                attachments.createDrafts(failedTurn.userMessage.fileAttachments)
+                attachments.createDrafts(resendable)
             }.getOrElse { failure ->
                 emitNotice(ChatNotice.EditDraftsRestoreFailed)
                 Log.w(TAG, "Failed to create edit drafts", failure)

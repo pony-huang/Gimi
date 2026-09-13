@@ -26,6 +26,7 @@ class SettingsViewModel @Inject constructor() : ViewModel() {
             SettingsAction.OpenPlugins -> emitEffect(SettingsEffect.NavigateToPlugins)
             SettingsAction.OpenSkills -> emitEffect(SettingsEffect.NavigateToSkills)
             SettingsAction.OpenWorkFiles -> emitEffect(SettingsEffect.NavigateToWorkFiles)
+            SettingsAction.OpenWorkspace -> emitEffect(SettingsEffect.NavigateToWorkspace)
             SettingsAction.OpenPermissions -> emitEffect(SettingsEffect.NavigateToPermissions)
             SettingsAction.OpenToolAuthorization ->
                 emitEffect(SettingsEffect.NavigateToToolAuthorization)

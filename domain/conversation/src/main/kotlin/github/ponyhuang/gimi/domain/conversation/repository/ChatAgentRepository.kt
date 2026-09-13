@@ -47,21 +47,22 @@ class ChatSessionRewindException(cause: Throwable) :
  * 附件选择完成后，输入栏只持有轻量的 [DraftAttachment]。它记录应用私有草稿文件的
  * 引用、文件名、MIME 和大小，不把完整文件字节放进 Compose 状态。
  *
- * 发送时调用 [read]，将草稿文件转换为可发送的 [FileAttachment]，同时为已发送消息
- * 建立按会话保存的载荷引用（图片为压缩归档副本；音频/文档把草稿移动进归档目录，
- * 零拷贝）。发送成功后调用 [deleteDrafts] 清理临时草稿。删除整个会话时调用
- * [deleteSession] 清理该会话持久化的附件。
+ * 发送时调用 [read]，将草稿文件转换为可发送的 [FileAttachment]，同时建立持久载荷
+ * 引用：所有附件统一归档到全局共享工作区（`files/workspace/`，跨会话公用，文件名
+ * 内嵌显示名）。图片为压缩归档副本，内容寻址去重；音频/文档把草稿零拷贝移动进工作
+ * 区。归档与会话无关——文件不随会话删除，只能由用户在工作区管理界面显式删除。发送
+ * 成功后调用 [deleteDrafts] 清理临时草稿。
  *
  * 大致流程：
  * ```
  * 系统文件选择器
  *   -> DraftAttachment（输入栏草稿引用）
  *   -> read()
- *   -> FileAttachment（可发送的完整附件）
+ *   -> FileAttachment（可发送的完整附件，载荷位于共享工作区）
  *   -> deleteDrafts()（发送成功后）
  *
  * 删除会话
- *   -> deleteSession()
+ *   -> deleteSession()（仅清理旧版本遗留的按会话目录，工作区文件不受影响）
  * ```
  *
  * 该接口只定义附件生命周期规则；文件系统、图片压缩和线程切换等实现细节属于
@@ -78,14 +79,16 @@ interface ChatAttachmentRepository {
      * 读取并准备本轮要发送的附件。
      *
      * 实现需要解析 [attachments] 指向的应用私有草稿文件，生成可发送的 [FileAttachment]。
-     * 图片在此阶段执行发送前压缩并写入归档副本；音频和文档不压缩，草稿文件会被移动进
-     * 会话归档目录（零拷贝）。返回结果的顺序必须与传入草稿顺序一致。
+     * 所有附件统一归档到全局共享工作区：图片在此阶段执行发送前压缩并写入内容寻址的
+     * 归档文件（同显示名同内容跨会话复用）；音频和文档不压缩，草稿文件会被零拷贝移动
+     * 进工作区。返回结果的顺序必须与传入草稿顺序一致。
      *
      * 图片草稿不会被本方法删除，调用方只有在消息发送成功后才能调用 [deleteDrafts]；
      * 音频/文档草稿因被移动而失效，事后调用 [deleteDrafts] 会安全跳过。读取失败时未
      * 被移动的草稿仍可用于错误处理或后续清理。
      *
-     * @param sessionId 当前聊天会话 ID，用于把已准备的附件归档到对应会话。
+     * @param sessionId 当前聊天会话 ID。归档目的地为全局共享工作区，与会话无关，本参数
+     *   仅为接口兼容保留。
      * @param attachments 输入栏当前选择的轻量草稿附件。
      * @return 可交给聊天请求层内联发送的完整附件。
      * @throws Exception 草稿不存在、内容已变化、无法读取或无法转换时抛出。
@@ -106,12 +109,14 @@ interface ChatAttachmentRepository {
     suspend fun deleteDrafts(attachments: List<DraftAttachment>)
 
     /**
-     * 删除某个会话保存的全部附件载荷。
+     * 删除某个会话在旧版本按会话布局下保存的附件载荷。
      *
-     * 只负责附件文件，不负责删除会话记录、消息或远端资源。通常由“删除会话”流程调用。
-     * 如果会话目录不存在，调用应安全返回。
+     * 新归档全部位于全局共享工作区且永不随会话删除；本方法只负责清理变更前数据的
+     * 遗留按会话目录（`files/conversation/attachments/<sessionId>/`），使旧目录随会话
+     * 删除自然收缩。只负责附件文件，不负责删除会话记录、消息或远端资源。通常由“删除
+     * 会话”流程调用。如果会话目录不存在，调用应安全返回。
      *
-     * @param sessionId 要清理附件的聊天会话 ID。
+     * @param sessionId 要清理遗留附件的聊天会话 ID。
      */
     suspend fun deleteSession(sessionId: String)
 }

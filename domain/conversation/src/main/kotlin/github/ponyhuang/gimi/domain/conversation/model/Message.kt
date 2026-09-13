@@ -57,6 +57,9 @@ data class Message(
  * from. [inlineData] is only populated for attachments that have no backing file, i.e. those
  * restored from an ADK `inlineData` part; keeping bytes off the model lets a long
  * conversation hold thumbnails rather than every original payload.
+ *
+ * @property isMissing 仅在历史还原阶段为 true：[payloadReference] 指向的文件已不存在（例如
+ *   被用户从工作区删除）。此类附件必须降级渲染为缺失占位，禁止预览/播放，重发时应被剔除。
  */
 @Serializable
 data class FileAttachment(
@@ -66,6 +69,7 @@ data class FileAttachment(
     val displayName: String = "",
     val payloadReference: String? = null,
     val inlineData: ByteArray? = null,
+    val isMissing: Boolean = false,
     val category: AttachmentCategory = requireNotNull(
         AttachmentCategory.from(mimeType, displayName),
     ) { "Unsupported attachment type: $mimeType ($displayName)" },
@@ -87,6 +91,7 @@ data class FileAttachment(
         if (displayName != other.displayName) return false
         if (sizeBytes != other.sizeBytes) return false
         if (payloadReference != other.payloadReference) return false
+        if (isMissing != other.isMissing) return false
         if (category != other.category) return false
         // Usually null, so the full-payload comparison is skipped outright.
         if (!inlineData.contentEquals(other.inlineData)) return false
@@ -100,6 +105,7 @@ data class FileAttachment(
         result = 31 * result + displayName.hashCode()
         result = 31 * result + sizeBytes.hashCode()
         result = 31 * result + (payloadReference?.hashCode() ?: 0)
+        result = 31 * result + isMissing.hashCode()
         result = 31 * result + category.hashCode()
         result = 31 * result + (inlineData?.contentHashCode() ?: 0)
         return result

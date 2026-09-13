@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Workspace management -->
+    <string name="workspace_screen_title">Workspace</string>
+    <string name="workspace_selected_count">%1$d selected</string>
+    <string name="workspace_exit_selection">Exit selection</string>
+    <string name="workspace_delete_selected">Delete selected files</string>
+    <string name="workspace_summary">%1$d files · %2$s total</string>
+    <string name="workspace_file_meta">%1$s · %2$s</string>
+    <string name="workspace_empty_title">No files yet</string>
+    <string name="workspace_empty_subtitle">Attachments sent in chats are saved here; preview or delete them anytime</string>
+    <string name="workspace_load_failed">Failed to load the workspace</string>
+    <string name="workspace_retry">Retry</string>
+    <string name="workspace_delete_confirm_title">Delete selected files</string>
+    <string name="workspace_delete_confirm_text">%1$d files will be deleted permanently.</string>
+    <string name="workspace_delete_confirm_confirm">Delete</string>
+    <string name="workspace_delete_confirm_cancel">Cancel</string>
+    <string name="workspace_delete_done">Deleted %1$d files</string>
+    <string name="workspace_delete_partial">Deleted %1$d files, %2$d failed</string>
+    <string name="workspace_open_failed">No app can open this file</string>
+</resources>

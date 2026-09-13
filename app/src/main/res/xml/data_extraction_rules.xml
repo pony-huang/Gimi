@@ -1,19 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+   API 31+ 备份/迁移规则。附件字节不进云端自动备份：工作区（files/workspace/）与
+   遗留按会话归档（files/conversation/attachments/）由用户自管，不应默认上云。
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="file" path="workspace" />
+        <exclude domain="file" path="conversation/attachments" />
     </cloud-backup>
-    <!--
-    <device-transfer>
-        <include .../>
-        <exclude .../>
-    </device-transfer>
-    -->
+    <!-- device-transfer 不排除：设备间迁移不经云端、无 25MB 配额，仍携带附件。 -->
 </data-extraction-rules>

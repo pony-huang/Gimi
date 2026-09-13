@@ -16,8 +16,9 @@ class PrepareChatTurnUseCase @Inject constructor(
     /**
      * 构造一次可运行的发送尝试，不做任何网络/模型调用。
      *
-     * - 纯重试（[reuseOriginal]）：校验上次保存的附件仍可读，原样复用 [retry.userMessage]，
-     *   并把历史回退到该轮之前的消息，避免再次发送时在模型上下文里重复用户消息。
+     * - 纯重试（[reuseOriginal]）：剔除历史还原时标记缺失的附件，校验其余附件仍可读后
+     *   原样复用 [retry.userMessage]，并把历史回退到该轮之前的消息，避免再次发送时在
+     *   模型上下文里重复用户消息。缺失附件直接离开重发内容，而不是让校验失败阻断重试。
      * - 编辑（[retry] 非空、[reuseOriginal] false）：重新读取草稿附件，保留原消息 id 但替换
      *   文本与附件，历史同样回退到该轮之前。
      * - 首次发送（[retry] 为空）：按草稿读取附件并新建用户消息。
@@ -35,8 +36,11 @@ class PrepareChatTurnUseCase @Inject constructor(
         val userMessage: Message
         val effectiveHistory: List<Message>
         if (reuseOriginal && retry != null) {
-            attachments.validateSaved(retry.userMessage.fileAttachments)
-            userMessage = retry.userMessage
+            // 缺失附件的载荷文件已不可用（历史还原时标记），直接从重发内容中剔除并只校验
+            // 其余附件；失效路径不进入模型请求。
+            val resendable = retry.userMessage.fileAttachments.filterNot { it.isMissing }
+            attachments.validateSaved(resendable)
+            userMessage = retry.userMessage.copy(fileAttachments = resendable)
             effectiveHistory = retry.history
         } else {
             val prepared = attachments.read(sessionId, drafts)

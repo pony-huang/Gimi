@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 工作区管理 -->
+    <string name="workspace_screen_title">工作区</string>
+    <string name="workspace_selected_count">已选 %1$d 项</string>
+    <string name="workspace_exit_selection">退出多选</string>
+    <string name="workspace_delete_selected">删除所选文件</string>
+    <string name="workspace_summary">%1$d 个文件 · 共 %2$s</string>
+    <string name="workspace_file_meta">%1$s · %2$s</string>
+    <string name="workspace_empty_title">工作区还没有文件</string>
+    <string name="workspace_empty_subtitle">聊天中发送的附件会保存到这里，可随时预览或删除</string>
+    <string name="workspace_load_failed">工作区加载失败</string>
+    <string name="workspace_retry">重试</string>
+    <string name="workspace_delete_confirm_title">删除所选文件</string>
+    <string name="workspace_delete_confirm_text">将删除 %1$d 个文件，删除后无法恢复。</string>
+    <string name="workspace_delete_confirm_confirm">删除</string>
+    <string name="workspace_delete_confirm_cancel">取消</string>
+    <string name="workspace_delete_done">已删除 %1$d 个文件</string>
+    <string name="workspace_delete_partial">已删除 %1$d 个文件，%2$d 个删除失败</string>
+    <string name="workspace_open_failed">没有可用于打开此文件的应用</string>
+</resources>

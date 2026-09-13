@@ -34,6 +34,7 @@ fun SettingsRoute(
     onNavigateToPlugins: () -> Unit,
     onNavigateToSkills: () -> Unit,
     onNavigateToWorkFiles: () -> Unit,
+    onNavigateToWorkspace: () -> Unit,
     onNavigateToPermissions: () -> Unit,
     onNavigateToToolAuthorization: () -> Unit,
     onNavigateToRecommendations: () -> Unit,
@@ -56,6 +57,7 @@ fun SettingsRoute(
                 SettingsEffect.NavigateToPlugins -> onNavigateToPlugins()
                 SettingsEffect.NavigateToSkills -> onNavigateToSkills()
                 SettingsEffect.NavigateToWorkFiles -> onNavigateToWorkFiles()
+                SettingsEffect.NavigateToWorkspace -> onNavigateToWorkspace()
                 SettingsEffect.NavigateToPermissions -> onNavigateToPermissions()
                 SettingsEffect.NavigateToToolAuthorization -> onNavigateToToolAuthorization()
                 SettingsEffect.NavigateToRecommendations -> onNavigateToRecommendations()

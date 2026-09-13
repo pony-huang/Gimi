@@ -17,6 +17,7 @@ import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -43,13 +44,17 @@ class AndroidChatAttachmentRepository @Inject constructor(
     ): List<FileAttachment> =
         withContext(Dispatchers.IO) {
             attachments.map { attachment ->
-                val prepared = when (attachment.category) {
-                    AttachmentCategory.IMAGE -> prepareImage(attachment)
+                when (attachment.category) {
+                    AttachmentCategory.IMAGE -> persist(sessionId, prepareImage(attachment))
                     AttachmentCategory.AUDIO,
                     AttachmentCategory.DOCUMENT,
-                    -> prepareOriginal(attachment)
+                    -> archiveDraftAttachment(
+                        root = attachmentRoot,
+                        sessionId = sessionId,
+                        attachment = attachment,
+                        extension = extensionFor(attachment.displayName, attachment.mimeType),
+                    )
                 }
-                persist(sessionId, prepared)
             }
         }
 
@@ -109,13 +114,16 @@ class AndroidChatAttachmentRepository @Inject constructor(
         }
 
     /**
-     * Writes the payload into session-owned storage and returns a reference-only attachment.
+     * Writes the re-encoded image payload into session-owned storage and returns a
+     * reference-only attachment.
      *
-     * The bytes stay local to this call so that a long conversation holds paths rather than
-     * every original payload. The file is named `<id>.<ext>`: the id keeps identical payloads
-     * deduplicating onto the same file, while the extension lets consumers that infer a type
-     * from the file name — such as the Xiaohongshu plugin's upload bridge — see the real MIME
-     * type instead of `application/octet-stream`.
+     * Only images take this path: they must be decoded and compressed before sending, so the
+     * archived bytes are new content, named `<id>.<ext>` — the content-addressed id keeps
+     * identical images deduplicating onto the same file, while the extension lets consumers
+     * that infer a type from the file name — such as the Xiaohongshu plugin's upload bridge —
+     * see the real MIME type instead of `application/octet-stream`. Audio and document
+     * drafts skip this copy and are moved into the session directory by
+     * [archiveDraftAttachment] instead.
      */
     private fun persist(sessionId: String, payload: PreparedPayload): FileAttachment {
         val directory = conversationSessionDirectory(attachmentRoot, sessionId).apply { mkdirs() }
@@ -173,19 +181,6 @@ class AndroidChatAttachmentRepository @Inject constructor(
             bitmap.recycle()
         }
         throw IllegalArgumentException("The selected image is too large after compression")
-    }
-
-    private fun prepareOriginal(attachment: DraftAttachment): PreparedPayload {
-        val bytes = File(attachment.reference).readBytes()
-        check(bytes.size.toLong() == attachment.sizeBytes) {
-            "The selected attachment changed before it could be sent"
-        }
-        return PreparedPayload(
-            mimeType = attachment.mimeType,
-            displayName = attachment.displayName,
-            bytes = bytes,
-            category = attachment.category,
-        )
     }
 
     /** A payload that has been normalised but not yet written to session storage. */
@@ -277,4 +272,55 @@ internal fun conversationSessionDirectory(root: File, sessionId: String): File {
     val directory = File(root.canonicalFile, safeSessionId).canonicalFile
     check(directory.parentFile == root.canonicalFile) { "Invalid conversation session directory" }
     return directory
+}
+
+/**
+ * 把音频/文档草稿移动进会话归档目录，以零拷贝方式建立持久载荷引用。
+ *
+ * 草稿位于 cache 草稿目录：系统存储紧张时可能被回收，发送成功后也会被清理，不能直接
+ * 作为历史消息的载荷引用。用移动（rename）代替复制归档，同一份数据不再产生第二份副
+ * 本。两个约定：
+ * - 草稿引用本就是归档文件（编辑重发路径复用 FileAttachment.payloadReference）时，
+ *   原路径仍被历史事件引用，必须原样返回引用，不能改名，否则旧事件路径悬空；
+ * - [extension] 由调用方解析并校验合法性（displayName 扩展名优先，MimeTypeMap 兜底），
+ *   归档名保留扩展名，供知乎等上传桥按文件名推断 Content-Type。
+ *
+ * rename 失败（跨卷挂载等罕见场景）时回退为复制后删除，成本回落到旧的复制归档。
+ */
+internal fun archiveDraftAttachment(
+    root: File,
+    sessionId: String,
+    attachment: DraftAttachment,
+    extension: String?,
+): FileAttachment {
+    val source = File(attachment.reference)
+    require(source.isFile) { "The selected attachment is no longer available" }
+    check(source.length() == attachment.sizeBytes) {
+        "The selected attachment changed before it could be sent"
+    }
+    val canonicalSource = source.canonicalFile
+    if (canonicalSource.parentFile?.parentFile == root.canonicalFile) {
+        return FileAttachment.fromFile(
+            file = source,
+            mimeType = attachment.mimeType,
+            displayName = attachment.displayName,
+        )
+    }
+    val directory = conversationSessionDirectory(root, sessionId).apply { mkdirs() }
+    val target = File(
+        directory,
+        buildString {
+            append(UUID.randomUUID())
+            if (extension != null) append('.').append(extension)
+        },
+    )
+    if (!source.renameTo(target)) {
+        source.copyTo(target, overwrite = false)
+        source.delete()
+    }
+    return FileAttachment.fromFile(
+        file = target,
+        mimeType = attachment.mimeType,
+        displayName = attachment.displayName,
+    )
 }

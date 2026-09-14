@@ -53,7 +53,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import java.util.Base64
-import java.io.File
 import java.util.stream.Collectors
 import com.google.adk.kt.types.Tool as AdkTool
 
@@ -314,16 +313,7 @@ open class Claude(
                 blob.mimeType
                     ?: throw UnsupportedOperationException("FileData MIME type is missing")
             val uri = blob.fileUri ?: throw UnsupportedOperationException("FileData Uri is missing")
-            val localFile = File(uri.removePrefix("file://"))
-            if (localFile.isFile) {
-                return Part(
-                    inlineData = com.google.adk.kt.types.Blob(
-                        mimeType = mimeType,
-                        displayName = blob.displayName,
-                        data = localFile.readBytes(),
-                    ),
-                ).toContentBlockParam()
-            }
+            require(uri.isHttpReference()) { "Unsupported remote file reference: $uri" }
             return when {
                 isSupportedImageMimeType(mimeType) ->
                     ofImage(
@@ -375,6 +365,9 @@ open class Claude(
         }
         throw UnsupportedOperationException("Not supported yet. $this")
     }
+
+    private fun String.isHttpReference(): Boolean =
+        startsWith("http://", ignoreCase = true) || startsWith("https://", ignoreCase = true)
 
     protected open val defaultImageMimePrefix: String = "image/"
 

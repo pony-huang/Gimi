@@ -44,7 +44,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import java.util.Base64
-import java.io.File
 import com.google.adk.kt.types.Tool as AdkTool
 
 
@@ -349,8 +348,7 @@ open class Openai(
             parts.mapNotNull { it.fileData }.forEach { fileData ->
                 val mimeType = fileData.mimeType ?: return@forEach
                 val fileUri = fileData.fileUri ?: return@forEach
-                val displayName = fileData.displayName ?: return@forEach
-                buildFilePart(mimeType, displayName, fileUri)?.let { add(it) }
+                buildRemoteFilePart(mimeType, fileUri)?.let { add(it) }
             }
         }
         if (contentParts.isNotEmpty()) {
@@ -376,16 +374,11 @@ open class Openai(
         return result
     }
 
-    protected open fun buildFilePart(
+    protected open fun buildRemoteFilePart(
         mimeType: String,
-        displayName: String,
-        fileUri: String
+        fileUri: String,
     ): ChatCompletionContentPart? {
-        val localFile = File(fileUri.removePrefix("file://"))
-        if (localFile.isFile) {
-            return buildInlineContentPart(mimeType, localFile.readBytes(), displayName)
-        }
-        if (isSupportedImageMimeType(mimeType)) {
+        if (isSupportedImageMimeType(mimeType) && fileUri.isHttpReference()) {
             return ChatCompletionContentPart.ofImageUrl(
                 ChatCompletionContentPartImage.builder()
                     .imageUrl(
@@ -396,8 +389,11 @@ open class Openai(
                     .build()
             )
         }
-        return null;
+        return null
     }
+
+    private fun String.isHttpReference(): Boolean =
+        startsWith("http://", ignoreCase = true) || startsWith("https://", ignoreCase = true)
 
     protected open fun buildInlineContentPart(
         mimeType: String,

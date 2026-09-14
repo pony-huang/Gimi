@@ -4,6 +4,7 @@ import com.anthropic.client.okhttp.AnthropicOkHttpClient
 import com.google.adk.kt.models.Gemini
 import com.google.adk.kt.models.Model
 import com.openai.client.okhttp.OpenAIOkHttpClient
+import github.ponyhuang.gimi.data.agent.execution.AttachmentResolvingModel
 import github.ponyhuang.gimi.data.agent.model.Claude
 import github.ponyhuang.gimi.data.agent.model.Openai
 import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolRegistry
@@ -97,8 +98,8 @@ class AgentLLMModelFactory @Inject constructor(
     }
 
 
-    fun createModel(cfg: ModelConfig): Model =
-        when (cfg.baseType) {
+    fun createModel(cfg: ModelConfig): Model = AttachmentResolvingModel(
+        delegate = when (cfg.baseType) {
             ApiProtocol.Standard -> Openai(
                 name = cfg.modelId,
                 client = OpenAIOkHttpClient.builder()
@@ -122,7 +123,8 @@ class AgentLLMModelFactory @Inject constructor(
                 name = cfg.modelId,
                 apiKey = cfg.apiKey,
             )
-        }
+        },
+    )
 
     /**
      * 当前服务以厂商原生形态执行的官方内置工具名。

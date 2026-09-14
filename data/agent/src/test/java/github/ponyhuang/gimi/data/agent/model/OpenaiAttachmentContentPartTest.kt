@@ -6,13 +6,8 @@ import io.mockk.mockk
 import java.nio.charset.StandardCharsets
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.Rule
-import org.junit.rules.TemporaryFolder
 
 class OpenaiAttachmentContentPartTest {
-    @get:Rule
-    val temporaryFolder = TemporaryFolder()
-
     private val subject = TestOpenai()
 
     @Test
@@ -39,22 +34,10 @@ class OpenaiAttachmentContentPartTest {
     }
 
     @Test
-    fun `managed local reference is read and serialized inline without a file id`() {
-        val file = temporaryFolder.newFile("report.pdf").apply {
-            writeBytes("pdf".toByteArray(StandardCharsets.UTF_8))
-        }
+    fun `remote image reference is serialized as image url`() {
+        val part = json(subject.remoteFilePart("image/png", "https://example.com/image.png"))
 
-        val part = json(
-            subject.filePart(
-                mimeType = "application/pdf",
-                displayName = "report.pdf",
-                reference = file.absolutePath,
-            ),
-        )
-
-        assertTrue(part.contains("\"filename\":\"report.pdf\""))
-        assertTrue(part.contains("\"file_data\":\"data:application/pdf;base64,"))
-        assertTrue(!part.contains("\"file_id\""))
+        assertTrue(part.contains("\"url\":\"https://example.com/image.png\""))
     }
 
     private fun json(value: Any?): String = jsonMapper().writeValueAsString(value)
@@ -63,7 +46,7 @@ class OpenaiAttachmentContentPartTest {
         fun inlinePart(mimeType: String, data: ByteArray, displayName: String) =
             buildInlineContentPart(mimeType, data, displayName)
 
-        fun filePart(mimeType: String, displayName: String, reference: String) =
-            buildFilePart(mimeType, displayName, reference)
+        fun remoteFilePart(mimeType: String, reference: String) =
+            buildRemoteFilePart(mimeType, reference)
     }
 }

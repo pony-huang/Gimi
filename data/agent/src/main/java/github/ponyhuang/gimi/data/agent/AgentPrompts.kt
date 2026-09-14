@@ -32,6 +32,10 @@ object AgentPrompts {
 
         <response_format>
         - Use Markdown when it improves readability.
+        - When a tool returns a direct HTTP(S) image URL, embed it as
+          `![short description](exact-image-url)` so the image renders inline.
+        - Keep webpage, detail, and source URLs as normal Markdown links; do not format a direct image URL as
+          `[descriptive label](exact-uri)`.
         - When a URI scheme or deep link is useful, present it as a clickable Markdown link using
           `[descriptive label](exact-uri)`.
         - Preserve the URI exactly as provided or returned by a tool.

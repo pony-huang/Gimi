@@ -124,6 +124,7 @@ Android Studio may run the `app` debug configuration on a device or emulator.
 
 ### Testing rules
 
+- Keep the engineering process proportionate to the change's scope and risk. For small, localized, non-core changes that do not materially affect behavior, contracts, data, security, architecture, or release wiring, avoid mandatory TDD, new tests, broad builds, device verification, OpenSpec, or other heavyweight workflows unless the user explicitly requests them or investigation reveals higher risk. Prefer the smallest relevant edit and lightweight, directly relevant validation; this does not waive targeted coverage for meaningful behavior changes or high-risk boundaries.
 - Pure text-only changes, including documentation, comments, user-facing copy, and prompt wording, do not require adding or updating automated tests. This applies when the change does not also modify Kotlin control flow, parsing or interpolation logic, tool definitions, structured output contracts, resources wiring, or UI behavior. Review the diff and use only lightweight, directly relevant validation; do not run broad builds or test suites solely for these text-only edits.
 - Use JUnit 4 in the owning module's `src/test`; use behavior-based `*Test.kt` names. Put Android/Compose interaction coverage in `src/androidTest`.
 - Behavior-preserving refactors of ViewModel transitions or externally visible repository behavior require characterization test coverage.
@@ -146,6 +147,7 @@ Android Studio may run the `app` debug configuration on a device or emulator.
 
 ### Git
 
+- When the user requests a commit, format its subject as `<type>[optional scope][!]: <description>`. Use `feat` for features, `fix` for bug fixes, and an appropriate type such as `docs`, `refactor`, `test`, `build`, `ci`, or `chore` for other changes. Mark breaking changes with `!` or a `BREAKING CHANGE:` footer; separate any optional body or footer from the subject with a blank line. This rule is self-contained; do not look up an external commit convention unless the user explicitly asks.
 - Keep commits focused with imperative subjects under 72 characters. Pull requests describe user-visible changes, tests, relevant issue/OpenSpec change, and Compose screenshots.
 - Before committing, inspect staged paths, run `git diff --cached --check`, exclude generated/local artifacts, and confirm architecture boundaries.
 

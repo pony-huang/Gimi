@@ -180,9 +180,9 @@ open class Openai(
                     chunk.usage().orElse(null)?.let(responseAccumulator::setUsage)
                     for (choice in choices) {
                         responseAccumulator.accumulateToolCall(choice)
-                        choice.textDeltaOrNull()?.let { text ->
-                            responseAccumulator.appendText(text)
-                            emitTextDelta(text)
+                        choice.streamingParts().forEach { part ->
+                            responseAccumulator.appendPart(part)
+                            emitStreamingPart(part)
                         }
                     }
                 }
@@ -195,32 +195,37 @@ open class Openai(
     }
 
     /**
-     * Extracts a regular-text delta from [ChatCompletionChunk.Choice].
+     * Extracts regular text and provider-compatible thought deltas from [ChatCompletionChunk.Choice].
      *
-     * The returned value is used to emit a `partial = true` [LlmResponse] for the typewriter UI.
      * OpenAI-compatible providers commonly put reasoning in an extension field such as
-     * `reasoning_content`; those deltas are discarded instead of being rendered as text.
+     * `reasoning_content`; it is emitted separately with `thought = true`.
      */
-    /** Extract a regular-text delta from a streaming [ChatCompletionChunk.Choice]. Override to surface vendor-specific reasoning or content fields. */
-    protected open fun ChatCompletionChunk.Choice.textDeltaOrNull(): String? {
+    /** Extract streaming parts from a [ChatCompletionChunk.Choice]. Override for vendor-specific content fields. */
+    protected open fun ChatCompletionChunk.Choice.streamingParts(): List<Part> {
         val delta = delta()
-        delta.content().orElse(null)
-            ?.takeIf { it.isNotBlank() }
-            ?.let { return it }
-
-        val thoughtFields = delta._additionalProperties().keys.intersect(THOUGHT_DELTA_FIELDS)
-        if (thoughtFields.isNotEmpty()) {
-            logger.trace { "Ignoring OpenAI streaming thought delta from $thoughtFields" }
+        return buildList {
+            THOUGHT_DELTA_FIELDS.firstNotNullOfOrNull { field ->
+                delta._additionalProperties()[field]
+                    ?.asString()
+                    ?.orElse(null)
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { field to it }
+            }?.let { (field, text) ->
+                logger.trace { "OpenAI-compatible streaming thought chunk from $field" }
+                add(Part(text = text, thought = true))
+            }
+            delta.content().orElse(null)
+                ?.takeIf { it.isNotBlank() }
+                ?.let { add(Part(text = it, thought = false)) }
         }
-        return null
     }
 
-    protected open suspend fun FlowCollector<LlmResponse>.emitTextDelta(text: String) {
+    protected open suspend fun FlowCollector<LlmResponse>.emitStreamingPart(part: Part) {
         emit(
             LlmResponse(
                 content = Content(
                     role = Role.MODEL,
-                    parts = listOf(Part(text = text, thought = false)),
+                    parts = listOf(part),
                 ),
                 partial = true,
             ),
@@ -228,12 +233,17 @@ open class Openai(
     }
 
     private inner class StreamingResponseAccumulator {
-        private val text = StringBuilder()
+        private val parts = mutableListOf<Part>()
         private val toolCalls = linkedMapOf<Pair<Long, Long>, StreamedToolCall>()
         private var usage: CompletionUsage? = null
 
-        fun appendText(delta: String) {
-            text.append(delta)
+        fun appendPart(part: Part) {
+            val previous = parts.lastOrNull()
+            if (previous != null && previous.thought == part.thought && previous.functionCall == null) {
+                parts[parts.lastIndex] = previous.copy(text = previous.text.orEmpty() + part.text.orEmpty())
+            } else {
+                parts += part
+            }
         }
 
         fun setUsage(usage: CompletionUsage) {
@@ -255,8 +265,7 @@ open class Openai(
 
         fun toLlmResponse(): LlmResponse {
             val parts = buildList {
-                text.takeIf { it.isNotEmpty() }
-                    ?.let { add(Part(text = it.toString(), thought = false)) }
+                addAll(this@StreamingResponseAccumulator.parts)
                 toolCalls.values.forEach { toolCall ->
                     val name = toolCall.name ?: return@forEach
                     add(

@@ -171,8 +171,9 @@ open class Claude(
                 while (it.hasNext()) {
                     val event = it.next()
                     accumulator.accumulate(event)
-                    emitTextDeltaIfPresent(event)
-//                    emitThinkingDeltaIfPresent(event)
+                    event.streamingPartOrNull()?.let { part ->
+                        emitStreamingPart(part)
+                    }
                 }
             }
 
@@ -186,35 +187,24 @@ open class Claude(
         }
     }
 
-    protected open suspend fun FlowCollector<LlmResponse>.emitTextDeltaIfPresent(event: RawMessageStreamEvent) {
-        if (!event.isContentBlockDelta()) return
-        val delta = event.asContentBlockDelta().delta()
-        if (!delta.isText()) return
-        val text = delta.asText().text()
+    protected open fun RawMessageStreamEvent.streamingPartOrNull(): Part? {
+        if (!isContentBlockDelta()) return null
+        val delta = asContentBlockDelta().delta()
+        return when {
+            delta.isText() -> Part(text = delta.asText().text(), thought = false)
+            delta.isThinking() -> Part(text = delta.asThinking().thinking(), thought = true)
+            else -> null
+        }
+    }
+
+    protected open suspend fun FlowCollector<LlmResponse>.emitStreamingPart(part: Part) {
         emit(
             LlmResponse(
-                content = Content(role = Role.MODEL, parts = listOf(Part(text = text))),
+                content = Content(role = Role.MODEL, parts = listOf(part)),
                 partial = true
             )
         )
     }
-
-//    private suspend fun FlowCollector<LlmResponse>.emitThinkingDeltaIfPresent(event: com.anthropic.models.messages.RawMessageStreamEvent) {
-//        if (!event.isContentBlockDelta()) return
-//        val delta = event.asContentBlockDelta().delta()
-//        if (!delta.isThinking()) return
-//        val thinking = delta.asThinking().thinking()
-//        logger.trace { "Claude streaming text chunk: $thinking" }
-//        emit(
-//            LlmResponse(
-//                content = Content(
-//                    role = Role.MODEL,
-//                    parts = listOf(Part(text = thinking, thought = true))
-//                ),
-//                partial = true
-//            )
-//        )
-//    }
 
     protected open fun Message.toLlmResponse(): LlmResponse = LlmResponse(
         content = Content(
@@ -245,11 +235,11 @@ open class Claude(
                 )
             )
 
-//            isThinking() -> Part(
-//                text = asThinking().thinking(),
-//                thought = true,
-//                thoughtSignature = asThinking().signature().toByteArray(Charsets.UTF_8)
-//            )
+            isThinking() -> Part(
+                text = asThinking().thinking(),
+                thought = true,
+                thoughtSignature = asThinking().signature().toByteArray(Charsets.UTF_8)
+            )
 
             else -> null
         }

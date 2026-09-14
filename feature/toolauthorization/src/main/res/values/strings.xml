@@ -17,7 +17,6 @@
     <string name="toolauth_tool_access_label">工具加载</string>
     <string name="toolauth_tool_access_on_demand_description">按需加载，节省上下文</string>
     <string name="toolauth_tool_access_always_description">全量加载，随轮就绪</string>
-    <string name="toolauth_tool_access_notice">切换后旧会话可能存在错误，请使用新会话</string>
     <!-- 共享：Agent 任务进行中 -->
     <string name="toolauth_agent_mutation_blocked">Agent 任务进行中，请先停止任务后再修改。</string>
 </resources>

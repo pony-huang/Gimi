@@ -78,6 +78,7 @@ fun ToolAuthorizationScreen(
                         icon = Icons.Default.Tune,
                         title = stringResource(R.string.toolauth_tool_access_label),
                         subtitle = toolAccessModeDescription(state.toolAccessMode),
+                        showDivider = true,
                         trailingContent = {
                             Switch(
                                 checked = state.toolAccessMode == ToolAccessMode.ALWAYS_AVAILABLE,
@@ -96,18 +97,7 @@ fun ToolAuthorizationScreen(
                             )
                         },
                     )
-                }
-            }
-            item {
-                PreferenceBanner(
-                    text = stringResource(R.string.toolauth_tool_access_notice),
-                    tone = PreferenceBannerTone.Info,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
-                )
-            }
-            item {
-                val configurationEnabled = state.isCustomizationEnabled && !state.isMutationBlocked
-                PreferenceGroupCard {
+                    val configurationEnabled = state.isCustomizationEnabled && !state.isMutationBlocked
                     PreferenceListItem(
                         icon = Icons.Default.Rule,
                         title = stringResource(R.string.toolauth_customize_label),

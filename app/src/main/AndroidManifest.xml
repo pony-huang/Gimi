@@ -5,11 +5,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
@@ -90,13 +86,6 @@
                 <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".voice.AssistantLockScreenActivity"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:launchMode="singleTop"
-            android:noHistory="true"
-            android:theme="@style/Theme.Asssistantai.Transparent" />
         <service
             android:name="github.ponyhuang.gimi.data.agent.tools.system.MediaNotificationListenerService"
             android:exported="true"
@@ -106,10 +95,6 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
-        <service
-            android:name=".voice.BluetoothVoiceService"
-            android:exported="false"
-            android:foregroundServiceType="microphone" />
     </application>
 
 </manifest>

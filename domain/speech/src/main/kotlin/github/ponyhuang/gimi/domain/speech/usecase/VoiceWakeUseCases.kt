@@ -1,7 +1,6 @@
 package github.ponyhuang.gimi.domain.speech.usecase
 
 import github.ponyhuang.gimi.domain.modelcatalog.model.DefaultModelSettings
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.speech.model.VoiceWakeSettings
 import github.ponyhuang.gimi.domain.speech.repository.VoiceWakeRepository
@@ -17,7 +16,7 @@ class ObserveVoiceWakeSettingsUseCase @Inject constructor(
     operator fun invoke() = combine(defaultModels, repository.state) { models, voiceState ->
         VoiceWakeSettings(
             voiceState = voiceState,
-            configurationReady = models.isVoiceWakeConfigurationReady(),
+            configurationReady = models.hasChatModel(),
         )
     }
 }
@@ -25,51 +24,16 @@ class ObserveVoiceWakeSettingsUseCase @Inject constructor(
 class ManageVoiceWakeUseCase @Inject constructor(
     private val repository: VoiceWakeRepository,
 ) {
-    fun selectModel(modelId: String) = repository.selectModel(modelId)
+    fun setEnabled(enabled: Boolean) = repository.setEnabled(enabled)
 
-    fun installModel(modelId: String) = repository.installModel(modelId)
+    fun addTriggerPhrase(phrase: String) = repository.addTriggerPhrase(phrase)
 
-    fun cancelInstall(modelId: String) = repository.cancelInstall(modelId)
-
-    fun removeModel(modelId: String) {
-        val state = repository.state.value
-        if (state.activeModelId == modelId && state.isRunning) {
-            repository.stop()
-        }
-        repository.removeModel(modelId)
-    }
-
-    fun start() = repository.start()
-
-    fun stop() = repository.stop()
-
-    fun setWakeWord(modelId: String, wakeWord: String) = repository.setWakeWord(modelId, wakeWord)
+    fun removeTriggerPhrase(phrase: String) = repository.removeTriggerPhrase(phrase)
 }
 
-private fun DefaultModelSettings.isVoiceWakeConfigurationReady(): Boolean {
-    val configuredServices = services.filter { it.isEnabled && it.apiKey.isNotBlank() }
-    val hasChatModel = configuredServices.any { service ->
+private fun DefaultModelSettings.hasChatModel(): Boolean =
+    services.filter { it.isEnabled && it.apiKey.isNotBlank() }.any { service ->
         service.groups.any { group ->
             group.models.any { model -> !model.isStt && !model.isTts }
         }
     }
-    val hasSelectedSpeechModel = configuredServices.containsSelection(
-        selection = speechSelection,
-        predicate = { it.isStt },
-    )
-    return hasChatModel && hasSelectedSpeechModel
-}
-
-private fun List<github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting>.containsSelection(
-    selection: ModelSelection?,
-    predicate: (github.ponyhuang.gimi.domain.modelcatalog.model.Model) -> Boolean,
-): Boolean {
-    if (selection == null) return false
-    return any { service ->
-        service.id == selection.serviceId && service.groups.any { group ->
-            group.id == selection.groupId && group.models.any { model ->
-                model.id == selection.modelId && predicate(model)
-            }
-        }
-    }
-}

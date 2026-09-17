@@ -1,11 +1,4 @@
 <resources>
     <string name="app_name">Gimi</string>
     <string name="media_notification_listener_label">asssistantai media control</string>
-    <string name="bluetooth_voice_channel_name">Voice wake-up</string>
-    <string name="bluetooth_voice_notification_title">Voice wake-up assistant</string>
-    <string name="bluetooth_voice_action_pause">Pause</string>
-    <string name="bluetooth_voice_action_resume">Resume</string>
-    <string name="bluetooth_voice_action_stop">Stop</string>
-    <string name="bluetooth_voice_status_starting">Starting listener</string>
-    <string name="bluetooth_voice_status_permission_missing">Microphone or Bluetooth permission missing</string>
 </resources>

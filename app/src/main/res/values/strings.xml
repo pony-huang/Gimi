@@ -2,11 +2,4 @@
     <string name="app_name">Gimi</string>
 
     <string name="media_notification_listener_label">asssistantai media control</string>
-    <string name="bluetooth_voice_channel_name">语音唤醒</string>
-    <string name="bluetooth_voice_notification_title">语音唤醒助手</string>
-    <string name="bluetooth_voice_action_pause">暂停</string>
-    <string name="bluetooth_voice_action_resume">继续</string>
-    <string name="bluetooth_voice_action_stop">停止</string>
-    <string name="bluetooth_voice_status_starting">正在启动监听</string>
-    <string name="bluetooth_voice_status_permission_missing">缺少麦克风或蓝牙权限</string>
 </resources>

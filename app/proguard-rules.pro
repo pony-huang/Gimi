@@ -4,8 +4,8 @@
 # Each entry below covers a case where R8 cannot prove a class is reachable
 # even though the runtime does (reflection, manifest lookup, native binding).
 # Everything else is handled by consumer-rules.pro embedded in each AAR
-# (Compose, Hilt, Room, openai-java, anthropic-java, google-adk,
-# vosk-android, ktor) — those are merged automatically.
+# (Compose, Hilt, Room, openai-java, anthropic-java, google-adk, ktor) —
+# those are merged automatically.
 #
 # 发版策略：只收缩、不混淆。历史上多次发版被 R8 改名坑（插件 ABI 的
 # DefaultConstructorMarker/Continuation/coroutines 被改短名、反射/序列化改名），
@@ -175,19 +175,3 @@
 # ---------------------------------------------------------------------------
 -keep class kotlin.** { *; }
 -keep class kotlinx.coroutines.** { *; }
-
-# ---------------------------------------------------------------------------
-# Vosk 语音唤醒（JNA 原生绑定）
-#
-# vosk-android 0.3.75 依赖 net.java.dev.jna:jna:5.18.1（aar），两个 AAR 均不携带
-# consumer-rules.pro。org.vosk.LibVosk 是 JNA Library 接口，Model/Recognizer 经
-# com.sun.jna.Native 反射加载 libvosk.so / libjnidispatch.so；若 R8 收缩掉 JNA 内部类
-# 或 vosk 接口方法，release 构建里 Model(modelPath) 会抛 UnsatisfiedLinkError /
-# ClassNotFoundException，表现为「唤醒模型已下载但 switch 始终启动失败（无法加载模型）」。
-# 全局已 -dontobfuscate，这里主要防收缩。
-# ---------------------------------------------------------------------------
--keep class org.vosk.** { *; }
--keep class com.sun.jna.** { *; }
--keepclassmembers class * extends com.sun.jna.** { public *; }
--dontwarn com.sun.jna.**
--dontwarn org.vosk.**

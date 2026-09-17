@@ -1,57 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- VoiceWakeSettingsScreen -->
     <string name="voicewake_screen_title">语音唤醒</string>
-    <string name="voicewake_listening_title">后台监听</string>
-    <string name="voicewake_listening_subtitle">优先使用蓝牙耳机，不可用时自动改用手机</string>
-
-    <string name="voicewake_section_models">唤醒模型</string>
-    <string name="voicewake_section_models_note">选择后自动下载，识别仅在本机进行</string>
-    <string name="voicewake_model_cn_name">中文唤醒模型</string>
-    <string name="voicewake_model_en_name">英语唤醒模型</string>
-    <string name="voicewake_model_status_bundled">选择后自动准备</string>
-    <string name="voicewake_model_status_download_required">约 %1$d MB</string>
-    <string name="voicewake_model_downloading_progress">正在下载 %1$d%%</string>
-    <string name="voicewake_model_installing">正在安装模型</string>
-    <string name="voicewake_model_removing">正在移除模型</string>
-    <string name="voicewake_model_ready">已就绪，仅在本机识别“%1$s”</string>
-    <string name="voicewake_model_install_failed">安装失败</string>
-    <string name="voicewake_action_download">下载</string>
-    <string name="voicewake_action_retry">重试</string>
-    <string name="voicewake_action_cancel">取消</string>
-    <string name="voicewake_action_remove">移除</string>
-
-    <string name="voicewake_section_keyword_with_language">唤醒词 · %1$s</string>
-    <string name="voicewake_language_zh">中文</string>
-    <string name="voicewake_language_en">English</string>
-    <string name="voicewake_keyword_say_preview">说出“%1$s”然后说出你的任务</string>
-    <string name="voicewake_keyword_empty_preview">唤醒词</string>
-    <string name="voicewake_keyword_field_label">自定义</string>
-    <string name="voicewake_keyword_hint_zh">请输入 2–20 个字符</string>
-    <string name="voicewake_keyword_hint_en">请输入 1–4 个英文单词</string>
-    <string name="voicewake_keyword_error_length_zh">唤醒词需要包含 2–20 个字符</string>
-    <string name="voicewake_keyword_error_length_en">唤醒词总长度需要在 2–40 个字符之间</string>
-    <string name="voicewake_keyword_error_characters">唤醒词不能包含控制字符</string>
-    <string name="voicewake_keyword_error_format_en">请使用 1–4 个英文单词，不要输入符号或数字</string>
-    <string name="voicewake_keyword_clear">清空唤醒词</string>
-    <string name="voicewake_keyword_recommendations">推荐唤醒词</string>
-    <string name="voicewake_keyword_vocabulary_notice">唤醒词由离线模型识别，少见名称或生造词可能无法触发。</string>
-    <string name="voicewake_keyword_model_required">可以先保存；安装当前唤醒模型后生效。</string>
-    <string name="voicewake_keyword_use_default">使用默认值</string>
-    <string name="voicewake_keyword_save">保存更改</string>
-    <string name="voicewake_keyword_retry">重试</string>
-    <string name="voicewake_keyword_save_failed">未能保存或应用唤醒词，旧唤醒词仍然有效。</string>
-    <string name="voicewake_keyword_saved">唤醒词已更新为“%1$s”</string>
-    <string name="voicewake_keyword_applying">正在应用新唤醒词…</string>
-    <string name="voicewake_unsaved_title">保存唤醒词修改？</string>
-    <string name="voicewake_unsaved_message">你还有未保存的唤醒词。</string>
-    <string name="voicewake_unsaved_save">保存修改</string>
-    <string name="voicewake_unsaved_discard">放弃修改</string>
-    <string name="voicewake_unsaved_continue">继续编辑</string>
-
-    <string name="voicewake_offline_setup_required">启用前请配置可用的默认模型和语音识别模型。</string>
-    <string name="voicewake_section_display">后台显示</string>
-    <string name="voicewake_overlay_permission_title">允许悬浮显示</string>
-    <string name="voicewake_overlay_permission_granted">已授权，后台唤醒时显示助手浮层</string>
-    <string name="voicewake_overlay_permission_missing">未授权，后台仍通过通知和语音反馈</string>
-
+    <string name="voicewake_enable_title">语音唤醒</string>
+    <string name="voicewake_status_unavailable">此设备不支持设备端语音识别</string>
+    <string name="voicewake_status_disabled">已关闭</string>
+    <string name="voicewake_status_listening">正在等待唤醒短语</string>
+    <string name="voicewake_status_submitting">正在提交识别到的命令</string>
+    <string name="voicewake_status_waiting_foreground">应用回到前台后开始监听</string>
+    <string name="voicewake_recognizer_unavailable">此设备没有可用的设备端语音识别服务，语音唤醒无法启用。</string>
+    <string name="voicewake_chat_model_required">启用前请先配置可用的默认对话模型。</string>
+    <string name="voicewake_section_recognition">识别方式</string>
+    <string name="voicewake_recognition_title">Android 设备端识别</string>
+    <string name="voicewake_recognition_subtitle">语音由系统转换为文字；仅匹配到唤醒短语后，才把剩余命令提交到当前会话。</string>
+    <string name="voicewake_section_phrases">唤醒短语</string>
+    <string name="voicewake_phrase_saved">已用于本地文本匹配</string>
+    <string name="voicewake_phrase_explanation">识别文本以任一短语开头时触发，默认短语为“吉米”。</string>
+    <string name="voicewake_phrase_label">新唤醒短语</string>
+    <string name="voicewake_phrase_hint">输入 2–20 个字符</string>
+    <string name="voicewake_phrase_error_length">唤醒短语需要包含 2–20 个字符</string>
+    <string name="voicewake_phrase_error_characters">唤醒短语不能包含控制字符</string>
+    <string name="voicewake_phrase_error_duplicate">该唤醒短语已经存在</string>
+    <string name="voicewake_phrase_error_last">至少需要保留一个唤醒短语</string>
+    <string name="voicewake_add_phrase">添加短语</string>
+    <string name="voicewake_remove_phrase">移除 %1$s</string>
 </resources>

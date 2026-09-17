@@ -76,9 +76,7 @@ fun ChatRoute(
     val scope = rememberCoroutineScope()
 
     LifecycleResumeEffect(viewModel) {
-        viewModel.setCurrentChatVisible(true)
         onPauseOrDispose {
-            viewModel.setCurrentChatVisible(false)
             viewModel.onAction(ChatAction.LeaveChat)
         }
     }

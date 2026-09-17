@@ -4,9 +4,9 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import github.ponyhuang.gimi.data.voicewake.BluetoothVoiceController
-import github.ponyhuang.gimi.data.voicewake.notification.AndroidWakeModelNotifier
-import github.ponyhuang.gimi.data.voicewake.notification.WakeModelNotifier
+import github.ponyhuang.gimi.data.voicewake.SystemVoiceWakeController
+import github.ponyhuang.gimi.data.voicewake.AndroidOnDeviceVoiceWakeRecognizer
+import github.ponyhuang.gimi.data.voicewake.VoiceWakeRecognizer
 import github.ponyhuang.gimi.domain.speech.repository.VoiceWakeRepository
 import javax.inject.Singleton
 
@@ -15,13 +15,13 @@ import javax.inject.Singleton
 abstract class VoiceWakeModule {
     @Binds
     @Singleton
-    abstract fun bindWakeModelNotifier(
-        implementation: AndroidWakeModelNotifier,
-    ): WakeModelNotifier
+    abstract fun bindVoiceWakeRecognizer(
+        implementation: AndroidOnDeviceVoiceWakeRecognizer,
+    ): VoiceWakeRecognizer
 
     @Binds
     @Singleton
     abstract fun bindVoiceWakeRepository(
-        implementation: BluetoothVoiceController,
+        implementation: SystemVoiceWakeController,
     ): VoiceWakeRepository
 }

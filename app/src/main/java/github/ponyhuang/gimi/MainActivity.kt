@@ -14,6 +14,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import github.ponyhuang.gimi.navigation.MainScreen
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
+import github.ponyhuang.gimi.domain.speech.repository.VoiceWakeRepository
 import github.ponyhuang.gimi.feature.chat.sharedImageUris
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.voice.AssistantPanelInteractor
@@ -27,6 +28,8 @@ class MainActivity : ComponentActivity() {
     lateinit var assistantSessionCoordinator: AssistantSessionCoordinator
     @Inject
     lateinit var assistantPanelInteractor: AssistantPanelInteractor
+    @Inject
+    lateinit var voiceWakeRepository: VoiceWakeRepository
 
     private val sharedMediaUris = mutableStateOf<List<Uri>>(emptyList())
     private val openChatRequest = mutableStateOf(0)
@@ -66,14 +69,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        MainActivityVisibility.setForeground(true)
+    override fun onStart() {
+        super.onStart()
+        voiceWakeRepository.setForeground(true)
     }
 
-    override fun onPause() {
-        MainActivityVisibility.setForeground(false)
-        super.onPause()
+    override fun onResume() {
+        super.onResume()
+        voiceWakeRepository.refreshPermission()
+    }
+
+    override fun onStop() {
+        voiceWakeRepository.setForeground(false)
+        super.onStop()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

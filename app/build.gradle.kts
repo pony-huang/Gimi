@@ -53,7 +53,7 @@ android {
     buildFeatures {
         buildConfig = true
     }
-    // Baseline 记录现存 lint 问题（如 BluetoothVoiceService 蓝牙权限检查），lint 继续对新问题报错。
+    // Baseline 记录现存 lint 问题，lint 继续对新问题报错。
     lint {
         baseline = file("lint-baseline.xml")
     }

@@ -3,28 +3,19 @@ package github.ponyhuang.gimi.domain.speech.repository
 import github.ponyhuang.gimi.domain.speech.model.VoiceWakeState
 import kotlinx.coroutines.flow.StateFlow
 
+/** 前台设备端语音唤醒的领域入口。 */
 interface VoiceWakeRepository {
     val state: StateFlow<VoiceWakeState>
 
-    /** 切换激活的唤醒模型。 */
-    fun selectModel(modelId: String)
+    fun setEnabled(enabled: Boolean)
 
-    /** 安装（内置解包或下载）指定模型。 */
-    fun installModel(modelId: String)
+    /** 由应用根 Activity 转发整个应用是否处于可见状态。 */
+    fun setForeground(foreground: Boolean)
 
-    /** 取消正在进行的模型安装/下载。 */
-    fun cancelInstall(modelId: String)
+    /** 权限请求或系统设置返回后重新核对录音权限。 */
+    fun refreshPermission()
 
-    /** 删除指定模型的本地文件。 */
-    fun removeModel(modelId: String)
+    fun addTriggerPhrase(phrase: String): Result<Unit>
 
-    fun start()
-
-    fun stop()
-
-    /** 标记当前聊天页是否在前台可交互；可见时不响应唤醒词。 */
-    fun setCurrentChatVisible(visible: Boolean)
-
-    /** 保存当前模型的唤醒词；校验失败时返回类型化错误。 */
-    fun setWakeWord(modelId: String, wakeWord: String): Result<Unit>
+    fun removeTriggerPhrase(phrase: String): Result<Unit>
 }

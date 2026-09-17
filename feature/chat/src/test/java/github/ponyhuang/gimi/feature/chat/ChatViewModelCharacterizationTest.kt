@@ -44,12 +44,9 @@ import github.ponyhuang.gimi.domain.memory.model.MemoryOperation
 import github.ponyhuang.gimi.domain.memory.model.MemoryRuntimeFailure
 import github.ponyhuang.gimi.domain.memory.repository.MemoryRuntimeStatus
 import github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState
-import github.ponyhuang.gimi.domain.speech.model.VoiceWakeState
-import github.ponyhuang.gimi.domain.speech.model.VoiceWakeStatus
 import github.ponyhuang.gimi.domain.speech.repository.SpeechPlaybackRepository
 import github.ponyhuang.gimi.domain.speech.repository.SpeechRecognitionRepository
 import github.ponyhuang.gimi.domain.speech.repository.SpeechSettingsRepository
-import github.ponyhuang.gimi.domain.speech.repository.VoiceWakeRepository
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 import io.mockk.coEvery
@@ -59,7 +56,6 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import io.mockk.verify
-import io.mockk.verifyOrder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
@@ -418,34 +414,6 @@ class ChatViewModelCharacterizationTest {
 
         assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
         coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
-    }
-
-    @Test
-    fun wakeCommandCaptureDoesNotReplaceCurrentChatComposer() = runTest {
-        val fixture = fixture(configured = true)
-        fixture.viewModel.onAction(ChatAction.SwitchSession("session-1"))
-        advanceUntilIdle()
-        val stateBeforeWake = fixture.viewModel.uiState.value
-
-        fixture.voiceWake.value = VoiceWakeState(
-            status = VoiceWakeStatus.CapturingCommand,
-        )
-        advanceUntilIdle()
-
-        assertEquals(stateBeforeWake, fixture.viewModel.uiState.value)
-    }
-
-    @Test
-    fun currentChatVisibilityIsForwardedToVoiceWakeRuntime() = runTest {
-        val fixture = fixture(configured = true)
-
-        fixture.viewModel.setCurrentChatVisible(true)
-        fixture.viewModel.setCurrentChatVisible(false)
-
-        verifyOrder {
-            fixture.voiceWakeRepository.setCurrentChatVisible(true)
-            fixture.voiceWakeRepository.setCurrentChatVisible(false)
-        }
     }
 
     @Test
@@ -1445,10 +1413,6 @@ class ChatViewModelCharacterizationTest {
             ): ConversationToolConfiguration =
                 conversations.conversationToolConfiguration(sessionId) ?: defaultTools
         }
-        val voiceWakeState = MutableStateFlow(VoiceWakeState())
-        val voiceWake = mockk<VoiceWakeRepository>(relaxed = true) {
-            every { state } returns voiceWakeState
-        }
         val attachments = mockk<ChatAttachmentRepository> {
             coEvery { read(any(), any()) } coAnswers {
                 attachmentReadFailure?.let { throw it }
@@ -1505,7 +1469,6 @@ class ChatViewModelCharacterizationTest {
                 speechRecognitionRepository = recognition,
                 speechPlaybackController = playback,
                 speechSettings = speechSettings,
-                voiceWake = voiceWake,
                 attachments = attachments,
                 prepareChatTurn = prepareChatTurn,
                 toolAuthorization = toolAuthorization,
@@ -1525,8 +1488,6 @@ class ChatViewModelCharacterizationTest {
             appearance = appearance,
             toolApproval = toolApproval,
             mcpRepository = mcpRepository,
-            voiceWake = voiceWakeState,
-            voiceWakeRepository = voiceWake,
             playback = playback,
             speechSettings = speechSettings,
         )
@@ -1628,8 +1589,6 @@ class ChatViewModelCharacterizationTest {
         val appearance: AppearanceRepository,
         val toolApproval: FakeToolApprovalRepository,
         val mcpRepository: McpRepository,
-        val voiceWake: MutableStateFlow<VoiceWakeState>,
-        val voiceWakeRepository: VoiceWakeRepository,
         val playback: SpeechPlaybackRepository,
         val speechSettings: FakeSpeechSettingsRepository,
     )

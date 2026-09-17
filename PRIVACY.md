@@ -27,7 +27,7 @@ The following stays on your device and is never sent to the developer (who opera
 - **Memory data**: vector embeddings computed entirely on-device
 - **Settings and model service configs**: including API keys you enter, encrypted with the Android
   Keystore before storage
-- **Wake-word models**: downloaded once, then run fully offline
+- **Wake phrases**: stored only in the app's private settings
 - **Working folders**: accessed only after you explicitly authorize a folder
 
 Uninstalling the app or clearing its data removes all of the above. If system cloud backup is on,
@@ -43,12 +43,11 @@ use the following services** does relevant data go to the corresponding provider
 | Model services you configure (OpenAI, Anthropic, DeepSeek, Moonshot, Zhipu, MiniMax, MiMo, Gemini, or any OpenAI / Anthropic-compatible endpoint) | Conversation content, images you send, tool results | When you send a message or invoke a tool |
 | Speech recognition / synthesis services you configure | Recorded audio or text to synthesize | When you use voice input or play spoken replies |
 | MCP servers you add, plugins you install | Data required by those tools to run | When you invoke the corresponding tools |
-| alphacephei.com (official Vosk model hosting) | Model download requests only, no personal data | When you download a wake-word model |
 | GitHub (api.github.com and Releases) | Update-check and APK download requests only, no personal data | When you check for or install app updates in Settings |
 
 How each provider handles your data is governed by its own privacy policy, which is outside this
-project's control — configure only services you trust. Wake-word detection and memory embedding run
-entirely offline on your device.
+project's control — configure only services you trust. Voice wake uses Android on-device speech
+recognition and matches phrases locally; memory embedding also runs entirely on your device.
 
 ## Permissions and built-in tools
 

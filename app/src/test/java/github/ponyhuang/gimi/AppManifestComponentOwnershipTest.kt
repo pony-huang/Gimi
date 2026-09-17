@@ -28,13 +28,13 @@ class AppManifestComponentOwnershipTest {
     }
 
     @Test
-    fun voiceAssistantDeclaresOptionalOverlayPermissionAndPrivateLockScreenActivity() {
+    fun foregroundVoiceWakeDoesNotDeclareLegacyBackgroundComponentsOrPermissions() {
         val content = File("src/main/AndroidManifest.xml").readText()
 
-        assertTrue(content.contains("android.permission.SYSTEM_ALERT_WINDOW"))
-        assertTrue(content.contains("android:name=\".voice.AssistantLockScreenActivity\""))
-        assertTrue(content.contains("android:exported=\"false\""))
-        assertTrue(content.contains("android:excludeFromRecents=\"true\""))
-        assertTrue(content.contains("android:noHistory=\"true\""))
+        assertFalse(content.contains("android.permission.SYSTEM_ALERT_WINDOW"))
+        assertFalse(content.contains("android.permission.FOREGROUND_SERVICE_MICROPHONE"))
+        assertFalse(content.contains("android.permission.MODIFY_AUDIO_SETTINGS"))
+        assertFalse(content.contains("BluetoothVoiceService"))
+        assertFalse(content.contains("AssistantLockScreenActivity"))
     }
 }

@@ -20,7 +20,12 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
-    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
+    <!-- PACKAGE_USAGE_STATS 是签名/特权权限；推荐上下文（RecommendationContextCollector）
+         通过 Settings#ACTION_USAGE_ACCESS_SETTINGS 让用户手动授权，appop 通道运行时可用。
+         Lint 把这视为系统权限误报，工具维度静默。 -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
     <uses-feature
         android:name="android.hardware.camera.any"
         android:required="false" />

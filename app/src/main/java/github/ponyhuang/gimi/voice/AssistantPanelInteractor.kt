@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.voice
 
+import android.annotation.SuppressLint
 import github.ponyhuang.gimi.core.audio.VoiceAudioRecorder
 import github.ponyhuang.gimi.domain.assistant.model.AssistantInvocationSource
 import github.ponyhuang.gimi.domain.assistant.model.AssistantPresentationEvent
@@ -67,6 +68,9 @@ class AssistantPanelInteractor @Inject constructor(
         scope.cancel()
     }
 
+    // UI 层（AppNavigation）已 checkSelfPermission / RequestPermission 校验过
+    // RECORD_AUDIO；这里只是无法被 Lint 静态证明。
+    @SuppressLint("MissingPermission")
     private fun startRecording() {
         if (_recording.value) return
         pcm.reset()

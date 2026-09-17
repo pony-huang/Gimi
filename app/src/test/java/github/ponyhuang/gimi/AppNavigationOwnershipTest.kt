@@ -10,7 +10,7 @@ class AppNavigationOwnershipTest {
     @Test
     fun appNavigationDoesNotOwnChatStateOrFileOpening() {
         val navigation = File(
-            "src/main/java/github/ponyhuang/gimi/app/navigation/AppNavigation.kt",
+            "src/main/java/github/ponyhuang/gimi/navigation/AppNavigation.kt",
         )
 
         assertTrue("AppNavigation.kt should exist", navigation.isFile)
@@ -32,7 +32,7 @@ class AppNavigationOwnershipTest {
     @Test
     fun appNavigationComposesFeatureEntryProvidersInsteadOfFeatureRoutes() {
         val navigation = File(
-            "src/main/java/github/ponyhuang/gimi/app/navigation/AppNavigation.kt",
+            "src/main/java/github/ponyhuang/gimi/navigation/AppNavigation.kt",
         )
 
         assertTrue("AppNavigation.kt should exist", navigation.isFile)
@@ -58,7 +58,7 @@ class AppNavigationOwnershipTest {
     @Test
     fun appNavigationDistinguishesSameNamedFeatureDestinationsForTransitions() {
         val navigation = File(
-            "src/main/java/github/ponyhuang/gimi/app/navigation/AppNavigation.kt",
+            "src/main/java/github/ponyhuang/gimi/navigation/AppNavigation.kt",
         )
 
         assertTrue("AppNavigation.kt should exist", navigation.isFile)

@@ -71,7 +71,7 @@ class Mem0MemoryServiceTest {
         assertEquals("favorite drink", body.getValue("query").jsonPrimitive.content)
         assertEquals("user-default", body.getValue("filters").jsonObject.getValue("AND").jsonArray[0].jsonObject.getValue("user_id").jsonPrimitive.content)
         assertEquals("Gimi", body.getValue("filters").jsonObject.getValue("AND").jsonArray[1].jsonObject.getValue("app_id").jsonPrimitive.content)
-        assertEquals("5", body.getValue("top_k").jsonPrimitive.content)
+        assertEquals("10", body.getValue("top_k").jsonPrimitive.content)
         assertEquals("m1", response.memories.single().id)
         assertEquals("Likes tea", response.memories.single().content.parts.single().text)
         assertEquals("user", response.memories.single().author)

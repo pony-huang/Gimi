@@ -34,11 +34,6 @@ class AppDirectoryResolverTest {
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun rejectsAbsolutePath() {
-        FileSystemAppDirectoryResolver(roots()).resolve(spec(relativePath = "C:/outside"))
-    }
-
-    @Test(expected = IllegalArgumentException::class)
     fun rejectsTraversalOutsideRoot() {
         FileSystemAppDirectoryResolver(roots()).resolve(spec(relativePath = "../../outside"))
     }

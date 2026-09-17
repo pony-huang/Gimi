@@ -7,7 +7,6 @@ import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.tools.Toolset
-import com.google.adk.kt.tools.PreloadMemoryTool
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.ThinkingLevel
 import github.ponyhuang.gimi.data.agent.contribution.LocalToolContribution
@@ -106,18 +105,6 @@ class AgentFactoryToolAccessTest {
     }
 
     @Test
-    fun preloadMemoryRunsInBothAccessModesWithoutModelDeclaration() = runTest {
-        val fixture = fixture()
-
-        val always = fixture.create(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE).agent as LlmAgent
-        val onDemand = fixture.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
-
-        assertTrue(always.tools.any { it is PreloadMemoryTool })
-        assertTrue(onDemand.tools.any { it is PreloadMemoryTool })
-        assertEquals(null, always.tools.filterIsInstance<PreloadMemoryTool>().single().declaration())
-    }
-
-    @Test
     fun mcpConfigurationAndManualToolsAreDirectlyAvailableInBothAccessModes() = runTest {
         val configurationTool = mockk<McpConfigurationTool>(relaxed = true) {
             every { name } returns McpConfigurationTool.NAME
@@ -157,7 +144,7 @@ class AgentFactoryToolAccessTest {
         // 基础工具按贡献方 id 排序聚合：base 工具 → local 确认续接工具 → mcp 维护工具。
         assertEquals(
             listOf(
-                "preload_memory",
+                "load_memory",
                 "load_artifacts",
                 "adk_request_input",
                 "get_user_choice",
@@ -167,10 +154,6 @@ class AgentFactoryToolAccessTest {
                 McpManualConfigurationTool.NAME,
             ),
             agent.tools.map(BaseTool::name),
-        )
-        assertEquals(
-            null,
-            agent.tools.filterIsInstance<PreloadMemoryTool>().single().declaration(),
         )
     }
 
@@ -184,7 +167,7 @@ class AgentFactoryToolAccessTest {
 
         assertEquals(
             listOf(
-                "preload_memory",
+                "load_memory",
                 "load_artifacts",
                 "adk_request_input",
                 "get_user_choice",

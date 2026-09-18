@@ -111,8 +111,13 @@ object EventMapper {
      *   DAO 查询结果 = append 顺序 = runner emit 顺序 = 用户 streaming 时看到的顺序。
      */
     fun fromSession(session: Session): List<Message> =
-        session.events
-            .mapNotNull { fromEvent(it) }
+        session.events.mapNotNull { event ->
+            // 双保险：即使 fromEvent 未来新增抛错点，一个坏事件也只会丢自己，
+            // 不能让 loadMessages 的 catch-all 把整个会话历史吞成空列表。
+            runCatching { fromEvent(event) }
+                .onFailure { Log.w(TAG, "Skipping unreadable event ${event.id}", it) }
+                .getOrNull()
+        }
 
     // ── 内部 helper ─────────────────────────────────────────────────────
 
@@ -136,27 +141,44 @@ object EventMapper {
     }
 
     private fun Part.toFileAttachment(): FileAttachment? {
+        // per-part 降级：不可表示的附件段只丢弃本段并留日志。绝不能在这里抛异常——
+        // loadMessages 的 catch-all 会把整个 session 的历史吞成空列表，
+        // 一个坏事件就能让全会话渲染成空白。
         inlineData?.let { blob ->
-            val mimeType = requireNotNull(blob.mimeType) { "Attachment MIME type is missing" }
-            val data = requireNotNull(blob.data) { "Attachment payload is missing" }
-            return FileAttachment.fromBytes(
-                mimeType = mimeType,
-                data = data,
-                displayName = blob.displayName.orEmpty(),
-            )
+            val mimeType = blob.mimeType
+            val data = blob.data
+            if (mimeType == null || data == null) {
+                Log.w(TAG, "Dropping inline attachment without mime/payload: ${blob.displayName.orEmpty()}")
+                return null
+            }
+            return runCatching {
+                FileAttachment.fromBytes(
+                    mimeType = mimeType,
+                    data = data,
+                    displayName = blob.displayName.orEmpty(),
+                )
+            }.onFailure {
+                Log.w(TAG, "Dropping unrepresentable inline attachment ($mimeType): $it")
+            }.getOrNull()
         }
         fileData?.let { file ->
-            val mimeType = requireNotNull(file.mimeType) { "Attachment MIME type is missing" }
-            val reference = requireNotNull(file.fileUri) { "Attachment reference is missing" }
+            val mimeType = file.mimeType
+            val reference = file.fileUri
+            if (mimeType == null || reference == null) {
+                Log.w(TAG, "Dropping file attachment without mime/reference: ${file.displayName.orEmpty()}")
+                return null
+            }
             val payload = File(reference.removePrefix("file://"))
-            // per-part 降级：文件缺失时仍映射出带 isMissing 标记的附件，由 UI 渲染占位。
-            // 不能在这里 require 抛异常——loadMessages 的 catch-all 会把整个 session 的
-            // 历史吞成空列表，一个丢失的载荷文件就能让全会话渲染成空白。
-            val attachment = FileAttachment.fromFile(
-                file = payload,
-                mimeType = mimeType,
-                displayName = file.displayName.orEmpty(),
-            )
+            val attachment = runCatching {
+                FileAttachment.fromFile(
+                    file = payload,
+                    mimeType = mimeType,
+                    displayName = file.displayName.orEmpty(),
+                )
+            }.onFailure {
+                Log.w(TAG, "Dropping unrepresentable file attachment ($mimeType): $it")
+            }.getOrNull() ?: return null
+            // 文件缺失时仍映射出带 isMissing 标记的附件，由 UI 渲染占位。
             return if (payload.isFile) attachment else attachment.copy(isMissing = true)
         }
         return null

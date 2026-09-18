@@ -12,9 +12,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Row
@@ -34,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -51,6 +56,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import coil3.compose.SubcomposeAsyncImage
+import coil3.compose.SubcomposeAsyncImageContent
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
@@ -152,14 +158,145 @@ private fun ImagePreviewDialog(
     )
 }
 
+/** 用户消息图片的排布方式（对应 ChatGPT 式无边框大图设计）。 */
+internal enum class SentImagesLayout {
+    /** 纯图片消息：不套气泡，单图按原宽高比放大为圆角卡片，多图方形网格。 */
+    STANDALONE,
+
+    /** 图文混合：图片贴气泡顶边全幅展示，由气泡形状统一裁剪圆角。 */
+    FULL_BLEED_HEADER,
+}
+
+/** 单图卡片最大宽度/高度：约占半屏宽，超长图按高度截断并裁切。 */
+private val SentImageMaxWidth = 220.dp
+private val SentImageMaxHeight = 300.dp
+
+/** 多图网格单格边长：两列排布，方形裁切。 */
+private val SentImageGridCell = 106.dp
+
+/**
+ * 用户消息图片区：按 [layout] 决定无边框大图或贴边全幅头部，
+ * 内部持有点击放大预览的对话框状态。
+ */
+@Composable
+internal fun SentImages(
+    images: List<FileAttachment>,
+    layout: SentImagesLayout,
+    modifier: Modifier = Modifier,
+) {
+    if (images.isEmpty()) return
+    var previewImage by remember { mutableStateOf<FileAttachment?>(null) }
+    val single = images.singleOrNull()?.takeIf { !it.isMissing }
+    when (layout) {
+        SentImagesLayout.STANDALONE -> Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            if (single != null) {
+                SentImageCard(
+                    image = single,
+                    onClick = { previewImage = single },
+                    modifier = Modifier
+                        .widthIn(max = SentImageMaxWidth)
+                        .heightIn(max = SentImageMaxHeight),
+                )
+            } else {
+                SentImageGrid(images) { previewImage = it }
+            }
+        }
+
+        SentImagesLayout.FULL_BLEED_HEADER -> Column(modifier = modifier.fillMaxWidth()) {
+            if (single != null) {
+                SentImageCard(
+                    image = single,
+                    onClick = { previewImage = single },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = SentImageMaxHeight),
+                )
+            } else {
+                SentImageGrid(images) { previewImage = it }
+            }
+        }
+    }
+
+    previewImage?.let { image ->
+        ImagePreviewDialog(
+            image = image,
+            onDismiss = { previewImage = null },
+        )
+    }
+}
+
+/** 多图（或含缺失项）的方形网格缩略行。 */
+@Composable
+private fun SentImageGrid(
+    images: List<FileAttachment>,
+    onClick: (FileAttachment) -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        images.forEach { image ->
+            if (image.isMissing) {
+                MissingImageTile()
+            } else {
+                InlineImage(
+                    image = image,
+                    size = SentImageGridCell,
+                    onClick = { onClick(image) },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 单张已发送图片的宽高比卡片：加载完成后读取 intrinsicSize 更新比例，
+ * 保证不同方向的实拍图都以原始构图展示而不是固定方块。
+ */
+@Composable
+private fun SentImageCard(
+    image: FileAttachment,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var ratio by remember(image.id) { mutableFloatStateOf(1f) }
+    SubcomposeAsyncImage(
+        model = image.imageModel,
+        contentDescription = stringResource(R.string.chat_attachment_sent_image),
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .aspectRatio(ratio),
+        contentScale = ContentScale.Crop,
+        loading = {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(MaterialTheme.colorScheme.surfaceDim),
+            )
+        },
+        error = { AttachmentPlaceholder() },
+        success = {
+            val intrinsic = painter.intrinsicSize
+            if (intrinsic.width > 0f && intrinsic.height > 0f) {
+                LaunchedEffect(intrinsic) { ratio = intrinsic.width / intrinsic.height }
+            }
+            SubcomposeAsyncImageContent()
+        },
+    )
+}
+
 @Composable
 private fun InlineImage(
     image: FileAttachment,
+    size: Dp = 88.dp,
     onClick: () -> Unit,
 ) {
     AttachmentTile(
         modifier = Modifier.clickable(onClick = onClick),
-        size = 88.dp,
+        size = size,
     ) {
         Box(
             modifier = Modifier

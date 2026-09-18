@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.ui.chatcontent
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -28,14 +29,17 @@ import github.ponyhuang.gimi.ui.theme.LocalUserBubbleColors
  * 当前消费方：`:feature:chat`（聊天页消息）与 `:feature:assistant`（语音助手面板），
  * 两侧借此保证消息视觉完全一致。
  *
- * @param role      消息角色，决定左右对齐和配色
- * @param modifier  修饰符（气泡整体容器的 Modifier）
- * @param content   气泡内部内容，可以是任意 Composable
+ * @param role        消息角色，决定左右对齐和配色
+ * @param modifier    修饰符（气泡整体容器的 Modifier）
+ * @param imageHeader 可选全幅头部（如贴边图片），仅 USER 气泡生效；铺满气泡宽度、
+ *                    不带内容内边距，由气泡形状统一裁剪圆角
+ * @param content     气泡内部内容，可以是任意 Composable
  */
 @Composable
 fun ChatMessageBubble(
     role: ChatBubbleRole,
     modifier: Modifier = Modifier,
+    imageHeader: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val isUser = role == ChatBubbleRole.USER
@@ -54,10 +58,13 @@ fun ChatMessageBubble(
                 contentColor = userBubbleColors.onContainer,
                 shape = MaterialTheme.shapes.large,
             ) {
-                Box(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                ) {
-                    content()
+                Column {
+                    imageHeader?.invoke()
+                    Box(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    ) {
+                        content()
+                    }
                 }
             }
         } else {

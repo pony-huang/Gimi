@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.Messages
@@ -75,7 +76,32 @@ fun MessageBubble(
 ) {
     val role = message.role
     val fillsBubbleWidth = role != MessageRole.User
-    ChatMessageBubble(role = role.toChatBubbleRole(), modifier = modifier) {
+    val images = message.fileAttachments.filter { it.category == AttachmentCategory.IMAGE }
+    val otherAttachments = message.fileAttachments.filterNot { it.category == AttachmentCategory.IMAGE }
+    val hasVisibleText = message.textParts.any { !it.thought }
+    val isImageOnlyUserMessage = role == MessageRole.User &&
+        images.isNotEmpty() && !hasVisibleText && otherAttachments.isEmpty()
+
+    if (isImageOnlyUserMessage) {
+        // 纯图片消息：不套灰底气泡，直接以无边框大图卡片右对齐（ChatGPT 式）。
+        SentImages(
+            images = images,
+            layout = SentImagesLayout.STANDALONE,
+            modifier = modifier,
+        )
+        return
+    }
+
+    val userImagesAsHeader = role == MessageRole.User && images.isNotEmpty()
+    ChatMessageBubble(
+        role = role.toChatBubbleRole(),
+        modifier = modifier,
+        imageHeader = if (userImagesAsHeader) {
+            { SentImages(images = images, layout = SentImagesLayout.FULL_BLEED_HEADER) }
+        } else {
+            null
+        },
+    ) {
         Column(modifier = if (fillsBubbleWidth) Modifier.fillMaxWidth() else Modifier) {
             if (message.textParts.isNotEmpty()) {
                 message.textParts.filterNot { it.thought }.forEach { part ->
@@ -89,7 +115,7 @@ fun MessageBubble(
             }
 
             MessageAttachments(
-                attachments = message.fileAttachments,
+                attachments = if (userImagesAsHeader) otherAttachments else message.fileAttachments,
                 onOpenDocument = onOpenDocument,
             )
 

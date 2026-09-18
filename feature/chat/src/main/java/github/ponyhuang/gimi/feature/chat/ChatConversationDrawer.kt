@@ -195,27 +195,7 @@ private fun HistoryDrawerContent(
             color = MaterialTheme.colorScheme.outlineVariant,
         )
 
-        // ── 底部固定 - 夜间模式三态选择 + 设置入口 ────────────────
-        // 单独一行放置分段选择器：三枚图标一眼可辨当前模式，点任意一枚即显式选定，
-        // 含点回"跟随系统"重新启用自动跟随。
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 24.dp, end = 24.dp, top = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(R.string.chat_theme_mode_label),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium,
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            ThemeModeButton(
-                mode = themeMode,
-                onClick = { onThemeModeChange(themeMode.next()) },
-            )
-        }
-
+        // ── 底部固定 - 设置入口 + 夜间模式循环按钮（并列一行）───────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -234,6 +214,12 @@ private fun HistoryDrawerContent(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(start = 20.dp),
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            // 按钮自身消费点击，不会触发整行的设置跳转；点击循环 跟随系统→浅色→深色。
+            ThemeModeButton(
+                mode = themeMode,
+                onClick = { onThemeModeChange(themeMode.next()) },
             )
         }
 

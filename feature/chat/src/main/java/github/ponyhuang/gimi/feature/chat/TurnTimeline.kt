@@ -192,11 +192,10 @@ private fun List<Message>.toTurnTimeline(
     val seenFileResults = mutableSetOf<ToolCallKey>()
     var activityGroupCount = 0
 
-    // 思考文本不单独切组：纯思考缓冲并入后续工具组，避免正文前出现「0 次工具」的孤立折叠行；
-    // 只有出现真实工具活动后才在正文前 flush。轮次末尾 force flush 兜底展示落单的思考。
-    fun flushActivity(force: Boolean = false) {
+    // 思考与工具活动都发生在其后的正文之前，因此正文段出现前无条件 flush 缓冲，
+    // 保证「思考 / 执行工具 N 次」折叠组始终排在对应正文段上方，与事件时序一致。
+    fun flushActivity() {
         if (activityEntries.isEmpty()) return
-        if (!force && activityEntries.all { it is TimelineEntry.Thought }) return
         segments += TurnSegment.Activity(
             id = "${user.id}:a$activityGroupCount",
             entries = activityEntries.toList(),
@@ -247,7 +246,7 @@ private fun List<Message>.toTurnTimeline(
             }
         }
     }
-    flushActivity(force = true)
+    flushActivity()
 
     return TurnTimeline(
         turnId = user.id,

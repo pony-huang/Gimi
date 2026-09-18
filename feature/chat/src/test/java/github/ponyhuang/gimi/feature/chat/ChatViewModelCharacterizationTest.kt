@@ -27,6 +27,7 @@ import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
+import github.ponyhuang.gimi.domain.conversation.repository.NoAvailableAssistantModelException
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionSnapshot
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionBusyException
@@ -95,6 +96,7 @@ class ChatViewModelCharacterizationTest {
         mockkStatic(Log::class)
         every { Log.i(any<String>(), any<String>()) } returns 0
         every { Log.w(any<String>(), any<String>()) } returns 0
+        every { Log.w(any<String>(), any<String>(), any<Throwable>()) } returns 0
     }
 
     @After
@@ -508,6 +510,26 @@ class ChatViewModelCharacterizationTest {
             )
             assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
             coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun sendWithUnexpectedResolutionFailureSurfacesRealCauseNotModelNotice() = runTest {
+        val failingResolver = mockk<ConversationSessionResolver>(relaxed = true) {
+            coEvery { resolveCurrentOrCreate() } throws java.io.IOException("disk boom")
+            coEvery { activate(any()) } throws java.io.IOException("disk boom")
+        }
+        val fixture = fixture(configured = true, sessionResolverOverride = failingResolver)
+
+        fixture.viewModel.effects.test {
+            fixture.viewModel.send("你好")
+            advanceUntilIdle()
+
+            assertEquals(
+                ChatEffect.ShowNotice(ChatNotice.Message("disk boom")),
+                awaitItem(),
+            )
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -1353,6 +1375,7 @@ class ChatViewModelCharacterizationTest {
         agentRuntimeGate: FakeAgentRuntimeGate = FakeAgentRuntimeGate(),
         contentRevisions: MutableStateFlow<Map<String, Long>> = MutableStateFlow(emptyMap()),
         attachmentReadFailure: Exception? = null,
+        sessionResolverOverride: ConversationSessionResolver? = null,
     ): Fixture {
         val selection = ModelSelection("service", "chat", "model")
         val services = if (configured) listOf(service()) else emptyList()
@@ -1396,7 +1419,7 @@ class ChatViewModelCharacterizationTest {
                 "web_search" to setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
             ),
         )
-        val sessionResolver = object : ConversationSessionResolver {
+        val sessionResolver = sessionResolverOverride ?: object : ConversationSessionResolver {
             override suspend fun resolveCurrentOrCreate(): ConversationSessionSnapshot {
                 val sessionId = conversations.lastConversationId()
                     ?.takeIf(String::isNotBlank)
@@ -1406,7 +1429,7 @@ class ChatViewModelCharacterizationTest {
             }
 
             override suspend fun createAndActivate(): ConversationSessionSnapshot {
-                check(configured) { "No available assistant model." }
+                if (!configured) throw NoAvailableAssistantModelException()
                 val sessionId = conversations.createConversation(
                     ModelSelectionCodec.encode(selection),
                     true,
@@ -1417,7 +1440,7 @@ class ChatViewModelCharacterizationTest {
 
             override suspend fun activate(sessionId: String): ConversationSessionSnapshot? {
                 if (sessionId.isBlank()) return null
-                check(configured) { "No available assistant model." }
+                if (!configured) throw NoAvailableAssistantModelException()
                 if (conversations.loadMessages(sessionId) == null) return null
                 conversations.activateConversation(sessionId, ModelSelectionCodec.encode(selection))
                 return ConversationSessionSnapshot(

@@ -18,6 +18,7 @@ import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
+import github.ponyhuang.gimi.domain.conversation.repository.NoAvailableAssistantModelException
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRunLease
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionBusyException
@@ -494,6 +495,7 @@ class ChatViewModel @Inject constructor(
             } catch (_: AgentSessionBusyException) {
                 if (runtime.runToken === token) emitNotice(ChatNotice.CurrentConversationBusy)
             } catch (failure: Exception) {
+                Log.w(TAG, "Chat run failed for session ${runtime.sessionId}", failure)
                 if (runtime.runToken === token) {
                     eventReducer.applyError(
                         runtime.sessionId,
@@ -729,8 +731,13 @@ class ChatViewModel @Inject constructor(
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (_: NoAvailableAssistantModelException) {
                 emitNotice(ChatNotice.ConfigureChatModel)
+            } catch (failure: Exception) {
+                // 不能把所有解析失败都归因于"未配置模型"；Room/ADK/附件归档故障
+                // 需要真实的堆栈与原因，否则用户会去做完全无关的修复。
+                Log.w(TAG, "Chat send session resolution failed", failure)
+                emitNotice(ChatNotice.Message(failure.message ?: "Unknown error"))
             } finally {
                 if (!handedOff) submission.complete(ChatSubmissionResult.REJECTED)
             }

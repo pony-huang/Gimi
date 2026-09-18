@@ -78,26 +78,33 @@ fun MessageBubble(
     val fillsBubbleWidth = role != MessageRole.User
     val images = message.fileAttachments.filter { it.category == AttachmentCategory.IMAGE }
     val otherAttachments = message.fileAttachments.filterNot { it.category == AttachmentCategory.IMAGE }
-    // 空白文本段（重试/还原链路可能残留）不算可见文本，避免纯图片消息被撑成空气泡。
-    val visibleTextParts = message.textParts.filterNot { it.thought }.filter { it.text.isNotBlank() }
+    // 空白/零宽文本段（重试、还原或 runner 回显可能残留）不算可见文本，
+    // 避免纯图片消息被撑成空气泡或图片下方多出一个小灰块。
+    val visibleTextParts = message.textParts.filterNot { it.thought }.filter { it.hasVisibleContent }
     val hasBubbleBody = visibleTextParts.isNotEmpty() || otherAttachments.isNotEmpty()
 
-    if (role == MessageRole.User && images.isNotEmpty()) {
-        // 用户图片一律以无边框自适应卡片排在气泡上方（ChatGPT 式）：
-        // 单图按原宽高比放大、多图方形网格；文字/文件仍走灰底气泡。
-        Column(modifier = modifier) {
-            SentImages(images = images)
-            if (hasBubbleBody) {
-                UserBubbleBody(
-                    message = message,
-                    visibleTextParts = visibleTextParts,
-                    otherAttachments = otherAttachments,
-                    partChannelProvider = partChannelProvider,
-                    onOpenDocument = onOpenDocument,
-                )
-            }
+    if (role == MessageRole.User) {
+        if (images.isEmpty() && !hasBubbleBody) {
+            // 完全无可见内容的用户消息（如历史回显的空事件）：不渲染空气泡。
+            return
         }
-        return
+        if (images.isNotEmpty()) {
+            // 用户图片一律以无边框自适应卡片排在气泡上方（ChatGPT 式）：
+            // 单图按原宽高比放大、多图方形网格；文字/文件仍走灰底气泡。
+            Column(modifier = modifier) {
+                SentImages(images = images)
+                if (hasBubbleBody) {
+                    UserBubbleBody(
+                        message = message,
+                        visibleTextParts = visibleTextParts,
+                        otherAttachments = otherAttachments,
+                        partChannelProvider = partChannelProvider,
+                        onOpenDocument = onOpenDocument,
+                    )
+                }
+            }
+            return
+        }
     }
 
     ChatMessageBubble(role = role.toChatBubbleRole(), modifier = modifier) {
@@ -127,6 +134,24 @@ fun MessageBubble(
         }
     }
 }
+
+/**
+ * 文本段是否含可见字符：除常规空白外，还要排除 NBSP、零宽空格/连接符、BOM 等
+ * `isBlank` 不视为空白但渲染上完全不可见的字符，否则历史还原后会冒出空气泡。
+ */
+private val TextPart.hasVisibleContent: Boolean
+    get() = text.any { !it.isWhitespace() && it.code !in InvisibleCharCodes }
+
+private val InvisibleCharCodes = setOf(
+    0x00A0, // NBSP
+    0x200B, // zero-width space
+    0x200C, // ZWNJ
+    0x200D, // ZWJ
+    0x200E, // LRM
+    0x200F, // RLM
+    0x2060, // word joiner
+    0xFEFF, // BOM / zero-width NBSP
+)
 
 /** 用户图片消息的正文气泡：文本段与非图片附件，沿用共享灰底气泡样式。 */
 @Composable

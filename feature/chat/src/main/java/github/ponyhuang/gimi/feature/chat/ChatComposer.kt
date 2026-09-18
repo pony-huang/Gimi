@@ -66,6 +66,7 @@ import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import java.io.ByteArrayOutputStream
+import java.io.File
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -565,6 +566,9 @@ public data class MessageData(
                         val category = runCatching {
                             AttachmentCategory.valueOf(values[4])
                         }.getOrNull() ?: return@mapNotNull null
+                        // 草稿文件是发送/离开页面清理的唯一真相：回执到达前胶囊被卸载时
+                        // 快照仍是旧的，文件已被回执删除则说明该附件已消费，不再恢复 chip。
+                        if (!File(values[0]).exists()) return@mapNotNull null
                         DraftAttachment(
                             reference = values[0],
                             displayName = values[1],

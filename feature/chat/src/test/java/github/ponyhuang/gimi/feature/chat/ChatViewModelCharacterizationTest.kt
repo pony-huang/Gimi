@@ -1187,6 +1187,25 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun successfulSendWithDraftAttachmentsDeliversAcceptedReceipt() = runTest {
+        val fixture = fixture(configured = true)
+        val drafts = listOf(
+            github.ponyhuang.gimi.domain.conversation.model.DraftAttachment(
+                reference = "/drafts/doc.pdf",
+                displayName = "doc.pdf",
+                mimeType = "application/pdf",
+                sizeBytes = 128,
+                category = github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory.DOCUMENT,
+            ),
+        )
+        val results = mutableListOf<ChatSubmissionResult>()
+        fixture.viewModel.send("带附件的提问", drafts, results::add)
+        advanceUntilIdle()
+        assertEquals(listOf(ChatSubmissionResult.ACCEPTED), results)
+        coVerify(exactly = 1) { fixture.execution.send("带附件的提问", any(), any()) }
+    }
+
+    @Test
     fun failedPreparationDoesNotConsumeInputOrPublishAUserMessage() = runTest {
         val fixture = fixture(configured = true, attachmentReadFailure = java.io.IOException("missing"))
         val results = mutableListOf<ChatSubmissionResult>()

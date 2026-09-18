@@ -85,12 +85,14 @@ class AdkChatAgentRepository @Inject constructor(
                     val mimeType = file.mimeType ?: return@let null
                     val reference = file.fileUri ?: return@let null
                     val payload = File(reference.removePrefix("file://"))
-                    require(payload.isFile) { "Attachment payload is unavailable: $reference" }
-                    FileAttachment.fromFile(
+                    // per-part 降级：workspace 文件可能被用户删除，映射为 isMissing 占位而不是抛错，
+                    // 否则一个丢失的载荷文件会让该会话之后的每一轮流式事件全部失败。
+                    val attachment = FileAttachment.fromFile(
                         file = payload,
                         mimeType = mimeType,
                         displayName = file.displayName.orEmpty(),
                     )
+                    if (payload.isFile) attachment else attachment.copy(isMissing = true)
                 },
             )
         },

@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.data.agent.conversation
 
 import com.google.adk.kt.events.Event
 import com.google.adk.kt.types.Content
+import com.google.adk.kt.types.FileData
 import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.FunctionResponse
 import com.google.adk.kt.types.Part
@@ -20,7 +21,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 /**
  * `AdkChatAgentRepository` 的 ADK Event → ChatRunEvent 映射 characterization。
@@ -29,6 +32,9 @@ import org.junit.Test
  * 防止后续重构（模块迁移、契约调整）改变行为。
  */
 class AdkChatAgentRepositoryMappingTest {
+
+    @get:Rule
+    val temporaryFolder = TemporaryFolder()
 
     private val execution = mockk<AgentChatRunner.Execution>()
     private val runner = mockk<AgentChatRunner> {
@@ -164,6 +170,33 @@ class AdkChatAgentRepositoryMappingTest {
             .single()
 
         assertEquals(false, mapped.confirmationApproved)
+    }
+
+    @Test
+    fun streamedFileDataWithDeletedPayloadMapsToMissingPlaceholder() = runTest {
+        val gone = temporaryFolder.newFile("report.pdf").apply { delete() }
+        val event = adkEvent(
+            parts = listOf(
+                Part(
+                    fileData = FileData(
+                        mimeType = "application/pdf",
+                        displayName = "report.pdf",
+                        fileUri = gone.absolutePath,
+                    ),
+                ),
+            ),
+        )
+        coEvery {
+            execution.send(any(), any(), any())
+        } returns flowOf(event)
+
+        val mapped = repository.createExecution("session-1", selection)
+            .send("继续", emptyList())
+            .toList()
+
+        val attachment = mapped.single().parts.single().attachment
+        assertEquals(true, attachment?.isMissing)
+        assertEquals("report.pdf", attachment?.displayName)
     }
 
     private fun adkEvent(

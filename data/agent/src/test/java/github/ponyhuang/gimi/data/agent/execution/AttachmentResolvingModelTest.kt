@@ -15,6 +15,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -97,8 +98,8 @@ class AttachmentResolvingModelTest {
         )
     }
 
-    @Test(expected = IllegalArgumentException::class)
-    fun `missing local file fails before provider invocation`() = runTest {
+    @Test
+    fun `missing local file degrades to text marker and request still proceeds`() = runTest {
         val delegate = RecordingModel()
 
         AttachmentResolvingModel(delegate).generateContent(
@@ -119,6 +120,39 @@ class AttachmentResolvingModelTest {
             ),
             stream = false,
         ).toList()
+
+        val resolved = delegate.request!!.contents.single().parts.single()
+        assertNull(resolved.fileData)
+        assertNull(resolved.inlineData)
+        assertTrue(resolved.text!!.contains("missing.pdf"))
+    }
+
+    @Test
+    fun `file data without URI degrades to text marker`() = runTest {
+        val delegate = RecordingModel()
+
+        AttachmentResolvingModel(delegate).generateContent(
+            LlmRequest(
+                contents = listOf(
+                    Content(
+                        parts = listOf(
+                            Part(
+                                fileData = FileData(
+                                    mimeType = "application/pdf",
+                                    displayName = "broken.pdf",
+                                    fileUri = null,
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            stream = false,
+        ).toList()
+
+        val resolved = delegate.request!!.contents.single().parts.single()
+        assertNull(resolved.fileData)
+        assertTrue(resolved.text!!.contains("broken.pdf"))
     }
 
     private class RecordingModel : Model {

@@ -122,13 +122,16 @@ class VoiceAudioRecorder {
 
     @Synchronized
     fun stop() {
+        // 取消无法打断阻塞中的原生 read()，在 IO 线程仍停在 read 时 release()
+        // 是设备相关的崩溃/未定义行为路径。这里只 cancel 并 stop()（stop() 会让
+        // 阻塞 read 立即返回），stop()/release() 与字段清空统一由读循环的
+        // finally 在同一把锁内完成。
         readJob?.cancel()
-        readJob = null
-        audioRecord?.run {
-            if (recordingState == AudioRecord.RECORDSTATE_RECORDING) stop()
-            release()
+        audioRecord?.let { recorder ->
+            if (recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                runCatching { recorder.stop() }
+            }
         }
-        audioRecord = null
     }
 
     fun release() {

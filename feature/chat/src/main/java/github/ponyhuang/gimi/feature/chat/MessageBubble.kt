@@ -78,44 +78,41 @@ fun MessageBubble(
     val fillsBubbleWidth = role != MessageRole.User
     val images = message.fileAttachments.filter { it.category == AttachmentCategory.IMAGE }
     val otherAttachments = message.fileAttachments.filterNot { it.category == AttachmentCategory.IMAGE }
-    val hasVisibleText = message.textParts.any { !it.thought }
-    val isImageOnlyUserMessage = role == MessageRole.User &&
-        images.isNotEmpty() && !hasVisibleText && otherAttachments.isEmpty()
+    // 空白文本段（重试/还原链路可能残留）不算可见文本，避免纯图片消息被撑成空气泡。
+    val visibleTextParts = message.textParts.filterNot { it.thought }.filter { it.text.isNotBlank() }
+    val hasBubbleBody = visibleTextParts.isNotEmpty() || otherAttachments.isNotEmpty()
 
-    if (isImageOnlyUserMessage) {
-        // 纯图片消息：不套灰底气泡，直接以无边框大图卡片右对齐（ChatGPT 式）。
-        SentImages(
-            images = images,
-            layout = SentImagesLayout.STANDALONE,
-            modifier = modifier,
-        )
+    if (role == MessageRole.User && images.isNotEmpty()) {
+        // 用户图片一律以无边框自适应卡片排在气泡上方（ChatGPT 式）：
+        // 单图按原宽高比放大、多图方形网格；文字/文件仍走灰底气泡。
+        Column(modifier = modifier) {
+            SentImages(images = images)
+            if (hasBubbleBody) {
+                UserBubbleBody(
+                    message = message,
+                    visibleTextParts = visibleTextParts,
+                    otherAttachments = otherAttachments,
+                    partChannelProvider = partChannelProvider,
+                    onOpenDocument = onOpenDocument,
+                )
+            }
+        }
         return
     }
 
-    val userImagesAsHeader = role == MessageRole.User && images.isNotEmpty()
-    ChatMessageBubble(
-        role = role.toChatBubbleRole(),
-        modifier = modifier,
-        imageHeader = if (userImagesAsHeader) {
-            { SentImages(images = images, layout = SentImagesLayout.FULL_BLEED_HEADER) }
-        } else {
-            null
-        },
-    ) {
+    ChatMessageBubble(role = role.toChatBubbleRole(), modifier = modifier) {
         Column(modifier = if (fillsBubbleWidth) Modifier.fillMaxWidth() else Modifier) {
-            if (message.textParts.isNotEmpty()) {
-                message.textParts.filterNot { it.thought }.forEach { part ->
-                    RenderTextPart(
-                        part = part,
-                        partial = message.partial,
-                        chunkChannel = partChannelProvider(part.id),
-                        fillAvailableWidth = fillsBubbleWidth,
-                    )
-                }
+            visibleTextParts.forEach { part ->
+                RenderTextPart(
+                    part = part,
+                    partial = message.partial,
+                    chunkChannel = partChannelProvider(part.id),
+                    fillAvailableWidth = fillsBubbleWidth,
+                )
             }
 
             MessageAttachments(
-                attachments = if (userImagesAsHeader) otherAttachments else message.fileAttachments,
+                attachments = message.fileAttachments,
                 onOpenDocument = onOpenDocument,
             )
 
@@ -127,6 +124,36 @@ fun MessageBubble(
                     onToggleSpeechPlayback = onToggleSpeechPlayback,
                 )
             }
+        }
+    }
+}
+
+/** 用户图片消息的正文气泡：文本段与非图片附件，沿用共享灰底气泡样式。 */
+@Composable
+private fun UserBubbleBody(
+    message: Message,
+    visibleTextParts: List<TextPart>,
+    otherAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
+    partChannelProvider: (partId: String) -> ReceiveChannel<String>?,
+    onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit,
+) {
+    ChatMessageBubble(
+        role = ChatBubbleRole.USER,
+        modifier = Modifier.padding(top = 4.dp),
+    ) {
+        Column {
+            visibleTextParts.forEach { part ->
+                RenderTextPart(
+                    part = part,
+                    partial = message.partial,
+                    chunkChannel = partChannelProvider(part.id),
+                    fillAvailableWidth = false,
+                )
+            }
+            MessageAttachments(
+                attachments = otherAttachments,
+                onOpenDocument = onOpenDocument,
+            )
         }
     }
 }

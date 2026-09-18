@@ -157,15 +157,6 @@ private fun ImagePreviewDialog(
     )
 }
 
-/** 用户消息图片的排布方式（对应 ChatGPT 式无边框大图设计）。 */
-internal enum class SentImagesLayout {
-    /** 纯图片消息：不套气泡，单图按原宽高比放大为圆角卡片，多图方形网格。 */
-    STANDALONE,
-
-    /** 图文混合：图片贴气泡顶边全幅展示，由气泡形状统一裁剪圆角。 */
-    FULL_BLEED_HEADER,
-}
-
 /** 单图卡片长边上限：按图片原始宽高比自适应，横图取宽、竖图取高。 */
 private val SentImageMaxEdge = 280.dp
 
@@ -176,48 +167,33 @@ private val SentImagePlaceholder = 160.dp
 private val SentImageGridCell = 106.dp
 
 /**
- * 用户消息图片区：按 [layout] 决定无边框大图或贴边全幅头部，
- * 内部持有点击放大预览的对话框状态。
+ * 用户消息图片区：不套气泡，单图按原宽高比放大为圆角卡片、多图方形网格，
+ * 右对齐排在文字气泡上方；内部持有点击放大预览的对话框状态。
  */
 @Composable
 internal fun SentImages(
     images: List<FileAttachment>,
-    layout: SentImagesLayout,
     modifier: Modifier = Modifier,
 ) {
     if (images.isEmpty()) return
     var previewImage by remember { mutableStateOf<FileAttachment?>(null) }
     val single = images.singleOrNull()?.takeIf { !it.isMissing }
-    when (layout) {
-        SentImagesLayout.STANDALONE -> Row(
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            if (single != null) {
-                SentImageCard(
-                    image = single,
-                    onClick = { previewImage = single },
-                    modifier = Modifier
-                        .widthIn(max = SentImageMaxEdge)
-                        .heightIn(max = SentImageMaxEdge),
-                )
-            } else {
-                SentImageGrid(images) { previewImage = it }
-            }
-        }
-
-        SentImagesLayout.FULL_BLEED_HEADER -> Column(modifier = modifier.fillMaxWidth()) {
-            if (single != null) {
-                SentImageCard(
-                    image = single,
-                    onClick = { previewImage = single },
-                    modifier = Modifier.heightIn(max = SentImageMaxEdge),
-                )
-            } else {
-                SentImageGrid(images) { previewImage = it }
-            }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.End,
+    ) {
+        if (single != null) {
+            SentImageCard(
+                image = single,
+                onClick = { previewImage = single },
+                modifier = Modifier
+                    .widthIn(max = SentImageMaxEdge)
+                    .heightIn(max = SentImageMaxEdge),
+            )
+        } else {
+            SentImageGrid(images) { previewImage = it }
         }
     }
 

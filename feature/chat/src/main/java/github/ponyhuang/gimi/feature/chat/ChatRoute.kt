@@ -6,7 +6,6 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -135,9 +134,9 @@ fun ChatRoute(
             onOpenSettings()
             scope.launch { drawerState.close() }
         },
-        darkTheme = uiState.darkThemeOverride ?: isSystemInDarkTheme(),
-        onDarkThemeChange = { enabled ->
-            viewModel.onAction(ChatAction.SetDarkTheme(enabled))
+        themeMode = uiState.themeMode,
+        onThemeModeChange = { mode ->
+            viewModel.onAction(ChatAction.SetThemeMode(mode))
         },
     ) {
         ChatScaffold(

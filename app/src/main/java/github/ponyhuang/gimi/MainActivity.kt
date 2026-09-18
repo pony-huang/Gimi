@@ -13,6 +13,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import github.ponyhuang.gimi.navigation.MainScreen
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
+import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
 import github.ponyhuang.gimi.domain.speech.repository.VoiceWakeRepository
 import github.ponyhuang.gimi.feature.chat.sharedImageUris
@@ -43,10 +44,15 @@ class MainActivity : ComponentActivity() {
         if (intent.action == ACTION_OPEN_CURRENT_CHAT) openChatRequest.value += 1
         enableEdgeToEdge()
         setContent {
-            // 用户未显式切换时（null）跟随系统深色模式，切换后锁定为所选模式。
-            val darkThemeOverride by appearanceRepository.darkThemeOverride
+            // 跟随系统时读取实时 uiMode，系统切深浅会自动重组；手动锁定后固定为所选模式。
+            val themeMode by appearanceRepository.themeMode
                 .collectAsStateWithLifecycle()
-            AsssistantaiTheme(darkTheme = darkThemeOverride ?: isSystemInDarkTheme()) {
+            val darkTheme = when (themeMode) {
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            }
+            AsssistantaiTheme(darkTheme = darkTheme) {
                 MainScreen(
                     assistantSessionCoordinator = assistantSessionCoordinator,
                     assistantPanelInteractor = assistantPanelInteractor,

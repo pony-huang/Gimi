@@ -24,6 +24,7 @@ import github.ponyhuang.gimi.domain.conversation.model.FunctionCallView
 import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.usecase.PrepareChatTurnUseCase
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
+import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionSnapshot
@@ -569,13 +570,13 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
-    fun setDarkThemeDelegatesToDisplayPreferences() = runTest {
+    fun setThemeModeDelegatesToAppearanceRepository() = runTest {
         val fixture = fixture(configured = true)
 
-        fixture.viewModel.onAction(ChatAction.SetDarkTheme(true))
+        fixture.viewModel.onAction(ChatAction.SetThemeMode(ThemeMode.DARK))
         advanceUntilIdle()
 
-        verify { fixture.appearance.setDarkThemeOverride(true) }
+        verify { fixture.appearance.setThemeMode(ThemeMode.DARK) }
     }
 
     @Test
@@ -1359,8 +1360,8 @@ class ChatViewModelCharacterizationTest {
             coEvery { createExecution(any(), any(), any()) } returns execution
         }
         val appearance = mockk<AppearanceRepository> {
-            every { darkThemeOverride } returns MutableStateFlow(null)
-            every { setDarkThemeOverride(any()) } returns Unit
+            every { themeMode } returns MutableStateFlow(ThemeMode.SYSTEM)
+            every { setThemeMode(any()) } returns Unit
         }
         val recognition = mockk<SpeechRecognitionRepository>(relaxed = true) {
             every { availability } returns MutableStateFlow(false)

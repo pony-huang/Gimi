@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.feature.chat
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.appearance.ThemeMode
 
 /**
  * 聊天页用户意图契约 — [ChatViewModel] 全部"发后即忘"的用户操作都经
@@ -95,8 +96,8 @@ sealed interface ChatAction {
     /** 用户关闭工具配置保存失败的提示。 */
     data object ClearToolConfigurationError : ChatAction
 
-    /** 切换夜间模式（写入明确偏好，不再跟随系统）。 */
-    data class SetDarkTheme(val enabled: Boolean) : ChatAction
+    /** 选择夜间模式（跟随系统/浅色/深色），持久化后由 MainActivity 解析主题。 */
+    data class SetThemeMode(val mode: ThemeMode) : ChatAction
 }
 
 /**

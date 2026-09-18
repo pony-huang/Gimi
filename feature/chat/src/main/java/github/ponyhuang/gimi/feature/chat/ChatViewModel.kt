@@ -15,6 +15,7 @@ import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurnStatus
 import github.ponyhuang.gimi.domain.conversation.usecase.PrepareChatTurnUseCase
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
+import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
@@ -148,8 +149,8 @@ class ChatViewModel @Inject constructor(
             )
             is ChatAction.LoadOfficialToolFunctions -> loadOfficialToolFunctions(action.toolId)
             ChatAction.ClearToolConfigurationError -> clearToolConfigurationError()
-            is ChatAction.SetDarkTheme ->
-                appearanceRepository.setDarkThemeOverride(action.enabled)
+            is ChatAction.SetThemeMode ->
+                appearanceRepository.setThemeMode(action.mode)
         }
     }
 
@@ -285,8 +286,8 @@ class ChatViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            appearanceRepository.darkThemeOverride.collect { override ->
-                _uiState.update { it.copy(darkThemeOverride = override) }
+            appearanceRepository.themeMode.collect { mode ->
+                _uiState.update { it.copy(themeMode = mode) }
             }
         }
         viewModelScope.launch {

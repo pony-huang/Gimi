@@ -14,6 +14,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
+import github.ponyhuang.gimi.domain.appearance.ThemeMode
 
 /**
  * The current UI state of the chat conversation.
@@ -67,8 +68,8 @@ data class ChatUiState(
     val availableMcpServers: List<McpServer> = emptyList(),
     val officialToolDescriptors: List<OfficialToolDescriptor> = emptyList(),
     val hasToolConfigurationError: Boolean = false,
-    /** 夜间模式覆盖值；`null` 表示跟随系统。由抽屉里的开关写入，MainActivity 据此解析主题。 */
-    val darkThemeOverride: Boolean? = null,
+    /** 夜间模式偏好；由抽屉底部三态选择器写入，MainActivity 据此解析主题。默认跟随系统。 */
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val isSpeechRecognitionAvailable: Boolean = false,
     val pendingToolConfirmations: List<PendingToolConfirmation> = emptyList(),
     /** Agent 在用户输入类长时运行工具上挂起、等待用户答复的请求（选择/输入卡片数据源）。 */

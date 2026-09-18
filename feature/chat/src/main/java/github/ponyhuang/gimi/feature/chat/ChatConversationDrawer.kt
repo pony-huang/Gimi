@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.feature.chat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,9 +17,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
@@ -49,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -56,6 +60,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.domain.conversation.model.Conversation
 import github.ponyhuang.gimi.feature.chat.R
 import github.ponyhuang.gimi.feature.chat.ConversationTaskStatus
@@ -74,8 +79,8 @@ import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
  * @param onConversationClick 点击某个对话时回调（实现方负责关闭抽屉）
  * @param onDeleteClick       删除某个对话时回调（实现方应再次校验不是 currentSessionId）
  * @param onSettingsClick     点击底部"设置"按钮时回调（实现方负责关闭抽屉并跳转）
- * @param darkTheme           当前是否处于夜间模式（已解析系统默认值后的结果）
- * @param onDarkThemeChange   拨动底部夜间模式开关时回调（实现方负责持久化并应用主题）
+ * @param themeMode           当前夜间模式偏好（跟随系统/浅色/深色）
+ * @param onThemeModeChange   点选某一项夜间模式时回调（实现方负责持久化并应用主题）
  * @param modifier            修饰符
  * @param content             抽屉背后的主屏幕内容
  */
@@ -89,8 +94,8 @@ fun ChatDrawer(
     onConversationClick: (Conversation) -> Unit,
     onDeleteClick: (Conversation) -> Unit,
     onSettingsClick: () -> Unit,
-    darkTheme: Boolean,
-    onDarkThemeChange: (Boolean) -> Unit,
+    themeMode: ThemeMode,
+    onThemeModeChange: (ThemeMode) -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
@@ -108,8 +113,8 @@ fun ChatDrawer(
                     onConversationClick = onConversationClick,
                     onDeleteClick = onDeleteClick,
                     onSettingsClick = onSettingsClick,
-                    darkTheme = darkTheme,
-                    onDarkThemeChange = onDarkThemeChange,
+                    themeMode = themeMode,
+                    onThemeModeChange = onThemeModeChange,
                 )
             }
         },
@@ -130,11 +135,10 @@ private fun HistoryDrawerContent(
     onConversationClick: (Conversation) -> Unit,
     onDeleteClick: (Conversation) -> Unit,
     onSettingsClick: () -> Unit,
-    darkTheme: Boolean,
-    onDarkThemeChange: (Boolean) -> Unit,
+    themeMode: ThemeMode,
+    onThemeModeChange: (ThemeMode) -> Unit,
 ) {
     var menuConversation by remember { mutableStateOf<Conversation?>(null) }
-    val darkModeContentDescription = stringResource(R.string.chat_dark_mode_toggle)
 
     Column(
         modifier = Modifier
@@ -184,7 +188,24 @@ private fun HistoryDrawerContent(
             color = MaterialTheme.colorScheme.outlineVariant,
         )
 
-        // ── 底部固定 - 设置入口 + 夜间模式开关 ────────────────
+        // ── 底部固定 - 夜间模式三态选择 + 设置入口 ────────────────
+        // 单独一行放置分段选择器：三枚图标一眼可辨当前模式，点任意一枚即显式选定，
+        // 含点回"跟随系统"重新启用自动跟随。
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 24.dp, end = 24.dp, top = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.chat_theme_mode_label),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            ThemeModeSelector(mode = themeMode, onSelect = onThemeModeChange)
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -204,20 +225,6 @@ private fun HistoryDrawerContent(
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(start = 20.dp),
             )
-            Spacer(modifier = Modifier.weight(1f))
-            // 图标展示"点击后切换到的模式"：当前浅色显示月亮，当前深色显示太阳。
-            // IconButton 自身消费点击，不会触发整行的设置跳转。
-            IconButton(onClick = { onDarkThemeChange(!darkTheme) }) {
-                Icon(
-                    imageVector = if (darkTheme) {
-                        Icons.Default.LightMode
-                    } else {
-                        Icons.Default.DarkMode
-                    },
-                    contentDescription = darkModeContentDescription,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
 
         menuConversation?.let { conversation ->
@@ -233,6 +240,77 @@ private fun HistoryDrawerContent(
                 },
             )
         }
+    }
+}
+
+// ── 夜间模式三态选择器 ──────────────────────────────────────────
+
+/**
+ * 抽屉底部分段三态选择器：跟随系统 / 浅色 / 深色。当前项以 primary 实心圆高亮，
+ * 点击任意一项即显式选定（点回"跟随系统"恢复自动跟随）。
+ */
+@Composable
+private fun ThemeModeSelector(
+    mode: ThemeMode,
+    onSelect: (ThemeMode) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant,
+                RoundedCornerShape(percent = 50),
+            )
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ThemeMode.entries.forEach { option ->
+            val icon = when (option) {
+                ThemeMode.SYSTEM -> Icons.Default.BrightnessAuto
+                ThemeMode.LIGHT -> Icons.Default.LightMode
+                ThemeMode.DARK -> Icons.Default.DarkMode
+            }
+            val label = stringResource(
+                when (option) {
+                    ThemeMode.SYSTEM -> R.string.chat_theme_system
+                    ThemeMode.LIGHT -> R.string.chat_theme_light
+                    ThemeMode.DARK -> R.string.chat_theme_dark
+                },
+            )
+            ThemeModeOption(
+                icon = icon,
+                label = label,
+                selected = option == mode,
+                onClick = { onSelect(option) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThemeModeOption(
+    icon: ImageVector,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val container = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
+    val content = if (selected) MaterialTheme.colorScheme.onPrimary
+    else MaterialTheme.colorScheme.onSurfaceVariant
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .size(36.dp)
+            .background(container, CircleShape)
+            .semantics { contentDescription = label },
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = content,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 
@@ -457,8 +535,8 @@ private fun ChatDrawerPreview() {
             onConversationClick = { },
             onDeleteClick = { },
             onSettingsClick = { },
-            darkTheme = false,
-            onDarkThemeChange = { },
+            themeMode = ThemeMode.SYSTEM,
+            onThemeModeChange = { },
         ) {
             // 预览中作为占位的主屏幕内容
             Box(
@@ -483,8 +561,8 @@ private fun ChatDrawerEmptyPreview() {
             onConversationClick = { },
             onDeleteClick = { },
             onSettingsClick = { },
-            darkTheme = false,
-            onDarkThemeChange = { },
+            themeMode = ThemeMode.SYSTEM,
+            onThemeModeChange = { },
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -508,8 +586,8 @@ private fun ChatDrawerClosedPreview() {
             onConversationClick = { },
             onDeleteClick = { },
             onSettingsClick = { },
-            darkTheme = false,
-            onDarkThemeChange = { },
+            themeMode = ThemeMode.SYSTEM,
+            onThemeModeChange = { },
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),

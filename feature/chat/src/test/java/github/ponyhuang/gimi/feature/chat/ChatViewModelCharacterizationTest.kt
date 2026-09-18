@@ -392,14 +392,14 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
-    fun toggleTimelineAction_updatesExpandedTurnIds() = runTest {
+    fun toggleTimelineAction_updatesExpandedActivityGroupIds() = runTest {
         val fixture = fixture(configured = true)
 
-        fixture.viewModel.onAction(ChatAction.ToggleTimeline("turn-1"))
-        assertEquals(setOf("turn-1"), fixture.viewModel.uiState.value.expandedTimelineIds)
+        fixture.viewModel.onAction(ChatAction.ToggleTimeline("turn-1:a0"))
+        assertEquals(setOf("turn-1:a0"), fixture.viewModel.uiState.value.expandedActivityGroupIds)
 
-        fixture.viewModel.onAction(ChatAction.ToggleTimeline("turn-1"))
-        assertTrue(fixture.viewModel.uiState.value.expandedTimelineIds.isEmpty())
+        fixture.viewModel.onAction(ChatAction.ToggleTimeline("turn-1:a0"))
+        assertTrue(fixture.viewModel.uiState.value.expandedActivityGroupIds.isEmpty())
     }
 
     @Test

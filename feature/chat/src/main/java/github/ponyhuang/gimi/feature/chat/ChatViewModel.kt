@@ -125,7 +125,7 @@ class ChatViewModel @Inject constructor(
                 toggleSpeechPlayback(action.messageId, action.markdown)
             ChatAction.ToggleAutoSpeak ->
                 speechSettings.setAutoSpeakEnabled(!speechSettings.autoSpeakEnabled.value)
-            is ChatAction.ToggleTimeline -> toggleTimeline(action.turnId)
+            is ChatAction.ToggleTimeline -> toggleTimeline(action.groupId)
             is ChatAction.RespondToToolConfirmation ->
                 respondToToolConfirmation(action.confirmed, action.alwaysAllow)
             is ChatAction.RespondToInputRequest ->
@@ -165,11 +165,11 @@ class ChatViewModel @Inject constructor(
         speechPlaybackController.toggle(messageId, markdownToSpeechText(markdown))
     }
 
-    private fun toggleTimeline(turnId: String) {
+    private fun toggleTimeline(groupId: String) {
         _uiState.update { state ->
-            val expanded = state.expandedTimelineIds.toMutableSet()
-            if (!expanded.add(turnId)) expanded.remove(turnId)
-            state.copy(expandedTimelineIds = expanded)
+            val expanded = state.expandedActivityGroupIds.toMutableSet()
+            if (!expanded.add(groupId)) expanded.remove(groupId)
+            state.copy(expandedActivityGroupIds = expanded)
         }
     }
 

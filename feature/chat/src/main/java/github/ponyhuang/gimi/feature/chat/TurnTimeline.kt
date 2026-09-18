@@ -27,22 +27,37 @@ sealed interface ChatListItem {
  * 一个用户请求及其后续 assistant 活动的派生视图。
  *
  * @property turnId 所属用户消息 id，同时作为列表稳定 key。
- * @property startedAtMs 用户提交时间；缺失或非正数时为 null。
- * @property finishedAtMs 最后一个有效 assistant 事件时间；运行中或时长无效时为 null。
  * @property isRunning 当前轮次是否仍在运行。
- * @property isFailed 本轮是否包含错误消息。
- * @property entries 按事件顺序派生出的思考、工具和文件结果。
- * @property answerMessages 仍需作为正文气泡渲染的原始 assistant 消息。
+ * @property segments 按事件顺序交替排列的正文段与工具活动组段。
  */
 data class TurnTimeline(
     val turnId: String,
-    val startedAtMs: Long?,
-    val finishedAtMs: Long?,
     val isRunning: Boolean,
-    val isFailed: Boolean,
-    val entries: List<TimelineEntry>,
-    val answerMessages: List<Message>,
+    val segments: List<TurnSegment>,
 )
+
+/**
+ * assistant 轮次内按时间顺序排列的一个展示分段。
+ */
+sealed interface TurnSegment {
+    /**
+     * 一段助手正文。保留原始 [Message] 以继续驱动流式打字机 channel、附件与错误渲染。
+     *
+     * @property message 含非思考文本、附件或错误的原始 assistant 消息。
+     */
+    data class Answer(val message: Message) : TurnSegment
+
+    /**
+     * 两段正文之间聚合的连续工具活动，折叠为一行「执行工具 N 次」。
+     *
+     * @property id 组内稳定 id（turnId + 组序号），作为展开态 key。
+     * @property entries 组内按事件顺序排列的思考、工具调用和文件结果。
+     */
+    data class Activity(
+        val id: String,
+        val entries: List<TimelineEntry>,
+    ) : TurnSegment
+}
 
 /**
  * assistant 轮次内可折叠展示的过程条目。
@@ -171,19 +186,39 @@ private fun List<Message>.toTurnTimeline(
     val historicalStatuses = historicalConfirmationStatuses()
     val callsByKey = flatMap { it.visibleFunctionCalls() }
         .associateBy { ToolCallKey(it.id, it.name) }
-    val entries = mutableListOf<TimelineEntry>()
+    val segments = mutableListOf<TurnSegment>()
+    val activityEntries = mutableListOf<TimelineEntry>()
     val seenToolEntries = mutableSetOf<ToolCallKey>()
     val seenFileResults = mutableSetOf<ToolCallKey>()
+    var activityGroupCount = 0
+
+    // 思考文本不单独切组：纯思考缓冲并入后续工具组，避免正文前出现「0 次工具」的孤立折叠行；
+    // 只有出现真实工具活动后才在正文前 flush。轮次末尾 force flush 兜底展示落单的思考。
+    fun flushActivity(force: Boolean = false) {
+        if (activityEntries.isEmpty()) return
+        if (!force && activityEntries.all { it is TimelineEntry.Thought }) return
+        segments += TurnSegment.Activity(
+            id = "${user.id}:a$activityGroupCount",
+            entries = activityEntries.toList(),
+        )
+        activityGroupCount += 1
+        activityEntries.clear()
+    }
 
     forEach { message ->
         message.textParts
             .filter { it.thought && it.text.isNotBlank() }
-            .forEach { part -> entries += TimelineEntry.Thought(part.id, part.text) }
+            .forEach { part -> activityEntries += TimelineEntry.Thought(part.id, part.text) }
+
+        if (message.hasAnswerContent()) {
+            flushActivity()
+            segments += TurnSegment.Answer(message)
+        }
 
         message.visibleFunctionCalls().forEach { call ->
             val key = ToolCallKey(call.id, call.name)
             if (seenToolEntries.add(key)) {
-                entries += TimelineEntry.ToolCall(
+                activityEntries += TimelineEntry.ToolCall(
                     callId = call.id,
                     name = call.name,
                     argsSummary = call.argsSummary,
@@ -199,7 +234,7 @@ private fun List<Message>.toTurnTimeline(
         message.visibleFunctionResponses().forEach { response ->
             val key = ToolCallKey(response.id, response.name)
             if (key !in callsByKey && seenToolEntries.add(key)) {
-                entries += TimelineEntry.ToolCall(
+                activityEntries += TimelineEntry.ToolCall(
                     callId = response.id,
                     name = response.name,
                     argsSummary = "",
@@ -208,28 +243,16 @@ private fun List<Message>.toTurnTimeline(
             }
             val selected = selectedResponses[key]
             if (selected?.hasStructuredResult() == true && seenFileResults.add(key)) {
-                entries += TimelineEntry.FileResults(selected)
+                activityEntries += TimelineEntry.FileResults(selected)
             }
         }
     }
+    flushActivity(force = true)
 
-    val startedAtMs = user.timestamp.takeIf { it > 0L }
-    val lastAssistantTimestamp = lastOrNull { it.timestamp > 0L }?.timestamp
-    val finishedAtMs = if (!isRunning && startedAtMs != null &&
-        lastAssistantTimestamp != null && lastAssistantTimestamp > startedAtMs
-    ) {
-        lastAssistantTimestamp
-    } else {
-        null
-    }
     return TurnTimeline(
         turnId = user.id,
-        startedAtMs = startedAtMs,
-        finishedAtMs = finishedAtMs,
         isRunning = isRunning,
-        isFailed = any { it.error != null },
-        entries = entries,
-        answerMessages = filter(Message::hasAnswerContent),
+        segments = segments,
     )
 }
 

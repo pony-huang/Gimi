@@ -196,6 +196,36 @@ class TurnTimelineTest {
     }
 
     @Test
+    fun `thought group is ordered above the answer text it precedes`() {
+        val assistant = assistantMessage(
+            id = "thoughtful",
+            timestamp = 200L,
+            textParts = listOf(
+                TextPart(id = "thought", text = "先想想怎么回答", thought = true),
+                TextPart(id = "answer", text = "哈哈，需要帮忙吗？", thought = false),
+            ),
+        )
+
+        val timeline = (listOf(userMessage(timestamp = 100L), assistant)
+            .toChatListItems(TimelineActivityState())[1] as ChatListItem.AssistantTurn).timeline
+
+        assertEquals(
+            listOf("activity", "thoughtful"),
+            timeline.segments.map { segment ->
+                when (segment) {
+                    is TurnSegment.Answer -> segment.message.id
+                    is TurnSegment.Activity -> "activity"
+                }
+            },
+        )
+        val group = timeline.segments.first() as TurnSegment.Activity
+        assertEquals(
+            listOf("thought"),
+            group.entries.filterIsInstance<TimelineEntry.Thought>().map { it.partId },
+        )
+    }
+
+    @Test
     fun `tool statuses are isolated by call id and historical missing evidence is unknown`() {
         val assistant = assistantMessage(
             timestamp = 200L,

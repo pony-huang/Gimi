@@ -1,7 +1,6 @@
 package github.ponyhuang.gimi.feature.chat
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,23 +9,27 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.QuestionMark
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
@@ -50,45 +53,56 @@ internal fun TurnActivityGroupPanel(
     modifier: Modifier = Modifier,
 ) {
     val toolCount = segment.entries.count { it is TimelineEntry.ToolCall }
-    Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onToggle)
-                .padding(vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = if (expanded) Icons.Default.ExpandLess
-                else Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = stringResource(
-                    if (expanded) R.string.chat_timeline_collapse else R.string.chat_timeline_expand,
-                ),
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = if (toolCount > 0) {
-                    stringResource(R.string.chat_timeline_tool_group_count, toolCount)
-                } else {
-                    stringResource(R.string.chat_timeline_thought_group)
-                },
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        AnimatedVisibility(visible = expanded) {
-            Column(
-                modifier = Modifier.padding(start = 22.dp, top = 2.dp, bottom = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+    Surface(
+        onClick = onToggle,
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                segment.entries.forEach { entry ->
-                    TimelineEntryRow(
-                        entry = entry,
-                        onOpenLocalFile = onOpenLocalFile,
-                        onShowAllLocalFiles = onShowAllLocalFiles,
+                Text(
+                    text = if (toolCount > 0) {
+                        stringResource(R.string.chat_timeline_tool_group_count, toolCount)
+                    } else {
+                        stringResource(R.string.chat_timeline_thought_group)
+                    },
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = stringResource(
+                        if (expanded) R.string.chat_timeline_collapse else R.string.chat_timeline_expand,
+                    ),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            AnimatedVisibility(visible = expanded) {
+                Column {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.32f),
                     )
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        segment.entries.forEach { entry ->
+                            TimelineEntryRow(
+                                entry = entry,
+                                onOpenLocalFile = onOpenLocalFile,
+                                onShowAllLocalFiles = onShowAllLocalFiles,
+                            )
+                        }
+                    }
                 }
             }
         }

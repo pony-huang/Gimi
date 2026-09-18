@@ -25,7 +25,7 @@ import github.ponyhuang.gimi.domain.mcp.model.McpServer
  *
  * @param messages 未损失的原始消息列表，供搜索、朗读和滚动定位等非时间线消费者使用
  * @param listItems 按用户轮次派生的聊天列表展示元素
- * @param expandedTimelineIds 用户手动展开的已完成时间线 turn id
+ * @param expandedActivityGroupIds 用户手动展开的工具活动组 id
  * @param sessionId 当前激活的会话 id；空串表示还没建立会话
  * @param isAgentRunning Agent turn 是否仍在进行（包括思考、流式输出和工具执行）。
  *                       用于显示思考/停止状态并锁定会话级操作。
@@ -45,7 +45,7 @@ import github.ponyhuang.gimi.domain.mcp.model.McpServer
 data class ChatUiState(
     val messages: List<Message> = emptyList(),
     val listItems: List<ChatListItem> = emptyList(),
-    val expandedTimelineIds: Set<String> = emptySet(),
+    val expandedActivityGroupIds: Set<String> = emptySet(),
     val sessionId: String = "",
     val isAgentRunning: Boolean = false,
     /**

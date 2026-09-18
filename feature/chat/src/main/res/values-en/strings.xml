@@ -172,10 +172,9 @@
     <string name="chat_repeat_execution_title">Resend this message?</string>
     <string name="chat_repeat_execution_body">This turn already ran a tool. Resending may repeat that tool operation; actions already done cannot be undone.</string>
     <string name="chat_repeat_execution_confirm">Resend</string>
-    <string name="chat_timeline_worked_duration">Worked for %1$s</string>
-    <string name="chat_timeline_step_count">%1$d steps</string>
-    <string name="chat_timeline_duration_minutes_seconds">%1$dm %2$ds</string>
-    <string name="chat_timeline_duration_seconds">%1$ds</string>
+    <string name="chat_timeline_tool_group_count">Ran %1$d tool(s)</string>
+    <string name="chat_timeline_thought_group">Thinking</string>
+    <string name="chat_turn_working">Thinking…</string>
     <string name="chat_timeline_expand">Expand work details</string>
     <string name="chat_timeline_collapse">Collapse work details</string>
     <string name="chat_timeline_file_count">Found %1$d files</string>

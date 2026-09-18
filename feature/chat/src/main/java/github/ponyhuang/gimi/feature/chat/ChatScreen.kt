@@ -129,7 +129,7 @@ fun ChatScaffold(
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit,
     onOpenLocalFile: (github.ponyhuang.gimi.domain.conversation.model.LocalFileReference) -> Unit,
     onShowAllLocalFiles: (responseId: String) -> Unit,
-    onToggleTimeline: (turnId: String) -> Unit = {},
+    onToggleTimeline: (groupId: String) -> Unit = {},
     onToolConfirmation: (Boolean) -> Unit,
     onToolConfirmationAlwaysAllow: () -> Unit,
     onRespondToInputRequest: (callId: String, value: String) -> Unit = { _, _ -> },
@@ -185,7 +185,12 @@ fun ChatScaffold(
         listItems.sumOf { item ->
             when (item) {
                 is ChatListItem.UserMessage -> 1
-                is ChatListItem.AssistantTurn -> 1 + item.timeline.answerMessages.size
+                is ChatListItem.AssistantTurn ->
+                    if (item.timeline.segments.isEmpty()) {
+                        if (item.timeline.isRunning) 1 else 0
+                    } else {
+                        item.timeline.segments.size
+                    }
             }
         }
     }
@@ -480,37 +485,63 @@ fun ChatScaffold(
                             }
                             is ChatListItem.AssistantTurn -> {
                                 val timeline = listItem.timeline
-                                item(
-                                    key = "timeline:${timeline.turnId}",
-                                    contentType = "timeline",
-                                ) {
-                                    TurnTimelinePanel(
-                                        timeline = timeline,
-                                        expanded = timeline.isRunning ||
-                                            timeline.turnId in state.expandedTimelineIds,
-                                        onToggle = { onToggleTimeline(timeline.turnId) },
-                                        onOpenLocalFile = onOpenLocalFile,
-                                        onShowAllLocalFiles = onShowAllLocalFiles,
-                                    )
-                                }
-                                timeline.answerMessages.forEach { message ->
+                                if (timeline.segments.isEmpty() && timeline.isRunning) {
                                     item(
-                                        key = "answer:${timeline.turnId}:${message.id}",
-                                        contentType = if (message.error != null) {
-                                            "error"
-                                        } else if (message.partial) {
-                                            "answer_streaming"
-                                        } else {
-                                            "answer"
-                                        },
+                                        key = "turn_working:${timeline.turnId}",
+                                        contentType = "turn_working",
                                     ) {
-                                        MessageRow(
-                                            message = message,
-                                            partChannelProvider = partChannelProvider,
-                                            speechPlaybackState = speechPlaybackState,
-                                            onToggleSpeechPlayback = onToggleSpeechPlayback,
-                                            onOpenDocument = onOpenDocument,
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                strokeWidth = 2.dp,
+                                            )
+                                            Spacer(Modifier.width(10.dp))
+                                            Text(
+                                                text = stringResource(R.string.chat_turn_working),
+                                                style = MaterialTheme.typography.labelLarge,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
+                                }
+                                timeline.segments.forEach { segment ->
+                                    when (segment) {
+                                        is TurnSegment.Answer -> {
+                                            val message = segment.message
+                                            item(
+                                                key = "answer:${timeline.turnId}:${message.id}",
+                                                contentType = if (message.error != null) {
+                                                    "error"
+                                                } else if (message.partial) {
+                                                    "answer_streaming"
+                                                } else {
+                                                    "answer"
+                                                },
+                                            ) {
+                                                MessageRow(
+                                                    message = message,
+                                                    partChannelProvider = partChannelProvider,
+                                                    speechPlaybackState = speechPlaybackState,
+                                                    onToggleSpeechPlayback = onToggleSpeechPlayback,
+                                                    onOpenDocument = onOpenDocument,
+                                                )
+                                            }
+                                        }
+                                        is TurnSegment.Activity -> item(
+                                            key = "activity:${segment.id}",
+                                            contentType = "activity",
+                                        ) {
+                                            TurnActivityGroupPanel(
+                                                segment = segment,
+                                                expanded = segment.id in
+                                                    state.expandedActivityGroupIds ||
+                                                    (timeline.isRunning &&
+                                                        segment === timeline.segments.last()),
+                                                onToggle = { onToggleTimeline(segment.id) },
+                                                onOpenLocalFile = onOpenLocalFile,
+                                                onShowAllLocalFiles = onShowAllLocalFiles,
+                                            )
+                                        }
                                     }
                                 }
                             }

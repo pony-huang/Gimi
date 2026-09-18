@@ -38,8 +38,8 @@ sealed interface ChatAction {
     /** 切换自动语音播报全局开关（持久化，跨会话保持）。 */
     data object ToggleAutoSpeak : ChatAction
 
-    /** 切换一个已完成 assistant 轮次的活动时间线展开状态。 */
-    data class ToggleTimeline(val turnId: String) : ChatAction
+    /** 切换一个 assistant 轮次内工具活动组的展开状态。 */
+    data class ToggleTimeline(val groupId: String) : ChatAction
 
     /** 把用户对挂起工具调用的确认 / 拒绝决定送回 runner。 */
     data class RespondToToolConfirmation(

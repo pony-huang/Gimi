@@ -9,7 +9,6 @@ import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -160,34 +159,40 @@ class TurnTimelineTest {
     }
 
     @Test
-    fun `timestamps derive from user and final assistant with invalid duration falling back`() {
-        val valid = (listOf(
-            userMessage(id = "valid", timestamp = 1_000L),
-            assistantMessage(timestamp = 2_000L, text = "partial"),
-            assistantMessage(timestamp = 4_000L, text = "final"),
-        ).toChatListItems(TimelineActivityState())[1] as ChatListItem.AssistantTurn).timeline
-        val invalid = (listOf(
-            userMessage(id = "invalid", timestamp = 5_000L),
-            assistantMessage(timestamp = 5_000L, text = "answer"),
-        ).toChatListItems(TimelineActivityState())[1] as ChatListItem.AssistantTurn).timeline
+    fun `answer text and tool activity alternate as ordered segments`() {
+        val roundOne = assistantMessage(
+            id = "round-1",
+            timestamp = 200L,
+            text = "我先找一下相关代码。",
+            functionCalls = listOf(FunctionCallView("call-1", "search_codebase", "(query=附件)")),
+        )
+        val response = assistantMessage(
+            id = "response-1",
+            timestamp = 300L,
+            functionResponses = listOf(FunctionResponseView("call-1", "search_codebase")),
+        )
+        val roundTwo = assistantMessage(
+            id = "round-2",
+            timestamp = 400L,
+            text = "让我直接读一下实现细节。",
+        )
 
-        assertEquals(1_000L, valid.startedAtMs)
-        assertEquals(4_000L, valid.finishedAtMs)
-        assertEquals(5_000L, invalid.startedAtMs)
-        assertNull(invalid.finishedAtMs)
-    }
+        val timeline = (listOf(userMessage(timestamp = 100L), roundOne, response, roundTwo)
+            .toChatListItems(TimelineActivityState())[1] as ChatListItem.AssistantTurn).timeline
 
-    @Test
-    fun `last valid assistant timestamp wins when a later event has no timestamp`() {
-        val timeline = (listOf(
-            userMessage(timestamp = 1_000L),
-            assistantMessage(id = "valid", timestamp = 3_000L, text = "answer"),
-            assistantMessage(id = "missing", timestamp = 0L, functionResponses = listOf(
-                FunctionResponseView("call-1", "search_documents"),
-            )),
-        ).toChatListItems(TimelineActivityState())[1] as ChatListItem.AssistantTurn).timeline
-
-        assertEquals(3_000L, timeline.finishedAtMs)
+        assertEquals(
+            listOf("round-1", "activity", "round-2"),
+            timeline.segments.map { segment ->
+                when (segment) {
+                    is TurnSegment.Answer -> segment.message.id
+                    is TurnSegment.Activity -> "activity"
+                }
+            },
+        )
+        val group = timeline.segments[1] as TurnSegment.Activity
+        assertEquals("${timeline.turnId}:a0", group.id)
+        assertEquals(listOf("call-1"), group.entries.filterIsInstance<TimelineEntry.ToolCall>()
+            .map { it.callId })
     }
 
     @Test
@@ -367,3 +372,11 @@ class TurnTimelineTest {
         ),
     )
 }
+
+/** 扁平派生视图：所有工具活动组内条目的时间顺序拼接，供既有断言沿用。 */
+private val TurnTimeline.entries: List<TimelineEntry>
+    get() = segments.filterIsInstance<TurnSegment.Activity>().flatMap { it.entries }
+
+/** 扁平派生视图：所有正文段携带的原始消息。 */
+private val TurnTimeline.answerMessages: List<Message>
+    get() = segments.filterIsInstance<TurnSegment.Answer>().map { it.message }

@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.feature.chat
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,132 +10,85 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.QuestionMark
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
 import github.ponyhuang.gimi.domain.conversation.model.LocalFileReference
 import github.ponyhuang.gimi.domain.conversation.model.LocalFileSearchResult
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
-import kotlinx.coroutines.delay
 
 /**
- * 单个 assistant 轮次的无状态活动时间线。
+ * assistant 轮次内单个工具活动组的折叠行。
  *
- * 运行中的轮次由调用方保持展开；本组件只在头部局部按秒更新时间，过程条目与文件结果
- * 都收纳在同一个圆角容器内。
+ * 头部显示「执行工具 N 次」（N 为组内工具调用数；纯思考组退化为「思考」），
+ * 展开后按事件顺序显示思考文本、工具调用与文件结果。运行中的组由调用方保持展开。
  */
 @Composable
-internal fun TurnTimelinePanel(
-    timeline: TurnTimeline,
+internal fun TurnActivityGroupPanel(
+    segment: TurnSegment.Activity,
     expanded: Boolean,
     onToggle: () -> Unit,
     onOpenLocalFile: (LocalFileReference) -> Unit,
     onShowAllLocalFiles: (responseId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var nowMs by remember(timeline.turnId) { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(timeline.turnId, timeline.startedAtMs, timeline.isRunning) {
-        while (timeline.isRunning) {
-            nowMs = System.currentTimeMillis()
-            delay(1_000L)
+    val toolCount = segment.entries.count { it is TimelineEntry.ToolCall }
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onToggle)
+                .padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = if (expanded) Icons.Default.ExpandLess
+                else Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = stringResource(
+                    if (expanded) R.string.chat_timeline_collapse else R.string.chat_timeline_expand,
+                ),
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = if (toolCount > 0) {
+                    stringResource(R.string.chat_timeline_tool_group_count, toolCount)
+                } else {
+                    stringResource(R.string.chat_timeline_thought_group)
+                },
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-    }
-    val durationMs = timeline.startedAtMs?.let { startedAt ->
-        val endedAt = if (timeline.isRunning) nowMs else timeline.finishedAtMs
-        endedAt?.minus(startedAt)?.takeIf { it > 0L }
-    }
-    val header = if (durationMs == null) {
-        stringResource(R.string.chat_timeline_step_count, timeline.entries.size)
-    } else {
-        stringResource(R.string.chat_timeline_worked_duration, formatTimelineDuration(durationMs))
-    }
-
-    Surface(
-        onClick = onToggle,
-        enabled = !timeline.isRunning,
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        shape = RoundedCornerShape(12.dp),
-    ) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 9.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        AnimatedVisibility(visible = expanded) {
+            Column(
+                modifier = Modifier.padding(start = 22.dp, top = 2.dp, bottom = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Icon(
-                    imageVector = when {
-                        timeline.isFailed -> Icons.Default.ErrorOutline
-                        timeline.isRunning -> Icons.Default.HourglassTop
-                        else -> Icons.Default.CheckCircle
-                    },
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = header,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f),
-                )
-                Icon(
-                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = stringResource(
-                        if (expanded) R.string.chat_timeline_collapse else R.string.chat_timeline_expand,
-                    ),
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-
-            AnimatedVisibility(visible = expanded && timeline.entries.isNotEmpty()) {
-                Column {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.32f),
+                segment.entries.forEach { entry ->
+                    TimelineEntryRow(
+                        entry = entry,
+                        onOpenLocalFile = onOpenLocalFile,
+                        onShowAllLocalFiles = onShowAllLocalFiles,
                     )
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        timeline.entries.forEach { entry ->
-                            TimelineEntryRow(
-                                entry = entry,
-                                onOpenLocalFile = onOpenLocalFile,
-                                onShowAllLocalFiles = onShowAllLocalFiles,
-                            )
-                        }
-                    }
                 }
             }
         }
@@ -229,24 +183,8 @@ private fun toolStatusLabel(status: ToolCallStatus): String = stringResource(
     },
 )
 
-@Composable
-private fun formatTimelineDuration(durationMs: Long): String {
-    val totalSeconds = durationMs / 1_000L
-    val minutes = totalSeconds / 60L
-    val seconds = totalSeconds % 60L
-    return if (minutes > 0L) {
-        stringResource(R.string.chat_timeline_duration_minutes_seconds, minutes, seconds)
-    } else {
-        stringResource(R.string.chat_timeline_duration_seconds, seconds)
-    }
-}
-
-private fun previewTimeline(isRunning: Boolean, failed: Boolean = false) = TurnTimeline(
-    turnId = if (isRunning) "running" else "complete",
-    startedAtMs = System.currentTimeMillis() - 74_000L,
-    finishedAtMs = if (isRunning) null else System.currentTimeMillis(),
-    isRunning = isRunning,
-    isFailed = failed,
+private val previewActivityGroup = TurnSegment.Activity(
+    id = "preview:a0",
     entries = listOf(
         TimelineEntry.Thought("thought", "先检索工作区内的项目计划"),
         TimelineEntry.ToolCall("call", "search_workspace", "(query=项目计划)", ToolCallStatus.Completed),
@@ -271,29 +209,28 @@ private fun previewTimeline(isRunning: Boolean, failed: Boolean = false) = TurnT
         ),
         TimelineEntry.ToolCall("read", "read_document", "(风险清单.pdf)", ToolCallStatus.Rejected),
     ),
-    answerMessages = emptyList(),
 )
 
-@Preview(name = "折叠", showBackground = true)
+@Preview(name = "工具组折叠", showBackground = true)
 @Composable
-private fun TurnTimelineCollapsedPreview() {
+private fun TurnActivityGroupCollapsedPreview() {
     AsssistantaiTheme(darkTheme = false) {
-        TurnTimelinePanel(previewTimeline(false), false, {}, {}, {})
+        TurnActivityGroupPanel(previewActivityGroup, false, {}, {}, {})
     }
 }
 
-@Preview(name = "展开", showBackground = true)
+@Preview(name = "工具组展开", showBackground = true)
 @Composable
-private fun TurnTimelineExpandedPreview() {
+private fun TurnActivityGroupExpandedPreview() {
     AsssistantaiTheme(darkTheme = false) {
-        TurnTimelinePanel(previewTimeline(false), true, {}, {}, {})
+        TurnActivityGroupPanel(previewActivityGroup, true, {}, {}, {})
     }
 }
 
-@Preview(name = "运行中（深色）", showBackground = true)
+@Preview(name = "工具组展开（深色）", showBackground = true)
 @Composable
-private fun TurnTimelineRunningDarkPreview() {
+private fun TurnActivityGroupExpandedDarkPreview() {
     AsssistantaiTheme(darkTheme = true) {
-        TurnTimelinePanel(previewTimeline(true), true, {}, {}, {})
+        TurnActivityGroupPanel(previewActivityGroup, true, {}, {}, {})
     }
 }

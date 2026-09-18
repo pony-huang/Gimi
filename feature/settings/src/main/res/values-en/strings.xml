@@ -2,7 +2,6 @@
     <string name="settings_title">Settings</string>
 
     <string name="settings_group_model">Models</string>
-    <string name="settings_group_voice">Voice</string>
     <string name="settings_group_tools">Tools</string>
     <string name="settings_group_general">General</string>
     <string name="settings_memory_title">Memory</string>
@@ -13,9 +12,6 @@
 
     <string name="settings_default_model_title">Default models</string>
     <string name="settings_default_model_subtitle">Assistant · Quick response · Voice recognition &amp; playback</string>
-
-    <string name="settings_voice_wake_title">Voice wake</string>
-    <string name="settings_voice_wake_subtitle">Bluetooth headset · Wake word · Offline model</string>
 
     <string name="settings_mcp_title">MCP</string>
     <string name="settings_mcp_subtitle">Remote tool services · Connection &amp; authorization</string>

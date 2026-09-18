@@ -8,7 +8,6 @@ enum class PermissionGroupKind {
     Calendar,
     Media,
     Microphone,
-    Bluetooth,
     Notifications,
 }
 

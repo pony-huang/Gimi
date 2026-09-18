@@ -36,8 +36,8 @@ class PermissionUseCasesTest {
     fun wasPermissionRequestedDelegatesPerPermission() {
         repository.wasRequestedResult = true
 
-        assertTrue(WasPermissionRequestedUseCase(repository)(AppPermission.BluetoothConnect))
-        assertEquals(listOf(AppPermission.BluetoothConnect), repository.wasRequestedCalls)
+        assertTrue(WasPermissionRequestedUseCase(repository)(AppPermission.RecordAudio))
+        assertEquals(listOf(AppPermission.RecordAudio), repository.wasRequestedCalls)
     }
 
     @Test

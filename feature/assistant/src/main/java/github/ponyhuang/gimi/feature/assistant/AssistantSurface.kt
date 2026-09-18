@@ -24,7 +24,7 @@ enum class AssistantSurfaceMode {
 /**
  * 语音助手的两态界面：悬浮胶囊态与全宽对话面板态。
  *
- * 唤醒后先出现底部悬浮胶囊（输入框 + 麦克风 + 发送），指令就绪后展开为通栏对话面板，
+ * 唤起后先出现底部悬浮胶囊（输入框 + 麦克风 + 发送），指令就绪后展开为通栏对话面板，
  * 消息渲染复用 [github.ponyhuang.gimi.ui.chatcontent.ChatMessageBubble]，
  * 与聊天页保持同一套视觉。三种宿主（应用内 Sheet / 系统悬浮窗 / 锁屏 Activity）渲染同一 Composable。
  * 面板态见 [AssistantConversationPanel]，胶囊态见 [AssistantCapsuleOverlay]。

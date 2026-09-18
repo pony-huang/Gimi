@@ -44,9 +44,6 @@ enum class AssistantSessionPhase {
 
 /** 唤起助理的入口来源。 */
 enum class AssistantInvocationSource {
-    /** 蓝牙唤醒词。 */
-    BLUETOOTH_WAKE,
-
     /** 助手面板内直接发起的追问（语音或键盘输入）。 */
     ASSISTANT_PANEL,
 }

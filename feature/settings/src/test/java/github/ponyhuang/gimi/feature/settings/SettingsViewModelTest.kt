@@ -22,8 +22,6 @@ class SettingsViewModelTest {
             assertEquals(SettingsEffect.NavigateToModelService, awaitItem())
             viewModel.onAction(SettingsAction.OpenDefaultModels)
             assertEquals(SettingsEffect.NavigateToDefaultModels, awaitItem())
-            viewModel.onAction(SettingsAction.OpenVoiceWake)
-            assertEquals(SettingsEffect.NavigateToVoiceWake, awaitItem())
             viewModel.onAction(SettingsAction.OpenMcpServers)
             assertEquals(SettingsEffect.NavigateToMcpServers, awaitItem())
             viewModel.onAction(SettingsAction.OpenSkills)

@@ -9,7 +9,6 @@ enum class AppPermission {
     ReadMediaVideo,
     ReadMediaAudio,
     RecordAudio,
-    BluetoothConnect,
     PostNotifications,
     WriteSystemSettings,
     NotificationListener,
@@ -32,6 +31,5 @@ val RuntimeAppPermissions = setOf(
     AppPermission.ReadMediaVideo,
     AppPermission.ReadMediaAudio,
     AppPermission.RecordAudio,
-    AppPermission.BluetoothConnect,
     AppPermission.PostNotifications,
 )

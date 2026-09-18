@@ -64,9 +64,8 @@ interval in Settings.
 
 ### Voice
 
-Tap-to-talk, or set a wake word for hands-free use. Customize the wake word for an installed offline
-wake model. Gimi prefers a connected Bluetooth headset and can also use the phone microphone and speaker:
-say the wake word, then speak a task, and it runs without touching the screen.
+Tap the microphone to dictate a task; the transcript goes straight into the current conversation. A
+keyboard is always available as well.
 
 ### Built-in tools
 
@@ -176,7 +175,7 @@ synthesis model.
    suggestions in *Settings → Smart recommendations*.
 7. Start chatting.
 
-Optional extensions include voice wake, MCP servers, plugins or skills, and authorized working folders.
+Optional extensions include MCP servers, plugins or skills, and authorized working folders.
 
 ## Privacy
 

@@ -21,7 +21,6 @@ class SettingsViewModel @Inject constructor() : ViewModel() {
         when (action) {
             SettingsAction.OpenModelService -> emitEffect(SettingsEffect.NavigateToModelService)
             SettingsAction.OpenDefaultModels -> emitEffect(SettingsEffect.NavigateToDefaultModels)
-            SettingsAction.OpenVoiceWake -> emitEffect(SettingsEffect.NavigateToVoiceWake)
             SettingsAction.OpenMcpServers -> emitEffect(SettingsEffect.NavigateToMcpServers)
             SettingsAction.OpenPlugins -> emitEffect(SettingsEffect.NavigateToPlugins)
             SettingsAction.OpenSkills -> emitEffect(SettingsEffect.NavigateToSkills)

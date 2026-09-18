@@ -56,8 +56,6 @@ import github.ponyhuang.gimi.feature.skills.SkillsDestination
 import github.ponyhuang.gimi.feature.skills.SkillsEntryProvider
 import github.ponyhuang.gimi.feature.toolauthorization.ToolAuthorizationDestination
 import github.ponyhuang.gimi.feature.toolauthorization.ToolAuthorizationEntryProvider
-import github.ponyhuang.gimi.feature.assistant.voicewake.VoiceWakeDestination
-import github.ponyhuang.gimi.feature.assistant.voicewake.VoiceWakeEntryProvider
 import github.ponyhuang.gimi.feature.workfiles.WorkFilesDestination
 import github.ponyhuang.gimi.feature.workfiles.WorkFilesEntryProvider
 import github.ponyhuang.gimi.feature.workspace.WorkspaceDestination
@@ -157,7 +155,6 @@ fun MainScreen(
                         onNavigateToDefaultModels = {
                             navigate(ModelSettingsDestination.Defaults)
                         },
-                        onNavigateToVoiceWake = { navigate(VoiceWakeDestination.Settings) },
                         onNavigateToMcpServers = { navigate(McpDestination.ServerList) },
                         onNavigateToPlugins = { navigate(PluginDestination.Settings) },
                         onNavigateToSkills = { navigate(SkillsDestination.Settings) },
@@ -184,7 +181,6 @@ fun MainScreen(
                     MemoryEntryProvider(destination, goBack, navigate) ||
                     PermissionEntryProvider(destination, goBack) ||
                     SkillsEntryProvider(destination, goBack) ||
-                    VoiceWakeEntryProvider(destination, goBack) ||
                     WorkFilesEntryProvider(destination, goBack) ||
                     WorkspaceEntryProvider(destination, goBack)
 

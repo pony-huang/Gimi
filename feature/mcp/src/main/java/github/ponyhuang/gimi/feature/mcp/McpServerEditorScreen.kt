@@ -82,7 +82,7 @@ fun McpServerEditorScreen(
                 )
             }
             // 启用开关是状态控制而非表单字段，置顶作主开关；
-            // 样式与语音唤醒等设置页的 PreferenceListItem + 尾部 Switch 保持一致。
+            // 样式与其它设置页条目的 PreferenceListItem + 尾部 Switch 保持一致。
             PreferenceGroupCard {
                 PreferenceListItem(
                     icon = Icons.Default.Extension,

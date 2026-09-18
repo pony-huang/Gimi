@@ -7,17 +7,17 @@ import org.junit.Test
 
 class AssistantPresentationEventTest {
     @Test
-    fun `wake capture starts a fresh visible turn`() {
+    fun `capture starts a fresh visible turn`() {
         val state = AssistantSessionState(
             phase = AssistantSessionPhase.FOLLOW_UP_IDLE,
             messages = listOf(AssistantMessage(1, AssistantMessageAuthor.USER, "旧问题")),
             presentationVisible = false,
         ).applyPresentationEvent(
-            AssistantPresentationEvent.CaptureStarted(AssistantInvocationSource.BLUETOOTH_WAKE),
+            AssistantPresentationEvent.CaptureStarted(AssistantInvocationSource.ASSISTANT_PANEL),
         )
 
         assertEquals(AssistantSessionPhase.LISTENING, state.phase)
-        assertEquals(AssistantInvocationSource.BLUETOOTH_WAKE, state.source)
+        assertEquals(AssistantInvocationSource.ASSISTANT_PANEL, state.source)
         assertTrue(state.messages.isEmpty())
         assertTrue(state.presentationVisible)
     }
@@ -26,7 +26,7 @@ class AssistantPresentationEventTest {
     fun `transcript and speaking only update presentation phase`() {
         val transcribed = AssistantSessionState()
             .applyPresentationEvent(
-                AssistantPresentationEvent.CaptureStarted(AssistantInvocationSource.BLUETOOTH_WAKE),
+                AssistantPresentationEvent.CaptureStarted(AssistantInvocationSource.ASSISTANT_PANEL),
             )
             .applyPresentationEvent(AssistantPresentationEvent.Transcribing)
             .applyPresentationEvent(AssistantPresentationEvent.TranscriptReady)

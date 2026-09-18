@@ -51,7 +51,7 @@ fun routeAssistantSurface(environment: AssistantSurfaceEnvironment): AssistantSu
 
 /** 语音链路投射到共享助手界面的事件。 */
 sealed interface AssistantPresentationEvent {
-    /** 检测到唤醒词并开始采集一条新指令。 */
+    /** 开始采集一条新指令。 */
     data class CaptureStarted(val source: AssistantInvocationSource) : AssistantPresentationEvent
 
     /** 正在将录音转写为文本。 */

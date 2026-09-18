@@ -161,10 +161,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
             return AssistantSubmissionResult.Failed(message)
         }
         val sessionId = session.sessionId
-        val gateSource = when (source) {
-            AssistantInvocationSource.BLUETOOTH_WAKE -> AgentTaskSource.BLUETOOTH_VOICE
-            AssistantInvocationSource.ASSISTANT_PANEL -> AgentTaskSource.SYSTEM_ASSISTANT
-        }
+        val gateSource = AgentTaskSource.SYSTEM_ASSISTANT
         val lease = try {
             runtimeGate.acquire(gateSource, sessionId)
         } catch (_: AgentSessionBusyException) {

@@ -181,12 +181,6 @@ private enum class PermissionGroupDefinition(
         R.string.permission_desc_microphone,
         listOf(AppPermission.RecordAudio),
     ),
-    Bluetooth(
-        PermissionGroupKind.Bluetooth,
-        R.string.permission_name_bluetooth,
-        R.string.permission_desc_bluetooth,
-        listOf(AppPermission.BluetoothConnect),
-    ),
     Notifications(
         PermissionGroupKind.Notifications,
         R.string.permission_name_notifications,

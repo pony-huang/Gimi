@@ -27,7 +27,6 @@ The following stays on your device and is never sent to the developer (who opera
 - **Memory data**: vector embeddings computed entirely on-device
 - **Settings and model service configs**: including API keys you enter, encrypted with the Android
   Keystore before storage
-- **Wake phrases**: stored only in the app's private settings
 - **Working folders**: accessed only after you explicitly authorize a folder
 
 Uninstalling the app or clearing its data removes all of the above. If system cloud backup is on,
@@ -46,8 +45,7 @@ use the following services** does relevant data go to the corresponding provider
 | GitHub (api.github.com and Releases) | Update-check and APK download requests only, no personal data | When you check for or install app updates in Settings |
 
 How each provider handles your data is governed by its own privacy policy, which is outside this
-project's control — configure only services you trust. Voice wake uses Android on-device speech
-recognition and matches phrases locally; memory embedding also runs entirely on your device.
+project's control — configure only services you trust. Memory embedding runs entirely on your device.
 
 ## Permissions and built-in tools
 
@@ -56,8 +54,7 @@ Permissions*:
 
 | Permission | Purpose |
 |---|---|
-| Microphone | Voice input, wake word |
-| Bluetooth | Background voice wake via Bluetooth headset |
+| Microphone | Voice input |
 | Calendar (read / write) | Let the assistant view and create calendar events |
 | Fine / coarse location | Let the assistant get your current location |
 | Photos / video / audio | Search and play media, read media you share into chat |

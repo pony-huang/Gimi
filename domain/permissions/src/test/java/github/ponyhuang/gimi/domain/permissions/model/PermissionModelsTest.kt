@@ -48,7 +48,6 @@ class PermissionModelsTest {
                 AppPermission.ReadMediaVideo,
                 AppPermission.ReadMediaAudio,
                 AppPermission.RecordAudio,
-                AppPermission.BluetoothConnect,
                 AppPermission.PostNotifications,
             ),
             RuntimeAppPermissions,

@@ -28,7 +28,7 @@ class AppManifestComponentOwnershipTest {
     }
 
     @Test
-    fun foregroundVoiceWakeDoesNotDeclareLegacyBackgroundComponentsOrPermissions() {
+    fun manifestDoesNotDeclareLegacyBackgroundVoiceComponentsOrPermissions() {
         val content = File("src/main/AndroidManifest.xml").readText()
 
         assertFalse(content.contains("android.permission.SYSTEM_ALERT_WINDOW"))

@@ -29,7 +29,6 @@ fun SettingsRoute(
     onBack: () -> Unit,
     onNavigateToModelService: () -> Unit,
     onNavigateToDefaultModels: () -> Unit,
-    onNavigateToVoiceWake: () -> Unit,
     onNavigateToMcpServers: () -> Unit,
     onNavigateToPlugins: () -> Unit,
     onNavigateToSkills: () -> Unit,
@@ -52,7 +51,6 @@ fun SettingsRoute(
             when (effect) {
                 SettingsEffect.NavigateToModelService -> onNavigateToModelService()
                 SettingsEffect.NavigateToDefaultModels -> onNavigateToDefaultModels()
-                SettingsEffect.NavigateToVoiceWake -> onNavigateToVoiceWake()
                 SettingsEffect.NavigateToMcpServers -> onNavigateToMcpServers()
                 SettingsEffect.NavigateToPlugins -> onNavigateToPlugins()
                 SettingsEffect.NavigateToSkills -> onNavigateToSkills()

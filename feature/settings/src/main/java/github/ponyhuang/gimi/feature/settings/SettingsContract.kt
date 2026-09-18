@@ -6,7 +6,6 @@ class SettingsUiState
 sealed interface SettingsAction {
     data object OpenModelService : SettingsAction
     data object OpenDefaultModels : SettingsAction
-    data object OpenVoiceWake : SettingsAction
     data object OpenMcpServers : SettingsAction
     data object OpenPlugins : SettingsAction
     data object OpenSkills : SettingsAction
@@ -24,7 +23,6 @@ sealed interface SettingsAction {
 sealed interface SettingsEffect {
     data object NavigateToModelService : SettingsEffect
     data object NavigateToDefaultModels : SettingsEffect
-    data object NavigateToVoiceWake : SettingsEffect
     data object NavigateToMcpServers : SettingsEffect
     data object NavigateToPlugins : SettingsEffect
     data object NavigateToSkills : SettingsEffect

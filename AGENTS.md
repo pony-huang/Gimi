@@ -16,7 +16,7 @@
 
 ### Capabilities
 
-Current domain capabilities are `modelcatalog`, `assistant`, `conversation`, `speech`, `mcp`, `workfiles`, `permissions`, `toolauthorization`, `skills`, `appupdate`, `plugin`, `recommendation`, `memory`, `workspace`, and `appearance`. Provider/runtime-only data capabilities also include `agent` and `voicewake`. Current features are `modelsettings`, `settings`, `mcp`, `workfiles`, `permissions`, `toolauthorization`, `skills`, `chat`, `assistant` (including `voicewake` under `github.ponyhuang.gimi.feature.assistant.voicewake`), `plugin`, `recommendation`, `memory`, and `workspace`.
+Current domain capabilities are `modelcatalog`, `assistant`, `conversation`, `speech`, `mcp`, `workfiles`, `permissions`, `toolauthorization`, `skills`, `appupdate`, `plugin`, `recommendation`, `memory`, `workspace`, and `appearance`. Provider/runtime-only data capabilities also include `agent`. Current features are `modelsettings`, `settings`, `mcp`, `workfiles`, `permissions`, `toolauthorization`, `skills`, `chat`, `assistant`, `plugin`, `recommendation`, `memory`, and `workspace`.
 
 ### Ownership and placement
 

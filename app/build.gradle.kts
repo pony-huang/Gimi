@@ -98,7 +98,6 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":data:modelcatalog"))
     implementation(project(":data:speech"))
-    implementation(project(":data:voicewake"))
     implementation(project(":data:conversation"))
     implementation(project(":data:agent"))
     implementation(project(":data:appearance"))

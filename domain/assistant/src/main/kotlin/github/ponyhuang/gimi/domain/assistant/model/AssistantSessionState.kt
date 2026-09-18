@@ -60,7 +60,7 @@ data class AssistantSessionState(
 
 /**
  * 是否应展开会话面板：存在消息或待确认工具时展开为对话面板，
- * 否则保持悬浮胶囊态（刚唤醒、仅采集指令的阶段）。
+ * 否则保持悬浮胶囊态（刚开始采集指令的阶段）。
  */
 val AssistantSessionState.shouldShowConversation: Boolean
     get() = messages.isNotEmpty() || pendingConfirmation != null

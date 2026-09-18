@@ -2,7 +2,6 @@
     <string name="settings_title">设置</string>
 
     <string name="settings_group_model">模型</string>
-    <string name="settings_group_voice">语音</string>
     <string name="settings_group_tools">工具</string>
     <string name="settings_group_general">通用</string>
     <string name="settings_memory_title">记忆</string>
@@ -13,9 +12,6 @@
 
     <string name="settings_default_model_title">默认模型</string>
     <string name="settings_default_model_subtitle">助手 · 快速响应 · 语音识别与播放</string>
-
-    <string name="settings_voice_wake_title">语音唤醒</string>
-    <string name="settings_voice_wake_subtitle">蓝牙耳机 · 唤醒词 · 离线模型</string>
 
     <string name="settings_mcp_title">MCP</string>
     <string name="settings_mcp_subtitle">远程工具服务 · 连接与授权</string>

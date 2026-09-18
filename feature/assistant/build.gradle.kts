@@ -15,7 +15,6 @@ android {
 dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":domain:assistant"))
-    implementation(project(":domain:speech"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.foundation)
@@ -34,7 +33,6 @@ dependencies {
     implementation(libs.kotlinx.serialization.core)
 
     testImplementation(project(":core:testing"))
-    testImplementation(project(":domain:modelcatalog"))
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)

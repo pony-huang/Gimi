@@ -24,7 +24,7 @@ class AssistantSessionStateTest {
     @Test
     fun freshCaptureKeepsCapsuleCollapsed() {
         val state = AssistantSessionState().applyPresentationEvent(
-            AssistantPresentationEvent.CaptureStarted(AssistantInvocationSource.BLUETOOTH_WAKE),
+            AssistantPresentationEvent.CaptureStarted(AssistantInvocationSource.ASSISTANT_PANEL),
         )
         assertFalse(state.shouldShowConversation)
     }
@@ -70,7 +70,7 @@ class AssistantSessionStateTest {
         assertTrue(conversing.shouldShowConversation)
 
         val recaptured = conversing.applyPresentationEvent(
-            AssistantPresentationEvent.CaptureStarted(AssistantInvocationSource.BLUETOOTH_WAKE),
+            AssistantPresentationEvent.CaptureStarted(AssistantInvocationSource.ASSISTANT_PANEL),
         )
         assertFalse(recaptured.shouldShowConversation)
     }
@@ -78,7 +78,7 @@ class AssistantSessionStateTest {
     @Test
     fun captureAbandonedHidesPresentationImmediately() {
         val listening = AssistantSessionState().applyPresentationEvent(
-            AssistantPresentationEvent.CaptureStarted(AssistantInvocationSource.BLUETOOTH_WAKE),
+            AssistantPresentationEvent.CaptureStarted(AssistantInvocationSource.ASSISTANT_PANEL),
         )
         assertTrue(listening.presentationVisible)
 

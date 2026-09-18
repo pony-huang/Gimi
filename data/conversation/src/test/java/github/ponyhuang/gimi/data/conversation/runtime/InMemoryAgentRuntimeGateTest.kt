@@ -19,7 +19,7 @@ class InMemoryAgentRuntimeGateTest {
         val first = gate.acquire(AgentTaskSource.CHAT, sessionId = "session-a")
 
         try {
-            gate.acquire(AgentTaskSource.BLUETOOTH_VOICE, sessionId = "session-a")
+            gate.acquire(AgentTaskSource.SYSTEM_ASSISTANT, sessionId = "session-a")
             fail("Expected the second acquisition for the same session to be rejected")
         } catch (_: IllegalStateException) {
             // Expected: one conversation may only have one active writer.
@@ -32,7 +32,7 @@ class InMemoryAgentRuntimeGateTest {
     fun differentSessionsCanStillRunConcurrently() = runTest {
         val gate = InMemoryAgentRuntimeGate()
         val first = gate.acquire(AgentTaskSource.CHAT, sessionId = "session-a")
-        val second = gate.acquire(AgentTaskSource.BLUETOOTH_VOICE, sessionId = "session-b")
+        val second = gate.acquire(AgentTaskSource.SYSTEM_ASSISTANT, sessionId = "session-b")
 
         assertEquals(2, (gate.state.value as AgentRuntimeState.Busy).tasks.size)
 
@@ -44,7 +44,7 @@ class InMemoryAgentRuntimeGateTest {
     fun activeTasksBlockMutationsUntilEveryLeaseIsReleased() = runTest {
         val gate = InMemoryAgentRuntimeGate()
         val chat = gate.acquire(AgentTaskSource.CHAT, sessionId = "session-a")
-        val voice = gate.acquire(AgentTaskSource.BLUETOOTH_VOICE)
+        val assistant = gate.acquire(AgentTaskSource.SYSTEM_ASSISTANT)
 
         assertSame(
             AgentMutationResult.BlockedByActiveAgent,
@@ -61,7 +61,7 @@ class InMemoryAgentRuntimeGateTest {
             AgentMutationResult.BlockedByActiveAgent,
             gate.runMutation { error("must not run") },
         )
-        voice.release()
+        assistant.release()
 
         assertEquals(AgentRuntimeState.Idle, gate.state.value)
         assertEquals(7, (gate.runMutation { 7 } as AgentMutationResult.Applied).value)

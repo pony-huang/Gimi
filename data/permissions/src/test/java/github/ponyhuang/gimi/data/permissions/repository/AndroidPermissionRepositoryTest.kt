@@ -235,7 +235,6 @@ class AndroidPermissionRepositoryTest {
         AppPermission.ReadMediaVideo -> Manifest.permission.READ_MEDIA_VIDEO
         AppPermission.ReadMediaAudio -> Manifest.permission.READ_MEDIA_AUDIO
         AppPermission.RecordAudio -> Manifest.permission.RECORD_AUDIO
-        AppPermission.BluetoothConnect -> Manifest.permission.BLUETOOTH_CONNECT
         AppPermission.PostNotifications -> Manifest.permission.POST_NOTIFICATIONS
         AppPermission.WriteSystemSettings,
         AppPermission.NotificationListener,

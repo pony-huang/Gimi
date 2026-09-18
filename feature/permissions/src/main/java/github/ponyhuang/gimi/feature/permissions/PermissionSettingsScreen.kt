@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.LocationOn
@@ -194,7 +193,6 @@ private val PermissionGroupKind.icon: ImageVector
         PermissionGroupKind.Calendar -> Icons.Default.CalendarMonth
         PermissionGroupKind.Media -> Icons.Default.Folder
         PermissionGroupKind.Microphone -> Icons.Default.Mic
-        PermissionGroupKind.Bluetooth -> Icons.Default.Bluetooth
         PermissionGroupKind.Notifications -> Icons.Default.Notifications
     }
 

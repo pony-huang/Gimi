@@ -9,7 +9,6 @@ import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Rule
 import androidx.compose.material.icons.filled.School
@@ -66,17 +65,6 @@ fun SettingsScreen(
                         title = stringResource(R.string.settings_default_model_title),
                         subtitle = stringResource(R.string.settings_default_model_subtitle),
                         onClick = { onAction(SettingsAction.OpenDefaultModels) },
-                    )
-                }
-            }
-            item { PreferenceSectionTitle(stringResource(R.string.settings_group_voice)) }
-            item {
-                PreferenceGroupCard {
-                    PreferenceNavigationCard(
-                        icon = Icons.Default.Mic,
-                        title = stringResource(R.string.settings_voice_wake_title),
-                        subtitle = stringResource(R.string.settings_voice_wake_subtitle),
-                        onClick = { onAction(SettingsAction.OpenVoiceWake) },
                     )
                 }
             }

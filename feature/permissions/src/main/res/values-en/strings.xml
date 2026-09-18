@@ -22,9 +22,7 @@
     <string name="permission_name_media">Media files</string>
     <string name="permission_desc_media">Allows the assistant to search shared images, videos, and audio</string>
     <string name="permission_name_microphone">Microphone</string>
-    <string name="permission_desc_microphone">Used for voice input and Bluetooth voice wake</string>
-    <string name="permission_name_bluetooth">Bluetooth devices</string>
-    <string name="permission_desc_bluetooth">Used to connect to a headset and run voice wake tasks</string>
+    <string name="permission_desc_microphone">Used for voice input</string>
     <string name="permission_name_notifications">Notifications</string>
     <string name="permission_desc_notifications">Used to display the running state of background voice tasks</string>
     <string name="permissions_special_usage_access_title">App usage access</string>

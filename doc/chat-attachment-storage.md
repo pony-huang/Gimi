@@ -140,10 +140,6 @@ placeholder, so one lost file can never blank a whole session (the `loadMessages
 catch-all is now a last-resort only). Missing attachments are dropped from retry/edit
 resends (`PrepareChatTurnUseCase`, `ChatViewModel.editFailedTurn`).
 
-Before each model request, `AgentChatRunner` also appends an `attachmentPathManifest` text
-part listing the local paths, for tools that take path arguments (e.g. `read_local_file`,
-plugin upload bridges).
-
 ## 6. Rendering
 
 Rendering never base64-encodes; that happens only in the provider adapters

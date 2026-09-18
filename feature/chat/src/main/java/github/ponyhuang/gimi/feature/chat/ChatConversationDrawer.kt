@@ -1,5 +1,13 @@
 package github.ponyhuang.gimi.feature.chat
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,7 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
@@ -35,13 +42,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -80,7 +87,7 @@ import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
  * @param onDeleteClick       删除某个对话时回调（实现方应再次校验不是 currentSessionId）
  * @param onSettingsClick     点击底部"设置"按钮时回调（实现方负责关闭抽屉并跳转）
  * @param themeMode           当前夜间模式偏好（跟随系统/浅色/深色）
- * @param onThemeModeChange   点选某一项夜间模式时回调（实现方负责持久化并应用主题）
+ * @param onThemeModeChange   点击夜间模式按钮循环到下一模式时回调（实现方负责持久化并应用主题）
  * @param modifier            修饰符
  * @param content             抽屉背后的主屏幕内容
  */
@@ -203,7 +210,10 @@ private fun HistoryDrawerContent(
                 fontWeight = FontWeight.Medium,
             )
             Spacer(modifier = Modifier.weight(1f))
-            ThemeModeSelector(mode = themeMode, onSelect = onThemeModeChange)
+            ThemeModeButton(
+                mode = themeMode,
+                onClick = { onThemeModeChange(themeMode.next()) },
+            )
         }
 
         Row(
@@ -243,75 +253,79 @@ private fun HistoryDrawerContent(
     }
 }
 
-// ── 夜间模式三态选择器 ──────────────────────────────────────────
+// ── 夜间模式循环按钮 ────────────────────────────────────────────
 
 /**
- * 抽屉底部分段三态选择器：跟随系统 / 浅色 / 深色。当前项以 primary 实心圆高亮，
- * 点击任意一项即显式选定（点回"跟随系统"恢复自动跟随）。
+ * 抽屉底部夜间模式按钮：单枚按钮点击循环 跟随系统→浅色→深色。图标与文案用
+ * [AnimatedContent] 做上滑淡入淡出过渡，切换连贯不生硬；按钮始终反映当前模式，
+ * 点回"跟随系统"即恢复自动跟随。
  */
 @Composable
-private fun ThemeModeSelector(
+private fun ThemeModeButton(
     mode: ThemeMode,
-    onSelect: (ThemeMode) -> Unit,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier
-            .background(
-                MaterialTheme.colorScheme.surfaceVariant,
-                RoundedCornerShape(percent = 50),
-            )
-            .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    val label = stringResource(themeModeLabelRes(mode))
+    Surface(
+        onClick = onClick,
+        modifier = modifier.semantics { contentDescription = label },
+        shape = RoundedCornerShape(percent = 50),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
     ) {
-        ThemeMode.entries.forEach { option ->
-            val icon = when (option) {
-                ThemeMode.SYSTEM -> Icons.Default.BrightnessAuto
-                ThemeMode.LIGHT -> Icons.Default.LightMode
-                ThemeMode.DARK -> Icons.Default.DarkMode
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            AnimatedContent(
+                targetState = mode,
+                transitionSpec = { themeModeSlideSpec() },
+                label = "themeModeIcon",
+            ) { m ->
+                Icon(
+                    imageVector = themeModeIcon(m),
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
             }
-            val label = stringResource(
-                when (option) {
-                    ThemeMode.SYSTEM -> R.string.chat_theme_system
-                    ThemeMode.LIGHT -> R.string.chat_theme_light
-                    ThemeMode.DARK -> R.string.chat_theme_dark
-                },
-            )
-            ThemeModeOption(
-                icon = icon,
-                label = label,
-                selected = option == mode,
-                onClick = { onSelect(option) },
-            )
+            AnimatedContent(
+                targetState = mode,
+                transitionSpec = { themeModeSlideSpec() },
+                label = "themeModeLabel",
+            ) { m ->
+                Text(
+                    text = stringResource(themeModeLabelRes(m)),
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }
 
-@Composable
-private fun ThemeModeOption(
-    icon: ImageVector,
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    val container = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
-    val content = if (selected) MaterialTheme.colorScheme.onPrimary
-    else MaterialTheme.colorScheme.onSurfaceVariant
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier
-            .size(36.dp)
-            .background(container, CircleShape)
-            .semantics { contentDescription = label },
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = content,
-            modifier = Modifier.size(20.dp),
-        )
-    }
+// 新内容从下方半格滑入并淡入、旧内容向上半格滑出并淡出，切换连贯不生硬。
+private fun themeModeSlideSpec(): ContentTransform =
+    slideInVertically(tween(220)) { it / 2 } + fadeIn(tween(220)) togetherWith
+        slideOutVertically(tween(220)) { -it / 2 } + fadeOut(tween(160))
+
+private fun ThemeMode.next(): ThemeMode = when (this) {
+    ThemeMode.SYSTEM -> ThemeMode.LIGHT
+    ThemeMode.LIGHT -> ThemeMode.DARK
+    ThemeMode.DARK -> ThemeMode.SYSTEM
+}
+
+private fun themeModeIcon(mode: ThemeMode): ImageVector = when (mode) {
+    ThemeMode.SYSTEM -> Icons.Default.BrightnessAuto
+    ThemeMode.LIGHT -> Icons.Default.LightMode
+    ThemeMode.DARK -> Icons.Default.DarkMode
+}
+
+private fun themeModeLabelRes(mode: ThemeMode): Int = when (mode) {
+    ThemeMode.SYSTEM -> R.string.chat_theme_system
+    ThemeMode.LIGHT -> R.string.chat_theme_light
+    ThemeMode.DARK -> R.string.chat_theme_dark
 }
 
 // ── 对话列表项 ──────────────────────────────────────────────────

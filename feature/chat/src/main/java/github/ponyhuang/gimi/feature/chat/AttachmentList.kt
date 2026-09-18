@@ -38,7 +38,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -167,9 +166,11 @@ internal enum class SentImagesLayout {
     FULL_BLEED_HEADER,
 }
 
-/** 单图卡片最大宽度/高度：约占半屏宽，超长图按高度截断并裁切。 */
-private val SentImageMaxWidth = 220.dp
-private val SentImageMaxHeight = 300.dp
+/** 单图卡片长边上限：按图片原始宽高比自适应，横图取宽、竖图取高。 */
+private val SentImageMaxEdge = 280.dp
+
+/** 加载/失败态的占位边长，避免以固定方形撑出留白。 */
+private val SentImagePlaceholder = 160.dp
 
 /** 多图网格单格边长：两列排布，方形裁切。 */
 private val SentImageGridCell = 106.dp
@@ -199,8 +200,8 @@ internal fun SentImages(
                     image = single,
                     onClick = { previewImage = single },
                     modifier = Modifier
-                        .widthIn(max = SentImageMaxWidth)
-                        .heightIn(max = SentImageMaxHeight),
+                        .widthIn(max = SentImageMaxEdge)
+                        .heightIn(max = SentImageMaxEdge),
                 )
             } else {
                 SentImageGrid(images) { previewImage = it }
@@ -212,9 +213,7 @@ internal fun SentImages(
                 SentImageCard(
                     image = single,
                     onClick = { previewImage = single },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = SentImageMaxHeight),
+                    modifier = Modifier.heightIn(max = SentImageMaxEdge),
                 )
             } else {
                 SentImageGrid(images) { previewImage = it }
@@ -252,8 +251,9 @@ private fun SentImageGrid(
 }
 
 /**
- * 单张已发送图片的宽高比卡片：加载完成后读取 intrinsicSize 更新比例，
- * 保证不同方向的实拍图都以原始构图展示而不是固定方块。
+ * 单张已发送图片的自适应卡片：尺寸直接由图片 intrinsicSize 的宽高比驱动
+ * （在 success 子组合内套用 aspectRatio），横图取宽、竖图取高，长边不超过
+ * 调用方给定的 widthIn/heightIn 上限，容器与图片严丝合缝、不会出现留白。
  */
 @Composable
 private fun SentImageCard(
@@ -261,29 +261,35 @@ private fun SentImageCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var ratio by remember(image.id) { mutableFloatStateOf(1f) }
     SubcomposeAsyncImage(
         model = image.imageModel,
         contentDescription = stringResource(R.string.chat_attachment_sent_image),
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .aspectRatio(ratio),
+            .clickable(onClick = onClick),
         contentScale = ContentScale.Crop,
         loading = {
             Box(
                 modifier = Modifier
-                    .matchParentSize()
+                    .size(SentImagePlaceholder)
                     .background(MaterialTheme.colorScheme.surfaceDim),
             )
         },
-        error = { AttachmentPlaceholder() },
+        error = {
+            Box(modifier = Modifier.size(SentImagePlaceholder)) {
+                AttachmentPlaceholder()
+            }
+        },
         success = {
             val intrinsic = painter.intrinsicSize
-            if (intrinsic.width > 0f && intrinsic.height > 0f) {
-                LaunchedEffect(intrinsic) { ratio = intrinsic.width / intrinsic.height }
+            val ratio = if (intrinsic.width > 0f && intrinsic.height > 0f) {
+                intrinsic.width / intrinsic.height
+            } else {
+                1f
             }
-            SubcomposeAsyncImageContent()
+            SubcomposeAsyncImageContent(
+                modifier = Modifier.aspectRatio(ratio),
+            )
         },
     )
 }

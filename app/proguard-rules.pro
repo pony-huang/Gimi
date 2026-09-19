@@ -154,6 +154,12 @@
 -keep class com.google.adk.kt.models.** { *; }
 -keep class com.google.adk.kt.tools.** { *; }
 -keep class com.google.adk.kt.types.** { *; }
+# ADK 的 Room 会话转换器在运行时通过 kotlinx.serialization 的 contextual
+# `Any` serializer 编码工具返回的 JSON-native Map。该注册点藏在库的序列化 DSL
+# lambda 中，R8 无法可靠追踪；一旦收缩，正式版会在工具响应落库时报
+# "Serializer for class 'Any' is not found"。完整保留这个很小的运行时包，
+# 保证正常工具响应仍可持久化，而不是将其误判为会话错误丢弃。
+-keep class com.google.adk.kt.serialization.** { *; }
 # 上面的 `{ *; }` 只保字段/方法，不含构造函数。插件构造这些 Kotlin 数据类时走带
 # DefaultConstructorMarker 的合成默认参构造函数；host 自身可能不调用同一变体，R8 会把它
 # 剥掉，插件加载即抛 NoSuchMethodError。这里显式保留所有 <init>，补齐插件 ABI。

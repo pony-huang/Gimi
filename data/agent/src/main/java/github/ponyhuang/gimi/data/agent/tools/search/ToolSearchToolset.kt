@@ -1,7 +1,9 @@
 package github.ponyhuang.gimi.data.agent.tools.search
 
 import com.google.adk.kt.agents.ReadonlyContext
+import com.google.adk.kt.annotations.FrameworkInternalApi
 import com.google.adk.kt.models.LlmRequest
+import com.google.adk.kt.serialization.adkJson
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.tools.Toolset
@@ -15,7 +17,6 @@ import github.ponyhuang.gimi.data.agent.tools.search.ToolSearchToolset.Companion
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.json.Json
 import java.security.MessageDigest
 
 internal const val TOOL_SEARCH_NAME: String = "tool_search"
@@ -193,12 +194,17 @@ internal class ToolSearchToolset(
                     emptyList()
                 }
             tools.forEach { tool ->
-                if (tool.declaration() != null) {
-                    candidates += ToolCandidate(
-                        sourceId = source.id,
-                        sourceDisplayName = source.displayName,
-                        tool = tool,
-                    )
+                try {
+                    if (tool.declaration() != null) {
+                        candidates += ToolCandidate(
+                            sourceId = source.id,
+                            sourceDisplayName = source.displayName,
+                            tool = tool,
+                        )
+                    }
+                } catch (error: Throwable) {
+                    if (error is CancellationException) throw error
+                    // 单个工具解析或声明序列化失败跳过该候选，避免阻断整个工具检索
                 }
             }
         }
@@ -244,14 +250,9 @@ internal class ToolSearchToolset(
         return selected
     }
 
+    @OptIn(FrameworkInternalApi::class)
     private fun schemaBytes(candidate: ToolCandidate): Int =
-        candidate.tool.declaration()
-            ?.let { declaration ->
-                Json.encodeToString(FunctionDeclaration.serializer(), declaration)
-                    .encodeToByteArray()
-                    .size
-            }
-            ?: 0
+        candidate.declarationBytes
 
     private fun unchangedSearchResult(
         ambiguous: List<Map<String, Any>> = emptyList(),
@@ -350,15 +351,17 @@ internal class ToolSearchToolset(
      * @property sourceDisplayName 可安全返回给模型的来源名称。
      * @property tool 本机保存的 ADK 执行实例。
      */
+    @OptIn(FrameworkInternalApi::class)
     private data class ToolCandidate(
         val sourceId: String,
         val sourceDisplayName: String,
         val tool: BaseTool,
     ) {
-        private val declarationJson: String = Json.encodeToString(
+        private val declarationJson: String = adkJson.encodeToString(
             FunctionDeclaration.serializer(),
             requireNotNull(tool.declaration()),
         )
+        val declarationBytes: Int = declarationJson.encodeToByteArray().size
         val key: String = "$sourceId:${tool.name}:${sha256(declarationJson).take(KEY_HASH_LENGTH)}"
 
         fun vectorDocument(): ToolVectorDocument {

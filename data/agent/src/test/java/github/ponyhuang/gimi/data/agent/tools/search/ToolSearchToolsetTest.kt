@@ -30,6 +30,41 @@ import org.junit.Test
 class ToolSearchToolsetTest {
 
     @Test
+    fun toolWithContextualDefaultInParameterSchemaCanBeDiscoveredAndSerialized() = runTest {
+        val tool = object : BaseTool("weather_tool", "Get weather") {
+            override fun declaration(): FunctionDeclaration = FunctionDeclaration(
+                name = "weather_tool",
+                description = "Get weather",
+                parameters = Schema(
+                    type = Type.OBJECT,
+                    properties = mapOf(
+                        "city" to Schema(
+                            type = Type.STRING,
+                            default = "Beijing",
+                        ),
+                    ),
+                ),
+            )
+            override suspend fun run(context: ToolContext, args: Map<String, Any?>): Any = emptyMap<String, Any>()
+        }
+        val toolset = toolset(listOf(tool))
+        val result = toolset.search("weather", toolContext(context()))
+        assertEquals(listOf("weather_tool"), result.loadedToolNames())
+    }
+
+    @Test
+    fun faultyToolDeclarationDoesNotBreakDiscoveryOfOtherTools() = runTest {
+        val brokenTool = object : BaseTool("broken_tool", "Broken tool") {
+            override fun declaration(): FunctionDeclaration = throw IllegalStateException("Boom")
+            override suspend fun run(context: ToolContext, args: Map<String, Any?>): Any = emptyMap<String, Any>()
+        }
+        val validTool = tool("valid_tool", "Valid tool")
+        val toolset = toolset(listOf(brokenTool, validTool))
+        val result = toolset.search("valid", toolContext(context()))
+        assertEquals(listOf("valid_tool"), result.loadedToolNames())
+    }
+
+    @Test
     fun appendsToolSearchInstructionsWhenProcessingLlmRequest() = runTest {
         val toolset = toolset(
             tools = listOf(tool("set_alarm")),

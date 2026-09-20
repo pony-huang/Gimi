@@ -26,3 +26,4 @@ local.properties
 /app/release/
 / .orca/
 /.zcode/
+/agent/

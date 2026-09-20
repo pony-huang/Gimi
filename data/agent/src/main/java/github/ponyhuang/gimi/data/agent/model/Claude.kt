@@ -4,6 +4,7 @@ import com.anthropic.client.AnthropicClient
 import com.anthropic.core.JsonValue
 import com.anthropic.core.JsonValue.Companion.from
 import com.anthropic.core.jsonMapper
+import com.anthropic.errors.AnthropicException
 import com.anthropic.errors.AnthropicServiceException
 import com.anthropic.helpers.MessageAccumulator
 import com.anthropic.models.messages.Base64ImageSource
@@ -49,6 +50,7 @@ import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.ThinkingLevel
 import com.google.adk.kt.types.UsageMetadata
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
@@ -93,7 +95,9 @@ open class Claude(
             logger.debug { "Sending request to Claude model ${params.model()}" }
             val message = try {
                 client.messages().create(params)
-            } catch (e: AnthropicServiceException) {
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: AnthropicException) {
                 emit(mapToErrorResponse(e))
                 return@flow
             }
@@ -181,7 +185,9 @@ open class Claude(
             logger.debug { "Claude streaming complete: $message" }
             emit(message.toLlmResponse())
 
-        } catch (e: AnthropicServiceException) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: AnthropicException) {
             logger.error(e) { "Error processing Claude streaming response" }
             emit(mapToErrorResponse(e))
         }
@@ -434,7 +440,7 @@ open class Claude(
         finishReason = if (e is AnthropicServiceException) FinishReason.SAFETY
         else FinishReason.FINISH_REASON_UNSPECIFIED,
         errorMessage = if (e is AnthropicServiceException) "${e.statusCode()}: ${e.message}"
-        else e.message
+        else e.message ?: e::class.simpleName ?: "Unknown error",
     )
 }
 

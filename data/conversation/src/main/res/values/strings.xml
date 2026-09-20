@@ -3,4 +3,10 @@
     <string name="conversation_default_title">新对话</string>
     <string name="conversation_image_message_title">图片消息</string>
     <string name="conversation_attachment_message_title">附件消息</string>
+    <string name="agent_execution_service_title">智能助手</string>
+    <string name="agent_execution_service_channel_name">助手任务执行</string>
+    <string name="agent_execution_phase_generating">正在生成回答…</string>
+    <string name="agent_execution_phase_tool">正在执行工具…</string>
+    <string name="agent_execution_phase_confirmation">等待操作确认…</string>
+    <string name="agent_execution_phase_input">等待输入…</string>
 </resources>

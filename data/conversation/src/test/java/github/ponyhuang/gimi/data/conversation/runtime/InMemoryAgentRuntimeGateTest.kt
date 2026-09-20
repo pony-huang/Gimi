@@ -1,9 +1,11 @@
 package github.ponyhuang.gimi.data.conversation.runtime
 
+import android.content.Context
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentMutationResult
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeState
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskSource
+import io.mockk.mockk
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
@@ -13,9 +15,12 @@ import org.junit.Assert.fail
 import org.junit.Test
 
 class InMemoryAgentRuntimeGateTest {
+    private val context = mockk<Context>(relaxed = true)
+    private fun createGate() = InMemoryAgentRuntimeGate(context)
+
     @Test
     fun sameSessionCannotBeAcquiredTwice() = runTest {
-        val gate = InMemoryAgentRuntimeGate()
+        val gate = createGate()
         val first = gate.acquire(AgentTaskSource.CHAT, sessionId = "session-a")
 
         try {
@@ -30,7 +35,7 @@ class InMemoryAgentRuntimeGateTest {
 
     @Test
     fun differentSessionsCanStillRunConcurrently() = runTest {
-        val gate = InMemoryAgentRuntimeGate()
+        val gate = createGate()
         val first = gate.acquire(AgentTaskSource.CHAT, sessionId = "session-a")
         val second = gate.acquire(AgentTaskSource.SYSTEM_ASSISTANT, sessionId = "session-b")
 
@@ -42,7 +47,7 @@ class InMemoryAgentRuntimeGateTest {
 
     @Test
     fun activeTasksBlockMutationsUntilEveryLeaseIsReleased() = runTest {
-        val gate = InMemoryAgentRuntimeGate()
+        val gate = createGate()
         val chat = gate.acquire(AgentTaskSource.CHAT, sessionId = "session-a")
         val assistant = gate.acquire(AgentTaskSource.SYSTEM_ASSISTANT)
 
@@ -69,7 +74,7 @@ class InMemoryAgentRuntimeGateTest {
 
     @Test
     fun phaseUpdatesAndRepeatedReleaseAreSafe() = runTest {
-        val gate = InMemoryAgentRuntimeGate()
+        val gate = createGate()
         val lease = gate.acquire(AgentTaskSource.CHAT)
 
         lease.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
@@ -86,7 +91,7 @@ class InMemoryAgentRuntimeGateTest {
 
     @Test
     fun taskAcquisitionWaitsForAnAtomicMutation() = runTest {
-        val gate = InMemoryAgentRuntimeGate()
+        val gate = createGate()
         val mutationStarted = CompletableDeferred<Unit>()
         val finishMutation = CompletableDeferred<Unit>()
         val mutation = async {

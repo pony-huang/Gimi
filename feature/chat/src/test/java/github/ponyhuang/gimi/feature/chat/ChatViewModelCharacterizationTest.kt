@@ -21,7 +21,9 @@ import github.ponyhuang.gimi.domain.conversation.repository.ChatSessionRewindExc
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurnStatus
 import github.ponyhuang.gimi.domain.conversation.model.FunctionCallView
+import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.Messages
+import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import github.ponyhuang.gimi.domain.conversation.usecase.PrepareChatTurnUseCase
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.appearance.ThemeMode
@@ -532,6 +534,32 @@ class ChatViewModelCharacterizationTest {
             )
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun resumeChatReseedsPartialChannelsWhenSessionIsActive() = runTest {
+        val fixture = fixture(configured = true)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+
+        val sessionId = fixture.viewModel.uiState.value.sessionId
+        val runtime = fixture.viewModel.runtimeFor(sessionId)
+        runtime.isAgentRunning = true
+        runtime.messages = listOf(
+            Message(
+                author = "Assistant",
+                role = MessageRole.Assistant,
+                textParts = listOf(TextPart(id = "part-1", text = "hello background", thought = false)),
+                partial = true,
+            ),
+        )
+
+        fixture.viewModel.onAction(ChatAction.ResumeChat)
+        advanceUntilIdle()
+
+        val channel = fixture.viewModel.partChannelFor("part-1")
+        org.junit.Assert.assertNotNull(channel)
+        assertEquals("hello background", channel?.tryReceive()?.getOrNull())
     }
 
     @Test

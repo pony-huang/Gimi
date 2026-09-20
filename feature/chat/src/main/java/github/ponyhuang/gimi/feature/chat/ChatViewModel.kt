@@ -121,6 +121,7 @@ class ChatViewModel @Inject constructor(
             ChatAction.EditFailedTurn -> editFailedTurn()
             ChatAction.CancelEditFailedTurn -> cancelEditFailedTurn()
             ChatAction.LeaveChat -> cancelFailedTurnEdit(restorePreviousDraft = false)
+            ChatAction.ResumeChat -> resumeChat()
             is ChatAction.ResolveRepeatExecution -> resolveRepeatExecution(action.proceed)
             ChatAction.StopStreaming -> stopStreaming()
             is ChatAction.ToggleSpeechPlayback ->
@@ -376,7 +377,7 @@ class ChatViewModel @Inject constructor(
         )
     }
 
-    private fun runtimeFor(sessionId: String): ChatSessionRuntime =
+    internal fun runtimeFor(sessionId: String): ChatSessionRuntime =
         sessionRuntimes.getOrPut(sessionId) { ChatSessionRuntime(sessionId) }
 
     private fun publishRuntime(runtime: ChatSessionRuntime) {
@@ -938,6 +939,17 @@ class ChatViewModel @Inject constructor(
                 runCatching { attachments.deleteDrafts(editDrafts) }
                     .onFailure { Log.w(TAG, "Failed to clean up edit drafts", it) }
             }
+        }
+    }
+
+    /** 返回/恢复聊天界面；若当前会话仍在后台执行，重设流式 channel 保证 UI 能继续无缝消费增量。 */
+    private fun resumeChat() {
+        val sessionId = _uiState.value.sessionId
+        if (sessionId.isBlank()) return
+        val runtime = sessionRuntimes[sessionId] ?: return
+        if (runtime.isActive) {
+            runtime.reseedPartialChannels()
+            publishRuntime(runtime)
         }
     }
 

@@ -27,6 +27,9 @@ sealed interface ChatAction {
     /** 离开聊天页；丢弃当前失败轮编辑态和编辑草稿，不影响失败轮本身。 */
     data object LeaveChat : ChatAction
 
+    /** 返回/恢复聊天页；若当前会话在后台仍在生成，重新播种流式 channel 并刷新 UI。 */
+    data object ResumeChat : ChatAction
+
     /** 工具重复执行确认：proceed=true 时真正重新发送，false 时取消。 */
     data class ResolveRepeatExecution(val proceed: Boolean) : ChatAction
 

@@ -1,5 +1,7 @@
 package github.ponyhuang.gimi.data.conversation.runtime
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.domain.conversation.runtime.ActiveAgentTask
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentMutationResult
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRunLease
@@ -17,7 +19,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 @Singleton
-class InMemoryAgentRuntimeGate @Inject constructor() : AgentRuntimeGate {
+class InMemoryAgentRuntimeGate @Inject constructor(
+    @ApplicationContext private val context: Context,
+) : AgentRuntimeGate {
     private val mutationMutex = Mutex()
     private val tasks = linkedMapOf<Any, ActiveAgentTask>()
     private val _state = MutableStateFlow<AgentRuntimeState>(AgentRuntimeState.Idle)
@@ -33,6 +37,7 @@ class InMemoryAgentRuntimeGate @Inject constructor() : AgentRuntimeGate {
             if (sessionId != null && tasks.values.any { it.sessionId == sessionId }) {
                 throw AgentSessionBusyException(sessionId)
             }
+            val wasEmpty = tasks.isEmpty()
             val token = Any()
             tasks[token] = ActiveAgentTask(
                 source = source,
@@ -40,6 +45,9 @@ class InMemoryAgentRuntimeGate @Inject constructor() : AgentRuntimeGate {
                 phase = phase,
             )
             publishState()
+            if (wasEmpty) {
+                AgentExecutionService.start(context)
+            }
             Lease(token)
         }
     }
@@ -75,7 +83,12 @@ class InMemoryAgentRuntimeGate @Inject constructor() : AgentRuntimeGate {
 
         override fun release() {
             synchronized(tasks) {
-                if (tasks.remove(token) != null) publishState()
+                if (tasks.remove(token) != null) {
+                    publishState()
+                    if (tasks.isEmpty()) {
+                        AgentExecutionService.stop(context)
+                    }
+                }
             }
         }
     }

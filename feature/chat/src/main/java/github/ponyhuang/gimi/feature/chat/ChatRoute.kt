@@ -75,6 +75,7 @@ fun ChatRoute(
     val scope = rememberCoroutineScope()
 
     LifecycleResumeEffect(viewModel) {
+        viewModel.onAction(ChatAction.ResumeChat)
         onPauseOrDispose {
             viewModel.onAction(ChatAction.LeaveChat)
         }

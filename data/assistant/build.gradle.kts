@@ -8,6 +8,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:notifications"))
     implementation(project(":domain:assistant"))
     implementation(project(":domain:conversation"))
     implementation(libs.androidx.core.ktx)

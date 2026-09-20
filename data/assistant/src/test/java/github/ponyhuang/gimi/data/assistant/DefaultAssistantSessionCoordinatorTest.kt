@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.data.assistant
 
+import github.ponyhuang.gimi.core.notifications.AppNotificationManager
 import github.ponyhuang.gimi.domain.assistant.model.AssistantInvocationSource
 import github.ponyhuang.gimi.domain.assistant.model.AssistantMessageAuthor
 import github.ponyhuang.gimi.domain.assistant.model.AssistantPresentationEvent
@@ -78,6 +79,7 @@ class DefaultAssistantSessionCoordinatorTest {
             runtimeGate = gate,
             sessionResolver = sessionResolver,
             toolApproval = toolApproval,
+            appNotificationManager = mockk<AppNotificationManager>(relaxed = true),
         )
     }
 

@@ -205,8 +205,9 @@ fun ChatScaffold(
 
     LaunchedEffect(
         renderedItemCount,
+        state.scrollToLatestRequest,
         pendingToolConfirmation?.confirmationCallId,
-        pendingInputRequest?.callId
+        pendingInputRequest?.callId,
     ) {
         if (state.getCurrentUserMessage() != null) {
             delay(100.milliseconds)

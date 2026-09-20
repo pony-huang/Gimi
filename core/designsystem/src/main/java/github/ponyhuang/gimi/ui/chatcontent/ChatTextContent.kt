@@ -50,8 +50,8 @@ import kotlinx.coroutines.channels.ReceiveChannel
  * - **静态路径**：[chunkChannel] 为空且 [partial] 为 false 时
  *   `Markdown(content = text)`，首帧立即可见（用户消息 / 历史回放 / 已完成消息）。
  *
- * 一旦本 Composable 消费过任意增量（channel 或桥接），即使增量来源随后消失，也继续用
- * streaming state 渲染，避免切回静态路径触发整段 markdown 重 parse / 重布局导致气泡闪烁。
+ * 在同一轮流式输出中，即使增量来源暂时消失，也继续用 streaming state 渲染；当 channel
+ * 被重新播种时，外层 key 会重建状态并回到权威全文。正常完成只更新消息文本，不重建渲染状态。
  *
  * ## Channel 关闭 / 协程取消的契约
  *
@@ -75,7 +75,10 @@ fun ChatTextContent(
 ) {
     // 桥接路径遇到非前缀覆盖时递增，重建内部流式状态（StreamingMarkdownState 只能 append）。
     var bridgeEpoch by remember { mutableIntStateOf(0) }
-    key(bridgeEpoch) {
+    // A new channel means the producer reseeded the stream (for example after returning from
+    // background). Reset only for a channel replacement so ordinary stream completion can keep
+    // its current markdown state without a visible re-parse flash.
+    key(bridgeEpoch, chunkChannel) {
         ChatTextContentBody(
             text = text,
             partial = partial,
@@ -137,10 +140,8 @@ private fun ChatTextContentBody(
     // - 本 Composition 内曾消费过增量（channel 或桥接）：走 streaming 路径
     // - 其它（用户消息 / 历史回放 / 滚回已完成消息）：走静态路径
     //
-    // 关键边界：用户滚离再滚回已完成消息时，LazyColumn 重新 Composition，
-    // 本地 `streamingState` 和 `streamedAnyChunk` 被重置；但 `chunkChannel` 引用仍在，
-    // 仅用 `chunkChannel != null || streamedAnyChunk` 会用空 state 渲染导致气泡只剩壳。
-    // `partial` 是消息级稳定信号，用它做 gating 能正确落到静态路径 + text。
+    // channel 被重新播种时，外层 key 已重置本地状态；后台恢复后的完整消息因此使用
+    // 权威全文，避免旧的 streaming state 覆盖完整回复。
     val useStreamingState = (partial && chunkChannel != null) || streamedAnyChunk
 
     val contentModifier = if (fillAvailableWidth) modifier.fillMaxWidth() else modifier

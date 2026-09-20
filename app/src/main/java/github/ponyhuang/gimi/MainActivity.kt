@@ -14,6 +14,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import github.ponyhuang.gimi.navigation.MainScreen
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.appearance.ThemeMode
+import github.ponyhuang.gimi.core.notifications.AppNotificationManager
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
 import github.ponyhuang.gimi.feature.chat.sharedImageUris
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
@@ -28,9 +29,16 @@ class MainActivity : ComponentActivity() {
     lateinit var assistantSessionCoordinator: AssistantSessionCoordinator
     @Inject
     lateinit var assistantPanelInteractor: AssistantPanelInteractor
+    @Inject
+    lateinit var appNotificationManager: AppNotificationManager
 
     private val sharedMediaUris = mutableStateOf<List<Uri>>(emptyList())
     private val openChatRequest = mutableStateOf(0)
+
+    override fun onStart() {
+        super.onStart()
+        appNotificationManager.cancelPendingInteractionNotifications()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

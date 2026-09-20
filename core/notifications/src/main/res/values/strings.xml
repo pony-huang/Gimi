@@ -1,0 +1,16 @@
+<resources>
+    <string name="notification_channel_name">任务通知</string>
+    <string name="notification_channel_description">任务完成和需要用户操作时的通知</string>
+    <string name="notification_task_completed_title">任务已完成</string>
+    <string name="notification_task_completed_text">助手已完成任务</string>
+    <string name="notification_tool_execution_title">正在执行工具</string>
+    <string name="notification_tool_execution_text">助手正在执行工具</string>
+    <string name="notification_tool_execution_tool_text">助手正在执行：%1$s</string>
+    <string name="notification_confirmation_title">需要确认</string>
+    <string name="notification_confirmation_text">助手正在等待你的确认</string>
+    <string name="notification_confirmation_tool_text">助手正在等待确认：%1$s</string>
+    <string name="notification_input_title">需要输入</string>
+    <string name="notification_input_text">助手正在等待你的输入</string>
+    <string name="notification_choice_title">需要选择</string>
+    <string name="notification_choice_text">助手正在等待你的选择</string>
+</resources>

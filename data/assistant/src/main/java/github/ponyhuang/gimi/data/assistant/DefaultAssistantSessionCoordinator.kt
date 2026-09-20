@@ -10,10 +10,12 @@ import github.ponyhuang.gimi.domain.assistant.model.appendUserMessage
 import github.ponyhuang.gimi.domain.assistant.model.applyPresentationEvent
 import github.ponyhuang.gimi.domain.assistant.model.failLastAssistantMessage
 import github.ponyhuang.gimi.domain.assistant.model.updateLastAssistantMessage
+import github.ponyhuang.gimi.core.notifications.AppNotificationManager
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantConfirmationHandler
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSubmissionResult
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
+import github.ponyhuang.gimi.domain.conversation.model.UserInputKind
 import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
@@ -57,6 +59,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     private val runtimeGate: AgentRuntimeGate,
     private val sessionResolver: ConversationSessionResolver,
     private val toolApproval: ToolApprovalRepository,
+    private val appNotificationManager: AppNotificationManager,
 ) : AssistantSessionCoordinator {
 
     /** 测试可替换的任务调度器；必须在首次提交前设置。 */
@@ -225,6 +228,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                 run.pendingInputRequest?.let { return finishAwaitingInput(it) }
             }
             conversations.refreshConversation(sessionId)
+            appNotificationManager.notifyTaskCompleted()
             _state.update {
                 it.copy(
                     phase = AssistantSessionPhase.FOLLOW_UP_IDLE,
@@ -237,6 +241,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                 responseText = run.responseText(),
             )
         } catch (cancelled: CancellationException) {
+            appNotificationManager.cancelPendingInteractionNotifications()
             _state.update {
                 if (it.phase == AssistantSessionPhase.STOPPED) {
                     it.copy(taskActive = false, pendingConfirmation = null)
@@ -272,6 +277,9 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     /** 收集一轮事件流：归并回答文本、推导工具阶段、提取确认请求。 */
     private suspend fun collectTurn(events: Flow<ChatRunEvent>, run: TaskRun) {
         events.collect { event ->
+            event.functionCalls
+                .firstOrNull { it.confirmationRequest == null }
+                ?.let { appNotificationManager.notifyToolExecution(it.name) }
             if (run.error != null) return@collect
             event.errorMessage?.let { run.error = it; return@collect }
             event.errorCode?.let { run.error = it; return@collect }
@@ -326,6 +334,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                 pendingConfirmation = presented,
             )
         }
+        appNotificationManager.notifyToolConfirmation(request.toolName)
         if (handler != null) return handler.confirm(presented)
         val deferred = CompletableDeferred<Boolean>()
         confirmationResponse = PendingConfirmationResponse(
@@ -345,6 +354,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     }
 
     private fun finishFailed(message: String): AssistantSubmissionResult {
+        appNotificationManager.cancelPendingInteractionNotifications()
         _state.update {
             it.copy(
                 phase = AssistantSessionPhase.ERROR,
@@ -357,6 +367,12 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     }
 
     private fun finishAwaitingInput(request: UserInputRequest): AssistantSubmissionResult {
+        when (request.kind) {
+            UserInputKind.CHOICE ->
+                appNotificationManager.notifyChoice()
+            github.ponyhuang.gimi.domain.conversation.model.UserInputKind.FREE_TEXT ->
+                appNotificationManager.notifyTextInput()
+        }
         val message = request.message.ifBlank { "需要你的输入。" }
         _state.update {
             it.copy(

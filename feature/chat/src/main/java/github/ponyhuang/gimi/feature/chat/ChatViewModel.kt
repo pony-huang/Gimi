@@ -27,7 +27,9 @@ import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskSource
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
+import github.ponyhuang.gimi.domain.conversation.model.UserInputKind
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
+import github.ponyhuang.gimi.core.notifications.AppNotificationManager
 import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
@@ -97,6 +99,7 @@ class ChatViewModel @Inject constructor(
     private val prepareChatTurn: PrepareChatTurnUseCase,
     private val officialFunctionCatalog: OfficialToolFunctionCatalog,
     private val memoryRuntimeStatus: MemoryRuntimeStatus,
+    private val appNotificationManager: AppNotificationManager,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -536,6 +539,7 @@ class ChatViewModel @Inject constructor(
             // 有用户卡片在等决策时先不排空自动放行队列，保持"用户答复优先"的旧顺序。
             pending != null -> {
                 runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
+                appNotificationManager.notifyToolConfirmation(pending.toolName)
                 publishRuntime(runtime)
             }
             // 自动放行通道：不弹卡片，run 流暂停后静默回复 ADK confirmed=true。
@@ -549,6 +553,10 @@ class ChatViewModel @Inject constructor(
             pendingInput != null -> {
                 runtime.phase = AgentTaskPhase.WAITING_FOR_INPUT
                 runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_INPUT)
+                when (pendingInput.kind) {
+                    UserInputKind.CHOICE -> appNotificationManager.notifyChoice()
+                    UserInputKind.FREE_TEXT -> appNotificationManager.notifyTextInput()
+                }
                 publishRuntime(runtime)
             }
             else -> {
@@ -560,6 +568,10 @@ class ChatViewModel @Inject constructor(
                     runtime.lastTurn = null
                 }
                 runtime.approvedToolsThisTurn.clear()
+                appNotificationManager.cancelPendingInteractionNotifications()
+                if (completedNormally && !runtime.failed) {
+                    appNotificationManager.notifyTaskCompleted()
+                }
                 releaseRunLease(runtime)
                 if (_uiState.value.sessionId != sessionId) {
                     runtime.attention = when {
@@ -819,7 +831,12 @@ class ChatViewModel @Inject constructor(
                     text = turn.userMessage.textParts.joinToString("") { it.text },
                     fileAttachments = turn.userMessage.fileAttachments,
                     rewindBeforeInvocationId = turn.rewindBeforeInvocationId,
-                ).collect { event -> eventReducer.applyEvent(sessionId, event, runToken) }
+                ).collect { event ->
+                    event.functionCalls
+                        .firstOrNull { it.confirmationRequest == null }
+                        ?.let { appNotificationManager.notifyToolExecution(it.name) }
+                    eventReducer.applyEvent(sessionId, event, runToken)
+                }
             } finally {
                 submission.complete(ChatSubmissionResult.REJECTED)
                 if (submission.result == ChatSubmissionResult.ACCEPTED) {
@@ -942,7 +959,14 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    /** 返回/恢复聊天界面；若当前会话仍在后台执行，重设流式 channel 保证 UI 能继续无缝消费增量。 */
+    /**
+     * 返回/恢复聊天界面。
+     *
+     * 活跃任务只重设流式 channel，避免重新读取历史打断正在生成的会话；后台已完成的
+     * 任务则重新读取一次完整历史。Activity 在后台期间可能没有持续消费 Compose 的
+     * streaming state，直接沿用旧 channel 会留下截断的 Markdown 文本，重新切换会话之所以
+     * 能修复正是因为它走了这条历史读取路径。
+     */
     private fun resumeChat() {
         val sessionId = _uiState.value.sessionId
         if (sessionId.isBlank()) return
@@ -950,6 +974,25 @@ class ChatViewModel @Inject constructor(
         if (runtime.isActive) {
             runtime.reseedPartialChannels()
             publishRuntime(runtime)
+            return
+        }
+
+        viewModelScope.launch {
+            val messages = repository.loadMessages(sessionId)
+                ?.takeIf { it.isNotEmpty() || runtime.messages.isEmpty() }
+                ?: return@launch
+            if (_uiState.value.sessionId != sessionId || runtime.isActive) return@launch
+            runtime.closePartChannels()
+            runtime.messages = messages
+            runtime.isLoaded = true
+            publishRuntime(runtime)
+            _uiState.update { state ->
+                if (state.sessionId == sessionId) {
+                    state.copy(scrollToLatestRequest = state.scrollToLatestRequest + 1L)
+                } else {
+                    state
+                }
+            }
         }
     }
 

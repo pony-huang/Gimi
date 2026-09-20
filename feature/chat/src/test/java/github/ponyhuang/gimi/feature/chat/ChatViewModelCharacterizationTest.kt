@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.feature.chat
 import android.util.Log
 import app.cash.turbine.test
 import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
+import github.ponyhuang.gimi.core.notifications.AppNotificationManager
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunPart
@@ -560,6 +561,33 @@ class ChatViewModelCharacterizationTest {
         val channel = fixture.viewModel.partChannelFor("part-1")
         org.junit.Assert.assertNotNull(channel)
         assertEquals("hello background", channel?.tryReceive()?.getOrNull())
+    }
+
+    @Test
+    fun resumeChatReloadsPersistedMessagesAfterBackgroundCompletion() = runTest {
+        val persisted = Message(
+            id = "complete-message",
+            author = "Assistant",
+            role = MessageRole.Assistant,
+            textParts = listOf(TextPart(id = "complete-part", text = "完整的后台回复")),
+            partial = false,
+        )
+        val fixture = fixture(configured = true)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+
+        val sessionId = fixture.viewModel.uiState.value.sessionId
+        val runtime = fixture.viewModel.runtimeFor(sessionId)
+        runtime.isAgentRunning = false
+        runtime.messages = listOf(persisted.copy(textParts = listOf(
+            TextPart(id = "stale-part", text = "截断的后台回复"),
+        )))
+        coEvery { fixture.conversations.loadMessages(sessionId) } returns listOf(persisted)
+
+        fixture.viewModel.onAction(ChatAction.ResumeChat)
+        advanceUntilIdle()
+
+        assertEquals(listOf(persisted), fixture.viewModel.uiState.value.messages)
     }
 
     @Test
@@ -1551,6 +1579,7 @@ class ChatViewModelCharacterizationTest {
                 memoryRuntimeStatus = mockk<MemoryRuntimeStatus>(relaxed = true) {
                     every { failures } returns memoryFailures
                 },
+                appNotificationManager = mockk<AppNotificationManager>(relaxed = true),
             ),
             conversations = conversations,
             sessionResolver = sessionResolver,

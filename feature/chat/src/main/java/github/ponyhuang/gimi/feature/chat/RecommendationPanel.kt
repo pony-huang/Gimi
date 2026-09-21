@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Create
@@ -34,18 +33,21 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.LocalUserBubbleColors
 
 /**
- * 空会话中的全局推荐列表，每项都是可直接发起任务的药丸按钮。
+ * 空会话中的全局推荐列表：单列右对齐的紧凑小气泡，点击即把 prompt 作为用户消息发出。
  *
- * 面板本身不带内边距：横向内缩由调用方给出（跟随胶囊的收放动画对齐边缘），
+ * 条目与 ChatMessageBubble 的 USER 气泡同构（LocalUserBubbleColors + shapes.large +
+ * 320dp 宽度上限），用"发出这条消息"的视觉语义替代旧版满宽大药丸。
+ *
+ * 面板本身不带外边距：横向内缩由调用方给出（跟随胶囊的收放动画对齐边缘），
  * 纵向留白由列表的 contentPadding 负责，这样面板可以贴着输入胶囊向上堆叠。
  */
 @Composable
@@ -55,17 +57,16 @@ internal fun RecommendationPanel(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp), // 与 ChatMessageBubble 用户气泡的横向内缩对齐
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
             text = stringResource(R.string.chat_recommendations_title),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier
-                .widthIn(max = 600.dp)
-                .fillMaxWidth(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         recommendations.forEach { recommendation ->
             RecommendationAction(
@@ -82,7 +83,7 @@ private fun RecommendationAction(
     recommendation: AgentRecommendation,
     onClick: () -> Unit,
 ) {
-    // 卡片正文截断到两行，长按弹浮层补全。TooltipBox 在 PointerEventPass.Initial
+    // 气泡正文截断到两行，长按弹浮层补全。TooltipBox 在 PointerEventPass.Initial
     // 里消费长按事件，抬手不会连带触发按钮的点击发送。
     TooltipBox(
         positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
@@ -96,31 +97,28 @@ private fun RecommendationAction(
             }
         },
         state = rememberTooltipState(isPersistent = true),
-        modifier = Modifier
-            .widthIn(max = 600.dp)
-            .fillMaxWidth(),
+        modifier = Modifier.widthIn(max = 320.dp),
     ) {
-        // 手搓药丸而不用 ExtendedFloatingActionButton：后者锁死 56dp 高和 20dp 内边距，
-        // 六张卡片叠起来太占版面。这里只保留它的配色与圆角。
+        // 与用户消息气泡同构的紧凑右对齐小气泡：宽度随文字收缩而非铺满一行，
+        // 配色/圆角直接复用 LocalUserBubbleColors + shapes.large，保证"点击即发送"的语义一致。
         Surface(
             onClick = onClick,
             modifier = Modifier
-                .fillMaxWidth()
                 .semantics { contentDescription = recommendation.prompt }
                 .testTag("recommendation-${recommendation.id}"),
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            shape = MaterialTheme.shapes.large,
+            color = LocalUserBubbleColors.current.container,
+            contentColor = LocalUserBubbleColors.current.onContainer,
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
                     imageVector = recommendation.category.icon,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(14.dp),
                 )
                 Text(
                     text = recommendation.prompt,
@@ -144,7 +142,7 @@ private val RecommendationCategory.icon: ImageVector
         RecommendationCategory.GENERAL -> Icons.Default.AutoAwesome
     }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, widthDp = 360)
 @Composable
 private fun RecommendationPanelPreview() {
     AsssistantaiTheme {
@@ -152,17 +150,17 @@ private fun RecommendationPanelPreview() {
             recommendations = listOf(
                 AgentRecommendation(
                     id = "rec-1",
-                    prompt = "帮我总结这篇文档的核心要点",
-                    category = RecommendationCategory.REASONING,
+                    prompt = "查询今晚上海的天气情况",
+                    category = RecommendationCategory.DEVICE,
                 ),
                 AgentRecommendation(
                     id = "rec-2",
-                    prompt = "分析这张截图里的报错信息",
-                    category = RecommendationCategory.VISION,
+                    prompt = "帮我规划从当前位置到上海虹桥火车站的驾车路线",
+                    category = RecommendationCategory.RESEARCH,
                 ),
                 AgentRecommendation(
                     id = "rec-3",
-                    prompt = "把会议记录整理成待办事项清单",
+                    prompt = "把这份会议记录整理成按负责人分组的待办事项清单并标注优先级",
                     category = RecommendationCategory.PRODUCTIVITY,
                 ),
             ),

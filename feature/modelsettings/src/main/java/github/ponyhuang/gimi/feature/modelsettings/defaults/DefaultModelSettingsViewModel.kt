@@ -10,14 +10,19 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.DefaultModelSettings
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.UpdateDefaultModelSettingsUseCase
+import github.ponyhuang.gimi.domain.speech.model.TtsVoice
 import github.ponyhuang.gimi.domain.speech.model.TtsVoiceCatalog
+import github.ponyhuang.gimi.domain.speech.repository.TtsVoiceRepository
 import github.ponyhuang.gimi.feature.modelsettings.R
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -26,18 +31,51 @@ class DefaultModelSettingsViewModel @Inject constructor(
     observeSettings: ObserveDefaultModelSettingsUseCase,
     private val updateSettings: UpdateDefaultModelSettingsUseCase,
     private val runWhenAgentIdle: RunWhenAgentIdleUseCase,
+    private val ttsVoiceRepository: TtsVoiceRepository,
 ) : ViewModel() {
     private val dialog = MutableStateFlow<DefaultModelDialog?>(null)
+    private val ttsVoiceOptions = MutableStateFlow<List<TtsVoice>>(emptyList())
+    private val isTtsVoiceLoading = MutableStateFlow(false)
 
     // 缓冲若干条一次性反馈，避免 Route 尚未开始收集时丢失。
     private val _effects = MutableSharedFlow<DefaultModelSettingsEffect>(extraBufferCapacity = 8)
     val effects = _effects.asSharedFlow()
 
-    val uiState = combine(observeSettings(), dialog, runWhenAgentIdle.state) {
-            settings, currentDialog, runtimeState ->
+    init {
+        viewModelScope.launch {
+            observeSettings()
+                .map { it.ttsSelection?.serviceId }
+                .distinctUntilChanged()
+                .collectLatest { serviceId ->
+                    if (serviceId == null) {
+                        ttsVoiceOptions.value = emptyList()
+                        return@collectLatest
+                    }
+                    isTtsVoiceLoading.value = true
+                    try {
+                        val voices = ttsVoiceRepository.getVoices(serviceId)
+                        ttsVoiceOptions.value = voices
+                    } catch (_: Exception) {
+                        // 出错由 Repository / Provider 内部降级，若仍然异常则置空由兜底策略生效
+                    } finally {
+                        isTtsVoiceLoading.value = false
+                    }
+                }
+        }
+    }
+
+    val uiState = combine(
+        observeSettings(),
+        dialog,
+        runWhenAgentIdle.state,
+        ttsVoiceOptions,
+        isTtsVoiceLoading,
+    ) { settings, currentDialog, runtimeState, voices, loading ->
         settings.toUiState(
             dialog = currentDialog,
             isMutationBlocked = runtimeState.isBusy,
+            ttsVoiceOptions = voices.ifEmpty { TtsVoiceCatalog.forService(settings.ttsSelection?.serviceId) },
+            isTtsVoiceLoading = loading,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -95,6 +133,8 @@ class DefaultModelSettingsViewModel @Inject constructor(
 private fun DefaultModelSettings.toUiState(
     dialog: DefaultModelDialog?,
     isMutationBlocked: Boolean,
+    ttsVoiceOptions: List<TtsVoice>,
+    isTtsVoiceLoading: Boolean,
 ): DefaultModelSettingsUiState {
     val configuredServices = services.filter { it.isEnabled && it.apiKey.isNotBlank() }
     return DefaultModelSettingsUiState(
@@ -103,7 +143,8 @@ private fun DefaultModelSettings.toUiState(
         speechSelection = speechSelection,
         ttsSelection = ttsSelection,
         ttsVoiceId = ttsVoiceId,
-        ttsVoiceOptions = TtsVoiceCatalog.forService(ttsSelection?.serviceId),
+        ttsVoiceOptions = ttsVoiceOptions,
+        isTtsVoiceLoading = isTtsVoiceLoading,
         chatModels = configuredServices.rows { !it.isStt && !it.isTts },
         speechModels = configuredServices.rows { it.isStt },
         ttsModels = configuredServices.rows { it.isTts },

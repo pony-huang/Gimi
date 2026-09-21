@@ -167,7 +167,11 @@ fun DefaultModelSettingsScreen(
             key = TtsVoice::id,
             title = stringResource(R.string.modelsettings_dialog_pick_voice),
             optionTitle = TtsVoice::name,
-            optionSubtitle = { listOfNotNull(it.language, it.gender).joinToString(" · ") },
+            optionSubtitle = {
+                listOfNotNull(it.description, it.language, it.gender)
+                    .filter { text -> text.isNotBlank() }
+                    .joinToString(" · ")
+            },
             emptyText = stringResource(R.string.modelsettings_dialog_no_voices),
             onPick = { onAction(DefaultModelSettingsAction.SelectVoice(it.id)) },
             onDismiss = { onAction(DefaultModelSettingsAction.DismissDialog) },

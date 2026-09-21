@@ -1,9 +1,28 @@
 package github.ponyhuang.gimi.domain.speech.repository
 
 import github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState
+import github.ponyhuang.gimi.domain.speech.model.TtsVoice
+import github.ponyhuang.gimi.domain.speech.model.TtsVoiceContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+
+interface TtsVoiceProvider {
+    val serviceId: String
+
+    /**
+     * 获取指定厂商的模型音色列表。
+     * 可实现为本地静态列表、远程 API 动态拉取，或结合本地数据做兜底。
+     */
+    suspend fun getVoices(context: TtsVoiceContext): List<TtsVoice>
+}
+
+interface TtsVoiceRepository {
+    /**
+     * 获取指定厂商的模型音色列表（由仓储统一装配当前服务商的配置并路由到对应的 Provider）。
+     */
+    suspend fun getVoices(serviceId: String): List<TtsVoice>
+}
 
 interface SpeechRecognitionRepository {
     val availability: Flow<Boolean>

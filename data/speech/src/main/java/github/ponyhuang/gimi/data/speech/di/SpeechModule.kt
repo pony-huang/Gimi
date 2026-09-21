@@ -6,18 +6,24 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dagger.multibindings.IntoSet
 import github.ponyhuang.gimi.data.speech.playback.AndroidSpeechPlaybackRepository
 import github.ponyhuang.gimi.data.speech.remote.MiMoSpeechSynthesisGateway
+import github.ponyhuang.gimi.data.speech.remote.MiMoVoiceProvider
 import github.ponyhuang.gimi.data.speech.remote.MinimaxTtsGateway
+import github.ponyhuang.gimi.data.speech.remote.MinimaxVoiceProvider
 import github.ponyhuang.gimi.data.speech.remote.OpenAiCompatibleSpeechRecognitionGateway
 import github.ponyhuang.gimi.data.speech.remote.SpeechRecognitionGateway
 import github.ponyhuang.gimi.data.speech.repository.DefaultSpeechRecognitionRepository
 import github.ponyhuang.gimi.data.speech.repository.DefaultSpeechSynthesisRepository
+import github.ponyhuang.gimi.data.speech.repository.DefaultTtsVoiceRepository
 import github.ponyhuang.gimi.data.speech.repository.SpeechSettingsPreferences
 import github.ponyhuang.gimi.domain.speech.repository.SpeechPlaybackRepository
 import github.ponyhuang.gimi.domain.speech.repository.SpeechRecognitionRepository
 import github.ponyhuang.gimi.domain.speech.repository.SpeechSettingsRepository
 import github.ponyhuang.gimi.domain.speech.repository.SpeechSynthesisRepository
+import github.ponyhuang.gimi.domain.speech.repository.TtsVoiceProvider
+import github.ponyhuang.gimi.domain.speech.repository.TtsVoiceRepository
 import javax.inject.Singleton
 import okhttp3.OkHttpClient
 
@@ -49,7 +55,25 @@ abstract class SpeechModule {
         implementation: SpeechSettingsPreferences,
     ): SpeechSettingsRepository
 
+    @Binds
+    @Singleton
+    abstract fun bindTtsVoiceRepository(
+        implementation: DefaultTtsVoiceRepository,
+    ): TtsVoiceRepository
+
+    @Binds
+    @IntoSet
+    abstract fun bindMiMoVoiceProvider(
+        implementation: MiMoVoiceProvider,
+    ): TtsVoiceProvider
+
     companion object {
+        @Provides
+        @Singleton
+        @IntoSet
+        fun provideMinimaxVoiceProvider(
+            okHttpClient: OkHttpClient,
+        ): TtsVoiceProvider = MinimaxVoiceProvider(okHttpClient)
         @Provides
         @Singleton
         fun provideSpeechRecognitionGateway(

@@ -12,6 +12,13 @@ data class TtsVoice(
     val name: String,
     val language: String?,
     val gender: String?,
+    val description: String? = null,
+)
+
+data class TtsVoiceContext(
+    val serviceId: String,
+    val apiKey: String = "",
+    val baseUrl: String = "",
 )
 
 object MiMoTtsVoices {

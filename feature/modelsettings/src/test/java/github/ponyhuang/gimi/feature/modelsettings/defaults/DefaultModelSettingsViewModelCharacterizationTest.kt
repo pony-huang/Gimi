@@ -12,6 +12,9 @@ import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogReposito
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.UpdateDefaultModelSettingsUseCase
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
+import github.ponyhuang.gimi.domain.speech.model.TtsVoice
+import github.ponyhuang.gimi.domain.speech.repository.TtsVoiceRepository
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -99,10 +102,41 @@ class DefaultModelSettingsViewModelCharacterizationTest {
         verify(exactly = 0) { repository.selectTtsVoice(any()) }
     }
 
-    private fun viewModel(repository: ModelCatalogRepository) = DefaultModelSettingsViewModel(
+    @Test
+    fun ttsVoiceOptionsAreLoadedFromRepository() = runTest {
+        val customVoices = listOf(
+            TtsVoice(id = "custom_voice_1", name = "Custom Voice 1", language = "中文", gender = "女声", description = "测试音色"),
+        )
+        val ttsVoiceRepository: TtsVoiceRepository = mockk {
+            coEvery { getVoices("service") } returns customVoices
+        }
+        val repository = repository(
+            ttsSelection = ModelSelection("service", "group", "tts"),
+        )
+        val viewModel = viewModel(repository, ttsVoiceRepository)
+
+        viewModel.uiState.test {
+            awaitItem()
+            var state = awaitItem()
+            while (state.ttsVoiceOptions.none { it.id == "custom_voice_1" }) {
+                state = awaitItem()
+            }
+            assertEquals("custom_voice_1", state.ttsVoiceOptions.first().id)
+            assertEquals("测试音色", state.ttsVoiceOptions.first().description)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    private fun viewModel(
+        repository: ModelCatalogRepository,
+        ttsVoiceRepository: TtsVoiceRepository = mockk {
+            coEvery { getVoices(any()) } returns emptyList()
+        },
+    ) = DefaultModelSettingsViewModel(
         observeSettings = ObserveDefaultModelSettingsUseCase(repository),
         updateSettings = UpdateDefaultModelSettingsUseCase(repository),
         runWhenAgentIdle = RunWhenAgentIdleUseCase(FakeAgentRuntimeGate()),
+        ttsVoiceRepository = ttsVoiceRepository,
     )
 
     private suspend fun DefaultModelSettingsViewModel.awaitUiStateReady() {

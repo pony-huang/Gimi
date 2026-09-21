@@ -22,6 +22,7 @@ data class DefaultModelSettingsUiState(
     val ttsSelection: ModelSelection? = null,
     val ttsVoiceId: String = "",
     val ttsVoiceOptions: List<TtsVoice> = emptyList(),
+    val isTtsVoiceLoading: Boolean = false,
     val chatModels: List<SelectableModelRow> = emptyList(),
     val speechModels: List<SelectableModelRow> = emptyList(),
     val ttsModels: List<SelectableModelRow> = emptyList(),

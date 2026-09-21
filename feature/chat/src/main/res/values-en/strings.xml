@@ -69,6 +69,7 @@
     <string name="chat_theme_dark">Dark</string>
     <string name="chat_tool_confirmation_title">Allow running this tool?</string>
     <string name="chat_tool_get_user_choice">Ask user to choose</string>
+    <string name="chat_tool_search_on_demand">Search tools on demand</string>
     <string name="chat_action_reject">Reject</string>
     <string name="chat_action_allow">Allow</string>
     <string name="chat_action_always_allow">Always allow</string>

@@ -54,7 +54,7 @@ class TurnTimelineTest {
     }
 
     @Test
-    fun `thought tool and file results become timeline entries while protocols stay hidden`() {
+    fun `thought tool and file results become timeline entries while only confirmation stays hidden`() {
         val fileResult = localFileResult("plan.md")
         val assistant = assistantMessage(
             id = "assistant",
@@ -66,7 +66,7 @@ class TurnTimelineTest {
             functionCalls = listOf(
                 FunctionCallView("call-1", "search_documents", "(query=计划)"),
                 FunctionCallView("protocol-1", ConfirmationToolName, ""),
-                FunctionCallView("protocol-2", ToolSearchProtocolName, ""),
+                FunctionCallView("protocol-2", ToolSearchProtocolName, "(query=项目计划)"),
             ),
             functionResponses = listOf(
                 FunctionResponseView("call-1", "search_documents", fileResult),
@@ -80,12 +80,18 @@ class TurnTimelineTest {
         )
         val timeline = (items[1] as ChatListItem.AssistantTurn).timeline
 
-        assertEquals(3, timeline.entries.size)
+        // 按需加载的检索调用是与业务工具同级的用户可见活动；确认信令只是握手，继续隐藏。
+        assertEquals(4, timeline.entries.size)
         assertEquals("thought", (timeline.entries[0] as TimelineEntry.Thought).partId)
         val tool = timeline.entries[1] as TimelineEntry.ToolCall
         assertEquals("call-1", tool.callId)
         assertEquals(ToolCallStatus.Completed, tool.status)
-        assertEquals(fileResult, (timeline.entries[2] as TimelineEntry.FileResults).response.localFileSearchResult)
+        val search = timeline.entries[2] as TimelineEntry.ToolCall
+        assertEquals(ToolSearchProtocolName, search.name)
+        assertEquals("(query=项目计划)", search.argsSummary)
+        assertEquals(ToolCallStatus.Completed, search.status)
+        assertEquals(fileResult, (timeline.entries[3] as TimelineEntry.FileResults).response.localFileSearchResult)
+        assertFalse(timeline.entries.any { it is TimelineEntry.ToolCall && it.name == ConfirmationToolName })
         assertEquals(listOf("assistant"), timeline.answerMessages.map { it.id })
     }
 

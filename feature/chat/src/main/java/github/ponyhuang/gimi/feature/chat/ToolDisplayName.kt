@@ -11,5 +11,6 @@ private val McpNamePrefix = Regex("^mcp_[A-Za-z0-9_-]{8}_")
 @Composable
 internal fun toolDisplayName(rawName: String): String = when (rawName) {
     GetUserChoiceToolName -> stringResource(R.string.chat_tool_get_user_choice)
+    ToolSearchProtocolName -> stringResource(R.string.chat_tool_search_on_demand)
     else -> rawName.replace(McpNamePrefix, "")
 }

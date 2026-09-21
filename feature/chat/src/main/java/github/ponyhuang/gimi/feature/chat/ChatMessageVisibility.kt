@@ -13,12 +13,19 @@ import github.ponyhuang.gimi.domain.conversation.model.AdkRequestConfirmationToo
 internal const val ConfirmationToolName = AdkRequestConfirmationToolName
 
 /**
- * 动态工具检索的内部工具名。检索调用和响应必须保留在 ADK session 中恢复声明选择，
- * 但不属于面向用户的工具执行活动，因此聊天界面不渲染它。
+ * 动态工具检索的内部工具名。它既是 ADK 协议信令（检索结果决定后续声明注入），
+ * 也是用户看得见的 Agent 活动，因此时间线照常渲染，仅由 [toolDisplayName]
+ * 换成本地化展示名。
  */
 internal const val ToolSearchProtocolName = "tool_search"
 
-private val HiddenProtocolToolNames = setOf(ConfirmationToolName, ToolSearchProtocolName)
+/**
+ * 只用于协议握手、不该作为工具活动呈现的内部名。
+ *
+ * `tool_search` 曾在此列，导致按需加载模式下用户看不到"检索工具"这一步；
+ * 它现在与业务工具同样呈现，只剩确认信令继续隐藏。
+ */
+private val HiddenProtocolToolNames = setOf(ConfirmationToolName)
 
 /** 过滤掉内部协议信令后的工具调用列表。 */
 internal fun Message.visibleFunctionCalls(): List<FunctionCallView> =

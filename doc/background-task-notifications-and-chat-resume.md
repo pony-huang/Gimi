@@ -306,6 +306,12 @@ When modifying this feature:
 - **Root cause:** Background restoration behavior was applied to ordinary completion: Markdown state was recreated on `partial` changes and the complete message list triggered an extra scroll effect.
 - **Guard:** Key streaming state by channel identity only, keep normal completion on the existing channel, and reserve explicit restoration scrolling for `scrollToLatestRequest`.
 
+### 2026-09-21 — Concurrent background sessions restored stale rendering
+
+- **Symptom:** Two background chat tasks completed, but only one completion notification remained; opening the first session showed a truncated response until another navigation event.
+- **Root cause:** All completion notifications shared one Android notification identity, while an inactive cached conversation could reuse old Compose/Markdown state instead of reloading authoritative history at the session boundary.
+- **Guard:** Tag task notifications by session, cancel only the completing task's interaction notification, reload inactive sessions before publishing them, and include the session id in LazyColumn item keys.
+
 ## Future entries
 
 Add new entries here using this format:

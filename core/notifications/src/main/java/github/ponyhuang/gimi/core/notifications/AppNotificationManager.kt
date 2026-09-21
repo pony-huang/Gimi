@@ -7,15 +7,15 @@ package github.ponyhuang.gimi.core.notifications
  * notification permission or app notifications.
  */
 interface AppNotificationManager {
-    fun notifyTaskCompleted()
+    fun notifyTaskCompleted(taskId: String? = null)
 
-    fun notifyToolExecution(toolName: String? = null)
+    fun notifyToolExecution(toolName: String? = null, taskId: String? = null)
 
-    fun notifyToolConfirmation(toolName: String? = null)
+    fun notifyToolConfirmation(toolName: String? = null, taskId: String? = null)
 
-    fun notifyTextInput()
+    fun notifyTextInput(taskId: String? = null)
 
-    fun notifyChoice()
+    fun notifyChoice(taskId: String? = null)
 
-    fun cancelPendingInteractionNotifications()
+    fun cancelPendingInteractionNotifications(taskId: String? = null)
 }

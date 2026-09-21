@@ -539,7 +539,10 @@ class ChatViewModel @Inject constructor(
             // 有用户卡片在等决策时先不排空自动放行队列，保持"用户答复优先"的旧顺序。
             pending != null -> {
                 runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
-                appNotificationManager.notifyToolConfirmation(pending.toolName)
+                appNotificationManager.notifyToolConfirmation(
+                    toolName = pending.toolName,
+                    taskId = sessionId,
+                )
                 publishRuntime(runtime)
             }
             // 自动放行通道：不弹卡片，run 流暂停后静默回复 ADK confirmed=true。
@@ -554,8 +557,8 @@ class ChatViewModel @Inject constructor(
                 runtime.phase = AgentTaskPhase.WAITING_FOR_INPUT
                 runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_INPUT)
                 when (pendingInput.kind) {
-                    UserInputKind.CHOICE -> appNotificationManager.notifyChoice()
-                    UserInputKind.FREE_TEXT -> appNotificationManager.notifyTextInput()
+                    UserInputKind.CHOICE -> appNotificationManager.notifyChoice(sessionId)
+                    UserInputKind.FREE_TEXT -> appNotificationManager.notifyTextInput(sessionId)
                 }
                 publishRuntime(runtime)
             }
@@ -568,9 +571,9 @@ class ChatViewModel @Inject constructor(
                     runtime.lastTurn = null
                 }
                 runtime.approvedToolsThisTurn.clear()
-                appNotificationManager.cancelPendingInteractionNotifications()
+                appNotificationManager.cancelPendingInteractionNotifications(sessionId)
                 if (completedNormally && !runtime.failed) {
-                    appNotificationManager.notifyTaskCompleted()
+                    appNotificationManager.notifyTaskCompleted(sessionId)
                 }
                 releaseRunLease(runtime)
                 if (_uiState.value.sessionId != sessionId) {
@@ -834,7 +837,12 @@ class ChatViewModel @Inject constructor(
                 ).collect { event ->
                     event.functionCalls
                         .firstOrNull { it.confirmationRequest == null }
-                        ?.let { appNotificationManager.notifyToolExecution(it.name) }
+                        ?.let {
+                            appNotificationManager.notifyToolExecution(
+                                toolName = it.name,
+                                taskId = sessionId,
+                            )
+                        }
                     eventReducer.applyEvent(sessionId, event, runToken)
                 }
             } finally {
@@ -1193,9 +1201,11 @@ class ChatViewModel @Inject constructor(
         val loadToken = Any()
         activeSessionLoadToken = loadToken
         loadingSessionId = sessionId
-        // 让 MainScreen 中央 spinner 立刻接管，避免 history commit 之前旧 messages 残留闪烁。
+        // 让 MainScreen 中央 spinner 立刻接管，避免重新读取已结束会话时旧 messages
+        // 残留闪烁；运行中的会话仍直接显示内存流，不能被历史读取打断。
         val targetRuntime = runtimeFor(sessionId)
-        showRuntime(sessionId, isInitializing = !targetRuntime.isLoaded)
+        val requiresHistoryLoad = !targetRuntime.isLoaded || !targetRuntime.isActive
+        showRuntime(sessionId, isInitializing = requiresHistoryLoad)
         val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
                 val snapshot = sessionResolver.activate(sessionId)
@@ -1203,9 +1213,9 @@ class ChatViewModel @Inject constructor(
                 if (activeSessionLoadToken !== loadToken) return@launch
                 targetRuntime.modelSelection = snapshot?.modelSelection
                 targetRuntime.toolConfiguration = snapshot?.toolConfiguration
-                if (targetRuntime.isLoaded && (targetRuntime.isActive ||
-                    targetRuntime.loadedContentRevision >= contentRevision(sessionId))
-                ) {
+                // 运行中的会话必须继续使用内存中的流式状态；已结束的缓存会话则
+                // 每次切入都从持久化历史重建，避免后台完成后把旧的内存快照重新展示。
+                if (targetRuntime.isLoaded && targetRuntime.isActive) {
                     targetRuntime.attention = SessionResultAttention.NONE
                     targetRuntime.reseedPartialChannels()
                     showRuntime(sessionId)
@@ -1242,6 +1252,13 @@ class ChatViewModel @Inject constructor(
                         targetRuntime.attention = SessionResultAttention.NONE
                         targetRuntime.reseedPartialChannels()
                         showRuntime(sessionId)
+                        _uiState.update { state ->
+                            if (state.sessionId == sessionId) {
+                                state.copy(scrollToLatestRequest = state.scrollToLatestRequest + 1L)
+                            } else {
+                                state
+                            }
+                        }
                     }
                 }
             } finally {

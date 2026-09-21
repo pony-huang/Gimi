@@ -473,7 +473,7 @@ fun ChatScaffold(
                     listItems.forEach { listItem ->
                         when (listItem) {
                             is ChatListItem.UserMessage -> item(
-                                key = "user:${listItem.message.id}",
+                                key = "user:${state.sessionId}:${listItem.message.id}",
                                 contentType = "user",
                             ) {
                                 MessageRow(
@@ -488,7 +488,7 @@ fun ChatScaffold(
                                 val timeline = listItem.timeline
                                 if (timeline.segments.isEmpty() && timeline.isRunning) {
                                     item(
-                                        key = "turn_working:${timeline.turnId}",
+                                        key = "turn_working:${state.sessionId}:${timeline.turnId}",
                                         contentType = "turn_working",
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -510,7 +510,7 @@ fun ChatScaffold(
                                         is TurnSegment.Answer -> {
                                             val message = segment.message
                                             item(
-                                                key = "answer:${timeline.turnId}:${message.id}",
+                                                key = "answer:${state.sessionId}:${timeline.turnId}:${message.id}",
                                                 contentType = if (message.error != null) {
                                                     "error"
                                                 } else if (message.partial) {
@@ -529,7 +529,7 @@ fun ChatScaffold(
                                             }
                                         }
                                         is TurnSegment.Activity -> item(
-                                            key = "activity:${segment.id}",
+                                            key = "activity:${state.sessionId}:${segment.id}",
                                             contentType = "activity",
                                         ) {
                                             TurnActivityGroupPanel(
@@ -551,7 +551,7 @@ fun ChatScaffold(
                     state.failedTurn?.let { failedTurn ->
                         if (!state.isAgentRunning && !state.editingFailedTurn) {
                             item(
-                                key = "failed-turn-actions",
+                                key = "failed-turn-actions:${state.sessionId}",
                                 contentType = "failed_turn_actions",
                             ) {
                                 FailedTurnActions(
@@ -562,7 +562,7 @@ fun ChatScaffold(
                         }
                     }
                     item(
-                        key = "chat-bottom-anchor",
+                        key = "chat-bottom-anchor:${state.sessionId}",
                         contentType = "bottom_anchor",
                     ) {
                         Spacer(modifier = Modifier.height(1.dp))

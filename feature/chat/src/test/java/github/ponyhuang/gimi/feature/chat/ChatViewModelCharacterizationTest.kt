@@ -702,6 +702,68 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun switchingToInactiveSessionReloadsAuthoritativeHistoryAfterBackgroundCompletion() = runTest {
+        val fixture = fixture(
+            configured = true,
+            sessionIds = listOf("session-a", "session-b"),
+        )
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        fixture.viewModel.onAction(ChatAction.NewConversation)
+        advanceUntilIdle()
+
+        val stale = Messages.fromAssistant().copy(
+            textParts = listOf(TextPart(text = "截断的后台回答")),
+        )
+        val complete = stale.copy(
+            textParts = listOf(TextPart(text = "完整的后台回答，已经持久化完成。")),
+        )
+        val runtime = fixture.viewModel.runtimeFor("session-a")
+        runtime.isLoaded = true
+        runtime.isAgentRunning = false
+        runtime.messages = listOf(stale)
+        coEvery { fixture.conversations.loadMessages("session-a") } returns listOf(complete)
+        val previousScrollRequest = fixture.viewModel.uiState.value.scrollToLatestRequest
+
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
+        advanceUntilIdle()
+
+        assertEquals(listOf(complete), fixture.viewModel.uiState.value.messages)
+        assertTrue(
+            fixture.viewModel.uiState.value.scrollToLatestRequest > previousScrollRequest,
+        )
+    }
+
+    @Test
+    fun concurrentBackgroundCompletionsKeepDistinctNotificationTaskIds() = runTest {
+        val agent = ControllableAgent()
+        val fixture = fixture(
+            configured = true,
+            agentOverride = agent,
+            sessionIds = listOf("session-a", "session-b"),
+        )
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        fixture.viewModel.send("ask-a")
+        runCurrent()
+        fixture.viewModel.onAction(ChatAction.NewConversation)
+        advanceUntilIdle()
+        fixture.viewModel.send("ask-b")
+        runCurrent()
+
+        agent.complete("session-a")
+        agent.complete("session-b")
+        advanceUntilIdle()
+
+        verify(exactly = 1) {
+            fixture.appNotificationManager.notifyTaskCompleted("session-a")
+        }
+        verify(exactly = 1) {
+            fixture.appNotificationManager.notifyTaskCompleted("session-b")
+        }
+    }
+
+    @Test
     fun externalWriteDuringHistoryReloadIsNotAcknowledgedByOlderSnapshot() = runTest {
         val revisions = MutableStateFlow<Map<String, Long>>(emptyMap())
         val fixture = fixture(configured = true, contentRevisions = revisions)
@@ -1552,6 +1614,7 @@ class ChatViewModelCharacterizationTest {
                 every { supportedToolIds(any(), any()) } returns setOf("web_search")
                 coEvery { listFunctions(any()) } returns emptyList()
             }
+        val appNotificationManager = mockk<AppNotificationManager>(relaxed = true)
         val toolApproval = FakeToolApprovalRepository()
         val prepareChatTurn = PrepareChatTurnUseCase(
             attachments = attachments,
@@ -1579,7 +1642,7 @@ class ChatViewModelCharacterizationTest {
                 memoryRuntimeStatus = mockk<MemoryRuntimeStatus>(relaxed = true) {
                     every { failures } returns memoryFailures
                 },
-                appNotificationManager = mockk<AppNotificationManager>(relaxed = true),
+                appNotificationManager = appNotificationManager,
             ),
             conversations = conversations,
             sessionResolver = sessionResolver,
@@ -1590,6 +1653,7 @@ class ChatViewModelCharacterizationTest {
             mcpRepository = mcpRepository,
             playback = playback,
             speechSettings = speechSettings,
+            appNotificationManager = appNotificationManager,
         )
     }
 
@@ -1691,6 +1755,7 @@ class ChatViewModelCharacterizationTest {
         val mcpRepository: McpRepository,
         val playback: SpeechPlaybackRepository,
         val speechSettings: FakeSpeechSettingsRepository,
+        val appNotificationManager: AppNotificationManager,
     )
 }
 

@@ -22,12 +22,15 @@ internal class AndroidAppNotificationManager @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : AppNotificationManager {
     private val manager = NotificationManagerCompat.from(context)
+    private val interactionTags = mutableSetOf<String>()
 
     @SuppressLint("MissingPermission")
-    override fun notifyTaskCompleted() {
+    override fun notifyTaskCompleted(taskId: String?) {
+        // 只清理已经完成的任务，不能让并行会话的交互通知被先完成的任务误删。
+        cancelPendingInteractionNotifications(taskId)
         if (!shouldNotify()) return
-        manager.cancel(NOTIFICATION_INTERACTION)
         notify(
+            taskTag(taskId),
             NOTIFICATION_TASK_COMPLETED,
             baseBuilder()
                 .setContentTitle(context.getString(R.string.notification_task_completed_title))
@@ -39,81 +42,97 @@ internal class AndroidAppNotificationManager @Inject constructor(
     }
 
     @SuppressLint("MissingPermission")
-    override fun notifyToolExecution(toolName: String?) {
+    override fun notifyToolExecution(toolName: String?, taskId: String?) {
         if (!shouldNotify()) return
         val text = if (toolName.isNullOrBlank()) {
             context.getString(R.string.notification_tool_execution_text)
         } else {
             context.getString(R.string.notification_tool_execution_tool_text, toolName)
         }
-        notify(
-            NOTIFICATION_INTERACTION,
-            baseBuilder()
-                .setContentTitle(context.getString(R.string.notification_tool_execution_title))
-                .setContentText(text)
-                .setSmallIcon(android.R.drawable.stat_notify_sync)
-                .setOngoing(true)
-                .build(),
+        notifyInteraction(
+            taskId,
+            R.string.notification_tool_execution_title,
+            text,
+            android.R.drawable.stat_notify_sync,
         )
     }
 
     @SuppressLint("MissingPermission")
-    override fun notifyToolConfirmation(toolName: String?) {
+    override fun notifyToolConfirmation(toolName: String?, taskId: String?) {
         if (!shouldNotify()) return
         val text = if (toolName.isNullOrBlank()) {
             context.getString(R.string.notification_confirmation_text)
         } else {
             context.getString(R.string.notification_confirmation_tool_text, toolName)
         }
-        notify(
-            NOTIFICATION_INTERACTION,
-            baseBuilder()
-                .setContentTitle(context.getString(R.string.notification_confirmation_title))
-                .setContentText(text)
-                .setSmallIcon(android.R.drawable.stat_sys_warning)
-                .setOngoing(true)
-                .build(),
+        notifyInteraction(
+            taskId,
+            R.string.notification_confirmation_title,
+            text,
+            android.R.drawable.stat_sys_warning,
         )
     }
 
     @SuppressLint("MissingPermission")
-    override fun notifyTextInput() {
+    override fun notifyTextInput(taskId: String?) {
         notifyInteraction(
+            taskId,
             R.string.notification_input_title,
-            R.string.notification_input_text,
+            context.getString(R.string.notification_input_text),
+            android.R.drawable.stat_notify_more,
         )
     }
 
     @SuppressLint("MissingPermission")
-    override fun notifyChoice() {
+    override fun notifyChoice(taskId: String?) {
         notifyInteraction(
+            taskId,
             R.string.notification_choice_title,
-            R.string.notification_choice_text,
+            context.getString(R.string.notification_choice_text),
+            android.R.drawable.stat_notify_more,
         )
     }
 
-    override fun cancelPendingInteractionNotifications() {
-        manager.cancel(NOTIFICATION_INTERACTION)
+    override fun cancelPendingInteractionNotifications(taskId: String?) {
+        val tags = synchronized(interactionTags) {
+            if (taskId == null) {
+                interactionTags.toList().also { interactionTags.clear() }
+            } else {
+                listOf(taskTag(taskId)).also { interactionTags.removeAll(it.toSet()) }
+            }
+        }
+        tags.forEach { tag -> manager.cancel(tag, NOTIFICATION_INTERACTION) }
     }
 
     @SuppressLint("MissingPermission")
-    private fun notifyInteraction(titleRes: Int, textRes: Int) {
+    private fun notifyInteraction(
+        taskId: String?,
+        titleRes: Int,
+        text: String,
+        icon: Int,
+    ) {
         if (!shouldNotify()) return
+        val tag = taskTag(taskId)
+        synchronized(interactionTags) { interactionTags += tag }
         notify(
+            tag,
             NOTIFICATION_INTERACTION,
             baseBuilder()
                 .setContentTitle(context.getString(titleRes))
-                .setContentText(context.getString(textRes))
-                .setSmallIcon(android.R.drawable.stat_notify_more)
+                .setContentText(text)
+                .setSmallIcon(icon)
                 .setOngoing(true)
                 .build(),
         )
     }
 
     @SuppressLint("MissingPermission")
-    private fun notify(id: Int, notification: android.app.Notification) {
-        manager.notify(id, notification)
+    private fun notify(tag: String, id: Int, notification: android.app.Notification) {
+        manager.notify(tag, id, notification)
     }
+
+    private fun taskTag(taskId: String?): String =
+        taskId?.takeIf(String::isNotBlank)?.let { "agent-task:$it" } ?: DEFAULT_TASK_TAG
 
     private fun baseBuilder(): NotificationCompat.Builder {
         ensureChannel()
@@ -166,6 +185,7 @@ internal class AndroidAppNotificationManager @Inject constructor(
     private companion object {
         // Channel importance is immutable after creation; v2 upgrades existing installs to heads-up.
         const val CHANNEL_ID = "app_events_v2"
+        const val DEFAULT_TASK_TAG = "agent-task:default"
         const val NOTIFICATION_TASK_COMPLETED = 4301
         const val NOTIFICATION_INTERACTION = 4302
         const val REQUEST_OPEN_APP = 4303

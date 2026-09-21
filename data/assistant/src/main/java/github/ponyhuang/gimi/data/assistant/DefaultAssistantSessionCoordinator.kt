@@ -196,15 +196,15 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
             val execution = chatAgent.createExecution(
                 sessionId, session.modelSelection, session.toolConfiguration,
             )
-            collectTurn(execution.send(text, emptyList()), run)
-            run.error?.let { return finishFailed(it) }
-            run.pendingInputRequest?.let { return finishAwaitingInput(it) }
+            collectTurn(sessionId, execution.send(text, emptyList()), run)
+            run.error?.let { return finishFailed(sessionId, it) }
+            run.pendingInputRequest?.let { return finishAwaitingInput(sessionId, it) }
             while (run.pendingConfirmations.isNotEmpty()) {
                 lease.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
                 val request = run.pendingConfirmations.removeFirst()
                 val confirmed = request.toolName in run.approvedTools ||
                     toolApproval.isAutoApproved(request.toolName) ||
-                    awaitConfirmation(request, confirmationHandler)
+                    awaitConfirmation(sessionId, request, confirmationHandler)
                 if (confirmed) {
                     run.approvedTools += request.toolName
                 } else {
@@ -218,17 +218,18 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                     )
                 }
                 collectTurn(
+                    sessionId,
                     execution.respondToToolConfirmation(
                         confirmationCallId = request.confirmationCallId,
                         confirmed = confirmed,
                     ),
                     run,
                 )
-                run.error?.let { return finishFailed(it) }
-                run.pendingInputRequest?.let { return finishAwaitingInput(it) }
+                run.error?.let { return finishFailed(sessionId, it) }
+                run.pendingInputRequest?.let { return finishAwaitingInput(sessionId, it) }
             }
             conversations.refreshConversation(sessionId)
-            appNotificationManager.notifyTaskCompleted()
+            appNotificationManager.notifyTaskCompleted(sessionId)
             _state.update {
                 it.copy(
                     phase = AssistantSessionPhase.FOLLOW_UP_IDLE,
@@ -241,7 +242,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                 responseText = run.responseText(),
             )
         } catch (cancelled: CancellationException) {
-            appNotificationManager.cancelPendingInteractionNotifications()
+            appNotificationManager.cancelPendingInteractionNotifications(sessionId)
             _state.update {
                 if (it.phase == AssistantSessionPhase.STOPPED) {
                     it.copy(taskActive = false, pendingConfirmation = null)
@@ -275,11 +276,20 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     }
 
     /** 收集一轮事件流：归并回答文本、推导工具阶段、提取确认请求。 */
-    private suspend fun collectTurn(events: Flow<ChatRunEvent>, run: TaskRun) {
+    private suspend fun collectTurn(
+        sessionId: String,
+        events: Flow<ChatRunEvent>,
+        run: TaskRun,
+    ) {
         events.collect { event ->
             event.functionCalls
                 .firstOrNull { it.confirmationRequest == null }
-                ?.let { appNotificationManager.notifyToolExecution(it.name) }
+                ?.let {
+                    appNotificationManager.notifyToolExecution(
+                        toolName = it.name,
+                        taskId = sessionId,
+                    )
+                }
             if (run.error != null) return@collect
             event.errorMessage?.let { run.error = it; return@collect }
             event.errorCode?.let { run.error = it; return@collect }
@@ -322,6 +332,7 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
     }
 
     private suspend fun awaitConfirmation(
+        sessionId: String,
         request: PendingAssistantConfirmation,
         handler: AssistantConfirmationHandler?,
     ): Boolean {
@@ -334,7 +345,10 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
                 pendingConfirmation = presented,
             )
         }
-        appNotificationManager.notifyToolConfirmation(request.toolName)
+        appNotificationManager.notifyToolConfirmation(
+            toolName = request.toolName,
+            taskId = sessionId,
+        )
         if (handler != null) return handler.confirm(presented)
         val deferred = CompletableDeferred<Boolean>()
         confirmationResponse = PendingConfirmationResponse(
@@ -353,8 +367,11 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
         }
     }
 
-    private fun finishFailed(message: String): AssistantSubmissionResult {
-        appNotificationManager.cancelPendingInteractionNotifications()
+    private fun finishFailed(
+        sessionId: String,
+        message: String,
+    ): AssistantSubmissionResult {
+        appNotificationManager.cancelPendingInteractionNotifications(sessionId)
         _state.update {
             it.copy(
                 phase = AssistantSessionPhase.ERROR,
@@ -366,12 +383,15 @@ class DefaultAssistantSessionCoordinator @Inject constructor(
         return AssistantSubmissionResult.Failed(message)
     }
 
-    private fun finishAwaitingInput(request: UserInputRequest): AssistantSubmissionResult {
+    private fun finishAwaitingInput(
+        sessionId: String,
+        request: UserInputRequest,
+    ): AssistantSubmissionResult {
         when (request.kind) {
             UserInputKind.CHOICE ->
-                appNotificationManager.notifyChoice()
+                appNotificationManager.notifyChoice(sessionId)
             github.ponyhuang.gimi.domain.conversation.model.UserInputKind.FREE_TEXT ->
-                appNotificationManager.notifyTextInput()
+                appNotificationManager.notifyTextInput(sessionId)
         }
         val message = request.message.ifBlank { "需要你的输入。" }
         _state.update {

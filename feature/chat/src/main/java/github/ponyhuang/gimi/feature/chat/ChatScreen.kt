@@ -180,7 +180,6 @@ fun ChatScaffold(
     // 只要用户仍停留在底部，就让流式内容增长持续跟随；用户向上浏览历史时则停止抢占滚动。
     var shouldFollowLatest by remember { mutableStateOf(true) }
     var isModelPickerVisible by remember { mutableStateOf(false) }
-    var isComposerExpanded by remember { mutableStateOf(false) }
     val renderedItemCount = remember(listItems) {
         listItems.sumOf { item ->
             when (item) {
@@ -196,12 +195,8 @@ fun ChatScaffold(
     }
     val latestItemIndex by rememberUpdatedState(renderedItemCount)
     val showsRecommendations = listItems.isEmpty() && recommendations.isNotEmpty()
-    // 推荐卡片跟着胶囊一起收放，聚焦放大后两者左右边缘刚好对齐。
-    val recommendationHorizontalInset by animateDpAsState(
-        targetValue = if (isComposerExpanded) 0.dp else ComposerCollapsedHorizontalInset,
-        animationSpec = ComposerInsetAnimationSpec,
-        label = "recommendationHorizontalInset",
-    )
+    // 推荐卡片与胶囊边缘对齐（大胶囊样式下左右无内缩）。
+    val recommendationHorizontalInset = ComposerCollapsedHorizontalInset
 
     LaunchedEffect(
         renderedItemCount,
@@ -374,7 +369,6 @@ fun ChatScaffold(
                                     sharedMediaUris = sharedMediaUris,
                                     onSharedMediaConsumed = onSharedMediaConsumed,
                                     retainExpanded = isModelPickerVisible,
-                                    onExpandedChange = { isComposerExpanded = it },
                                     modelSelectorContent = {
                                         ModelTitleAndPicker(
                                             services = state.availableLLMModelSettings,

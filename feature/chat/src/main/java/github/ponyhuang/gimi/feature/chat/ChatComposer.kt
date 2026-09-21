@@ -10,7 +10,6 @@ import github.ponyhuang.gimi.core.audio.VoiceAudioRecorder
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -133,7 +132,6 @@ public fun ChatComposer(
     var showAttachmentOptions by rememberSaveable { mutableStateOf(false) }
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCameraPath by rememberSaveable { mutableStateOf<String?>(null) }
-    var isComposerExpanded by remember { mutableStateOf(messageData.attachments.isNotEmpty()) }
     var voiceInputState: VoiceInputUiState by remember { mutableStateOf(VoiceInputUiState.Idle) }
     var voiceErrorMessage by remember { mutableStateOf<String?>(null) }
     val voiceAudio = remember { VoicePcmBuffer() }
@@ -370,10 +368,9 @@ public fun ChatComposer(
 
     val componentFactory = LocalChatAiComponentFactory.current
     val recordingState = voiceInputState as? VoiceInputUiState.Recording
-    val isCapsuleExpanded = isComposerExpanded || retainExpanded || recordingState != null
 
-    LaunchedEffect(isCapsuleExpanded) {
-        onExpandedChange(isCapsuleExpanded)
+    LaunchedEffect(Unit) {
+        onExpandedChange(true)
     }
 
     Box(
@@ -383,14 +380,8 @@ public fun ChatComposer(
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .fillMaxWidth(),
     ) {
-        val composerHorizontalInset by animateDpAsState(
-            targetValue = if (isCapsuleExpanded) 0.dp else ComposerCollapsedHorizontalInset,
-            animationSpec = ComposerInsetAnimationSpec,
-            label = "composerHorizontalInset",
-        )
         Surface(
             modifier = Modifier
-                .padding(horizontal = composerHorizontalInset)
                 .fillMaxWidth()
                 .testTag("chat_composer_surface"),
             shape = RoundedCornerShape(28.dp),
@@ -434,7 +425,7 @@ public fun ChatComposer(
                                 onStopClick = onStopClick,
                                 onVoiceInputStart = ::startVoiceInput,
                                 retainExpanded = retainExpanded,
-                                onExpandedChange = { isComposerExpanded = it },
+                                onExpandedChange = onExpandedChange,
                                 onAttachmentsClick = { if (!isSubmitting) showAttachmentOptions = true },
                                 modelSelectorContent = modelSelectorContent,
                             ),
@@ -501,8 +492,8 @@ internal fun appendTranscript(draft: String, transcript: String): String {
 }
 
 
-/** 胶囊收起时的横向内缩。聚焦放大后归零，推荐列表复用同一数值保持边缘对齐。 */
-internal val ComposerCollapsedHorizontalInset = 20.dp
+/** 胶囊横向内缩。大胶囊样式下无横向内缩（0.dp），保留常量保证调用兼容。 */
+internal val ComposerCollapsedHorizontalInset = 0.dp
 
 /** 胶囊收放的动画规格；跟随胶囊移动的外部内容共用它，避免两段动画错拍。 */
 internal val ComposerInsetAnimationSpec: AnimationSpec<Dp> = tween(

@@ -43,11 +43,11 @@ class ChatComposerLayoutTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun unfocusedEmptyComposerUsesCompactControls() {
+    fun emptyComposerShowsModelSelector() {
         setComposer()
 
         composeRule.onNodeWithTag("chat_composer_add").assertIsDisplayed()
-        composeRule.onNodeWithTag("chat_composer_model_picker").assertDoesNotExist()
+        composeRule.onNodeWithTag("chat_composer_model_picker").assertIsDisplayed()
         composeRule.onNodeWithTag("chat_composer_microphone").assertIsDisplayed()
         composeRule.onNodeWithTag("chat_composer_send").assertDoesNotExist()
     }
@@ -74,7 +74,7 @@ class ChatComposerLayoutTest {
     }
 
     @Test
-    fun focusedEmptyComposerExpandsAndShowsModelSelector() {
+    fun focusedEmptyComposerShowsModelSelector() {
         setComposer()
 
         composeRule.onNodeWithTag("chat_composer_text_field").performClick()
@@ -83,27 +83,13 @@ class ChatComposerLayoutTest {
     }
 
     @Test
-    fun focusedComposerIsWiderThanUnfocusedComposer() {
+    fun composerMaintainsConsistentDimensionsWhenFocused() {
         setComposer()
-        val compactWidth = composeRule.onNodeWithTag("chat_composer_surface")
+        val initialWidth = composeRule.onNodeWithTag("chat_composer_surface")
             .fetchSemanticsNode()
             .boundsInRoot
             .width
-
-        composeRule.onNodeWithTag("chat_composer_text_field").performClick()
-        composeRule.waitForIdle()
-
-        val expandedWidth = composeRule.onNodeWithTag("chat_composer_surface")
-            .fetchSemanticsNode()
-            .boundsInRoot
-            .width
-        assert(expandedWidth > compactWidth)
-    }
-
-    @Test
-    fun focusedComposerIsTallerThanUnfocusedComposer() {
-        setComposer()
-        val compactHeight = composeRule.onNodeWithTag("chat_composer_surface")
+        val initialHeight = composeRule.onNodeWithTag("chat_composer_surface")
             .fetchSemanticsNode()
             .boundsInRoot
             .height
@@ -111,11 +97,16 @@ class ChatComposerLayoutTest {
         composeRule.onNodeWithTag("chat_composer_text_field").performClick()
         composeRule.waitForIdle()
 
-        val expandedHeight = composeRule.onNodeWithTag("chat_composer_surface")
+        val focusedWidth = composeRule.onNodeWithTag("chat_composer_surface")
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .width
+        val focusedHeight = composeRule.onNodeWithTag("chat_composer_surface")
             .fetchSemanticsNode()
             .boundsInRoot
             .height
-        assert(expandedHeight > compactHeight)
+        org.junit.Assert.assertEquals(initialWidth, focusedWidth, 0.5f)
+        org.junit.Assert.assertEquals(initialHeight, focusedHeight, 0.5f)
     }
 
     @Test

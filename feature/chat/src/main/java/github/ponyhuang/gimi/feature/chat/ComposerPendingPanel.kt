@@ -233,7 +233,7 @@ internal fun PendingConfirmationPanel(
 }
 
 /**
- * 面板容器：**取代**胶囊本体时复刻其几何 —— 外边距 12/8、收放留白 20、28dp 圆角、
+ * 面板容器：**取代**胶囊本体时复刻其几何 —— 外边距 12/8、28dp 圆角、
  * surfaceContainer 中性色，并自带 IME / 导航栏内边距（与 ChatComposer 外层一致），
  * 让面板就是输入栏。内容超高一屏时内部滚动，避免面板无限增高。
  */
@@ -250,7 +250,6 @@ private fun PendingPanelContainer(
     ) {
         Surface(
             modifier = Modifier
-                .padding(horizontal = ComposerCollapsedHorizontalInset)
                 .fillMaxWidth(),
             shape = RoundedCornerShape(28.dp),
             // 与胶囊同为中性容器色：面板是输入栏的替身，不能比胶囊更“重”。

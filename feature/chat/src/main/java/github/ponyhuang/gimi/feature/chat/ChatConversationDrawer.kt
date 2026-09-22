@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
@@ -103,6 +104,7 @@ fun ChatDrawer(
     onSettingsClick: () -> Unit,
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
+    showUpdateBadge: Boolean = false,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
@@ -122,6 +124,7 @@ fun ChatDrawer(
                     onSettingsClick = onSettingsClick,
                     themeMode = themeMode,
                     onThemeModeChange = onThemeModeChange,
+                    showUpdateBadge = showUpdateBadge,
                 )
             }
         },
@@ -144,6 +147,7 @@ private fun HistoryDrawerContent(
     onSettingsClick: () -> Unit,
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
+    showUpdateBadge: Boolean = false,
 ) {
     var menuConversation by remember { mutableStateOf<Conversation?>(null) }
 
@@ -215,6 +219,15 @@ private fun HistoryDrawerContent(
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(start = 20.dp),
             )
+            if (showUpdateBadge) {
+                // 有未发现的新版本时在"设置"入口旁点亮提醒点。
+                Box(
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .size(8.dp)
+                        .background(MaterialTheme.colorScheme.error, CircleShape),
+                )
+            }
             Spacer(modifier = Modifier.weight(1f))
             // 按钮自身消费点击，不会触发整行的设置跳转；点击循环 跟随系统→浅色→深色。
             ThemeModeButton(

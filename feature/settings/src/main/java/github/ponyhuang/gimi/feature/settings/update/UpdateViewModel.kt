@@ -47,8 +47,11 @@ class UpdateViewModel @Inject constructor(
 
     fun onAction(action: UpdateAction) {
         when (action) {
-            UpdateAction.ScreenEntered ->
+            // 进入关于页：先熄灭入口红点（视为已查看），再触发一次静默自动检查（仓库内节流）。
+            UpdateAction.ScreenEntered -> {
+                appUpdateRepository.markUpdateSeen()
                 viewModelScope.launch { appUpdateRepository.checkForUpdate(manual = false) }
+            }
 
             UpdateAction.CheckNow -> checkManually()
 

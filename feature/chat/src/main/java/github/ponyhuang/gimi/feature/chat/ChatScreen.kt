@@ -277,6 +277,7 @@ fun ChatScaffold(
                     onNewConversation = onNewConversation,
                     onOpenSettings = onOpenSettings,
                     onToggleAutoSpeak = onToggleAutoSpeak,
+                    showUpdateBadge = state.hasUpdateBadge,
                 )
                 Box(
                     modifier = Modifier
@@ -584,6 +585,7 @@ internal fun ChatHeaderActions(
     onNewConversation: () -> Unit,
     onOpenSettings: () -> Unit,
     onToggleAutoSpeak: () -> Unit,
+    showUpdateBadge: Boolean = false,
 ) {
     Row(
         modifier = Modifier
@@ -655,17 +657,29 @@ internal fun ChatHeaderActions(
                     modifier = Modifier.height(24.dp),
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
                 )
-                IconButton(
-                    onClick = onOpenSettings,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("chat_header_settings"),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = stringResource(R.string.chat_settings),
-                        modifier = Modifier.size(24.dp),
-                    )
+                Box {
+                    IconButton(
+                        onClick = onOpenSettings,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("chat_header_settings"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.chat_settings),
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                    if (showUpdateBadge) {
+                        // 有未发现的新版本时在设置图标右上角点亮提醒点。
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 8.dp, end = 8.dp)
+                                .size(10.dp)
+                                .background(MaterialTheme.colorScheme.error, CircleShape),
+                        )
+                    }
                 }
             }
         }

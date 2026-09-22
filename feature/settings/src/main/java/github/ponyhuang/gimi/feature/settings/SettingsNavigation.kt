@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.feature.settings
 
 import androidx.compose.runtime.Composable
 import androidx.navigation3.runtime.NavKey
+import github.ponyhuang.gimi.feature.settings.about.AboutRoute
 import kotlinx.serialization.Serializable
 
 /** Destinations owned by the application settings feature. */
@@ -9,6 +10,10 @@ sealed interface SettingsDestination : NavKey {
     /** Application settings destination. */
     @Serializable
     data object Settings : SettingsDestination
+
+    /** 「关于」页：内含检查更新、项目主页等应用信息。 */
+    @Serializable
+    data object About : SettingsDestination
 }
 
 /** Cross-capability navigation callbacks displayed by the settings hub. */
@@ -25,6 +30,7 @@ class SettingsNavigationCallbacks(
     val onNavigateToToolAuthorization: () -> Unit,
     val onNavigateToRecommendations: () -> Unit,
     val onNavigateToMemory: () -> Unit,
+    val onNavigateToAbout: () -> Unit,
 )
 
 /** Resolves the settings hub while the app supplies only cross-feature callbacks. */
@@ -49,6 +55,15 @@ fun SettingsEntryProvider(
             onNavigateToToolAuthorization = callbacks.onNavigateToToolAuthorization,
             onNavigateToRecommendations = callbacks.onNavigateToRecommendations,
             onNavigateToMemory = callbacks.onNavigateToMemory,
+            onNavigateToAbout = callbacks.onNavigateToAbout,
+        )
+        true
+    }
+
+    SettingsDestination.About -> {
+        AboutRoute(
+            appVersionName = appVersionName,
+            onBack = callbacks.onBack,
         )
         true
     }

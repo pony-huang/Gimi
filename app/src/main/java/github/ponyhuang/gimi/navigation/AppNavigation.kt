@@ -168,6 +168,7 @@ fun MainScreen(
                             navigate(RecommendationDestination.Settings)
                         },
                         onNavigateToMemory = { navigate(MemoryDestination.Settings) },
+                        onNavigateToAbout = { navigate(SettingsDestination.About) },
                     ),
                 ) || ModelSettingsEntryProvider(destination, goBack, navigate) ||
                     McpEntryProvider(destination, goBack, navigate, replaceCurrent) ||

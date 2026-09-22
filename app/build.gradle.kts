@@ -90,6 +90,7 @@ dependencies {
     implementation(project(":domain:appearance"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:speech"))
+    implementation(project(":domain:appupdate"))
     implementation(project(":core:audio"))
     implementation(project(":data:assistant"))
     implementation(project(":domain:assistant"))

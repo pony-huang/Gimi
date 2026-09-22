@@ -32,8 +32,7 @@ class SettingsViewModel @Inject constructor() : ViewModel() {
             SettingsAction.OpenRecommendations ->
                 emitEffect(SettingsEffect.NavigateToRecommendations)
             SettingsAction.OpenMemory -> emitEffect(SettingsEffect.NavigateToMemory)
-            SettingsAction.OpenProjectPage ->
-                emitEffect(SettingsEffect.OpenProjectPage)
+            SettingsAction.OpenAbout -> emitEffect(SettingsEffect.NavigateToAbout)
         }
     }
 

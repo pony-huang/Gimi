@@ -44,12 +44,22 @@ interface AppUpdateRepository {
     val state: StateFlow<AppUpdateState>
 
     /**
+     * 冷启动/自动检查发现新版本、但用户尚未进入「关于」页查看时为 true，用于在设置入口上
+     * 点亮提醒红点。进入关于页调用 [markUpdateSeen] 后熄灭，并在本进程内保持熄灭（不因重复
+     * 检查而重新点亮）；下次冷启动重新计数。
+     */
+    val hasUnseenUpdate: StateFlow<Boolean>
+
+    /**
      * 检查 GitHub Releases 最新版本并与当前版本比较。
      *
      * @param manual true 表示用户主动触发：总是请求网络、失败写入状态；
      * false 表示进入设置页的静默自动检查：6 小时节流（窗口内返回上次结果）、失败静默。
      */
     suspend fun checkForUpdate(manual: Boolean): UpdateCheckResult
+
+    /** 标记用户已查看当前发现的新版本，熄灭红点（进程内粘性）。 */
+    fun markUpdateSeen()
 
     /** 异步开始下载，进度通过 [state] 与通知栏暴露。 */
     fun startDownload(info: AppUpdateInfo)

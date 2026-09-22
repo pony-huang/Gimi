@@ -139,6 +139,7 @@ fun ChatRoute(
         onThemeModeChange = { mode ->
             viewModel.onAction(ChatAction.SetThemeMode(mode))
         },
+        showUpdateBadge = uiState.hasUpdateBadge,
     ) {
         ChatScaffold(
             state = uiState,

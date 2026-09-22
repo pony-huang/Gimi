@@ -11,7 +11,7 @@ data class UpdateUiState(
 )
 
 sealed interface UpdateAction {
-    /** 进入设置页：静默自动检查（仓库内节流）。 */
+    /** 进入关于页：熄灭入口红点并静默自动检查（仓库内节流）。 */
     data object ScreenEntered : UpdateAction
 
     /** 点击「检查更新」。 */

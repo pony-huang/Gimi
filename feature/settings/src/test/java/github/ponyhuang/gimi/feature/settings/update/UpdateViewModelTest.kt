@@ -200,6 +200,10 @@ class UpdateViewModelTest {
     ) : AppUpdateRepository {
         val mutableState = MutableStateFlow<AppUpdateState>(AppUpdateState.Idle)
         override val state: StateFlow<AppUpdateState> = mutableState.asStateFlow()
+        private val mutableHasUnseen = MutableStateFlow(false)
+        override val hasUnseenUpdate: StateFlow<Boolean> = mutableHasUnseen.asStateFlow()
+        var markSeenCalls = 0
+            private set
         var manualChecks = 0
             private set
 
@@ -207,6 +211,11 @@ class UpdateViewModelTest {
             if (manual) manualChecks++
             mutableState.value = resultState
             return checkResult
+        }
+
+        override fun markUpdateSeen() {
+            markSeenCalls++
+            mutableHasUnseen.value = false
         }
 
         override fun startDownload(info: AppUpdateInfo) = Unit

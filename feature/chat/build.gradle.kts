@@ -23,6 +23,7 @@ dependencies {
     implementation(project(":core:notifications"))
     implementation(project(":core:storage"))
     implementation(project(":domain:appearance"))
+    implementation(project(":domain:appupdate"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:modelcatalog"))
     implementation(project(":domain:mcp"))

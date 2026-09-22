@@ -16,8 +16,8 @@ sealed interface SettingsAction {
     data object OpenToolAuthorization : SettingsAction
     data object OpenRecommendations : SettingsAction
     data object OpenMemory : SettingsAction
-    /** 在浏览器中打开 GitHub 项目页。 */
-    data object OpenProjectPage : SettingsAction
+    /** 进入「关于」页（内含检查更新、项目主页等）。 */
+    data object OpenAbout : SettingsAction
 }
 
 sealed interface SettingsEffect {
@@ -33,6 +33,6 @@ sealed interface SettingsEffect {
     data object NavigateToToolAuthorization : SettingsEffect
     data object NavigateToRecommendations : SettingsEffect
     data object NavigateToMemory : SettingsEffect
-    /** 打开 GitHub 项目页（https://github.com/pony-huang/Gimi）。 */
-    data object OpenProjectPage : SettingsEffect
+    /** 进入「关于」页。 */
+    data object NavigateToAbout : SettingsEffect
 }

@@ -85,6 +85,11 @@ data class ChatUiState(
      * 跨会话保持，不随新会话重置。
      */
     val autoSpeakEnabled: Boolean = true,
+    /**
+     * 设置入口红点：冷启动静默检查发现新版本、用户尚未进入「关于」页查看时为 true。
+     * 转发自 `AppUpdateRepository.hasUnseenUpdate`，仅用于在设置图标/抽屉入口上显示提醒点。
+     */
+    val hasUpdateBadge: Boolean = false,
 )
 
 /** 失败轮恢复交互的封闭状态，避免多个布尔值与 pending 字段形成非法组合。 */

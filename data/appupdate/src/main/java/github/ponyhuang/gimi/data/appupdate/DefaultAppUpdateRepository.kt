@@ -56,6 +56,12 @@ class DefaultAppUpdateRepository @Inject constructor(
     private val mutableState = MutableStateFlow<AppUpdateState>(AppUpdateState.Idle)
     override val state: StateFlow<AppUpdateState> = mutableState.asStateFlow()
 
+    private val mutableHasUnseenUpdate = MutableStateFlow(false)
+    override val hasUnseenUpdate: StateFlow<Boolean> = mutableHasUnseenUpdate.asStateFlow()
+
+    /** 用户本次进程内是否已进过关于页；置为 true 后红点熄灭且不再因重复检查重新点亮。 */
+    private var updateAcked = false
+
     private var downloadJob: Job? = null
     private var currentVersionName: String = currentVersionName()
     private var lastAutoCheckAt = 0L
@@ -85,6 +91,7 @@ class DefaultAppUpdateRepository @Inject constructor(
                     }
                     else -> {
                         mutableState.value = AppUpdateState.Available(info, currentVersionName)
+                        if (!updateAcked) mutableHasUnseenUpdate.value = true
                         UpdateCheckResult.UpdateAvailable(info)
                     }
                 }
@@ -109,7 +116,13 @@ class DefaultAppUpdateRepository @Inject constructor(
             mutableState.value is AppUpdateState.Idle
         ) {
             mutableState.value = AppUpdateState.Available(cached.info, currentVersionName)
+            if (!updateAcked) mutableHasUnseenUpdate.value = true
         }
+    }
+
+    override fun markUpdateSeen() {
+        updateAcked = true
+        mutableHasUnseenUpdate.value = false
     }
 
     override fun startDownload(info: AppUpdateInfo) {

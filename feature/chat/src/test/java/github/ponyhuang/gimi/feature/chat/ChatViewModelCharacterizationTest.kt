@@ -1615,6 +1615,8 @@ class ChatViewModelCharacterizationTest {
                 coEvery { listFunctions(any()) } returns emptyList()
             }
         val appNotificationManager = mockk<AppNotificationManager>(relaxed = true)
+        val appUpdateRepository = mockk<github.ponyhuang.gimi.domain.appupdate.repository.AppUpdateRepository>(relaxed = true)
+        every { appUpdateRepository.hasUnseenUpdate } returns MutableStateFlow(false)
         val toolApproval = FakeToolApprovalRepository()
         val prepareChatTurn = PrepareChatTurnUseCase(
             attachments = attachments,
@@ -1643,6 +1645,7 @@ class ChatViewModelCharacterizationTest {
                     every { failures } returns memoryFailures
                 },
                 appNotificationManager = appNotificationManager,
+                appUpdateRepository = appUpdateRepository,
             ),
             conversations = conversations,
             sessionResolver = sessionResolver,

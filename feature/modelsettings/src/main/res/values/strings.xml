@@ -70,7 +70,7 @@
     <string name="modelsettings_new_model_tts">语音合成模型（TTS）</string>
 
     <!-- 路由标题（由 :app 注入 SettingsScaffold 使用） -->
-    <string name="modelsettings_list_title">模型服务</string>
+    <string name="modelsettings_list_title">API 接入</string>
     <string name="modelsettings_defaults_screen_title">默认模型</string>
     <string name="modelsettings_detail_title">服务详情</string>
 

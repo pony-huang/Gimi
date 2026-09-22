@@ -62,7 +62,7 @@
     <string name="modelsettings_new_model_tts">Speech synthesis model (TTS)</string>
 
     <!-- Navigation screen titles (consumed by :app SettingsScaffold) -->
-    <string name="modelsettings_list_title">Model services</string>
+    <string name="modelsettings_list_title">API access</string>
     <string name="modelsettings_defaults_screen_title">Default models</string>
     <string name="modelsettings_detail_title">Service details</string>
 

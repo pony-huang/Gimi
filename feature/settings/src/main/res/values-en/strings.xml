@@ -5,7 +5,7 @@
     <string name="settings_group_tools">Tools</string>
     <string name="settings_group_general">General</string>
     <string name="settings_memory_title">Memory</string>
-    <string name="settings_memory_subtitle">Configure on-device or Mem0 long-term memory</string>
+    <string name="settings_memory_subtitle">Configure on-device or cloud long-term memory</string>
 
     <string name="settings_model_service_title">API access</string>
     <string name="settings_model_service_subtitle">Keys · Endpoints · Models</string>
@@ -27,7 +27,7 @@
     <string name="settings_workspace_title">Workspace</string>
     <string name="settings_workspace_subtitle">View and manage chat attachment files</string>
 
-    <string name="settings_tool_authorization_title">Tools</string>
+    <string name="settings_tool_authorization_title">Tool access</string>
     <string name="settings_tool_authorization_subtitle">Choose which local tools the assistant may use</string>
     <string name="settings_permissions_title">Permissions</string>
     <string name="settings_permissions_subtitle">Pre-grant permissions needed for chat and voice features</string>
@@ -65,5 +65,5 @@
     <string name="update_failed_title">Update failed</string>
     <string name="update_retry">Retry</string>
     <string name="settings_recommendations_title">Smart recommendations</string>
-    <string name="settings_recommendations_subtitle">Configure empty-chat suggestions and background updates</string>
+    <string name="settings_recommendations_subtitle">Configure new-chat suggestions and idle pre-generation</string>
 </resources>

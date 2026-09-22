@@ -5,7 +5,7 @@
     <string name="settings_group_tools">工具</string>
     <string name="settings_group_general">通用</string>
     <string name="settings_memory_title">记忆</string>
-    <string name="settings_memory_subtitle">配置本地记忆或 Mem0 长期记忆</string>
+    <string name="settings_memory_subtitle">配置本地记忆或云端长期记忆</string>
 
     <string name="settings_model_service_title">API 接入</string>
     <string name="settings_model_service_subtitle">密钥 · 服务地址 · 模型列表</string>
@@ -27,7 +27,7 @@
     <string name="settings_workspace_title">工作区</string>
     <string name="settings_workspace_subtitle">查看与管理聊天附件文件</string>
 
-    <string name="settings_tool_authorization_title">工具</string>
+    <string name="settings_tool_authorization_title">工具授权</string>
     <string name="settings_tool_authorization_subtitle">选择允许助手使用的本地工具</string>
     <string name="settings_permissions_title">权限管理</string>
     <string name="settings_permissions_subtitle">预先授权聊天任务和语音功能所需权限</string>
@@ -65,5 +65,5 @@
     <string name="update_failed_title">更新失败</string>
     <string name="update_retry">重试</string>
     <string name="settings_recommendations_title">智能推荐</string>
-    <string name="settings_recommendations_subtitle">配置空会话任务建议与后台更新</string>
+    <string name="settings_recommendations_subtitle">配置新会话的任务建议与空闲预生成</string>
 </resources>

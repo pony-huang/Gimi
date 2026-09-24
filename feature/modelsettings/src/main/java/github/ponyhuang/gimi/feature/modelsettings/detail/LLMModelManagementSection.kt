@@ -1,8 +1,5 @@
 package github.ponyhuang.gimi.feature.modelsettings.detail
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,7 +9,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
@@ -25,13 +21,10 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -42,10 +35,7 @@ import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 
 /**
- * 「模型」管理区：节标题行（刷新 / 新增动作）+ 每个模型分组一张 One UI 卡片。
- *
- * 分组头为卡片内普通行（承担折叠入口，保持 ≥56dp 点击热区），
- * 模型行为纯文本行 + 能力徽标 + 移除按钮，行间使用内缩分隔线。
+ * 「模型」管理区：刷新后按目录顺序平铺模型，避免来源分组和折叠增加查找成本。
  */
 @Composable
 fun LLMModelManagementSection(
@@ -92,32 +82,21 @@ fun LLMModelManagementSection(
             }
         }
 
-        // 扁平行流按 GroupHeader 切段，每段渲染成一张可折叠卡片。
-        rows.toModelGroups().forEachIndexed { index, group ->
-            PreferenceGroupCard(
-                modifier = Modifier.padding(top = if (index == 0) 0.dp else 12.dp),
-            ) {
-                GroupHeaderRow(
-                    row = group.header,
-                    hasModels = group.models.isNotEmpty(),
-                    onToggle = {
-                        onAction(LLMModelSettingDetailAction.ToggleGroup(group.header.groupId))
+        PreferenceGroupCard {
+            val models = rows.filterIsInstance<LLMModelSettingDetailRow.LLMModelItem>()
+            models.forEachIndexed { modelIndex, item ->
+                ModelItemRow(
+                    row = item,
+                    onRemove = {
+                        onAction(
+                            LLMModelSettingDetailAction.RemoveLLMModel(
+                                groupId = item.groupId,
+                                modelId = item.model.id,
+                            ),
+                        )
                     },
+                    showDivider = modelIndex < models.lastIndex,
                 )
-                group.models.forEachIndexed { modelIndex, item ->
-                    ModelItemRow(
-                        row = item,
-                        onRemove = {
-                            onAction(
-                                LLMModelSettingDetailAction.RemoveLLMModel(
-                                    groupId = item.groupId,
-                                    modelId = item.model.id,
-                                ),
-                            )
-                        },
-                        showDivider = modelIndex < group.models.lastIndex,
-                    )
-                }
             }
         }
     }
@@ -138,82 +117,6 @@ fun LLMModelManagementSection(
     }
 }
 
-/**
- * 一次展开渲染的模型分组片段。
- *
- * @property header 分组头行，承担折叠入口与分组名展示。
- * @property models 组内模型行，按目录顺序排列。
- */
-private data class ModelGroup(
-    val header: LLMModelSettingDetailRow.GroupHeader,
-    val models: List<LLMModelSettingDetailRow.LLMModelItem>,
-)
-
-/** 把 ViewModel 展开的扁平行流按分组头重新切段，供逐组渲染卡片。 */
-private fun List<LLMModelSettingDetailRow>.toModelGroups(): List<ModelGroup> = buildList {
-    var header: LLMModelSettingDetailRow.GroupHeader? = null
-    var models = mutableListOf<LLMModelSettingDetailRow.LLMModelItem>()
-    for (row in this@toModelGroups) {
-        when (row) {
-            is LLMModelSettingDetailRow.GroupHeader -> {
-                header?.let { add(ModelGroup(it, models)) }
-                header = row
-                models = mutableListOf()
-            }
-            is LLMModelSettingDetailRow.LLMModelItem -> models.add(row)
-        }
-    }
-    header?.let { add(ModelGroup(it, models)) }
-}
-
-@Composable
-private fun GroupHeaderRow(
-    row: LLMModelSettingDetailRow.GroupHeader,
-    hasModels: Boolean,
-    onToggle: () -> Unit,
-) {
-    val rotation by animateFloatAsState(
-        targetValue = if (row.isExpanded) 180f else 0f,
-        label = "arrow-rotation",
-    )
-    Column(modifier = Modifier.fillMaxWidth()) {
-        // 组头承担折叠入口，保持 ≥56dp 的完整点击热区（见 LLMModelManagementSectionTest）。
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .clickable(role = Role.Button, onClick = onToggle)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = row.groupName,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowDown,
-                contentDescription = stringResource(
-                    if (row.isExpanded) R.string.modelsettings_sync_collapse
-                    else R.string.modelsettings_sync_expand,
-                ),
-                modifier = Modifier
-                    .padding(start = 12.dp)
-                    .size(22.dp)
-                    .rotate(rotation),
-            )
-        }
-        if (hasModels) {
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-            )
-        }
-    }
-}
 
 @Composable
 private fun ModelItemRow(
@@ -352,11 +255,6 @@ private fun LLMModelManagementSectionPreview() {
         LLMModelManagementSection(
             service = service,
             rows = listOf(
-                LLMModelSettingDetailRow.GroupHeader(
-                    groupId = service.groups.first().id,
-                    groupName = service.groups.first().name,
-                    isExpanded = true,
-                ),
                 LLMModelSettingDetailRow.LLMModelItem(
                     groupId = service.groups.first().id,
                     model = model,

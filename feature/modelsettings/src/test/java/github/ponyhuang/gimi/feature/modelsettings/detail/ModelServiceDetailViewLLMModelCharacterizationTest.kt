@@ -35,7 +35,7 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     @Test
-    fun loadServiceExpandsGroupsAndToggleHidesChildren() = runTest {
+    fun loadServiceFlattensModelsWithoutGroupHeaders() = runTest {
         val provider = service(apiKey = "key")
         val fixture = fixture(provider)
 
@@ -45,26 +45,20 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
 
             var state = awaitItem()
             while (state.service == null) state = awaitItem()
-            assertEquals(2, state.rows.size)
+            assertEquals(1, state.rows.size)
             assertEquals(
-                LLMModelSettingDetailRow.GroupHeader("chat", "Chat", isExpanded = true),
+                LLMModelSettingDetailRow.LLMModelItem(
+                    "chat",
+                    Model("deepseek-chat", "deepseek-chat"),
+                ),
                 state.rows.first(),
-            )
-
-            fixture.viewModel.onAction(LLMModelSettingDetailAction.ToggleGroup("chat"))
-            do {
-                state = awaitItem()
-            } while (state.rows.size != 1)
-            assertEquals(
-                listOf(LLMModelSettingDetailRow.GroupHeader("chat", "Chat", isExpanded = false)),
-                state.rows,
             )
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun newlySynchronizedGroupsAreExpanded() = runTest {
+    fun newlySynchronizedModelsAreVisibleWithoutGroupHeaders() = runTest {
         val provider = service(apiKey = "key")
         val fixture = fixture(provider)
         fixture.viewModel.onAction(LLMModelSettingDetailAction.Load(provider.id))
@@ -83,7 +77,6 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
 
         assertEquals(
             listOf(
-                LLMModelSettingDetailRow.GroupHeader("MiniMax", "MiniMax", isExpanded = true),
                 LLMModelSettingDetailRow.LLMModelItem(
                     "MiniMax",
                     Model("MiniMax-M2.7", "MiniMax-M2.7"),

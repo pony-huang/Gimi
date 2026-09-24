@@ -159,11 +159,6 @@ private fun LLMModelSettingDetailScreenPreview() {
                 isLoading = false,
                 service = service,
                 rows = listOf(
-                    LLMModelSettingDetailRow.GroupHeader(
-                        groupId = service.groups.first().id,
-                        groupName = service.groups.first().name,
-                        isExpanded = true,
-                    ),
                     LLMModelSettingDetailRow.LLMModelItem(
                         groupId = service.groups.first().id,
                         model = service.groups.first().models.first(),

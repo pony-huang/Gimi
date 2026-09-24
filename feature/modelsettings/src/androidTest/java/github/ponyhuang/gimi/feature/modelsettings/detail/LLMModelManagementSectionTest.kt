@@ -1,12 +1,12 @@
 package github.ponyhuang.gimi.feature.modelsettings.detail
 
-import androidx.compose.ui.test.assertHasClickAction
-import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import org.junit.Rule
 import org.junit.Test
@@ -16,16 +16,15 @@ class LLMModelManagementSectionTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun modelGroupHeaderUsesProminentFullHeightClickTarget() {
+    fun modelListOmitsGroupNameAndShowsModelsDirectly() {
         composeRule.setContent {
             AsssistantaiTheme {
                 LLMModelManagementSection(
                     service = service(),
                     rows = listOf(
-                        LLMModelSettingDetailRow.GroupHeader(
+                        LLMModelSettingDetailRow.LLMModelItem(
                             groupId = "minimax",
-                            groupName = "MiniMax",
-                            isExpanded = true,
+                            model = Model("MiniMax-M2.7", "MiniMax-M2.7"),
                         ),
                     ),
                     isRefreshing = false,
@@ -37,10 +36,8 @@ class LLMModelManagementSectionTest {
             }
         }
 
-        composeRule
-            .onNodeWithText("MiniMax")
-            .assertHasClickAction()
-            .assertHeightIsAtLeast(56.dp)
+        composeRule.onNodeWithText("MiniMax-M2.7").assertExists()
+        composeRule.onNodeWithText("MiniMax").assertDoesNotExist()
     }
 
     private fun service() = LLMModelSetting(

@@ -26,7 +26,6 @@ sealed interface LLMModelSettingDetailAction {
     data class ApiBaseUrlChanged(val value: String) : LLMModelSettingDetailAction
     data class ApiProtocolChanged(val value: ApiProtocol) : LLMModelSettingDetailAction
     data class EnabledChanged(val value: Boolean) : LLMModelSettingDetailAction
-    data class ToggleGroup(val groupId: String) : LLMModelSettingDetailAction
     data class RemoveLLMModel(val groupId: String, val modelId: String) : LLMModelSettingDetailAction
     data class NewLLMModelIdChanged(val value: String) : LLMModelSettingDetailAction
     data class NewLLMModelKindChanged(val value: NewModelKind) : LLMModelSettingDetailAction
@@ -56,12 +55,7 @@ sealed interface LLMModelSettingDetailEffect {
 }
 
 sealed interface LLMModelSettingDetailRow {
-    data class GroupHeader(
-        val groupId: String,
-        val groupName: String,
-        val isExpanded: Boolean,
-    ) : LLMModelSettingDetailRow
-
+    /** 供扁平列表渲染的模型，以及删除该模型所需的原始目录归属。 */
     data class LLMModelItem(
         val groupId: String,
         val model: Model,

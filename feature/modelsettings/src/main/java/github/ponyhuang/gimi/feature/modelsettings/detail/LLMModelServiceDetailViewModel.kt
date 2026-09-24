@@ -40,7 +40,6 @@ class ModelServiceDetailViewModel @Inject constructor(
     val effects = _effects.asSharedFlow()
 
     private var serviceId: String? = null
-    private var expandedGroupIds: Set<String> = emptySet()
     private var loadJob: Job? = null
     private var loadGeneration = 0L
 
@@ -59,7 +58,6 @@ class ModelServiceDetailViewModel @Inject constructor(
             is LLMModelSettingDetailAction.ApiBaseUrlChanged -> changeBaseUrl(action.value)
             is LLMModelSettingDetailAction.ApiProtocolChanged -> changeProtocol(action.value)
             is LLMModelSettingDetailAction.EnabledChanged -> changeEnabled(action.value)
-            is LLMModelSettingDetailAction.ToggleGroup -> toggleGroup(action.groupId)
             is LLMModelSettingDetailAction.RemoveLLMModel -> removeModel(action.groupId, action.modelId)
             is LLMModelSettingDetailAction.NewLLMModelIdChanged ->
                 _uiState.update { it.copy(newModelId = action.value) }
@@ -104,7 +102,6 @@ class ModelServiceDetailViewModel @Inject constructor(
                 return@launch
             }
 
-            expandedGroupIds = initial.groups.map { it.id }.toSet()
             publishService(initial)
             observeModelService(id).collect { service ->
                 if (generation == loadGeneration && serviceId == id) {
@@ -115,17 +112,11 @@ class ModelServiceDetailViewModel @Inject constructor(
     }
 
     private fun publishService(service: LLMModelSetting?) {
-        val previousGroupIds = _uiState.value.service?.groups?.mapTo(mutableSetOf()) { it.id }
-        if (previousGroupIds != null && service != null) {
-            expandedGroupIds = expandedGroupIds + service.groups
-                .map { it.id }
-                .filterNot { it in previousGroupIds }
-        }
         _uiState.update { state ->
             state.copy(
                 isLoading = false,
                 service = service,
-                rows = service?.toRows(expandedGroupIds).orEmpty(),
+                rows = service?.toRows().orEmpty(),
             )
         }
     }
@@ -178,17 +169,6 @@ class ModelServiceDetailViewModel @Inject constructor(
         mutate {
             if (!updateModelService.enabled(id, enabled)) return@mutate
             _uiState.update { state -> state.copy(service = state.service?.copy(isEnabled = enabled)) }
-        }
-    }
-
-    private fun toggleGroup(groupId: String) {
-        expandedGroupIds = if (groupId in expandedGroupIds) {
-            expandedGroupIds - groupId
-        } else {
-            expandedGroupIds + groupId
-        }
-        _uiState.update { state ->
-            state.copy(rows = state.service?.toRows(expandedGroupIds).orEmpty())
         }
     }
 
@@ -278,15 +258,11 @@ class ModelServiceDetailViewModel @Inject constructor(
     }
 }
 
-private fun LLMModelSetting.toRows(expandedGroupIds: Set<String>): List<LLMModelSettingDetailRow> =
+private fun LLMModelSetting.toRows(): List<LLMModelSettingDetailRow> =
     buildList {
         groups.forEach { group ->
-            val expanded = group.id in expandedGroupIds
-            add(LLMModelSettingDetailRow.GroupHeader(group.id, group.name, expanded))
-            if (expanded) {
-                group.models.forEach { model ->
-                    add(LLMModelSettingDetailRow.LLMModelItem(group.id, model))
-                }
+            group.models.forEach { model ->
+                add(LLMModelSettingDetailRow.LLMModelItem(group.id, model))
             }
         }
     }

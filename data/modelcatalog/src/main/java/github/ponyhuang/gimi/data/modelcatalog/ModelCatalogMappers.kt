@@ -10,6 +10,7 @@ fun LLMModelProvider.toDomain(): LLMModelSetting = LLMModelSetting(
     id = serviceId,
     name = serviceName,
     isEnabled = isEnabled,
+    isOfficialToolsEnabled = isOfficialToolsEnabled,
     apiKey = apiKey,
     apiBaseUrl = apiBaseUrl,
     apiProtocol = baseType.toDomain(),

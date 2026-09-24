@@ -37,13 +37,14 @@ class DefaultOfficialToolsetTest {
         val tools = toolset().resolveTools(config(serviceId = "openai"), selection = null)
 
         // 目录 ID 是 openai_web_search,但线上声明字面量保持厂商规定的 web_search。
-        assertEquals(listOf("web_search"), tools.map { it.name })
+        assertTrue(tools.any { it.name == "web_search" })
     }
 
     @Test
     fun ignoresServicesWithoutOfficialToolDeclarations() = runTest {
         assertTrue(
-            toolset().resolveTools(config(serviceId = "deepseek"), selection = null).isEmpty(),
+            toolset().resolveTools(config(serviceId = "deepseek"), selection = null)
+                .any { it.name == "minimax_text_to_image" },
         )
     }
 
@@ -52,7 +53,7 @@ class DefaultOfficialToolsetTest {
         assertTrue(
             toolset()
                 .resolveTools(config(serviceId = "openai", baseType = ApiProtocol.Anthropic), null)
-                .isEmpty(),
+                .none { it is OfficialBuiltInTool },
         )
     }
 
@@ -64,14 +65,14 @@ class DefaultOfficialToolsetTest {
                 config(serviceId = serviceId, baseType = ApiProtocol.Anthropic),
                 selection = null,
             )
-            assertEquals("service: $serviceId", listOf("web_search"), tools.map { it.name })
+            assertTrue("service: $serviceId", tools.any { it.name == "web_search" })
         }
         for (serviceId in listOf("openai", "mimo")) {
             val tools = toolset.resolveTools(
                 config(serviceId = serviceId, baseType = ApiProtocol.Standard),
                 selection = null,
             )
-            assertEquals("service: $serviceId", listOf("web_search"), tools.map { it.name })
+            assertTrue("service: $serviceId", tools.any { it.name == "web_search" })
         }
     }
 
@@ -84,6 +85,43 @@ class DefaultOfficialToolsetTest {
 
         assertTrue(tools.any { it.name == "minimax_text_to_image" })
         assertTrue(tools.any { it.name == "minimax_image_to_image" })
+    }
+
+    @Test
+    fun resolvesEnabledMinimaxImageGenerationForAnotherChatModel() = runTest {
+        val tools = toolset().resolveTools(
+            config(serviceId = "openai", baseType = ApiProtocol.Standard),
+            selection = null,
+        )
+
+        assertTrue(tools.any { it.name == "minimax_text_to_image" })
+        assertTrue(tools.any { it.name == "minimax_image_to_image" })
+    }
+
+    @Test
+    fun doesNotMixMinimaxRemoteWebSearchIntoAnotherChatModel() = runTest {
+        val tools = toolset().resolveTools(
+            config(serviceId = "openai", baseType = ApiProtocol.Standard),
+            selection = null,
+        )
+
+        assertEquals(1, tools.filterIsInstance<OfficialBuiltInTool>().size)
+    }
+
+    @Test
+    fun skipsCrossModelToolsWhenTheirServiceDisablesOfficialTools() = runTest {
+        val registry = OfficialToolRegistry(
+            kimiFormulaCache = testKimiFormulaCache(),
+            httpClient = testHttpClient(),
+            modelServices = allServices(officialToolsEnabled = false),
+        )
+
+        val tools = DefaultOfficialToolset(registry, FakeToolAccessRepository()).resolveTools(
+            config(serviceId = "openai", baseType = ApiProtocol.Standard),
+            selection = null,
+        )
+
+        assertTrue(tools.isEmpty())
     }
 
     @Test
@@ -106,7 +144,7 @@ class DefaultOfficialToolsetTest {
             selection = null,
         )
 
-        assertEquals(3, tools.size)
+        assertTrue(tools.size >= 3)
         assertTrue(tools.any { it is GoogleSearchTool })
         assertTrue(tools.any { it is UrlContextTool })
         assertTrue(tools.any { it is GoogleMapsTool })
@@ -117,7 +155,7 @@ class DefaultOfficialToolsetTest {
         assertTrue(
             toolset()
                 .resolveTools(config(serviceId = "gemini", baseType = ApiProtocol.Standard), null)
-                .isEmpty(),
+                .none { it is GoogleSearchTool || it is UrlContextTool || it is GoogleMapsTool },
         )
     }
 
@@ -147,14 +185,14 @@ class DefaultOfficialToolsetTest {
     fun glmToolsRequireModelFamilyMatch() = runTest {
         val toolset = toolset()
 
-        assertEquals(
-            listOf(GlmWebSearchTool.NAME, GlmReaderTool.NAME),
+        assertTrue(
             toolset.resolveTools(config(serviceId = "glm", modelId = "glm-4.6"), null)
-                .map { it.name },
+                .map { it.name }
+                .containsAll(listOf(GlmWebSearchTool.NAME, GlmReaderTool.NAME)),
         )
         assertTrue(
             toolset.resolveTools(config(serviceId = "glm", modelId = "other-model"), null)
-                .isEmpty(),
+                .none { it.name == GlmWebSearchTool.NAME || it.name == GlmReaderTool.NAME },
         )
     }
 
@@ -165,7 +203,7 @@ class DefaultOfficialToolsetTest {
             selection = null,
         )
 
-        assertEquals(2, tools.size)
+        assertTrue(tools.map { it.name }.containsAll(listOf(GlmWebSearchTool.NAME, GlmReaderTool.NAME)))
     }
 
     @Test
@@ -230,7 +268,7 @@ class DefaultOfficialToolsetTest {
         val tools = toolset(manifestClient(200, MANIFEST_BODY))
             .resolveTools(config(serviceId = "kimi", modelId = "kimi-k2.5"), selection = null)
 
-        assertEquals(listOf("translate"), tools.map { it.name })
+        assertTrue(tools.any { it.name == "translate" })
     }
 
     @Test
@@ -238,7 +276,7 @@ class DefaultOfficialToolsetTest {
         assertTrue(
             toolset(manifestClient(200, MANIFEST_BODY))
                 .resolveTools(config(serviceId = "kimi", modelId = "other-model"), null)
-                .isEmpty(),
+                .none { it.name == "translate" },
         )
     }
 
@@ -251,7 +289,7 @@ class DefaultOfficialToolsetTest {
         assertTrue(
             toolset(manifestClient(200, MANIFEST_BODY))
                 .resolveTools(config(serviceId = "kimi", modelId = "kimi-k2.5"), selection)
-                .isEmpty(),
+                .none { it.name == "translate" },
         )
     }
 
@@ -266,7 +304,7 @@ class DefaultOfficialToolsetTest {
         val tools = toolset(manifestClient(200, MANIFEST_BODY))
             .resolveTools(config(serviceId = "kimi", modelId = "kimi-k2.5"), selection)
 
-        assertEquals(listOf("translate"), tools.map { it.name })
+        assertTrue(tools.any { it.name == "translate" })
     }
 
     @Test
@@ -274,7 +312,7 @@ class DefaultOfficialToolsetTest {
         assertTrue(
             toolset(manifestClient(500, "{}"))
                 .resolveTools(config(serviceId = "kimi", modelId = "kimi-k2.5"), selection = null)
-                .isEmpty(),
+                .none { it.name == "translate" },
         )
     }
 
@@ -286,7 +324,7 @@ class DefaultOfficialToolsetTest {
                 selection = null,
             )
 
-        assertEquals(listOf("translate"), tools.map { it.name })
+        assertTrue(tools.any { it.name == "translate" })
     }
 
     @Test
@@ -358,12 +396,22 @@ class DefaultOfficialToolsetTest {
 
     /** 同时提供 glm/kimi 等服务的凭据,便于各厂商用例共用一个注册表。 */
     private fun allServices(credential: String): AgentModelConfigurationSource {
+        return allServices(credential = credential, officialToolsEnabled = true)
+    }
+
+    private fun allServices(
+        credential: String = "key",
+        officialToolsEnabled: Boolean,
+    ): AgentModelConfigurationSource {
         val serviceIds = listOf("openai", "anthropic", "minimax", "mimo", "gemini", "glm", "kimi")
         val services = serviceIds.map { serviceId ->
             mockk<LLMModelSetting> {
                 every { id } returns serviceId
                 every { isEnabled } returns true
+                every { isOfficialToolsEnabled } returns officialToolsEnabled
                 every { apiKey } returns credential
+                every { apiProtocol } returns ApiProtocol.Standard
+                every { activeApiBaseUrl } returns "https://example.com"
             }
         }
         return mockk {

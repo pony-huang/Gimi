@@ -6,6 +6,8 @@ data class LLMModelSetting(
     val id: String,
     val name: String,
     val isEnabled: Boolean,
+    /** 是否把该服务可独立调用的官方工具暴露给会话工具抽屉。 */
+    val isOfficialToolsEnabled: Boolean = isEnabled,
     val apiKey: String,
     val apiBaseUrl: String,
     val apiProtocol: ApiProtocol,

@@ -3,6 +3,8 @@ package github.ponyhuang.gimi.data.agent.tools.official
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolAvailability
+import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,6 +22,15 @@ class DefaultOfficialToolFunctionCatalog @Inject constructor(
 
     override fun supportedToolIds(serviceId: String, protocol: ApiProtocol): Set<String> =
         registry.supportedToolIds(serviceId, protocol)
+
+    override fun availableTools(
+        activeService: LLMModelSetting,
+        activeModelId: String,
+    ): List<OfficialToolAvailability> = registry.availableSpecsFor(
+        serviceId = activeService.id,
+        protocol = activeService.apiProtocol,
+        modelId = activeModelId,
+    ).map { spec -> OfficialToolAvailability(toolId = spec.toolId, serviceId = spec.serviceId) }
 
     override suspend fun listFunctions(toolId: String): List<OfficialToolFunction> =
         registry.listFunctions(toolId)

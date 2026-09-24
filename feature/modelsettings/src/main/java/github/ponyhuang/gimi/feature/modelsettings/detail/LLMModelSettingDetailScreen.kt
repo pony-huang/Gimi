@@ -63,6 +63,14 @@ fun LLMModelSettingDetailScreen(
                     },
                 )
             }
+            OfficialToolsSection(
+                enabled = service.isOfficialToolsEnabled,
+                serviceEnabled = service.isEnabled,
+                onEnabledChange = {
+                    dispatch(LLMModelSettingDetailAction.OfficialToolsEnabledChanged(it))
+                },
+                modifier = Modifier.alpha(blockedAlpha),
+            )
             PreferenceSectionTitle(
                 text = stringResource(R.string.modelsettings_section_connection),
             )
@@ -119,6 +127,7 @@ private fun LLMModelSettingDetailAction.changesAgentConfiguration(): Boolean = w
     is LLMModelSettingDetailAction.ApiBaseUrlChanged,
     is LLMModelSettingDetailAction.ApiProtocolChanged,
     is LLMModelSettingDetailAction.EnabledChanged,
+    is LLMModelSettingDetailAction.OfficialToolsEnabledChanged,
     is LLMModelSettingDetailAction.RemoveLLMModel,
     is LLMModelSettingDetailAction.NewLLMModelIdChanged,
     is LLMModelSettingDetailAction.NewLLMModelKindChanged,

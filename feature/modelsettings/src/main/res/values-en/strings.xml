@@ -24,6 +24,9 @@
     <string name="modelsettings_dialog_cancel">Cancel</string>
 
     <string name="modelsettings_section_connection">Connection</string>
+    <string name="modelsettings_section_official_tools">Official tools</string>
+    <string name="modelsettings_official_tools_enabled">Enable official tools</string>
+    <string name="modelsettings_official_tools_enabled_summary">Allow independent API tools provided by this service in chats.</string>
     <string name="modelsettings_key_url_missing">API key help URL is not configured</string>
     <string name="modelsettings_no_browser">No browser available</string>
     <string name="modelsettings_notice_service_not_found">Service not found</string>

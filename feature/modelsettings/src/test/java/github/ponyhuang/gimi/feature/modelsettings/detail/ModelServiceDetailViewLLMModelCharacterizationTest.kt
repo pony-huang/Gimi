@@ -140,6 +140,20 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
     }
 
     @Test
+    fun officialToolsSwitchUpdatesStateAndRepository() = runTest {
+        val provider = service(apiKey = "key")
+        val fixture = fixture(provider)
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.Load(provider.id))
+        advanceUntilIdle()
+
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.OfficialToolsEnabledChanged(false))
+        advanceUntilIdle()
+
+        assertFalse(fixture.viewModel.uiState.value.service?.isOfficialToolsEnabled ?: true)
+        io.mockk.verify { fixture.repository.updateOfficialToolsEnabled(provider.id, false) }
+    }
+
+    @Test
     fun protocolChangeToUnsupportedProtocolIsRejected() = runTest {
         val provider = service(apiKey = "key").copy(
             supportedProtocols = listOf(ApiProtocol.Standard),

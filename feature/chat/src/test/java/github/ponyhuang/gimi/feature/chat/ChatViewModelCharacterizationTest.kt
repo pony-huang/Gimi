@@ -42,6 +42,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolAvailability
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
@@ -1251,7 +1252,9 @@ class ChatViewModelCharacterizationTest {
     @Test
     fun cancelledOfficialFunctionLoadDoesNotSwallowCancellationException() = runTest {
         val catalog = mockk<OfficialToolFunctionCatalog>(relaxed = true) {
-            every { supportedToolIds(any(), any()) } returns setOf("web_search")
+            every { availableTools(any(), any()) } returns listOf(
+                OfficialToolAvailability("web_search", "service"),
+            )
             coEvery { listFunctions("web_search") } throws CancellationException("load cancelled")
         }
         val fixture = fixture(configured = true, officialCatalogOverride = catalog)
@@ -1611,7 +1614,9 @@ class ChatViewModelCharacterizationTest {
         }
         val officialFunctionCatalog = officialCatalogOverride
             ?: mockk<OfficialToolFunctionCatalog>(relaxed = true) {
-                every { supportedToolIds(any(), any()) } returns setOf("web_search")
+                every { availableTools(any(), any()) } returns listOf(
+                    OfficialToolAvailability("web_search", "service"),
+                )
                 coEvery { listFunctions(any()) } returns emptyList()
             }
         val appNotificationManager = mockk<AppNotificationManager>(relaxed = true)

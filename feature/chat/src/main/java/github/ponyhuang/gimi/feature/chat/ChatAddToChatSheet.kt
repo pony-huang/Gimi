@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,12 +16,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -47,6 +46,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -64,6 +64,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.Velocity
@@ -79,7 +80,6 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.gimi.ui.components.GimiBottomSheet
 import github.ponyhuang.gimi.ui.components.GimiBottomSheetHeader
 import github.ponyhuang.gimi.ui.components.GimiBottomSheetOptionRow
-import github.ponyhuang.gimi.ui.components.GimiBottomSheetSwitchRow
 import androidx.compose.ui.tooling.preview.Preview
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
@@ -547,72 +547,53 @@ private fun OfficialToolsDetailPage(
                         .then(if (isScrollable) Modifier.fillMaxSize() else Modifier.wrapContentHeight())
                         .nestedScroll(rememberLowerBoundaryNestedScrollConnection(listState)),
                 ) {
-                    state.officialTools.forEachIndexed { index, tool ->
-                        if (state.officialTools.size > 1) {
-                            item(key = "header-${tool.id}") {
-                                OfficialToolGroupHeader(
-                                    title = officialToolLabel(tool.id),
-                                    subtitle = officialToolDescription(tool.id),
-                                    isFirst = index == 0,
-                                )
-                            }
-                        }
-                        if (tool.functions.isEmpty() && tool.isLoadingFunctions) {
-                            item(key = "loading-${tool.id}") {
-                                LoadingState(compact = true)
-                            }
-                        } else if (tool.functions.isEmpty() && tool.loadError != null) {
-                            item(key = "error-${tool.id}") {
-                                ErrorState(
-                                    message = tool.loadError,
-                                    onRetry = { onRetry(tool.id) },
-                                    compact = true,
-                                )
-                            }
-                        } else {
-                            items(tool.functions, key = { "${tool.id}-${it.id}" }) { function ->
-                                OfficialToolFunctionRow(
-                                    toolId = tool.id,
-                                    function = function,
-                                    enabled = state.isOfficialFunctionEnabled(tool.id, function.id),
-                                    mutationEnabled = !state.isMutationBlocked &&
-                                        state.configuration != null,
-                                    onEnabledChange = {
-                                        onFunctionEnabledChange(tool.id, function.id, it)
+                    state.officialTools.groupBy { it.sourceServiceId }.values
+                        .forEachIndexed { sourceIndex, sourceTools ->
+                            val source = sourceTools.first()
+                            item(key = "source-${source.sourceServiceId}") {
+                                OfficialToolSourceHeader(
+                                    title = source.sourceServiceName.ifBlank {
+                                        officialToolLabel(source.id)
                                     },
+                                    isFirst = sourceIndex == 0,
                                 )
-                                HorizontalDivider(
-                    modifier = Modifier.padding(start = 66.dp, end = 16.dp),
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                )
+                            }
+                            sourceTools.forEach { tool ->
+                                if (tool.functions.isEmpty() && tool.isLoadingFunctions) {
+                                    item(key = "loading-${tool.id}") {
+                                        LoadingState(compact = true)
+                                    }
+                                } else if (tool.functions.isEmpty() && tool.loadError != null) {
+                                    item(key = "error-${tool.id}") {
+                                        ErrorState(
+                                            message = tool.loadError,
+                                            onRetry = { onRetry(tool.id) },
+                                            compact = true,
+                                        )
+                                    }
+                                } else {
+                                    items(tool.functions, key = { "${tool.id}-${it.id}" }) { function ->
+                                        OfficialToolFunctionRow(
+                                            toolId = tool.id,
+                                            function = function,
+                                            enabled = state.isOfficialFunctionEnabled(tool.id, function.id),
+                                            mutationEnabled = !state.isMutationBlocked &&
+                                                state.configuration != null,
+                                            onEnabledChange = {
+                                                onFunctionEnabledChange(tool.id, function.id, it)
+                                            },
+                                        )
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(start = 66.dp, end = 16.dp),
+                                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                        )
+                                    }
+                                }
                             }
                         }
-                    }
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun OfficialToolGroupHeader(
-    title: String,
-    subtitle: String,
-    isFirst: Boolean,
-) {
-    Column(modifier = Modifier.padding(top = if (isFirst) 4.dp else 18.dp, bottom = 4.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-        )
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
-        )
     }
 }
 
@@ -680,15 +661,58 @@ private fun OfficialToolFunctionRow(
     mutationEnabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
 ) {
-    GimiBottomSheetSwitchRow(
-        icon = Icons.Default.Functions,
-        label = officialFunctionLabel(toolId, function.id),
-        description = officialFunctionDescription(toolId, function.id, function.description),
-        checked = enabled,
-        enabled = mutationEnabled,
-        onCheckedChange = onEnabledChange,
-        modifier = Modifier.testTag("official-tool-function-$toolId-${function.id}"),
-    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 64.dp)
+            .testTag("official-tool-function-$toolId-${function.id}")
+            .toggleable(
+                value = enabled,
+                enabled = mutationEnabled,
+                role = Role.Switch,
+                onValueChange = onEnabledChange,
+            )
+            .padding(horizontal = 20.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(32.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.Functions,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 12.dp, end = 12.dp),
+        ) {
+            Text(
+                text = officialFunctionLabel(toolId, function.id),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                text = officialFunctionDescription(toolId, function.id, function.description),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
+        Switch(
+            checked = enabled,
+            onCheckedChange = null,
+            enabled = mutationEnabled,
+        )
+    }
 }
 
 @Composable
@@ -971,7 +995,7 @@ private fun officialToolDescription(toolId: String): String = when (toolId) {
 
 /**
  * 函数行展示:目录 ID 与工具相同的单函数工具复用工具文案;GLM 的两个本地函数
- * 按厂商函数名映射;Kimi 公式等动态函数直接展示厂商返回的名称/描述。
+ * 和 MiniMax 生图函数按厂商函数名映射;Kimi 公式等动态函数展示厂商返回的信息。
  */
 @Composable
 private fun officialFunctionLabel(toolId: String, functionId: String): String =
@@ -981,6 +1005,10 @@ private fun officialFunctionLabel(toolId: String, functionId: String): String =
             stringResource(R.string.chat_official_tool_web_search)
         functionId == OfficialToolIds.GLM_WEB_READER_FUNCTION ->
             stringResource(R.string.chat_official_tool_web_reader)
+        functionId == OfficialToolIds.MINIMAX_TEXT_TO_IMAGE ->
+            stringResource(R.string.chat_official_tool_text_to_image)
+        functionId == OfficialToolIds.MINIMAX_IMAGE_TO_IMAGE ->
+            stringResource(R.string.chat_official_tool_image_to_image)
         else -> functionId
     }
 
@@ -992,6 +1020,10 @@ private fun officialFunctionDescription(toolId: String, functionId: String, fall
             stringResource(R.string.chat_official_tool_web_search_description)
         functionId == OfficialToolIds.GLM_WEB_READER_FUNCTION ->
             stringResource(R.string.chat_official_tool_web_reader_description)
+        functionId == OfficialToolIds.MINIMAX_TEXT_TO_IMAGE ->
+            stringResource(R.string.chat_official_tool_text_to_image_description)
+        functionId == OfficialToolIds.MINIMAX_IMAGE_TO_IMAGE ->
+            stringResource(R.string.chat_official_tool_image_to_image_description)
         else -> fallback
     }
 
@@ -1038,6 +1070,21 @@ private fun ChatAddToChatHomePreview() {
     }
 }
 
+@Composable
+private fun OfficialToolSourceHeader(title: String, isFirst: Boolean) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(
+            start = 20.dp,
+            end = 20.dp,
+            top = if (isFirst) 4.dp else 18.dp,
+            bottom = 8.dp,
+        ),
+    )
+}
+
 @Preview(showBackground = true)
 @Composable
 private fun ChatAddToChatHomeWithErrorPreview() {
@@ -1081,12 +1128,59 @@ private fun ChatAddToChatMcpServersPagePreview() {
     }
 }
 
-@Preview(showBackground = true)
+private fun previewMinimaxOfficialToolsState(): ChatAddToChatState =
+    previewAddToChatState().copy(
+        officialTools = listOf(
+            OfficialToolDescriptor(
+                id = OfficialToolIds.MINIMAX_WEB_SEARCH,
+                sourceServiceId = "minimax",
+                sourceServiceName = "MiniMax",
+                functions = listOf(
+                    OfficialToolFunction(
+                        id = OfficialToolIds.MINIMAX_WEB_SEARCH,
+                        name = "Web search",
+                        description = "Search the web for current information",
+                    ),
+                ),
+            ),
+            OfficialToolDescriptor(
+                id = OfficialToolIds.MINIMAX_IMAGE_GENERATION,
+                sourceServiceId = "minimax",
+                sourceServiceName = "MiniMax",
+                functions = listOf(
+                    OfficialToolFunction(
+                        id = OfficialToolIds.MINIMAX_TEXT_TO_IMAGE,
+                        name = "Text to image",
+                        description = "Generate an image from text",
+                    ),
+                    OfficialToolFunction(
+                        id = OfficialToolIds.MINIMAX_IMAGE_TO_IMAGE,
+                        name = "Image to image",
+                        description = "Generate an image from a reference image",
+                    ),
+                ),
+            ),
+        ),
+    )
+
+@Preview(name = "官方工具-浅色", showBackground = true)
 @Composable
 private fun ChatAddToChatOfficialToolsDetailPagePreview() {
-    AsssistantaiTheme {
+    AsssistantaiTheme(darkTheme = false) {
         OfficialToolsDetailPage(
-            state = previewAddToChatState(),
+            state = previewMinimaxOfficialToolsState(),
+            onFunctionEnabledChange = { _, _, _ -> },
+            onRetry = {},
+        )
+    }
+}
+
+@Preview(name = "官方工具-深色", showBackground = true)
+@Composable
+private fun ChatAddToChatOfficialToolsDetailPageDarkPreview() {
+    AsssistantaiTheme(darkTheme = true) {
+        OfficialToolsDetailPage(
+            state = previewMinimaxOfficialToolsState(),
             onFunctionEnabledChange = { _, _, _ -> },
             onRetry = {},
         )

@@ -42,6 +42,10 @@
     <string name="chat_session_mcp_empty_description">Add a server from MCP in Settings first.</string>
     <string name="chat_official_tool_web_search">Web search</string>
     <string name="chat_official_tool_web_search_description">Search the web for current information</string>
+    <string name="chat_official_tool_text_to_image">Text to image</string>
+    <string name="chat_official_tool_text_to_image_description">Generate an image from a text description</string>
+    <string name="chat_official_tool_image_to_image">Image to image</string>
+    <string name="chat_official_tool_image_to_image_description">Generate an image from a reference image and text</string>
     <string name="chat_official_tool_kimi_formulas">Kimi formulas</string>
     <string name="chat_official_tool_kimi_formulas_description">Use Kimi formula calculations</string>
     <string name="chat_official_tool_glm_web_search">GLM web search</string>

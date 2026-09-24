@@ -31,6 +31,7 @@ fun servicesWith(
     val service = mockk<LLMModelSetting> {
         every { id } returns serviceId
         every { isEnabled } returns true
+        every { isOfficialToolsEnabled } returns true
         every { apiKey } returns apiKey
     }
     return mockk {

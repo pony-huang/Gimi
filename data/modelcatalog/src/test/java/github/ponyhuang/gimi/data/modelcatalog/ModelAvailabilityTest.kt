@@ -72,6 +72,12 @@ class ModelAvailabilityTest {
         assertFalse(configured.copy(apiKey = "").isConfiguredForChat)
     }
 
+    @Test
+    fun officialToolsDefaultToTheServiceEnabledState() {
+        assertTrue(provider(isEnabled = true, apiKey = "key").isOfficialToolsEnabled)
+        assertFalse(provider(isEnabled = false, apiKey = "key").isOfficialToolsEnabled)
+    }
+
     private fun provider(isEnabled: Boolean, apiKey: String) = LLMModelProvider(
         serviceId = "test",
         serviceName = "Test",

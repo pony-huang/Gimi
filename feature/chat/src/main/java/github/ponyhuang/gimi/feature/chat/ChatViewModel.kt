@@ -37,6 +37,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolAvailability
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.gimi.domain.mcp.model.McpSkippedServer
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
@@ -279,7 +280,20 @@ class ChatViewModel @Inject constructor(
         }
         viewModelScope.launch {
             modelServices.observeServices().collect { services ->
-                _uiState.update { it.copy(availableLLMModelSettings = services) }
+                _uiState.update { state ->
+                    state.copy(
+                        availableLLMModelSettings = services,
+                        officialToolDescriptors = buildOfficialToolDescriptors(
+                            selection = state.currentModelSelection,
+                            existing = state.officialToolDescriptors,
+                        ),
+                    )
+                }
+                val sessionId = _uiState.value.sessionId
+                val runtime = sessionRuntimes[sessionId] ?: return@collect
+                val selection = runtime.modelSelection ?: return@collect
+                initializeOfficialFunctionsForSelection(sessionId, runtime, selection)
+                publishRuntime(runtime)
             }
         }
         viewModelScope.launch {
@@ -1504,11 +1518,18 @@ class ChatViewModel @Inject constructor(
         selection: ModelSelection?,
         existing: List<OfficialToolDescriptor>,
     ): List<OfficialToolDescriptor> {
-        val ids = supportedOfficialToolIds(selection)
-        if (ids.isEmpty()) return emptyList()
+        val available = availableOfficialTools(selection)
+        if (available.isEmpty()) return emptyList()
         val existingById = existing.associateBy { it.id }
-        return ids.map { id ->
-            existingById[id] ?: OfficialToolDescriptor(id = id)
+        val services = modelServices.currentServices().associateBy(LLMModelSetting::id)
+        return available.map { tool ->
+            existingById[tool.toolId]
+                ?.takeIf { it.sourceServiceId == tool.serviceId }
+                ?: OfficialToolDescriptor(
+                    id = tool.toolId,
+                    sourceServiceId = tool.serviceId,
+                    sourceServiceName = services[tool.serviceId]?.name.orEmpty(),
+                )
         }
     }
 
@@ -1540,15 +1561,23 @@ class ChatViewModel @Inject constructor(
     }
 
     /**
-     * 当前选择支持的官方工具 ID(厂商唯一)。官方工具支持矩阵由 agent 层的
-     * [OfficialToolFunctionCatalog] 实现维护,按服务 + 当前协议查询。
+     * 当前选择可用的官方工具，包含当前服务原生工具与其它服务独立 API 工具。
      */
     private fun supportedOfficialToolIds(selection: ModelSelection?): Set<String> {
-        val current = selection ?: return emptySet()
+        return availableOfficialTools(selection).mapTo(linkedSetOf()) { it.toolId }
+    }
+
+    private fun availableOfficialTools(
+        selection: ModelSelection?,
+    ): List<OfficialToolAvailability> {
+        val current = selection ?: return emptyList()
         val service = modelServices.currentServices()
             .firstOrNull { it.id == current.serviceId }
-            ?: return emptySet()
-        return officialFunctionCatalog.supportedToolIds(current.serviceId, service.apiProtocol)
+            ?: return emptyList()
+        return officialFunctionCatalog.availableTools(
+            activeService = service,
+            activeModelId = current.modelId,
+        )
     }
 
     private fun isUsableChatSelection(selection: ModelSelection): Boolean =

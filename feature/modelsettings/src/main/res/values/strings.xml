@@ -29,6 +29,9 @@
 
     <!-- LLMModelServiceDetailScreen / Route -->
     <string name="modelsettings_section_connection">连接配置</string>
+    <string name="modelsettings_section_official_tools">官方工具</string>
+    <string name="modelsettings_official_tools_enabled">启用官方工具</string>
+    <string name="modelsettings_official_tools_enabled_summary">开启后，可在聊天中使用此服务提供的独立 API 工具。</string>
     <string name="modelsettings_key_url_missing">未配置密钥获取链接</string>
     <string name="modelsettings_no_browser">未找到可用的浏览器</string>
     <string name="modelsettings_notice_service_not_found">未找到该服务</string>

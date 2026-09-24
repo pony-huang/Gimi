@@ -37,8 +37,7 @@ class OfficialToolContribution @Inject constructor(
 
     override suspend fun candidateSources(spec: AgentBuildSpec): List<ToolCandidateSource> {
         if (spec.toolAccessMode != ToolAccessMode.ON_DEMAND) return emptyList()
-        return registry.all
-            .filter { it.searchCandidate }
+        return registry.enabledSearchCandidateSpecs()
             .map { candidate -> OfficialToolCandidateSource(candidate, officialToolset) }
     }
 

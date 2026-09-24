@@ -180,12 +180,14 @@ fun ChatUiState.getCurrentUserMessage(): Message? =
     messages.firstOrNull()?.takeIf { message -> message.role == MessageRole.User }
 
 /**
- * A user-selectable official tool exposed by the active model service. The
+ * A user-selectable official tool exposed by its source model service. The
  * function list is loaded lazily by [ChatViewModel] when the user opens the
  * sub-page; [OfficialToolDescriptor.functions] stays empty while loading.
  */
 data class OfficialToolDescriptor(
     val id: String,
+    val sourceServiceId: String = "",
+    val sourceServiceName: String = "",
     val functions: List<OfficialToolFunction> = emptyList(),
     val isLoadingFunctions: Boolean = false,
     val loadError: String? = null,

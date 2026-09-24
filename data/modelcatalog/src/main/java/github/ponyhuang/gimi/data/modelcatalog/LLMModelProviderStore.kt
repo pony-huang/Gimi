@@ -46,6 +46,7 @@ sealed interface ModelCatalogLoadState {
 private data class ModelServiceSettings(
     // 补默认值容忍旧版本稀疏 blob（Gson 静默留 null / 缺字段，kotlinx 默认抛异常）。
     val isEnabled: Boolean = false,
+    val isOfficialToolsEnabled: Boolean = isEnabled,
     val apiKey: String = "",
     val apiBaseUrl: String = "",
     val baseType: ApiBaseType = ApiBaseType.Standard,
@@ -269,8 +270,14 @@ class ModelServiceRepository @Inject constructor(
             Log.w(TAG, "Refusing to enable '$serviceId' — apiKey is blank.")
             return false
         }
-        updateService(serviceId) { it.copy(isEnabled = enabled) }
+        updateService(serviceId) { it.copy(isEnabled = enabled, isOfficialToolsEnabled = enabled) }
         return true
+    }
+
+    override fun updateOfficialToolsEnabled(serviceId: String, enabled: Boolean) {
+        updateService(serviceId) { provider ->
+            provider.copy(isOfficialToolsEnabled = enabled && provider.isEnabled)
+        }
     }
 
     suspend fun removeModel(serviceId: String, groupId: String, modelId: String) {
@@ -427,7 +434,14 @@ class ModelServiceRepository @Inject constructor(
     private fun entityToProvider(entity: LLMModelConfigEntity): LLMModelProvider {
         val providerSettings = settings.value[entity.serviceId]
             ?: defaultSettings[entity.serviceId]
-            ?: ModelServiceSettings(false, "", "", ApiBaseType.Standard, "")
+            ?: ModelServiceSettings(
+                isEnabled = false,
+                isOfficialToolsEnabled = false,
+                apiKey = "",
+                apiBaseUrl = "",
+                baseType = ApiBaseType.Standard,
+                anthropicBaseUrl = "",
+            )
         // 接口标准白名单是静态元数据，按 serviceId 从默认清单回填；
         // 持久化的协议若不在白名单内（例如厂商后来收紧了格式约束），回退到首个允许值。
         val supportedBaseTypes = LLMModelConfigs.supportedBaseTypesFor(entity.serviceId)
@@ -437,6 +451,7 @@ class ModelServiceRepository @Inject constructor(
             serviceId = entity.serviceId,
             serviceName = entity.serviceName,
             isEnabled = providerSettings.isEnabled,
+            isOfficialToolsEnabled = providerSettings.isOfficialToolsEnabled,
             apiKey = providerSettings.apiKey,
             apiBaseUrl = providerSettings.apiBaseUrl,
             baseType = baseType,
@@ -471,6 +486,7 @@ class ModelServiceRepository @Inject constructor(
 
     private fun LLMModelProvider.toSettings(): ModelServiceSettings = ModelServiceSettings(
         isEnabled = isEnabled,
+        isOfficialToolsEnabled = isOfficialToolsEnabled,
         apiKey = apiKey,
         apiBaseUrl = apiBaseUrl,
         baseType = baseType,
@@ -479,6 +495,7 @@ class ModelServiceRepository @Inject constructor(
 
     private fun LLMModelProvider.applySettings(value: ModelServiceSettings): LLMModelProvider = copy(
         isEnabled = value.isEnabled,
+        isOfficialToolsEnabled = value.isOfficialToolsEnabled,
         apiKey = value.apiKey,
         apiBaseUrl = value.apiBaseUrl,
         baseType = value.baseType,

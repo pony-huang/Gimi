@@ -45,6 +45,9 @@ class UpdateModelServiceUseCase @Inject constructor(
     fun enabled(serviceId: String, enabled: Boolean): Boolean =
         repository.updateEnabled(serviceId, enabled)
 
+    fun officialToolsEnabled(serviceId: String, enabled: Boolean) =
+        repository.updateOfficialToolsEnabled(serviceId, enabled)
+
     fun protocol(serviceId: String, protocol: ApiProtocol) =
         repository.updateApiProtocol(serviceId, protocol)
 

@@ -128,14 +128,16 @@ class DefaultConversationSessionResolver @Inject constructor(
                 .firstOrNull()
     }
 
-    /**
-     * 当前服务 + 协议支持的官方工具 ID(厂商唯一);官方工具支持矩阵由 agent 层的
-     * [OfficialToolFunctionCatalog] 实现维护,模型目录不再承载该职责。
-     */
+    /** 当前聊天模型与所有已开启工具服务共同可用的官方工具 ID。 */
     private fun supportedOfficialToolIds(selection: ModelSelection): Set<String> =
         modelCatalog.currentServices()
             .firstOrNull { it.id == selection.serviceId }
-            ?.let { service -> officialTools.supportedToolIds(selection.serviceId, service.apiProtocol) }
+            ?.let { service ->
+                officialTools.availableTools(
+                    activeService = service,
+                    activeModelId = selection.modelId,
+                ).mapTo(linkedSetOf()) { it.toolId }
+            }
             .orEmpty()
 
     private fun isUsable(selection: ModelSelection): Boolean =

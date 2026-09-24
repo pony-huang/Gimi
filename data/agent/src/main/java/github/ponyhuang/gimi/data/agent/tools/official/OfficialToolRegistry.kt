@@ -4,7 +4,6 @@ import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.GoogleMapsTool
 import com.google.adk.kt.tools.GoogleSearchTool
 import com.google.adk.kt.tools.UrlContextTool
-import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
 import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmReaderTool
 import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmWebSearchTool
 import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmWebToolApi
@@ -15,6 +14,7 @@ import github.ponyhuang.gimi.data.agent.tools.official.minimax.MinimaxImageGener
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
+import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,6 +35,7 @@ import okhttp3.OkHttpClient
  * [dynamicFunctions] 动态获取(如 Kimi formulas)。
  * @property searchCandidate 是否在 Tool access ON_DEMAND 模式下转为 tool_search 检索候选源。
  * @property binding 工具构造方式。
+ * @property canBeUsedAcrossModels 是否可安全注入非来源服务的聊天模型。
  * @property dynamicFunctions 动态函数列表获取(按当前服务凭据);仅当
  * [staticFunctionIds] 为空时生效,与厂商本地执行绑定配套使用。
  */
@@ -47,6 +48,7 @@ data class OfficialToolSpec(
     val staticFunctionIds: List<String> = emptyList(),
     val searchCandidate: Boolean = false,
     val binding: OfficialToolBinding,
+    val canBeUsedAcrossModels: Boolean = false,
     val dynamicFunctions: (suspend (serviceId: String, apiKey: String) -> List<OfficialToolFunction>)? = null,
 )
 
@@ -68,7 +70,7 @@ sealed interface OfficialToolBinding {
 
     /** 本地执行的函数工具(GLM/Kimi):按当前请求凭据构造真正可执行的工具实例。 */
     data class LocalFunctions(
-        val create: suspend (config: ModelRuntimeMetadata, apiKey: String) -> List<BaseTool>,
+        val create: suspend (source: LLMModelSetting, apiKey: String) -> List<BaseTool>,
     ) : OfficialToolBinding
 }
 
@@ -122,6 +124,8 @@ class OfficialToolRegistry @Inject constructor(
                 OfficialToolIds.MINIMAX_TEXT_TO_IMAGE,
                 OfficialToolIds.MINIMAX_IMAGE_TO_IMAGE,
             ),
+            // 图像生成通过独立 REST API 调用，函数名也为厂商唯一，可安全供其它模型使用。
+            canBeUsedAcrossModels = true,
             binding = OfficialToolBinding.LocalFunctions { _, apiKey ->
                 val api = MinimaxImageGenerationApi(apiKey, httpClient)
                 listOf(
@@ -169,10 +173,10 @@ class OfficialToolRegistry @Inject constructor(
             modelFamilies = setOf("glm"),
             displayName = "GLM web tools",
             staticFunctionIds = listOf(GlmWebSearchTool.NAME, GlmReaderTool.NAME),
-            binding = OfficialToolBinding.LocalFunctions { config, apiKey ->
+            binding = OfficialToolBinding.LocalFunctions { source, apiKey ->
                 val api = GlmWebToolApi(
                     apiKey = apiKey,
-                    baseUrl = config.fullBaseUrl,
+                    baseUrl = source.activeApiBaseUrl,
                     httpClient = httpClient,
                 )
                 listOf(
@@ -189,9 +193,9 @@ class OfficialToolRegistry @Inject constructor(
             displayName = "Kimi formulas",
             staticFunctionIds = emptyList(),
             searchCandidate = true,
-            binding = OfficialToolBinding.LocalFunctions { config, apiKey ->
+            binding = OfficialToolBinding.LocalFunctions { source, apiKey ->
                 kimiFormulaCache.fetch(
-                    serviceId = config.serviceId,
+                    serviceId = source.id,
                     apiKey = apiKey,
                 ).map { declaration ->
                     KimiFormulaTool(
@@ -231,6 +235,30 @@ class OfficialToolRegistry @Inject constructor(
     }
 
     /**
+     * 当前聊天模型的完整官方工具集合。
+     *
+     * 当前服务可以保留其协议原生工具；其它服务只能贡献 [OfficialToolBinding.LocalFunctions]，
+     * 因而不会把厂商远端声明错误下发给另一家模型。
+     */
+    fun availableSpecsFor(
+        serviceId: String,
+        protocol: ApiProtocol,
+        modelId: String,
+    ): List<OfficialToolSpec> {
+        val services = modelServices.currentServices().associateBy(LLMModelSetting::id)
+        val active = specsFor(serviceId, protocol, modelId)
+            .filter { spec -> services[spec.serviceId].isOfficialToolSourceEnabled() }
+        val crossModel = all.filter { spec ->
+            spec.serviceId != serviceId &&
+                spec.binding is OfficialToolBinding.LocalFunctions &&
+                spec.canBeUsedAcrossModels &&
+                protocolFor(spec.serviceId, services)?.let(spec.protocols::contains) == true &&
+                services[spec.serviceId].isOfficialToolSourceEnabled()
+        }
+        return (active + crossModel).distinctBy(OfficialToolSpec::toolId)
+    }
+
+    /**
      * 服务 + 协议粒度的工具目录(不含模型家族收窄),与会话工具配置初始化、
      * UI 工具列表的旧语义保持一致:模型家族差异由运行时门控兜底。
      */
@@ -240,6 +268,13 @@ class OfficialToolRegistry @Inject constructor(
         .toSet()
 
     fun specById(toolId: String): OfficialToolSpec? = specsById[toolId]
+
+    /** ON_DEMAND 模式下可被 tool_search 发现的已开启本地官方工具。 */
+    fun enabledSearchCandidateSpecs(): List<OfficialToolSpec> = all.filter { spec ->
+        spec.searchCandidate &&
+            spec.binding is OfficialToolBinding.LocalFunctions &&
+            sourceService(spec.serviceId) != null
+    }
 
     /**
      * 当前服务 + 协议下由厂商远端执行的保留声明字面量集合。
@@ -251,14 +286,14 @@ class OfficialToolRegistry @Inject constructor(
         serviceId: String,
         protocol: ApiProtocol,
         modelId: String,
-    ): Set<String> = specsFor(serviceId, protocol, modelId)
+    ): Set<String> = availableSpecsFor(serviceId, protocol, modelId)
         .mapNotNull { spec ->
             (spec.binding as? OfficialToolBinding.ProviderDeclaration)?.wireName
         }
         .toSet()
 
     /** 构造 [spec] 在当前请求下真正可用的工具实例;凭据缺失时返回空列表。 */
-    suspend fun createTools(spec: OfficialToolSpec, config: ModelRuntimeMetadata): List<BaseTool> =
+    suspend fun createTools(spec: OfficialToolSpec): List<BaseTool> =
         when (val binding = spec.binding) {
             is OfficialToolBinding.ProviderDeclaration ->
                 listOf(OfficialBuiltInTool(declarationName = binding.wireName))
@@ -266,9 +301,8 @@ class OfficialToolRegistry @Inject constructor(
             is OfficialToolBinding.AdkNative -> listOf(binding.create())
 
             is OfficialToolBinding.LocalFunctions ->
-                apiKeyForService(spec.serviceId)
-                    ?.takeIf(String::isNotBlank)
-                    ?.let { apiKey -> binding.create(config, apiKey) }
+                sourceService(spec.serviceId)
+                    ?.let { service -> binding.create(service, service.apiKey) }
                     .orEmpty()
         }
 
@@ -281,8 +315,8 @@ class OfficialToolRegistry @Inject constructor(
             }
         }
         val dynamic = spec.dynamicFunctions ?: return emptyList()
-        val apiKey = apiKeyForService(spec.serviceId)?.takeIf(String::isNotBlank) ?: return emptyList()
-        return dynamic(spec.serviceId, apiKey)
+        val service = sourceService(spec.serviceId) ?: return emptyList()
+        return dynamic(service.id, service.apiKey)
     }
 
     private fun OfficialToolSpec.modelBelongsToFamily(modelId: String): Boolean {
@@ -298,9 +332,16 @@ class OfficialToolRegistry @Inject constructor(
         }
     }
 
-    /** 从安全模型配置源读取服务的凭据;凭据不进入 RunConfig metadata。 */
-    private fun apiKeyForService(serviceId: String): String? = modelServices
+    /** 从安全模型配置源读取可贡献工具的服务；凭据不进入 RunConfig metadata。 */
+    private fun sourceService(serviceId: String): LLMModelSetting? = modelServices
         .currentServices()
-        .firstOrNull { service -> service.id == serviceId && service.isEnabled }
-        ?.apiKey
+        .firstOrNull { service -> service.id == serviceId && service.isOfficialToolSourceEnabled() }
+
+    private fun protocolFor(
+        serviceId: String,
+        services: Map<String, LLMModelSetting>,
+    ): ApiProtocol? = services[serviceId]?.apiProtocol
+
+    private fun LLMModelSetting?.isOfficialToolSourceEnabled(): Boolean =
+        this != null && isEnabled && isOfficialToolsEnabled && apiKey.isNotBlank()
 }

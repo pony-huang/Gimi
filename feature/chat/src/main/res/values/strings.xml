@@ -44,6 +44,10 @@
     <string name="chat_session_mcp_empty_description">请先前往设置中的 MCP 页面添加服务器。</string>
     <string name="chat_official_tool_web_search">网页搜索</string>
     <string name="chat_official_tool_web_search_description">搜索最新的互联网信息</string>
+    <string name="chat_official_tool_text_to_image">文生图</string>
+    <string name="chat_official_tool_text_to_image_description">根据文字描述生成图片</string>
+    <string name="chat_official_tool_image_to_image">图生图</string>
+    <string name="chat_official_tool_image_to_image_description">根据参考图片和文字描述生成图片</string>
     <string name="chat_official_tool_kimi_formulas">Kimi 公式</string>
     <string name="chat_official_tool_kimi_formulas_description">使用 Kimi 的公式计算能力</string>
     <string name="chat_official_tool_glm_web_search">GLM 网页搜索</string>

@@ -13,6 +13,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolAvailability
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -38,7 +39,9 @@ class DefaultConversationSessionResolverTest {
         )
     }
     private val officialTools = mockk<OfficialToolFunctionCatalog> {
-        every { supportedToolIds("service", ApiProtocol.Standard) } returns setOf("service_web_search")
+        every { availableTools(any(), any()) } returns listOf(
+            OfficialToolAvailability("service_web_search", "service"),
+        )
     }
     private val resolver = DefaultConversationSessionResolver(
         conversations,

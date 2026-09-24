@@ -32,7 +32,7 @@ class DefaultOfficialToolset @Inject constructor(
         selection: ConversationToolConfiguration?,
     ): List<BaseTool> {
         val onDemand = toolAccessRepository.defaultToolAccessMode.value == ToolAccessMode.ON_DEMAND
-        return registry.specsFor(
+        return registry.availableSpecsFor(
             serviceId = config.serviceId,
             protocol = config.baseType,
             modelId = config.modelId,
@@ -53,7 +53,7 @@ class DefaultOfficialToolset @Inject constructor(
         selection: ConversationToolConfiguration?,
     ): List<BaseTool> {
         if (!selection.isOfficialToolEnabled(spec.toolId)) return emptyList()
-        val tools = registry.createTools(spec, config)
+        val tools = registry.createTools(spec)
         // 函数级勾选只作用于本地执行的工具(工具名即函数 ID);厂商声明/Gemini 原生
         // 工具单工具单函数,工具名是厂商 wire 字面量,工具级开关已足够。
         if (spec.binding !is OfficialToolBinding.LocalFunctions) return tools

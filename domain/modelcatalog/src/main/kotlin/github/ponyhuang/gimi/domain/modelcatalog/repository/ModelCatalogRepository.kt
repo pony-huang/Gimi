@@ -45,6 +45,8 @@ interface ModelCatalogRepository {
 
     fun updateEnabled(serviceId: String, enabled: Boolean): Boolean
 
+    fun updateOfficialToolsEnabled(serviceId: String, enabled: Boolean)
+
     fun updateApiProtocol(serviceId: String, protocol: ApiProtocol)
 
     fun updateBaseUrl(serviceId: String, value: String)

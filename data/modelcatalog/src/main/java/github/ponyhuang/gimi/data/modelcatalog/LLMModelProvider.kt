@@ -8,6 +8,7 @@ import kotlinx.serialization.Serializable
  * @property serviceId 平台唯一 ID（如 `"deepseek"`）。
  * @property serviceName 中文 / 品牌展示名（如 `"深度求索"`）。
  * @property isEnabled 总开关；false 时列表页不显示 ON 胶囊，且 Agent 不应路由到此服务。
+ * @property isOfficialToolsEnabled 是否允许该服务的独立官方 API 工具参与跨模型会话。
  * @property apiKey API 密钥；可填多个，逗号分隔（UI HelperText 已说明）。
  * @property baseType 接口标准类型，决定预览拼接路径。
  * @property supportedBaseTypes 该厂商允许的接口标准集合。OpenAI 仅支持 Standard，
@@ -24,6 +25,8 @@ data class LLMModelProvider(
     val serviceId: String,
     val serviceName: String,
     val isEnabled: Boolean,
+    /** 是否允许本服务的独立官方 API 工具参与跨模型会话。 */
+    val isOfficialToolsEnabled: Boolean = isEnabled,
     val apiKey: String,
     val apiBaseUrl: String,
     val baseType: ApiBaseType = ApiBaseType.Standard,

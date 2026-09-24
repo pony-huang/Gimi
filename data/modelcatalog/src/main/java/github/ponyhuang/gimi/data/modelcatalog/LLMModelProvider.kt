@@ -234,6 +234,14 @@ object LLMModelConfigs {
         LLMModelType.MiniMax.toProvider(
             modelGroups = listOf(
                 LLMModelGroup(
+                    groupId = "minimax-stt",
+                    groupName = "Minimax Speech Recognition",
+                    isExpanded = true,
+                    models = listOf(
+                        LLMModelItem("asr-1.0", "asr-1.0", isStt = true),
+                    ),
+                ),
+                LLMModelGroup(
                     groupId = "minimax-tts",
                     groupName = "Minimax Speech",
                     isExpanded = true,

@@ -107,6 +107,16 @@ class ModelCatalogOperationsTest {
     }
 
     @Test
+    fun minimaxDefaultsIncludeOfficialAsrModel() {
+        val minimax = LLMModelConfigs.services.single { it.serviceId == LLMModelType.MiniMax.serviceId }
+
+        val asr = minimax.lLMModelGroups.single { it.groupId == "minimax-stt" }.models.single()
+        assertEquals("asr-1.0", asr.modelId)
+        assertTrue(asr.isStt)
+        assertFalse(asr.isTts)
+    }
+
+    @Test
     fun syncRemoteModelsGroupsTwoSegmentModelIdsByFamily() {
         val result = syncStoredRemoteModels(
             existingGroups = emptyList(),

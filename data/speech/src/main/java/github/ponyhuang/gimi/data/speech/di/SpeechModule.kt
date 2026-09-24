@@ -10,10 +10,11 @@ import dagger.multibindings.IntoSet
 import github.ponyhuang.gimi.data.speech.playback.AndroidSpeechPlaybackRepository
 import github.ponyhuang.gimi.data.speech.remote.MiMoSpeechSynthesisGateway
 import github.ponyhuang.gimi.data.speech.remote.MiMoVoiceProvider
+import github.ponyhuang.gimi.data.speech.remote.MinimaxSpeechRecognitionGateway
 import github.ponyhuang.gimi.data.speech.remote.MinimaxTtsGateway
 import github.ponyhuang.gimi.data.speech.remote.MinimaxVoiceProvider
 import github.ponyhuang.gimi.data.speech.remote.OpenAiCompatibleSpeechRecognitionGateway
-import github.ponyhuang.gimi.data.speech.remote.SpeechRecognitionGateway
+import github.ponyhuang.gimi.data.speech.remote.SpeechRecognitionGatewayFactory
 import github.ponyhuang.gimi.data.speech.repository.DefaultSpeechRecognitionRepository
 import github.ponyhuang.gimi.data.speech.repository.DefaultSpeechSynthesisRepository
 import github.ponyhuang.gimi.data.speech.repository.DefaultTtsVoiceRepository
@@ -76,10 +77,12 @@ abstract class SpeechModule {
         ): TtsVoiceProvider = MinimaxVoiceProvider(okHttpClient)
         @Provides
         @Singleton
-        fun provideSpeechRecognitionGateway(
+        fun provideSpeechRecognitionGatewayFactory(
             okHttpClient: OkHttpClient,
-        ): SpeechRecognitionGateway =
-            OpenAiCompatibleSpeechRecognitionGateway(okHttpClient)
+        ): SpeechRecognitionGatewayFactory = SpeechRecognitionGatewayFactory(
+            openAiCompatibleGateway = OpenAiCompatibleSpeechRecognitionGateway(okHttpClient),
+            minimaxGateway = MinimaxSpeechRecognitionGateway(okHttpClient),
+        )
 
         @Provides
         @Singleton

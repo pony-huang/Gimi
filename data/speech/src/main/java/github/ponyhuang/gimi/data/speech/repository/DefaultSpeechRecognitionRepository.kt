@@ -1,7 +1,7 @@
 package github.ponyhuang.gimi.data.speech.repository
 
 import github.ponyhuang.gimi.data.speech.remote.SpeechRecognitionConfig
-import github.ponyhuang.gimi.data.speech.remote.SpeechRecognitionGateway
+import github.ponyhuang.gimi.data.speech.remote.SpeechRecognitionGatewayFactory
 import github.ponyhuang.gimi.data.speech.remote.SpeechRecognitionRequest
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 @Singleton
 class DefaultSpeechRecognitionRepository @Inject constructor(
     private val modelCatalog: ModelCatalogRepository,
-    private val gateway: SpeechRecognitionGateway,
+    private val gatewayFactory: SpeechRecognitionGatewayFactory,
 ) : SpeechRecognitionRepository {
     override val availability: Flow<Boolean> = combine(
         modelCatalog.observeServices(),
@@ -28,7 +28,7 @@ class DefaultSpeechRecognitionRepository @Inject constructor(
     override suspend fun transcribe(pcm16: ByteArray): String {
         require(pcm16.isNotEmpty()) { "没有录制到语音，请重试" }
         val config = currentConfig() ?: error("请先在设置中选择可用的默认语音模型")
-        return gateway.transcribe(
+        return gatewayFactory.create(config).transcribe(
             config = config,
             request = SpeechRecognitionRequest(pcm16 = pcm16),
         ).trim().takeIf { it.isNotEmpty() } ?: error("语音识别未返回文本")
@@ -45,6 +45,7 @@ class DefaultSpeechRecognitionRepository @Inject constructor(
     ): SpeechRecognitionConfig? {
         val resolved = services.resolve(selection, isSpeech = true) ?: return null
         return SpeechRecognitionConfig(
+            serviceId = resolved.first.id,
             baseUrl = resolved.first.openAiCompatibleBaseUrl,
             apiKey = resolved.first.apiKey.trim(),
             modelId = resolved.second.id,

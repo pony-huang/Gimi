@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.data.speech.repository
 
 import github.ponyhuang.gimi.data.speech.remote.SpeechRecognitionConfig
 import github.ponyhuang.gimi.data.speech.remote.SpeechRecognitionGateway
+import github.ponyhuang.gimi.data.speech.remote.SpeechRecognitionGatewayFactory
 import github.ponyhuang.gimi.data.speech.remote.SpeechRecognitionRequest
 import github.ponyhuang.gimi.data.speech.remote.SpeechSynthesisConfig
 import github.ponyhuang.gimi.data.speech.remote.SpeechSynthesisGateway
@@ -36,10 +37,14 @@ class DefaultSpeechRepositoriesTest {
         val gateway = mockk<SpeechRecognitionGateway> {
             coEvery { transcribe(capture(config), capture(request)) } returns " 识别结果 "
         }
-        val repository = DefaultSpeechRecognitionRepository(catalog, gateway)
+        val factory = mockk<SpeechRecognitionGatewayFactory> {
+            every { create(any()) } returns gateway
+        }
+        val repository = DefaultSpeechRecognitionRepository(catalog, factory)
 
         assertTrue(repository.availability.first())
         assertEquals("识别结果", repository.transcribe(byteArrayOf(1, 2)))
+        assertEquals("service", config.captured.serviceId)
         assertEquals("https://example.test/v1", config.captured.baseUrl)
         assertEquals("secret", config.captured.apiKey)
         assertEquals("stt", config.captured.modelId)

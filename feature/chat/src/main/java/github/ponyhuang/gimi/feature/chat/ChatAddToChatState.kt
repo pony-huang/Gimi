@@ -58,7 +58,7 @@ data class ChatAddToChatState(
 
     /**
      * Total number of functions the user has selected across every official
-     * tool in the active service. Used for the single "官方内置工具" row on
+     * tool in the active service. Used for the single "官方工具" row on
      * the home sheet so it can advertise an aggregate summary without
      * exposing each provider separately at the top level.
      */

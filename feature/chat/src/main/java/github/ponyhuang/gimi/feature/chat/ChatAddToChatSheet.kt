@@ -80,6 +80,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.gimi.ui.components.GimiBottomSheet
 import github.ponyhuang.gimi.ui.components.GimiBottomSheetHeader
 import github.ponyhuang.gimi.ui.components.GimiBottomSheetOptionRow
+import github.ponyhuang.gimi.ui.components.GimiBottomSheetSwitchRow
 import androidx.compose.ui.tooling.preview.Preview
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor

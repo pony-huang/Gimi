@@ -10,6 +10,8 @@ import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmWebSearchTool
 import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmWebToolApi
 import github.ponyhuang.gimi.data.agent.tools.official.kimi.KimiFormulaCache
 import github.ponyhuang.gimi.data.agent.tools.official.kimi.KimiFormulaTool
+import github.ponyhuang.gimi.data.agent.tools.official.minimax.MinimaxImageGenerationApi
+import github.ponyhuang.gimi.data.agent.tools.official.minimax.MinimaxImageGenerationTool
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
@@ -110,6 +112,23 @@ class OfficialToolRegistry @Inject constructor(
             displayName = "MiniMax web search",
             staticFunctionIds = listOf(OfficialToolIds.MINIMAX_WEB_SEARCH),
             binding = OfficialToolBinding.ProviderDeclaration(wireName = "web_search"),
+        ),
+        OfficialToolSpec(
+            toolId = OfficialToolIds.MINIMAX_IMAGE_GENERATION,
+            serviceId = "minimax",
+            protocols = setOf(ApiProtocol.Standard, ApiProtocol.Anthropic),
+            displayName = "MiniMax image generation",
+            staticFunctionIds = listOf(
+                OfficialToolIds.MINIMAX_TEXT_TO_IMAGE,
+                OfficialToolIds.MINIMAX_IMAGE_TO_IMAGE,
+            ),
+            binding = OfficialToolBinding.LocalFunctions { _, apiKey ->
+                val api = MinimaxImageGenerationApi(apiKey, httpClient)
+                listOf(
+                    MinimaxImageGenerationTool.textToImage(api),
+                    MinimaxImageGenerationTool.imageToImage(api),
+                )
+            },
         ),
         OfficialToolSpec(
             toolId = OfficialToolIds.MIMO_WEB_SEARCH,

@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.data.agent.tools.official
 import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -33,6 +34,17 @@ class OfficialToolRegistryTest {
     }
 
     @Test
+    fun minimaxImageGenerationExposesTextAndImageFunctions() = runTest {
+        assertEquals(
+            listOf(
+                OfficialToolIds.MINIMAX_TEXT_TO_IMAGE,
+                OfficialToolIds.MINIMAX_IMAGE_TO_IMAGE,
+            ),
+            registry.listFunctions(OfficialToolIds.MINIMAX_IMAGE_GENERATION).map { it.id },
+        )
+    }
+
+    @Test
     fun providerWireNamesAreScopedByServiceAndProtocol() {
         assertEquals(
             setOf("web_search"),
@@ -54,6 +66,18 @@ class OfficialToolRegistryTest {
         assertTrue(
             registry.providerDeclaredWireNames("openai", ApiProtocol.Anthropic, "gpt-5.2").isEmpty(),
         )
+    }
+
+    @Test
+    fun minimaxImageGenerationUsesLocalToolsForBothSupportedProtocols() {
+        for (protocol in setOf(ApiProtocol.Standard, ApiProtocol.Anthropic)) {
+            assertEquals(
+                listOf(OfficialToolIds.MINIMAX_IMAGE_GENERATION),
+                registry.specsFor("minimax", protocol, "MiniMax-M2.7")
+                    .filter { it.toolId == OfficialToolIds.MINIMAX_IMAGE_GENERATION }
+                    .map { it.toolId },
+            )
+        }
     }
 
     @Test

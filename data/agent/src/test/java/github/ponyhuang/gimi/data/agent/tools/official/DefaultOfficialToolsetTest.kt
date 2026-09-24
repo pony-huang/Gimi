@@ -76,6 +76,17 @@ class DefaultOfficialToolsetTest {
     }
 
     @Test
+    fun resolvesMinimaxImageGenerationFunctions() = runTest {
+        val tools = toolset().resolveTools(
+            config(serviceId = "minimax", baseType = ApiProtocol.Anthropic),
+            selection = null,
+        )
+
+        assertTrue(tools.any { it.name == "minimax_text_to_image" })
+        assertTrue(tools.any { it.name == "minimax_image_to_image" })
+    }
+
+    @Test
     fun dropsToolWhenConversationSelectionExcludesIt() = runTest {
         val selection = ConversationToolConfiguration(
             enabledOfficialFunctionIds = mapOf("openai_web_search" to emptySet()),

@@ -11,7 +11,6 @@
     <string name="modelsettings_api_protocol_anthropic">Anthropic API endpoint</string>
     <string name="modelsettings_api_protocol_gemini">Gemini API</string>
 
-    <string name="modelsettings_open_homepage">Open homepage</string>
 
     <string name="modelsettings_section_models">Models</string>
     <string name="modelsettings_sync_refreshing">Syncing…</string>
@@ -25,7 +24,6 @@
     <string name="modelsettings_dialog_cancel">Cancel</string>
 
     <string name="modelsettings_section_connection">Connection</string>
-    <string name="modelsettings_homepage_missing">Homepage URL is not configured</string>
     <string name="modelsettings_key_url_missing">API key help URL is not configured</string>
     <string name="modelsettings_no_browser">No browser available</string>
     <string name="modelsettings_notice_service_not_found">Service not found</string>

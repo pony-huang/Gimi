@@ -4,30 +4,23 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
-import github.ponyhuang.gimi.feature.modelsettings.R
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.ui.settings.llmmodel.LLMModelServiceIcon
 
 @Composable
 fun HeaderSection(
     service: LLMModelSetting,
     onToggleEnabled: (Boolean) -> Unit,
-    onOpenHomepage: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -48,12 +41,6 @@ fun HeaderSection(
             enabled = service.apiKey.isNotBlank(),
             onCheckedChange = onToggleEnabled,
         )
-        IconButton(onClick = onOpenHomepage, modifier = Modifier.padding(start = 4.dp)) {
-            Icon(
-                Icons.Default.OpenInNew,
-                contentDescription = stringResource(R.string.modelsettings_open_homepage),
-            )
-        }
     }
 }
 
@@ -71,11 +58,9 @@ private fun HeaderSectionPreview() {
                 apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Standard,
                 anthropicBaseUrl = "https://api.anthropic.com",
                 groups = emptyList(),
-                homepageUrl = "https://openai.com",
                 keyHelpUrl = "https://help.openai.com",
             ),
             onToggleEnabled = {},
-            onOpenHomepage = {},
         )
     }
 }

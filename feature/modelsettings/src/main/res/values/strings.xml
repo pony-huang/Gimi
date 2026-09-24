@@ -14,7 +14,6 @@
     <string name="modelsettings_api_protocol_gemini">Gemini API</string>
 
     <!-- HeaderSection -->
-    <string name="modelsettings_open_homepage">打开主页</string>
 
     <!-- LLMModelManagementSection -->
     <string name="modelsettings_section_models">模型</string>
@@ -30,7 +29,6 @@
 
     <!-- LLMModelServiceDetailScreen / Route -->
     <string name="modelsettings_section_connection">连接配置</string>
-    <string name="modelsettings_homepage_missing">未配置主页链接</string>
     <string name="modelsettings_key_url_missing">未配置密钥获取链接</string>
     <string name="modelsettings_no_browser">未找到可用的浏览器</string>
     <string name="modelsettings_notice_service_not_found">未找到该服务</string>

@@ -37,7 +37,6 @@ fun LLMModelSettingDetailScreen(
         if (!state.isMutationBlocked || !action.changesAgentConfiguration()) onAction(action)
     }
 
-    val homepageMissing = stringResource(R.string.modelsettings_homepage_missing)
     val keyUrlMissing = stringResource(R.string.modelsettings_key_url_missing)
     // Agent 任务进行中时整页配置降透明度提示只读，改配置动作被 dispatch 屏蔽。
     val blockedAlpha = if (state.isMutationBlocked) 0.6f else 1f
@@ -61,9 +60,6 @@ fun LLMModelSettingDetailScreen(
                     service = service,
                     onToggleEnabled = {
                         dispatch(LLMModelSettingDetailAction.EnabledChanged(it))
-                    },
-                    onOpenHomepage = {
-                        onOpenUrl(service.homepageUrl, homepageMissing)
                     },
                 )
             }
@@ -151,7 +147,6 @@ private fun LLMModelSettingDetailScreenPreview() {
                     models = listOf(Model(id = "gpt-4o", name = "GPT-4o")),
                 ),
             ),
-            homepageUrl = "https://openai.com",
             keyHelpUrl = "https://help.openai.com",
         )
         LLMModelSettingDetailScreen(

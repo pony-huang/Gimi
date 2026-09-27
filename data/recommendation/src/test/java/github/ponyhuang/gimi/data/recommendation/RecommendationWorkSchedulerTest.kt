@@ -28,7 +28,7 @@ class RecommendationWorkSchedulerTest {
         verify {
             workManager.enqueueUniqueWork(
                 WorkManagerRecommendationScheduler.IMMEDIATE_WORK_NAME,
-                ExistingWorkPolicy.KEEP,
+                ExistingWorkPolicy.REPLACE,
                 any<OneTimeWorkRequest>(),
             )
         }

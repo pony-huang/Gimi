@@ -146,7 +146,8 @@ class WorkManagerRecommendationScheduler @Inject constructor(
             .build()
         workManager.enqueueUniqueWork(
             IMMEDIATE_WORK_NAME,
-            ExistingWorkPolicy.KEEP,
+            // REPLACE 而非 KEEP：手动立即更新需要取消仍在等待重试梯子的实例并重新开跑。
+            ExistingWorkPolicy.REPLACE,
             request,
         )
     }

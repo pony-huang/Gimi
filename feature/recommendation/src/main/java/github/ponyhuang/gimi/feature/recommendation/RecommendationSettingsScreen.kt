@@ -106,8 +106,11 @@ fun RecommendationSettingsScreen(
                                 )
                                 Button(
                                     onClick = { onAction(RecommendationSettingsAction.RefreshNow) },
+                                    // 失败重试等待期也是用户最可能想手动重试的时刻：只要没有正在进行的
+                                    // 模型调用（无 lastError 的 Refreshing），就允许立即更新插队。
                                     enabled = state.enabled &&
-                                        state.refreshStatus == RecommendationRefreshStatus.Idle,
+                                        (state.refreshStatus == RecommendationRefreshStatus.Idle ||
+                                            state.lastError != null),
                                     modifier = Modifier
                                         .fillMaxWidth(0.5f)
                                         .align(Alignment.CenterHorizontally)
@@ -199,6 +202,24 @@ private fun RecommendationSettingsScreenEnabledPreview() {
                 intervalHours = 2,
                 generatedAtEpochMillis = Instant.parse("2026-09-06T08:30:00Z").toEpochMilli(),
                 refreshStatus = RecommendationRefreshStatus.Scheduled,
+            ),
+            onAction = {},
+            onOpenPermissions = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun RecommendationSettingsScreenRetryPreview() {
+    AsssistantaiTheme {
+        RecommendationSettingsScreen(
+            state = RecommendationSettingsUiState(
+                enabled = true,
+                intervalHours = 2,
+                refreshStatus = RecommendationRefreshStatus.Refreshing,
+                lastError = "Configure an OpenAI-compatible fast model.",
+                retryDelaySeconds = 30,
             ),
             onAction = {},
             onOpenPermissions = {},

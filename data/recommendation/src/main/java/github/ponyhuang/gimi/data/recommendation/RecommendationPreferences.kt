@@ -103,7 +103,7 @@ class RecommendationPreferences @Inject constructor(
         }
     }
 
-    /** 记录失败后的等待倒计时；期间保持 Refreshing，避免手动刷新打断重试梯子。 */
+    /** 记录失败后的等待倒计时；保持 Refreshing 表示更新流程未结束，用户仍可手动插队重试。 */
     fun markRetrying(delaySeconds: Long, message: String) {
         mutableState.update {
             it.copy(

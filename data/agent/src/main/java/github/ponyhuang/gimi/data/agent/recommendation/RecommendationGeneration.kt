@@ -26,15 +26,12 @@ import github.ponyhuang.gimi.domain.recommendation.model.RecommendationSnapshot
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationGenerator
 import github.ponyhuang.gimi.pluginapi.PluginJson
 import kotlinx.coroutines.flow.toList
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** 构建不含凭据与工具参数 schema 的推荐生成提示。 */
+/** 动态构建推荐Prompt。 */
 object RecommendationPromptBuilder {
     fun build(input: RecommendationGenerationInput): String = buildString {
         appendLine("Current assistant system instruction:")
@@ -104,58 +101,64 @@ object RecommendationOutputFormat {
     )
 }
 
+/**
+ * 推荐模型返回的顶层 JSON 对象。
+ *
+ * 必填字段刻意不给默认值：缺键或类型不符必须由序列化直接拒绝，
+ * 而不是被兜底分支悄悄修好后掩盖提示契约已被破坏。
+ */
+@Serializable
+private data class RecommendationResponse(
+    val recommendations: List<RecommendationPayload>,
+)
+
+/**
+ * 模型输出中的单条推荐。
+ *
+ * @property prompt 任务文案，长度上限由领域规则校验。
+ * @property category 受控类别的字面量；保持字符串以便由领域枚举显式判定未知值，
+ *   不让 domain 枚举反向依赖序列化注解。
+ */
+@Serializable
+private data class RecommendationPayload(
+    val prompt: String,
+    val category: String,
+)
+
 /** 把模型的受控 JSON 输出转换为经过领域校验的推荐列表。 */
 object RecommendationOutputParser {
     fun parse(raw: String): List<AgentRecommendation> {
-        val normalized = raw.trim()
-            .removePrefix("```json")
-            .removePrefix("```")
-            .removeSuffix("```")
-            .trim()
-        val root = runCatching { Json.parseToJsonElement(normalized) }
+        val response = runCatching { json.decodeFromString<RecommendationResponse>(raw) }
             .getOrElse {
                 throw IllegalArgumentException(
-                    "Recommendation model returned invalid JSON.",
+                    "Recommendation model returned invalid or unexpected JSON.",
                     it
                 )
             }
-        val array = when (root) {
-            is JsonArray -> root
-            else -> root.jsonObject["recommendations"]?.jsonArray
-                ?: throw IllegalArgumentException("Recommendation model returned no recommendations.")
-        }
-        require(array.size == RecommendationSnapshot.RECOMMENDATION_COUNT) {
+        require(response.recommendations.size == RecommendationSnapshot.RECOMMENDATION_COUNT) {
             "The recommendation model must return exactly ${RecommendationSnapshot.RECOMMENDATION_COUNT} items."
         }
-        val items = buildList {
-            array.forEachIndexed { index, element ->
-                val item = element.jsonObject
-                // 兼容部分模型忽略 responseSchema 后返回的 task/suggestion 数组。
-                val prompt = item["prompt"]?.jsonPrimitive?.content.orEmpty().trim()
-                    .ifEmpty { item["task"]?.jsonPrimitive?.content.orEmpty().trim() }
-                require(prompt.isNotEmpty() && prompt.length <= MAX_PROMPT_LENGTH) {
-                    "Recommendation prompts must contain 1..$MAX_PROMPT_LENGTH characters."
-                }
-                val category = runCatching {
-                    RecommendationCategory.valueOf(
-                        item["category"]?.jsonPrimitive?.content
-                            ?.uppercase()
-                            ?: RecommendationCategory.GENERAL.name,
-                    )
-                }.getOrElse {
-                    throw IllegalArgumentException(
-                        "Unknown recommendation category.",
-                        it
-                    )
-                }
-                add(AgentRecommendation("recommendation-${index + 1}", prompt, category))
+        return response.recommendations.mapIndexed { index, payload ->
+            val prompt = payload.prompt.trim()
+            require(prompt.isNotEmpty() && prompt.length <= MAX_PROMPT_LENGTH) {
+                "Recommendation prompts must contain 1..$MAX_PROMPT_LENGTH characters."
             }
+            val category = runCatching {
+                RecommendationCategory.valueOf(payload.category.uppercase())
+            }.getOrElse {
+                throw IllegalArgumentException(
+                    "Unknown recommendation category.",
+                    it
+                )
+            }
+            AgentRecommendation("recommendation-${index + 1}", prompt, category)
         }
-        RecommendationSnapshot(items, 0L)
-        return items
     }
 
     private const val MAX_PROMPT_LENGTH: Int = 160
+
+    // 模型可能附带额外字段：未知键忽略，必填与类型仍然严格失败。
+    private val json = Json { ignoreUnknownKeys = true }
 }
 
 /** 推荐生成只依据能力摘要，不执行能力工具，避免工具结果污染推荐会话。 */
@@ -289,11 +292,13 @@ class AgentRecommendationGenerator @Inject constructor(
         """.trimIndent()
 
 
-        /** Agent 执行前必须执行的工具， 此处用于获取当前信息状态。 */
+        /** 必须执行的工具，此处用于获取当前信息状态，更加个性化推荐 */
         val READ_ONLY_STATUS_TOOLS = listOf(
             "get_current_location",
             "get_current_time",
             "list_installed_apps",
+            "get_upcoming_calendar_events",
+            "list_calendars",
         )
     }
 }

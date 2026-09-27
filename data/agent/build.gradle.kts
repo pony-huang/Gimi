@@ -2,6 +2,7 @@ plugins {
     id("gimi.android.library")
     id("gimi.android.hilt")
     alias(libs.plugins.kotlin.kapt)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {

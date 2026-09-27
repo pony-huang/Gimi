@@ -38,23 +38,80 @@ class RecommendationOutputParserTest {
     }
 
     @Test
-    fun parsesTopLevelTaskSuggestionArrayWithoutCategories() {
-        val raw = """
-            [
-              {"task":"任务1","suggestion":"建议1"},
-              {"task":"任务2","suggestion":"建议2"},
-              {"task":"任务3","suggestion":"建议3"},
-              {"task":"任务4","suggestion":"建议4"},
-              {"task":"任务5","suggestion":"建议5"},
-              {"task":"任务6","suggestion":"建议6"}
-            ]
-        """.trimIndent()
+    fun rejectsMissingOrUnknownCategoryInsteadOfDefaulting() {
+        val missingCategory = """{"recommendations":[
+            {"prompt":"任务1"},
+            {"prompt":"任务2","category":"vision"},
+            {"prompt":"任务3","category":"research"},
+            {"prompt":"任务4","category":"writing"},
+            {"prompt":"任务5","category":"device"},
+            {"prompt":"任务6","category":"productivity"}
+        ]}""".trimIndent()
+        val unknownCategory = """{"recommendations":[
+            {"prompt":"任务1","category":"telepathy"},
+            {"prompt":"任务2","category":"vision"},
+            {"prompt":"任务3","category":"research"},
+            {"prompt":"任务4","category":"writing"},
+            {"prompt":"任务5","category":"device"},
+            {"prompt":"任务6","category":"productivity"}
+        ]}""".trimIndent()
+
+        assertThrows(IllegalArgumentException::class.java) {
+            RecommendationOutputParser.parse(missingCategory)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            RecommendationOutputParser.parse(unknownCategory)
+        }
+    }
+
+    @Test
+    fun rejectsTopLevelArrayAndAliasedKeys() {
+        // 结构契约已写进提示，别名兜底会把契约违约伪装成成功，因此必须显式拒绝。
+        val aliasedArray = """[
+            {"task":"任务1","suggestion":"建议1"},
+            {"task":"任务2","suggestion":"建议2"},
+            {"task":"任务3","suggestion":"建议3"},
+            {"task":"任务4","suggestion":"建议4"},
+            {"task":"任务5","suggestion":"建议5"},
+            {"task":"任务6","suggestion":"建议6"}
+        ]""".trimIndent()
+
+        assertThrows(IllegalArgumentException::class.java) {
+            RecommendationOutputParser.parse(aliasedArray)
+        }
+    }
+
+    @Test
+    fun rejectsPromptBeyondDisplayLengthLimit() {
+        val oversized = """{"recommendations":[
+            {"prompt":"${"很".repeat(161)}","category":"general"},
+            {"prompt":"任务2","category":"vision"},
+            {"prompt":"任务3","category":"research"},
+            {"prompt":"任务4","category":"writing"},
+            {"prompt":"任务5","category":"device"},
+            {"prompt":"任务6","category":"productivity"}
+        ]}""".trimIndent()
+
+        assertThrows(IllegalArgumentException::class.java) {
+            RecommendationOutputParser.parse(oversized)
+        }
+    }
+
+    @Test
+    fun parsesExtraFieldsWithoutFailing() {
+        val raw = """{"recommendations":[
+            {"prompt":"任务1","category":"reasoning","reason":"模型附带的解释"},
+            {"prompt":"任务2","category":"vision"},
+            {"prompt":"任务3","category":"research"},
+            {"prompt":"任务4","category":"writing"},
+            {"prompt":"任务5","category":"device"},
+            {"prompt":"任务6","category":"productivity"}
+        ]}""".trimIndent()
 
         val result = RecommendationOutputParser.parse(raw)
 
         assertEquals(RecommendationSnapshot.RECOMMENDATION_COUNT, result.size)
-        assertEquals("任务1", result.first().prompt)
-        assertEquals(RecommendationCategory.GENERAL, result.first().category)
+        assertEquals(RecommendationCategory.REASONING, result.first().category)
     }
 
     @Test

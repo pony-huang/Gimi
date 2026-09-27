@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.data.recommendation
 
 import android.content.Context
+import android.util.Log
 import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -95,6 +96,8 @@ class RecommendationRefresher(
                 throw error
             } catch (error: Throwable) {
                 val message = error.message ?: "Recommendation update failed"
+                // UI 只保留一句短文案，堆栈与尝试序号必须落日志，否则失败原因无法追溯。
+                Log.w(TAG, "Recommendation refresh attempt ${attempt + 1} failed: $message", error)
                 val delaySeconds = RETRY_DELAY_SECONDS.getOrNull(attempt)
                 if (delaySeconds == null) {
                     preferences.markFailed(message)
@@ -110,6 +113,7 @@ class RecommendationRefresher(
     private companion object {
         /** 失败后的固定重试等待秒数；按序消耗，耗尽后落为最终失败。 */
         val RETRY_DELAY_SECONDS: List<Long> = listOf(30L, 60L, 120L, 180L)
+        const val TAG: String = "RecommendationRefresher"
     }
 }
 

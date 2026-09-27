@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.data.recommendation
 
+import android.util.Log
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentMutationResult
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRunLease
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
@@ -15,7 +16,10 @@ import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationCapa
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationContextSource
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationGenerator
 import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import io.mockk.verify
 import io.mockk.verifyOrder
 import java.io.IOException
@@ -23,12 +27,25 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
+import org.junit.Before
 import org.junit.Test
 
 class RecommendationRefresherTest {
+    @Before
+    fun setUp() {
+        mockkStatic(Log::class)
+        every { Log.w(any<String>(), any<String>(), any<Throwable>()) } returns 0
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic(Log::class)
+    }
+
     @Test
     fun successfulGenerationCommitsTimestampedSnapshot() = runTest {
         val generator = mockk<RecommendationGenerator>()

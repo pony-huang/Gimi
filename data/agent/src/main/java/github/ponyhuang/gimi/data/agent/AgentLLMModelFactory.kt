@@ -147,6 +147,23 @@ class AgentLLMModelFactory @Inject constructor(
         return resolved.toModelConfig()
     }
 
+    /** 格式化推荐只走快速模型所属服务的 OpenAI 兼容端点，不沿用聊天协议。 */
+    fun forRecommendationJson(config: ModelConfig): ModelConfig {
+        if (config.baseType == ApiProtocol.Standard) {
+            return config
+        }
+        val service = modelServices.currentServices()
+            .firstOrNull { it.id == config.serviceId }
+        check(service != null && ApiProtocol.Standard in service.supportedProtocols) {
+            "The fast model service does not support OpenAI-compatible JSON output."
+        }
+        val standardBaseUrl = service.openAiCompatibleBaseUrl
+        check(standardBaseUrl.isNotBlank()) {
+            "The fast model service has no OpenAI-compatible base URL."
+        }
+        return config.copy(baseType = ApiProtocol.Standard, fullBaseUrl = standardBaseUrl)
+    }
+
     private fun ResolvedAgentModel.toModelConfig(): ModelConfig = ModelConfig(
         serviceId = serviceId,
         baseType = protocol,

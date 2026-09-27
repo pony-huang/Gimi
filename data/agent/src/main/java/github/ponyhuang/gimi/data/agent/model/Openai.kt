@@ -22,6 +22,7 @@ import com.openai.errors.OpenAIException
 import com.openai.models.FunctionDefinition
 import com.openai.models.FunctionParameters
 import com.openai.models.ReasoningEffort
+import com.openai.models.ResponseFormatJsonObject
 import com.openai.models.chat.completions.ChatCompletion
 import com.openai.models.chat.completions.ChatCompletionAssistantMessageParam
 import com.openai.models.chat.completions.ChatCompletionChunk
@@ -138,6 +139,16 @@ open class Openai(
                 // requests such as title generation within the supported enum values.
                 builder.reasoningEffort(ReasoningEffort.LOW)
             }
+        }
+
+        // ADK 只定义跨模型的 responseMimeType/responseSchema；自定义 OpenAI 兼容桥接
+        // 必须把 JSON 诉求显式转成 Chat Completions 的 response_format，否则该配置会静默丢失。
+        if (request.config.responseMimeType.equals("application/json", ignoreCase = true)) {
+            builder.responseFormat(
+                ResponseFormatJsonObject.builder()
+                    .type(JsonValue.from("json_object"))
+                    .build(),
+            )
         }
 
         postProcessParams(builder, request)

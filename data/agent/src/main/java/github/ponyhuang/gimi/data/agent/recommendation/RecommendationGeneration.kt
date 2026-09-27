@@ -178,7 +178,10 @@ class AgentRecommendationGenerator @Inject constructor(
     override suspend fun generate(input: RecommendationGenerationInput): List<AgentRecommendation> {
         val resolvedInput =
             input.copy(systemInstruction = AgentPrompts.defaultAssistantInstruction())
-        val config = modelFactory.selectFastModelConfig() ?: modelFactory.selectModelConfig(null)
+        val config = modelFactory.forRecommendationJson(
+            modelFactory.selectFastModelConfig()
+                ?: error("Configure an OpenAI-compatible fast model for recommendation generation."),
+        )
         val model = modelFactory.createModel(config)
         val request = LlmRequest(
             model = model,

@@ -100,6 +100,23 @@ fun PreferenceSectionTitle(
 }
 
 /**
+ * 分组标题下的小字备注：用更小的字号和次要文字色说明整组的前提或限制。
+ * 左右缩进与 [PreferenceSectionTitle] 一致，紧跟标题摆放。
+ */
+@Composable
+fun PreferenceSectionNote(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.padding(start = 32.dp, end = 32.dp, top = 0.dp, bottom = 10.dp),
+    )
+}
+
+/**
  * One UI 风格的设置分组卡片：大圆角、白（深色为略亮表面）底容器。
  * 内部按行摆放 [PreferenceListItem] 等内容；行间分隔线由行的 `showDivider` 控制，
  * 调用方保证组内除末行外均开启分隔线。

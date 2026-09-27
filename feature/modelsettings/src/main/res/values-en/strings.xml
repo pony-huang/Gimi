@@ -39,22 +39,24 @@
     <string name="modelsettings_list_load_failed">Failed to load the model catalog</string>
 
         <string name="modelsettings_defaults_section_chat">Chat</string>
-    <string name="modelsettings_defaults_section_voice">Voice</string>
+    <string name="modelsettings_defaults_section_stt">STT</string>
+    <string name="modelsettings_defaults_section_tts">TTS</string>
+    <string name="modelsettings_defaults_online_only_note">Online API models only</string>
 <string name="modelsettings_defaults_assistant_title">Default assistant model</string>
     <string name="modelsettings_defaults_assistant_subtitle">Model used when creating a new assistant</string>
     <string name="modelsettings_defaults_quick_title">Quick model</string>
     <string name="modelsettings_defaults_quick_subtitle">Used to generate conversation titles</string>
-    <string name="modelsettings_defaults_stt_title">Default voice input model</string>
-    <string name="modelsettings_defaults_stt_subtitle">Used for voice input. Only speech-to-text models are listed.</string>
-    <string name="modelsettings_defaults_tts_title">Default voice playback model</string>
-    <string name="modelsettings_defaults_tts_subtitle">Used for reading assistant replies aloud. Only text-to-speech models are listed.</string>
-    <string name="modelsettings_defaults_voice_title">Voice playback voice</string>
+    <string name="modelsettings_defaults_stt_title">Speech recognition model</string>
+    <string name="modelsettings_defaults_stt_subtitle">Used for voice input</string>
+    <string name="modelsettings_defaults_tts_title">Speech synthesis model</string>
+    <string name="modelsettings_defaults_tts_subtitle">Used to read assistant replies aloud</string>
+    <string name="modelsettings_defaults_voice_title">Playback voice</string>
 
     <string name="modelsettings_dialog_pick_assistant">Select default assistant model</string>
     <string name="modelsettings_dialog_pick_quick">Select quick model</string>
-    <string name="modelsettings_dialog_pick_stt">Select default voice input model</string>
-    <string name="modelsettings_dialog_pick_tts">Select default voice playback model</string>
-    <string name="modelsettings_dialog_pick_voice">Select voice playback voice</string>
+    <string name="modelsettings_dialog_pick_stt">Select speech recognition model</string>
+    <string name="modelsettings_dialog_pick_tts">Select speech synthesis model</string>
+    <string name="modelsettings_dialog_pick_voice">Select playback voice</string>
     <string name="modelsettings_dialog_no_voices">No voices available</string>
     <string name="modelsettings_dialog_no_models">No models available. Please enable at least one model in Model Services first.</string>
 

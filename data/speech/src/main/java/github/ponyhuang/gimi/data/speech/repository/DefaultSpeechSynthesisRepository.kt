@@ -27,7 +27,7 @@ class DefaultSpeechSynthesisRepository @Inject constructor(
     override fun synthesize(text: String): Flow<ByteArray> {
         val normalized = text.trim().takeIf(String::isNotEmpty)
             ?: error("没有可朗读的回复内容")
-        val config = currentConfig() ?: error("请先在设置中选择可用的默认语音播放模型")
+        val config = currentConfig() ?: error("请先在设置中选择可用的语音合成模型")
         return gatewayFactory.create(config).synthesize(config, normalized)
     }
 

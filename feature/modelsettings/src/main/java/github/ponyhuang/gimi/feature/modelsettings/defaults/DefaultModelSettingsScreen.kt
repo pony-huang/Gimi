@@ -30,6 +30,7 @@ import github.ponyhuang.gimi.ui.components.PickerSingleChoiceDialog
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
+import github.ponyhuang.gimi.ui.preference.PreferenceSectionNote
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 
 @Composable
@@ -78,7 +79,10 @@ fun DefaultModelSettingsScreen(
                     )
                 }
             }
-            item { PreferenceSectionTitle(stringResource(R.string.modelsettings_defaults_section_voice)) }
+            item { PreferenceSectionTitle(stringResource(R.string.modelsettings_defaults_section_stt)) }
+            item {
+                PreferenceSectionNote(stringResource(R.string.modelsettings_defaults_online_only_note))
+            }
             item {
                 PreferenceGroupCard {
                     DefaultModelOption(
@@ -87,11 +91,18 @@ fun DefaultModelSettingsScreen(
                         subtitle = stringResource(R.string.modelsettings_defaults_stt_subtitle),
                         selection = state.speechSelection,
                         rows = state.speechModels,
-                        showDivider = true,
                         onClick = if (state.isMutationBlocked) null else {
                             { onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Speech)) }
                         },
                     )
+                }
+            }
+            item { PreferenceSectionTitle(stringResource(R.string.modelsettings_defaults_section_tts)) }
+            item {
+                PreferenceSectionNote(stringResource(R.string.modelsettings_defaults_online_only_note))
+            }
+            item {
+                PreferenceGroupCard {
                     DefaultModelOption(
                         icon = Icons.AutoMirrored.Filled.VolumeUp,
                         title = stringResource(R.string.modelsettings_defaults_tts_title),
@@ -263,6 +274,9 @@ private fun DefaultModelSettingsScreenPreview() {
         DefaultModelSettingsScreen(
             state = DefaultModelSettingsUiState(
                 assistantSelection = row.selection(),
+                speechSelection = row.selection(),
+                ttsSelection = row.selection(),
+                ttsVoiceId = "default",
                 chatModels = listOf(row),
                 speechModels = listOf(row),
                 ttsModels = listOf(row),

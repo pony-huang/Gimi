@@ -100,7 +100,7 @@ class AndroidSpeechPlaybackRepository @Inject constructor(
     private fun start(messageId: String, text: String) {
         val identity = synthesis.cacheIdentity()
         if (identity == null) {
-            _errors.tryEmit("请先在设置中启用服务并选择默认语音播放模型")
+            _errors.tryEmit("请先在设置中启用服务并选择语音合成模型")
             return
         }
         val cacheKey = "$messageId|${text.hashCode()}|$identity"

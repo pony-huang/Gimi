@@ -104,7 +104,7 @@
     <string name="chat_voice_recording_remaining">Recording, %1$d seconds remaining</string>
     <string name="chat_voice_waveform">Live voice waveform</string>
 
-    <string name="chat_stt_configure_default_first">Please configure the default voice model in Settings first</string>
+    <string name="chat_stt_configure_default_first">Please configure the speech recognition model in Settings first</string>
 
         <string name="chat_time_just_now">Just now</string>
     <string name="chat_time_minutes_ago">%1$d min ago</string>

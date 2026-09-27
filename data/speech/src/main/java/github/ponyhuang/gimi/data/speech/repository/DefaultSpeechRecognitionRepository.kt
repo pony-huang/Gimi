@@ -27,7 +27,7 @@ class DefaultSpeechRecognitionRepository @Inject constructor(
 
     override suspend fun transcribe(pcm16: ByteArray): String {
         require(pcm16.isNotEmpty()) { "没有录制到语音，请重试" }
-        val config = currentConfig() ?: error("请先在设置中选择可用的默认语音模型")
+        val config = currentConfig() ?: error("请先在设置中选择可用的语音识别模型")
         return gatewayFactory.create(config).transcribe(
             config = config,
             request = SpeechRecognitionRequest(pcm16 = pcm16),

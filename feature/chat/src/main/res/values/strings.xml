@@ -110,7 +110,7 @@
     <string name="chat_voice_waveform">实时语音波形</string>
 
     <!-- SpeechToTextButton 提示 -->
-    <string name="chat_stt_configure_default_first">请先在设置中配置默认语音模型</string>
+    <string name="chat_stt_configure_default_first">请先在设置中配置语音识别模型</string>
 
     <!-- ChatConversationDrawer -->
     <string name="chat_time_just_now">刚刚</string>

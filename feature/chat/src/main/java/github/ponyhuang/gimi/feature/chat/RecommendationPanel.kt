@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
@@ -122,7 +123,7 @@ private fun RecommendationAction(
                 )
                 Text(
                     text = recommendation.prompt,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )

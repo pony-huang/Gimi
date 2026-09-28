@@ -33,6 +33,7 @@ data class ModelConfig(
     val modelId: String,
     val apiKey: String,
     val fullBaseUrl: String,
+    val supportsImages: Boolean = false,
 )
 
 /**
@@ -51,6 +52,7 @@ data class ModelRuntimeMetadata(
     val baseType: ApiProtocol,
     val modelId: String,
     val fullBaseUrl: String,
+    val supportsImages: Boolean = false,
 )
 
 internal fun ModelConfig.toRuntimeMetadata(): ModelRuntimeMetadata = ModelRuntimeMetadata(
@@ -58,6 +60,7 @@ internal fun ModelConfig.toRuntimeMetadata(): ModelRuntimeMetadata = ModelRuntim
     baseType = baseType,
     modelId = modelId,
     fullBaseUrl = fullBaseUrl,
+    supportsImages = supportsImages,
 )
 
 @Singleton
@@ -169,6 +172,11 @@ class AgentLLMModelFactory @Inject constructor(
         baseType = protocol,
         modelId = modelId,
         apiKey = apiKey,
-        fullBaseUrl = modelBaseUrl
+        fullBaseUrl = modelBaseUrl,
+        supportsImages = modelServices.currentServices()
+            .firstOrNull { it.id == serviceId }
+            ?.groups?.flatMap { it.models }
+            ?.firstOrNull { it.id == modelId }
+            ?.capabilities?.supportsImages == true,
     )
 }

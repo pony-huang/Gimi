@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Rule
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -83,6 +84,13 @@ fun SettingsScreen(
                         title = stringResource(R.string.settings_tool_authorization_title),
                         subtitle = stringResource(R.string.settings_tool_authorization_subtitle),
                         onClick = { onAction(SettingsAction.OpenToolAuthorization) },
+                        showDivider = true,
+                    )
+                    PreferenceNavigationCard(
+                        icon = Icons.Default.Phonelink,
+                        title = stringResource(R.string.settings_mobile_use_title),
+                        subtitle = stringResource(R.string.settings_mobile_use_subtitle),
+                        onClick = { onAction(SettingsAction.OpenMobileUse) },
                         showDivider = true,
                     )
                     PreferenceNavigationCard(

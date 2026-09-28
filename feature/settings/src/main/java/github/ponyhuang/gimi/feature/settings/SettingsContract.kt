@@ -14,6 +14,7 @@ sealed interface SettingsAction {
     data object OpenWorkspace : SettingsAction
     data object OpenPermissions : SettingsAction
     data object OpenToolAuthorization : SettingsAction
+    data object OpenMobileUse : SettingsAction
     data object OpenRecommendations : SettingsAction
     data object OpenMemory : SettingsAction
     /** 进入「关于」页（内含检查更新、项目主页等）。 */
@@ -31,6 +32,7 @@ sealed interface SettingsEffect {
     data object NavigateToWorkspace : SettingsEffect
     data object NavigateToPermissions : SettingsEffect
     data object NavigateToToolAuthorization : SettingsEffect
+    data object NavigateToMobileUse : SettingsEffect
     data object NavigateToRecommendations : SettingsEffect
     data object NavigateToMemory : SettingsEffect
     /** 进入「关于」页。 */

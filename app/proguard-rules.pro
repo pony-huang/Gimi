@@ -181,3 +181,9 @@
 # ---------------------------------------------------------------------------
 -keep class kotlin.** { *; }
 -keep class kotlinx.coroutines.** { *; }
+# Shizuku 在独立 shell 进程中按类名反射构造 UserService；保留入口及销毁事务。
+-keep class github.ponyhuang.gimi.data.mobileuse.ShellMobileUseService {
+    public <init>();
+    public <init>(android.content.Context);
+    public void destroy();
+}

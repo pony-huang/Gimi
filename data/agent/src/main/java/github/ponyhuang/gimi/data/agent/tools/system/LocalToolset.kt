@@ -5,6 +5,7 @@ import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.data.agent.LocalToolCatalog
 import github.ponyhuang.gimi.data.agent.tools.allowConfirmationRequiredTools
+import github.ponyhuang.gimi.data.agent.tools.modelRuntimeMetadataOrNull
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -28,6 +29,7 @@ class LocalToolset @Inject constructor(
         val allowConfirmation = readonlyContext.allowConfirmationRequiredTools()
         return catalog.tools().filter { tool ->
             tool.name in authorized &&
+                (tool.name != "mobile_use" || readonlyContext.modelRuntimeMetadataOrNull()?.supportsImages == true) &&
                 (allowConfirmation || tool.name !in catalog.confirmationRequiredToolIds)
         }
     }

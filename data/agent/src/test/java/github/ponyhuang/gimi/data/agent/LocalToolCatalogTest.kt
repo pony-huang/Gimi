@@ -10,6 +10,7 @@ import github.ponyhuang.gimi.data.agent.tools.system.FilesTool
 import github.ponyhuang.gimi.data.agent.tools.system.LaunchersTool
 import github.ponyhuang.gimi.data.agent.tools.system.LocationTool
 import github.ponyhuang.gimi.data.agent.tools.system.MediaTool
+import github.ponyhuang.gimi.data.agent.tools.system.MobileUseTool
 import github.ponyhuang.gimi.data.agent.tools.system.PeopleTool
 import github.ponyhuang.gimi.data.agent.tools.system.ReadLocalFileTool
 import github.ponyhuang.gimi.data.agent.tools.system.SettingsTool
@@ -95,6 +96,7 @@ class LocalToolCatalogTest {
         launchersTool = mockk<LaunchersTool>(relaxed = true),
         locationTool = mockk<LocationTool>(relaxed = true),
         mediaTool = mockk<MediaTool>(relaxed = true),
+        mobileUseTool = MobileUseTool(mockk(relaxed = true)),
         peopleTool = mockk<PeopleTool>(relaxed = true),
         // 真实实例：手写 FunctionTool 无 KSP 生成物，relaxed mock 的 name/确认门无法参与断言。
         readLocalFileTool = ReadLocalFileTool(mockk(relaxed = true), mockk(relaxed = true)),

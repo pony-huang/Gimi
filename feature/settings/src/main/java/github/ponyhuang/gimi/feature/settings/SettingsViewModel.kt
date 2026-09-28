@@ -29,6 +29,7 @@ class SettingsViewModel @Inject constructor() : ViewModel() {
             SettingsAction.OpenPermissions -> emitEffect(SettingsEffect.NavigateToPermissions)
             SettingsAction.OpenToolAuthorization ->
                 emitEffect(SettingsEffect.NavigateToToolAuthorization)
+            SettingsAction.OpenMobileUse -> emitEffect(SettingsEffect.NavigateToMobileUse)
             SettingsAction.OpenRecommendations ->
                 emitEffect(SettingsEffect.NavigateToRecommendations)
             SettingsAction.OpenMemory -> emitEffect(SettingsEffect.NavigateToMemory)

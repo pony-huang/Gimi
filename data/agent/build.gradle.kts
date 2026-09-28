@@ -31,6 +31,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":domain:mobileuse"))
     implementation(project(":domain:recommendation"))
     implementation(project(":core:common"))
     implementation(project(":core:storage"))

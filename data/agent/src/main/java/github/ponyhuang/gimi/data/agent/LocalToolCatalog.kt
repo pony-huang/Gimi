@@ -11,6 +11,7 @@ import github.ponyhuang.gimi.data.agent.tools.system.FilesTool
 import github.ponyhuang.gimi.data.agent.tools.system.LaunchersTool
 import github.ponyhuang.gimi.data.agent.tools.system.LocationTool
 import github.ponyhuang.gimi.data.agent.tools.system.MediaTool
+import github.ponyhuang.gimi.data.agent.tools.system.MobileUseTool
 import github.ponyhuang.gimi.data.agent.tools.system.PeopleTool
 import github.ponyhuang.gimi.data.agent.tools.system.ReadLocalFileTool
 import github.ponyhuang.gimi.data.agent.tools.system.SettingsTool
@@ -39,6 +40,7 @@ class LocalToolCatalog @Inject constructor(
     launchersTool: LaunchersTool,
     locationTool: LocationTool,
     mediaTool: MediaTool,
+    mobileUseTool: MobileUseTool,
     peopleTool: PeopleTool,
     readLocalFileTool: ReadLocalFileTool,
     settingsTool: SettingsTool,
@@ -57,6 +59,7 @@ class LocalToolCatalog @Inject constructor(
         addAll(launchersTool.generatedTools().registeredAs(LocalToolCategory.LAUNCHERS))
         addAll(locationTool.generatedTools().registeredAs(LocalToolCategory.LOCATION))
         addAll(mediaTool.generatedTools().registeredAs(LocalToolCategory.MEDIA))
+        add(RegisteredLocalTool(category = LocalToolCategory.MOBILE_USE, tool = mobileUseTool))
         addAll(peopleTool.generatedTools().registeredAs(LocalToolCategory.PEOPLE))
         addAll(settingsTool.generatedTools().registeredAs(LocalToolCategory.SETTINGS))
         addAll(webTool.generatedTools().registeredAs(LocalToolCategory.WEB))

@@ -35,8 +35,11 @@ coil = "3.5.0"
 work = "2.11.0"
 opentelemetrySdk = "1.56.0"
 dataStore = "1.2.1"
+shizuku = "13.1.5"
 
 [libraries]
+shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
+shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
 javax-inject = { module = "javax.inject:javax.inject", version.ref = "javaxInject" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 androidx-compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }

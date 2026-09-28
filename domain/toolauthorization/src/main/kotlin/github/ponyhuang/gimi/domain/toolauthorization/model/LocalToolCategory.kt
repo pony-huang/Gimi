@@ -22,6 +22,7 @@ enum class LocalToolCategory(
     LAUNCHERS("launchers", "应用"),
     LOCATION("location", "位置"),
     MEDIA("media", "媒体"),
+    MOBILE_USE("mobile_use", "副屏操作"),
     PEOPLE("people", "联系人"),
     SETTINGS("settings", "系统设置"),
     WEB("web", "Web 与搜索"),

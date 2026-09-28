@@ -25,6 +25,8 @@ object ToolRunMetadata {
     private const val KEY_MODEL_PROTOCOL = "selkie.model.protocol"
     private const val KEY_MODEL_ID = "selkie.model.id"
     private const val KEY_MODEL_BASE_URL = "selkie.model.base_url"
+    private const val KEY_MODEL_SUPPORTS_IMAGES = "selkie.model.supports_images"
+    private const val KEY_MOBILE_USE_OWNER = "selkie.mobile_use.owner"
     private const val KEY_PRESENT = "selkie.tool_config.present"
     private const val KEY_MCP_SERVER_IDS = "selkie.tool_config.mcp_server_ids"
     private const val KEY_OFFICIAL_FUNCTIONS = "selkie.tool_config.official_functions"
@@ -35,12 +37,15 @@ object ToolRunMetadata {
         modelRuntime: ModelRuntimeMetadata,
         toolConfiguration: ConversationToolConfiguration?,
         allowConfirmationRequiredTools: Boolean,
+        mobileUseOwner: String = "",
     ): Map<String, Any> {
         val metadata = mutableMapOf<String, Any>(
             KEY_MODEL_SERVICE_ID to modelRuntime.serviceId,
             KEY_MODEL_PROTOCOL to modelRuntime.baseType.name,
             KEY_MODEL_ID to modelRuntime.modelId,
             KEY_MODEL_BASE_URL to modelRuntime.fullBaseUrl,
+            KEY_MODEL_SUPPORTS_IMAGES to modelRuntime.supportsImages,
+            KEY_MOBILE_USE_OWNER to mobileUseOwner,
             KEY_ALLOW_CONFIRMATION_TOOLS to allowConfirmationRequiredTools,
         )
         if (toolConfiguration != null) {
@@ -65,6 +70,7 @@ object ToolRunMetadata {
             baseType = protocol,
             modelId = modelId,
             fullBaseUrl = baseUrl,
+            supportsImages = metadata[KEY_MODEL_SUPPORTS_IMAGES] == true,
         )
     }
 
@@ -88,6 +94,9 @@ object ToolRunMetadata {
     /** 是否允许需要用户确认的工具；缺省 true。 */
     fun allowConfirmationRequiredTools(metadata: Map<String, Any>?): Boolean =
         (metadata?.get(KEY_ALLOW_CONFIRMATION_TOOLS) as? Boolean) ?: true
+
+    fun mobileUseOwner(metadata: Map<String, Any>?): String? =
+        (metadata?.get(KEY_MOBILE_USE_OWNER) as? String)?.takeIf(String::isNotBlank)
 
     private fun Map<String, Any>.stringSet(key: String): Set<String> =
         (this[key] as? List<*>)?.filterIsInstance<String>()?.toSet().orEmpty()

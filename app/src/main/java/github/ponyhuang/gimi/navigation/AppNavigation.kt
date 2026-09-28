@@ -41,6 +41,8 @@ import github.ponyhuang.gimi.feature.mcp.McpDestination
 import github.ponyhuang.gimi.feature.mcp.McpEntryProvider
 import github.ponyhuang.gimi.feature.memory.MemoryDestination
 import github.ponyhuang.gimi.feature.memory.MemoryEntryProvider
+import github.ponyhuang.gimi.feature.mobileuse.MobileUseDestination
+import github.ponyhuang.gimi.feature.mobileuse.MobileUseEntryProvider
 import github.ponyhuang.gimi.feature.modelsettings.ModelSettingsDestination
 import github.ponyhuang.gimi.feature.modelsettings.ModelSettingsEntryProvider
 import github.ponyhuang.gimi.feature.permissions.PermissionDestination
@@ -164,6 +166,9 @@ fun MainScreen(
                         onNavigateToToolAuthorization = {
                             navigate(ToolAuthorizationDestination.Settings)
                         },
+                        onNavigateToMobileUse = {
+                            navigate(MobileUseDestination.Settings)
+                        },
                         onNavigateToRecommendations = {
                             navigate(RecommendationDestination.Settings)
                         },
@@ -174,6 +179,7 @@ fun MainScreen(
                     McpEntryProvider(destination, goBack, navigate, replaceCurrent) ||
                     PluginEntryProvider(destination, goBack, navigate) ||
                     ToolAuthorizationEntryProvider(destination, goBack, navigate) ||
+                    MobileUseEntryProvider(destination, goBack) ||
                     RecommendationEntryProvider(
                         destination = destination,
                         onBack = goBack,

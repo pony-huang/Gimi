@@ -34,10 +34,15 @@ import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import java.util.UUID
+import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
 
 
 /**
@@ -75,6 +80,7 @@ class AgentChatRunner(
     },
     private val plugins: (PluginRuntimeSnapshot<AgentPlugin>) -> List<Plugin> = { emptyList() },
     private val toolAccessRepository: ToolAccessRepository,
+    private val mobileUseRepository: MobileUseRepository? = null,
 ) {
     /**
      * Agent 构建的唯一缓存键。
@@ -156,8 +162,9 @@ class AgentChatRunner(
                 modelRuntime = runtime.modelRuntime,
                 toolConfiguration = toolConfiguration,
                 allowConfirmationRequiredTools = allowConfirmationRequiredTools,
+                mobileUseOwner = UUID.randomUUID().toString(),
             )
-            Execution(userId, sessionId, runtime.runner, metadata)
+            Execution(userId, sessionId, runtime.runner, metadata, mobileUseRepository)
         }
     }
 
@@ -167,6 +174,7 @@ class AgentChatRunner(
         private val sessionId: String,
         private val runner: InMemoryRunner,
         private val customMetadata: Map<String, Any>,
+        private val mobileUseRepository: MobileUseRepository? = null,
     ) {
         /** 把新用户消息发送给本轮 Agent。 */
         suspend fun send(
@@ -217,7 +225,7 @@ class AgentChatRunner(
                     streamingMode = StreamingMode.SSE,
                     customMetadata = customMetadata,
                 ),
-            ).flowOn(Dispatchers.IO)
+            ).flowOn(Dispatchers.IO).releaseMobileUseOnCompletion()
         }
 
         /**
@@ -282,7 +290,13 @@ class AgentChatRunner(
                     streamingMode = StreamingMode.SSE,
                     customMetadata = customMetadata,
                 ),
-            ).flowOn(Dispatchers.IO)
+            ).flowOn(Dispatchers.IO).releaseMobileUseOnCompletion()
+        }
+
+        private fun Flow<Event>.releaseMobileUseOnCompletion(): Flow<Event> = onCompletion {
+            val owner = ToolRunMetadata.mobileUseOwner(customMetadata) ?: return@onCompletion
+            // 取消中的协程仍须销毁副屏，否则虚拟显示可能跨任务存活。
+            withContext(NonCancellable) { mobileUseRepository?.stop(owner) }
         }
     }
 

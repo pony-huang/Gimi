@@ -1,0 +1,24 @@
+<resources>
+    <string name="mobile_use_title">后台静默操作</string>
+    <string name="mobile_use_intro">让 Agent 在独立副屏运行其他应用并读取画面。</string>
+    <string name="mobile_use_scope">仅支持 Shizuku ADB shell 模式。授权后，Agent 可自动创建副屏；任务结束时销毁。首版支持观察、启动应用、点击、滑动和返回。</string>
+    <string name="mobile_use_authorize">授权 Gimi</string>
+    <string name="mobile_use_refresh">刷新状态</string>
+    <string name="mobile_use_open_shizuku">打开 Shizuku</string>
+    <string name="mobile_use_missing_title">未安装 Shizuku</string>
+    <string name="mobile_use_missing_detail">安装 Shizuku 后，以无线调试或 ADB 启动服务。</string>
+    <string name="mobile_use_stopped_title">Shizuku 未运行</string>
+    <string name="mobile_use_stopped_detail">先在 Shizuku 中启动 ADB 模式服务。</string>
+    <string name="mobile_use_permission_title">等待授权</string>
+    <string name="mobile_use_permission_detail">Shizuku 已运行。授权 Gimi 后，Agent 才能使用副屏。</string>
+    <string name="mobile_use_denied_title">授权被拒绝</string>
+    <string name="mobile_use_denied_detail">请在 Shizuku 的已授权应用中允许 Gimi。</string>
+    <string name="mobile_use_root_title">当前为 root 模式</string>
+    <string name="mobile_use_root_detail">此功能只接受 Shizuku ADB shell 模式，请改用 ADB 启动。</string>
+    <string name="mobile_use_ready_title">已就绪 · ADB shell</string>
+    <string name="mobile_use_ready_detail">Agent 可在执行任务时创建一个 720 × 1280 的独立副屏。</string>
+    <string name="mobile_use_busy_title">副屏正在使用</string>
+    <string name="mobile_use_busy_detail">当前有一个 Agent 任务持有副屏。</string>
+    <string name="mobile_use_unsupported_title">此设备暂不支持</string>
+    <string name="mobile_use_unsupported_detail">副屏创建或隔离验证未通过，无法执行静默操作。</string>
+</resources>

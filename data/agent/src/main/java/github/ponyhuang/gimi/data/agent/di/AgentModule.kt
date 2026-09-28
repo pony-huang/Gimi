@@ -39,6 +39,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurat
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import github.ponyhuang.gimi.domain.toolauthorization.repository.LocalToolDefinitionSource
+import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
 import io.objectbox.Box
 import io.objectbox.BoxStore
 import github.ponyhuang.gimi.core.storage.ManagedDirectorySpec
@@ -154,6 +155,7 @@ object AgentModule {
         contributionRegistry: AgentContributionRegistry,
         pluginRuntimeProvider: PluginRuntimeProvider<AgentPlugin>,
         toolAccessRepository: ToolAccessRepository,
+        mobileUseRepository: MobileUseRepository,
     ): AgentChatRunner = AgentChatRunner(
         factory = { spec ->
             modelServices.awaitReady()
@@ -177,6 +179,7 @@ object AgentModule {
             }
         },
         toolAccessRepository = toolAccessRepository,
+        mobileUseRepository = mobileUseRepository,
     )
 
 }

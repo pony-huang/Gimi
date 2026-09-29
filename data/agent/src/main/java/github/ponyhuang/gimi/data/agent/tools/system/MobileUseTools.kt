@@ -16,6 +16,8 @@ import github.ponyhuang.gimi.domain.mobileuse.MobileUseResult
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 /** 副屏动作的扁平工具目录；共享任务归属和一次性截图注入。 */
 @Singleton
@@ -74,6 +76,20 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
             val y = args.int("y") ?: return@action invalid("y must be an integer.")
             val value = args["text"] as? String ?: return@action invalid("text must be a string.")
             repository.typeText(owner, x, y, value)
+        },
+        action(
+            "mobile_wait", "Wait before checking the secondary display again. Use during downloads or installation; this does not capture a screenshot or change the display. Call mobile_observe afterward.",
+            mapOf("seconds" to integer("Wait duration in seconds, 1..60.")), listOf("seconds"),
+        ) { _, args ->
+            val seconds = (args["seconds"] as? Number)?.toDouble()
+                ?.takeIf { it in 1.0..60.0 && it % 1.0 == 0.0 }
+                ?.toInt() ?: return@action invalid("seconds must be an integer from 1..60.")
+            delay((seconds * 1_000L).milliseconds)
+            mapOf(
+                "status" to "waited",
+                "message" to "Waited ${seconds}s; call mobile_observe to inspect the latest screen.",
+                "seconds" to seconds,
+            )
         },
         action("mobile_stop", "Stop the owned secondary display and release its resources.") { owner, _ ->
             repository.stop(owner)

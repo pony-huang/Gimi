@@ -15,12 +15,18 @@ import github.ponyhuang.gimi.domain.mobileuse.MobileUseResult
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.confirmVerified
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MobileUseToolsTest {
@@ -30,7 +36,7 @@ class MobileUseToolsTest {
     @Test
     fun actionsAreSeparateTools() {
         assertEquals(
-            setOf("mobile_observe", "mobile_open_app", "mobile_tap", "mobile_swipe", "mobile_back", "mobile_type_text", "mobile_stop"),
+            setOf("mobile_observe", "mobile_open_app", "mobile_tap", "mobile_swipe", "mobile_back", "mobile_type_text", "mobile_wait", "mobile_stop"),
             tools.keys,
         )
     }
@@ -72,6 +78,32 @@ class MobileUseToolsTest {
         ) as Map<*, *>
         assertEquals("text_set", payload["status"])
         coVerify(exactly = 1) { repository.typeText("turn-1", 200, 300, "Faded") }
+    }
+
+    @Test
+    fun waitDelaysWithoutCapturingOrChangingDisplay() = runTest {
+        val waiting = async {
+            tools.getValue("mobile_wait").execute(context("turn-1"), mapOf("seconds" to 3)) as Map<*, *>
+        }
+        runCurrent()
+        assertFalse(waiting.isCompleted)
+        advanceTimeBy(2_999)
+        runCurrent()
+        assertFalse(waiting.isCompleted)
+        advanceTimeBy(1)
+        runCurrent()
+        assertTrue(waiting.isCompleted)
+        assertEquals("waited", waiting.await()["status"])
+        confirmVerified(repository)
+    }
+
+    @Test
+    fun waitRejectsOutOfRangeDurations() = runTest {
+        val tool = tools.getValue("mobile_wait")
+        for (seconds in listOf(0, 1.5, 61)) {
+            val response = tool.execute(context("turn-1"), mapOf("seconds" to seconds)) as Map<*, *>
+            assertEquals("invalid_argument", response["status"])
+        }
     }
 
     @Test

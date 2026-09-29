@@ -29,7 +29,7 @@ class LocalToolset @Inject constructor(
         val allowConfirmation = readonlyContext.allowConfirmationRequiredTools()
         return catalog.tools().filter { tool ->
             tool.name in authorized &&
-                (tool.name != "mobile_use" || readonlyContext.modelRuntimeMetadataOrNull()?.supportsImages == true) &&
+                (tool.name !in catalog.mobileUseToolIds || readonlyContext.modelRuntimeMetadataOrNull()?.supportsImages == true) &&
                 (allowConfirmation || tool.name !in catalog.confirmationRequiredToolIds)
         }
     }

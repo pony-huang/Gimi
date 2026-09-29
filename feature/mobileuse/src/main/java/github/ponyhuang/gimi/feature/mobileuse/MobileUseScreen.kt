@@ -22,8 +22,10 @@ import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 @Composable
 fun MobileUseScreen(
     availability: MobileUseAvailability,
+    textInputAvailable: Boolean,
     onPrimaryAction: () -> Unit,
     onOpenShizuku: () -> Unit,
+    onTextInputAction: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     PreferencePageContainer(modifier = modifier) {
@@ -49,6 +51,32 @@ fun MobileUseScreen(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
+            }
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(16.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.mobile_use_text_input_title),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        stringResource(
+                            if (textInputAvailable) R.string.mobile_use_text_input_ready
+                            else R.string.mobile_use_text_input_required,
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+            Button(onClick = onTextInputAction, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    stringResource(
+                        if (textInputAvailable) R.string.mobile_use_text_input_refresh
+                        else R.string.mobile_use_text_input_settings,
+                    ),
+                )
             }
             Button(onClick = onPrimaryAction, modifier = Modifier.fillMaxWidth()) {
                 Text(
@@ -98,7 +126,7 @@ private fun MobileUseAvailability.detailRes(): Int = when (this) {
 @Composable
 private fun PermissionPreview() {
     AsssistantaiTheme {
-        MobileUseScreen(MobileUseAvailability.PERMISSION_REQUIRED, {}, {})
+        MobileUseScreen(MobileUseAvailability.PERMISSION_REQUIRED, false, {}, {}, {})
     }
 }
 
@@ -110,6 +138,6 @@ private fun PermissionPreview() {
 @Composable
 private fun ReadyDarkPreview() {
     AsssistantaiTheme {
-        MobileUseScreen(MobileUseAvailability.READY, {}, {})
+        MobileUseScreen(MobileUseAvailability.READY, true, {}, {}, {})
     }
 }

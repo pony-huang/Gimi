@@ -19,12 +19,16 @@ enum class MobileUseAvailability {
  * @property message 可向 Agent 展示的处理建议。
  * @property displayId 当前副屏 ID，未创建时为空。
  * @property imageJpeg 本次观察的压缩截图，仅供临时模型请求，不可持久化。
+ * @property width 当前副屏截图宽度，未创建时为空。
+ * @property height 当前副屏截图高度，未创建时为空。
  */
 data class MobileUseResult(
     val status: String,
     val message: String,
     val displayId: Int? = null,
     val imageJpeg: ByteArray? = null,
+    val width: Int? = null,
+    val height: Int? = null,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -35,6 +39,7 @@ data class MobileUseResult(
         if (displayId != other.displayId) return false
         if (status != other.status) return false
         if (message != other.message) return false
+        if (width != other.width || height != other.height) return false
         if (!imageJpeg.contentEquals(other.imageJpeg)) return false
 
         return true
@@ -44,6 +49,8 @@ data class MobileUseResult(
         var result = displayId ?: 0
         result = 31 * result + status.hashCode()
         result = 31 * result + message.hashCode()
+        result = 31 * result + (width ?: 0)
+        result = 31 * result + (height ?: 0)
         result = 31 * result + (imageJpeg?.contentHashCode() ?: 0)
         return result
     }
@@ -58,5 +65,7 @@ interface MobileUseRepository {
     suspend fun tap(owner: String, x: Int, y: Int): MobileUseResult
     suspend fun swipe(owner: String, x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Int): MobileUseResult
     suspend fun back(owner: String): MobileUseResult
+    suspend fun typeText(owner: String, x: Int, y: Int, text: String): MobileUseResult
     suspend fun stop(owner: String): MobileUseResult
+    fun textInputAvailable(): Boolean
 }

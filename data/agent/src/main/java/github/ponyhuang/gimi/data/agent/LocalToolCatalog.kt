@@ -11,7 +11,7 @@ import github.ponyhuang.gimi.data.agent.tools.system.FilesTool
 import github.ponyhuang.gimi.data.agent.tools.system.LaunchersTool
 import github.ponyhuang.gimi.data.agent.tools.system.LocationTool
 import github.ponyhuang.gimi.data.agent.tools.system.MediaTool
-import github.ponyhuang.gimi.data.agent.tools.system.MobileUseTool
+import github.ponyhuang.gimi.data.agent.tools.system.MobileUseTools
 import github.ponyhuang.gimi.data.agent.tools.system.PeopleTool
 import github.ponyhuang.gimi.data.agent.tools.system.ReadLocalFileTool
 import github.ponyhuang.gimi.data.agent.tools.system.SettingsTool
@@ -40,7 +40,7 @@ class LocalToolCatalog @Inject constructor(
     launchersTool: LaunchersTool,
     locationTool: LocationTool,
     mediaTool: MediaTool,
-    mobileUseTool: MobileUseTool,
+    mobileUseTools: MobileUseTools,
     peopleTool: PeopleTool,
     readLocalFileTool: ReadLocalFileTool,
     settingsTool: SettingsTool,
@@ -59,7 +59,7 @@ class LocalToolCatalog @Inject constructor(
         addAll(launchersTool.generatedTools().registeredAs(LocalToolCategory.LAUNCHERS))
         addAll(locationTool.generatedTools().registeredAs(LocalToolCategory.LOCATION))
         addAll(mediaTool.generatedTools().registeredAs(LocalToolCategory.MEDIA))
-        add(RegisteredLocalTool(category = LocalToolCategory.MOBILE_USE, tool = mobileUseTool))
+        addAll(mobileUseTools.all().registeredAs(LocalToolCategory.MOBILE_USE))
         addAll(peopleTool.generatedTools().registeredAs(LocalToolCategory.PEOPLE))
         addAll(settingsTool.generatedTools().registeredAs(LocalToolCategory.SETTINGS))
         addAll(webTool.generatedTools().registeredAs(LocalToolCategory.WEB))
@@ -77,6 +77,10 @@ class LocalToolCatalog @Inject constructor(
 
     /** 所有本地工具的扁平视图，顺序与注册顺序一致。 */
     fun tools(): List<BaseTool> = registeredTools.map(RegisteredLocalTool::tool)
+
+    val mobileUseToolIds: Set<String> = registeredTools
+        .filter { it.category == LocalToolCategory.MOBILE_USE }
+        .mapTo(linkedSetOf()) { it.tool.name }
 
     /**
      * 需要用户确认的工具 ID 集合。

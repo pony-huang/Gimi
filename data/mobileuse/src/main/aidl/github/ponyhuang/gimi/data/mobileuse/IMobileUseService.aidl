@@ -9,5 +9,7 @@ interface IMobileUseService {
     void back(int displayId) = 6;
     byte[] capture() = 7;
     void stop() = 8;
+    int[] geometry(int displayId) = 9;
+    void recoverSurface(int displayId) = 10;
     void destroy() = 16777114;
 }

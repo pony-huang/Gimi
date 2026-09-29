@@ -1,6 +1,8 @@
 package github.ponyhuang.gimi.feature.mobileuse
 
 import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
@@ -20,10 +22,12 @@ fun MobileUseRoute(
 ) {
     val context = LocalContext.current
     val status by viewModel.availability.collectAsStateWithLifecycle()
+    val textInputAvailable by viewModel.textInputAvailable.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
     PreferenceScaffold(title = stringResource(R.string.mobile_use_title), onBack = onBack) { modifier ->
         MobileUseScreen(
             availability = status,
+            textInputAvailable = textInputAvailable,
             onPrimaryAction = {
                 if (status == MobileUseAvailability.PERMISSION_REQUIRED) {
                     viewModel.requestPermission()
@@ -37,6 +41,17 @@ fun MobileUseRoute(
                 if (intent != null) {
                     try {
                         context.startActivity(intent)
+                    } catch (_: ActivityNotFoundException) {
+                        viewModel.refresh()
+                    }
+                }
+            },
+            onTextInputAction = {
+                if (textInputAvailable) {
+                    viewModel.refresh()
+                } else {
+                    try {
+                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                     } catch (_: ActivityNotFoundException) {
                         viewModel.refresh()
                     }

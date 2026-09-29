@@ -15,9 +15,12 @@ class MobileUseViewModel @Inject constructor(
 ) : ViewModel() {
     private val mutableAvailability = MutableStateFlow(repository.availability())
     val availability: StateFlow<MobileUseAvailability> = mutableAvailability
+    private val mutableTextInputAvailable = MutableStateFlow(repository.textInputAvailable())
+    val textInputAvailable: StateFlow<Boolean> = mutableTextInputAvailable
 
     fun refresh() {
         mutableAvailability.value = repository.availability()
+        mutableTextInputAvailable.value = repository.textInputAvailable()
     }
 
     fun requestPermission() {

@@ -1,7 +1,7 @@
 <resources>
     <string name="mobile_use_title">后台静默操作</string>
     <string name="mobile_use_intro">让 Agent 在独立副屏运行其他应用并读取画面。</string>
-    <string name="mobile_use_scope">仅支持 Shizuku ADB shell 模式。授权后，Agent 可自动创建副屏；任务结束时销毁。首版支持观察、启动应用、点击、滑动和返回。</string>
+    <string name="mobile_use_scope">仅支持 Shizuku ADB shell 模式。授权后，Agent 可自动创建副屏；任务结束时销毁。支持观察、启动应用、点击、滑动、返回及直接设置副屏输入框文字。</string>
     <string name="mobile_use_authorize">授权 Gimi</string>
     <string name="mobile_use_refresh">刷新状态</string>
     <string name="mobile_use_open_shizuku">打开 Shizuku</string>
@@ -16,7 +16,12 @@
     <string name="mobile_use_root_title">当前为 root 模式</string>
     <string name="mobile_use_root_detail">此功能只接受 Shizuku ADB shell 模式，请改用 ADB 启动。</string>
     <string name="mobile_use_ready_title">已就绪 · ADB shell</string>
-    <string name="mobile_use_ready_detail">Agent 可在执行任务时创建一个 720 × 1280 的独立副屏。</string>
+    <string name="mobile_use_ready_detail">Agent 可在执行任务时创建与当前设备尺寸匹配的独立副屏。</string>
+    <string name="mobile_use_text_input_title">副屏文字输入</string>
+    <string name="mobile_use_text_input_ready">无障碍服务已开启。可直接写入副屏支持的输入框。</string>
+    <string name="mobile_use_text_input_required">需要开启无障碍服务；无法直接设置副屏文字时会停止操作，不会主动调用输入法。</string>
+    <string name="mobile_use_text_input_refresh">刷新输入状态</string>
+    <string name="mobile_use_text_input_settings">打开无障碍设置</string>
     <string name="mobile_use_busy_title">副屏正在使用</string>
     <string name="mobile_use_busy_detail">当前有一个 Agent 任务持有副屏。</string>
     <string name="mobile_use_unsupported_title">此设备暂不支持</string>

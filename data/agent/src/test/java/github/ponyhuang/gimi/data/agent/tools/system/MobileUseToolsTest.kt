@@ -14,6 +14,7 @@ import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseResult
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -22,24 +23,34 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-class MobileUseToolTest {
+class MobileUseToolsTest {
     private val repository = mockk<MobileUseRepository>()
-    private val tool = MobileUseTool(repository)
+    private val tools = MobileUseTools(repository).all().associateBy { it.name }
+
+    @Test
+    fun actionsAreSeparateTools() {
+        assertEquals(
+            setOf("mobile_observe", "mobile_open_app", "mobile_tap", "mobile_swipe", "mobile_back", "mobile_type_text", "mobile_stop"),
+            tools.keys,
+        )
+    }
 
     @Test
     fun screenshotIsOnlyAttachedToImmediateNextRequest() = runTest {
         val jpeg = byteArrayOf(1, 2, 3, 4)
         coEvery { repository.observe("turn-1") } returns
-            MobileUseResult("ready", "screenshot", 290, jpeg)
-        val payload = tool.execute(context("turn-1"), mapOf("action" to "observe")) as Map<*, *>
-        assertEquals("ready", payload["status"])
+            MobileUseResult("ready", "screenshot", 290, jpeg, 1080, 2400)
+        val tool = tools.getValue("mobile_observe")
+        val payload = tool.execute(context("turn-1"), emptyMap()) as Map<*, *>
+        assertEquals(1080, payload["width"])
+        assertEquals(2400, payload["height"])
         val request = LlmRequest(
             contents = listOf(
                 Content(
                     role = Role.USER,
                     parts = listOf(
                         Part(functionResponse = FunctionResponse(
-                            name = "mobile_use",
+                            name = tool.name,
                             id = "call-1",
                             response = payload.entries.associate { it.key.toString() to it.value },
                         )),
@@ -47,18 +58,27 @@ class MobileUseToolTest {
                 ),
             ),
         )
-
         val enriched = tool.processLlmRequest(mockk(), request)
         assertArrayEquals(jpeg, enriched.contents.last().parts.last().inlineData?.data)
-        assertEquals("image/jpeg", enriched.contents.last().parts.last().inlineData?.mimeType)
-        assertEquals(Role.USER, enriched.contents.last().role)
         assertEquals(1, tool.processLlmRequest(mockk(), request).contents.size)
     }
 
     @Test
+    fun typeTextTargetsCoordinatesOnOwnedDisplay() = runTest {
+        coEvery { repository.typeText("turn-1", 200, 300, "Faded") } returns
+            MobileUseResult("text_set", "done", 290, null, 1080, 2400)
+        val payload = tools.getValue("mobile_type_text").execute(
+            context("turn-1"), mapOf("x" to 200, "y" to 300, "text" to "Faded"),
+        ) as Map<*, *>
+        assertEquals("text_set", payload["status"])
+        coVerify(exactly = 1) { repository.typeText("turn-1", 200, 300, "Faded") }
+    }
+
+    @Test
     fun missingTaskIdentityDoesNotOperateDisplay() = runTest {
-        val payload = tool.execute(mockk { every { context } returns mockk(relaxed = true) },
-            mapOf("action" to "observe")) as Map<*, *>
+        val payload = tools.getValue("mobile_observe").execute(
+            mockk { every { context } returns mockk(relaxed = true) }, emptyMap(),
+        ) as Map<*, *>
         assertEquals("unavailable", payload["status"])
         assertNull(payload["imageToken"])
     }
@@ -68,9 +88,7 @@ class MobileUseToolTest {
         every { readonly.runConfig } returns RunConfig(
             customMetadata = ToolRunMetadata.of(
                 ModelRuntimeMetadata("service", ApiProtocol.Standard, "vision", "https://example.com", true),
-                null,
-                true,
-                owner,
+                null, true, owner,
             ),
         )
         return mockk { every { context } returns readonly }

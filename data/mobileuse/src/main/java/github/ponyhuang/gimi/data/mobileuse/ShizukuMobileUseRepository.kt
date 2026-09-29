@@ -33,7 +33,7 @@ class ShizukuMobileUseRepository @Inject constructor(
     private val mutex = Mutex()
     private val args = Shizuku.UserServiceArgs(
         ComponentName(context.packageName, ShellMobileUseService::class.java.name),
-    ).tag("gimi.mobileuse.shell").version(1).daemon(false).processNameSuffix("mobileuse")
+    ).tag("gimi.mobileuse.shell").version(2).daemon(false).processNameSuffix("mobileuse")
     private var owner: String? = null
     private var displayId: Int? = null
     private var service: IMobileUseService? = null
@@ -65,8 +65,10 @@ class ShizukuMobileUseRepository @Inject constructor(
         }
     }
 
-    override suspend fun observe(owner: String): MobileUseResult = perform(owner) { remote, _ ->
-        resultWithCapture(remote, "ready", "Virtual display screenshot attached to the next model request.")
+    override fun textInputAvailable(): Boolean = MobileTextAccessibilityService.current() != null
+
+    override suspend fun observe(owner: String): MobileUseResult = perform(owner) { remote, id ->
+        resultWithCapture(remote, id, "ready", "Virtual display screenshot attached to the next model request.")
     }
 
     override suspend fun launch(owner: String, packageName: String): MobileUseResult = perform(owner) { remote, id ->
@@ -75,25 +77,48 @@ class ShizukuMobileUseRepository @Inject constructor(
                 "app_unavailable", "No launchable activity for package $packageName.",
             )
         remote.launch(launcher.flattenToString(), id)
-        resultWithCapture(remote, "launched", "App started on virtual display.")
+        resultWithCapture(remote, id, "launched", "App started on virtual display.")
     }
 
     override suspend fun tap(owner: String, x: Int, y: Int): MobileUseResult = perform(owner) { remote, id ->
+        if (!insideDisplay(remote, id, x, y)) {
+            return@perform MobileUseResult("invalid_argument", "Point outside virtual display.")
+        }
         remote.tap(id, x, y)
-        resultWithCapture(remote, "tapped", "Tap delivered to virtual display.")
+        resultWithCapture(remote, id, "tapped", "Tap delivered to virtual display.")
     }
 
     override suspend fun swipe(
         owner: String, x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Int,
     ): MobileUseResult = perform(owner) { remote, id ->
+        if (!insideDisplay(remote, id, x1, y1) || !insideDisplay(remote, id, x2, y2)) {
+            return@perform MobileUseResult("invalid_argument", "Point outside virtual display.")
+        }
         remote.swipe(id, x1, y1, x2, y2, durationMs)
-        resultWithCapture(remote, "swiped", "Swipe delivered to virtual display.")
+        resultWithCapture(remote, id, "swiped", "Swipe delivered to virtual display.")
     }
 
     override suspend fun back(owner: String): MobileUseResult = perform(owner) { remote, id ->
         remote.back(id)
-        resultWithCapture(remote, "back", "Back delivered to virtual display.")
+        resultWithCapture(remote, id, "back", "Back delivered to virtual display.")
     }
+
+    override suspend fun typeText(owner: String, x: Int, y: Int, text: String): MobileUseResult =
+        perform(owner) { remote, id ->
+            if (!insideDisplay(remote, id, x, y)) {
+                return@perform MobileUseResult("invalid_argument", "Point outside virtual display.")
+            }
+            val accessibility = MobileTextAccessibilityService.current()
+                ?: return@perform MobileUseResult(
+                    "accessibility_required", "Enable Gimi secondary display text input in Accessibility settings.",
+                )
+            if (!accessibility.replaceText(id, x, y, text)) {
+                return@perform MobileUseResult(
+                    "text_target_unavailable", "No editable secondary-display node supports direct text replacement at this point.",
+                )
+            }
+            resultWithCapture(remote, id, "text_set", "Text replaced on secondary display.")
+        }
 
     override suspend fun stop(owner: String): MobileUseResult = withContext(Dispatchers.IO) {
         mutex.withLock {
@@ -125,7 +150,9 @@ class ShizukuMobileUseRepository @Inject constructor(
                 }
                 val id = displayId ?: remote.createDisplay().also { displayId = it }
                 this@ShizukuMobileUseRepository.owner = owner
-                operation(remote, id).copy(displayId = id)
+                val result = operation(remote, id)
+                val geometry = remote.geometry(id)
+                result.copy(displayId = id, width = geometry[0], height = geometry[1])
             } catch (failure: Exception) {
                 closeLocked()
                 if (failure is CancellationException) throw failure
@@ -135,10 +162,21 @@ class ShizukuMobileUseRepository @Inject constructor(
     }
 
     private fun resultWithCapture(
-        remote: IMobileUseService, status: String, message: String,
+        remote: IMobileUseService, id: Int, status: String, message: String,
     ): MobileUseResult {
         Thread.sleep(450)
-        return MobileUseResult(status, message, imageJpeg = remote.capture())
+        val frame = MobileCaptureRecovery.capture(
+            captureFrame = { remote.capture() },
+            recoverSurface = { remote.recoverSurface(id) },
+        ) ?: return MobileUseResult(
+            "frame_unavailable", "No display frame yet; the app and virtual display remain active. Retry mobile_observe.",
+        )
+        return MobileUseResult(status, message, imageJpeg = frame)
+    }
+
+    private fun insideDisplay(remote: IMobileUseService, id: Int, x: Int, y: Int): Boolean {
+        val dimensions = remote.geometry(id)
+        return x in 0 until dimensions[0] && y in 0 until dimensions[1]
     }
 
     private suspend fun bind(): IMobileUseService {

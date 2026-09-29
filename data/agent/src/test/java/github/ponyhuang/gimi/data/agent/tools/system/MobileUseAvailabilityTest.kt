@@ -18,11 +18,12 @@ import org.junit.Test
 class MobileUseAvailabilityTest {
     @Test
     fun toolIsOfferedOnlyToImageCapableModels() = runTest {
-        val mobileTool = MobileUseTool(mockk<MobileUseRepository>())
+        val mobileTool = MobileUseTools(mockk<MobileUseRepository>()).all().first()
         val catalog = mockk<LocalToolCatalog>()
         val authorization = mockk<ToolAuthorizationRepository>()
         every { catalog.tools() } returns listOf(mobileTool)
-        coEvery { authorization.enabledToolIds() } returns setOf("mobile_use")
+        every { catalog.mobileUseToolIds } returns setOf(mobileTool.name)
+        coEvery { authorization.enabledToolIds() } returns setOf(mobileTool.name)
         val toolset = LocalToolset(catalog, authorization)
 
         assertEquals(emptyList<Any>(), toolset.getTools(context(supportsImages = false)))

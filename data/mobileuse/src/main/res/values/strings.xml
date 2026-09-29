@@ -1,0 +1,4 @@
+<resources>
+    <string name="mobile_text_accessibility_label">Gimi 副屏文字输入</string>
+    <string name="mobile_text_accessibility_description">仅在你启用副屏操作时，向副屏的输入框写入文字。</string>
+</resources>

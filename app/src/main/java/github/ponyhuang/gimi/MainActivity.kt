@@ -1,21 +1,27 @@
 package github.ponyhuang.gimi
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.content.ContextCompat
 import dagger.hilt.android.AndroidEntryPoint
 import github.ponyhuang.gimi.navigation.MainScreen
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.core.notifications.AppNotificationManager
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
+import github.ponyhuang.gimi.domain.permissions.model.AppPermission
+import github.ponyhuang.gimi.domain.permissions.repository.PermissionRepository
 import github.ponyhuang.gimi.feature.chat.sharedImageUris
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.voice.AssistantPanelInteractor
@@ -31,6 +37,12 @@ class MainActivity : ComponentActivity() {
     lateinit var assistantPanelInteractor: AssistantPanelInteractor
     @Inject
     lateinit var appNotificationManager: AppNotificationManager
+    @Inject
+    lateinit var permissionRepository: PermissionRepository
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {}
 
     private val sharedMediaUris = mutableStateOf<List<Uri>>(emptyList())
     private val openChatRequest = mutableStateOf(0)
@@ -42,6 +54,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestNotificationPermissionOnFreshInstall()
         sharedMediaUris.value = savedInstanceState
             ?.getStringArrayList(KEY_SHARED_MEDIA_URIS)
             ?.map(Uri::parse)
@@ -67,6 +80,22 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    private fun requestNotificationPermissionOnFreshInstall() {
+        val permission = AppPermission.PostNotifications
+        if (!shouldRequestNotificationPermission(
+                sdkInt = android.os.Build.VERSION.SDK_INT,
+                granted = ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                ) == PackageManager.PERMISSION_GRANTED,
+                previouslyRequested = permissionRepository.wasRequested(permission),
+            )
+        ) return
+
+        permissionRepository.recordRequested(setOf(permission))
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     override fun onNewIntent(intent: Intent) {

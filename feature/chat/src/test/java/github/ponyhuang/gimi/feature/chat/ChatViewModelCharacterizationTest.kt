@@ -362,6 +362,7 @@ class ChatViewModelCharacterizationTest {
     @Test
     fun completedReply_autoSpeaksLatestAssistantMessageWhenEnabled() = runTest {
         val fixture = fixture(configured = true)
+        advanceUntilIdle()
         assertTrue(fixture.viewModel.uiState.value.autoSpeakEnabled)
 
         fixture.viewModel.send("你好")

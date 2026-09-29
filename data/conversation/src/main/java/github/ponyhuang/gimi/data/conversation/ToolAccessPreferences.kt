@@ -14,7 +14,7 @@ import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
 /**
  * Persistent, app-wide tool loading preference.
  *
- * Defaults to [ToolAccessMode.ON_DEMAND] (load on demand, the recommended mode) and falls
+ * Defaults to [ToolAccessMode.ALWAYS_AVAILABLE] (load all) and falls
  * back to it for any unknown/corrupt persisted value so the switch always reconciles to a
  * known enum.
  */
@@ -37,7 +37,7 @@ class ToolAccessPreferences @Inject constructor(
     private fun readMode(): ToolAccessMode {
         val name = preferences.getString(DEFAULT_TOOL_ACCESS_MODE_KEY, null)
         return ToolAccessMode.entries.firstOrNull { it.name == name }
-            ?: ToolAccessMode.ON_DEMAND
+            ?: ToolAccessMode.ALWAYS_AVAILABLE
     }
 
     private companion object {

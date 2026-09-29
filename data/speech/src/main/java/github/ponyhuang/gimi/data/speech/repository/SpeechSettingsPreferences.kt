@@ -11,8 +11,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * 持久化语音播报偏好。`auto_speak_enabled` 键不存在时取默认开启——与产品预期一致：
- * 用户从未操作过开关时，每轮回复自动朗读。
+ * 持久化语音播报偏好。`auto_speak_enabled` 键不存在时默认关闭；
+ * 用户显式开启后才会在每轮回复完成时自动朗读。
  */
 @Singleton
 class SpeechSettingsPreferences @Inject constructor(
@@ -34,6 +34,6 @@ class SpeechSettingsPreferences @Inject constructor(
     private companion object {
         const val PREFERENCES_NAME = "speech_preferences"
         const val AUTO_SPEAK_ENABLED_KEY = "auto_speak_enabled"
-        const val DEFAULT_AUTO_SPEAK_ENABLED = true
+        const val DEFAULT_AUTO_SPEAK_ENABLED = false
     }
 }

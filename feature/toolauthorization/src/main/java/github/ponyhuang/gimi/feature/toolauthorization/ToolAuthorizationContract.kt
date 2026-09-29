@@ -7,7 +7,7 @@ data class ToolAuthorizationUiState(
     val isCustomizationEnabled: Boolean = false,
     val tools: List<ToolDescriptor> = emptyList(),
     val isMutationBlocked: Boolean = false,
-    val toolAccessMode: ToolAccessMode = ToolAccessMode.ON_DEMAND,
+    val toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
 ) {
     val enabledCount: Int get() = tools.count(ToolDescriptor::isEnabled)
     val totalCount: Int get() = tools.size

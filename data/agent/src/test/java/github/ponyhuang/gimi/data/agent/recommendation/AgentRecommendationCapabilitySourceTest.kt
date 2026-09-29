@@ -35,6 +35,7 @@ class AgentRecommendationCapabilitySourceTest {
                 LocalToolContribution(
                     localToolCatalog = mockk(relaxed = true),
                     localToolset = mockk(relaxed = true),
+                    mobileUseTools = mockk(relaxed = true),
                     toolAuthorization = toolAuthorization,
                 ),
                 McpToolContribution(

@@ -1,8 +1,11 @@
 package github.ponyhuang.gimi.data.agent.tools.system
 
+import com.google.adk.kt.agents.ReadonlyContext
 import com.google.adk.kt.models.LlmRequest
+import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.FunctionTool
 import com.google.adk.kt.tools.ToolContext
+import com.google.adk.kt.tools.Toolset
 import com.google.adk.kt.types.Blob
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionDeclaration
@@ -11,6 +14,8 @@ import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
+import github.ponyhuang.gimi.data.agent.tools.modelRuntimeMetadataOrNull
+import github.ponyhuang.gimi.domain.mobileuse.MobileUseAvailability
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseResult
 import java.util.UUID
@@ -19,9 +24,9 @@ import javax.inject.Singleton
 import kotlinx.coroutines.delay
 import kotlin.time.Duration.Companion.milliseconds
 
-/** 副屏动作的扁平工具目录；共享任务归属和一次性截图注入。 */
+/** Shizuku 运行时自动声明的副屏工具集；共享任务归属和一次性截图注入。 */
 @Singleton
-class MobileUseTools @Inject constructor(private val repository: MobileUseRepository) {
+class MobileUseTools @Inject constructor(private val repository: MobileUseRepository) : Toolset {
     private val pendingImages = object : LinkedHashMap<String, ByteArray>(8, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ByteArray>?): Boolean = size > 8
     }
@@ -97,6 +102,39 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
     )
 
     fun all(): List<FunctionTool> = tools
+
+    override suspend fun getTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
+        if (availableFor(readonlyContext)) tools else emptyList()
+
+    override suspend fun processLlmRequest(
+        toolContext: ToolContext,
+        llmRequest: LlmRequest,
+    ): LlmRequest {
+        if (!availableFor(toolContext.context)) return llmRequest
+        return llmRequest.appendInstructions(
+            Content(
+                parts = listOf(Part(text = """
+                    <mobile_use>
+                    Use mobile_* tools only when the user asks you to operate or inspect an installed Android app.
+                    They act on an isolated secondary display, never the user's main screen.
+                    Start with mobile_observe or mobile_open_app, use coordinates from the latest screenshot,
+                    observe again after actions when the result is uncertain, and call mobile_stop when done.
+                    If a tool reports that Shizuku permission or device support is unavailable, explain the
+                    required setup instead of retrying the same action.
+                    </mobile_use>
+                """.trimIndent())),
+            ),
+        )
+    }
+
+    private fun availableFor(context: ReadonlyContext?): Boolean =
+        context.modelRuntimeMetadataOrNull()?.supportsImages == true &&
+            repository.availability() in setOf(
+                MobileUseAvailability.READY,
+                MobileUseAvailability.BUSY,
+                MobileUseAvailability.PERMISSION_REQUIRED,
+                MobileUseAvailability.PERMISSION_DENIED,
+            )
 
     private fun action(
         name: String,

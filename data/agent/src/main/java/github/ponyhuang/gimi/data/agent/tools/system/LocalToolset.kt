@@ -5,7 +5,6 @@ import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.data.agent.LocalToolCatalog
 import github.ponyhuang.gimi.data.agent.tools.allowConfirmationRequiredTools
-import github.ponyhuang.gimi.data.agent.tools.modelRuntimeMetadataOrNull
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -14,7 +13,7 @@ import javax.inject.Singleton
  * 本地系统工具的 ADK [Toolset] 入口。
  *
  * 过滤全部推迟到每次模型请求时执行：
- * - 全局授权（[ToolAuthorizationRepository]，在设置中自定义）；
+ * - 全局授权（[ToolAuthorizationRepository]，在设置中自定义；副屏工具由独立 Toolset 管理）；
  * - 调用方不允许确认类工具时（如无 UI 的后台执行），排除
  *   [LocalToolCatalog.confirmationRequiredToolIds]。
  */
@@ -29,7 +28,6 @@ class LocalToolset @Inject constructor(
         val allowConfirmation = readonlyContext.allowConfirmationRequiredTools()
         return catalog.tools().filter { tool ->
             tool.name in authorized &&
-                (tool.name !in catalog.mobileUseToolIds || readonlyContext.modelRuntimeMetadataOrNull()?.supportsImages == true) &&
                 (allowConfirmation || tool.name !in catalog.confirmationRequiredToolIds)
         }
     }

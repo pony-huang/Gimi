@@ -251,7 +251,7 @@ class AgentFactoryToolAccessTest {
         val officialToolset = DefaultOfficialToolset(officialRegistry, FakeToolAccessRepository())
         val registry = AgentContributionRegistry(
             setOf(
-                LocalToolContribution(localToolCatalog, localToolset, toolAuthorization),
+                LocalToolContribution(localToolCatalog, localToolset, mockk(relaxed = true), toolAuthorization),
                 McpToolContribution(
                     conversationMcpToolset = mcpToolset,
                     mcpToolsetRegistry = mcpRegistry,
@@ -291,6 +291,7 @@ class AgentFactoryToolAccessTest {
      * 模式的候选源装配路径。
      */
     private fun officialRegistry(): OfficialToolRegistry = mockk {
+        every { enabledSearchCandidateSpecs() } returns emptyList()
         every { all } returns listOf(
             OfficialToolSpec(
                 toolId = "kimi_formulas",

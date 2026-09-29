@@ -117,6 +117,14 @@ Run from the repository root with `gradlew.bat` on Windows:
 
 Android Studio may run the `app` debug configuration on a device or emulator.
 
+### Fast validation and Jugg fallback
+
+- Choose the smallest Gradle targets that satisfy the testing rules below. For compile/test-only checks, run `gradlew.bat` directly so the repository's configuration cache can be reused; combine compatible required targets in one invocation when practical. Use Jugg for an eligible incremental/device loop, and check its resolved command before treating `jugg compile` as a narrow compile: the `app` run configuration can instead execute `:app:assembleDebug` with the configuration cache disabled.
+- If Jugg's embedded Kotlin compiler reports `INTERNAL_ERROR` with `Could not find installation home path` / missing `product-info.json`, classify it as an IDE/Jugg compiler-environment failure, not a Kotlin source error. Retry the incremental compiler at most once; if it repeats, validate with the required Gradle targets and report the Jugg failure separately.
+- If Jugg reports `READY_FULL_COMPILE (build.gradle.kts changed)`, inspect both `git diff` for build scripts and Jugg's `getLastBuildFile ... exists: false` entries. Missing Jugg history can trigger this verdict even when this task changed no build script. Accept one full build to re-establish the baseline, or use direct Gradle for compile-only validation; do not repeatedly retry incremental compile against the same state or delete build artifacts to force it.
+- Changes to Hilt/Room annotations, generated code, or bytecode transforms need the Gradle build required by the testing rules; Jugg's source-to-dex incremental path does not rerun every processor or transform. Keep one build running at a time.
+- After a test failure, inspect the exact failing test and cause before rerunning. Repair a stale fixture or source issue, then rerun the same targeted tests; report unrelated failures separately. Record whether compilation, tests, APK assembly, deployment, and device verification actually completed.
+
 ### CI/CD (GitHub Actions, `.github/workflows/`)
 
 - `ci.yml`: push/PR to `main` runs `testDebugUnitTest`, `assembleDebug`, and `app:lintDebug` on JDK 21 (Ubuntu).

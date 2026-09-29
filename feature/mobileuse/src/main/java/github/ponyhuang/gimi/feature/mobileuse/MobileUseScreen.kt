@@ -4,12 +4,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -31,11 +33,13 @@ fun MobileUseScreen(
     PreferencePageContainer(modifier = modifier) {
         Column(
             verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(20.dp),
         ) {
             Text(
                 stringResource(R.string.mobile_use_intro),
                 style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.fillMaxWidth(),
             )
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -46,10 +50,12 @@ fun MobileUseScreen(
                         stringResource(availability.titleRes()),
                         style = MaterialTheme.typography.titleMedium,
                     )
-                    Text(
-                        stringResource(availability.detailRes()),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    availability.detailRes()?.let { detailRes ->
+                        Text(
+                            stringResource(detailRes),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                 }
             }
             Card(modifier = Modifier.fillMaxWidth()) {
@@ -58,19 +64,21 @@ fun MobileUseScreen(
                     modifier = Modifier.padding(16.dp),
                 ) {
                     Text(
-                        stringResource(R.string.mobile_use_text_input_title),
+                        stringResource(
+                            if (textInputAvailable) R.string.mobile_use_text_input_ready_title
+                            else R.string.mobile_use_text_input_required_title,
+                        ),
                         style = MaterialTheme.typography.titleMedium,
                     )
-                    Text(
-                        stringResource(
-                            if (textInputAvailable) R.string.mobile_use_text_input_ready
-                            else R.string.mobile_use_text_input_required,
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    if (!textInputAvailable) {
+                        Text(
+                            stringResource(R.string.mobile_use_text_input_required),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                 }
             }
-            Button(onClick = onTextInputAction, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = onTextInputAction, modifier = Modifier.width(220.dp)) {
                 Text(
                     stringResource(
                         if (textInputAvailable) R.string.mobile_use_text_input_refresh
@@ -78,7 +86,7 @@ fun MobileUseScreen(
                     ),
                 )
             }
-            Button(onClick = onPrimaryAction, modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = onPrimaryAction, modifier = Modifier.width(220.dp)) {
                 Text(
                     stringResource(
                         if (availability == MobileUseAvailability.PERMISSION_REQUIRED) {
@@ -89,13 +97,9 @@ fun MobileUseScreen(
                     ),
                 )
             }
-            OutlinedButton(onClick = onOpenShizuku, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = onOpenShizuku, modifier = Modifier.width(220.dp)) {
                 Text(stringResource(R.string.mobile_use_open_shizuku))
             }
-            Text(
-                stringResource(R.string.mobile_use_scope),
-                style = MaterialTheme.typography.bodySmall,
-            )
         }
     }
 }
@@ -111,13 +115,13 @@ private fun MobileUseAvailability.titleRes(): Int = when (this) {
     MobileUseAvailability.UNSUPPORTED -> R.string.mobile_use_unsupported_title
 }
 
-private fun MobileUseAvailability.detailRes(): Int = when (this) {
+private fun MobileUseAvailability.detailRes(): Int? = when (this) {
     MobileUseAvailability.SHIZUKU_MISSING -> R.string.mobile_use_missing_detail
     MobileUseAvailability.SHIZUKU_STOPPED -> R.string.mobile_use_stopped_detail
     MobileUseAvailability.PERMISSION_REQUIRED -> R.string.mobile_use_permission_detail
     MobileUseAvailability.PERMISSION_DENIED -> R.string.mobile_use_denied_detail
     MobileUseAvailability.ROOT_UNSUPPORTED -> R.string.mobile_use_root_detail
-    MobileUseAvailability.READY -> R.string.mobile_use_ready_detail
+    MobileUseAvailability.READY -> null
     MobileUseAvailability.BUSY -> R.string.mobile_use_busy_detail
     MobileUseAvailability.UNSUPPORTED -> R.string.mobile_use_unsupported_detail
 }

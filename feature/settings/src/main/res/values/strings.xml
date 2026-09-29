@@ -30,7 +30,7 @@
     <string name="settings_tool_authorization_title">工具授权</string>
     <string name="settings_tool_authorization_subtitle">选择允许助手使用的本地工具</string>
     <string name="settings_mobile_use_title">后台静默操作</string>
-    <string name="settings_mobile_use_subtitle">Shizuku 副屏状态与授权</string>
+    <string name="settings_mobile_use_subtitle">查看运行状态与管理授权</string>
     <string name="settings_permissions_title">权限管理</string>
     <string name="settings_permissions_subtitle">预先授权聊天任务和语音功能所需权限</string>
 

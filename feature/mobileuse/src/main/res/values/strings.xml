@@ -1,7 +1,6 @@
 <resources>
     <string name="mobile_use_title">后台静默操作</string>
-    <string name="mobile_use_intro">让 Agent 在独立副屏运行其他应用并读取画面。</string>
-    <string name="mobile_use_scope">仅支持 Shizuku ADB shell 模式。授权后，Agent 可自动创建副屏；任务结束时销毁。支持观察、启动应用、点击、滑动、返回及直接设置副屏输入框文字。</string>
+    <string name="mobile_use_intro">让 Agent 操作其他应用，不打断你当前的操作。</string>
     <string name="mobile_use_authorize">授权 Gimi</string>
     <string name="mobile_use_refresh">刷新状态</string>
     <string name="mobile_use_open_shizuku">打开 Shizuku</string>
@@ -10,20 +9,19 @@
     <string name="mobile_use_stopped_title">Shizuku 未运行</string>
     <string name="mobile_use_stopped_detail">先在 Shizuku 中启动 ADB 模式服务。</string>
     <string name="mobile_use_permission_title">等待授权</string>
-    <string name="mobile_use_permission_detail">Shizuku 已运行。授权 Gimi 后，Agent 才能使用副屏。</string>
+    <string name="mobile_use_permission_detail">Shizuku 已运行。授权 Gimi 后即可使用后台操作。</string>
     <string name="mobile_use_denied_title">授权被拒绝</string>
     <string name="mobile_use_denied_detail">请在 Shizuku 的已授权应用中允许 Gimi。</string>
     <string name="mobile_use_root_title">当前为 root 模式</string>
     <string name="mobile_use_root_detail">此功能只接受 Shizuku ADB shell 模式，请改用 ADB 启动。</string>
     <string name="mobile_use_ready_title">已就绪 · ADB shell</string>
-    <string name="mobile_use_ready_detail">Agent 可在执行任务时创建与当前设备尺寸匹配的独立副屏。</string>
-    <string name="mobile_use_text_input_title">副屏文字输入</string>
-    <string name="mobile_use_text_input_ready">无障碍服务已开启。可直接写入副屏支持的输入框。</string>
-    <string name="mobile_use_text_input_required">需要开启无障碍服务；无法直接设置副屏文字时会停止操作，不会主动调用输入法。</string>
+    <string name="mobile_use_text_input_ready_title">文字输入 · 已开启</string>
+    <string name="mobile_use_text_input_required_title">文字输入 · 待授权</string>
+    <string name="mobile_use_text_input_required">需要开启无障碍服务。</string>
     <string name="mobile_use_text_input_refresh">刷新输入状态</string>
     <string name="mobile_use_text_input_settings">打开无障碍设置</string>
-    <string name="mobile_use_busy_title">副屏正在使用</string>
-    <string name="mobile_use_busy_detail">当前有一个 Agent 任务持有副屏。</string>
+    <string name="mobile_use_busy_title">后台操作正在使用</string>
+    <string name="mobile_use_busy_detail">当前已有一个 Agent 任务在运行。</string>
     <string name="mobile_use_unsupported_title">此设备暂不支持</string>
-    <string name="mobile_use_unsupported_detail">副屏创建或隔离验证未通过，无法执行静默操作。</string>
+    <string name="mobile_use_unsupported_detail">当前设备不支持后台独立运行，无法执行静默操作。</string>
 </resources>

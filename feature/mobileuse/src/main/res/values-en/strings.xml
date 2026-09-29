@@ -1,7 +1,6 @@
 <resources>
     <string name="mobile_use_title">Background app control</string>
-    <string name="mobile_use_intro">Let the Agent run another app on an independent virtual display and read its screen.</string>
-    <string name="mobile_use_scope">Requires Shizuku in ADB shell mode. Once authorized, the Agent can create a display automatically and removes it when the task ends. Supports observation, app launch, tap, swipe, Back, and direct text replacement on the secondary display.</string>
+    <string name="mobile_use_intro">Let the Agent use other apps without interrupting your current activity.</string>
     <string name="mobile_use_authorize">Authorize Gimi</string>
     <string name="mobile_use_refresh">Refresh status</string>
     <string name="mobile_use_open_shizuku">Open Shizuku</string>
@@ -10,20 +9,19 @@
     <string name="mobile_use_stopped_title">Shizuku is stopped</string>
     <string name="mobile_use_stopped_detail">Start the Shizuku service in ADB mode.</string>
     <string name="mobile_use_permission_title">Authorization needed</string>
-    <string name="mobile_use_permission_detail">Shizuku is running. Authorize Gimi before the Agent can use a virtual display.</string>
+    <string name="mobile_use_permission_detail">Shizuku is running. Authorize Gimi to enable background app control.</string>
     <string name="mobile_use_denied_title">Authorization denied</string>
     <string name="mobile_use_denied_detail">Allow Gimi in Shizuku’s authorized apps.</string>
     <string name="mobile_use_root_title">Root mode is active</string>
     <string name="mobile_use_root_detail">This feature requires Shizuku ADB shell mode. Restart it with ADB.</string>
     <string name="mobile_use_ready_title">Ready · ADB shell</string>
-    <string name="mobile_use_ready_detail">The Agent can create a separate display matching the current device size during a task.</string>
-    <string name="mobile_use_text_input_title">Secondary display text input</string>
-    <string name="mobile_use_text_input_ready">Accessibility is enabled. Supported fields on the secondary display can receive text directly.</string>
-    <string name="mobile_use_text_input_required">Enable Accessibility for direct input. If direct text replacement is unavailable, the operation stops without invoking an input method.</string>
+    <string name="mobile_use_text_input_ready_title">Text input · On</string>
+    <string name="mobile_use_text_input_required_title">Text input · Authorization needed</string>
+    <string name="mobile_use_text_input_required">Enable Accessibility for direct input.</string>
     <string name="mobile_use_text_input_refresh">Refresh input status</string>
     <string name="mobile_use_text_input_settings">Open Accessibility settings</string>
-    <string name="mobile_use_busy_title">Display in use</string>
-    <string name="mobile_use_busy_detail">Another Agent task currently owns the display.</string>
+    <string name="mobile_use_busy_title">Background control in use</string>
+    <string name="mobile_use_busy_detail">Another Agent task is already running.</string>
     <string name="mobile_use_unsupported_title">Device unsupported</string>
-    <string name="mobile_use_unsupported_detail">Display creation or isolation verification failed.</string>
+    <string name="mobile_use_unsupported_detail">This device does not support independent background app control.</string>
 </resources>

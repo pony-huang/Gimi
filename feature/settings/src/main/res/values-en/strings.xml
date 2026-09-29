@@ -30,7 +30,7 @@
     <string name="settings_tool_authorization_title">Tool access</string>
     <string name="settings_tool_authorization_subtitle">Choose which local tools the assistant may use</string>
     <string name="settings_mobile_use_title">Background app control</string>
-    <string name="settings_mobile_use_subtitle">Shizuku virtual display status and authorization</string>
+    <string name="settings_mobile_use_subtitle">View status and manage permissions</string>
     <string name="settings_permissions_title">Permissions</string>
     <string name="settings_permissions_subtitle">Pre-grant permissions needed for chat and voice features</string>
 

@@ -17,6 +17,7 @@ import android.view.Display;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
@@ -31,6 +32,8 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
     private VirtualDisplay display;
     private Context shellContext;
     private MobileDisplayGeometry displayGeometry;
+    private Object windowManagerService;
+    private Integer previousImePolicy;
 
     public ShellMobileUseService() {}
 
@@ -65,7 +68,16 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
             if (display == null || display.getDisplay() == null) {
                 throw new IllegalStateException("Virtual display creation failed");
             }
-            return display.getDisplay().getDisplayId();
+            int displayId = display.getDisplay().getDisplayId();
+            // shell 虚拟屏不能承载 IME；禁止输入框获焦时键盘回退到用户主屏。
+            Class<?> global = Class.forName("android.view.WindowManagerGlobal");
+            windowManagerService = global.getMethod("getWindowManagerService").invoke(null);
+            Class<?> windowManagerClass = Class.forName("android.view.IWindowManager");
+            Method getPolicy = windowManagerClass.getMethod("getDisplayImePolicy", int.class);
+            previousImePolicy = (Integer) getPolicy.invoke(windowManagerService, displayId);
+            windowManagerClass.getMethod("setDisplayImePolicy", int.class, int.class)
+                    .invoke(windowManagerService, displayId, 2); // DISPLAY_IME_POLICY_HIDE
+            return displayId;
         } catch (Exception failure) {
             Log.e("GimiMobileUseService", "createDisplay failed", failure);
             stop();
@@ -163,9 +175,20 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
 
     @Override public synchronized void stop() {
         if (display != null) {
+            if (windowManagerService != null && previousImePolicy != null) {
+                try {
+                    Class.forName("android.view.IWindowManager")
+                            .getMethod("setDisplayImePolicy", int.class, int.class)
+                            .invoke(windowManagerService, display.getDisplay().getDisplayId(), previousImePolicy);
+                } catch (Exception failure) {
+                    Log.w("GimiMobileUseService", "Unable to restore display IME policy", failure);
+                }
+            }
             display.release();
             display = null;
         }
+        windowManagerService = null;
+        previousImePolicy = null;
         if (reader != null) {
             reader.close();
             reader = null;

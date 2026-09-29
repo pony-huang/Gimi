@@ -1,4 +1,4 @@
 <resources>
-    <string name="mobile_text_accessibility_label">Gimi secondary display text input</string>
-    <string name="mobile_text_accessibility_description">Writes text to fields on the secondary display while you use background app control.</string>
+    <string name="mobile_text_accessibility_label">Gimi Background App Control · Text Input</string>
+    <string name="mobile_text_accessibility_description">Finds editable fields on the virtual display and fills them during Background App Control.</string>
 </resources>

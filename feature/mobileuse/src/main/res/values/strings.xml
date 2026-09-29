@@ -17,7 +17,7 @@
     <string name="mobile_use_ready_title">已就绪 · ADB shell</string>
     <string name="mobile_use_text_input_ready_title">文字输入 · 已开启</string>
     <string name="mobile_use_text_input_required_title">文字输入 · 待授权</string>
-    <string name="mobile_use_text_input_required">需要开启无障碍服务。</string>
+    <string name="mobile_use_text_input_required">请开启“Gimi 后台静默操作 · 文字输入”无障碍服务。</string>
     <string name="mobile_use_text_input_refresh">刷新输入状态</string>
     <string name="mobile_use_text_input_settings">打开无障碍设置</string>
     <string name="mobile_use_busy_title">后台操作正在使用</string>

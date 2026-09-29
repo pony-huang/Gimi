@@ -110,7 +110,7 @@ class ShizukuMobileUseRepository @Inject constructor(
             }
             val accessibility = MobileTextAccessibilityService.current()
                 ?: return@perform MobileUseResult(
-                    "accessibility_required", "Enable Gimi secondary display text input in Accessibility settings.",
+                    "accessibility_required", "Enable Gimi Background App Control · Text Input in Accessibility settings.",
                 )
             if (!accessibility.replaceText(id, x, y, text)) {
                 return@perform MobileUseResult(

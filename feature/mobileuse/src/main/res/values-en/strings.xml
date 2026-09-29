@@ -17,7 +17,7 @@
     <string name="mobile_use_ready_title">Ready · ADB shell</string>
     <string name="mobile_use_text_input_ready_title">Text input · On</string>
     <string name="mobile_use_text_input_required_title">Text input · Authorization needed</string>
-    <string name="mobile_use_text_input_required">Enable Accessibility for direct input.</string>
+    <string name="mobile_use_text_input_required">Enable the “Gimi Background App Control · Text Input” Accessibility service.</string>
     <string name="mobile_use_text_input_refresh">Refresh input status</string>
     <string name="mobile_use_text_input_settings">Open Accessibility settings</string>
     <string name="mobile_use_busy_title">Background control in use</string>

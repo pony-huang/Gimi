@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** 导航 composition root 的源码约定检查；运行时 key 契约由 NavigationContentKeyTest 验证。 */
 class AppNavigationOwnershipTest {
 
     @Test
@@ -55,21 +56,4 @@ class AppNavigationOwnershipTest {
         )
     }
 
-    @Test
-    fun appNavigationDistinguishesSameNamedFeatureDestinationsForTransitions() {
-        val navigation = File(
-            "src/main/java/github/ponyhuang/gimi/navigation/AppNavigation.kt",
-        )
-
-        assertTrue("AppNavigation.kt should exist", navigation.isFile)
-        val content = navigation.readText()
-        assertTrue(
-            "NavEntry needs an explicit content key because multiple feature destinations stringify to Settings",
-            content.contains("contentKey = destination.navigationContentKey()"),
-        )
-        assertTrue(
-            "The navigation content key must include the destination type to avoid cross-feature collisions",
-            content.contains("this::class.qualifiedName"),
-        )
-    }
 }

@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi
 
 import java.io.File
+import org.w3c.dom.Element
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -35,9 +36,15 @@ class ManagedDirectoryArchitectureTest {
 
         val filePaths = File("src/main/res/xml/file_paths.xml")
         assertTrue(filePaths.isFile)
-        val content = filePaths.readText()
-        assertEquals(1, Regex("<cache-path").findAll(content).count())
-        assertTrue(content.contains("path=\"shareable/\""))
+        val root = sourceXml(filePaths.path).documentElement
+        assertEquals("paths", root.tagName)
+        val paths = (0 until root.childNodes.length)
+            .mapNotNull { root.childNodes.item(it) as? Element }
+        assertEquals("只允许共享缓存路径，额外 root/files/external 路径会暴露私有文件", 1, paths.size)
+        val sharedCache = paths.single()
+        assertEquals("cache-path", sharedCache.tagName)
+        assertEquals("shareable", sharedCache.getAttribute("name"))
+        assertEquals("shareable/", sharedCache.getAttribute("path"))
     }
 
     private fun productionKotlinFiles(): Sequence<File> {
@@ -45,7 +52,9 @@ class ManagedDirectoryArchitectureTest {
         return sequenceOf("app", "core", "data", "feature")
             .map { File(root, it) }
             .filter(File::isDirectory)
-            .flatMap(File::walkTopDown)
+            .flatMap { directory ->
+                directory.walkTopDown().onEnter { it.name !in setOf("build", ".gradle", ".kotlin") }
+            }
             .filter { file ->
                 file.isFile &&
                     file.extension == "kt" &&

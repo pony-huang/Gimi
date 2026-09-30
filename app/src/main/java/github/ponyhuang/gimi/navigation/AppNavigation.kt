@@ -255,9 +255,4 @@ fun MainScreen(
     }
 }
 
-private fun NavKey.navigationContentKey(): String {
-    // Navigation 3 默认使用 toString()；跨 feature 的多个 Settings data object 会因此共享 Scene key。
-    return "${this::class.qualifiedName}:$this"
-}
-
 private const val AssistantResultStayMs = 5_000L

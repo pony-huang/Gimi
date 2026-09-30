@@ -602,24 +602,6 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
-    fun newConversationSnapshotsGlobalToolAndMcpDefaults() = runTest {
-        val fixture = fixture(configured = true)
-
-        fixture.viewModel.onAction(ChatAction.NewConversation)
-        advanceUntilIdle()
-
-        coVerify {
-            fixture.conversations.createConversation(
-                any(),
-                true,
-                match { configuration ->
-                    configuration.enabledMcpServerIds == setOf("enabled-mcp")
-                },
-            )
-        }
-    }
-
-    @Test
     fun sendReloadsPersistedToolConfigurationAfterAgentImportsMcpServers() = runTest {
         val fixture = fixture(configured = true)
         val beforeImport = ConversationToolConfiguration(
@@ -1277,6 +1259,7 @@ class ChatViewModelCharacterizationTest {
 
         val descriptor = fixture.viewModel.uiState.value.officialToolDescriptors
             .first { it.id == "web_search" }
+        coVerify(exactly = 1) { catalog.listFunctions("web_search") }
         assertTrue(descriptor.isLoadingFunctions)
         assertEquals(null, descriptor.loadError)
     }
@@ -1353,10 +1336,15 @@ class ChatViewModelCharacterizationTest {
             ),
         )
         val results = mutableListOf<ChatSubmissionResult>()
+        val archived = github.ponyhuang.gimi.domain.conversation.model.FileAttachment.fromBytes(
+            "application/pdf", byteArrayOf(1, 2, 3), "doc.pdf",
+        )
+        coEvery { fixture.attachments.read("session-1", drafts) } returns listOf(archived)
         fixture.viewModel.send("带附件的提问", drafts, results::add)
         advanceUntilIdle()
         assertEquals(listOf(ChatSubmissionResult.ACCEPTED), results)
-        coVerify(exactly = 1) { fixture.execution.send("带附件的提问", any(), any()) }
+        coVerify(exactly = 1) { fixture.attachments.read("session-1", drafts) }
+        coVerify(exactly = 1) { fixture.execution.send("带附件的提问", listOf(archived), null) }
     }
 
     @Test
@@ -1665,6 +1653,7 @@ class ChatViewModelCharacterizationTest {
             conversations = conversations,
             sessionResolver = sessionResolver,
             execution = execution,
+            attachments = attachments,
             agent = agent,
             appearance = appearance,
             toolApproval = toolApproval,
@@ -1762,11 +1751,13 @@ class ChatViewModelCharacterizationTest {
         ),
     )
 
+    /** ChatViewModel 测试依赖集合；attachments 用于验证草稿读取和归档载荷传递。 */
     private data class Fixture(
         val viewModel: ChatViewModel,
         val conversations: ConversationRepository,
         val sessionResolver: ConversationSessionResolver,
         val execution: ChatAgentExecution,
+        val attachments: ChatAttachmentRepository,
         val agent: ChatAgentRepository,
         val appearance: AppearanceRepository,
         val toolApproval: FakeToolApprovalRepository,

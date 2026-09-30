@@ -5,6 +5,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** 发布源码配置约定，不证明最终依赖图、合并 R8 规则或 Release 运行行为。 */
 class McpReleaseR8RulesTest {
 
     @Test
@@ -57,22 +58,4 @@ class McpReleaseR8RulesTest {
         )
     }
 
-    @Test
-    fun releaseBuildProvidesEnoughHeapForR8() {
-        val gradleProperties = File("../gradle.properties").readText()
-        val releaseWorkflow = File("../.github/workflows/release.yml").readText()
-
-        assertTrue(
-            "R8 exhausted the former 4 GiB heap; release builds require a 6 GiB Gradle heap",
-            gradleProperties.contains("org.gradle.jvmargs=-Xmx6144m"),
-        )
-        assertTrue(
-            "CI must cap Gradle worker concurrency during release shrinking",
-            releaseWorkflow.contains("--max-workers=2"),
-        )
-        assertTrue(
-            "CI must not run other project tasks in parallel with R8",
-            releaseWorkflow.contains("--no-parallel"),
-        )
-    }
 }

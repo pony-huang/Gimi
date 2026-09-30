@@ -36,7 +36,7 @@ class MobileUseToolsTest {
     @Test
     fun actionsAreSeparateTools() {
         assertEquals(
-            setOf("mobile_observe", "mobile_open_app", "mobile_tap", "mobile_swipe", "mobile_back", "mobile_type_text", "mobile_wait", "mobile_stop"),
+            setOf("mobile_observe", "mobile_open_app", "mobile_tap", "mobile_tap_relative", "mobile_swipe", "mobile_back", "mobile_type_text", "mobile_wait", "mobile_stop"),
             tools.keys,
         )
     }
@@ -78,6 +78,17 @@ class MobileUseToolsTest {
         ) as Map<*, *>
         assertEquals("text_set", payload["status"])
         coVerify(exactly = 1) { repository.typeText("turn-1", 200, 300, "Faded") }
+    }
+
+    @Test
+    fun relativeTapUsesNormalizedCoordinates() = runTest {
+        coEvery { repository.tapRelative("turn-1", 500, 975) } returns
+            MobileUseResult("tapped", "done", 290, null, 1080, 2400)
+        val payload = tools.getValue("mobile_tap_relative").execute(
+            context("turn-1"), mapOf("xPermille" to 500, "yPermille" to 975),
+        ) as Map<*, *>
+        assertEquals("tapped", payload["status"])
+        coVerify(exactly = 1) { repository.tapRelative("turn-1", 500, 975) }
     }
 
     @Test

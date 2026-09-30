@@ -63,6 +63,7 @@ interface MobileUseRepository {
     suspend fun observe(owner: String): MobileUseResult
     suspend fun launch(owner: String, packageName: String): MobileUseResult
     suspend fun tap(owner: String, x: Int, y: Int): MobileUseResult
+    suspend fun tapRelative(owner: String, xPermille: Int, yPermille: Int): MobileUseResult
     suspend fun swipe(owner: String, x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Int): MobileUseResult
     suspend fun back(owner: String): MobileUseResult
     suspend fun typeText(owner: String, x: Int, y: Int, text: String): MobileUseResult

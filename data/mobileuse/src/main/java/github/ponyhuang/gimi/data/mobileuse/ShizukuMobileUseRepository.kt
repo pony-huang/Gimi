@@ -77,7 +77,7 @@ class ShizukuMobileUseRepository @Inject constructor(
                 "app_unavailable", "No launchable activity for package $packageName.",
             )
         remote.launch(launcher.flattenToString(), id)
-        resultWithCapture(remote, id, "launched", "App started on virtual display.")
+        resultWithCapture(remote, id, "launched", "App started on virtual display.", initialDelayMs = 1_200)
     }
 
     override suspend fun tap(owner: String, x: Int, y: Int): MobileUseResult = perform(owner) { remote, id ->
@@ -87,6 +87,17 @@ class ShizukuMobileUseRepository @Inject constructor(
         remote.tap(id, x, y)
         resultWithCapture(remote, id, "tapped", "Tap delivered to virtual display.")
     }
+
+    override suspend fun tapRelative(owner: String, xPermille: Int, yPermille: Int): MobileUseResult =
+        perform(owner) { remote, id ->
+            if (xPermille !in 0..1000 || yPermille !in 0..1000) {
+                return@perform MobileUseResult("invalid_argument", "Relative coordinates must be 0..1000.")
+            }
+            val dimensions = remote.geometry(id)
+            val geometry = MobileDisplayGeometry(dimensions[0], dimensions[1], dimensions[2])
+            remote.tap(id, geometry.xAtPermille(xPermille), geometry.yAtPermille(yPermille))
+            resultWithCapture(remote, id, "tapped", "Tap delivered to virtual display.")
+        }
 
     override suspend fun swipe(
         owner: String, x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Int,
@@ -112,7 +123,14 @@ class ShizukuMobileUseRepository @Inject constructor(
                 ?: return@perform MobileUseResult(
                     "accessibility_required", "Enable Gimi Background App Control · Text Input in Accessibility settings.",
                 )
-            if (!accessibility.replaceText(id, x, y, text)) {
+            var replaced = accessibility.replaceText(id, x, y, text)
+            if (!replaced) {
+                // 某些应用只在触摸获焦后暴露可编辑节点；仅重试一次，避免重复写入。
+                remote.tap(id, x, y)
+                Thread.sleep(200)
+                replaced = accessibility.replaceText(id, x, y, text)
+            }
+            if (!replaced) {
                 return@perform MobileUseResult(
                     "text_target_unavailable", "No editable secondary-display node supports direct text replacement at this point.",
                 )
@@ -162,9 +180,9 @@ class ShizukuMobileUseRepository @Inject constructor(
     }
 
     private fun resultWithCapture(
-        remote: IMobileUseService, id: Int, status: String, message: String,
+        remote: IMobileUseService, id: Int, status: String, message: String, initialDelayMs: Long = 450,
     ): MobileUseResult {
-        Thread.sleep(450)
+        Thread.sleep(initialDelayMs)
         val frame = MobileCaptureRecovery.capture(
             captureFrame = { remote.capture() },
             recoverSurface = { remote.recoverSurface(id) },

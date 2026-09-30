@@ -44,13 +44,25 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
             else repository.launch(owner, packageName)
         },
         action(
-            "mobile_tap", "Tap a pixel coordinate on the secondary display. Do not tap text fields; use mobile_type_text at the field coordinate instead.",
+            "mobile_tap", "Tap a pixel coordinate from the latest screenshot on the secondary display. Prefer mobile_tap_relative when screenshot rendering size is uncertain. Use mobile_type_text for text fields.",
             mapOf("x" to integer("X in the latest screenshot."), "y" to integer("Y in the latest screenshot.")),
             listOf("x", "y"),
         ) { owner, args ->
             val x = args.int("x") ?: return@action invalid("x must be an integer.")
             val y = args.int("y") ?: return@action invalid("y must be an integer.")
             repository.tap(owner, x, y)
+        },
+        action(
+            "mobile_tap_relative", "Tap a position relative to the full latest screenshot, avoiding UI preview scaling errors. Inspect the latest screenshot and avoid overlays covering the target.",
+            mapOf(
+                "xPermille" to integer("Horizontal position 0..1000; 0 is left, 1000 is right."),
+                "yPermille" to integer("Vertical position 0..1000; 0 is top, 1000 is bottom."),
+            ), listOf("xPermille", "yPermille"),
+        ) { owner, args ->
+            val x = args.int("xPermille") ?: return@action invalid("xPermille must be an integer.")
+            val y = args.int("yPermille") ?: return@action invalid("yPermille must be an integer.")
+            if (x !in 0..1000 || y !in 0..1000) invalid("Relative coordinates must be 0..1000.")
+            else repository.tapRelative(owner, x, y)
         },
         action(
             "mobile_swipe", "Swipe between pixel coordinates on the secondary display.",
@@ -70,7 +82,7 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
         },
         action("mobile_back", "Send Back to the secondary display.") { owner, _ -> repository.back(owner) },
         action(
-            "mobile_type_text", "Replace text in an editable secondary-display node at a screenshot coordinate without tapping the field first. Does not invoke an input method; fails when direct text replacement is unavailable.",
+            "mobile_type_text", "Replace text in a secondary-display field at a screenshot coordinate. If direct replacement fails, focus the field with one tap and retry once. Does not invoke an input method.",
             mapOf(
                 "x" to integer("X inside the text field in the latest screenshot."),
                 "y" to integer("Y inside the text field in the latest screenshot."),
@@ -117,8 +129,13 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
                     <mobile_use>
                     Use mobile_* tools only when the user asks you to operate or inspect an installed Android app.
                     They act on an isolated secondary display, never the user's main screen.
-                    Start with mobile_observe or mobile_open_app, use coordinates from the latest screenshot,
-                    observe again after actions when the result is uncertain, and call mobile_stop when done.
+                    When the app package is known, start with mobile_open_app and use its screenshot;
+                    an empty display before launch may have no frame. Prefer mobile_tap_relative
+                    for visible targets to avoid preview scaling errors. After a tap, inspect its
+                    returned screenshot before deciding the next action. If an overlay covers a
+                    target, observe again and choose an uncovered point. Use mobile_type_text at
+                    the field coordinate; it handles one focus retry. Wait for generation or upload
+                    only when the app shows progress, and call mobile_stop when done.
                     If a tool reports that Shizuku permission or device support is unavailable, explain the
                     required setup instead of retrying the same action.
                     </mobile_use>

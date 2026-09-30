@@ -32,7 +32,7 @@ fun servicesWith(
         every { id } returns serviceId
         every { isEnabled } returns true
         every { isOfficialToolsEnabled } returns true
-        every { apiKey } returns apiKey
+        every { this@mockk.apiKey } returns apiKey
     }
     return mockk {
         every { currentServices() } returns listOf(service)

@@ -48,25 +48,36 @@ class OfficialToolRegistryTest {
     fun providerWireNamesAreScopedByServiceAndProtocol() {
         assertEquals(
             setOf("web_search"),
-            registry.providerDeclaredWireNames("openai", ApiProtocol.Standard, "gpt-5.2"),
+            registryFor("openai").providerDeclaredWireNames("openai", ApiProtocol.Standard, "gpt-5.2"),
         )
         assertEquals(
             setOf("web_search"),
-            registry.providerDeclaredWireNames("mimo", ApiProtocol.Standard, "mimo-model"),
+            registryFor("mimo").providerDeclaredWireNames("mimo", ApiProtocol.Standard, "mimo-model"),
         )
         assertEquals(
             setOf("web_search"),
-            registry.providerDeclaredWireNames("minimax", ApiProtocol.Anthropic, "minimax-model"),
+            registryFor("minimax").providerDeclaredWireNames("minimax", ApiProtocol.Anthropic, "minimax-model"),
         )
         // GLM 的本地搜索是可执行函数,不得转换为厂商 wire 形态。
         assertTrue(
-            registry.providerDeclaredWireNames("glm", ApiProtocol.Standard, "glm-4.6").isEmpty(),
+            registryFor("glm").providerDeclaredWireNames("glm", ApiProtocol.Standard, "glm-4.6").isEmpty(),
         )
         // 协议不匹配的服务没有 wire 声明。
         assertTrue(
-            registry.providerDeclaredWireNames("openai", ApiProtocol.Anthropic, "gpt-5.2").isEmpty(),
+            registryFor("openai").providerDeclaredWireNames("openai", ApiProtocol.Anthropic, "gpt-5.2").isEmpty(),
         )
     }
+
+    @Test
+    fun providerWireNamesAreAbsentWhenTheSourceServiceIsMissing() {
+        assertTrue(registry.providerDeclaredWireNames("openai", ApiProtocol.Standard, "gpt-5.2").isEmpty())
+    }
+
+    private fun registryFor(serviceId: String) = OfficialToolRegistry(
+        kimiFormulaCache = testKimiFormulaCache(),
+        httpClient = testHttpClient(),
+        modelServices = servicesWith(serviceId),
+    )
 
     @Test
     fun minimaxImageGenerationUsesLocalToolsForBothSupportedProtocols() {

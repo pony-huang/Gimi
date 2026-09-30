@@ -50,20 +50,27 @@ class KimiFormulaCacheTest {
     @Test
     fun isolatesEntriesByServiceAndCredential() = runTest {
         var loadCount = 0
+        val loadedCredentials = mutableListOf<String>()
         val cache = KimiFormulaCache(
-            loader = {
+            loader = { credential ->
+                loadedCredentials += credential
                 loadCount += 1
                 listOf(declaration("tool_$loadCount"))
             },
             nowMillis = { 0L },
         )
 
-        cache.fetch(serviceId = "service-a", apiKey = "key-a")
-        cache.fetch(serviceId = "service-b", apiKey = "key-a")
-        cache.fetch(serviceId = "service-a", apiKey = "key-b")
-        cache.fetch(serviceId = "service-a", apiKey = "key-a")
+        val first = cache.fetch(serviceId = "service-a", apiKey = "key-a")
+        val otherService = cache.fetch(serviceId = "service-b", apiKey = "key-a")
+        val otherCredential = cache.fetch(serviceId = "service-a", apiKey = "key-b")
+        val reused = cache.fetch(serviceId = "service-a", apiKey = "key-a")
 
         assertEquals(3, loadCount)
+        assertEquals(listOf("key-a", "key-a", "key-b"), loadedCredentials)
+        assertEquals(listOf("tool_1"), first.map { it.name })
+        assertEquals(listOf("tool_2"), otherService.map { it.name })
+        assertEquals(listOf("tool_3"), otherCredential.map { it.name })
+        assertEquals(first, reused)
     }
 
     @Test

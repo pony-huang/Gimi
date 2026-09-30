@@ -41,10 +41,11 @@ class DefaultOfficialToolsetTest {
     }
 
     @Test
-    fun ignoresServicesWithoutOfficialToolDeclarations() = runTest {
-        assertTrue(
+    fun serviceWithoutNativeDeclarationsOnlyReceivesCrossModelImageFunctions() = runTest {
+        assertEquals(
+            setOf("minimax_text_to_image", "minimax_image_to_image"),
             toolset().resolveTools(config(serviceId = "deepseek"), selection = null)
-                .any { it.name == "minimax_text_to_image" },
+                .map { it.name }.toSet(),
         )
     }
 
@@ -105,7 +106,7 @@ class DefaultOfficialToolsetTest {
             selection = null,
         )
 
-        assertEquals(1, tools.filterIsInstance<OfficialBuiltInTool>().size)
+        assertEquals(listOf("web_search"), tools.filterIsInstance<OfficialBuiltInTool>().map { it.name })
     }
 
     @Test
@@ -144,10 +145,9 @@ class DefaultOfficialToolsetTest {
             selection = null,
         )
 
-        assertTrue(tools.size >= 3)
-        assertTrue(tools.any { it is GoogleSearchTool })
-        assertTrue(tools.any { it is UrlContextTool })
-        assertTrue(tools.any { it is GoogleMapsTool })
+        assertEquals(1, tools.count { it is GoogleSearchTool })
+        assertEquals(1, tools.count { it is UrlContextTool })
+        assertEquals(1, tools.count { it is GoogleMapsTool })
     }
 
     @Test

@@ -1,11 +1,8 @@
 package github.ponyhuang.gimi.data.agent.tools.official.glm
 
+import github.ponyhuang.gimi.data.agent.tools.official.cannedClient
 import kotlinx.coroutines.test.runTest
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Protocol
-import okhttp3.Response
-import okhttp3.ResponseBody.Companion.toResponseBody
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -38,17 +35,16 @@ class GlmWebToolApiTest {
             request.url.toString(),
         )
         assertEquals("Bearer secret", request.header("Authorization"))
+        assertEquals("POST", request.method)
         val payload = request.body!!.let {
             val buffer = okio.Buffer()
             it.writeTo(buffer)
             buffer.readUtf8()
         }
-        assertTrue(payload.contains("\"search_query\":\"2026 人工智能趋势\""))
-        assertTrue(payload.contains("\"search_engine\":\"search_std\""))
-        assertTrue(payload.contains("\"search_intent\":false"))
-        assertTrue(payload.contains("\"count\":5"))
-        assertTrue(payload.contains("\"search_recency_filter\":\"oneWeek\""))
-        assertTrue(payload.contains("\"content_size\":\"high\""))
+        assertEquals(
+            Json.parseToJsonElement("""{"search_query":"2026 人工智能趋势","search_engine":"search_std","search_intent":false,"count":5,"search_recency_filter":"oneWeek","content_size":"high"}"""),
+            Json.parseToJsonElement(payload),
+        )
 
         assertEquals(
             listOf(
@@ -103,15 +99,16 @@ class GlmWebToolApiTest {
         val request = requireNotNull(captured)
         assertEquals("https://proxy.example.com/v4/reader", request.url.toString())
         assertEquals("Bearer secret", request.header("Authorization"))
+        assertEquals("POST", request.method)
         val payload = request.body!!.let {
             val buffer = okio.Buffer()
             it.writeTo(buffer)
             buffer.readUtf8()
         }
-        assertTrue(payload.contains("\"url\":\"https://example.com/article\""))
-        assertTrue(payload.contains("\"timeout\":15"))
-        assertTrue(payload.contains("\"no_cache\":true"))
-        assertTrue(payload.contains("\"return_format\":\"markdown\""))
+        assertEquals(
+            Json.parseToJsonElement("""{"url":"https://example.com/article","timeout":15,"no_cache":true,"return_format":"markdown"}"""),
+            Json.parseToJsonElement(payload),
+        )
         assertEquals(
             GlmReaderResult(
                 title = "示例文章",
@@ -137,6 +134,7 @@ class GlmWebToolApiTest {
 
         assertTrue(error is IllegalStateException)
         assertTrue(error!!.message!!.contains("HTTP 500"))
+        assertTrue(error.message.orEmpty().contains("boom"))
     }
 
     private companion object {
@@ -171,23 +169,5 @@ class GlmWebToolApiTest {
             }
         """
 
-        /** Short-circuits every request with a canned response. */
-        fun cannedClient(
-            code: Int,
-            body: String,
-            onRequest: (okhttp3.Request) -> Unit = {},
-        ): OkHttpClient =
-            OkHttpClient.Builder()
-                .addInterceptor { chain ->
-                    onRequest(chain.request())
-                    Response.Builder()
-                        .request(chain.request())
-                        .protocol(Protocol.HTTP_1_1)
-                        .code(code)
-                        .message("canned")
-                        .body(body.toResponseBody("application/json".toMediaType()))
-                        .build()
-                }
-                .build()
     }
 }

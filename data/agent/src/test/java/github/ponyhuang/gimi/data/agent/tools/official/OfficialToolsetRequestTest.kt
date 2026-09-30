@@ -13,6 +13,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.async
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -50,20 +51,32 @@ class OfficialToolsetRequestTest {
 
     @Test
     fun concurrentRequestsUseTheirOwnModelConfiguration() = runTest {
-        val toolset = FakeOfficialToolset()
+        val bothRequestsEntered = CompletableDeferred<Unit>()
+        val releaseRequests = CompletableDeferred<Unit>()
+        var enteredRequests = 0
+        val toolset = FakeOfficialToolset {
+            enteredRequests++
+            if (enteredRequests == 2) bothRequestsEntered.complete(Unit)
+            releaseRequests.await()
+        }
         val configurations = listOf(
             config(modelId = "first_tool"),
             config(modelId = "second_tool"),
         )
 
-        val resolvedNames = configurations.map { config ->
+        val pendingRequests = configurations.map { config ->
             async {
                 toolset.processLlmRequest(toolContext(config), LlmRequest())
                     .config.tools.orEmpty()
                     .flatMap { it.functionDeclarations.orEmpty() }
                     .map { it.name }
             }
-        }.awaitAll()
+        }
+        // 两个 invocation 均进入解析后再放行，避免 async 实际串行完成。
+        bothRequestsEntered.await()
+        assertEquals(configurations, toolset.seenConfigurations)
+        releaseRequests.complete(Unit)
+        val resolvedNames = pendingRequests.awaitAll()
 
         assertEquals(
             listOf(listOf("first_tool"), listOf("second_tool")),
@@ -71,7 +84,9 @@ class OfficialToolsetRequestTest {
         )
     }
 
-    private class FakeOfficialToolset : OfficialToolset {
+    private class FakeOfficialToolset(
+        private val beforeResolve: suspend () -> Unit = {},
+    ) : OfficialToolset {
         val seenConfigurations = mutableListOf<ModelRuntimeMetadata>()
 
         override suspend fun resolveTools(
@@ -79,6 +94,7 @@ class OfficialToolsetRequestTest {
             selection: ConversationToolConfiguration?,
         ): List<BaseTool> {
             seenConfigurations += config
+            beforeResolve()
             return listOf(DeclarationTool(config.modelId))
         }
     }

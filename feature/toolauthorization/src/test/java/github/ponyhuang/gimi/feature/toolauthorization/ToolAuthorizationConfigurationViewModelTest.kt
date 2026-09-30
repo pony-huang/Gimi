@@ -34,7 +34,7 @@ class ToolAuthorizationConfigurationViewModelTest {
             viewModel.onAction(ToolAuthorizationConfigurationAction.Search("location"))
             viewModel.onAction(ToolAuthorizationConfigurationAction.SetFilter(ToolAuthorizationFilter.DISABLED))
             var state = awaitItem()
-            while (state.visibleTools.size != 1) {
+            while (state.query != "location" || state.filter != ToolAuthorizationFilter.DISABLED || state.tools.size != 3) {
                 state = awaitItem()
             }
 
@@ -86,7 +86,8 @@ class ToolAuthorizationConfigurationViewModelTest {
     private fun repository(): ToolAuthorizationRepository = mockk(relaxed = true) {
         every { tools } returns MutableStateFlow(
             listOf(
-                ToolDescriptor("clock", "clock", "Clock", true),
+                ToolDescriptor("clock", "clock", "Clock", false),
+                ToolDescriptor("location_history", "location_history", "Location history", true),
                 ToolDescriptor("get_location", "get_location", "Location", false),
             ),
         )

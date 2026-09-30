@@ -229,11 +229,17 @@ class PluginConfigViewModelTest {
                 actions = listOf(PluginActionDescriptor(id = "login", label = "Authorize")),
             ),
             callbackOutcome = PluginActionOutcome(message = "Authorization succeeded", success = true),
+            runExecution = PluginActionExecution.AwaitingCallback(
+                PluginActionCallbackRequest(handlerId = "web", parameters = emptyMap()),
+            ),
         )
         val viewModel = PluginConfigViewModel(repository)
         viewModel.load("spotify")
 
         viewModel.effects.test {
+            viewModel.onAction(PluginConfigAction.RunAction("login"))
+            advanceUntilIdle()
+            assertEquals("login", viewModel.state.value.callback?.actionId)
             viewModel.onAction(PluginConfigAction.ReceiveActionCallback("login", values))
 
             assertEquals(

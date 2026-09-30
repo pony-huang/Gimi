@@ -32,8 +32,8 @@ class AppVersionTest {
     }
 
     @Test
-    fun `higher patch outranks pre-release of lower numbers`() {
-        assertTrue(AppVersion.parse("v0.2.0")!! > AppVersion.parse("0.1.1-alpha")!!)
+    fun `higher patch outranks stable release with lower patch`() {
+        assertTrue(AppVersion.parse("0.1.2-alpha")!! > AppVersion.parse("0.1.1")!!)
     }
 
     @Test

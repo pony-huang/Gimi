@@ -70,9 +70,11 @@ class PluginSettingsViewModelTest {
         val repository = FakePluginRepository() // refreshResult 为空
         val viewModel = PluginSettingsViewModel(repository)
 
-        viewModel.onAction(PluginSettingsAction.Refresh)
-        advanceUntilIdle()
-
+        viewModel.effects.test {
+            viewModel.onAction(PluginSettingsAction.Refresh)
+            advanceUntilIdle()
+            expectNoEvents()
+        }
         assertEquals(1, repository.refreshCalls)
     }
 
@@ -156,6 +158,8 @@ class PluginSettingsViewModelTest {
         collectUiState(viewModel)
 
         viewModel.onAction(PluginSettingsAction.RequestUninstall("zhihu"))
+        advanceUntilIdle()
+        assertEquals("zhihu", viewModel.uiState.value.pendingUninstallPluginId)
         viewModel.onAction(PluginSettingsAction.DismissUninstall)
         advanceUntilIdle()
 

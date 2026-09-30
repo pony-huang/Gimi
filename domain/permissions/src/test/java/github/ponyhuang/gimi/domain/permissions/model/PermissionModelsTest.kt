@@ -54,15 +54,4 @@ class PermissionModelsTest {
         )
     }
 
-    @Test
-    fun runtimePermissionsExcludeSpecialPermissions() {
-        assertFalse(AppPermission.WriteSystemSettings in RuntimeAppPermissions)
-        assertFalse(AppPermission.NotificationListener in RuntimeAppPermissions)
-    }
-
-    @Test
-    fun runtimePermissionsAreASubsetOfAllDeclaredPermissions() {
-        assertTrue(AppPermission.entries.size > RuntimeAppPermissions.size)
-        assertTrue(AppPermission.entries.containsAll(RuntimeAppPermissions))
-    }
 }

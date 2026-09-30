@@ -30,12 +30,20 @@ class PrepareChatTurnUseCaseTest {
     }
     private val prepare = PrepareChatTurnUseCase(attachments)
 
-    @Test fun retryValidatesBeforeRewindingAndKeepsOneOriginalUserMessage() = runBlocking {
-        val result = prepare("session", "ignored", emptyList(), listOf(original), failed, true)
+    @Test fun retryValidatesAttachmentsAndPreservesHistoryAndRewindBoundary() = runBlocking {
+        val earlierUser = Messages.fromUser("earlier question")
+        val earlierAssistant = Messages.fromAssistant().copy(textParts = listOf(TextPart(text = "earlier answer")))
+        val partialAssistant = Messages.fromAssistant().copy(textParts = listOf(TextPart(text = "partial failed answer")))
+        val history = listOf(earlierUser, earlierAssistant)
+        val failedAttempt = failed.copy(
+            messages = history + original + partialAssistant,
+            rewindBeforeInvocationId = "failed-invocation",
+        )
+        val result = prepare("session", "ignored", emptyList(), failedAttempt.messages, failedAttempt, true)
         assertEquals(listOf("validate"), calls)
-        assertEquals(listOf(original), result.messages)
+        assertEquals(history + original, result.messages)
         assertEquals(failed.id, result.id)
-        assertEquals(failed.rewindBeforeInvocationId, result.rewindBeforeInvocationId)
+        assertEquals("failed-invocation", result.rewindBeforeInvocationId)
     }
 
     @Test fun retryDropsMissingAttachmentsInsteadOfResendingBrokenPaths() = runBlocking {

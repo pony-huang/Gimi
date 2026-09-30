@@ -36,6 +36,14 @@ class SettingsViewModelTest {
             assertEquals(SettingsEffect.NavigateToMemory, awaitItem())
             viewModel.onAction(SettingsAction.OpenToolAuthorization)
             assertEquals(SettingsEffect.NavigateToToolAuthorization, awaitItem())
+            viewModel.onAction(SettingsAction.OpenPlugins)
+            assertEquals(SettingsEffect.NavigateToPlugins, awaitItem())
+            viewModel.onAction(SettingsAction.OpenWorkspace)
+            assertEquals(SettingsEffect.NavigateToWorkspace, awaitItem())
+            viewModel.onAction(SettingsAction.OpenMobileUse)
+            assertEquals(SettingsEffect.NavigateToMobileUse, awaitItem())
+            viewModel.onAction(SettingsAction.OpenAbout)
+            assertEquals(SettingsEffect.NavigateToAbout, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
     }

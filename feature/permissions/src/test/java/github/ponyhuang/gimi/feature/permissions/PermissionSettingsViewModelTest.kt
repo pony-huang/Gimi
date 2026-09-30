@@ -64,6 +64,17 @@ class PermissionSettingsViewModelTest {
     fun permissionResultPersistsBlockedPermissionsAndRefreshesSnapshot() {
         val repository = repository(PermissionSnapshot(emptySet(), emptySet()))
         val viewModel = viewModel(repository)
+        viewModel.onAction(PermissionSettingsAction.RequestGroup(PermissionGroupKind.Microphone))
+        val request = viewModel.uiState.value.runtimeRequest!!
+        assertEquals(listOf(AppPermission.RecordAudio), request.permissions)
+        assertEquals(request, viewModel.pendingRuntimeRequest)
+        viewModel.onAction(PermissionSettingsAction.RuntimeRequestHandled(request.id))
+        assertNull(viewModel.uiState.value.runtimeRequest)
+        assertNotNull(viewModel.pendingRuntimeRequest)
+        every { repository.snapshot() } returns PermissionSnapshot(
+            granted = RuntimeAppPermissions - AppPermission.RecordAudio,
+            permanentlyDenied = setOf(AppPermission.RecordAudio),
+        )
 
         viewModel.onAction(
             PermissionSettingsAction.RuntimePermissionsResult(
@@ -73,8 +84,15 @@ class PermissionSettingsViewModelTest {
 
         verify { repository.recordPermanentlyDenied(setOf(AppPermission.RecordAudio)) }
         assertNull(viewModel.pendingRuntimeRequest)
-        assertNotNull(viewModel.uiState.value.groups)
-        assertTrue(!viewModel.uiState.value.allRuntimeGranted)
+        assertEquals(
+            PermissionGroupStatus.Denied,
+            viewModel.uiState.value.groups.single { it.kind == PermissionGroupKind.Microphone }.status,
+        )
+        assertEquals(setOf(AppPermission.RecordAudio), viewModel.uiState.value.permanentlyDenied)
+        assertEquals(
+            PermissionGroupStatus.Granted,
+            viewModel.uiState.value.groups.single { it.kind == PermissionGroupKind.Location }.status,
+        )
     }
 
     @Test

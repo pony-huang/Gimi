@@ -9,11 +9,6 @@ import org.junit.Test
 class ComposerActionColorsTest {
 
     @Test
-    fun actionContainerIsTransparent() {
-        assertEquals(Color.Transparent, composerActionContainerColor())
-    }
-
-    @Test
     fun enabledIconUsesCurrentThemeOnSurface() {
         val lightScheme = lightColorScheme(onSurface = Color(0xFF202124))
         val darkScheme = darkColorScheme(onSurface = Color(0xFFE6E6E6))

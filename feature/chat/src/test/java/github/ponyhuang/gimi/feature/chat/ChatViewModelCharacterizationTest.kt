@@ -161,6 +161,7 @@ class ChatViewModelCharacterizationTest {
 
     @Test
     fun failedTurn_retry_reusesOriginalUserMessageWithoutDuplication() = runTest {
+        val sentTexts = mutableListOf<String>()
         val failingAgent = object : ChatAgentRepository {
             override suspend fun createExecution(
                 sessionId: String,
@@ -171,7 +172,10 @@ class ChatViewModelCharacterizationTest {
                     text: String,
                     fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
                     rewindBeforeInvocationId: String?,
-                ): Flow<ChatRunEvent> = flow { throw java.io.IOException("offline") }
+                ): Flow<ChatRunEvent> = flow {
+                    sentTexts += text
+                    throw java.io.IOException("offline")
+                }
 
                 override suspend fun respondToToolConfirmation(
                     confirmationCallId: String,
@@ -201,6 +205,7 @@ class ChatViewModelCharacterizationTest {
 
         val userCount = fixture.viewModel.uiState.value.messages.count { it.role == MessageRole.User }
         assertEquals(1, userCount)
+        assertEquals(listOf("你好", "你好"), sentTexts)
         val retried = fixture.viewModel.uiState.value.failedTurn
         // 重试仍失败且未产生事件，同样没有可回退的真实 invocation id。
         assertNull(retried?.rewindBeforeInvocationId)
@@ -209,6 +214,7 @@ class ChatViewModelCharacterizationTest {
     @Test
     fun failedOfficialRewind_keepsThePreviousInvocationBoundary() = runTest {
         var callCount = 0
+        val rewindBoundaries = mutableListOf<String?>()
         val failingAgent = object : ChatAgentRepository {
             override suspend fun createExecution(
                 sessionId: String,
@@ -221,6 +227,7 @@ class ChatViewModelCharacterizationTest {
                     rewindBeforeInvocationId: String?,
                 ): Flow<ChatRunEvent> = flow {
                     callCount++
+                    rewindBoundaries += rewindBeforeInvocationId
                     if (callCount == 1) {
                         // 先流出带真实 ADK invocationId 的部分回答，再失败，从而建立待回退边界。
                         emit(event(partial = true, turnComplete = false))
@@ -250,6 +257,8 @@ class ChatViewModelCharacterizationTest {
 
         val retried = fixture.viewModel.uiState.value.failedTurn
         // rewind 失败时保留上一轮真实 invocation 边界，不被错误地替换。
+        assertEquals(2, callCount)
+        assertEquals(listOf(null, "invocation-1"), rewindBoundaries)
         assertEquals("invocation-1", retried?.rewindBeforeInvocationId)
     }
 

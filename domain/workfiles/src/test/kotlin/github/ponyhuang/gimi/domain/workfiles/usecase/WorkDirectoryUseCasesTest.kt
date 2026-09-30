@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -75,12 +74,14 @@ class WorkDirectoryUseCasesTest {
     }
 
     @Test
-    fun `repository returns failure when adding an invalid uri`() = runTest {
-        val repository = FakeRepository(MutableStateFlow(emptyList()))
-        val result = AddWorkDirectoryUseCase(repository).invoke("not-a-uri")
+    fun `add propagates repository failure and passes the requested uri`() = runTest {
+        val repository = FakeRepository(MutableStateFlow(emptyList())).apply {
+            addResult = WorkDirectoryOperationResult.Failure.InvalidDirectory
+        }
+        val result = AddWorkDirectoryUseCase(repository).invoke("content://documents/tree/item")
 
         assertEquals(WorkDirectoryOperationResult.Failure.InvalidDirectory, result)
-        assertFalse(repository.added.contains("not-a-uri"))
+        assertEquals(listOf("content://documents/tree/item"), repository.added)
     }
 
     private fun directory(uri: String) = WorkDirectory(
@@ -101,17 +102,14 @@ class WorkDirectoryUseCasesTest {
         val enabledChanges = mutableListOf<Pair<String, Boolean>>()
         val reauthorizations = mutableListOf<Pair<String, String>>()
         var refreshCount = 0
+        var addResult: WorkDirectoryOperationResult = WorkDirectoryOperationResult.Success
         private val state = initial.asStateFlow()
 
         override fun observeDirectories(): Flow<List<WorkDirectory>> = state
 
         override suspend fun addDirectory(uri: String): WorkDirectoryOperationResult {
-            return if (uri.contains("not-a-uri")) {
-                WorkDirectoryOperationResult.Failure.InvalidDirectory
-            } else {
-                added += uri
-                WorkDirectoryOperationResult.Success
-            }
+            added += uri
+            return addResult
         }
 
         override suspend fun removeDirectory(id: String): WorkDirectoryOperationResult {

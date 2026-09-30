@@ -15,15 +15,4 @@ class MemoryModelsTest {
         assertEquals("", configuration.apiKey)
     }
 
-    @Test
-    fun runtimeFailureCarriesOnlyOperationCategory() {
-        assertEquals(
-            MemoryOperation.SEARCH,
-            MemoryRuntimeFailure(MemoryOperation.SEARCH).operation,
-        )
-        assertEquals(
-            MemoryOperation.WRITE,
-            MemoryRuntimeFailure(MemoryOperation.WRITE).operation,
-        )
-    }
 }

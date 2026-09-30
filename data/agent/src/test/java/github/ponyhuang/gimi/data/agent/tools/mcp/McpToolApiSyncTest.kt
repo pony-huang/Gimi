@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.data.agent.tools.mcp
 
 import com.google.adk.kt.tools.ToolContext
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import io.mockk.slot
 import io.modelcontextprotocol.kotlin.sdk.client.Client
@@ -38,11 +39,13 @@ class McpToolApiSyncTest {
         coEvery {
             client.callTool(name = "echo", arguments = any(), options = capture(options))
         } returns textResult("ok")
-        val tool = mcpTool(client, hasProgressConsumers = true)
+        val callbackOptions = RequestOptions(onProgress = {})
+        val tool = mcpTool(client, hasProgressConsumers = true, optionsOverride = callbackOptions)
 
         tool.run(mockk<ToolContext>(), emptyMap())
 
         assertNotNull(options.captured.onProgress)
+        assertSame(callbackOptions, options.captured)
     }
 
     @Test
@@ -52,16 +55,20 @@ class McpToolApiSyncTest {
             client.callTool(name = "echo", arguments = any(), options = any())
         } returns textResult("ok")
         val tool = mcpTool(client)
+        val arguments = mapOf("text" to "hello", "repeat" to 2, "enabled" to true)
 
-        val result = tool.run(mockk<ToolContext>(), emptyMap()) as Map<*, *>
+        val result = tool.run(mockk<ToolContext>(), arguments) as Map<*, *>
         val content = result["content"] as List<*>
 
         assertEquals("ok", (content.single() as Map<*, *>)["text"])
+        assertEquals("text", (content.single() as Map<*, *>)["type"])
+        coVerify(exactly = 1) { client.callTool(name = "echo", arguments = arguments, options = any()) }
     }
 
     private fun mcpTool(
         client: Client,
         hasProgressConsumers: Boolean = false,
+        optionsOverride: RequestOptions? = null,
     ): McpTool =
         McpTool(
             name = "echo",
@@ -71,6 +78,7 @@ class McpToolApiSyncTest {
                 StaticSessionManager(
                     McpSession(client, McpTransportHandle(NoOpTransport())),
                     hasProgressConsumers,
+                    optionsOverride,
                 ),
         )
 
@@ -80,6 +88,7 @@ class McpToolApiSyncTest {
     private class StaticSessionManager(
         private val session: McpSession,
         override val hasProgressConsumers: Boolean,
+        private val optionsOverride: RequestOptions?,
     ) : SessionManager {
         override suspend fun getSession(
             headers: Map<String, String>,
@@ -87,7 +96,7 @@ class McpToolApiSyncTest {
         ): McpSession = session
 
         override fun requestOptions(): RequestOptions =
-            RequestOptions(onProgress = if (hasProgressConsumers) ({}) else null)
+            optionsOverride ?: RequestOptions(onProgress = if (hasProgressConsumers) ({}) else null)
 
         override fun close() = Unit
     }

@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.data.agent.tools.mcp
 import com.google.adk.kt.agents.ReadonlyContext
 import com.google.adk.kt.tools.ToolContext
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.modelcontextprotocol.kotlin.sdk.client.Client
@@ -12,6 +13,8 @@ import io.modelcontextprotocol.kotlin.sdk.shared.TransportSendOptions
 import io.modelcontextprotocol.kotlin.sdk.types.BlobResourceContents
 import io.modelcontextprotocol.kotlin.sdk.types.JSONRPCMessage
 import io.modelcontextprotocol.kotlin.sdk.types.ListResourcesResult
+import io.modelcontextprotocol.kotlin.sdk.types.ListResourcesRequest
+import io.modelcontextprotocol.kotlin.sdk.types.PaginatedRequestParams
 import io.modelcontextprotocol.kotlin.sdk.types.ListToolsResult
 import io.modelcontextprotocol.kotlin.sdk.types.ReadResourceRequest
 import io.modelcontextprotocol.kotlin.sdk.types.ReadResourceResult
@@ -23,6 +26,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 class McpToolsetResourceSyncTest {
@@ -81,7 +85,8 @@ class McpToolsetResourceSyncTest {
                     ),
                 nextCursor = "cursor-2",
             )
-        val manager = SequencedSessionManager(session(staleClient), session(currentClient))
+        val failedSession = session(staleClient)
+        val manager = SequencedSessionManager(failedSession, session(currentClient))
         val toolset = McpToolset(manager, useMcpResources = true)
         val listTool = toolset.getTools(null).single { it.name == "list_mcp_resources" }
 
@@ -90,6 +95,14 @@ class McpToolsetResourceSyncTest {
 
         assertEquals("cursor-2", result["nextCursor"])
         assertEquals("guide", ((result["resources"] as List<*>).single() as Map<*, *>)["name"])
+        coVerify(exactly = 1) {
+            staleClient.listResources(ListResourcesRequest(PaginatedRequestParams("cursor-1")), any())
+        }
+        coVerify(exactly = 1) {
+            currentClient.listResources(ListResourcesRequest(PaginatedRequestParams("cursor-1")), any())
+        }
+        assertEquals(1, manager.replacedSessions.size)
+        assertSame(failedSession, manager.replacedSessions.single())
     }
 
     @Test
@@ -117,13 +130,19 @@ class McpToolsetResourceSyncTest {
         val result = loadTool.run(toolContext(), mapOf("name" to "guide"))
 
         assertEquals("hello", result)
+        coVerify(exactly = 1) { client.listResources(ListResourcesRequest(PaginatedRequestParams(null)), any()) }
+        coVerify(exactly = 1) { client.listResources(ListResourcesRequest(PaginatedRequestParams("page-2")), any()) }
+        coVerify(exactly = 1) {
+            client.readResource(match<ReadResourceRequest> { it.uri == "file:///guide.md" }, any())
+        }
     }
 
     @Test
     fun loadResourceReportsConflictingArgumentsWithoutCallingTheServer() = runTest {
+        val client = mockk<Client>()
         val loadTool =
             LoadMcpResourceTool(
-                McpToolset(StaticSessionManager(session(mockk()))),
+                McpToolset(StaticSessionManager(session(client))),
                 maxMcpResourceLength = 100,
             )
 
@@ -134,6 +153,8 @@ class McpToolsetResourceSyncTest {
             )
 
         assertTrue(result.toString().contains("exactly one"))
+        coVerify(exactly = 0) { client.listResources(any(), any()) }
+        coVerify(exactly = 0) { client.readResource(any<ReadResourceRequest>(), any()) }
     }
 
     @Test
@@ -185,9 +206,18 @@ class McpToolsetResourceSyncTest {
     private class SequencedSessionManager(vararg sessions: McpSession) : SessionManager {
         private val sessions = sessions.toList()
         private var index = 0
+        val replacedSessions = mutableListOf<McpSession>()
 
-        override suspend fun getSession(headers: Map<String, String>, stale: McpSession?): McpSession =
-            sessions[index.coerceAtMost(sessions.lastIndex)].also { index++ }
+        override suspend fun getSession(headers: Map<String, String>, stale: McpSession?): McpSession {
+            // 普通读取复用当前 session；仅替换明确报告失败的那个 session。
+            if (stale != null) {
+                check(stale === sessions[index])
+                replacedSessions += stale
+                check(index < sessions.lastIndex)
+                index++
+            }
+            return sessions[index]
+        }
 
         override fun requestOptions(): RequestOptions = RequestOptions()
         override fun close() = Unit

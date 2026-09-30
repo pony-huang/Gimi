@@ -1,16 +1,19 @@
 package github.ponyhuang.gimi.data.agent.tools.mcp
 
 import io.modelcontextprotocol.kotlin.sdk.types.JSONRPCRequest
+import io.modelcontextprotocol.kotlin.sdk.types.JSONRPCMessage
+import io.modelcontextprotocol.kotlin.sdk.types.McpJson
 import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Test
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
 
 class OkHttpMcpTransportTest {
   private lateinit var server: MockWebServer
@@ -49,9 +52,17 @@ class OkHttpMcpTransportTest {
     val get = server.takeRequest(5, TimeUnit.SECONDS)
     val post = server.takeRequest(5, TimeUnit.SECONDS)
     assertEquals("/api/sse", get?.path)
+    assertEquals("GET", get?.method)
     assertEquals("Bearer test", get?.getHeader("Authorization"))
     assertEquals("2024-11-05", get?.getHeader("MCP-Protocol-Version"))
     assertEquals("/messages", post?.path)
+    assertEquals("POST", post?.method)
+    assertEquals("Bearer test", post?.getHeader("Authorization"))
+    assertEquals("2024-11-05", post?.getHeader("MCP-Protocol-Version"))
+    assertEquals(
+      Json.parseToJsonElement("""{"jsonrpc":"2.0","id":1,"method":"ping"}"""),
+      Json.parseToJsonElement(requireNotNull(post).body.readUtf8()),
+    )
     transport.close()
   }
 
@@ -88,7 +99,14 @@ class OkHttpMcpTransportTest {
     assertEquals("GET", listener?.method)
     assertEquals("session-1", listener?.getHeader("Mcp-Session-Id"))
     assertEquals("Token test-key", listener?.getHeader("Authorization"))
-    assertNotNull(received)
+    assertEquals(
+      McpJson.decodeFromString<JSONRPCMessage>("""{"jsonrpc":"2.0","id":1,"result":{}}"""),
+      received,
+    )
+    assertEquals(
+      Json.parseToJsonElement("""{"jsonrpc":"2.0","id":1,"method":"ping"}"""),
+      Json.parseToJsonElement(requireNotNull(post).body.readUtf8()),
+    )
 
     transport.close()
     val delete = server.takeRequest(5, TimeUnit.SECONDS)

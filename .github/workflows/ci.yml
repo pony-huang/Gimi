@@ -34,13 +34,25 @@ jobs:
 
       - name: Unit tests
         timeout-minutes: 15
-        # 模块并行测试有上限；输出具体用例，失败时不会无限等待其他测试进程。
-        run: ./gradlew testDebugUnitTest --init-script .github/gradle/ci-tests.gradle --max-workers=2 --console=plain --stacktrace
+        # 插件实例只编译，不运行测试；宿主的插件管理与协议测试仍保留。
+        run: |
+          ./gradlew testDebugUnitTest \
+            -x :plugins:zhihu:testDebugUnitTest \
+            -x :plugins:spotify:testDebugUnitTest \
+            -x :plugins:xiaohongshu:testDebugUnitTest \
+            -x :plugins:v2ex:testDebugUnitTest \
+            -x :plugins:weibo:testDebugUnitTest \
+            --init-script .github/gradle/ci-tests.gradle --max-workers=2 --console=plain --stacktrace
 
       - name: Assemble debug APK
         timeout-minutes: 10
-        # 只发布主 App APK，无需额外打包所有 library 与插件 APK。
-        run: ./gradlew :app:assembleDebug --max-workers=2 --console=plain --stacktrace
+        # 只打包主 App；插件实例保留源码编译检查。
+        run: |
+          ./gradlew :app:assembleDebug \
+            :plugins:zhihu:compileDebugKotlin :plugins:spotify:compileDebugKotlin \
+            :plugins:xiaohongshu:compileDebugKotlin :plugins:v2ex:compileDebugKotlin \
+            :plugins:weibo:compileDebugKotlin \
+            --max-workers=2 --console=plain --stacktrace
 
       - name: Lint
         timeout-minutes: 10

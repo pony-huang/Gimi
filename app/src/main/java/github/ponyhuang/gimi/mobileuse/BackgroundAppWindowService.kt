@@ -49,11 +49,13 @@ import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 /** 显示会话的独立前台服务；不读取 Agent 执行状态，用户可随时关闭。 */
 @AndroidEntryPoint
@@ -73,6 +75,9 @@ class BackgroundAppWindowService : Service() {
     private var shownSession: String? = null
     private var keyboardBottom = 0
     private var notifiedSession: String? = null
+    private var bubbleHidden = false
+    private var bubbleLeft = false
+    private var bubbleHideJob: Job? = null
     private var appliedBounds: List<Int>? = null
 
     override fun onCreate() {
@@ -83,7 +88,7 @@ class BackgroundAppWindowService : Service() {
         scope.launch {
             // 非焦点悬浮窗的局部 IME insets 可能为零，按主屏指标同步键盘可用区域。
             while (true) {
-                delay(250)
+                delay(250.milliseconds)
                 if (root != null) updateBounds()
             }
         }
@@ -148,7 +153,8 @@ class BackgroundAppWindowService : Service() {
         val height = if (small) minOf(dp(620), (metrics.bounds.height() * .76f).toInt()) else bubbleSize
         val layout = WindowManager.LayoutParams(width, height, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                (if (!small) WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS else 0),
             PixelFormat.TRANSLUCENT).apply {
             gravity = Gravity.TOP or Gravity.START
             x = if (small) (metrics.bounds.width() - width) / 2 else metrics.bounds.width() - width
@@ -165,13 +171,13 @@ class BackgroundAppWindowService : Service() {
                 val dark = when (mode) { ThemeMode.SYSTEM -> isSystemInDarkTheme(); ThemeMode.LIGHT -> false; ThemeMode.DARK -> true }
                 AsssistantaiTheme(darkTheme = dark) {
                     val dragModifier = Modifier.pointerInput(presentation) {
-                        detectDragGestures(onDragEnd = { if (!small) snapBubble() }) { change, delta ->
+                        detectDragGestures(onDragStart = { if (!small) revealBubble() }, onDragCancel = { if (!small) snapBubble() }, onDragEnd = { if (!small) snapBubble() }) { change, delta ->
                             change.consume()
                             moveWindow(delta.x.toInt(), delta.y.toInt())
                         }
                     }
                     if (small) BackgroundAppContent(viewModel, gateway, host, small = true, modifier = Modifier.fillMaxSize(), toolbarModifier = dragModifier)
-                    else BackgroundAppBubble(onOpen = host::open, modifier = dragModifier)
+                    else BackgroundAppBubble(onOpen = host::open, icon = { BackgroundAppIcon() }, modifier = dragModifier)
                 }
             }
         }
@@ -185,6 +191,7 @@ class BackgroundAppWindowService : Service() {
             windowManager.addView(view, layout)
             host.setOverlayRunning(true)
             updateBounds()
+            if (!small) snapBubble()
         } catch (_: SecurityException) { removeWindow() }
         catch (_: WindowManager.BadTokenException) { removeWindow() }
     }
@@ -194,10 +201,24 @@ class BackgroundAppWindowService : Service() {
         updateBounds()
     }
 
+    private fun revealBubble() {
+        bubbleHideJob?.cancel()
+        bubbleHidden = false
+        params?.let { it.x = if (bubbleLeft) 0 else windowManager.currentWindowMetrics.bounds.width() - it.width }
+        updateBounds()
+    }
+
     private fun snapBubble() {
         val layout = params ?: return
-        layout.x = if (layout.x + layout.width / 2 < windowManager.currentWindowMetrics.bounds.width() / 2) 0 else windowManager.currentWindowMetrics.bounds.width() - layout.width
-        updateBounds()
+        bubbleLeft = layout.x + layout.width / 2 < windowManager.currentWindowMetrics.bounds.width() / 2
+        revealBubble()
+        bubbleHideJob = scope.launch {
+            delay(2000)
+            // 旧窗口的延时任务不能移动切换后的全屏或小窗。
+            if (params !== layout || shown != BackgroundAppPresentation.BUBBLE) return@launch
+            bubbleHidden = true
+            updateBounds()
+        }
     }
 
     private fun updateBounds() {
@@ -212,7 +233,9 @@ class BackgroundAppWindowService : Service() {
             layout.width = minOf(dp(320), (metrics.bounds.width() - safe.left - safe.right - dp(16)).coerceAtLeast(dp(160)))
             layout.height = minOf(dp(620), availableHeight - dp(16)).coerceAtLeast(dp(56))
         }
-        layout.x = layout.x.coerceIn(safe.left, maxOf(safe.left, metrics.bounds.width() - safe.right - layout.width))
+        layout.x = if (shown == BackgroundAppPresentation.BUBBLE && bubbleHidden) {
+            if (bubbleLeft) -layout.width / 2 else metrics.bounds.width() - layout.width / 2
+        } else layout.x.coerceIn(safe.left, maxOf(safe.left, metrics.bounds.width() - safe.right - layout.width))
         layout.y = layout.y.coerceIn(safe.top, maxOf(safe.top, metrics.bounds.height() - bottom - layout.height))
         val bounds = listOf(layout.x, layout.y, layout.width, layout.height)
         // 输入法 insets 与窗口布局互相回调，只在几何确实变化时提交新布局。
@@ -226,6 +249,9 @@ class BackgroundAppWindowService : Service() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun removeWindow() {
+        bubbleHideJob?.cancel()
+        bubbleHideJob = null
+        bubbleHidden = false
         root?.let { view ->
             if (view.isAttachedToWindow) windowManager.removeViewImmediate(view)
             view.disposeComposition()

@@ -27,12 +27,9 @@
     <string name="mobile_use_unsupported_detail">当前设备不支持后台独立运行，无法执行静默操作。</string>
     <string name="background_app_title">后台应用</string>
     <string name="background_app_open">显示后台应用</string>
-    <string name="background_app_back">返回目标应用</string>
-    <string name="background_app_back_glyph">‹</string>
-    <string name="background_app_collapse">收起窗口</string>
-    <string name="background_app_collapse_glyph">—</string>
+    <string name="background_app_back">返回应用</string>
+    <string name="background_app_collapse">收起</string>
     <string name="background_app_more">更多</string>
-    <string name="background_app_more_glyph">⋯</string>
     <string name="background_app_fullscreen">切换为全屏</string>
     <string name="background_app_small_window">切换为小窗</string>
     <string name="background_app_window_settings">窗口设置</string>
@@ -44,5 +41,4 @@
     <string name="background_app_disconnected">后台应用已关闭或连接已断开。</string>
     <string name="background_app_preview_unavailable">暂时无法显示画面，请检查应用与连接。安全页面可能不允许显示。</string>
     <string name="background_app_input_unavailable">当前设备或输入控件未接受操作，请检查连接后重试。</string>
-    <string name="background_app_bubble_label">G</string>
 </resources>

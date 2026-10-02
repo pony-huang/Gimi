@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -48,21 +49,20 @@ fun BackgroundAppScreen(
 ) {
     Surface(modifier = modifier, shape = RoundedCornerShape(if (smallWindow) 24.dp else 0.dp)) {
         Column {
-            Row(modifier = toolbarModifier.fillMaxWidth().height(48.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = toolbarModifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 val backDescription = stringResource(R.string.background_app_back)
                 TextButton(onClick = { onAction(BackgroundAppAction.Back) }, modifier = Modifier.semantics { contentDescription = backDescription }) {
-                    Text(stringResource(R.string.background_app_back_glyph), style = MaterialTheme.typography.headlineSmall)
+                    Text(stringResource(R.string.background_app_back))
                 }
-                Text(state.session?.appName ?: stringResource(R.string.background_app_title), modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                Box(Modifier.weight(1f))
                 val collapseDescription = stringResource(R.string.background_app_collapse)
-                TextButton(onClick = onCollapse, modifier = Modifier.semantics { contentDescription = collapseDescription }) {
-                    Text(stringResource(R.string.background_app_collapse_glyph))
+                FilledTonalButton(onClick = onCollapse, modifier = Modifier.semantics { contentDescription = collapseDescription }) {
+                    Text(stringResource(R.string.background_app_collapse))
                 }
                 Box {
                     val moreDescription = stringResource(R.string.background_app_more)
                     TextButton(onClick = { onAction(BackgroundAppAction.Menu(true)) }, modifier = Modifier.semantics { contentDescription = moreDescription }) {
-                        Text(stringResource(R.string.background_app_more_glyph), style = MaterialTheme.typography.headlineSmall)
+                        Text(stringResource(R.string.background_app_more))
                     }
                     DropdownMenu(expanded = state.menuExpanded, onDismissRequest = { onAction(BackgroundAppAction.Menu(false)) }) {
                         DropdownMenuItem(text = { Text(stringResource(if (smallWindow) R.string.background_app_fullscreen else R.string.background_app_small_window)) },
@@ -134,12 +134,12 @@ private fun BackgroundAppDialogContent(
 
 /** 拖动由窗口宿主处理；气泡不读取仓库，也不反映 AI 的执行状态。 */
 @Composable
-fun BackgroundAppBubble(onOpen: () -> Unit, modifier: Modifier = Modifier) {
+fun BackgroundAppBubble(onOpen: () -> Unit, icon: @Composable () -> Unit, modifier: Modifier = Modifier) {
     val description = stringResource(R.string.background_app_open)
     Surface(modifier = modifier.size(56.dp).semantics { contentDescription = description }.clickable(onClick = onOpen),
         shape = CircleShape, color = MaterialTheme.colorScheme.primary, shadowElevation = 6.dp) {
         Box(contentAlignment = Alignment.Center) {
-            Text(stringResource(R.string.background_app_bubble_label), color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.titleLarge)
+            icon()
         }
     }
 }

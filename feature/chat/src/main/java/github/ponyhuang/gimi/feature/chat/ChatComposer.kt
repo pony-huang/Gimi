@@ -12,14 +12,13 @@ import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsets
@@ -56,7 +55,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import androidx.core.net.toUri
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.feature.chat.R
@@ -373,21 +371,27 @@ public fun ChatComposer(
         onExpandedChange(true)
     }
 
-    Box(
+    Column(
         modifier = modifier
             .imePadding()
             .navigationBarsPadding()
             .padding(horizontal = 12.dp, vertical = 8.dp)
             .fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        AnimatedVisibility(visible = isGenerating) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                AITypingIndicator()
+                Spacer(Modifier.height(12.dp))
+            }
+        }
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("chat_composer_surface"),
             shape = RoundedCornerShape(28.dp),
-            // 用中性容器色而非 surface+tonalElevation：后者会叠加 primary 色偏蓝，
-            // 浅色下与白色背景拉不开、深色下过亮。
-            color = MaterialTheme.colorScheme.surfaceContainer,
+            color = chatCapsuleColor(),
+            border = chatCapsuleBorder(),
             tonalElevation = 0.dp,
         ) {
             if (recordingState != null) {
@@ -435,15 +439,6 @@ public fun ChatComposer(
             }
         }
 
-        AnimatedVisibility(
-            visible = isGenerating,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .offset(x = 16.dp, y = (-18).dp)
-                .zIndex(1f),
-        ) {
-            AITypingIndicator()
-        }
     }
 
     if (showAttachmentOptions) {

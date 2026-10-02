@@ -130,7 +130,7 @@ internal fun DefaultComposerInputContent(
     Column(
         modifier = modifier.padding(
             horizontal = 10.dp,
-            vertical = 8.dp,
+            vertical = 6.dp,
         ),
     ) {
         SnackbarHost(hostState = snackbarHostState)
@@ -150,9 +150,9 @@ internal fun DefaultComposerInputContent(
                         .padding(
                             start = 6.dp,
                             end = 6.dp,
-                            bottom = 56.dp,
+                            bottom = 48.dp,
                         )
-                        .defaultMinSize(minHeight = LocalMinimumInteractiveComponentSize.current)
+                        .defaultMinSize(minHeight = 44.dp)
                         .onPreviewKeyEvent { event ->
                             // 物理键盘回车（无 Shift/Ctrl/Alt）触发发送；Shift+Enter 留给换行。
                             // 与"发送"按钮显隐规则一致：仅在有内容可发时触发。

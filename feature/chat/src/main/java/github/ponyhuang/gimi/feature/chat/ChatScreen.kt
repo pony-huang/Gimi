@@ -598,7 +598,8 @@ internal fun ChatHeaderActions(
         Surface(
             onClick = onOpenDrawer,
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surface,
+            color = chatCapsuleColor(),
+            border = chatCapsuleBorder(),
         ) {
             Box(
                 modifier = Modifier.size(48.dp),
@@ -613,7 +614,8 @@ internal fun ChatHeaderActions(
 
         Surface(
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surface,
+            color = chatCapsuleColor(),
+            border = chatCapsuleBorder(),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // 自动语音播报全局开关：开启态用 primary 高亮，关闭态回到普通前景色。

@@ -255,12 +255,11 @@ fun ChatScaffold(
             val topBarBackground = MaterialTheme.colorScheme.background
             val topFadeBrush = remember(topBarBackground) {
                 Brush.verticalGradient(
-                    // 顶栏按钮行占区域上半部，需要接近不透明才能压住后方文字；
-                    // 只在底部边缘渐隐到透明，保持"悬浮"观感。
+                    // 保留柔和淡出，略微降低遮罩强度，让后方正文更容易辨认。
                     colorStops = arrayOf(
                         0.0f to topBarBackground,
-                        0.55f to topBarBackground.copy(alpha = 0.95f),
-                        0.8f to topBarBackground.copy(alpha = 0.5f),
+                        0.55f to topBarBackground.copy(alpha = 0.9f),
+                        0.8f to topBarBackground.copy(alpha = 0.4f),
                         1.0f to Color.Transparent,
                     ),
                 )
@@ -291,11 +290,12 @@ fun ChatScaffold(
             val background = MaterialTheme.colorScheme.background
             val fadeBrush = remember(background) {
                 Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Transparent,
-                        background.copy(alpha = 0.8f),
-                        background.copy(alpha = 0.95f),
-                        background,
+                    // 恢复原来的渐变范围，仅小幅降低中段不透明度。
+                    colorStops = arrayOf(
+                        0.0f to Color.Transparent,
+                        0.333f to background.copy(alpha = 0.7f),
+                        0.667f to background.copy(alpha = 0.9f),
+                        1.0f to background,
                     ),
                 )
             }
@@ -599,7 +599,7 @@ internal fun ChatHeaderActions(
             onClick = onOpenDrawer,
             shape = CircleShape,
             color = chatCapsuleColor(),
-            border = chatCapsuleBorder(),
+            shadowElevation = 3.dp,
         ) {
             Box(
                 modifier = Modifier.size(48.dp),
@@ -615,7 +615,7 @@ internal fun ChatHeaderActions(
         Surface(
             shape = CircleShape,
             color = chatCapsuleColor(),
-            border = chatCapsuleBorder(),
+            shadowElevation = 3.dp,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // 自动语音播报全局开关：开启态用 primary 高亮，关闭态回到普通前景色。

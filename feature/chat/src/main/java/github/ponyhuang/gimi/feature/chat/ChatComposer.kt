@@ -375,7 +375,7 @@ public fun ChatComposer(
         modifier = modifier
             .imePadding()
             .navigationBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 14.dp)
             .fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -391,7 +391,7 @@ public fun ChatComposer(
                 .testTag("chat_composer_surface"),
             shape = RoundedCornerShape(28.dp),
             color = chatCapsuleColor(),
-            border = chatCapsuleBorder(),
+            shadowElevation = 3.dp,
             tonalElevation = 0.dp,
         ) {
             if (recordingState != null) {

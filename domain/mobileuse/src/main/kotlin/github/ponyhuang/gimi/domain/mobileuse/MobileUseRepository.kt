@@ -66,10 +66,14 @@ data class MobileUseResult(
     }
 }
 
-/** 单任务副屏能力；owner 为单轮 Agent 执行的稳定标识。 */
+/** 单显示后台操作能力；owner 为本轮执行标识，显示按稳定 chatId 跨轮保留。 */
 interface MobileUseRepository {
     /** 用户是否允许 Agent 使用后台操作，独立于系统授权。 */
     val enabled: StateFlow<Boolean>
+    val displaySession: StateFlow<MobileDisplaySession?>
+    val smallWindowEnabled: StateFlow<Boolean>
+    suspend fun setSmallWindowEnabled(enabled: Boolean)
+    suspend fun registerExecution(owner: String, chatId: String)
     /** 保存开关；关闭时释放当前任务资源，后续操作必须被拒绝。 */
     suspend fun setEnabled(enabled: Boolean)
     fun availability(): MobileUseAvailability
@@ -83,6 +87,9 @@ interface MobileUseRepository {
     suspend fun swipe(owner: String, observationId: String, x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Int): MobileUseResult
     suspend fun back(owner: String, observationId: String): MobileUseResult
     suspend fun typeText(owner: String, observationId: String, x: Int, y: Int, text: String): MobileUseResult
-    suspend fun stop(owner: String): MobileUseResult
+    suspend fun finishExecution(owner: String): MobileUseResult
+    suspend fun closeSession(sessionId: String): MobileUseResult
+    suspend fun manualTouch(sessionId: String, touch: MobileTouch): MobileUseResult
+    suspend fun manualBack(sessionId: String): MobileUseResult
     fun textInputAvailable(): Boolean
 }

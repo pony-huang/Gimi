@@ -2,4 +2,8 @@
     <string name="app_name">Gimi</string>
 
     <string name="media_notification_listener_label">asssistantai media control</string>
+    <string name="background_app_channel">后台应用窗口</string>
+    <string name="background_app_notification">后台应用仍在运行</string>
+    <string name="background_app_notification_detail">点击查看，或关闭后台应用。</string>
+    <string name="background_app_notification_close">关闭后台应用</string>
 </resources>

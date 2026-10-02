@@ -10,12 +10,17 @@ import android.media.Image;
 import android.media.ImageReader;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.IBinder;
 import android.os.Process;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.util.Log;
 import android.util.DisplayMetrics;
 import android.view.Display;
+import android.view.Surface;
+import android.view.MotionEvent;
+import android.view.InputEvent;
+import android.view.InputDevice;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -25,7 +30,7 @@ import java.util.Arrays;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 
-/** Shizuku UserService。仅在 ADB shell UID 下管理一个副屏，不保留任何跨任务画面。 */
+/** Shizuku UserService。仅在 shell UID 下管理一个进程内副屏，销毁时禁止迁移目标任务到主屏。 */
 public final class ShellMobileUseService extends IMobileUseService.Stub {
     // PUBLIC | OWN_CONTENT_ONLY | DESTROY_CONTENT_ON_REMOVAL | TRUSTED。
     // DESTROY_CONTENT_ON_REMOVAL 是核心隔离不变量，释放显示时禁止任务迁移到主屏。
@@ -43,6 +48,12 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
     private final MobileFrameMailbox<PendingFrame> pendingFrames = new MobileFrameMailbox<>();
     private final Runnable encodeFrameTask = this::encodePendingFrame;
     private Handler frameHandler;
+    private MobileDisplayRenderer renderer;
+    private String previewBinding;
+    private long gestureId = -1;
+    private float touchX, touchY;
+    private Object inputManager;
+    private Method injectInput;
 
     public ShellMobileUseService() {}
 
@@ -69,10 +80,11 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
             shellContext = shellContextTask.get(5, TimeUnit.SECONDS);
             displayGeometry = readGeometry();
             reader = newReader(displayGeometry);
+            renderer = new MobileDisplayRenderer(reader.getSurface(), displayGeometry.width, displayGeometry.height);
             DisplayManager manager = (DisplayManager) shellContext.getSystemService(Context.DISPLAY_SERVICE);
             display = manager.createVirtualDisplay(
                     "GimiMobileUse", displayGeometry.width, displayGeometry.height,
-                    displayGeometry.densityDpi, reader.getSurface(),
+                    displayGeometry.densityDpi, renderer.inputSurface(),
                     DISPLAY_FLAGS, null, new Handler(displayThread.getLooper()));
             if (display == null || display.getDisplay() == null) {
                 throw new IllegalStateException("Virtual display creation failed");
@@ -94,8 +106,8 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
         }
     }
 
-    @Override public synchronized void launch(String component, int displayId) {
-        requireDisplay(displayId);
+    @Override public void launch(String component, int displayId) {
+        synchronized (this) { requireDisplay(displayId); }
         if (component == null || !component.matches("[A-Za-z0-9_.$]+/[A-Za-z0-9_.$]+")) {
             throw new IllegalArgumentException("Invalid launcher component");
         }
@@ -103,25 +115,22 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
                 "-n", component);
     }
 
-    @Override public synchronized void tap(int displayId, int x, int y) {
-        requireDisplay(displayId);
-        requirePoint(x, y);
+    @Override public void tap(int displayId, int x, int y) {
+        synchronized (this) { requireDisplay(displayId); requirePoint(x, y); }
         command("input", "-d", Integer.toString(displayId), "tap",
                 Integer.toString(x), Integer.toString(y));
     }
 
-    @Override public synchronized void swipe(int displayId, int x1, int y1, int x2, int y2, int durationMs) {
-        requireDisplay(displayId);
-        requirePoint(x1, y1);
-        requirePoint(x2, y2);
+    @Override public void swipe(int displayId, int x1, int y1, int x2, int y2, int durationMs) {
+        synchronized (this) { requireDisplay(displayId); requirePoint(x1, y1); requirePoint(x2, y2); }
         if (durationMs < 100 || durationMs > 5000) throw new IllegalArgumentException("Invalid duration");
         command("input", "-d", Integer.toString(displayId), "swipe",
                 Integer.toString(x1), Integer.toString(y1), Integer.toString(x2), Integer.toString(y2),
                 Integer.toString(durationMs));
     }
 
-    @Override public synchronized void back(int displayId) {
-        requireDisplay(displayId);
+    @Override public void back(int displayId) {
+        synchronized (this) { requireDisplay(displayId); }
         command("input", "-d", Integer.toString(displayId), "keyevent", "4");
     }
 
@@ -141,6 +150,94 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
         result.putLong("sequence", frame.sequence);
         result.putLong("generation", frame.generation);
         return result;
+    }
+
+    @Override public synchronized void setPreview(int displayId, String bindingId, Surface surface, int width, int height) {
+        requireDisplay(displayId);
+        if (surface == null || !surface.isValid() || width <= 0 || height <= 0 || bindingId == null) {
+            throw new IllegalArgumentException("Invalid preview output");
+        }
+        cancelGesture(displayId);
+        renderer.preview(surface,width,height);
+        previewBinding = bindingId;
+        setImePolicy(displayId, 1); // FALLBACK_DISPLAY：原生输入连接不变，键盘显示在用户主屏。
+    }
+
+    @Override public synchronized void clearPreview(int displayId, String bindingId) {
+        requireDisplay(displayId);
+        // 旧窗口的销毁回调不能解绑刚切换的新窗口。
+        if (previewBinding == null || !previewBinding.equals(bindingId)) return;
+        cancelGesture(displayId);
+        renderer.preview(null,0,0);
+        previewBinding = null;
+        setImePolicy(displayId, 2);
+        hidePreviewKeyboard();
+    }
+
+    private void hidePreviewKeyboard() {
+        try {
+            // 切换为 HIDE 只约束后续请求，不会关闭已经回退到主屏的键盘。
+            // shell 拥有 TEST_INPUT_METHOD 权限；此系统入口仅隐藏 IME，不发送目标 App 返回。
+            IBinder binder = (IBinder) Class.forName("android.os.ServiceManager")
+                    .getMethod("getService", String.class).invoke(null, "input_method");
+            Object inputMethod = Class.forName("com.android.internal.view.IInputMethodManager$Stub")
+                    .getMethod("asInterface", IBinder.class).invoke(null, binder);
+            Class.forName("com.android.internal.view.IInputMethodManager")
+                    .getMethod("hideSoftInputFromServerForTest").invoke(inputMethod);
+        } catch (ReflectiveOperationException | RuntimeException failure) {
+            Log.w("GimiMobileUseService", "Unable to hide preview keyboard", failure);
+        }
+    }
+
+    private void setImePolicy(int displayId, int policy) {
+        try {
+            Class.forName("android.view.IWindowManager").getMethod("setDisplayImePolicy",int.class,int.class)
+                    .invoke(windowManagerService,displayId,policy);
+        } catch (Exception failure) { throw new IllegalStateException("Native keyboard unavailable",failure); }
+    }
+
+    @Override public synchronized boolean touch(int displayId, int action, float x, float y, long id, long eventTimeMs) {
+        requireDisplay(displayId);
+        if (previewBinding == null) return false;
+        if (!Float.isFinite(x) || !Float.isFinite(y) || action < 0 || action > 3) return false;
+        if (action == 0) {
+            cancelGesture(displayId);
+            if (x < 0 || y < 0 || x >= displayGeometry.width || y >= displayGeometry.height || id < 0) return false;
+            if (!inject(displayId,MotionEvent.ACTION_DOWN,x,y,id,eventTimeMs)) return false;
+            gestureId = id;
+        } else {
+            if (gestureId != id) return false;
+            int nativeAction = action == 1 ? MotionEvent.ACTION_MOVE : action == 2 ? MotionEvent.ACTION_UP : MotionEvent.ACTION_CANCEL;
+            x = Math.max(0,Math.min(x,displayGeometry.width-1));
+            y = Math.max(0,Math.min(y,displayGeometry.height-1));
+            boolean accepted = inject(displayId,nativeAction,x,y,id,eventTimeMs);
+            if (action == 2 || action == 3) gestureId = -1;
+            touchX = x; touchY = y;
+            return accepted;
+        }
+        touchX = x; touchY = y;
+        return true;
+    }
+
+    private boolean inject(int displayId, int action, float x, float y, long downTime, long eventTime) {
+        MotionEvent event = MotionEvent.obtain(downTime,Math.max(downTime,eventTime),action,x,y,0);
+        try {
+            event.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+            InputEvent.class.getMethod("setDisplayId",int.class).invoke(event,displayId);
+            if (inputManager == null) {
+                Class<?> manager = Class.forName("android.hardware.input.InputManagerGlobal");
+                inputManager = manager.getMethod("getInstance").invoke(null);
+                injectInput = manager.getMethod("injectInputEvent",InputEvent.class,int.class);
+            }
+            return (Boolean)injectInput.invoke(inputManager,event,0); // 异步投递，不等待目标 App 完成动作。
+        } catch (Exception failure) { throw new IllegalStateException("Touch injection unavailable",failure); }
+        finally { event.recycle(); }
+    }
+
+    private void cancelGesture(int displayId) {
+        if (gestureId < 0) return;
+        try { inject(displayId,MotionEvent.ACTION_CANCEL,touchX,touchY,gestureId,SystemClock.uptimeMillis()); }
+        finally { gestureId = -1; }
     }
 
     private synchronized void queueFrame(ImageReader source, MobileDisplayGeometry geometry,
@@ -230,6 +327,11 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
     }
 
     @Override public synchronized void stop() {
+        if (display != null) {
+            try { cancelGesture(display.getDisplay().getDisplayId()); }
+            catch (RuntimeException failure) { Log.w("GimiMobileUseService","Gesture cancellation unavailable"); }
+        }
+        previewBinding = null;
         clearPendingFrames();
         frames.reset();
         captureError = null;
@@ -246,6 +348,11 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
             }
             display.release();
             display = null;
+        }
+        if (renderer != null) {
+            try { renderer.close(); }
+            catch (RuntimeException failure) { Log.w("GimiMobileUseService","Renderer cleanup failed",failure); }
+            renderer = null;
         }
         windowManagerService = null;
         previousImePolicy = null;
@@ -336,20 +443,22 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
     private void ensureGeometry() {
         MobileDisplayGeometry current = readGeometry();
         if (current.sameAs(displayGeometry)) return;
-        display.resize(current.width, current.height, current.densityDpi);
+        cancelGesture(display.getDisplay().getDisplayId());
         replaceReader(current);
+        display.resize(current.width, current.height, current.densityDpi);
         displayGeometry = current;
     }
 
     private void replaceReader(MobileDisplayGeometry geometry) {
         ImageReader replacement = newReader(geometry);
         ImageReader previous = reader;
-        display.setSurface(replacement.getSurface());
+        renderer.resize(replacement.getSurface(), geometry.width, geometry.height);
         reader = replacement;
         if (previous != null) previous.close();
     }
 
     private void command(String... args) {
+        // 等待 shell 子进程期间不持显示锁，否则滑动会阻塞 ImageReader 消费并卡住预览。
         try {
             java.lang.Process child = new ProcessBuilder(args).redirectErrorStream(true).start();
             boolean finished = child.waitFor(10, TimeUnit.SECONDS);

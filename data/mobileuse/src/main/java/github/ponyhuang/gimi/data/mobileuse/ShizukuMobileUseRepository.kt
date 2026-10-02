@@ -8,6 +8,7 @@ import android.os.IBinder
 import android.os.DeadObjectException
 import android.os.RemoteException
 import android.os.SystemClock
+import android.view.Surface
 import android.util.Log
 import dagger.Binds
 import dagger.Module
@@ -18,12 +19,20 @@ import github.ponyhuang.gimi.domain.mobileuse.MobileUseAvailability
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseResult
 import github.ponyhuang.gimi.domain.mobileuse.MobileObservation
+import github.ponyhuang.gimi.domain.mobileuse.MobileDisplaySession
+import github.ponyhuang.gimi.domain.mobileuse.MobileDisplaySessions
+import github.ponyhuang.gimi.domain.mobileuse.MobileExecutionAccess
+import github.ponyhuang.gimi.domain.mobileuse.MobileTouch
+import github.ponyhuang.gimi.domain.mobileuse.MobileTouchAction
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -39,19 +48,54 @@ class ShizukuMobileUseRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val textRecognizer: MobileScreenshotTextRecognizer,
     private val preferences: MobileUsePreferences,
-) : MobileUseRepository {
+) : MobileUseRepository, MobileDisplayPreviewGateway {
     override val enabled: StateFlow<Boolean> = preferences.enabled
+    override val smallWindowEnabled: StateFlow<Boolean> = preferences.smallWindow
+    private val sessions = MobileDisplaySessions()
+    override val displaySession: StateFlow<MobileDisplaySession?> = sessions.session
     private val mutex = Mutex()
+    private val inputMutex = Mutex()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val args by lazy {
         Shizuku.UserServiceArgs(
             ComponentName(context.packageName, ShellMobileUseService::class.java.name),
-        ).tag("gimi.mobileuse.shell").version(3).daemon(false).processNameSuffix("mobileuse")
+        ).tag("gimi.mobileuse.shell").version(4).daemon(false).processNameSuffix("mobileuse")
     }
     private val guard = MobileObservationGuard()
-    @Volatile private var owner: String? = null
+    @Volatile private var physicalSessionId: String? = null
     @Volatile private var displayId: Int? = null
     @Volatile private var service: IMobileUseService? = null
     @Volatile private var connection: ServiceConnection? = null
+
+    init {
+        scope.launch {
+            while (true) {
+                delay(400)
+                val current = displaySession.value ?: continue
+                // UserService 可能在 Shizuku 主进程退出后继续存活，不能只依赖它的断连回调。
+                if (!Shizuku.pingBinder()) {
+                    mutex.withLock {
+                        if (displaySession.value?.id == current.id && !Shizuku.pingBinder()) closeLocked()
+                    }
+                    continue
+                }
+                val remote = service ?: continue
+                try {
+                    val geometry = remote.geometry(current.displayId)
+                    sessions.update(current.id, geometry[0], geometry[1])
+                } catch (_: DeadObjectException) {
+                    if (service === remote) mutex.withLock { if (service === remote) closeLocked() }
+                } catch (_: RemoteException) {
+                    // 暂时不可读不发布旧几何；下一次刷新或断连回调处理。
+                } catch (_: RuntimeException) {
+                    // 不影响 AI 与人工输入通道的生命周期。
+                }
+            }
+        }
+    }
+
+    override suspend fun registerExecution(owner: String, chatId: String) { sessions.register(owner, chatId) }
+    override suspend fun setSmallWindowEnabled(enabled: Boolean) { preferences.setSmallWindow(enabled) }
 
     override suspend fun setEnabled(enabled: Boolean) = withContext(Dispatchers.IO) {
         mutex.withLock {
@@ -72,7 +116,7 @@ class ShizukuMobileUseRepository @Inject constructor(
             when {
                 Shizuku.getUid() != 2000 -> MobileUseAvailability.ROOT_UNSUPPORTED
                 Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED ->
-                    if (owner == null) MobileUseAvailability.READY else MobileUseAvailability.BUSY
+                    if (displaySession.value == null) MobileUseAvailability.READY else MobileUseAvailability.BUSY
                 Shizuku.shouldShowRequestPermissionRationale() ->
                     MobileUseAvailability.PERMISSION_DENIED
                 else -> MobileUseAvailability.PERMISSION_REQUIRED
@@ -99,6 +143,10 @@ class ShizukuMobileUseRepository @Inject constructor(
             val launcher = context.packageManager.getLaunchIntentForPackage(packageName)?.component
                 ?: return@perform invalid("app_unavailable", "No launchable activity for package $packageName.")
             attempt(delivery) { remote.launch(launcher.flattenToString(), id); true }
+            displaySession.value?.let { current ->
+                val label = context.packageManager.getApplicationInfo(packageName, 0).loadLabel(context.packageManager).toString()
+                sessions.update(current.id, current.width, current.height, label)
+            }
             observeResult(remote, id, owner, delivery, "launched", "App launched; inspect the observation.")
         }
 
@@ -196,15 +244,68 @@ class ShizukuMobileUseRepository @Inject constructor(
                 if (replaced) "Text replaced." else "Focus tap sent, but no editable node accepted text.")
         }
 
-    override suspend fun stop(owner: String): MobileUseResult = withContext(Dispatchers.IO) {
+    override suspend fun finishExecution(owner: String): MobileUseResult = withContext(Dispatchers.IO) {
         mutex.withLock {
-            if (this@ShizukuMobileUseRepository.owner != owner) {
-                return@withLock invalid("not_active", "This Agent task does not own a display.")
+            if (!sessions.finish(owner)) {
+                return@withLock invalid("not_active", "This execution no longer owns the display.")
             }
-            closeLocked()
-            MobileUseResult("stopped", "Display stopped.", actionStatus = "delivered")
+            guard.reset()
+            MobileUseResult("execution_finished", "Execution released. Background app remains open for this chat until the user closes it.", displayId,
+                actionStatus = "delivered")
         }
     }
+
+    override suspend fun closeSession(sessionId: String): MobileUseResult = withContext(Dispatchers.IO) {
+        if (!sessions.close(sessionId)) return@withContext invalid("not_active", "Display session already closed.")
+        mutex.withLock {
+            if (physicalSessionId == sessionId) inputMutex.withLock { closeLocked() }
+        }
+        MobileUseResult("closed", "Background app closed.", actionStatus = "delivered")
+    }
+
+    override suspend fun manualTouch(sessionId: String, touch: MobileTouch): MobileUseResult = manual(sessionId) { remote, id ->
+        if (remote.touch(id, touch.action.ordinal, touch.x, touch.y, touch.gestureId, touch.eventTimeMs)) {
+            MobileUseResult("delivered", "", actionStatus = "delivered")
+        } else invalid(if (touch.action == MobileTouchAction.DOWN) "input_unavailable" else "input_rejected", "Touch was not accepted.")
+    }
+
+    override suspend fun manualBack(sessionId: String): MobileUseResult = manual(sessionId) { remote, id ->
+        remote.back(id)
+        MobileUseResult("delivered", "", actionStatus = "delivered")
+    }
+
+    override suspend fun attachPreview(sessionId: String, bindingId: String, surface: Surface, width: Int, height: Int): MobileUseResult =
+        manual(sessionId) { remote, id ->
+            remote.setPreview(id, bindingId, surface, width, height)
+            MobileUseResult("preview_attached", "", actionStatus = "delivered")
+        }
+
+    override suspend fun detachPreview(sessionId: String, bindingId: String) {
+        manual(sessionId) { remote, id ->
+            remote.clearPreview(id, bindingId)
+            MobileUseResult("preview_detached", "")
+        }
+    }
+
+    private suspend fun manual(sessionId: String, action: (IMobileUseService, Int) -> MobileUseResult): MobileUseResult =
+        withContext(Dispatchers.IO) {
+            inputMutex.withLock {
+                val current = displaySession.value?.takeIf { it.id == sessionId }
+                    ?: return@withLock invalid("session_lost", "Background app is no longer available.")
+                val remote = service ?: return@withLock invalid("session_lost", "Connection lost.")
+                try {
+                    action(remote, current.displayId)
+                } catch (_: DeadObjectException) {
+                    sessions.clear(blockOwner = true)
+                    scope.launch { mutex.withLock { if (service === remote) closeLocked() } }
+                    invalid("session_lost", "Connection lost.")
+                } catch (_: RemoteException) {
+                    invalid("input_unavailable", "Input unavailable.")
+                } catch (_: RuntimeException) {
+                    invalid("input_unavailable", "Input unavailable.")
+                }
+            }
+        }
 
     private suspend fun onObserved(
         owner: String, observationId: String, elementId: String? = null, navigation: Boolean = false,
@@ -232,15 +333,20 @@ class ShizukuMobileUseRepository @Inject constructor(
             if (!enabled.value) {
                 return@withLock unavailable(MobileUseAvailability.DISABLED).copy(actionStatus = delivery.status)
             }
-            if (this@ShizukuMobileUseRepository.owner != null && this@ShizukuMobileUseRepository.owner != owner) {
-                return@withLock invalid("busy", "Another Agent task owns the display.")
+            when (sessions.claim(owner)) {
+                MobileExecutionAccess.ALLOWED -> Unit
+                MobileExecutionAccess.CLOSED -> return@withLock invalid("session_closed", "User closed the background app. Do not recreate it during this execution.")
+                MobileExecutionAccess.UNREGISTERED -> return@withLock invalid("execution_finished", "This execution ended; a new turn can open the app.")
+                MobileExecutionAccess.OTHER_CHAT -> return@withLock invalid("busy", "Another chat has an open background app. Ask the user to close it first.")
+                MobileExecutionAccess.BUSY -> return@withLock invalid("busy", "Another execution in this chat is using the display.")
             }
+            if (physicalSessionId != null && displaySession.value == null) return@withLock invalid("session_closed", "Background app is closing.")
             if (!allowCreate && (displayId == null || service == null)) {
                 return@withLock invalid("stale_observation", "Display session ended; observe again.")
             }
             val available = availability()
             if (available != MobileUseAvailability.READY &&
-                !(available == MobileUseAvailability.BUSY && this@ShizukuMobileUseRepository.owner == owner)
+                available != MobileUseAvailability.BUSY
             ) return@withLock unavailable(available).copy(actionStatus = delivery.status)
             try {
                 val remote = service ?: bind().also { service = it }
@@ -250,9 +356,12 @@ class ShizukuMobileUseRepository @Inject constructor(
                 }
                 val id = displayId ?: remote.createDisplay().also {
                     displayId = it
+                    val geometry = remote.geometry(it)
+                    val sessionId = UUID.randomUUID().toString()
+                    physicalSessionId = sessionId
+                    sessions.open(owner, sessionId, it, geometry[0], geometry[1])
                     Log.i("GimiMobileUse", "Display session created: $it")
                 }
-                this@ShizukuMobileUseRepository.owner = owner
                 operation(remote, id, delivery).copy(displayId = id, actionStatus = delivery.status)
             } catch (failure: CancellationException) {
                 throw failure
@@ -419,11 +528,13 @@ class ShizukuMobileUseRepository @Inject constructor(
             }
             override fun onServiceDisconnected(name: ComponentName) {
                 if (connection !== this) return
-                guard.reset()
+                sessions.clear(blockOwner = true)
                 displayId?.let { MobileTextAccessibilityService.current()?.forgetDisplay(it) }
                 service = null
                 displayId = null
-                owner = null
+                physicalSessionId = null
+                connection = null
+                scope.launch { mutex.withLock { if (connection == null) guard.reset() } }
                 if (!deferred.isCompleted) deferred.completeExceptionally(
                     IllegalStateException("Shizuku UserService disconnected"),
                 )
@@ -443,6 +554,7 @@ class ShizukuMobileUseRepository @Inject constructor(
     }
 
     private fun closeLocked() {
+        sessions.clear(blockOwner = true)
         guard.reset()
         displayId?.let { MobileTextAccessibilityService.current()?.forgetDisplay(it) }
         runCatching { service?.stop() }
@@ -452,7 +564,7 @@ class ShizukuMobileUseRepository @Inject constructor(
         service = null
         connection = null
         displayId = null
-        owner = null
+        physicalSessionId = null
     }
 
     private fun unavailable(status: MobileUseAvailability): MobileUseResult = when (status) {
@@ -484,6 +596,8 @@ class ShizukuMobileUseRepository @Inject constructor(
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class MobileUseModule {
+    @Binds
+    abstract fun bindMobileDisplayPreviewGateway(implementation: ShizukuMobileUseRepository): MobileDisplayPreviewGateway
     @Binds
     abstract fun bindMobileUseRepository(
         implementation: ShizukuMobileUseRepository,

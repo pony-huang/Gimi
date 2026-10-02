@@ -202,6 +202,15 @@ class MobileUseToolsTest {
         confirmVerified(repository)
     }
 
+    @Test
+    fun stopFinishesOnlyTheExecutionAndKeepsTheDisplayForTheUser() = runTest {
+        coEvery { repository.finishExecution("turn-1") } returns MobileUseResult("execution_finished", "App remains open.")
+        val result = tools.getValue("mobile_stop").execute(context("turn-1"), emptyMap()) as Map<*, *>
+        assertEquals("execution_finished", result["status"])
+        coVerify(exactly = 1) { repository.finishExecution("turn-1") }
+        coVerify(exactly = 0) { repository.closeSession(any()) }
+    }
+
     private fun context(owner: String): ToolContext {
         val readonly = mockk<ReadonlyContext>()
         every { readonly.runConfig } returns RunConfig(

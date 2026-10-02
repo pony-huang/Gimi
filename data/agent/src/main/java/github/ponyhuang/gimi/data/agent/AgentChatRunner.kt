@@ -38,6 +38,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -293,10 +294,14 @@ class AgentChatRunner(
             ).flowOn(Dispatchers.IO).releaseMobileUseOnCompletion()
         }
 
-        private fun Flow<Event>.releaseMobileUseOnCompletion(): Flow<Event> = onCompletion {
+        private fun Flow<Event>.releaseMobileUseOnCompletion(): Flow<Event> = onStart {
+            ToolRunMetadata.mobileUseOwner(customMetadata)?.let { owner ->
+                mobileUseRepository?.registerExecution(owner, sessionId)
+            }
+        }.onCompletion {
             val owner = ToolRunMetadata.mobileUseOwner(customMetadata) ?: return@onCompletion
-            // 取消中的协程仍须销毁副屏，否则虚拟显示可能跨任务存活。
-            withContext(NonCancellable) { mobileUseRepository?.stop(owner) }
+            // 取消也释放本轮占用；画面属于聊天，保留到用户主动关闭。
+            withContext(NonCancellable) { mobileUseRepository?.finishExecution(owner) }
         }
     }
 

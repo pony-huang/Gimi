@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 
 @HiltAndroidApp
 class MainApplication : Application(), Configuration.Provider {
+    @Inject lateinit var backgroundAppWindowHost: github.ponyhuang.gimi.mobileuse.BackgroundAppWindowHost
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var recommendationStartupInitializer: RecommendationStartupInitializer
     @Inject lateinit var appUpdateRepository: AppUpdateRepository
@@ -34,6 +35,7 @@ class MainApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        backgroundAppWindowHost.start()
         appScope.launch {
             recommendationStartupInitializer.reconcile()
         }

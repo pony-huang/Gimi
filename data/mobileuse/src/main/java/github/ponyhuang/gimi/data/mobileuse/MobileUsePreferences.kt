@@ -22,6 +22,15 @@ class MobileUsePreferences @Inject constructor(
         },
     )
     val enabled: StateFlow<Boolean> = mutableEnabled.asStateFlow()
+    private val mutableSmallWindow = MutableStateFlow(
+        try { preferences.getBoolean("small_window", false) } catch (_: ClassCastException) { false },
+    )
+    val smallWindow: StateFlow<Boolean> = mutableSmallWindow.asStateFlow()
+
+    fun setSmallWindow(enabled: Boolean) {
+        preferences.edit().putBoolean("small_window", enabled).apply()
+        mutableSmallWindow.value = enabled
+    }
 
     fun setEnabled(enabled: Boolean) {
         preferences.edit().putBoolean("enabled", enabled).apply()

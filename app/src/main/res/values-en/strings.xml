@@ -1,4 +1,8 @@
 <resources>
     <string name="app_name">Gimi</string>
     <string name="media_notification_listener_label">asssistantai media control</string>
+    <string name="background_app_channel">Background app window</string>
+    <string name="background_app_notification">Background app is running</string>
+    <string name="background_app_notification_detail">Tap to view, or close the background app.</string>
+    <string name="background_app_notification_close">Close background app</string>
 </resources>

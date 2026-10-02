@@ -5,6 +5,7 @@ plugins {
 
 android {
     namespace = "github.ponyhuang.gimi.data.mobileuse"
+    defaultConfig.consumerProguardFiles("consumer-rules.pro")
     buildFeatures {
         aidl = true
     }

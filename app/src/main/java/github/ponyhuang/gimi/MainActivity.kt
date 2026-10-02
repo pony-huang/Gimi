@@ -29,6 +29,8 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @Inject lateinit var backgroundAppRepository: github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
+    @Inject lateinit var backgroundAppWindowHost: github.ponyhuang.gimi.mobileuse.BackgroundAppWindowHost
     @Inject
     lateinit var appearanceRepository: AppearanceRepository
     @Inject
@@ -49,6 +51,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        backgroundAppWindowHost.ensureService()
         appNotificationManager.cancelPendingInteractionNotifications()
     }
 
@@ -71,13 +74,16 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.DARK -> true
             }
             AsssistantaiTheme(darkTheme = darkTheme) {
-                MainScreen(
-                    assistantSessionCoordinator = assistantSessionCoordinator,
-                    assistantPanelInteractor = assistantPanelInteractor,
-                    openChatRequest = openChatRequest.value,
-                    sharedMediaUris = sharedMediaUris.value,
-                    onSharedMediaConsumed = { sharedMediaUris.value = emptyList() },
-                )
+                androidx.compose.foundation.layout.Box {
+                    MainScreen(
+                        assistantSessionCoordinator = assistantSessionCoordinator,
+                        assistantPanelInteractor = assistantPanelInteractor,
+                        openChatRequest = openChatRequest.value,
+                        sharedMediaUris = sharedMediaUris.value,
+                        onSharedMediaConsumed = { sharedMediaUris.value = emptyList() },
+                    )
+                    github.ponyhuang.gimi.mobileuse.BackgroundAppInAppBubble(backgroundAppRepository, backgroundAppWindowHost)
+                }
             }
         }
     }

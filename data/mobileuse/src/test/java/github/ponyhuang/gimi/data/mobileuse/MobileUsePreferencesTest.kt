@@ -27,6 +27,15 @@ class MobileUsePreferencesTest {
     }
 
     @Test
+    fun smallWindowDefaultsToOffAndRemembersChoiceSeparatelyFromFeatureSwitch() {
+        val settings = MobileUsePreferences(context)
+        assertFalse(settings.smallWindow.value)
+        settings.setSmallWindow(true)
+        assertTrue(MobileUsePreferences(context).smallWindow.value)
+        assertFalse(settings.enabled.value)
+    }
+
+    @Test
     fun freshInstallIsOffAndBothExplicitChoicesSurviveRecreation() {
         val settings = MobileUsePreferences(context)
         assertFalse(settings.enabled.value)

@@ -45,8 +45,11 @@ class MobileUseAvailabilityTest {
         assertEquals(request, toolset.processLlmRequest(toolContext, request))
         every { repository.availability() } returns MobileUseAvailability.READY
         val processed = toolset.processLlmRequest(toolContext, request)
-        assertTrue(processed.config.systemInstruction?.parts.orEmpty()
-            .mapNotNull { it.text }.joinToString("\n").contains("isolated secondary display"))
+        val instructions = processed.config.systemInstruction?.parts.orEmpty()
+            .mapNotNull { it.text }.joinToString("\n")
+        assertTrue(instructions.contains("background display associated with this chat"))
+        assertTrue(instructions.contains("the app stays open until the user closes it"))
+        assertTrue(instructions.contains("request passwords or verification codes in chat or tool arguments"))
     }
 
     private fun context(supportsImages: Boolean): ReadonlyContext = mockk {

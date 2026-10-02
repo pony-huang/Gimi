@@ -138,8 +138,8 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
                 "seconds" to seconds,
             )
         },
-        action("mobile_stop", "Stop the owned secondary display and release its resources.") { owner, _ ->
-            repository.stop(owner)
+        action("mobile_stop", "Finish this execution's display use. Keep the background app open for the user and future turns in this chat.") { owner, _ ->
+            repository.finishExecution(owner)
         },
     )
 
@@ -158,7 +158,8 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
                 parts = listOf(Part(text = """
                     <mobile_use>
                     Use mobile_* tools only when the user asks you to operate or inspect an installed Android app.
-                    They act on an isolated secondary display, never the user's main screen.
+                    They operate a background display associated with this chat. The user may also
+                    view and operate that app; user input can change the page between observations.
                     When the app package is known, start with mobile_open_app and use its screenshot;
                     an empty display before launch may have no frame. Prefer mobile_click with an
                     elementId from nodes, and mobile_set_text for nodes supporting set_text. OCR
@@ -175,7 +176,15 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
                     returned screenshot, including overlays, quantities and totals, before continuing.
                     mobile_type_text allows one focus retry only after explicit rejection of direct
                     replacement. Honor the user's stopping point for submitting or paying.
-                    Wait for progress when needed, and call mobile_stop when done.
+                    For login, passwords, verification codes, and sensitive confirmation steps,
+                    ask the user to complete them directly in the background app window. Do not
+                    request passwords or verification codes in chat or tool arguments. Observe
+                    the page again before continuing after user input; do not assume the prior
+                    input field or page remains active. Honor the user's consent for sensitive actions.
+                    Wait for progress when needed, and call mobile_stop when done. This releases
+                    only this execution; the app stays open until the user closes it. If session_closed
+                    is returned, do not reopen during this execution. Other chats must first close
+                    the existing background app.
                     If a tool reports that Shizuku permission or device support is unavailable, explain the
                     required setup instead of retrying the same action.
                     </mobile_use>

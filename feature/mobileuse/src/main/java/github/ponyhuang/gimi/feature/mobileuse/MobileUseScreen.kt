@@ -4,7 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -23,9 +24,9 @@ import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 /** 已确认的状态卡片布局；不读取服务或发起副屏操作。 */
 @Composable
 fun MobileUseScreen(
-    availability: MobileUseAvailability,
-    textInputAvailable: Boolean,
-    onPrimaryAction: () -> Unit,
+    state: MobileUseUiState,
+    onAuthorize: () -> Unit,
+    onRefresh: () -> Unit,
     onOpenShizuku: () -> Unit,
     onTextInputAction: () -> Unit,
     modifier: Modifier = Modifier,
@@ -34,7 +35,7 @@ fun MobileUseScreen(
         Column(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.verticalScroll(rememberScrollState()).padding(20.dp),
         ) {
             Text(
                 stringResource(R.string.mobile_use_intro),
@@ -47,57 +48,51 @@ fun MobileUseScreen(
                     modifier = Modifier.padding(16.dp),
                 ) {
                     Text(
-                        stringResource(availability.titleRes()),
+                        stringResource(state.availability.titleRes()),
                         style = MaterialTheme.typography.titleMedium,
                     )
-                    availability.detailRes()?.let { detailRes ->
+                    state.availability.detailRes()?.let { detailRes ->
                         Text(
                             stringResource(detailRes),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
-                }
-            }
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(16.dp),
-                ) {
-                    Text(
-                        stringResource(
-                            if (textInputAvailable) R.string.mobile_use_text_input_ready_title
-                            else R.string.mobile_use_text_input_required_title,
-                        ),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    if (!textInputAvailable) {
-                        Text(
-                            stringResource(R.string.mobile_use_text_input_required),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
+                    if (state.availability == MobileUseAvailability.PERMISSION_REQUIRED) {
+                        Button(onClick = onAuthorize) {
+                            Text(stringResource(R.string.mobile_use_authorize))
+                        }
                     }
                 }
             }
-            Button(onClick = onTextInputAction, modifier = Modifier.width(220.dp)) {
-                Text(
-                    stringResource(
-                        if (textInputAvailable) R.string.mobile_use_text_input_refresh
-                        else R.string.mobile_use_text_input_settings,
-                    ),
-                )
+            if (state.availability != MobileUseAvailability.DISABLED) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(16.dp),
+                    ) {
+                        Text(
+                            stringResource(
+                                if (state.textInputAvailable) R.string.mobile_use_text_input_ready_title
+                                else R.string.mobile_use_text_input_required_title,
+                            ),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        if (!state.textInputAvailable) {
+                            Text(
+                                stringResource(R.string.mobile_use_text_input_required),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            OutlinedButton(onClick = onTextInputAction) {
+                                Text(stringResource(R.string.mobile_use_text_input_settings))
+                            }
+                        }
+                    }
+                }
             }
-            Button(onClick = onPrimaryAction, modifier = Modifier.width(220.dp)) {
-                Text(
-                    stringResource(
-                        if (availability == MobileUseAvailability.PERMISSION_REQUIRED) {
-                            R.string.mobile_use_authorize
-                        } else {
-                            R.string.mobile_use_refresh
-                        },
-                    ),
-                )
+            Button(onClick = onRefresh, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.mobile_use_refresh))
             }
-            OutlinedButton(onClick = onOpenShizuku, modifier = Modifier.width(220.dp)) {
+            OutlinedButton(onClick = onOpenShizuku, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.mobile_use_open_shizuku))
             }
         }
@@ -105,6 +100,7 @@ fun MobileUseScreen(
 }
 
 private fun MobileUseAvailability.titleRes(): Int = when (this) {
+    MobileUseAvailability.DISABLED -> R.string.mobile_use_disabled_title
     MobileUseAvailability.SHIZUKU_MISSING -> R.string.mobile_use_missing_title
     MobileUseAvailability.SHIZUKU_STOPPED -> R.string.mobile_use_stopped_title
     MobileUseAvailability.PERMISSION_REQUIRED -> R.string.mobile_use_permission_title
@@ -116,6 +112,7 @@ private fun MobileUseAvailability.titleRes(): Int = when (this) {
 }
 
 private fun MobileUseAvailability.detailRes(): Int? = when (this) {
+    MobileUseAvailability.DISABLED -> R.string.mobile_use_disabled_detail
     MobileUseAvailability.SHIZUKU_MISSING -> R.string.mobile_use_missing_detail
     MobileUseAvailability.SHIZUKU_STOPPED -> R.string.mobile_use_stopped_detail
     MobileUseAvailability.PERMISSION_REQUIRED -> R.string.mobile_use_permission_detail
@@ -130,7 +127,7 @@ private fun MobileUseAvailability.detailRes(): Int? = when (this) {
 @Composable
 private fun PermissionPreview() {
     AsssistantaiTheme {
-        MobileUseScreen(MobileUseAvailability.PERMISSION_REQUIRED, false, {}, {}, {})
+        MobileUseScreen(MobileUseUiState(MobileUseAvailability.PERMISSION_REQUIRED), {}, {}, {}, {})
     }
 }
 
@@ -142,6 +139,6 @@ private fun PermissionPreview() {
 @Composable
 private fun ReadyDarkPreview() {
     AsssistantaiTheme {
-        MobileUseScreen(MobileUseAvailability.READY, true, {}, {}, {})
+        MobileUseScreen(MobileUseUiState(MobileUseAvailability.READY, true), {}, {}, {}, {})
     }
 }

@@ -8,6 +8,7 @@ android {
     buildFeatures {
         aidl = true
     }
+    testOptions.unitTests.isReturnDefaultValues = true
 }
 
 dependencies {

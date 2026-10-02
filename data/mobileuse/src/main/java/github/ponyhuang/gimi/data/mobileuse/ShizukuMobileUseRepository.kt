@@ -25,6 +25,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -37,18 +38,31 @@ import kotlin.time.Duration.Companion.milliseconds
 class ShizukuMobileUseRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val textRecognizer: MobileScreenshotTextRecognizer,
+    private val preferences: MobileUsePreferences,
 ) : MobileUseRepository {
+    override val enabled: StateFlow<Boolean> = preferences.enabled
     private val mutex = Mutex()
-    private val args = Shizuku.UserServiceArgs(
-        ComponentName(context.packageName, ShellMobileUseService::class.java.name),
-    ).tag("gimi.mobileuse.shell").version(3).daemon(false).processNameSuffix("mobileuse")
+    private val args by lazy {
+        Shizuku.UserServiceArgs(
+            ComponentName(context.packageName, ShellMobileUseService::class.java.name),
+        ).tag("gimi.mobileuse.shell").version(3).daemon(false).processNameSuffix("mobileuse")
+    }
     private val guard = MobileObservationGuard()
     @Volatile private var owner: String? = null
     @Volatile private var displayId: Int? = null
     @Volatile private var service: IMobileUseService? = null
     @Volatile private var connection: ServiceConnection? = null
 
+    override suspend fun setEnabled(enabled: Boolean) = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            // 与操作使用同一把锁，关闭完成后任何排队操作都不能重新创建后台画面。
+            preferences.setEnabled(enabled)
+            if (!enabled) closeLocked()
+        }
+    }
+
     override fun availability(): MobileUseAvailability {
+        if (!enabled.value) return MobileUseAvailability.DISABLED
         val installed = runCatching {
             context.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0)
         }.isSuccess
@@ -215,6 +229,9 @@ class ShizukuMobileUseRepository @Inject constructor(
     ): MobileUseResult = withContext(Dispatchers.IO) {
         mutex.withLock {
             val delivery = MobileActionDelivery(action)
+            if (!enabled.value) {
+                return@withLock unavailable(MobileUseAvailability.DISABLED).copy(actionStatus = delivery.status)
+            }
             if (this@ShizukuMobileUseRepository.owner != null && this@ShizukuMobileUseRepository.owner != owner) {
                 return@withLock invalid("busy", "Another Agent task owns the display.")
             }
@@ -429,7 +446,7 @@ class ShizukuMobileUseRepository @Inject constructor(
         guard.reset()
         displayId?.let { MobileTextAccessibilityService.current()?.forgetDisplay(it) }
         runCatching { service?.stop() }
-        if (Shizuku.pingBinder()) {
+        if (connection != null && Shizuku.pingBinder()) {
             runCatching { Shizuku.unbindUserService(args, connection, true) }
         }
         service = null
@@ -439,6 +456,9 @@ class ShizukuMobileUseRepository @Inject constructor(
     }
 
     private fun unavailable(status: MobileUseAvailability): MobileUseResult = when (status) {
+        MobileUseAvailability.DISABLED -> MobileUseResult(
+            "disabled", "Background app control is off. Enable it in Gimi Settings > Shizuku before retrying.",
+        )
         MobileUseAvailability.SHIZUKU_MISSING -> MobileUseResult(
             "shizuku_missing", "Install Shizuku and start it with wireless debugging or ADB.",
         )

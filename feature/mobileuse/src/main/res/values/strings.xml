@@ -1,6 +1,8 @@
 <resources>
-    <string name="mobile_use_title">后台静默操作</string>
-    <string name="mobile_use_intro">让 Agent 操作其他应用，不打断你当前的操作。</string>
+    <string name="mobile_use_title">Shizuku</string>
+    <string name="mobile_use_intro">让 Agent 在后台操作其他应用，不打断你当前的操作。</string>
+    <string name="mobile_use_disabled_title">后台操作已关闭</string>
+    <string name="mobile_use_disabled_detail">请在设置页开启 Shizuku 后再管理授权。</string>
     <string name="mobile_use_authorize">授权 Gimi</string>
     <string name="mobile_use_refresh">刷新状态</string>
     <string name="mobile_use_open_shizuku">打开 Shizuku</string>
@@ -14,11 +16,10 @@
     <string name="mobile_use_denied_detail">请在 Shizuku 的已授权应用中允许 Gimi。</string>
     <string name="mobile_use_root_title">当前为 root 模式</string>
     <string name="mobile_use_root_detail">此功能只接受 Shizuku ADB shell 模式，请改用 ADB 启动。</string>
-    <string name="mobile_use_ready_title">已就绪 · ADB shell</string>
+    <string name="mobile_use_ready_title">已就绪</string>
     <string name="mobile_use_text_input_ready_title">文字输入 · 已开启</string>
     <string name="mobile_use_text_input_required_title">文字输入 · 待授权</string>
     <string name="mobile_use_text_input_required">请开启“Gimi 后台静默操作 · 文字输入”无障碍服务。</string>
-    <string name="mobile_use_text_input_refresh">刷新输入状态</string>
     <string name="mobile_use_text_input_settings">打开无障碍设置</string>
     <string name="mobile_use_busy_title">后台操作正在使用</string>
     <string name="mobile_use_busy_detail">当前已有一个 Agent 任务在运行。</string>

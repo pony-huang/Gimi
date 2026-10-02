@@ -25,5 +25,8 @@ dependencies {
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
 
     testImplementation(libs.junit)
+    testImplementation(project(":core:testing"))
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockk)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

@@ -1,5 +1,7 @@
 <resources>
-    <string name="mobile_use_title">Background app control</string>
+    <string name="mobile_use_title">Shizuku</string>
+    <string name="mobile_use_disabled_title">Background app control is off</string>
+    <string name="mobile_use_disabled_detail">Enable Shizuku in Settings to manage permissions.</string>
     <string name="mobile_use_intro">Let the Agent use other apps without interrupting your current activity.</string>
     <string name="mobile_use_authorize">Authorize Gimi</string>
     <string name="mobile_use_refresh">Refresh status</string>
@@ -14,11 +16,10 @@
     <string name="mobile_use_denied_detail">Allow Gimi in Shizuku’s authorized apps.</string>
     <string name="mobile_use_root_title">Root mode is active</string>
     <string name="mobile_use_root_detail">This feature requires Shizuku ADB shell mode. Restart it with ADB.</string>
-    <string name="mobile_use_ready_title">Ready · ADB shell</string>
+    <string name="mobile_use_ready_title">Ready</string>
     <string name="mobile_use_text_input_ready_title">Text input · On</string>
     <string name="mobile_use_text_input_required_title">Text input · Authorization needed</string>
     <string name="mobile_use_text_input_required">Enable the “Gimi Background App Control · Text Input” Accessibility service.</string>
-    <string name="mobile_use_text_input_refresh">Refresh input status</string>
     <string name="mobile_use_text_input_settings">Open Accessibility settings</string>
     <string name="mobile_use_busy_title">Background control in use</string>
     <string name="mobile_use_busy_detail">Another Agent task is already running.</string>

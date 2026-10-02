@@ -21,6 +21,8 @@ class MobileUseAvailabilityTest {
     fun toolsetFollowsShizukuRuntimeAndVisionCapability() = runTest {
         val repository = mockk<MobileUseRepository>()
         val toolset = MobileUseTools(repository)
+        every { repository.availability() } returns MobileUseAvailability.DISABLED
+        assertEquals(emptyList<Any>(), toolset.getTools(context(supportsImages = true)))
         every { repository.availability() } returns MobileUseAvailability.SHIZUKU_STOPPED
         assertEquals(emptyList<Any>(), toolset.getTools(context(supportsImages = true)))
         every { repository.availability() } returns MobileUseAvailability.READY
@@ -37,6 +39,8 @@ class MobileUseAvailabilityTest {
         val readonly = context(supportsImages = true)
         val toolContext = mockk<ToolContext> { every { context } returns readonly }
         val request = LlmRequest()
+        every { repository.availability() } returns MobileUseAvailability.DISABLED
+        assertEquals(request, toolset.processLlmRequest(toolContext, request))
         every { repository.availability() } returns MobileUseAvailability.SHIZUKU_STOPPED
         assertEquals(request, toolset.processLlmRequest(toolContext, request))
         every { repository.availability() } returns MobileUseAvailability.READY

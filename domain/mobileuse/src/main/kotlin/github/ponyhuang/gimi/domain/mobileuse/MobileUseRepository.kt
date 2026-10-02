@@ -1,7 +1,10 @@
 package github.ponyhuang.gimi.domain.mobileuse
 
+import kotlinx.coroutines.flow.StateFlow
+
 /** Shizuku 授权及副屏当前状态。 */
 enum class MobileUseAvailability {
+    DISABLED,
     SHIZUKU_MISSING,
     SHIZUKU_STOPPED,
     PERMISSION_REQUIRED,
@@ -65,6 +68,10 @@ data class MobileUseResult(
 
 /** 单任务副屏能力；owner 为单轮 Agent 执行的稳定标识。 */
 interface MobileUseRepository {
+    /** 用户是否允许 Agent 使用后台操作，独立于系统授权。 */
+    val enabled: StateFlow<Boolean>
+    /** 保存开关；关闭时释放当前任务资源，后续操作必须被拒绝。 */
+    suspend fun setEnabled(enabled: Boolean)
     fun availability(): MobileUseAvailability
     fun requestPermission(requestCode: Int)
     suspend fun observe(owner: String): MobileUseResult

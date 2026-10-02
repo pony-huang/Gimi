@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -203,33 +204,43 @@ private fun HistoryDrawerContent(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .combinedClickable(onClick = onSettingsClick)
-                .padding(start = 24.dp, top = 20.dp, end = 24.dp, bottom = 20.dp)
+                .padding(horizontal = 16.dp, vertical = 20.dp)
                 .navigationBarsPadding(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = Icons.Default.Settings,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = stringResource(R.string.chat_settings),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(start = 20.dp),
-            )
-            if (showUpdateBadge) {
-                // 有未发现的新版本时在"设置"入口旁点亮提醒点。
-                Box(
-                    modifier = Modifier
-                        .padding(start = 8.dp)
-                        .size(8.dp)
-                        .background(MaterialTheme.colorScheme.error, CircleShape),
-                )
+            Surface(
+                onClick = onSettingsClick,
+                shape = CircleShape,
+                color = chatCapsuleColor(),
+                shadowElevation = 3.dp,
+            ) {
+                Row(
+                    modifier = Modifier.height(48.dp).padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = stringResource(R.string.chat_settings),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    if (showUpdateBadge) {
+                        // 有未发现的新版本时在"设置"入口旁点亮提醒点。
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(MaterialTheme.colorScheme.error, CircleShape),
+                        )
+                    }
+                }
             }
             Spacer(modifier = Modifier.weight(1f))
-            // 按钮自身消费点击，不会触发整行的设置跳转；点击循环 跟随系统→浅色→深色。
+            // 两枚胶囊独立消费点击；主题入口循环 跟随系统→浅色→深色。
             ThemeModeButton(
                 mode = themeMode,
                 onClick = { onThemeModeChange(themeMode.next()) },
@@ -270,11 +281,12 @@ private fun ThemeModeButton(
         onClick = onClick,
         modifier = modifier.semantics { contentDescription = label },
         shape = RoundedCornerShape(percent = 50),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        color = chatCapsuleColor(),
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        shadowElevation = 3.dp,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            modifier = Modifier.height(48.dp).padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {

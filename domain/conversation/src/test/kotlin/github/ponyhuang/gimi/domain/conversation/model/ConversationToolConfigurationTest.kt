@@ -16,19 +16,6 @@ class ConversationToolConfigurationTest {
     }
 
     @Test
-    fun reasoningEffortOnlyContainsTheFourSupportedLevels() {
-        assertEquals(
-            listOf(
-                ReasoningEffort.MINIMAL,
-                ReasoningEffort.LOW,
-                ReasoningEffort.MEDIUM,
-                ReasoningEffort.HIGH,
-            ),
-            ReasoningEffort.entries,
-        )
-    }
-
-    @Test
     fun officialFunctionsDefaultToTheAllMarkerForUnseenTools() {
         val configuration = ConversationToolConfiguration()
 

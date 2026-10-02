@@ -87,6 +87,8 @@ android {
 }
 
 dependencies {
+    // Provider 由主 App Manifest 注册，依赖归属 composition root，确保 lint 能解析该组件。
+    implementation(libs.shizuku.provider)
     implementation(project(":domain:appearance"))
     implementation(project(":domain:mobileuse"))
     implementation(project(":domain:permissions"))
@@ -177,10 +179,7 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.turbine)
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
 }

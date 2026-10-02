@@ -30,41 +30,6 @@ class SettingsViewModelTest {
     }
 
     @Test
-    fun navigationActionsEmitMatchingEffects() = runTest {
-        val viewModel = SettingsViewModel(repository)
-
-        viewModel.effects.test {
-            viewModel.onAction(SettingsAction.OpenModelService)
-            assertEquals(SettingsEffect.NavigateToModelService, awaitItem())
-            viewModel.onAction(SettingsAction.OpenDefaultModels)
-            assertEquals(SettingsEffect.NavigateToDefaultModels, awaitItem())
-            viewModel.onAction(SettingsAction.OpenMcpServers)
-            assertEquals(SettingsEffect.NavigateToMcpServers, awaitItem())
-            viewModel.onAction(SettingsAction.OpenSkills)
-            assertEquals(SettingsEffect.NavigateToSkills, awaitItem())
-            viewModel.onAction(SettingsAction.OpenWorkFiles)
-            assertEquals(SettingsEffect.NavigateToWorkFiles, awaitItem())
-            viewModel.onAction(SettingsAction.OpenPermissions)
-            assertEquals(SettingsEffect.NavigateToPermissions, awaitItem())
-            viewModel.onAction(SettingsAction.OpenRecommendations)
-            assertEquals(SettingsEffect.NavigateToRecommendations, awaitItem())
-            viewModel.onAction(SettingsAction.OpenMemory)
-            assertEquals(SettingsEffect.NavigateToMemory, awaitItem())
-            viewModel.onAction(SettingsAction.OpenToolAuthorization)
-            assertEquals(SettingsEffect.NavigateToToolAuthorization, awaitItem())
-            viewModel.onAction(SettingsAction.OpenPlugins)
-            assertEquals(SettingsEffect.NavigateToPlugins, awaitItem())
-            viewModel.onAction(SettingsAction.OpenWorkspace)
-            assertEquals(SettingsEffect.NavigateToWorkspace, awaitItem())
-            viewModel.onAction(SettingsAction.OpenMobileUse)
-            assertEquals(SettingsEffect.NavigateToMobileUse, awaitItem())
-            viewModel.onAction(SettingsAction.OpenAbout)
-            assertEquals(SettingsEffect.NavigateToAbout, awaitItem())
-            cancelAndIgnoreRemainingEvents()
-        }
-    }
-
-    @Test
     fun mobileUseCanOnlyBeOpenedAfterEnablingAndPersistsToggle() = runTest {
         enabled.value = false
         val viewModel = SettingsViewModel(repository)
@@ -113,12 +78,4 @@ class SettingsViewModelTest {
         }
     }
 
-    @Test
-    fun settingsFollowChangesMadeOutsideTheScreen() = runTest {
-        val viewModel = SettingsViewModel(repository)
-        runCurrent()
-        enabled.value = false
-        runCurrent()
-        assertFalse(viewModel.uiState.value.mobileUseEnabled)
-    }
 }

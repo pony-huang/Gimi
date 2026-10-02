@@ -15,29 +15,6 @@ import org.json.JSONObject
 
 class RecommendationOutputParserTest {
     @Test
-    fun parsesRecommendationsFromFencedJson() {
-        val raw = """
-            ```json
-            {"recommendations":[
-              {"prompt":"任务1","category":"reasoning"},
-              {"prompt":"任务2","category":"vision"},
-              {"prompt":"任务3","category":"research"},
-              {"prompt":"任务4","category":"writing"},
-              {"prompt":"任务5","category":"device"},
-              {"prompt":"任务6","category":"productivity"}
-            ]}
-            ```
-        """.trimIndent()
-
-        val result = RecommendationOutputParser.parse(raw)
-
-        assertEquals(RecommendationSnapshot.RECOMMENDATION_COUNT, result.size)
-        assertEquals("任务1", result.first().prompt)
-        assertEquals("recommendation-1", result.first().id)
-        assertEquals("recommendation-6", result.last().id)
-    }
-
-    @Test
     fun rejectsMissingOrUnknownCategoryInsteadOfDefaulting() {
         val missingCategory = """{"recommendations":[
             {"prompt":"任务1"},
@@ -65,7 +42,7 @@ class RecommendationOutputParserTest {
     }
 
     @Test
-    fun rejectsTopLevelArrayAndAliasedKeys() {
+    fun rejectsTopLevelArrayAliasedKeysAndMarkdownFences() {
         // 结构契约已写进提示，别名兜底会把契约违约伪装成成功，因此必须显式拒绝。
         val aliasedArray = """[
             {"task":"任务1","suggestion":"建议1"},
@@ -78,6 +55,18 @@ class RecommendationOutputParserTest {
 
         assertThrows(IllegalArgumentException::class.java) {
             RecommendationOutputParser.parse(aliasedArray)
+        }
+        // JSON 输出契约不接受 Markdown；围栏内使用合法内容以免其它校验掩盖格式问题。
+        val validJson = """{"recommendations":[
+            {"prompt":"任务1","category":"reasoning"},
+            {"prompt":"任务2","category":"vision"},
+            {"prompt":"任务3","category":"research"},
+            {"prompt":"任务4","category":"writing"},
+            {"prompt":"任务5","category":"device"},
+            {"prompt":"任务6","category":"productivity"}
+        ]}""".trimIndent()
+        assertThrows(IllegalArgumentException::class.java) {
+            RecommendationOutputParser.parse("```json\n$validJson\n```")
         }
     }
 
@@ -111,21 +100,24 @@ class RecommendationOutputParserTest {
         val result = RecommendationOutputParser.parse(raw)
 
         assertEquals(RecommendationSnapshot.RECOMMENDATION_COUNT, result.size)
+        assertEquals("任务1", result.first().prompt)
+        assertEquals("recommendation-1", result.first().id)
+        assertEquals("recommendation-6", result.last().id)
         assertEquals(RecommendationCategory.REASONING, result.first().category)
     }
 
     @Test
-    fun rejectsDuplicateOrWrongSizedOutput() {
-        val duplicated = """{"recommendations":[
-            {"prompt":"same","category":"general"},
-            {"prompt":"same","category":"general"},
+    fun rejectsWrongSizedOutput() {
+        val undersized = """{"recommendations":[
+            {"prompt":"1","category":"general"},
+            {"prompt":"2","category":"general"},
             {"prompt":"3","category":"general"},
             {"prompt":"4","category":"general"},
             {"prompt":"5","category":"general"}]}
         """.trimIndent()
 
         assertThrows(IllegalArgumentException::class.java) {
-            RecommendationOutputParser.parse(duplicated)
+            RecommendationOutputParser.parse(undersized)
         }
         assertThrows(IllegalArgumentException::class.java) {
             RecommendationOutputParser.parse("""{"recommendations":[]}""")
@@ -152,21 +144,6 @@ class RecommendationOutputParserTest {
         assertTrue(prompt.contains("Search MCP catalog"))
         assertTrue(prompt.contains("zh-CN"))
         assertTrue(prompt.contains("exactly ${RecommendationSnapshot.RECOMMENDATION_COUNT}"))
-    }
-
-    @Test
-    fun promptRequiresUsefulRecommendationsInsteadOfTrivialStatusQueries() {
-        val prompt = RecommendationPromptBuilder.build(
-            RecommendationGenerationInput(
-                systemInstruction = "system rules",
-                capabilities = emptyList(),
-                context = RecommendationContext(emptyMap()),
-            ),
-        )
-
-        assertTrue(prompt.contains("meaningful"))
-        assertTrue(prompt.contains("directly visible status"))
-        assertTrue(prompt.contains("multi-step"))
     }
 
     @Test

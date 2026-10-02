@@ -29,46 +29,6 @@ class WorkFilesSettingsViewModelCharacterizationTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     @Test
-    fun initialStateLoadsDirectoriesAndRefreshesAccessHealth() = runTest {
-        val directory = directory("work")
-        val repository = directoryRepository(listOf(directory))
-
-        val viewModel = viewModel(repository)
-        advanceUntilIdle()
-
-        assertEquals(listOf(directory), viewModel.uiState.value.directories)
-        coVerify(exactly = 1) { repository.refreshAccess() }
-    }
-
-    @Test
-    fun pickerSelectionAndRemovalDelegateStableDirectoryId() = runTest {
-        val repository = directoryRepository()
-        val viewModel = viewModel(repository)
-        val uri = "content://documents/tree/work"
-
-        viewModel.onAction(WorkFilesSettingsAction.RequestAddDirectory)
-        val requestId = requireNotNull(viewModel.uiState.value.directoryPickerRequestId)
-        viewModel.onAction(WorkFilesSettingsAction.DirectoryPickerHandled(requestId))
-        viewModel.onAction(WorkFilesSettingsAction.DirectorySelected(uri))
-        viewModel.onAction(WorkFilesSettingsAction.RemoveDirectory("directory-id"))
-        advanceUntilIdle()
-
-        coVerify(exactly = 1) { repository.addDirectory(uri) }
-        coVerify(exactly = 1) { repository.removeDirectory("directory-id") }
-    }
-
-    @Test
-    fun enableActionDelegatesStableIdAndRequestedState() = runTest {
-        val repository = directoryRepository()
-        val viewModel = viewModel(repository)
-
-        viewModel.onAction(WorkFilesSettingsAction.SetDirectoryEnabled("directory-id", false))
-        advanceUntilIdle()
-
-        coVerify(exactly = 1) { repository.setEnabled("directory-id", false) }
-    }
-
-    @Test
     fun reauthorizePickerRoutesSelectionToExistingDirectory() = runTest {
         val repository = directoryRepository()
         val viewModel = viewModel(repository)

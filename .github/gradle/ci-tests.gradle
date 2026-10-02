@@ -1,0 +1,14 @@
+import java.time.Duration
+import org.gradle.api.tasks.testing.Test
+
+// 只约束 CI 的测试执行，不把编译耗时算入模块测试超时，也不影响本地调试。
+allprojects {
+    tasks.withType(Test).configureEach {
+        timeout = Duration.ofMinutes(3)
+        maxParallelForks = 1
+        testLogging {
+            events 'started', 'failed', 'skipped'
+            exceptionFormat 'full'
+        }
+    }
+}

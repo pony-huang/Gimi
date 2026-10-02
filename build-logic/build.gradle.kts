@@ -21,8 +21,6 @@ dependencies {
     implementation(pluginMarker(libs.plugins.kotlin.compose))
     implementation(pluginMarker(libs.plugins.ksp))
     implementation(pluginMarker(libs.plugins.hilt.android))
-
-    testImplementation(libs.junit)
 }
 
 gradlePlugin {

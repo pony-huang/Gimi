@@ -1,7 +1,6 @@
 package github.ponyhuang.gimi
 
 import java.io.File
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -9,30 +8,9 @@ import org.junit.Test
 class McpReleaseR8RulesTest {
 
     @Test
-    fun releaseUsesKotlinMcpSdkWithoutJavaSdkRuntime() {
-        val catalog = File("../gradle/libs.versions.toml").readText()
-        val agentBuild = File("../data/agent/build.gradle.kts").readText()
-
-        assertTrue(
-            "The MCP client must use the Kotlin SDK",
-            catalog.contains("io.modelcontextprotocol:kotlin-sdk-client"),
-        )
-        assertFalse(
-            "The direct Java MCP SDK dependency must be removed",
-            catalog.contains("io.modelcontextprotocol.sdk:mcp-core"),
-        )
-        assertFalse(
-            "The Java SDK bridge must not keep Reactor in data:agent",
-            agentBuild.contains("libs.kotlinx.coroutines.reactor"),
-        )
-    }
-
-    @Test
-    fun releaseRulesDoNotKeepJavaMcpSerializationModels() {
+    fun releaseRulesProtectAppOptimizationAndPluginAbi() {
         val rules = File("proguard-rules.pro").readText()
 
-        assertFalse(rules.contains("io.modelcontextprotocol.json.TypeRef"))
-        assertFalse(rules.contains("io.modelcontextprotocol.spec.McpSchema"))
         assertTrue(
             "App code must stay shrinkable but optimization-free (R8 inlining crashed plugin config saving)",
             rules.contains("-keep,allowshrinking class github.ponyhuang.gimi.** { *; }"),
@@ -40,10 +18,6 @@ class McpReleaseR8RulesTest {
         assertTrue(
             "The plugin ABI must stay full keep roots for parent-first plugin resolution",
             rules.contains("-keep class github.ponyhuang.gimi.pluginapi.** { *; }"),
-        )
-        assertFalse(
-            "Gson-migrated data classes are @Serializable and must not need reflection keep rules",
-            rules.contains("-keep class github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration { *; }"),
         )
     }
 

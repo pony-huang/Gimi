@@ -22,6 +22,4 @@ dependencies {
     implementation(libs.multiplatform.markdown.renderer.code)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
-
-    testImplementation(libs.junit)
 }

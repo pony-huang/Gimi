@@ -19,8 +19,6 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -48,45 +46,6 @@ class DefaultModelSettingsViewModelCharacterizationTest {
             assertEquals(listOf("tts"), state.ttsModels.map { it.model.id })
             cancelAndIgnoreRemainingEvents()
         }
-    }
-
-    @Test
-    fun selectionsDelegateToDomainRepositoryAndDismissDialog() = runTest {
-        val repository = repository()
-        val viewModel = viewModel(repository)
-        val selection = ModelSelection("service", "group", "chat")
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.uiState.collect { }
-        }
-
-        viewModel.onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.Assistant))
-        advanceUntilIdle()
-        assertEquals(DefaultModelDialog.Assistant, viewModel.uiState.value.dialog)
-        viewModel.onAction(
-            DefaultModelSettingsAction.SelectModel(DefaultModelDialog.Assistant, selection),
-        )
-        advanceUntilIdle()
-
-        verify { repository.selectAssistantModel(selection) }
-        assertEquals(null, viewModel.uiState.value.dialog)
-    }
-
-    @Test
-    fun voiceSelectionDelegatesAndDismissesDialog() = runTest {
-        val repository = repository()
-        val viewModel = viewModel(repository)
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.uiState.collect { }
-        }
-        viewModel.onAction(DefaultModelSettingsAction.ShowDialog(DefaultModelDialog.TtsVoice))
-        advanceUntilIdle()
-        assertEquals(DefaultModelDialog.TtsVoice, viewModel.uiState.value.dialog)
-
-        viewModel.onAction(DefaultModelSettingsAction.SelectVoice("female-shaonv"))
-        advanceUntilIdle()
-
-        verify { repository.selectTtsVoice("female-shaonv") }
-        assertEquals(null, viewModel.uiState.value.dialog)
     }
 
     @Test

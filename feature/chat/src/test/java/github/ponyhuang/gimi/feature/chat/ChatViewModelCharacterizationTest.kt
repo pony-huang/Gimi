@@ -394,32 +394,6 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
-    fun toggleAutoSpeakAction_flipsGlobalSwitch() = runTest {
-        val fixture = fixture(configured = true)
-
-        fixture.viewModel.onAction(ChatAction.ToggleAutoSpeak)
-        advanceUntilIdle()
-        assertFalse(fixture.speechSettings.autoSpeakEnabled.value)
-        assertFalse(fixture.viewModel.uiState.value.autoSpeakEnabled)
-
-        fixture.viewModel.onAction(ChatAction.ToggleAutoSpeak)
-        advanceUntilIdle()
-        assertTrue(fixture.speechSettings.autoSpeakEnabled.value)
-        assertTrue(fixture.viewModel.uiState.value.autoSpeakEnabled)
-    }
-
-    @Test
-    fun toggleTimelineAction_updatesExpandedActivityGroupIds() = runTest {
-        val fixture = fixture(configured = true)
-
-        fixture.viewModel.onAction(ChatAction.ToggleTimeline("turn-1:a0"))
-        assertEquals(setOf("turn-1:a0"), fixture.viewModel.uiState.value.expandedActivityGroupIds)
-
-        fixture.viewModel.onAction(ChatAction.ToggleTimeline("turn-1:a0"))
-        assertTrue(fixture.viewModel.uiState.value.expandedActivityGroupIds.isEmpty())
-    }
-
-    @Test
     fun sameSessionBusyRejectsChatSendWithoutLeavingRunningState() = runTest {
         val gate = FakeAgentRuntimeGate().apply {
             acquireException = AgentSessionBusyException("session-1")

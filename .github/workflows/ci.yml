@@ -18,6 +18,7 @@ jobs:
   build:
     name: Build & Test
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,13 +33,29 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Unit tests
-        run: ./gradlew testDebugUnitTest --stacktrace
+        timeout-minutes: 15
+        # 模块并行测试有上限；输出具体用例，失败时不会无限等待其他测试进程。
+        run: ./gradlew testDebugUnitTest --init-script .github/gradle/ci-tests.gradle --max-workers=2 --console=plain --stacktrace
 
       - name: Assemble debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        timeout-minutes: 10
+        # 只发布主 App APK，无需额外打包所有 library 与插件 APK。
+        run: ./gradlew :app:assembleDebug --max-workers=2 --console=plain --stacktrace
 
       - name: Lint
-        run: ./gradlew app:lintDebug --stacktrace
+        timeout-minutes: 10
+        run: ./gradlew :app:lintDebug --max-workers=2 --console=plain --stacktrace
+
+      - name: Upload test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: |
+            **/build/test-results/testDebugUnitTest/TEST-*.xml
+            **/build/reports/tests/testDebugUnitTest/**
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4

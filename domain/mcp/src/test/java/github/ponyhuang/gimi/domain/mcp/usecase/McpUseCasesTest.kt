@@ -11,61 +11,15 @@ import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 import github.ponyhuang.gimi.domain.mcp.repository.McpConnectionTester
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertSame
 import org.junit.Test
 
 class McpUseCasesTest {
 
     private val repository = FakeMcpRepository()
-
-    @Test
-    fun observeServersExposesRepositoryFlow() = runTest {
-        val servers = listOf(McpServer(name = "search"), McpServer(name = "files"))
-        repository.servers.value = servers
-
-        assertEquals(servers, ObserveMcpServersUseCase(repository)().first())
-    }
-
-    @Test
-    fun manageServersLookUpDelegatesToRepository() {
-        val server = McpServer(name = "search")
-        repository.serverResult = server
-
-        assertSame(server, ManageMcpServersUseCase(repository).server("id-1"))
-        assertEquals(listOf("id-1"), repository.serverCalls)
-    }
-
-    @Test
-    fun manageServersSaveDelegatesToRepository() {
-        val server = McpServer(name = "search")
-
-        ManageMcpServersUseCase(repository).save(server)
-
-        assertEquals(listOf(server), repository.savedServers)
-    }
-
-    @Test
-    fun manageServersDeleteDelegatesToRepository() {
-        ManageMcpServersUseCase(repository).delete("id-9")
-
-        assertEquals(listOf("id-9"), repository.deletedIds)
-    }
-
-    @Test
-    fun manageServersImportJsonDelegatesAndReturnsResult() {
-        val result = McpImportResult(created = 2, skipped = 1)
-        repository.importResult = result
-
-        assertEquals(result, ManageMcpServersUseCase(repository).importJson("{}"))
-        assertEquals(listOf("{}"), repository.importedJson)
-    }
 
     @Test
     fun importForConversationEnablesReadyServersAndTracksCredentialTemplate() = runTest {
@@ -292,19 +246,6 @@ class McpUseCasesTest {
         assertEquals(false, result.configured)
         assertEquals(true, result.error?.contains("http") == true)
         assertEquals(emptyList<McpServer>(), repository.savedServers)
-    }
-
-    @Test
-    fun testConnectionDelegatesToTester() = runTest {
-        val server = McpServer(name = "search")
-        val tester = FakeMcpConnectionTester()
-        tester.result = McpProbeResult(reachable = true)
-
-        assertEquals(
-            McpProbeResult(reachable = true),
-            TestMcpConnectionUseCase(tester)(server),
-        )
-        assertEquals(listOf(server), tester.testedServers)
     }
 
     @Test

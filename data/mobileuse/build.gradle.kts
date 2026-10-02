@@ -14,7 +14,6 @@ android {
 dependencies {
     implementation(project(":domain:mobileuse"))
     implementation(libs.shizuku.api)
-    implementation(libs.shizuku.provider)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.mlkit.text.recognition.chinese)
 

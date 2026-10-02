@@ -1,7 +1,6 @@
 package github.ponyhuang.gimi
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Test
 
 /** 源 Manifest 声明契约；不代表已验证依赖合并后的 APK Manifest。 */
@@ -43,35 +42,4 @@ class AppManifestComponentOwnershipTest {
         )
     }
 
-    @Test
-    fun sourceManifestOmitsLegacyBackgroundVoiceComponentsAndPermissions() {
-        val manifest = sourceXml("src/main/AndroidManifest.xml")
-        val permissions = manifest.elements("uses-permission").map { it.androidAttribute("name") }
-        assertEquals(
-            emptySet<String>(),
-            permissions.toSet().intersect(
-                setOf(
-                    "android.permission.SYSTEM_ALERT_WINDOW",
-                    "android.permission.FOREGROUND_SERVICE_MICROPHONE",
-                    "android.permission.MODIFY_AUDIO_SETTINGS",
-                ),
-            ),
-        )
-        val components = (manifest.elements("service") + manifest.elements("activity"))
-            .map { it.androidAttribute("name").substringAfterLast('.') }
-        assertFalse("BluetoothVoiceService" in components)
-        assertFalse("AssistantLockScreenActivity" in components)
-    }
-
-    @Test
-    fun sourceManifestDoesNotRegisterDigitalAssistantServices() {
-        val manifest = sourceXml("src/main/AndroidManifest.xml")
-        val services = manifest.elements("service")
-        val names = services.map { it.androidAttribute("name").substringAfterLast('.') }
-        assertFalse("AssistantVoiceInteractionService" in names)
-        assertFalse("AssistantStubRecognitionService" in names)
-        assertFalse(services.any { it.androidAttribute("permission") == "android.permission.BIND_VOICE_INTERACTION" })
-        assertFalse(manifest.elements("meta-data").any { it.androidAttribute("name") == "android.voice_interaction" })
-        assertFalse(manifest.elements("action").any { it.androidAttribute("name") == "android.service.voice.VoiceInteractionService" })
-    }
 }

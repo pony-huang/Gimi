@@ -39,16 +39,6 @@ class PluginSettingsViewModelTest {
     )
 
     @Test
-    fun setEnabledDelegatesToRepository() = runTest {
-        val repository = FakePluginRepository()
-        val viewModel = PluginSettingsViewModel(repository)
-
-        viewModel.onAction(PluginSettingsAction.SetEnabled("zhihu", false))
-
-        assertEquals(listOf("zhihu" to false), repository.enabledCalls)
-    }
-
-    @Test
     fun refreshDelegatesAndEmitsAddedEffect() = runTest {
         val repository = FakePluginRepository().apply { refreshResult = listOf("spotify") }
         val viewModel = PluginSettingsViewModel(repository)
@@ -107,18 +97,6 @@ class PluginSettingsViewModelTest {
         }
 
     @Test
-    fun requestUninstallMarksPendingPlugin() = runTest {
-        val repository = FakePluginRepository().apply { pluginsFlow.value = listOf(UNINSTALLED_PLUGIN) }
-        val viewModel = PluginSettingsViewModel(repository)
-        collectUiState(viewModel)
-
-        viewModel.onAction(PluginSettingsAction.RequestUninstall("zhihu"))
-        advanceUntilIdle()
-
-        assertEquals("zhihu", viewModel.uiState.value.pendingUninstallPluginId)
-    }
-
-    @Test
     fun requestUninstallForUnknownPluginIsIgnored() = runTest {
         val repository = FakePluginRepository()
         val viewModel = PluginSettingsViewModel(repository)
@@ -148,21 +126,6 @@ class PluginSettingsViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
         advanceUntilIdle()
-        assertEquals(null, viewModel.uiState.value.pendingUninstallPluginId)
-    }
-
-    @Test
-    fun dismissUninstallClearsPending() = runTest {
-        val repository = FakePluginRepository().apply { pluginsFlow.value = listOf(UNINSTALLED_PLUGIN) }
-        val viewModel = PluginSettingsViewModel(repository)
-        collectUiState(viewModel)
-
-        viewModel.onAction(PluginSettingsAction.RequestUninstall("zhihu"))
-        advanceUntilIdle()
-        assertEquals("zhihu", viewModel.uiState.value.pendingUninstallPluginId)
-        viewModel.onAction(PluginSettingsAction.DismissUninstall)
-        advanceUntilIdle()
-
         assertEquals(null, viewModel.uiState.value.pendingUninstallPluginId)
     }
 

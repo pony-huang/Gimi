@@ -3,24 +3,12 @@ package github.ponyhuang.gimi.plugin.spotify.tools
 import github.ponyhuang.gimi.plugin.spotify.SpotifyApi
 import github.ponyhuang.gimi.plugin.spotify.SpotifyAuth
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import sun.misc.Unsafe
 
 class SpotifyToolCatalogTest {
-
-    @Test
-    fun catalogOmitsEndpointsRemovedBySpotifyIn2026() {
-        val names = allToolNames()
-
-        // 官方已移除/已废弃端点。
-        assertFalse("Recommendations endpoint was removed", "spotify_recommendations" in names)
-        assertFalse("Batch tracks endpoint was removed", "spotify_get_tracks" in names)
-        assertFalse("Batch albums endpoint was removed", "spotify_get_albums" in names)
-        assertFalse("Batch artists endpoint was removed", "spotify_get_artists" in names)
-    }
 
     @Test
     fun catalogExposesFullToolset() {

@@ -36,8 +36,10 @@ work = "2.11.0"
 opentelemetrySdk = "1.56.0"
 dataStore = "1.2.1"
 shizuku = "13.1.5"
+mlkitTextRecognition = "16.0.1"
 
 [libraries]
+mlkit-text-recognition-chinese = { module = "com.google.mlkit:text-recognition-chinese", version.ref = "mlkitTextRecognition" }
 shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
 shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
 javax-inject = { module = "javax.inject:javax.inject", version.ref = "javaxInject" }

@@ -21,6 +21,8 @@ enum class MobileUseAvailability {
  * @property imageJpeg 本次观察的压缩截图，仅供临时模型请求，不可持久化。
  * @property width 当前副屏截图宽度，未创建时为空。
  * @property height 当前副屏截图高度，未创建时为空。
+ * @property actionStatus 动作投递状态：not_requested、not_sent、delivered、rejected 或 unknown。
+ * @property observation 本次画面和元素共同使用的观察快照；超时不代表动作未执行。
  */
 data class MobileUseResult(
     val status: String,
@@ -29,6 +31,8 @@ data class MobileUseResult(
     val imageJpeg: ByteArray? = null,
     val width: Int? = null,
     val height: Int? = null,
+    val actionStatus: String = "not_requested",
+    val observation: MobileObservation? = null,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -40,6 +44,7 @@ data class MobileUseResult(
         if (status != other.status) return false
         if (message != other.message) return false
         if (width != other.width || height != other.height) return false
+        if (actionStatus != other.actionStatus || observation != other.observation) return false
         if (!imageJpeg.contentEquals(other.imageJpeg)) return false
 
         return true
@@ -51,6 +56,8 @@ data class MobileUseResult(
         result = 31 * result + message.hashCode()
         result = 31 * result + (width ?: 0)
         result = 31 * result + (height ?: 0)
+        result = 31 * result + actionStatus.hashCode()
+        result = 31 * result + (observation?.hashCode() ?: 0)
         result = 31 * result + (imageJpeg?.contentHashCode() ?: 0)
         return result
     }
@@ -62,11 +69,13 @@ interface MobileUseRepository {
     fun requestPermission(requestCode: Int)
     suspend fun observe(owner: String): MobileUseResult
     suspend fun launch(owner: String, packageName: String): MobileUseResult
-    suspend fun tap(owner: String, x: Int, y: Int): MobileUseResult
-    suspend fun tapRelative(owner: String, xPermille: Int, yPermille: Int): MobileUseResult
-    suspend fun swipe(owner: String, x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Int): MobileUseResult
-    suspend fun back(owner: String): MobileUseResult
-    suspend fun typeText(owner: String, x: Int, y: Int, text: String): MobileUseResult
+    suspend fun click(owner: String, observationId: String, elementId: String): MobileUseResult
+    suspend fun setText(owner: String, observationId: String, elementId: String, text: String): MobileUseResult
+    suspend fun tap(owner: String, observationId: String, x: Int, y: Int): MobileUseResult
+    suspend fun tapRelative(owner: String, observationId: String, xPermille: Int, yPermille: Int): MobileUseResult
+    suspend fun swipe(owner: String, observationId: String, x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Int): MobileUseResult
+    suspend fun back(owner: String, observationId: String): MobileUseResult
+    suspend fun typeText(owner: String, observationId: String, x: Int, y: Int, text: String): MobileUseResult
     suspend fun stop(owner: String): MobileUseResult
     fun textInputAvailable(): Boolean
 }

@@ -1,5 +1,7 @@
 package github.ponyhuang.gimi.data.mobileuse;
 
+import android.os.Bundle;
+
 interface IMobileUseService {
     int uid() = 1;
     int createDisplay() = 2;
@@ -7,9 +9,8 @@ interface IMobileUseService {
     void tap(int displayId, int x, int y) = 4;
     void swipe(int displayId, int x1, int y1, int x2, int y2, int durationMs) = 5;
     void back(int displayId) = 6;
-    byte[] capture() = 7;
+    Bundle capture() = 7;
     void stop() = 8;
     int[] geometry(int displayId) = 9;
-    void recoverSurface(int displayId) = 10;
     void destroy() = 16777114;
 }

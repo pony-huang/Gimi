@@ -27,13 +27,35 @@ import kotlin.time.Duration.Companion.milliseconds
 /** Shizuku 运行时自动声明的副屏工具集；共享任务归属和一次性截图注入。 */
 @Singleton
 class MobileUseTools @Inject constructor(private val repository: MobileUseRepository) : Toolset {
+    private val observationProperties = mapOf(
+        "observationId" to string("ID of the latest observation. Check availableActionModes. Old or consumed observations are rejected."),
+    )
     private val pendingImages = object : LinkedHashMap<String, ByteArray>(8, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ByteArray>?): Boolean = size > 8
     }
 
     private val tools = listOf(
-        action("mobile_observe", "Observe the isolated secondary display and return its current screenshot.") { owner, _ ->
+        action("mobile_observe", "Wait up to about 8 seconds for a quiet screen; return screenshot, observationId, elements and explicit observation status. Quiet does not prove business loading is complete.") { owner, _ ->
             repository.observe(owner)
+        },
+        action(
+            "mobile_click", "Click an element from the latest observation when its source is allowed by availableActionModes. Native elements use revalidated node actions; OCR text-box taps require settled pixels and are not verified buttons. Stale targets are rejected. Do not repeat a delivered or unknown action because observation timed out.",
+            observationProperties + mapOf("elementId" to string("Element ID from nodes in the latest observation.")),
+            listOf("observationId", "elementId"),
+        ) { owner, args ->
+            val observation = args.observationId() ?: return@action invalid("observationId required.")
+            val element = args["elementId"] as? String ?: return@action invalid("elementId required.")
+            repository.click(owner, observation, element)
+        },
+        action(
+            "mobile_set_text", "Replace text using an element supporting set_text in the latest observation. OCR text boxes cannot accept native text input. Does not invoke an input method.",
+            observationProperties + mapOf("elementId" to string("Editable native element ID."), "text" to string("Replacement text; empty clears the field.")),
+            listOf("observationId", "elementId", "text"),
+        ) { owner, args ->
+            val observation = args.observationId() ?: return@action invalid("observationId required.")
+            val element = args["elementId"] as? String ?: return@action invalid("elementId required.")
+            val text = args["text"] as? String ?: return@action invalid("text must be a string.")
+            repository.setText(owner, observation, element, text)
         },
         action(
             "mobile_open_app", "Launch an installed app by exact package name on the isolated secondary display.",
@@ -45,54 +67,62 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
         },
         action(
             "mobile_tap", "Tap a pixel coordinate from the latest screenshot on the secondary display. Prefer mobile_tap_relative when screenshot rendering size is uncertain. Use mobile_type_text for text fields.",
-            mapOf("x" to integer("X in the latest screenshot."), "y" to integer("Y in the latest screenshot.")),
-            listOf("x", "y"),
+            observationProperties + mapOf("x" to integer("X in the latest screenshot."), "y" to integer("Y in the latest screenshot.")),
+            listOf("observationId", "x", "y"),
         ) { owner, args ->
+            val observation = args.observationId() ?: return@action invalid("observationId required.")
             val x = args.int("x") ?: return@action invalid("x must be an integer.")
             val y = args.int("y") ?: return@action invalid("y must be an integer.")
-            repository.tap(owner, x, y)
+            repository.tap(owner, observation, x, y)
         },
         action(
             "mobile_tap_relative", "Tap a position relative to the full latest screenshot, avoiding UI preview scaling errors. Inspect the latest screenshot and avoid overlays covering the target.",
-            mapOf(
+            observationProperties + mapOf(
                 "xPermille" to integer("Horizontal position 0..1000; 0 is left, 1000 is right."),
                 "yPermille" to integer("Vertical position 0..1000; 0 is top, 1000 is bottom."),
-            ), listOf("xPermille", "yPermille"),
+            ), listOf("observationId", "xPermille", "yPermille"),
         ) { owner, args ->
+            val observation = args.observationId() ?: return@action invalid("observationId required.")
             val x = args.int("xPermille") ?: return@action invalid("xPermille must be an integer.")
             val y = args.int("yPermille") ?: return@action invalid("yPermille must be an integer.")
             if (x !in 0..1000 || y !in 0..1000) invalid("Relative coordinates must be 0..1000.")
-            else repository.tapRelative(owner, x, y)
+            else repository.tapRelative(owner, observation, x, y)
         },
         action(
             "mobile_swipe", "Swipe between pixel coordinates on the secondary display.",
-            mapOf(
+            observationProperties + mapOf(
                 "x1" to integer("Start X."), "y1" to integer("Start Y."),
                 "x2" to integer("End X."), "y2" to integer("End Y."),
                 "durationMs" to integer("Duration, 100..5000 ms; default 450."),
-            ), listOf("x1", "y1", "x2", "y2"),
+            ), listOf("observationId", "x1", "y1", "x2", "y2"),
         ) { owner, args ->
+            val observation = args.observationId() ?: return@action invalid("observationId required.")
             val x1 = args.int("x1") ?: return@action invalid("x1 must be an integer.")
             val y1 = args.int("y1") ?: return@action invalid("y1 must be an integer.")
             val x2 = args.int("x2") ?: return@action invalid("x2 must be an integer.")
             val y2 = args.int("y2") ?: return@action invalid("y2 must be an integer.")
-            val duration = args.int("durationMs") ?: 450
+            val duration = if ("durationMs" in args) args.int("durationMs")
+                ?: return@action invalid("durationMs must be an integer.") else 450
             if (duration !in 100..5000) invalid("durationMs must be 100..5000.")
-            else repository.swipe(owner, x1, y1, x2, y2, duration)
+            else repository.swipe(owner, observation, x1, y1, x2, y2, duration)
         },
-        action("mobile_back", "Send Back to the secondary display.") { owner, _ -> repository.back(owner) },
+        action("mobile_back", "Send Back once from the latest observation.", observationProperties, listOf("observationId")) { owner, args ->
+            val observation = args.observationId() ?: return@action invalid("observationId required.")
+            repository.back(owner, observation)
+        },
         action(
             "mobile_type_text", "Replace text in a secondary-display field at a screenshot coordinate. If direct replacement fails, focus the field with one tap and retry once. Does not invoke an input method.",
-            mapOf(
+            observationProperties + mapOf(
                 "x" to integer("X inside the text field in the latest screenshot."),
                 "y" to integer("Y inside the text field in the latest screenshot."),
                 "text" to string("Replacement text; an empty string clears the field."),
-            ), listOf("x", "y", "text"),
+            ), listOf("observationId", "x", "y", "text"),
         ) { owner, args ->
+            val observation = args.observationId() ?: return@action invalid("observationId required.")
             val x = args.int("x") ?: return@action invalid("x must be an integer.")
             val y = args.int("y") ?: return@action invalid("y must be an integer.")
             val value = args["text"] as? String ?: return@action invalid("text must be a string.")
-            repository.typeText(owner, x, y, value)
+            repository.typeText(owner, observation, x, y, value)
         },
         action(
             "mobile_wait", "Wait before checking the secondary display again. Use during downloads or installation; this does not capture a screenshot or change the display. Call mobile_observe afterward.",
@@ -130,12 +160,22 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
                     Use mobile_* tools only when the user asks you to operate or inspect an installed Android app.
                     They act on an isolated secondary display, never the user's main screen.
                     When the app package is known, start with mobile_open_app and use its screenshot;
-                    an empty display before launch may have no frame. Prefer mobile_tap_relative
-                    for visible targets to avoid preview scaling errors. After a tap, inspect its
-                    returned screenshot before deciding the next action. If an overlay covers a
-                    target, observe again and choose an uncovered point. Use mobile_type_text at
-                    the field coordinate; it handles one focus retry. Wait for generation or upload
-                    only when the app shows progress, and call mobile_stop when done.
+                    an empty display before launch may have no frame. Prefer mobile_click with an
+                    elementId from nodes, and mobile_set_text for nodes supporting set_text. OCR
+                    nodes are text boxes, not verified buttons. Use mobile_tap_relative as a visual
+                    fallback. All navigation/input actions require the latest observationId.
+                    Never reuse an observation after an action. If stale_observation is returned,
+                    observe again. If actionStatus is delivered or unknown, do not repeat an action
+                    because observation failed or timed out; call mobile_observe instead.
+                    observationStatus=settled means quiet pixels, not business loading complete.
+                    Check availableActionModes: pixel_coordinates is required for coordinates or
+                    OCR; native_elements allows revalidated native actions even during animations.
+                    If no applicable mode is available, observe again; back is available for navigation.
+                    Inspect each
+                    returned screenshot, including overlays, quantities and totals, before continuing.
+                    mobile_type_text allows one focus retry only after explicit rejection of direct
+                    replacement. Honor the user's stopping point for submitting or paying.
+                    Wait for progress when needed, and call mobile_stop when done.
                     If a tool reports that Shizuku permission or device support is unavailable, explain the
                     required setup instead of retrying the same action.
                     </mobile_use>
@@ -184,7 +224,7 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
                 Content(
                     role = Role.USER,
                     parts = listOf(
-                        Part(text = "Secondary display screenshot (${response["width"]}x${response["height"]}), following $name ${response["status"]}:"),
+                        Part(text = "Screenshot (${response["width"]}x${response["height"]}), observation=${response["observationId"]}, state=${response["observationStatus"]}, frameAgeMs=${response["frameAgeMs"]}; actionStatus=${response["actionStatus"]}:"),
                         Part(inlineData = Blob(mimeType = "image/jpeg", displayName = "mobile-use.jpg", data = jpeg)),
                     ),
                 ),
@@ -195,9 +235,40 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
     private fun MobileUseResult.asToolResponse(): Map<String, Any> = buildMap {
         put("status", status)
         put("message", message)
+        put("actionStatus", actionStatus)
         displayId?.let { put("displayId", it) }
         width?.let { put("width", it) }
         height?.let { put("height", it) }
+        observation?.let { snapshot ->
+            put("observationId", snapshot.id)
+            put("observationStatus", snapshot.state)
+            put("observationReason", snapshot.reason)
+            put("coordinateSystem", "screenshot_pixels")
+            snapshot.frameAgeMs?.let { put("frameAgeMs", it) }
+            snapshot.frameSequence?.let { put("frameSequence", it) }
+            put("nodesStatus", snapshot.nodesStatus)
+            put("nodesTruncated", snapshot.truncated)
+            put("availableActionModes", snapshot.actionModes)
+            put("nodes", snapshot.elements.map { element -> buildMap<String, Any> {
+                put("elementId", element.id)
+                put("source", element.source)
+                put("bounds", listOf(element.bounds.left, element.bounds.top, element.bounds.right, element.bounds.bottom))
+                put("actions", element.actions)
+                put("enabled", element.enabled)
+                put("editable", element.editable)
+                put("scrollable", element.scrollable)
+                element.clickable?.let { put("clickable", it) }
+                element.text?.let { put("text", it) }
+                element.description?.let { put("description", it) }
+                element.resourceId?.let { put("resourceId", it) }
+                element.className?.let { put("className", it) }
+                element.packageName?.let { put("packageName", it) }
+                element.windowId?.let { put("windowId", it) }
+                element.windowLayer?.let { put("windowLayer", it) }
+                element.parentId?.let { put("parentId", it) }
+                element.confidence?.let { put("confidence", it) }
+            } })
+        }
         imageJpeg?.let { bytes ->
             val token = UUID.randomUUID().toString()
             synchronized(pendingImages) { pendingImages[token] = bytes }
@@ -206,8 +277,10 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
         }
     }
 
-    private fun Map<String, Any?>.int(key: String): Int? = (get(key) as? Number)?.toInt()
+    private fun Map<String, Any?>.observationId(): String? = (get("observationId") as? String)?.takeIf { it.isNotBlank() }
+    private fun Map<String, Any?>.int(key: String): Int? = (get(key) as? Number)?.toDouble()
+        ?.takeIf { it.isFinite() && it >= Int.MIN_VALUE && it <= Int.MAX_VALUE && it % 1.0 == 0.0 }?.toInt()
     private fun string(description: String) = Schema(type = Type.STRING, description = description)
     private fun integer(description: String) = Schema(type = Type.INTEGER, description = description)
-    private fun invalid(message: String, status: String = "invalid_argument") = mapOf("status" to status, "message" to message)
+    private fun invalid(message: String, status: String = "invalid_argument") = mapOf("status" to status, "message" to message, "actionStatus" to "not_sent")
 }

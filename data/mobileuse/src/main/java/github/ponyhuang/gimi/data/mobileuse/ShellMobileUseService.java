@@ -11,6 +11,8 @@ import android.media.ImageReader;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Process;
+import android.os.Bundle;
+import android.os.SystemClock;
 import android.util.Log;
 import android.util.DisplayMetrics;
 import android.view.Display;
@@ -19,6 +21,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 
@@ -34,6 +37,12 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
     private MobileDisplayGeometry displayGeometry;
     private Object windowManagerService;
     private Integer previousImePolicy;
+    private final MobileFrameBuffer frames = new MobileFrameBuffer();
+    private String captureError;
+    private int[] previousPixels;
+    private final MobileFrameMailbox<PendingFrame> pendingFrames = new MobileFrameMailbox<>();
+    private final Runnable encodeFrameTask = this::encodePendingFrame;
+    private Handler frameHandler;
 
     public ShellMobileUseService() {}
 
@@ -116,29 +125,66 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
         command("input", "-d", Integer.toString(displayId), "keyevent", "4");
     }
 
-    @Override public synchronized byte[] capture() {
+    @Override public synchronized Bundle capture() {
         requireShell();
         if (display == null || reader == null) throw new IllegalStateException("Display stopped");
         ensureGeometry();
-        Image image = null;
-        long deadline = System.currentTimeMillis() + 2500;
-        while (image == null && System.currentTimeMillis() < deadline) {
-            image = reader.acquireLatestImage();
-            if (image == null) {
-                try { Thread.sleep(80); } catch (InterruptedException interrupted) {
-                    Thread.currentThread().interrupt();
-                    throw new IllegalStateException("Capture interrupted", interrupted);
-                }
-            }
-        }
-        if (image == null) return null;
+        Bundle result = new Bundle();
+        if (captureError != null) result.putString("error", captureError);
+        MobileFrameBuffer.Frame frame = frames.latest();
+        if (frame == null) return result;
+        result.putByteArray("jpeg", frame.jpeg);
+        result.putIntArray("samples", frame.samples);
+        result.putInt("width", frame.width);
+        result.putInt("height", frame.height);
+        result.putLong("capturedAtMs", frame.capturedAtMs);
+        result.putLong("sequence", frame.sequence);
+        result.putLong("generation", frame.generation);
+        return result;
+    }
+
+    private synchronized void queueFrame(ImageReader source, MobileDisplayGeometry geometry,
+                                         long generation) {
+        if (reader != source) return;
         try {
+            Image image = source.acquireLatestImage();
+            if (image == null) return;
+            long acquiredAtMs = SystemClock.elapsedRealtime();
+            PendingFrame frame = new PendingFrame(image, source, geometry, generation, acquiredAtMs);
+            long delayMs = pendingFrames.offer(frame, acquiredAtMs, PendingFrame::close);
+            if (delayMs >= 0) frameHandler.postDelayed(encodeFrameTask, delayMs);
+        } catch (RuntimeException failure) {
+            captureError = failure.getClass().getSimpleName();
+            Log.w("GimiMobileUseService", "Frame acquisition failed; display retained", failure);
+        }
+    }
+
+    private synchronized void encodePendingFrame() {
+        PendingFrame pending = pendingFrames.take(SystemClock.elapsedRealtime());
+        if (pending == null) return;
+        Image image = pending.image;
+        MobileDisplayGeometry geometry = pending.geometry;
+        long generation = pending.generation;
+        try {
+            if (reader != pending.source) return;
+            // 使用实际取得图像的时间，不能把延后编码的旧帧伪装成动作之后的新帧。
+            long now = pending.acquiredAtMs;
+            MobileFrameBuffer.Frame previous = frames.latest();
             Image.Plane plane = image.getPlanes()[0];
             ByteBuffer pixels = plane.getBuffer();
             int rowStride = plane.getRowStride();
             int pixelStride = plane.getPixelStride();
-            int width = displayGeometry.width;
-            int height = displayGeometry.height;
+            int width = geometry.width;
+            int height = geometry.height;
+            int[] samples = new int[64 * 96];
+            for (int sy = 0; sy < 96; sy++) {
+                for (int sx = 0; sx < 64; sx++) {
+                    int offset = (sy * height / 96) * rowStride + (sx * width / 64) * pixelStride;
+                    samples[sy * 64 + sx] = ((pixels.get(offset) & 255) * 77
+                            + (pixels.get(offset + 1) & 255) * 150
+                            + (pixels.get(offset + 2) & 255) * 29) >> 8;
+                }
+            }
             int[] colors = new int[width * height];
             for (int y = 0; y < height; y++) {
                 for (int x = 0; x < width; x++) {
@@ -149,17 +195,32 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
                     colors[y * width + x] = 0xff000000 | red << 16 | green << 8 | blue;
                 }
             }
+            // 比较完整像素后才复用 JPEG，避免采样网格之外的小文字变化丢失。
+            if (previous != null && Arrays.equals(previousPixels, colors)) {
+                frames.publish(generation, width, height, now, previous.jpeg, samples);
+                captureError = null;
+                return;
+            }
             Bitmap bitmap = Bitmap.createBitmap(colors, width, height, Bitmap.Config.ARGB_8888);
             try (ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 65, bytes);
-                return bytes.toByteArray();
-            } catch (IOException impossible) {
-                throw new IllegalStateException(impossible);
+                // 保持原图尺寸，只降低编码质量，给 Binder 元数据和并发事务留出空间。
+                for (int quality : new int[] {65, 45, 30, 15}) {
+                    bytes.reset();
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, quality, bytes);
+                    if (bytes.size() <= 750_000) break;
+                }
+                if (bytes.size() > 750_000) throw new IllegalStateException("Frame exceeds Binder payload budget");
+                frames.publish(generation, width, height, now, bytes.toByteArray(), samples);
+                previousPixels = colors;
+                captureError = null;
             } finally {
                 bitmap.recycle();
             }
+        } catch (RuntimeException | IOException failure) {
+            captureError = failure.getClass().getSimpleName();
+            Log.w("GimiMobileUseService", "Capture failed; display retained", failure);
         } finally {
-            image.close();
+            if (image != null) image.close();
         }
     }
 
@@ -168,12 +229,11 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
         return new int[] { displayGeometry.width, displayGeometry.height, displayGeometry.densityDpi };
     }
 
-    @Override public synchronized void recoverSurface(int displayId) {
-        requireDisplay(displayId);
-        replaceReader(displayGeometry);
-    }
-
     @Override public synchronized void stop() {
+        clearPendingFrames();
+        frames.reset();
+        captureError = null;
+        previousPixels = null;
         if (display != null) {
             if (windowManagerService != null && previousImePolicy != null) {
                 try {
@@ -237,7 +297,40 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
     }
 
     private ImageReader newReader(MobileDisplayGeometry geometry) {
-        return ImageReader.newInstance(geometry.width, geometry.height, PixelFormat.RGBA_8888, 2);
+        clearPendingFrames();
+        long generation = frames.reset();
+        captureError = null;
+        previousPixels = null;
+        // 一帧等待编码时，acquireLatestImage 仍需至少两个可获取槽位才能丢弃旧帧。
+        ImageReader result = ImageReader.newInstance(geometry.width, geometry.height, PixelFormat.RGBA_8888, 3);
+        frameHandler = new Handler(displayThread.getLooper());
+        result.setOnImageAvailableListener(source -> queueFrame(source, geometry, generation), frameHandler);
+        return result;
+    }
+
+    private void clearPendingFrames() {
+        if (frameHandler != null) frameHandler.removeCallbacks(encodeFrameTask);
+        pendingFrames.reset(PendingFrame::close);
+    }
+
+    /** 等待编码的图像及其 Surface/几何身份；替换、编码和停止三个路径均负责关闭图像。 */
+    private static final class PendingFrame {
+        final Image image;
+        final ImageReader source;
+        final MobileDisplayGeometry geometry;
+        final long generation;
+        final long acquiredAtMs;
+
+        PendingFrame(Image image, ImageReader source, MobileDisplayGeometry geometry,
+                     long generation, long acquiredAtMs) {
+            this.image = image;
+            this.source = source;
+            this.geometry = geometry;
+            this.generation = generation;
+            this.acquiredAtMs = acquiredAtMs;
+        }
+
+        void close() { image.close(); }
     }
 
     private void ensureGeometry() {

@@ -20,8 +20,11 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.AndroidUiDispatcher
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -44,6 +47,8 @@ import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
 import github.ponyhuang.gimi.feature.mobileuse.BackgroundAppBubble
+import github.ponyhuang.gimi.feature.mobileuse.BackgroundAppBubbleBounds
+import github.ponyhuang.gimi.feature.mobileuse.BackgroundAppBubbleMotionState
 import github.ponyhuang.gimi.feature.mobileuse.BackgroundAppViewModel
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import javax.inject.Inject
@@ -55,6 +60,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 
 /** 显示会话的独立前台服务；不读取 Agent 执行状态，用户可随时关闭。 */
@@ -75,9 +81,8 @@ class BackgroundAppWindowService : Service() {
     private var shownSession: String? = null
     private var keyboardBottom = 0
     private var notifiedSession: String? = null
-    private var bubbleHidden = false
-    private var bubbleLeft = false
-    private var bubbleHideJob: Job? = null
+    private var bubbleMotion: BackgroundAppBubbleMotionState? = null
+    private var bubblePositionJob: Job? = null
     private var appliedBounds: List<Int>? = null
 
     override fun onCreate() {
@@ -171,9 +176,13 @@ class BackgroundAppWindowService : Service() {
                 val dark = when (mode) { ThemeMode.SYSTEM -> isSystemInDarkTheme(); ThemeMode.LIGHT -> false; ThemeMode.DARK -> true }
                 AsssistantaiTheme(darkTheme = dark) {
                     val dragModifier = Modifier.pointerInput(presentation) {
-                        detectDragGestures(onDragStart = { if (!small) revealBubble() }, onDragCancel = { if (!small) snapBubble() }, onDragEnd = { if (!small) snapBubble() }) { change, delta ->
+                        detectDragGestures(
+                            onDragStart = { if (!small) bubbleMotion?.beginDrag() },
+                            onDragCancel = { if (!small) bubbleMotion?.endDrag() },
+                            onDragEnd = { if (!small) bubbleMotion?.endDrag() },
+                        ) { change, delta ->
                             change.consume()
-                            moveWindow(delta.x.toInt(), delta.y.toInt())
+                            moveWindow(delta)
                         }
                     }
                     if (small) BackgroundAppContent(viewModel, gateway, host, small = true, modifier = Modifier.fillMaxSize(), toolbarModifier = dragModifier)
@@ -191,38 +200,39 @@ class BackgroundAppWindowService : Service() {
             windowManager.addView(view, layout)
             host.setOverlayRunning(true)
             updateBounds()
-            if (!small) snapBubble()
+            bubbleMotion?.let { motion ->
+                bubblePositionJob = scope.launch {
+                    snapshotFlow { motion.position }.collect {
+                        if (bubbleMotion === motion && params === layout) applyBubblePosition()
+                    }
+                }
+            }
         } catch (_: SecurityException) { removeWindow() }
         catch (_: WindowManager.BadTokenException) { removeWindow() }
     }
 
-    private fun moveWindow(dx: Int, dy: Int) {
-        params?.let { it.x += dx; it.y += dy }
-        updateBounds()
-    }
-
-    private fun revealBubble() {
-        bubbleHideJob?.cancel()
-        bubbleHidden = false
-        params?.let { it.x = if (bubbleLeft) 0 else windowManager.currentWindowMetrics.bounds.width() - it.width }
-        updateBounds()
-    }
-
-    private fun snapBubble() {
-        val layout = params ?: return
-        bubbleLeft = layout.x + layout.width / 2 < windowManager.currentWindowMetrics.bounds.width() / 2
-        revealBubble()
-        bubbleHideJob = scope.launch {
-            delay(2000)
-            // 旧窗口的延时任务不能移动切换后的全屏或小窗。
-            if (params !== layout || shown != BackgroundAppPresentation.BUBBLE) return@launch
-            bubbleHidden = true
+    private fun moveWindow(delta: Offset) {
+        if (shown == BackgroundAppPresentation.BUBBLE) {
+            // 保留亚像素累计位移，慢速拖动也不能因为逐次取整而卡住。
+            bubbleMotion?.dragBy(delta)
+            applyBubblePosition()
+        } else {
+            params?.let { it.x += delta.x.toInt(); it.y += delta.y.toInt() }
             updateBounds()
         }
     }
 
+    private fun applyBubblePosition() {
+        val layout = params ?: return
+        val motion = bubbleMotion ?: return
+        layout.x = motion.position.x.roundToInt()
+        layout.y = motion.position.y.roundToInt()
+        // 动画帧只提交坐标；屏幕指标与系统 insets 继续由原来的监听和轮询更新。
+        applyWindowBounds()
+    }
+
     private fun updateBounds() {
-        val view = root ?: return
+        if (root == null) return
         val layout = params ?: return
         val metrics = windowManager.currentWindowMetrics
         val safe = metrics.windowInsets.getInsetsIgnoringVisibility(android.view.WindowInsets.Type.systemBars() or android.view.WindowInsets.Type.displayCutout() or android.view.WindowInsets.Type.systemGestures())
@@ -233,10 +243,31 @@ class BackgroundAppWindowService : Service() {
             layout.width = minOf(dp(320), (metrics.bounds.width() - safe.left - safe.right - dp(16)).coerceAtLeast(dp(160)))
             layout.height = minOf(dp(620), availableHeight - dp(16)).coerceAtLeast(dp(56))
         }
-        layout.x = if (shown == BackgroundAppPresentation.BUBBLE && bubbleHidden) {
-            if (bubbleLeft) -layout.width / 2 else metrics.bounds.width() - layout.width / 2
-        } else layout.x.coerceIn(safe.left, maxOf(safe.left, metrics.bounds.width() - safe.right - layout.width))
-        layout.y = layout.y.coerceIn(safe.top, maxOf(safe.top, metrics.bounds.height() - bottom - layout.height))
+        if (shown == BackgroundAppPresentation.BUBBLE) {
+            val motion = bubbleMotion ?: BackgroundAppBubbleMotionState(
+                // Service 自身没有 Compose 帧时钟；使用主线程 Choreographer 同步窗口动画。
+                CoroutineScope(scope.coroutineContext + AndroidUiDispatcher.Main),
+                Offset(layout.x.toFloat(), layout.y.toFloat()),
+            ).also { bubbleMotion = it }
+            motion.updateBounds(BackgroundAppBubbleBounds(
+                left = 0f,
+                right = (metrics.bounds.width() - layout.width).coerceAtLeast(0).toFloat(),
+                top = safe.top.toFloat(),
+                bottom = maxOf(safe.top, metrics.bounds.height() - bottom - layout.height).toFloat(),
+                halfSize = layout.width / 2f,
+            ))
+            layout.x = motion.position.x.roundToInt()
+            layout.y = motion.position.y.roundToInt()
+        } else {
+            layout.x = layout.x.coerceIn(safe.left, maxOf(safe.left, metrics.bounds.width() - safe.right - layout.width))
+            layout.y = layout.y.coerceIn(safe.top, maxOf(safe.top, metrics.bounds.height() - bottom - layout.height))
+        }
+        applyWindowBounds()
+    }
+
+    private fun applyWindowBounds() {
+        val view = root ?: return
+        val layout = params ?: return
         val bounds = listOf(layout.x, layout.y, layout.width, layout.height)
         // 输入法 insets 与窗口布局互相回调，只在几何确实变化时提交新布局。
         if (view.isAttachedToWindow && appliedBounds != bounds) {
@@ -249,9 +280,10 @@ class BackgroundAppWindowService : Service() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun removeWindow() {
-        bubbleHideJob?.cancel()
-        bubbleHideJob = null
-        bubbleHidden = false
+        bubblePositionJob?.cancel()
+        bubblePositionJob = null
+        bubbleMotion?.stop()
+        bubbleMotion = null
         root?.let { view ->
             if (view.isAttachedToWindow) windowManager.removeViewImmediate(view)
             view.disposeComposition()

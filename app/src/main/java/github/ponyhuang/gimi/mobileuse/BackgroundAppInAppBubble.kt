@@ -5,14 +5,15 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
@@ -20,9 +21,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
 import github.ponyhuang.gimi.feature.mobileuse.BackgroundAppBubble
+import github.ponyhuang.gimi.feature.mobileuse.BackgroundAppBubbleBounds
+import github.ponyhuang.gimi.feature.mobileuse.BackgroundAppBubbleMotionState
 import kotlin.math.roundToInt
-import kotlinx.coroutines.delay
-import androidx.compose.ui.draw.clipToBounds
 
 /** 无悬浮权限或服务启动受限时，Gimi 内仍有可拖动的气泡入口。 */
 @Composable
@@ -35,23 +36,22 @@ internal fun BackgroundAppInAppBubble(repository: MobileUseRepository, host: Bac
         val density = LocalDensity.current
         val maxX = with(density) { (maxWidth - 56.dp).toPx().coerceAtLeast(0f) }
         val maxY = with(density) { (maxHeight - 56.dp).toPx().coerceAtLeast(0f) }
-        var x by remember(session?.id) { mutableFloatStateOf(maxX) }
-        var y by remember(session?.id) { mutableFloatStateOf(maxY / 2) }
-        var hideGeneration by remember(session?.id) { mutableIntStateOf(0) }
-        var hidden by remember(session?.id) { androidx.compose.runtime.mutableStateOf(false) }
-        var dragging by remember(session?.id) { androidx.compose.runtime.mutableStateOf(false) }
-        LaunchedEffect(hideGeneration, maxX, maxY, dragging) {
-            if (dragging) return@LaunchedEffect
-            delay(2000)
-            x = if (x < maxX / 2) 0f else maxX
-            hidden = true
-        }
+        val scope = rememberCoroutineScope()
+        val motion = remember(session?.id) { BackgroundAppBubbleMotionState(scope, Offset(maxX, maxY / 2)) }
         val half = with(density) { 28.dp.toPx() }
+        val bounds = BackgroundAppBubbleBounds(0f, maxX, 0f, maxY, half)
+        LaunchedEffect(motion, bounds) { motion.updateBounds(bounds) }
+        DisposableEffect(motion) { onDispose { motion.stop() } }
         BackgroundAppBubble(icon = { BackgroundAppIcon() }, onOpen = host::open, modifier = Modifier
-            .offset { IntOffset((x.coerceIn(0f, maxX) + if (hidden) { if (x < maxX / 2) -half else half } else 0f).roundToInt(), y.coerceIn(0f, maxY).roundToInt()) }
-            .pointerInput(maxX, maxY) {
-                detectDragGestures(onDragStart = { dragging = true; hidden = false; hideGeneration++ }, onDragCancel = { dragging = false; hideGeneration++ }, onDragEnd = { dragging = false; x = if (x < maxX / 2) 0f else maxX; hideGeneration++ }) { change, delta ->
-                    change.consume(); x = (x + delta.x).coerceIn(0f, maxX); y = (y + delta.y).coerceIn(0f, maxY)
+            .offset { IntOffset(motion.position.x.roundToInt(), motion.position.y.roundToInt()) }
+            .pointerInput(motion, maxX, maxY) {
+                detectDragGestures(
+                    onDragStart = { motion.beginDrag() },
+                    onDragCancel = motion::endDrag,
+                    onDragEnd = motion::endDrag,
+                ) { change, delta ->
+                    change.consume()
+                    motion.dragBy(delta)
                 }
             })
     }

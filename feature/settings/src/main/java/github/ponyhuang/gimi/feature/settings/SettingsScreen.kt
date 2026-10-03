@@ -79,10 +79,31 @@ fun SettingsScreen(
                         showDivider = true,
                     )
                     PreferenceNavigationCard(
+                        icon = Icons.Default.Folder,
+                        title = stringResource(R.string.settings_work_files_title),
+                        subtitle = stringResource(R.string.settings_work_files_subtitle),
+                        onClick = { onAction(SettingsAction.OpenWorkFiles) },
+                        showDivider = true,
+                    )
+                    PreferenceNavigationCard(
+                        icon = Icons.Default.School,
+                        title = stringResource(R.string.settings_skills_title),
+                        subtitle = stringResource(R.string.settings_skills_subtitle),
+                        onClick = { onAction(SettingsAction.OpenSkills) },
+                        showDivider = true,
+                    )
+                    PreferenceNavigationCard(
                         icon = Icons.Default.Extension,
                         title = stringResource(R.string.settings_plugins_title),
                         subtitle = stringResource(R.string.settings_plugins_subtitle),
                         onClick = { onAction(SettingsAction.OpenPlugins) },
+                        showDivider = true,
+                    )
+                    PreferenceNavigationCard(
+                        icon = Icons.Default.FolderOpen,
+                        title = stringResource(R.string.settings_workspace_title),
+                        subtitle = stringResource(R.string.settings_workspace_subtitle),
+                        onClick = { onAction(SettingsAction.OpenWorkspace) },
                         showDivider = true,
                     )
                     PreferenceNavigationCard(
@@ -92,6 +113,7 @@ fun SettingsScreen(
                         onClick = { onAction(SettingsAction.OpenToolAuthorization) },
                         showDivider = true,
                     )
+                    // Shizuku 是开关型低频入口，固定在分组末尾，避免干扰上方常用项的定位
                     PreferenceListItem(
                         icon = Icons.Default.Phonelink,
                         title = stringResource(R.string.settings_mobile_use_title),
@@ -99,7 +121,6 @@ fun SettingsScreen(
                         onClick = if (state.mobileUseEnabled && !state.mobileUseUpdating) {
                             { onAction(SettingsAction.OpenMobileUse) }
                         } else null,
-                        showDivider = true,
                         trailingContent = {
                             val switchDescription = stringResource(R.string.settings_mobile_use_title)
                             Switch(
@@ -112,26 +133,6 @@ fun SettingsScreen(
                                 Icon(Icons.Default.ChevronRight, contentDescription = null)
                             }
                         },
-                    )
-                    PreferenceNavigationCard(
-                        icon = Icons.Default.School,
-                        title = stringResource(R.string.settings_skills_title),
-                        subtitle = stringResource(R.string.settings_skills_subtitle),
-                        onClick = { onAction(SettingsAction.OpenSkills) },
-                        showDivider = true,
-                    )
-                    PreferenceNavigationCard(
-                        icon = Icons.Default.Folder,
-                        title = stringResource(R.string.settings_work_files_title),
-                        subtitle = stringResource(R.string.settings_work_files_subtitle),
-                        onClick = { onAction(SettingsAction.OpenWorkFiles) },
-                        showDivider = true,
-                    )
-                    PreferenceNavigationCard(
-                        icon = Icons.Default.FolderOpen,
-                        title = stringResource(R.string.settings_workspace_title),
-                        subtitle = stringResource(R.string.settings_workspace_subtitle),
-                        onClick = { onAction(SettingsAction.OpenWorkspace) },
                     )
                 }
             }

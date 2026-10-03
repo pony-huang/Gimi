@@ -15,6 +15,10 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedAgentModel
+import github.ponyhuang.gimi.domain.modelcatalog.model.LOCAL_GEMMA_SERVICE_ID
+import github.ponyhuang.gimi.domain.modelcatalog.model.LOCAL_GEMMA_GROUP_ID
+import github.ponyhuang.gimi.domain.modelcatalog.model.enabledService
+import github.ponyhuang.gimi.domain.modelcatalog.repository.LocalModelRepository
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import javax.inject.Inject
@@ -27,6 +31,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -62,6 +67,7 @@ private data class ModelServiceSettings(
 class ModelServiceRepository @Inject constructor(
     @ApplicationContext private val applicationContext: Context,
     private val database: LLMModelRoomDatabase,
+    private val localModels: LocalModelRepository,
 ) : ModelCatalogRepository, AgentModelConfigurationSource {
     private val dao = database.lLMModelConfigDao()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -111,6 +117,11 @@ class ModelServiceRepository @Inject constructor(
 
     init {
         scope.launch {
+            localModels.state.map { it.enabledService() }.distinctUntilChanged().collect {
+                _configurationRevision.update { revision -> revision + 1 }
+            }
+        }
+        scope.launch {
             cancellationAwareRunCatching {
                 settings.value = readInitialSettings()
                 seedCatalogIfEmpty()
@@ -139,14 +150,16 @@ class ModelServiceRepository @Inject constructor(
 
     override suspend fun awaitReady() {
         ready.await()
+        localModels.awaitReady()
     }
 
-    override fun observeService(serviceId: String) = services
-        .map { providers -> providers.firstOrNull { it.serviceId == serviceId }?.toDomain() }
+    override fun observeService(serviceId: String) = observeServices()
+        .map { providers -> providers.firstOrNull { it.id == serviceId } }
         .distinctUntilChanged()
 
-    override fun observeServices() = services
-        .map { providers -> providers.map { it.toDomain() } }
+    override fun observeServices() = combine(services, localModels.state) { providers, local ->
+        providers.map { it.toDomain() } + local.enabledService()
+    }
         .distinctUntilChanged()
 
     override fun observeLoadState() = loadState
@@ -169,9 +182,9 @@ class ModelServiceRepository @Inject constructor(
 
     override fun observeTtsVoice() = defaultTtsVoice
 
-    override fun currentService(serviceId: String): LLMModelSetting? = getService(serviceId)?.toDomain()
+    override fun currentService(serviceId: String): LLMModelSetting? = currentServices().firstOrNull { it.id == serviceId }
 
-    override fun currentServices(): List<LLMModelSetting> = services.value.map { it.toDomain() }
+    override fun currentServices(): List<LLMModelSetting> = services.value.map { it.toDomain() } + localModels.state.value.enabledService()
 
     override fun currentAssistantSelection(): ModelSelection? = defaultAssistantSelection.value
 
@@ -314,8 +327,11 @@ class ModelServiceRepository @Inject constructor(
      * saved selection is absent or has since been disabled/removed.
      */
     override fun defaultSelection(): ModelSelection? =
-        _defaultAssistantSelection.value?.takeIf { resolveChatSelection(it) != null }
+        _defaultAssistantSelection.value?.takeIf { resolveChatModel(it) != null }
             ?: firstAvailableSelection()
+            ?: localModels.state.value.enabledService().groups.firstOrNull()?.models?.firstOrNull()?.let {
+                ModelSelection(LOCAL_GEMMA_SERVICE_ID, LOCAL_GEMMA_GROUP_ID, it.id)
+            }
 
     private fun firstAvailableSelection(): ModelSelection? = _services.value.asSequence()
         .filter { it.isConfiguredForChat }
@@ -358,8 +374,13 @@ class ModelServiceRepository @Inject constructor(
         _currentSelection.value = selection
     }
 
-    override fun resolveChatModel(selection: ModelSelection?): ResolvedAgentModel? =
-        resolveChatSelection(selection)?.let { resolved ->
+    override fun resolveChatModel(selection: ModelSelection?): ResolvedAgentModel? {
+        if (selection?.serviceId == LOCAL_GEMMA_SERVICE_ID) {
+            if (selection.groupId != LOCAL_GEMMA_GROUP_ID) return null
+            val local = localModels.resolve(selection.modelId) ?: return null
+            return ResolvedAgentModel(LOCAL_GEMMA_SERVICE_ID, ApiProtocol.Standard, selection.modelId, "", "", local)
+        }
+        return resolveChatSelection(selection)?.let { resolved ->
             val provider = resolved.provider
             ResolvedAgentModel(
                 serviceId = provider.serviceId,
@@ -369,6 +390,7 @@ class ModelServiceRepository @Inject constructor(
                 modelBaseUrl = provider.activeApiBaseUrl.trimEnd('/'),
             )
         }
+    }
 
     /** Resolves a normal chat model and rejects dedicated speech models. */
     fun resolveChatSelection(selection: ModelSelection?): ResolvedModel? =

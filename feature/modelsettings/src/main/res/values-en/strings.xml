@@ -70,4 +70,32 @@
     <string name="modelsettings_detail_title">Service details</string>
 
     <string name="modelsettings_agent_mutation_blocked">An agent task is running. Please stop it before making changes.</string>
+    <string name="local_model_title">Local models</string>
+    <string name="local_model_gemma4">Gemma 4</string>
+    <string name="local_model_description">Downloaded models run offline. Performance depends on device hardware and memory.</string>
+    <string name="local_model_brands">Available models</string>
+    <string name="local_model_brand_summary">Google · %1$d downloaded · %2$d enabled</string>
+    <string name="local_model_variants">Model variants</string>
+    <string name="local_model_enable_hint">Enable multiple downloaded variants to add them to the model picker. Disabling keeps the files.</string>
+    <string name="local_model_backend_hint">Official variants use mixed quantization. CPU is the general option; GPU requires compatible drivers. Larger variants need more memory. This iteration supports text chat and tool calls.</string>
+    <string name="local_model_source">View model source and license</string>
+    <string name="local_model_quantization_size">Mixed quantization · %1$s</string>
+    <string name="local_model_enable_description">Enable %1$s</string>
+    <string name="local_model_not_downloaded">Not downloaded</string>
+    <string name="local_model_downloading">Downloading · %1$d%%</string>
+    <string name="local_model_verifying">Verifying model file…</string>
+    <string name="local_model_downloaded">Downloaded · Disabled</string>
+    <string name="local_model_enabled">Downloaded · Enabled</string>
+    <string name="local_model_download">Download</string>
+    <string name="local_model_cancel_download">Cancel download</string>
+    <string name="local_model_remove">Remove</string>
+    <string name="local_model_cancel">Cancel</string>
+    <string name="local_model_remove_title">Remove local model?</string>
+    <string name="local_model_remove_message">%1$s\n%2$s\n\nThis deletes the downloaded model file and disables this variant. Using it again requires another download.</string>
+    <string name="local_model_storage_error">Not enough storage or unable to write the file. Free up space and retry.</string>
+    <string name="local_model_integrity_error">File verification failed. Download again.</string>
+    <string name="local_model_access_error">Access denied by the download source. Check the model source and license.</string>
+    <string name="local_model_network_error">Download failed. Check the network and retry.</string>
+    <string name="local_model_operation_failed">Operation failed. Retry; the model file may be unavailable or inaccessible.</string>
+    <string name="local_model_size_gb">%1$s GB</string>
 </resources>

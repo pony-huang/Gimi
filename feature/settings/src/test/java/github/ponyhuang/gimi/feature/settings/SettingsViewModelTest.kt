@@ -30,6 +30,15 @@ class SettingsViewModelTest {
     }
 
     @Test
+    fun localModelEntryNavigatesToLocalCatalog() = runTest {
+        val viewModel = SettingsViewModel(repository)
+        viewModel.effects.test {
+            viewModel.onAction(SettingsAction.OpenLocalModels)
+            assertEquals(SettingsEffect.NavigateToLocalModels, awaitItem())
+        }
+    }
+
+    @Test
     fun mobileUseCanOnlyBeOpenedAfterEnablingAndPersistsToggle() = runTest {
         enabled.value = false
         val viewModel = SettingsViewModel(repository)

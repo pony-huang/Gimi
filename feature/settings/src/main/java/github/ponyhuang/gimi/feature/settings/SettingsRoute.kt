@@ -14,6 +14,7 @@ fun SettingsRoute(
     appVersionName: String,
     onBack: () -> Unit,
     onNavigateToModelService: () -> Unit,
+    onNavigateToLocalModels: () -> Unit,
     onNavigateToDefaultModels: () -> Unit,
     onNavigateToMcpServers: () -> Unit,
     onNavigateToPlugins: () -> Unit,
@@ -34,6 +35,7 @@ fun SettingsRoute(
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
             when (effect) {
+                SettingsEffect.NavigateToLocalModels -> onNavigateToLocalModels()
                 SettingsEffect.NavigateToModelService -> onNavigateToModelService()
                 SettingsEffect.NavigateToDefaultModels -> onNavigateToDefaultModels()
                 SettingsEffect.NavigateToMcpServers -> onNavigateToMcpServers()

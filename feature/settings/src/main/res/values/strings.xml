@@ -68,4 +68,6 @@
     <string name="update_retry">重试</string>
     <string name="settings_recommendations_title">智能推荐</string>
     <string name="settings_recommendations_subtitle">配置新会话的任务建议与空闲预生成</string>
+    <string name="settings_local_model_title">本地模型</string>
+    <string name="settings_local_model_subtitle">下载模型，在设备上运行</string>
 </resources>

@@ -8,4 +8,6 @@ data class ResolvedAgentModel(
     val apiKey: String,
     /** 已 trimEnd('/') 的 activeApiBaseUrl。 */
     val modelBaseUrl: String,
+    /** 非空时使用设备文件推理，不创建远端 SDK 客户端。 */
+    val localModel: LocalModelRuntimeConfig? = null,
 )

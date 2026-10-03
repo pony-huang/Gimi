@@ -1665,7 +1665,7 @@ private fun ChatSessionRuntime.toChatListItems(): List<ChatListItem> =
 
 private fun List<LLMModelSetting>.isUsableChatSelection(selection: ModelSelection): Boolean {
     val service = firstOrNull { it.id == selection.serviceId } ?: return false
-    if (!service.isEnabled || service.apiKey.isBlank()) return false
+    if (!service.isConfiguredForChat) return false
     val group = service.groups.firstOrNull { it.id == selection.groupId } ?: return false
     val model = group.models.firstOrNull { it.id == selection.modelId } ?: return false
     return !model.isStt && !model.isTts

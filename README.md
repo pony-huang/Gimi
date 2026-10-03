@@ -52,6 +52,15 @@ In an empty conversation, Agent-generated task suggestions can use enabled tools
 context you allow. Tap one to start; turn them off, refresh them now, or set their background update
 interval in Settings.
 
+### Local models
+
+In *Settings → Local models*, download Gemma 4 E2B or E4B CPU/GPU variants and enable
+multiple versions for the existing chat and default-model pickers. Files are checked for size
+and SHA-256 before use. Disabling keeps the file; removal requires confirmation and deletes it.
+Local inference uses ADK LiteRT-LM without an API key. This iteration supports text and tool
+calls; GPU compatibility and inference speed depend on the device. Model inference is offline,
+but tools that access remote services still need a network connection.
+
 ### Voice
 
 Tap the microphone to record, then stop to transcribe speech into the composer. Edit the text before

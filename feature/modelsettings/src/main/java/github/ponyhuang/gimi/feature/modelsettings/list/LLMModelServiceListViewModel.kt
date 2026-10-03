@@ -42,11 +42,11 @@ class LLMModelServiceListViewModel @Inject constructor(
             loadState = loadState,
             query = currentQuery,
             items = if (currentQuery.isBlank()) {
-                services
+                services.filterNot { it.isLocal }
             } else {
                 services.filter { service ->
-                    service.id.contains(currentQuery, ignoreCase = true) ||
-                        service.name.contains(currentQuery, ignoreCase = true)
+                    !service.isLocal && (service.id.contains(currentQuery, ignoreCase = true) ||
+                        service.name.contains(currentQuery, ignoreCase = true))
                 }
             },
             isMutationBlocked = runtimeState.isBusy,

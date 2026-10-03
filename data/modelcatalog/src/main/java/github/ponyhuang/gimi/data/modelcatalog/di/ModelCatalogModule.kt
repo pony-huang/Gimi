@@ -24,6 +24,12 @@ import kotlinx.coroutines.Dispatchers
 abstract class ModelCatalogBindingsModule {
     @Binds
     @Singleton
+    abstract fun bindLocalModelRepository(
+        implementation: github.ponyhuang.gimi.data.modelcatalog.local.DownloadedLocalModelRepository,
+    ): github.ponyhuang.gimi.domain.modelcatalog.repository.LocalModelRepository
+
+    @Binds
+    @Singleton
     abstract fun bindModelCatalogRepository(
         implementation: ModelServiceRepository,
     ): ModelCatalogRepository

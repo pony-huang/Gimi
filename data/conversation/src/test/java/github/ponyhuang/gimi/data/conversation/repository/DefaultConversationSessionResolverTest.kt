@@ -132,6 +132,37 @@ class DefaultConversationSessionResolverTest {
         coVerify(exactly = 0) { conversations.createConversation(any(), any(), any()) }
     }
 
+    @Test
+    fun createUsesEnabledLocalModelWithoutApiKey() = runTest {
+        every { modelCatalog.currentAssistantSelection() } returns null
+        every { modelCatalog.currentServices() } returns listOf(service().copy(isLocal = true, apiKey = ""))
+        coEvery { conversations.createConversation(any(), true, any()) } returns "local"
+
+        assertEquals(selection, resolver.createAndActivate().modelSelection)
+    }
+
+    @Test
+    fun restoresLocalSelectionWithoutReplacingItWithRemoteDefault() = runTest {
+        val localSelection = selection.copy(serviceId = "local")
+        every { modelCatalog.currentServices() } returns listOf(service(), service().copy(id = "local", isLocal = true, apiKey = ""))
+        coEvery { conversations.lastConversationId() } returns "current"
+        coEvery { conversations.loadMessages("current") } returns emptyList()
+        coEvery { conversations.activateConversation("current", any()) } returns ModelSelectionCodec.encode(localSelection)
+        coEvery { conversations.conversationToolConfiguration("current") } returns ConversationToolConfiguration()
+        coEvery { conversations.setConversationToolConfiguration(any(), any()) } returns true
+
+        assertEquals(localSelection, resolver.resolveCurrentOrCreate().modelSelection)
+        coVerify(exactly = 0) { conversations.setConversationModel(any(), any()) }
+    }
+
+    @Test
+    fun remoteModelWithoutApiKeyRemainsUnavailable() = runTest {
+        every { modelCatalog.currentServices() } returns listOf(service().copy(apiKey = ""))
+
+        assertTrue(runCatching { resolver.createAndActivate() }.exceptionOrNull() is NoAvailableAssistantModelException)
+        coVerify(exactly = 0) { conversations.createConversation(any(), any(), any()) }
+    }
+
     private fun service() = LLMModelSetting(
         id = "service",
         name = "Service",

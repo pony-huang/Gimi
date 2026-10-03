@@ -9,6 +9,14 @@ import kotlinx.serialization.Serializable
 
 /** Destinations owned by model settings. */
 sealed interface ModelSettingsDestination : NavKey {
+    /** 本地模型品牌目录。 */
+    @Serializable
+    data object LocalList : ModelSettingsDestination
+
+    /** 品牌配置页；brandId 是目录中的稳定品牌标识。 */
+    @Serializable
+    data class LocalBrand(val brandId: String) : ModelSettingsDestination
+
     /** Configured model-provider list. */
     @Serializable
     data object ServiceList : ModelSettingsDestination
@@ -33,6 +41,18 @@ fun ModelSettingsEntryProvider(
     onBack: () -> Unit,
     navigate: (NavKey) -> Unit,
 ): Boolean = when (destination) {
+    ModelSettingsDestination.LocalList -> {
+        github.ponyhuang.gimi.feature.modelsettings.local.LocalModelRoute(
+            onBack = onBack,
+            onOpenBrand = { navigate(ModelSettingsDestination.LocalBrand(it)) },
+        )
+        true
+    }
+    is ModelSettingsDestination.LocalBrand -> {
+        github.ponyhuang.gimi.feature.modelsettings.local.LocalModelRoute(brandId = destination.brandId, onBack = onBack)
+        true
+    }
+
     ModelSettingsDestination.ServiceList -> {
         ModelServiceListRoute(
             onBack = onBack,

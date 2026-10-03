@@ -20,6 +20,7 @@ sealed interface SettingsDestination : NavKey {
 class SettingsNavigationCallbacks(
     val onBack: () -> Unit,
     val onNavigateToModelService: () -> Unit,
+    val onNavigateToLocalModels: () -> Unit,
     val onNavigateToDefaultModels: () -> Unit,
     val onNavigateToMcpServers: () -> Unit,
     val onNavigateToPlugins: () -> Unit,
@@ -46,6 +47,7 @@ fun SettingsEntryProvider(
             appVersionName = appVersionName,
             onBack = callbacks.onBack,
             onNavigateToModelService = callbacks.onNavigateToModelService,
+            onNavigateToLocalModels = callbacks.onNavigateToLocalModels,
             onNavigateToDefaultModels = callbacks.onNavigateToDefaultModels,
             onNavigateToMcpServers = callbacks.onNavigateToMcpServers,
             onNavigateToPlugins = callbacks.onNavigateToPlugins,

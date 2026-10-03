@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application>
+        <!-- LiteRT-LM GPU 后端的可选驱动库，缺失时仍允许安装并使用 CPU。 -->
+        <uses-native-library android:name="libvndksupport.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
         <activity
             android:name="github.ponyhuang.gimi.data.agent.permission.CalendarPermissionActivity"
             android:exported="false"

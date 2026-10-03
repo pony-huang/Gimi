@@ -68,4 +68,6 @@
     <string name="update_retry">Retry</string>
     <string name="settings_recommendations_title">Smart recommendations</string>
     <string name="settings_recommendations_subtitle">Configure new-chat suggestions and idle pre-generation</string>
+    <string name="settings_local_model_title">Local models</string>
+    <string name="settings_local_model_subtitle">Download models to run on this device</string>
 </resources>

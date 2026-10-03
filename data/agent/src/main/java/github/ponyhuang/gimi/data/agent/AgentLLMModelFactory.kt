@@ -11,6 +11,8 @@ import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolRegistry
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedAgentModel
+import github.ponyhuang.gimi.domain.modelcatalog.model.LocalModelRuntimeConfig
+import github.ponyhuang.gimi.data.agent.model.LocalInferenceModelFactory
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -34,6 +36,8 @@ data class ModelConfig(
     val apiKey: String,
     val fullBaseUrl: String,
     val supportsImages: Boolean = false,
+    /** 本地文件配置，不使用 apiKey 或 fullBaseUrl。 */
+    val localModel: LocalModelRuntimeConfig? = null,
 )
 
 /**
@@ -67,6 +71,7 @@ internal fun ModelConfig.toRuntimeMetadata(): ModelRuntimeMetadata = ModelRuntim
 class AgentLLMModelFactory @Inject constructor(
     private val modelServices: AgentModelConfigurationSource,
     private val officialToolRegistry: OfficialToolRegistry,
+    private val localInferenceModels: LocalInferenceModelFactory,
 ) {
     /**
      * 从 [AgentModelConfigurationSource] 选当前模型配置。
@@ -102,7 +107,7 @@ class AgentLLMModelFactory @Inject constructor(
 
 
     fun createModel(cfg: ModelConfig): Model = AttachmentResolvingModel(
-        delegate = when (cfg.baseType) {
+        delegate = cfg.localModel?.let { localInferenceModels.create(cfg.modelId, it) } ?: when (cfg.baseType) {
             ApiProtocol.Standard -> Openai(
                 name = cfg.modelId,
                 client = OpenAIOkHttpClient.builder()
@@ -152,6 +157,8 @@ class AgentLLMModelFactory @Inject constructor(
 
     /** 格式化推荐只走快速模型所属服务的 OpenAI 兼容端点，不沿用聊天协议。 */
     fun forRecommendationJson(config: ModelConfig): ModelConfig {
+        // 本地模型保持原生路径，推荐提示词和结果解析沿用现有流程。
+        if (config.localModel != null) return config
         if (config.baseType == ApiProtocol.Standard) {
             return config
         }
@@ -173,6 +180,7 @@ class AgentLLMModelFactory @Inject constructor(
         modelId = modelId,
         apiKey = apiKey,
         fullBaseUrl = modelBaseUrl,
+        localModel = localModel,
         supportsImages = modelServices.currentServices()
             .firstOrNull { it.id == serviceId }
             ?.groups?.flatMap { it.models }

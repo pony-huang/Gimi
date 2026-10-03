@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Rule
@@ -58,6 +59,13 @@ fun SettingsScreen(
                         title = stringResource(R.string.settings_model_service_title),
                         subtitle = stringResource(R.string.settings_model_service_subtitle),
                         onClick = { onAction(SettingsAction.OpenModelService) },
+                        showDivider = true,
+                    )
+                    PreferenceNavigationCard(
+                        icon = Icons.Default.Memory,
+                        title = stringResource(R.string.settings_local_model_title),
+                        subtitle = stringResource(R.string.settings_local_model_subtitle),
+                        onClick = { onAction(SettingsAction.OpenLocalModels) },
                         showDivider = true,
                     )
                     PreferenceNavigationCard(

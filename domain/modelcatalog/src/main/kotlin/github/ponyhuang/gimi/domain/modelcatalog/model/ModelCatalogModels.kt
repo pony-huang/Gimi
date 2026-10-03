@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.domain.modelcatalog.model
 
 import kotlinx.serialization.Serializable
 
+/** 模型服务的领域配置；本地服务通过 isLocal 使用设备文件而非远端凭据。 */
 data class LLMModelSetting(
     val id: String,
     val name: String,
@@ -18,7 +19,12 @@ data class LLMModelSetting(
     val iconRes: Int? = null,
     val homepageUrl: String = "",
     val keyHelpUrl: String = "",
+    /** 本地服务不需要远端 API Key，由文件校验和启用状态决定可用性。 */
+    val isLocal: Boolean = false,
 ) {
+    val isConfiguredForChat: Boolean
+        get() = isEnabled && (isLocal || apiKey.isNotBlank())
+
     val activeApiBaseUrl: String
         get() = when (apiProtocol) {
             ApiProtocol.Standard -> apiBaseUrl

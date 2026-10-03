@@ -13,7 +13,19 @@ import org.junit.Test
 
 class RecommendationModelConfigTest {
     private val modelServices = mockk<AgentModelConfigurationSource>()
-    private val factory = AgentLLMModelFactory(modelServices, mockk<OfficialToolRegistry>())
+    private val factory = AgentLLMModelFactory(modelServices, mockk<OfficialToolRegistry>(), mockk())
+
+    @Test
+    fun localFastModelKeepsNativeConfigurationWithoutRemoteEndpoint() {
+        val original = config("local-gemma4", ApiProtocol.Standard).copy(
+            apiKey = "", fullBaseUrl = "",
+            localModel = github.ponyhuang.gimi.domain.modelcatalog.model.LocalModelRuntimeConfig(
+                "/private/model.litertlm",
+                github.ponyhuang.gimi.domain.modelcatalog.model.LocalModelBackend.CPU,
+            ),
+        )
+        assertSame(original, factory.forRecommendationJson(original))
+    }
 
     @Test
     fun deepSeekAnthropicRecommendationUsesItsConfiguredStandardEndpoint() {

@@ -136,7 +136,7 @@ private fun DefaultModelSettings.toUiState(
     ttsVoiceOptions: List<TtsVoice>,
     isTtsVoiceLoading: Boolean,
 ): DefaultModelSettingsUiState {
-    val configuredServices = services.filter { it.isEnabled && it.apiKey.isNotBlank() }
+    val configuredServices = services.filter { it.isConfiguredForChat }
     return DefaultModelSettingsUiState(
         assistantSelection = assistantSelection,
         fastSelection = fastSelection,

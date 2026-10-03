@@ -304,7 +304,7 @@ private fun List<LLMModelSetting>.firstConfiguredChatSelection(): ModelSelection
 }
 
 private fun LLMModelSetting.isConfiguredForChat(): Boolean =
-    isEnabled && apiKey.isNotBlank() && groups.any { group -> group.models.any(Model::isChatModel) }
+    isConfiguredForChat && groups.any { group -> group.models.any(Model::isChatModel) }
 
 // 远端拉取的模型不会带 isTts 标记（OpenAiCompatibleModelServiceGateway 只取 id），
 // 这里额外按 id/name 中的 "tts" 关键字兜底过滤，避免语音合成模型混入聊天候选。

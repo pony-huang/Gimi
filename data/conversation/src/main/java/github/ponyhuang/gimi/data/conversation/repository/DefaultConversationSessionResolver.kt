@@ -117,7 +117,7 @@ class DefaultConversationSessionResolver @Inject constructor(
         return modelCatalog.currentAssistantSelection()
             ?.takeIf { services.isUsable(it) }
             ?: services.asSequence()
-                .filter { it.isEnabled && it.apiKey.isNotBlank() }
+                .filter { it.isConfiguredForChat }
                 .flatMap { service ->
                     service.groups.asSequence().flatMap { group ->
                         group.models.asSequence()
@@ -146,7 +146,7 @@ class DefaultConversationSessionResolver @Inject constructor(
 
 private fun List<LLMModelSetting>.isUsable(selection: ModelSelection): Boolean {
     val service = firstOrNull { it.id == selection.serviceId } ?: return false
-    if (!service.isEnabled || service.apiKey.isBlank()) return false
+    if (!service.isConfiguredForChat) return false
     val group = service.groups.firstOrNull { it.id == selection.groupId } ?: return false
     val model = group.models.firstOrNull { it.id == selection.modelId } ?: return false
     return !model.isStt && !model.isTts

@@ -154,6 +154,7 @@ fun MainScreen(
                         onNavigateToModelService = {
                             navigate(ModelSettingsDestination.ServiceList)
                         },
+                        onNavigateToLocalModels = { navigate(ModelSettingsDestination.LocalList) },
                         onNavigateToDefaultModels = {
                             navigate(ModelSettingsDestination.Defaults)
                         },

@@ -11,6 +11,8 @@ data class SettingsUiState(
 )
 
 sealed interface SettingsAction {
+    /** 打开设备本地模型目录。 */
+    data object OpenLocalModels : SettingsAction
     data object OpenModelService : SettingsAction
     data object OpenDefaultModels : SettingsAction
     data object OpenMcpServers : SettingsAction
@@ -32,6 +34,8 @@ sealed interface SettingsAction {
 }
 
 sealed interface SettingsEffect {
+    /** 跳转本地模型设置。 */
+    data object NavigateToLocalModels : SettingsEffect
     data object NavigateToModelService : SettingsEffect
     data object NavigateToDefaultModels : SettingsEffect
     data object NavigateToMcpServers : SettingsEffect

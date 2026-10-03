@@ -18,6 +18,7 @@ import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseAvailability
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseResult
+import github.ponyhuang.gimi.domain.mobileuse.MobileBounds
 import github.ponyhuang.gimi.domain.mobileuse.MobileObservation
 import github.ponyhuang.gimi.domain.mobileuse.MobileDisplaySession
 import github.ponyhuang.gimi.domain.mobileuse.MobileDisplaySessions
@@ -151,7 +152,9 @@ class ShizukuMobileUseRepository @Inject constructor(
         }
 
     override suspend fun click(owner: String, observationId: String, elementId: String): MobileUseResult =
-        onObserved(owner, observationId, elementId = elementId) { remote, id, screen, delivery ->
+        onObserved(owner, observationId, elementId = elementId, coordinateBounds = { screen ->
+            screen.elements.firstOrNull { it.id == elementId }?.bounds
+        }) { remote, id, screen, delivery ->
             val element = screen.elements.firstOrNull { it.id == elementId }
                 ?: return@onObserved invalid("invalid_argument", "Unknown elementId in this observation.")
             val accepted = when {
@@ -189,14 +192,19 @@ class ShizukuMobileUseRepository @Inject constructor(
         }
 
     override suspend fun tap(owner: String, observationId: String, x: Int, y: Int): MobileUseResult =
-        onObserved(owner, observationId) { remote, id, screen, delivery ->
+        onObserved(owner, observationId, coordinateBounds = { tapBounds(x, y) }) { remote, id, screen, delivery ->
             if (!inside(screen.frame, x, y)) return@onObserved invalid("invalid_argument", "Point outside screenshot.")
             attempt(delivery) { remote.tap(id, x, y); true }
             observeResult(remote, id, owner, delivery, "tapped", "Tap sent once.")
         }
 
     override suspend fun tapRelative(owner: String, observationId: String, xPermille: Int, yPermille: Int): MobileUseResult =
-        onObserved(owner, observationId) { remote, id, screen, delivery ->
+        onObserved(owner, observationId, coordinateBounds = { screen ->
+            if (xPermille !in 0..1000 || yPermille !in 0..1000) null else {
+                val geometry = MobileDisplayGeometry(screen.frame.width, screen.frame.height, 1)
+                tapBounds(geometry.xAtPermille(xPermille), geometry.yAtPermille(yPermille))
+            }
+        }) { remote, id, screen, delivery ->
             if (xPermille !in 0..1000 || yPermille !in 0..1000) {
                 return@onObserved invalid("invalid_argument", "Relative coordinates must be 0..1000.")
             }
@@ -209,7 +217,7 @@ class ShizukuMobileUseRepository @Inject constructor(
 
     override suspend fun swipe(
         owner: String, observationId: String, x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Int,
-    ): MobileUseResult = onObserved(owner, observationId) { remote, id, screen, delivery ->
+    ): MobileUseResult = onObserved(owner, observationId, coordinateBounds = { tapBounds(x1, y1) }, swipe = true) { remote, id, screen, delivery ->
         if (!inside(screen.frame, x1, y1) || !inside(screen.frame, x2, y2) || durationMs !in 100..5000) {
             return@onObserved invalid("invalid_argument", "Invalid swipe coordinates or duration.")
         }
@@ -224,7 +232,7 @@ class ShizukuMobileUseRepository @Inject constructor(
         }
 
     override suspend fun typeText(owner: String, observationId: String, x: Int, y: Int, text: String): MobileUseResult =
-        onObserved(owner, observationId) { remote, id, screen, delivery ->
+        onObserved(owner, observationId, coordinateBounds = { tapBounds(x, y) }) { remote, id, screen, delivery ->
             if (!inside(screen.frame, x, y)) return@onObserved invalid("invalid_argument", "Point outside screenshot.")
             val accessibility = MobileTextAccessibilityService.current()
                 ?: return@onObserved invalid("accessibility_required",
@@ -309,6 +317,7 @@ class ShizukuMobileUseRepository @Inject constructor(
 
     private suspend fun onObserved(
         owner: String, observationId: String, elementId: String? = null, navigation: Boolean = false,
+        coordinateBounds: ((MobileObservedScreen) -> MobileBounds?)? = null, swipe: Boolean = false,
         operation: suspend (IMobileUseService, Int, MobileObservedScreen, MobileActionDelivery) -> MobileUseResult,
     ): MobileUseResult = perform(owner, action = true, allowCreate = false) { remote, id, delivery ->
         val reading = readFrame(remote)
@@ -316,7 +325,8 @@ class ShizukuMobileUseRepository @Inject constructor(
         val frame = reading.frame
         val native = nativeSnapshot(id, frame)
         val nativeElementId = elementId?.takeIf { guard.latest?.native?.targets?.containsKey(it) == true }
-        val rejection = guard.rejection(owner, id, observationId, now(), frame, native, nativeElementId, navigation)
+        val bounds = guard.latest?.let { coordinateBounds?.invoke(it) }
+        val rejection = guard.rejection(owner, id, observationId, now(), frame, native, nativeElementId, navigation, bounds, swipe)
         if (rejection != null) {
             guard.clear()
             return@perform invalid("stale_observation", "$rejection; call mobile_observe before acting.")
@@ -455,8 +465,9 @@ class ShizukuMobileUseRepository @Inject constructor(
         }
         val observationId = UUID.randomUUID().toString()
         val observedAt = now()
-        val pixelActionsAllowed = state == "settled"
-        val nativeActionsAllowed = pixelActionsAllowed || reason == "changing" || reason == "changed_during_element_capture"
+        // 静止是观察信息，不是所有动作的前提；动态页面在动作前按目标局部复核。
+        val pixelActionsAllowed = state == "settled" || reason == "changing" || reason == "changed_during_element_capture"
+        val nativeActionsAllowed = pixelActionsAllowed
         if (state != "settled" && frame != null && captureError == null) {
             native = nativeSnapshot(id, frame)
             elements = if (native.consistent) native.targets.values.map { it.element } else emptyList()
@@ -464,10 +475,10 @@ class ShizukuMobileUseRepository @Inject constructor(
             truncated = native.truncated
         }
         val actionable = frame != null && captureError == null && native.consistent
-        if (actionable && frame != null) {
+        if (actionable) {
             guard.confirmFrame(frame)
             guard.record(MobileObservedScreen(observationId, owner, id, observedAt, frame, native, elements,
-                pixelActionsAllowed, nativeActionsAllowed))
+                pixelActionsAllowed, nativeActionsAllowed, swipeActionsAllowed = pixelActionsAllowed))
         }
         if (frame == null) state = "frame_unavailable"
         val observation = MobileObservation(
@@ -475,7 +486,10 @@ class ShizukuMobileUseRepository @Inject constructor(
             frame?.sequence, nodesStatus, elements, truncated,
             actionModes = if (!actionable) emptyList() else buildList {
                 if (nativeActionsAllowed) add("native_elements")
-                if (pixelActionsAllowed) add("pixel_coordinates")
+                if (pixelActionsAllowed) {
+                    add("pixel_coordinates")
+                    add("swipe_coordinates")
+                }
                 add("back")
             },
         )
@@ -500,6 +514,9 @@ class ShizukuMobileUseRepository @Inject constructor(
         )
         return MobileFrameReading(frame, payload.getString("error"))
     }
+
+    /** 点按周围留出采样余量，拒绝目标附近的移动而允许屏幕其他区域动画。 */
+    private fun tapBounds(x: Int, y: Int) = MobileBounds(x - 48, y - 48, x + 49, y + 49)
 
     private fun inside(frame: CapturedMobileFrame, x: Int, y: Int): Boolean =
         x in 0 until frame.width && y in 0 until frame.height

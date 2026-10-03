@@ -50,7 +50,6 @@ class MobileTextAccessibilityService : AccessibilityService() {
     internal fun lastChangeMs(displayId: Int): Long = changes[displayId]?.atMs ?: 0
 
     internal fun snapshot(displayId: Int, width: Int, height: Int): MobileAccessibilitySnapshot {
-        val before = changes[displayId]
         return try {
             val windows = windowsOnAllDisplays[displayId].orEmpty().sortedByDescending { it.layer }
             val states = windows.map { window ->
@@ -89,10 +88,15 @@ class MobileTextAccessibilityService : AccessibilityService() {
                 if (visited >= 2_000 || targets.size >= 200 || SystemClock.elapsedRealtime() >= deadline) break
             }
             val after = changes[displayId]
+            // 内容事件可能来自计时器或广告，只有窗口集合与几何变化使整次遍历失效。
+            // 具体目标的内容与位置由动作前的快照及 performNodeAction 再次核对。
+            val currentWindows = windowsOnAllDisplays[displayId].orEmpty().sortedByDescending { it.layer }.map { window ->
+                MobileWindowState(window.id, window.layer, Rect().also(window::getBoundsInScreen).domainBounds())
+            }
             MobileAccessibilitySnapshot(
                 status = if (windows.isEmpty()) "no_windows" else "available",
                 revision = after?.revision ?: 0, lastChangeMs = after?.atMs ?: 0,
-                windows = states, targets = targets, truncated = truncated, consistent = before == after,
+                windows = states, targets = targets, truncated = truncated, consistent = states == currentWindows,
             )
         } catch (failure: RuntimeException) {
             Log.w("GimiMobileUse", "Unable to retrieve display nodes", failure)

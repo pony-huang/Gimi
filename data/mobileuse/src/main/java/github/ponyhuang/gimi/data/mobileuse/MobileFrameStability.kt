@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.data.mobileuse
 
+import github.ponyhuang.gimi.domain.mobileuse.MobileBounds
 import kotlin.math.abs
 
 /** 同一次采集的完整截图及采样信息；时间基于 elapsedRealtime，generation 属于截图 Surface。 */
@@ -61,6 +62,26 @@ internal class MobileFrameStability(private val startedAtMs: Long, private val a
                         }
                     }
                     if (difference > 64 * 3) return false
+                }
+            }
+            return true
+        }
+
+        /** 仅复核点按目标周围的采样；其他区域动画不会使固定目标失效。 */
+        fun sameRegion(first: CapturedMobileFrame, second: CapturedMobileFrame, bounds: MobileBounds): Boolean {
+            if (first.width <= 0 || first.height <= 0 || bounds.left >= bounds.right || bounds.top >= bounds.bottom) return false
+            if (first.width != second.width || first.height != second.height || first.generation != second.generation) return false
+            if (bounds.right <= 0 || bounds.bottom <= 0 || bounds.left >= first.width || bounds.top >= first.height) return false
+            if (first.samples.size != SAMPLE_WIDTH * SAMPLE_HEIGHT || second.samples.size != first.samples.size) {
+                return first.jpeg.contentEquals(second.jpeg)
+            }
+            val left = (bounds.left.coerceAtLeast(0).toLong() * SAMPLE_WIDTH / first.width).toInt()
+            val right = ((bounds.right.coerceAtMost(first.width).toLong() * SAMPLE_WIDTH + first.width - 1) / first.width).toInt()
+            val top = (bounds.top.coerceAtLeast(0).toLong() * SAMPLE_HEIGHT / first.height).toInt()
+            val bottom = ((bounds.bottom.coerceAtMost(first.height).toLong() * SAMPLE_HEIGHT + first.height - 1) / first.height).toInt()
+            for (y in top until bottom) {
+                for (x in left until right) {
+                    if (abs(first.samples[y * SAMPLE_WIDTH + x] - second.samples[y * SAMPLE_WIDTH + x]) > 3) return false
                 }
             }
             return true

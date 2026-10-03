@@ -45,7 +45,7 @@ data class MobileElement(
  * @property frameSequence 当前截图采集序号。
  * @property nodesStatus 节点可用性及 OCR 兜底状态。
  * @property truncated 元素列表或遍历是否达到上限。
- * @property actionModes 当前观察允许的定位方式：native_elements、pixel_coordinates、back。
+ * @property actionModes 当前观察允许的定位方式：native_elements、pixel_coordinates、swipe_coordinates、back；不要求整页静止。
  */
 data class MobileObservation(
     val id: String,

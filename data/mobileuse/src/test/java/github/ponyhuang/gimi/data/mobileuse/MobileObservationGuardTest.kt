@@ -65,6 +65,84 @@ class MobileObservationGuardTest {
     }
 
     @Test
+    fun timerUpdateDoesNotInvalidateUnchangedNativeButtonOrBack() {
+        val button = MobileElement("pause", "accessibility", MobileBounds(10, 20, 30, 40), actions = listOf("click"))
+        val timer = button.copy(id = "timer", text = "01:19", actions = emptyList())
+        fun target(element: MobileElement) = MobileNodeTarget(element, emptyList(), element, emptyList(), element)
+        val before = native.copy(targets = mapOf("pause" to target(button), "timer" to target(timer)))
+        val after = before.copy(revision = 1, targets = before.targets + ("timer" to target(timer.copy(text = "01:20"))))
+        guard.record(MobileObservedScreen("player", "owner", 4, 100, frame, before, listOf(button, timer)))
+        assertNull(guard.rejection("owner", 4, "player", 200, frame, after, nativeElementId = "pause"))
+        assertNull(guard.rejection("owner", 4, "player", 200, frame, after, navigation = true))
+        val moved = after.copy(targets = after.targets + ("pause" to target(button.copy(bounds = MobileBounds(40, 20, 60, 40)))))
+        assertEquals("nodes_changed", guard.rejection("owner", 4, "player", 200, frame, moved, nativeElementId = "pause"))
+    }
+
+    @Test
+    fun animatedWebViewAllowsSwipeAndStableCoordinateRegion() {
+        val samples = IntArray(64 * 96) { 100 }
+        val before = CapturedMobileFrame(1080, 2400, 100, 1, 1, byteArrayOf(1), samples)
+        val animated = CapturedMobileFrame(1080, 2400, 200, 2, 1, byteArrayOf(2), samples.copyOf().apply { this[0] = 200 })
+        val webView = MobileAccessibilitySnapshot("accessibility_unavailable")
+        val region = MobileBounds(400, 1000, 500, 1100)
+        guard.record(MobileObservedScreen("web", "owner", 4, 100, before, webView, emptyList(), swipeActionsAllowed = true))
+        assertNull(guard.rejection("owner", 4, "web", 200, animated, webView, coordinateBounds = region, swipe = true))
+        assertNull(guard.rejection("owner", 4, "web", 200, animated, webView, coordinateBounds = region))
+        val changedTarget = CapturedMobileFrame(1080, 2400, 200, 3, 1, byteArrayOf(3), samples.copyOf().apply { this[42 * 64 + 26] = 200 })
+        assertEquals("frame_changed", guard.rejection("owner", 4, "web", 200, changedTarget, webView, coordinateBounds = region))
+        val overlay = webView.copy(windows = listOf(MobileWindowState(2, 2, MobileBounds(0, 0, 1080, 2400))))
+        assertEquals("nodes_changed", guard.rejection("owner", 4, "web", 200, animated, overlay, coordinateBounds = region, swipe = true))
+        assertEquals("frame_changed", guard.rejection("owner", 4, "web", 200, CapturedMobileFrame(1080, 2400, 200, 3, 2, byteArrayOf(3), samples), webView, coordinateBounds = region, swipe = true))
+        guard.awaitFrameAfter(200)
+        assertEquals("no_post_action_frame", guard.rejection("owner", 4, "web", 200, animated, webView, coordinateBounds = region, swipe = true))
+    }
+
+    @Test
+    fun unrelatedNodeUpdateDoesNotInvalidateCoordinateRegion() {
+        val samples = IntArray(64 * 96) { 100 }
+        val picture = CapturedMobileFrame(1080, 2400, 100, 1, 1, byteArrayOf(1), samples)
+        val element = MobileElement("ad", "accessibility", MobileBounds(10, 20, 30, 40), text = "Ad 1")
+        fun target(value: MobileElement) = MobileNodeTarget(value, emptyList(), value, null, null)
+        val before = native.copy(targets = mapOf("ad" to target(element)))
+        val after = before.copy(revision = 1, targets = mapOf("ad" to target(element.copy(text = "Ad 2"))))
+        guard.record(MobileObservedScreen("page", "owner", 4, 100, picture, before, listOf(element)))
+        assertNull(guard.rejection("owner", 4, "page", 200, picture, after, coordinateBounds = MobileBounds(400, 1000, 500, 1100)))
+        assertEquals("nodes_changed", guard.rejection("owner", 4, "page", 200, picture, after, coordinateBounds = element.bounds))
+    }
+
+    @Test
+    fun scrollingContainerSummaryDoesNotInvalidateFixedCoordinateButton() {
+        val samples = IntArray(64 * 96) { 100 }
+        val picture = CapturedMobileFrame(1080, 2400, 100, 1, 1, byteArrayOf(1), samples)
+        val region = MobileBounds(400, 1000, 500, 1100)
+        val container = MobileElement("list", "accessibility", MobileBounds(0, 0, 1080, 2400),
+            description = "广告 1，关注列表", scrollable = true)
+        val button = MobileElement("button", "accessibility", region, text = "关注", actions = listOf("click"))
+        fun target(value: MobileElement) = MobileNodeTarget(value, emptyList(), value, null, null)
+        val before = native.copy(targets = mapOf("list" to target(container), "button" to target(button)))
+        val after = before.copy(revision = 1,
+            targets = before.targets + ("list" to target(container.copy(description = "广告 2，关注列表"))))
+        guard.record(MobileObservedScreen("page", "owner", 4, 100, picture, before, listOf(container, button)))
+        assertNull(guard.rejection("owner", 4, "page", 200, picture, after, coordinateBounds = region))
+        val changedButton = after.copy(targets = after.targets + ("button" to target(button.copy(text = "购买"))))
+        assertEquals("nodes_changed", guard.rejection("owner", 4, "page", 200, picture, changedButton, coordinateBounds = region))
+    }
+
+    @Test
+    fun swipeIgnoresFeedTextUpdatesButRejectsReplacementOfItsSurface() {
+        val surface = MobileElement("list", "accessibility", MobileBounds(0, 0, 1080, 2400),
+            resourceId = "app:id/feed", packageName = "app", scrollable = true, description = "广告 1")
+        fun target(value: MobileElement) = MobileNodeTarget(value, emptyList(), value, null, null)
+        val before = native.copy(targets = mapOf("list" to target(surface)))
+        val updated = before.copy(revision = 1, targets = mapOf("list" to target(surface.copy(description = "广告 2"))))
+        val replaced = updated.copy(targets = mapOf("list" to target(surface.copy(resourceId = "app:id/payment"))))
+        guard.record(MobileObservedScreen("feed", "owner", 4, 100, frame, before, listOf(surface)))
+        val region = MobileBounds(400, 1000, 500, 1100)
+        assertNull(guard.rejection("owner", 4, "feed", 200, frame, updated, coordinateBounds = region, swipe = true))
+        assertEquals("nodes_changed", guard.rejection("owner", 4, "feed", 200, frame, replaced, coordinateBounds = region, swipe = true))
+    }
+
+    @Test
     fun higherWindowMasksLowerElementButNotItsOwnElements() {
         val element = MobileElement("a", "accessibility", MobileBounds(100, 100, 200, 200), windowId = 1, windowLayer = 1)
         val overlay = MobileWindowState(2, 2, MobileBounds(0, 0, 1080, 2400))

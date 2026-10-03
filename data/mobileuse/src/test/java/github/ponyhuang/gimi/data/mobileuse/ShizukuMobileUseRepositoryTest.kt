@@ -5,6 +5,8 @@ import android.content.ServiceConnection
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.IBinder
+import android.os.Bundle
+import android.os.SystemClock
 import android.os.RemoteException
 import android.os.DeadObjectException
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseAvailability
@@ -139,6 +141,67 @@ class ShizukuMobileUseRepositoryTest {
         }
         every { Shizuku.unbindUserService(any(), any(), true) } returns Unit
 
+        return remote
+    }
+
+    @Test
+    fun animatedFeedAdvertisesSwipeAndSendsItOnceWithoutSettledPixels() = runBlocking {
+        val remote = connectAnimatedRemote()
+        repository.setEnabled(true)
+        repository.registerExecution("feed", "chat")
+        val observation = repository.observe("feed").observation!!
+        assertEquals("changing", observation.reason)
+        assertTrue("swipe_coordinates" in observation.actionModes)
+        val result = repository.swipe("feed", observation.id, 450, 1200, 450, 400, 450)
+        assertEquals("swiped", result.status)
+        assertEquals("delivered", result.actionStatus)
+        assertEquals("changing", result.observation!!.reason)
+        val repeated = repository.swipe("feed", observation.id, 450, 1200, 450, 400, 450)
+        assertEquals("stale_observation", repeated.status)
+        assertEquals("not_sent", repeated.actionStatus)
+        verify(exactly = 1) { remote.swipe(10, 450, 1200, 450, 400, 450) }
+        repository.setEnabled(false)
+    }
+
+    @Test
+    fun animatedFeedAllowsTapWhenOnlyUnrelatedPixelsChange() = runBlocking {
+        val remote = connectAnimatedRemote()
+        repository.setEnabled(true)
+        repository.registerExecution("feed", "chat")
+        val observation = repository.observe("feed").observation!!
+        assertEquals("changing", observation.reason)
+        assertTrue("pixel_coordinates" in observation.actionModes)
+        val result = repository.tap("feed", observation.id, 450, 1050)
+        assertEquals("tapped", result.status)
+        assertEquals("delivered", result.actionStatus)
+        verify(exactly = 1) { remote.tap(10, 450, 1050) }
+        repository.setEnabled(false)
+    }
+
+    private fun connectAnimatedRemote(): IMobileUseService {
+        val remote = connectRemote()
+        mockkStatic(SystemClock::class)
+        var clockMs = 10_000L
+        var sequence = 0L
+        // 注入单调时钟与持续变化的横幅，不依赖真机或六秒实际超时。
+        every { SystemClock.elapsedRealtime() } answers { clockMs += 1_000; clockMs }
+        every { remote.capture() } answers {
+            val capturedAt = clockMs
+            val currentSequence = ++sequence
+            val pixels = IntArray(64 * 96) { 100 }.apply {
+                for (index in 0..15) this[index] = if (currentSequence % 2 == 0L) 200 else 100
+            }
+            mockk<Bundle> {
+                every { getByteArray("jpeg") } returns byteArrayOf(currentSequence.toByte())
+                every { getIntArray("samples") } returns pixels
+                every { getInt("width") } returns 1080
+                every { getInt("height") } returns 2400
+                every { getLong("capturedAtMs") } returns capturedAt
+                every { getLong("sequence") } returns currentSequence
+                every { getLong("generation") } returns 1
+                every { getString("error") } returns null
+            }
+        }
         return remote
     }
 

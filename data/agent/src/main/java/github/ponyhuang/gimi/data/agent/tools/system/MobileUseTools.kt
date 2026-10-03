@@ -35,11 +35,11 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
     }
 
     private val tools = listOf(
-        action("mobile_observe", "Wait up to about 8 seconds for a quiet screen; return screenshot, observationId, elements and explicit observation status. Quiet does not prove business loading is complete.") { owner, _ ->
+        action("mobile_observe", "Observe the screen with a bounded wait; return screenshot, observationId, elements and explicit observation status. A changing page can still allow actions; check availableActionModes. Quiet does not prove business loading is complete.") { owner, _ ->
             repository.observe(owner)
         },
         action(
-            "mobile_click", "Click an element from the latest observation when its source is allowed by availableActionModes. Native elements use revalidated node actions; OCR text-box taps require settled pixels and are not verified buttons. Stale targets are rejected. Do not repeat a delivered or unknown action because observation timed out.",
+            "mobile_click", "Click an element from the latest observation when its source is allowed by availableActionModes. Native elements use revalidated node actions; OCR text-box taps require an unchanged target region and are not verified buttons. Unrelated animations do not invalidate a fixed target. Stale targets are rejected. Do not repeat a delivered or unknown action because observation timed out.",
             observationProperties + mapOf("elementId" to string("Element ID from nodes in the latest observation.")),
             listOf("observationId", "elementId"),
         ) { owner, args ->
@@ -89,7 +89,7 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
             else repository.tapRelative(owner, observation, x, y)
         },
         action(
-            "mobile_swipe", "Swipe between pixel coordinates on the secondary display.",
+            "mobile_swipe", "Swipe between pixel coordinates on the secondary display when swipe_coordinates is available. The whole page need not settle; the starting region and windows are revalidated. Do not repeat a delivered or unknown swipe because observation timed out.",
             observationProperties + mapOf(
                 "x1" to integer("Start X."), "y1" to integer("Start Y."),
                 "x2" to integer("End X."), "y2" to integer("End Y."),
@@ -170,7 +170,11 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
                     because observation failed or timed out; call mobile_observe instead.
                     observationStatus=settled means quiet pixels, not business loading complete.
                     Check availableActionModes: pixel_coordinates is required for coordinates or
-                    OCR; native_elements allows revalidated native actions even during animations.
+                    OCR; swipe_coordinates allows swipes. native_elements allows revalidated native actions.
+                    A changing page can still allow actions: animations elsewhere do not invalidate a
+                    fixed target. Prefer swiping or a native element when a coordinate target itself changes.
+                    Do not repeatedly wait for the whole page to settle or ask the user to pause
+                    playback merely because unrelated animations continue.
                     If no applicable mode is available, observe again; back is available for navigation.
                     Inspect each
                     returned screenshot, including overlays, quantities and totals, before continuing.

@@ -146,6 +146,22 @@ class MobileUseToolsTest {
     }
 
     @Test
+    fun changingObservationExposesSwipeModeAndDeliveredSwipeIsNotRepeated() = runTest {
+        val observation = MobileObservation("screen-2", "timeout", "changing", 10, 8, "available",
+            actionModes = listOf("native_elements", "pixel_coordinates", "swipe_coordinates", "back"))
+        coEvery { repository.swipe("turn-1", "screen-1", 450, 1200, 450, 400, 450) } returns
+            MobileUseResult("swiped", "sent", actionStatus = "delivered", observation = observation)
+        val payload = tools.getValue("mobile_swipe").execute(context("turn-1"), mapOf(
+            "observationId" to "screen-1", "x1" to 450, "y1" to 1200, "x2" to 450, "y2" to 400,
+        )) as Map<*, *>
+        assertEquals("delivered", payload["actionStatus"])
+        assertEquals("changing", payload["observationReason"])
+        assertEquals(observation.actionModes, payload["availableActionModes"])
+        coVerify(exactly = 1) { repository.swipe("turn-1", "screen-1", 450, 1200, 450, 400, 450) }
+        confirmVerified(repository)
+    }
+
+    @Test
     fun screenshotAndElementsShareExplicitCoordinatesAndPreserveOcrUncertainty() = runTest {
         coEvery { repository.observe("turn-1") } returns MobileUseResult(
             "observed", "quiet", width = 1080, height = 2400,

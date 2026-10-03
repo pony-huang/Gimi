@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
+import github.ponyhuang.gimi.feature.mobileuse.BackgroundAppWindowGeometry
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -32,6 +33,8 @@ class BackgroundAppWindowHost @Inject constructor(
     private val mutableOverlayRunning = MutableStateFlow(false)
     val overlayRunning = mutableOverlayRunning.asStateFlow()
     private var started = false
+    // 与显示会话一样只在进程内记忆；收起、全屏切换和服务重建不重置用户布局。
+    internal var smallWindowGeometry: BackgroundAppWindowGeometry? = null
 
     fun start() {
         if (started) return

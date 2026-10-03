@@ -25,6 +25,7 @@ internal fun BackgroundAppContent(
     small: Boolean,
     modifier: Modifier = Modifier,
     toolbarModifier: Modifier = Modifier,
+    resizeModifier: Modifier = Modifier,
     onCollapsed: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -45,7 +46,7 @@ internal fun BackgroundAppContent(
                         onRelease = { it.cancelGesture() })
                 }
             }
-        }, modifier = modifier, toolbarModifier = toolbarModifier,
+        }, modifier = modifier, toolbarModifier = toolbarModifier, resizeModifier = resizeModifier,
         dialogHost = { dismiss, content ->
             if (small) BackgroundAppOverlayDialog(dismiss, content)
             else Dialog(onDismissRequest = dismiss, content = content)

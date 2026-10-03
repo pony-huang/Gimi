@@ -236,7 +236,7 @@ class ShizukuMobileUseRepository @Inject constructor(
             if (!inside(screen.frame, x, y)) return@onObserved invalid("invalid_argument", "Point outside screenshot.")
             val accessibility = MobileTextAccessibilityService.current()
                 ?: return@onObserved invalid("accessibility_required",
-                    "Enable Gimi Background App Control · Text Input in Accessibility settings.")
+                    "Enable Gimi Text Input in Accessibility settings.")
             fun replace() = attempt(delivery) {
                 accessibility.replaceText(id, screen.frame.width, screen.frame.height, x, y, text)
             }

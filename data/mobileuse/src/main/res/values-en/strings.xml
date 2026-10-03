@@ -1,4 +1,4 @@
 <resources>
-    <string name="mobile_text_accessibility_label">Gimi Background App Control · Text Input</string>
-    <string name="mobile_text_accessibility_description">Finds editable fields on the virtual display and fills them during Background App Control.</string>
+    <string name="mobile_text_accessibility_label">Gimi Text Input</string>
+    <string name="mobile_text_accessibility_description">Enters text in background apps.</string>
 </resources>

@@ -12,6 +12,7 @@ import com.google.adk.kt.plugins.LoggingPlugin
 import com.google.adk.kt.plugins.Plugin
 import com.google.adk.kt.runners.InMemoryRunner
 import com.google.adk.kt.sessions.SessionService
+import com.google.adk.kt.sessions.SessionKey
 import com.google.adk.kt.summarizer.EventsCompactionConfig
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FileData
@@ -26,19 +27,18 @@ import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfigura
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
-import github.ponyhuang.gimi.domain.conversation.repository.ChatSessionRewindException
 import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -181,9 +181,15 @@ class AgentChatRunner(
         suspend fun send(
             text: String,
             fileAttachments: List<FileAttachment> = emptyList(),
-            rewindBeforeInvocationId: String? = null,
+            retry: Boolean = false,
         ): Flow<Event> {
-            val parts = buildList {
+            val resumeInvocationId = if (retry) {
+                // 用户事件先于模型输出落盘；即使首个输出前报错，也从 SDK 日志取回原执行。
+                runner.sessionService.getSession(
+                    SessionKey(APP_NAME, userId, sessionId),
+                )?.events?.lastOrNull { it.invocationId != null }?.invocationId
+            } else null
+            val parts = if (resumeInvocationId != null) emptyList() else buildList {
                 text.takeIf(String::isNotBlank)?.let { add(Part(text = it)) }
                 fileAttachments.forEach { attachment ->
                     add(
@@ -203,30 +209,24 @@ class AgentChatRunner(
                 role = Role.USER,
                 parts = parts,
             )
-            rewindBeforeInvocationId?.let { rewindInvocationId ->
-                try {
-                    runner.rewindAsync(userId, sessionId, rewindInvocationId)
-                } catch (failure: CancellationException) {
-                    throw failure
-                } catch (failure: Exception) {
-                    // 回滚失败发生在 runAsync 之前，不能把尚未创建的新 invocation 当成下次回滚点。
-                    throw ChatSessionRewindException(failure)
-                }
-            }
             return runner.runAsync(
                 userId = userId,
                 sessionId = sessionId,
-                // ADK 0.8.0 在 isResumable=true 下：非空 invocationId 会被当成"恢复既有 invocation"，
-                // 恢复分支要求 session 已有事件；全新会话首条消息会因此抛 "Session ... has no events to resume"。
-                // 新消息必须传 null 让 ADK 自建 invocation；真实 id 由事件回流携带，用作失败轮回退边界。
-                invocationId = null,
-                newMessage = newMessage,
+                // 没有已保存的执行时才发送原请求；恢复时不重复写入用户事件。
+                invocationId = resumeInvocationId,
+                newMessage = newMessage.takeIf { resumeInvocationId == null },
                 stateDelta = null,
                 runConfig = RunConfig(
                     streamingMode = StreamingMode.SSE,
                     customMetadata = customMetadata,
                 ),
-            ).flowOn(Dispatchers.IO).releaseMobileUseOnCompletion()
+            ).transform { event ->
+                emit(event)
+                // SDK 错误事件也属于失败；立即结束收集，避免被记为已完成而无法恢复。
+                if (event.errorCode != null || !event.errorMessage.isNullOrBlank()) {
+                    throw IllegalStateException(event.errorMessage ?: event.errorCode)
+                }
+            }.flowOn(Dispatchers.IO).releaseMobileUseOnCompletion()
         }
 
         /**

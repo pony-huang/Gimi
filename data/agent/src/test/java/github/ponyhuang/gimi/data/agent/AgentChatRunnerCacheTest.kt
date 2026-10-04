@@ -2,7 +2,18 @@ package github.ponyhuang.gimi.data.agent
 
 import com.google.adk.kt.agents.LlmAgent
 import com.google.adk.kt.events.Event
-import com.google.adk.kt.events.EventActions
+import com.google.adk.kt.models.Model
+import com.google.adk.kt.models.LlmRequest
+import com.google.adk.kt.models.LlmResponse
+import com.google.adk.kt.types.Content
+import com.google.adk.kt.types.Part
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.awaitCancellation
+import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import com.google.adk.kt.sessions.InMemorySessionService
 import com.google.adk.kt.sessions.SessionKey
 import com.google.adk.kt.sessions.SessionService
@@ -83,37 +94,71 @@ class AgentChatRunnerCacheTest {
     }
 
     @Test
-    fun retryUsesAdkRewindBeforeStartingTheNewInvocation() = runTest {
+    fun retryResumesSdkInvocationWithoutAppendingAnotherUserMessage() = runTest {
+        verifySdkRetry(failureMode = "exception")
+    }
+
+    @Test
+    fun retryAfterCancellationResumesWithoutAppendingAnotherUserMessage() = runTest {
+        verifySdkRetry(failureMode = "cancel")
+    }
+
+    @Test
+    fun retryAfterSdkErrorEventResumesWithoutAppendingAnotherUserMessage() = runTest {
+        verifySdkRetry(failureMode = "error")
+    }
+
+    private suspend fun verifySdkRetry(failureMode: String) {
         val sessions = InMemorySessionService()
         val key = SessionKey(AgentChatRunner.APP_NAME, "user", "session")
-        val session = sessions.createSession(key)
-        sessions.appendEvent(
-            session,
-            Event(
-                invocationId = "attempt-1",
-                author = "agent",
-                actions = EventActions(stateDelta = mutableMapOf<String, Any>("result" to "partial")),
-            ),
-        )
+        var modelCalls = 0
+        val model = object : Model {
+            override val name = "test-model"
+            override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {
+                modelCalls++
+                if (modelCalls == 1) {
+                    if (failureMode == "exception") throw java.io.IOException("offline")
+                    if (failureMode == "error") {
+                        emit(LlmResponse(errorCode = "unavailable", errorMessage = "offline"))
+                        return@flow
+                    }
+                    emit(LlmResponse(
+                        content = Content(role = "model", parts = listOf(Part(text = "部分输出"))),
+                        partial = true,
+                    ))
+                    awaitCancellation()
+                }
+                emit(LlmResponse(content = Content(role = "model", parts = listOf(Part(text = "恢复成功")))))
+            }
+        }
         val runner = AgentChatRunner(
-            factory = { runtime() },
+            factory = { runtime().copy(agent = LlmAgent(name = "agent", model = model)) },
             sessionService = sessions,
             artifactService = null,
             memoryService = InMemoryMemoryService(),
             toolAccessRepository = FakeToolAccessRepository(),
         )
-
-        runner.createExecution(
-            userId = "user",
-            sessionId = "session",
-            selection = ModelSelection("service", "group", "model"),
-        ).send(
-            text = "retry",
-            rewindBeforeInvocationId = "attempt-1",
-        )
-
-        val rewound = sessions.getSession(key)!!
-        assertNull(rewound.state["result"])
+        val execution = runner.createExecution("user", "session")
+        if (failureMode != "cancel") {
+            try {
+                execution.send("你想想").toList()
+                fail("Expected model failure")
+            } catch (failure: Exception) {
+                assertTrue(failure is java.io.IOException || failure is IllegalStateException)
+                // 首个模型输出前失败，SDK 已保存用户事件，但 UI 尚未获得 invocationId。
+            }
+        } else {
+            // 首段输出后取消收集，模拟用户暂停。
+            execution.send("你想想").take(1).toList()
+        }
+        val originalInvocationId = sessions.getSession(key)!!.events.first { it.author == "user" }.invocationId
+        val recovered = execution.send("你想想", retry = true).toList()
+        val events = sessions.getSession(key)!!.events
+        assertEquals(2, modelCalls)
+        assertEquals(1, events.count { it.author == "user" })
+        assertTrue(events.none { it.actions.rewindBeforeInvocationId != null })
+        assertTrue(recovered.isNotEmpty())
+        assertTrue(recovered.all { it.invocationId == originalInvocationId })
     }
 
     @Test

@@ -98,7 +98,7 @@ class AdkChatAgentRepositoryMappingTest {
     }
 
     @Test
-    fun retryDelegatesStableInvocationIdsToTheAdkRunner() = runTest {
+    fun retryDelegatesResumeFlagToTheAdkRunner() = runTest {
         coEvery {
             execution.send(any(), any(), any())
         } returns flowOf(adkEvent())
@@ -106,14 +106,14 @@ class AdkChatAgentRepositoryMappingTest {
         repository.createExecution("session-1", selection).send(
             text = "retry",
             fileAttachments = emptyList(),
-            rewindBeforeInvocationId = "attempt-1",
+            retry = true,
         ).toList()
 
         coVerify {
             execution.send(
                 text = "retry",
                 fileAttachments = emptyList(),
-                rewindBeforeInvocationId = "attempt-1",
+                retry = true,
             )
         }
     }

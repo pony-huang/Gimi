@@ -10,6 +10,8 @@ import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.McpJson
 import io.modelcontextprotocol.kotlin.sdk.types.Tool as McpSchemaTool
 import io.modelcontextprotocol.kotlin.sdk.types.ToolAnnotations
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import github.ponyhuang.gimi.domain.mcp.model.McpToolSummary
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
@@ -92,6 +94,13 @@ internal constructor(
     }
     return mcpSessionManager.getSession(headers, stale = session).block()
   }
+
+  /** 查看工具信息应保留原始入参，避免 ADK 转换丢失默认值、枚举或联合类型。 */
+  internal fun summary(): McpToolSummary = McpToolSummary(
+    name = name,
+    description = description,
+    inputSchema = McpJson.encodeToJsonElement(ToolSchema.serializer(), mcpSchemaTool.inputSchema) as JsonObject,
+  )
 
   internal val annotations: ToolAnnotations?
     get() = mcpSchemaTool.annotations

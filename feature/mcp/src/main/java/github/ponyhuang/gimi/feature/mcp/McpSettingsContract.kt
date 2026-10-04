@@ -17,15 +17,25 @@ data class McpEditorDraft(
     val isEnabled: Boolean,
 )
 
-/** 列表展开的服务器能力状态；[Loaded]/[Failed] 携带探测时的配置快照用于失效判断。 */
+/** 服务器工具详情的能力状态；[Loaded]/[Failed] 携带探测时的配置快照用于失效判断。 */
 sealed interface ServerCapabilityState {
-    data object Loading : ServerCapabilityState
+    /** 正在读取指定配置的工具声明。 */
+    data class Loading(val serverSnapshot: McpServer) : ServerCapabilityState
+    /** 已读取的声明及其配置快照，用于识别过期缓存。 */
     data class Loaded(val result: McpProbeResult, val serverSnapshot: McpServer) : ServerCapabilityState
+    /** 安全错误信息及失败时的配置快照，可显式重试。 */
     data class Failed(val message: String, val serverSnapshot: McpServer) : ServerCapabilityState
 }
 
+/**
+ * MCP 配置与独立工具详情页面的不可变状态。
+ * @property menuServerId 正在显示操作菜单的服务器 ID。
+ * @property toolsServerId 当前查看工具详情的服务器 ID。
+ * @property expandedToolNames 当前服务器已展开的工具名称，不触发额外探测。
+ */
 data class McpSettingsUiState(
     val servers: List<McpServer> = emptyList(),
+    val isLoadingServers: Boolean = true,
     val importJson: String = "",
     val importResult: McpImportResult? = null,
     val editor: McpEditorDraft? = null,
@@ -33,13 +43,20 @@ data class McpSettingsUiState(
     val isMutationBlocked: Boolean = false,
     val isTestingConnection: Boolean = false,
     val connectionError: String? = null,
-    val expandedServerId: String? = null,
+    val menuServerId: String? = null,
+    val toolsServerId: String? = null,
+    val expandedToolNames: Set<String> = emptySet(),
     val capabilities: Map<String, ServerCapabilityState> = emptyMap(),
 )
 
 sealed interface McpSettingsAction {
     data class ToggleServer(val server: McpServer, val enabled: Boolean) : McpSettingsAction
-    data class ServerCardClicked(val serverId: String) : McpSettingsAction
+    /** 打开或关闭某个服务器的操作菜单。 */
+    data class ServerMenuChanged(val serverId: String?) : McpSettingsAction
+    /** 进入指定服务器的工具详情，并按配置快照加载能力。 */
+    data class LoadTools(val serverId: String) : McpSettingsAction
+    /** 展开或收起当前服务器工具详情，不发起网络请求。 */
+    data class ToggleTool(val toolName: String) : McpSettingsAction
     data class RefreshCapabilities(val serverId: String) : McpSettingsAction
     data class ImportJsonChanged(val value: String) : McpSettingsAction
     data object ImportServers : McpSettingsAction

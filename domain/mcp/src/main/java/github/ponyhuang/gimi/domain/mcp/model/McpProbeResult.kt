@@ -1,8 +1,15 @@
 package github.ponyhuang.gimi.domain.mcp.model
 
+import kotlinx.serialization.json.JsonObject
+
+/**
+ * 服务器声明的工具及原始入参定义，供详情展示使用，不经过模型供应商的 schema 转换。
+ * @property inputSchema 工具原始 JSON Schema；未提供时为空。
+ */
 data class McpToolSummary(
     val name: String,
     val description: String = "",
+    val inputSchema: JsonObject? = null,
 )
 
 /**

@@ -15,6 +15,7 @@ import github.ponyhuang.gimi.domain.mcp.usecase.ObserveMcpServersUseCase
 import github.ponyhuang.gimi.domain.mcp.usecase.TestMcpConnectionUseCase
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,6 +34,7 @@ class McpSettingsViewModel @Inject constructor(
     private val fetchCapabilities: FetchMcpServerCapabilitiesUseCase,
 ) : ViewModel() {
     private val localState = MutableStateFlow(LocalState())
+    private val capabilityRequests = mutableMapOf<String, Job>()
 
     private val _effects = MutableSharedFlow<McpSettingsEffect>(extraBufferCapacity = 1)
     val effects = _effects.asSharedFlow()
@@ -41,6 +43,7 @@ class McpSettingsViewModel @Inject constructor(
             servers, local, runtimeState ->
         McpSettingsUiState(
             servers = servers,
+            isLoadingServers = false,
             importJson = local.importJson,
             importResult = local.importResult,
             editor = local.editor,
@@ -48,7 +51,9 @@ class McpSettingsViewModel @Inject constructor(
             isMutationBlocked = runtimeState.isBusy,
             isTestingConnection = local.isTestingConnection,
             connectionError = local.connectionError,
-            expandedServerId = local.expandedServerId?.takeIf { id -> servers.any { it.id == id } },
+            menuServerId = local.menuServerId?.takeIf { id -> servers.any { it.id == id } },
+            toolsServerId = local.toolsServerId?.takeIf { id -> servers.any { it.id == id } },
+            expandedToolNames = local.expandedToolNames,
             // 服务器被删除后丢弃其能力缓存。
             capabilities = local.capabilities.filterKeys { id -> servers.any { it.id == id } },
         )
@@ -62,7 +67,12 @@ class McpSettingsViewModel @Inject constructor(
         when (action) {
             is McpSettingsAction.ToggleServer ->
                 mutate { manageServers.save(action.server.copy(isEnabled = action.enabled)) }
-            is McpSettingsAction.ServerCardClicked -> onServerCardClicked(action.serverId)
+            is McpSettingsAction.ServerMenuChanged -> localState.update { it.copy(menuServerId = action.serverId) }
+            is McpSettingsAction.LoadTools -> loadTools(action.serverId)
+            is McpSettingsAction.ToggleTool -> localState.update {
+                val expanded = it.expandedToolNames
+                it.copy(expandedToolNames = if (action.toolName in expanded) expanded - action.toolName else expanded + action.toolName)
+            }
             is McpSettingsAction.RefreshCapabilities -> refreshCapabilities(action.serverId)
             is McpSettingsAction.ImportJsonChanged -> localState.update {
                 it.copy(importJson = action.value, importResult = null)
@@ -160,10 +170,12 @@ class McpSettingsViewModel @Inject constructor(
         }
     }
 
-    private fun onServerCardClicked(serverId: String) {
-        val collapsing = localState.value.expandedServerId == serverId
-        localState.update { it.copy(expandedServerId = if (collapsing) null else serverId) }
-        if (!collapsing) fetchCapabilitiesIfStale(serverId)
+    private fun loadTools(serverId: String) {
+        localState.update {
+            it.copy(menuServerId = null, toolsServerId = serverId,
+                expandedToolNames = if (it.toolsServerId == serverId) it.expandedToolNames else emptySet())
+        }
+        fetchCapabilitiesIfStale(serverId)
     }
 
     private fun refreshCapabilities(serverId: String) {
@@ -176,14 +188,17 @@ class McpSettingsViewModel @Inject constructor(
         val server = uiState.value.servers.firstOrNull { it.id == serverId } ?: return
         val cached = localState.value.capabilities[serverId]
         val snapshot = when (cached) {
+            is ServerCapabilityState.Loading -> cached.serverSnapshot
             is ServerCapabilityState.Loaded -> cached.serverSnapshot
             is ServerCapabilityState.Failed -> cached.serverSnapshot
             else -> null
         }
-        if (cached is ServerCapabilityState.Loading || snapshot == server) return
+        if (snapshot == server) return
 
-        localState.update { it.copy(capabilities = it.capabilities + (serverId to ServerCapabilityState.Loading)) }
-        viewModelScope.launch {
+        capabilityRequests.remove(serverId)?.cancel()
+        val loading = ServerCapabilityState.Loading(server)
+        localState.update { it.copy(capabilities = it.capabilities + (serverId to loading)) }
+        capabilityRequests[serverId] = viewModelScope.launch {
             val result = probeSafely { fetchCapabilities(serverId) }
             val next = when {
                 result.reachable -> ServerCapabilityState.Loaded(result, server)
@@ -192,7 +207,10 @@ class McpSettingsViewModel @Inject constructor(
                     server,
                 )
             }
-            localState.update { it.copy(capabilities = it.capabilities + (serverId to next)) }
+            // 编辑或删除期间返回的旧探测结果不能覆盖新配置的详情。
+            if (uiState.value.servers.firstOrNull { it.id == serverId } == server) {
+                localState.update { it.copy(capabilities = it.capabilities + (serverId to next)) }
+            }
         }
     }
 
@@ -209,6 +227,7 @@ class McpSettingsViewModel @Inject constructor(
         viewModelScope.launch { runWhenAgentIdle { block() } }
     }
 
+    /** 编辑器、服务器菜单与工具详情的本地交互状态。 */
     private data class LocalState(
         val importJson: String = "",
         val importResult: McpImportResult? = null,
@@ -216,7 +235,9 @@ class McpSettingsViewModel @Inject constructor(
         val isTransportMenuExpanded: Boolean = false,
         val isTestingConnection: Boolean = false,
         val connectionError: String? = null,
-        val expandedServerId: String? = null,
+        val menuServerId: String? = null,
+        val toolsServerId: String? = null,
+        val expandedToolNames: Set<String> = emptySet(),
         val capabilities: Map<String, ServerCapabilityState> = emptyMap(),
     )
 

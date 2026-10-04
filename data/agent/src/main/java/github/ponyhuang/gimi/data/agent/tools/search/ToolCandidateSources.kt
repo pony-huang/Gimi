@@ -5,10 +5,9 @@ import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.data.agent.McpToolsetHandle
 import github.ponyhuang.gimi.data.agent.tools.modelRuntimeMetadataOrNull
-import github.ponyhuang.gimi.data.agent.tools.toolConfigurationOrNull
 import github.ponyhuang.gimi.data.agent.tools.official.DefaultOfficialToolset
-import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolSpec
-import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
+import github.ponyhuang.gimi.data.agent.tools.toolConfigurationOrNull
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSpec
 
 /**
  * 单个 MCP server 在 [ToolSearchToolset] 中的候选来源。
@@ -17,8 +16,8 @@ import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
  * - 模型 `tool_search` 命中时直接拿到 server 名称（如"filesystem""github"），便于按来源细看；
  * - registry 单 server 发现失败时只丢弃对应 source，其它 server 仍暴露。
  *
- * 创建方是 [github.ponyhuang.gimi.data.agent.AgentFactory.createSearchAgent]，
- * 每次构建按 [McpToolsetRegistry] 的解析结果一次性注册；registry 内部会缓存同一组
+ * 创建方是 `McpToolContribution`，每次构建按 `McpToolsetRegistry` 的解析结果
+ * 一次性注册；registry 内部会缓存同一组
  * 服务器选择的 Toolset，因此重复触发 `getTools` 不会重建连接。
  */
 internal class McpServerSource(
@@ -28,9 +27,8 @@ internal class McpServerSource(
     override val displayName: String = handle.displayName
 
     override suspend fun loadAllTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
-        // 单个 server 发现失败（不可达 / 超时）只丢弃该来源，不影响索引中的其它来源。
-        cancellationAwareRunCatching { handle.toolset.getTools(readonlyContext) }
-            .getOrDefault(emptyList())
+        // 失败交给搜索层隔离并生成脱敏提示；不能伪装成成功的空目录，否则会被缓存。
+        handle.toolset.getTools(readonlyContext)
 
     override suspend fun loadEnabledTools(
         readonlyContext: ReadonlyContext?,

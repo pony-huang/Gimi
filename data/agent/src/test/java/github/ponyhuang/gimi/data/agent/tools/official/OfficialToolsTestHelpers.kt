@@ -1,8 +1,12 @@
 package github.ponyhuang.gimi.data.agent.tools.official
 
-import github.ponyhuang.gimi.data.agent.tools.official.kimi.KimiFormulaCache
+import github.ponyhuang.gimi.data.modelcatalog.official.DefaultOfficialToolFunctionCatalog
+import github.ponyhuang.gimi.data.modelcatalog.official.kimi.KimiFormulaCache
+import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSupport
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
+import github.ponyhuang.gimi.domain.modelcatalog.repository.KimiFormulaSource
 import io.mockk.every
 import io.mockk.mockk
 import okhttp3.MediaType.Companion.toMediaType
@@ -33,6 +37,7 @@ fun servicesWith(
         every { isEnabled } returns true
         every { isOfficialToolsEnabled } returns true
         every { this@mockk.apiKey } returns apiKey
+        every { apiProtocol } returns ApiProtocol.Standard
     }
     return mockk {
         every { currentServices() } returns listOf(service)
@@ -56,3 +61,10 @@ fun cannedClient(
             .build()
     }
     .build()
+
+/** 同一目录与声明缓存同时供 UI 查询和 Agent 工厂使用。 */
+fun testCatalog(
+    modelServices: AgentModelConfigurationSource = emptyServices(),
+    httpClient: OkHttpClient = testHttpClient(),
+    kimiFormulas: KimiFormulaSource = testKimiFormulaCache(httpClient),
+) = DefaultOfficialToolFunctionCatalog(OfficialToolSupport(), modelServices, kimiFormulas)

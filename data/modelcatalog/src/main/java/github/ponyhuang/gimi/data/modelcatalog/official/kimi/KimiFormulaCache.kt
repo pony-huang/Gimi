@@ -1,5 +1,8 @@
-package github.ponyhuang.gimi.data.agent.tools.official.kimi
+package github.ponyhuang.gimi.data.modelcatalog.official.kimi
 
+import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
+import github.ponyhuang.gimi.domain.modelcatalog.model.FormulaDeclaration
+import github.ponyhuang.gimi.domain.modelcatalog.repository.KimiFormulaSource
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.sync.Mutex
@@ -17,7 +20,7 @@ import okhttp3.OkHttpClient
 class KimiFormulaCache internal constructor(
     private val loader: suspend (apiKey: String) -> List<FormulaDeclaration>,
     private val nowMillis: () -> Long,
-) {
+) : KimiFormulaSource {
     @Inject
     constructor(httpClient: OkHttpClient) : this(
         loader = { apiKey ->
@@ -32,7 +35,7 @@ class KimiFormulaCache internal constructor(
     private val mutex = Mutex()
     private val entries = mutableMapOf<CacheKey, CacheEntry>()
 
-    internal suspend fun fetch(
+    override suspend fun fetch(
         serviceId: String,
         apiKey: String,
     ): List<FormulaDeclaration> = mutex.withLock {
@@ -45,7 +48,7 @@ class KimiFormulaCache internal constructor(
             ?.takeIf { entry -> now - entry.loadedAtMillis < CACHE_DURATION_MILLIS }
             ?.let { entry -> return@withLock entry.declarations }
 
-        val declarations = runCatching { loader(apiKey) }
+        val declarations = cancellationAwareRunCatching { loader(apiKey) }
             .getOrElse { return@withLock emptyList() }
             .toList()
         entries[key] = CacheEntry(

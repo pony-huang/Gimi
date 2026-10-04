@@ -23,7 +23,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
-    implementation(libs.openai.java)
     ksp(libs.androidx.room.compiler)
 
     testImplementation(libs.junit)

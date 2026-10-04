@@ -5,8 +5,10 @@ import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolBinding
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSpec
 import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * 全局唯一的官方工具请求期组装器 — 所有厂商的官方工具都由它在
@@ -14,16 +16,17 @@ import javax.inject.Singleton
  *
  * 每次解析的流程(见 [resolveTools]):
  *
- * 1. [OfficialToolRegistry.specsFor] 按服务 + 协议 + 模型家族门控出适用声明;
+ * 1. [OfficialToolFunctionCatalog.availableSpecsFor] 按服务 + 协议 + 模型家族门控出适用声明;
  * 2. Tool access ON_DEMAND 模式下跳过 [OfficialToolSpec.searchCandidate] 声明,
  *    它们改由 tool_search 检索候选源按需暴露;
  * 3. 会话级开关([ConversationToolConfiguration],厂商唯一 toolId)决定工具是否注入;
  * 4. 函数级勾选过滤展开为普通声明的工具(GLM/Kimi);厂商原生工具单函数,天然通过。
  *
- * 厂商差异全部收敛在注册表声明里,新增厂商不需要新的 Toolset 类。
+ * 厂商差异全部收敛在目录声明里,新增厂商不需要新的 Toolset 类。
  */
 class DefaultOfficialToolset @Inject constructor(
-    private val registry: OfficialToolRegistry,
+    private val catalog: OfficialToolFunctionCatalog,
+    private val factory: OfficialToolFactory,
     private val toolAccessRepository: ToolAccessRepository,
 ) : OfficialToolset {
 
@@ -32,7 +35,7 @@ class DefaultOfficialToolset @Inject constructor(
         selection: ConversationToolConfiguration?,
     ): List<BaseTool> {
         val onDemand = toolAccessRepository.defaultToolAccessMode.value == ToolAccessMode.ON_DEMAND
-        return registry.availableSpecsFor(
+        return catalog.availableSpecsFor(
             serviceId = config.serviceId,
             protocol = config.baseType,
             modelId = config.modelId,
@@ -53,7 +56,7 @@ class DefaultOfficialToolset @Inject constructor(
         selection: ConversationToolConfiguration?,
     ): List<BaseTool> {
         if (!selection.isOfficialToolEnabled(spec.toolId)) return emptyList()
-        val tools = registry.createTools(spec)
+        val tools = factory.createTools(spec)
         // 函数级勾选只作用于本地执行的工具(工具名即函数 ID);厂商声明/Gemini 原生
         // 工具单工具单函数,工具名是厂商 wire 字面量,工具级开关已足够。
         if (spec.binding !is OfficialToolBinding.LocalFunctions) return tools

@@ -23,14 +23,14 @@ import org.junit.Test
 class MobileUseExecutionLifecycleTest {
     private val repository = mockk<MobileUseRepository>(relaxed = true)
 
-    private fun execution(events: Flow<Event>): AgentChatRunner.Execution {
+    private fun execution(events: Flow<Event>): AgentChatExecution {
         val runner = mockk<InMemoryRunner>()
         coEvery { runner.runAsync(any(), any(), any(), any(), any(), any()) } returns events
         val metadata = ToolRunMetadata.of(
             ModelRuntimeMetadata("service", ApiProtocol.Standard, "vision", "https://example.com", true),
             null, true, mobileUseOwner = "turn",
         )
-        return AgentChatRunner.Execution("user", "chat", runner, metadata, repository)
+        return AgentChatExecution("user", "chat", runner, metadata, repository)
     }
 
     @Test

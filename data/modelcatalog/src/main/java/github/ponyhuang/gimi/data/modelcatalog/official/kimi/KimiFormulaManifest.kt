@@ -1,15 +1,14 @@
-package github.ponyhuang.gimi.data.agent.tools.official.kimi
+package github.ponyhuang.gimi.data.modelcatalog.official.kimi
 
-import com.google.adk.kt.types.Schema
+import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
+import github.ponyhuang.gimi.domain.modelcatalog.model.FormulaDeclaration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -17,24 +16,9 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 /**
- * One user-facing function exposed by a Moonshot formula URI.
+ * Moonshot formula manifest fetcher without Agent SDK dependencies.
  *
- * @property name Function name sent to the model.
- * @property description Human-readable capability description used for discovery.
- * @property parameters Optional ADK parameter declaration.
- * @property formulaUri Moonshot formula endpoint identifier used during execution.
- */
-internal data class FormulaDeclaration(
-    val name: String,
-    val description: String,
-    val parameters: Schema?,
-    val formulaUri: String,
-)
-
-/**
- * Vendor-neutral fetcher for the Moonshot formula manifest.
- *
- * Used both by the official tool registry (to build ADK `FunctionTool`s) and by the
+ * Used both by the Agent tool factory and by the
  * function catalog implementation (to populate the user-selection UI). Network
  * access is parallelised across [FORMULA_URIS] with results deduplicated by
  * tool name; the first occurrence wins so the fiber endpoint URL stays stable
@@ -46,14 +30,16 @@ internal class KimiFormulaManifest(
 ) {
     suspend fun fetch(): List<FormulaDeclaration> = withContext(Dispatchers.IO) {
 
-        coroutineScope {
+        val results = coroutineScope {
             FORMULA_URIS.map { uri ->
                 async {
-                    runCatching { load(uri) }
-                        .getOrDefault(emptyList())
+                    cancellationAwareRunCatching { load(uri) }
                 }
             }.awaitAll()
-        }.flatten().deduplicate()
+        }
+        // 全部端点失败不能当作成功的空目录缓存，否则恢复网络后仍需等待五分钟。
+        if (results.all { it.isFailure }) results.first().getOrThrow()
+        results.flatMap { it.getOrDefault(emptyList()) }.deduplicate()
     }
 
     private fun load(uri: String): List<FormulaDeclaration> {
@@ -78,7 +64,7 @@ internal class KimiFormulaManifest(
             FormulaDeclaration(
                 name = name,
                 description = function["description"]?.jsonPrimitive?.content ?: name,
-                parameters = function["parameters"]?.jsonObject?.toAdkSchema(),
+                parameters = function["parameters"]?.jsonObject,
                 formulaUri = formulaUri,
             )
         }
@@ -107,12 +93,3 @@ internal class KimiFormulaManifest(
         )
     }
 }
-
-private fun JsonObject.toAdkSchema(): Schema = Schema(
-    description = this["description"]?.jsonPrimitive?.content,
-    properties = this["properties"]?.jsonObject?.mapValues { (_, value) ->
-        value.jsonObject.toAdkSchema()
-    },
-    items = this["items"]?.jsonObject?.toAdkSchema(),
-    required = this["required"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull },
-)

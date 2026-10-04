@@ -47,8 +47,12 @@ class MobileUseAvailabilityTest {
         val processed = toolset.processLlmRequest(toolContext, request)
         val instructions = processed.config.systemInstruction?.parts.orEmpty()
             .mapNotNull { it.text }.joinToString("\n")
+            .replace(Regex("\\s+"), " ")
         assertTrue(instructions.contains("background display associated with this chat"))
-        assertTrue(instructions.contains("the app stays open until the user closes it"))
+        assertTrue(instructions.contains("call mobile_stop when done"))
+        assertTrue(instructions.contains("releases this execution and hides preview windows"))
+        assertTrue(instructions.contains("the background app remains available for this chat"))
+        assertTrue(instructions.contains("can be reopened by the user from the notification"))
         assertTrue(instructions.contains("request passwords or verification codes in chat or tool arguments"))
     }
 

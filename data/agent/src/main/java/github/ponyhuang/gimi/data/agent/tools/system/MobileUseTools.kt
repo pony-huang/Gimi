@@ -138,7 +138,7 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
                 "seconds" to seconds,
             )
         },
-        action("mobile_stop", "Finish this execution's display use. Keep the background app open for the user and future turns in this chat.") { owner, _ ->
+        action("mobile_stop", "Finish this execution's display use and hide preview windows. Keep the background app available for future turns in this chat.") { owner, _ ->
             repository.finishExecution(owner)
         },
     )
@@ -186,7 +186,8 @@ class MobileUseTools @Inject constructor(private val repository: MobileUseReposi
                     the page again before continuing after user input; do not assume the prior
                     input field or page remains active. Honor the user's consent for sensitive actions.
                     Wait for progress when needed, and call mobile_stop when done. This releases
-                    only this execution; the app stays open until the user closes it. If session_closed
+                    this execution and hides preview windows; the background app remains available
+                    for this chat and can be reopened by the user from the notification. If session_closed
                     is returned, do not reopen during this execution. Other chats must first close
                     the existing background app.
                     If a tool reports that Shizuku permission or device support is unavailable, explain the

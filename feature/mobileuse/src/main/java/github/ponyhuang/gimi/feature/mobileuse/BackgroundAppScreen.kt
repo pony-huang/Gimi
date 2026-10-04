@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.HorizontalRule
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.OpenInFull
 import androidx.compose.material.icons.outlined.SouthEast
+import androidx.compose.material.icons.outlined.ScreenRotation
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
@@ -108,6 +109,12 @@ fun BackgroundAppScreen(
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null, modifier = Modifier.size(20.dp))
                     Text(stringResource(R.string.background_app_back), modifier = Modifier.padding(start = 8.dp))
                 }
+                IconButton(onClick = { onAction(BackgroundAppAction.Rotate) },
+                    enabled = state.session != null && !state.rotating, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Outlined.ScreenRotation, contentDescription = stringResource(
+                        if (state.session?.let { it.width > it.height } == true) R.string.background_app_rotate_portrait
+                        else R.string.background_app_rotate_landscape))
+                }
                 Box(Modifier.weight(1f))
                 if (smallWindow) {
                     Text(stringResource(R.string.background_app_resize_hint), style = MaterialTheme.typography.labelSmall,
@@ -136,6 +143,13 @@ fun BackgroundAppScreen(
                     }
                     TextButton(onClick = onOverlayPermission) { Text(stringResource(R.string.background_app_overlay_permission)) }
                 }
+            }
+        }
+    }
+    if (state.rotationUnavailable) {
+        dialogHost({ onAction(BackgroundAppAction.DismissRotationError) }) {
+            BackgroundAppDialogContent(onConfirm = { onAction(BackgroundAppAction.DismissRotationError) }) {
+                Text(stringResource(R.string.background_app_rotation_unavailable))
             }
         }
     }

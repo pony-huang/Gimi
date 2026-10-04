@@ -60,7 +60,7 @@ class ShizukuMobileUseRepository @Inject constructor(
     private val args by lazy {
         Shizuku.UserServiceArgs(
             ComponentName(context.packageName, ShellMobileUseService::class.java.name),
-        ).tag("gimi.mobileuse.shell").version(4).daemon(false).processNameSuffix("mobileuse")
+        ).tag("gimi.mobileuse.shell").version(5).daemon(false).processNameSuffix("mobileuse")
     }
     private val guard = MobileObservationGuard()
     @Volatile private var physicalSessionId: String? = null
@@ -82,8 +82,10 @@ class ShizukuMobileUseRepository @Inject constructor(
                 }
                 val remote = service ?: continue
                 try {
-                    val geometry = remote.geometry(current.displayId)
-                    sessions.update(current.id, geometry[0], geometry[1])
+                    inputMutex.withLock {
+                        val geometry = remote.geometry(current.displayId)
+                        sessions.update(current.id, geometry[0], geometry[1])
+                    }
                 } catch (_: DeadObjectException) {
                     if (service === remote) mutex.withLock { if (service === remote) closeLocked() }
                 } catch (_: RemoteException) {
@@ -258,7 +260,7 @@ class ShizukuMobileUseRepository @Inject constructor(
                 return@withLock invalid("not_active", "This execution no longer owns the display.")
             }
             guard.reset()
-            MobileUseResult("execution_finished", "Execution released. Background app remains open for this chat until the user closes it.", displayId,
+            MobileUseResult("execution_finished", "Execution released and preview windows hidden. Background app remains available for this chat.", displayId,
                 actionStatus = "delivered")
         }
     }
@@ -280,6 +282,16 @@ class ShizukuMobileUseRepository @Inject constructor(
     override suspend fun manualBack(sessionId: String): MobileUseResult = manual(sessionId) { remote, id ->
         remote.back(id)
         MobileUseResult("delivered", "", actionStatus = "delivered")
+    }
+
+    override suspend fun manualRotate(sessionId: String): MobileUseResult {
+        val result = manual(sessionId) { remote, id ->
+            val geometry = remote.rotateDisplay(id)
+            require(geometry.size >= 2 && geometry[0] > 0 && geometry[1] > 0)
+            sessions.update(sessionId, geometry[0], geometry[1])
+            MobileUseResult("delivered", "", displayId = id, width = geometry[0], height = geometry[1], actionStatus = "delivered")
+        }
+        return if (result.status == "input_unavailable") invalid("rotation_unavailable", "Display orientation could not be changed.") else result
     }
 
     override suspend fun attachPreview(sessionId: String, bindingId: String, surface: Surface, width: Int, height: Int): MobileUseResult =

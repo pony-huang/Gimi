@@ -284,6 +284,8 @@ class BackgroundAppWindowService : Service() {
             val requested = host.smallWindowGeometry?.copy(
                 aspectRatio = session.width.toFloat() / session.height, chromeHeight = dp(112).toFloat(),
             ) ?: return
+            // 旋转后拖动和缩放也必须使用新比例；安全区域约束仍只改变可见尺寸。
+            host.smallWindowGeometry = requested
             // 安全区域约束只改变可见尺寸，键盘关闭后恢复用户选择的尺寸。
             val visible = requested.constrain(bounds)
             layout.width = visible.width.roundToInt()

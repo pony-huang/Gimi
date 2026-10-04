@@ -8,16 +8,16 @@
     <string name="settings_memory_subtitle">配置本地记忆或云端长期记忆</string>
 
     <string name="settings_model_service_title">API 接入</string>
-    <string name="settings_model_service_subtitle">密钥 · 服务地址 · 模型列表</string>
+    <string name="settings_model_service_subtitle">管理密钥和模型服务</string>
 
     <string name="settings_default_model_title">默认模型</string>
-    <string name="settings_default_model_subtitle">助手 · 快速响应 · 语音识别与播放</string>
+    <string name="settings_default_model_subtitle">配置各项功能的默认模型</string>
 
     <string name="settings_mcp_title">MCP</string>
-    <string name="settings_mcp_subtitle">远程工具服务 · 连接与授权</string>
+    <string name="settings_mcp_subtitle">连接和授权远程工具服务</string>
 
     <string name="settings_plugins_title">插件</string>
-    <string name="settings_plugins_subtitle">动态加载的插件 · 启用与管理</string>
+    <string name="settings_plugins_subtitle">启用和管理动态插件</string>
 
     <string name="settings_skills_title">Skills</string>
     <string name="settings_skills_subtitle">安装可复用的说明与资源</string>

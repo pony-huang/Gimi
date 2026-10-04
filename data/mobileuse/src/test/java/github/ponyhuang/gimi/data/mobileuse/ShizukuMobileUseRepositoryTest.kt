@@ -89,6 +89,9 @@ class ShizukuMobileUseRepositoryTest {
         repository.observe("first")
         val id = repository.displaySession.value!!.id
         assertEquals("execution_finished", repository.finishExecution("first").status)
+        assertEquals(1L, repository.displaySession.value!!.completionVersion)
+        assertEquals("not_active", repository.finishExecution("first").status)
+        assertEquals(1L, repository.displaySession.value!!.completionVersion)
         assertEquals(id, repository.displaySession.value!!.id)
         val touch = MobileTouch(MobileTouchAction.DOWN, 10f, 20f, 100, 100)
         assertEquals("delivered", repository.manualTouch(id, touch).status)
@@ -111,6 +114,51 @@ class ShizukuMobileUseRepositoryTest {
         assertEquals("not_active", repository.closeSession(id).status)
         verify(exactly = 2) { remote.createDisplay() }
         verify(exactly = 1) { remote.stop() }
+        repository.setEnabled(false)
+    }
+
+    @Test
+    fun manualRotationUpdatesGeometryWithoutRecreatingTheSessionOrClaimingExecution() = runBlocking {
+        val remote = connectRemote()
+        repository.setEnabled(true)
+        repository.registerExecution("first", "chat")
+        repository.observe("first")
+        repository.finishExecution("first")
+        val before = repository.displaySession.value!!
+        every { remote.rotateDisplay(10) } returns intArrayOf(2400, 1080, 320)
+        every { remote.geometry(10) } returns intArrayOf(2400, 1080, 320)
+        val result = repository.manualRotate(before.id)
+        assertEquals("delivered", result.status)
+        assertEquals("delivered", result.actionStatus)
+        assertEquals(2400, result.width)
+        assertEquals(1080, result.height)
+        assertEquals(before.copy(width = 2400, height = 1080), repository.displaySession.value)
+        every { remote.rotateDisplay(10) } returns intArrayOf(1080, 2400, 320)
+        every { remote.geometry(10) } returns intArrayOf(1080, 2400, 320)
+        assertEquals("delivered", repository.manualRotate(before.id).status)
+        assertEquals(before, repository.displaySession.value)
+        verify(exactly = 1) { remote.createDisplay() }
+        verify(exactly = 0) { remote.stop() }
+        repository.setEnabled(false)
+    }
+
+    @Test
+    fun rotationRejectsOldWindowsAndRetainsSessionWhenUnsupported() = runBlocking {
+        val remote = connectRemote()
+        repository.setEnabled(true)
+        repository.registerExecution("first", "chat")
+        repository.observe("first")
+        val before = repository.displaySession.value!!
+        assertEquals("session_lost", repository.manualRotate("old-window").status)
+        verify(exactly = 0) { remote.rotateDisplay(any()) }
+        every { remote.rotateDisplay(10) } throws IllegalStateException("Unsupported")
+        assertEquals("rotation_unavailable", repository.manualRotate(before.id).status)
+        assertEquals(before, repository.displaySession.value)
+        every { remote.rotateDisplay(10) } throws RemoteException()
+        assertEquals("rotation_unavailable", repository.manualRotate(before.id).status)
+        every { remote.rotateDisplay(10) } returns intArrayOf(0, 1080, 320)
+        assertEquals("rotation_unavailable", repository.manualRotate(before.id).status)
+        assertEquals(before, repository.displaySession.value)
         repository.setEnabled(false)
     }
 

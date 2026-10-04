@@ -7,6 +7,7 @@ import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.FunctionResponse
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
+import github.ponyhuang.gimi.data.agent.AgentChatExecution
 import github.ponyhuang.gimi.data.agent.AgentChatRunner
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
@@ -36,7 +37,7 @@ class AdkChatAgentRepositoryMappingTest {
     @get:Rule
     val temporaryFolder = TemporaryFolder()
 
-    private val execution = mockk<AgentChatRunner.Execution>()
+    private val execution = mockk<AgentChatExecution>()
     private val runner = mockk<AgentChatRunner> {
         coEvery { createExecution(any(), any(), any(), any(), any()) } returns execution
     }

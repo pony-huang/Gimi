@@ -10,6 +10,10 @@ sealed interface McpDestination : NavKey {
     @Serializable
     data object ServerList : McpDestination
 
+    /** 指定服务器的工具列表与可展开详情；[serverId] 为服务器稳定标识。 */
+    @Serializable
+    data class Tools(val serverId: String) : McpDestination
+
     /** Choice between creating and importing a server. */
     @Serializable
     data object AddOptions : McpDestination
@@ -40,9 +44,15 @@ fun McpEntryProvider(
             onBack = onBack,
             onAddServer = { navigate(McpDestination.AddOptions) },
             onNavigateToEditor = { navigate(McpDestination.Editor(it)) },
+            onNavigateToTools = { navigate(McpDestination.Tools(it)) },
             onCreateServer = { navigate(McpDestination.Editor()) },
             onImportServers = { navigate(McpDestination.Import) },
         )
+        true
+    }
+
+    is McpDestination.Tools -> {
+        McpServerToolsRoute(serverId = destination.serverId, onBack = onBack)
         true
     }
 

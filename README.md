@@ -123,14 +123,8 @@ server manually, or paste an `mcpServers` JSON or a curl snippet straight from t
 it for you. Set a bearer token or custom headers, test the connection, and inspect the tools,
 resources, and prompts each server exposes. Disable any server anytime.
 
-#### Recommended servers
-
-| Server          | What it gives you                                   | Docs                                                        | Connect                                              |
-|-----------------|-----------------------------------------------------|-------------------------------------------------------------|------------------------------------------------------|
-| **AMap (高德)** | Maps: geocoding, route planning, POI search, weather | [lbs.amap.com/api/mcp-server/summary](https://lbs.amap.com/api/mcp-server/summary) | `https://mcp.amap.com/mcp?key=YOUR_KEY` (Streamable HTTP) |
-
-In *Settings → MCP*, tap **Import** and paste the `mcpServers` JSON or curl snippet from the docs
-above.
+In *Settings → MCP*, tap **Import** and paste the `mcpServers` JSON or curl snippet from the server
+documentation.
 
 ### Plugins
 

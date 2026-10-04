@@ -1,34 +1,42 @@
 package github.ponyhuang.gimi
 
 import android.Manifest
-import android.content.pm.PackageManager
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
-import github.ponyhuang.gimi.navigation.MainScreen
+import github.ponyhuang.gimi.core.notifications.AppNotificationManager
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.appearance.ThemeMode
-import github.ponyhuang.gimi.core.notifications.AppNotificationManager
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
 import github.ponyhuang.gimi.domain.permissions.model.AppPermission
 import github.ponyhuang.gimi.domain.permissions.repository.PermissionRepository
+import github.ponyhuang.gimi.domain.plugin.runtime.PluginLoadNotices
 import github.ponyhuang.gimi.feature.chat.sharedImageUris
+import github.ponyhuang.gimi.navigation.MainScreen
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.voice.AssistantPanelInteractor
 import javax.inject.Inject
+import kotlinx.coroutines.flow.collect
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @Inject lateinit var pluginLoadNotices: PluginLoadNotices
     @Inject lateinit var backgroundAppRepository: github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
     @Inject lateinit var backgroundAppWindowHost: github.ponyhuang.gimi.mobileuse.BackgroundAppWindowHost
     @Inject
@@ -65,6 +73,18 @@ class MainActivity : ComponentActivity() {
         if (intent.action == ACTION_OPEN_CURRENT_CHAT) openChatRequest.value += 1
         enableEdgeToEdge()
         setContent {
+            val incompatiblePluginMessage = stringResource(R.string.plugin_incompatible_upgrade)
+            LaunchedEffect(pluginLoadNotices, incompatiblePluginMessage) {
+                lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                    pluginLoadNotices.incompatiblePluginNames.collect { name ->
+                        Toast.makeText(
+                            this@MainActivity,
+                            incompatiblePluginMessage.format(name),
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                }
+            }
             // 跟随系统时读取实时 uiMode，系统切深浅会自动重组；手动锁定后固定为所选模式。
             val themeMode by appearanceRepository.themeMode
                 .collectAsStateWithLifecycle()

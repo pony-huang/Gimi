@@ -4,6 +4,11 @@ plugins {
 
 android {
     namespace = "github.ponyhuang.gimi.pluginapi"
+    buildFeatures { buildConfig = true }
+    defaultConfig {
+        buildConfigField("int", "PLUGIN_API_VERSION", libs.versions.pluginApi.get())
+        buildConfigField("String", "ADK_VERSION", "\"${libs.versions.googleAdk.get()}\"")
+    }
 }
 
 dependencies {

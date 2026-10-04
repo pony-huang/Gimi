@@ -64,4 +64,24 @@
 
     <!-- 共享：Agent 任务进行中 -->
     <string name="mcp_agent_mutation_blocked">Agent 任务进行中，请先停止任务后再修改。</string>
+
+    <!-- 工具详情 -->
+    <string name="mcp_more_action">更多操作</string>
+    <string name="mcp_view_tools">查看具体工具</string>
+    <string name="mcp_tools_title">具体工具</string>
+    <string name="mcp_tools_count">%1$d 个工具</string>
+    <string name="mcp_server_missing">服务器不存在或已删除</string>
+    <string name="mcp_tools_empty">服务器未提供工具</string>
+    <string name="mcp_tool_expand">展开详情</string>
+    <string name="mcp_tool_collapse">收起详情</string>
+    <string name="mcp_tool_description">工具描述</string>
+    <string name="mcp_tool_description_empty">未提供工具描述</string>
+    <string name="mcp_tool_parameters">入参</string>
+    <string name="mcp_tool_parameters_empty">无需入参</string>
+    <string name="mcp_tool_schema_unavailable">未提供入参定义</string>
+    <string name="mcp_tool_type_unspecified">未声明类型</string>
+    <string name="mcp_tool_required">必填</string>
+    <string name="mcp_tool_optional">可选</string>
+    <string name="mcp_tool_default_value">默认值：%1$s</string>
+    <string name="mcp_tool_enum_values">允许值：%1$s</string>
 </resources>

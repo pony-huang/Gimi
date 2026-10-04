@@ -20,6 +20,7 @@ fun McpServerListRoute(
     onBack: () -> Unit,
     onAddServer: () -> Unit,
     onNavigateToEditor: (String?) -> Unit,
+    onNavigateToTools: (String) -> Unit,
     onCreateServer: () -> Unit,
     onImportServers: () -> Unit,
     modifier: Modifier = Modifier,
@@ -42,6 +43,7 @@ fun McpServerListRoute(
             state = state,
             onAction = viewModel::onAction,
             onNavigateToEditor = onNavigateToEditor,
+            onNavigateToTools = onNavigateToTools,
             onCreateServer = onCreateServer,
             onImportServers = onImportServers,
             modifier = scaffoldModifier,
@@ -131,5 +133,22 @@ private fun CloseEffect(
                 }
             }
         }
+    }
+}
+/** 工具详情页只读取服务器声明，不影响启用状态和 Agent 会话。 */
+@Composable
+fun McpServerToolsRoute(
+    serverId: String,
+    onBack: () -> Unit,
+    viewModel: McpSettingsViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // stateIn 的首帧可能为空；服务器列表加载后再发起能力读取。
+    val server = state.servers.firstOrNull { it.id == serverId }
+    LaunchedEffect(serverId, server) {
+        if (server != null) viewModel.onAction(McpSettingsAction.LoadTools(serverId))
+    }
+    PreferenceScaffold(title = stringResource(R.string.mcp_tools_title), onBack = onBack) { modifier ->
+        McpServerToolsScreen(serverId, state, viewModel::onAction, modifier)
     }
 }

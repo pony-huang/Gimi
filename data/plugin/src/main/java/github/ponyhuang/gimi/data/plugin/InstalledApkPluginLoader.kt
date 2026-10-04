@@ -6,11 +6,12 @@ import android.content.pm.PackageManager
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dalvik.system.DexClassLoader
+import github.ponyhuang.gimi.core.storage.StorageRegistry
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import github.ponyhuang.gimi.pluginapi.PluginApi
-import github.ponyhuang.gimi.core.storage.StorageRegistry
-import java.io.File
+import java.lang.reflect.InvocationTargetException
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 
 /**
  * 基于「独立安装的插件 APK」的动态加载器（参考 keiyoushi/Tachiyomi 的 DCL 思路）。
@@ -18,11 +19,13 @@ import javax.inject.Inject
  * 发现协议：
  * - 插件 APK 声明一个 exported=true 的无功能 service，带
  *   intent-filter `action=[PluginApi.DISCOVERY_ACTION]`；
- * - `<application>` 下 `<meta-data android:name=[PluginApi.CLASS_META_DATA_KEY]>` 声明实现类全名。
+ * - `<application>` 下 `<meta-data android:name=[PluginApi.CLASS_META_DATA_KEY]>` 声明实现类全名；
+ * - [PluginApi.API_VERSION_META_DATA_KEY] 与 [PluginApi.ADK_VERSION_META_DATA_KEY] 声明编译版本，
+ *   缺失或与宿主不同均跳过，绝不执行插件代码。
  *
- * 加载流程：queryIntentServices 发现 → 取 sourceDir（插件 base.apk 路径）→ DexClassLoader
+ * 加载流程：queryIntentServices 发现 → APK 元数据兼容性校验 → DexClassLoader
  * （parent=宿主 classLoader，保证 ADK Plugin / AgentPlugin 类身份与宿主一致，避免
- * ClassCastException）→ 反射实例化 → apiVersion 校验。
+ * ClassCastException）→ 反射实例化 → apiVersion 校验 → 初始化。
  *
  * 单个插件失败仅跳过、不影响其它插件。仅支持纯 Kotlin 插件（无 native lib）。
  */
@@ -30,6 +33,7 @@ class InstalledApkPluginLoader @Inject constructor(
     @ApplicationContext private val context: Context,
     private val configStore: PluginConfigStore,
     storageRegistry: StorageRegistry,
+    private val notices: PluginLoadNoticeQueue,
 ) : PluginLoader {
 
     private val optimizedRoot = storageRegistry.resolve(PluginStorage.OPTIMIZED_ROOT_ID, create = true)
@@ -89,11 +93,25 @@ class InstalledApkPluginLoader @Inject constructor(
 
     private fun loadPlugin(packageName: String?): LoadedPlugin? {
         if (packageName == null) return null
-        return runCatching {
+        var displayName = packageName
+        val updateTime = lastUpdateTime(packageName)
+        return try {
             val appInfo = context.packageManager.getApplicationInfo(
                 packageName,
                 PackageManager.GET_META_DATA,
             )
+            displayName = context.packageManager.getApplicationLabel(appInfo).toString()
+            val metadata = appInfo.metaData
+            // 不能先实例化再检查：旧 ADK 的构造器/静态初始化可能已触发链接错误。
+            if (!PluginCompat.isCompatible(
+                    metadata?.getInt(PluginApi.API_VERSION_META_DATA_KEY),
+                    metadata?.getString(PluginApi.ADK_VERSION_META_DATA_KEY),
+                )
+            ) {
+                Log.w(TAG, "Incompatible plugin '$packageName'; skipping before class loading")
+                notices.report(packageName, updateTime, displayName)
+                return null
+            }
             val className = appInfo.metaData?.getString(PluginApi.CLASS_META_DATA_KEY)
                 ?: error("Missing ${PluginApi.CLASS_META_DATA_KEY} in $packageName")
             val sourceDir = appInfo.sourceDir
@@ -109,22 +127,29 @@ class InstalledApkPluginLoader @Inject constructor(
             val pluginClass = Class.forName(className, false, dexClassLoader)
             val plugin = pluginClass.getDeclaredConstructor().newInstance() as AgentPlugin
 
-            // 注入 applicationContext：需 Android 能力的插件（开浏览器/起本地服务/存 token）据此初始化。
-            plugin.onAttach(context.applicationContext)
-
-            // 回填宿主持久化的配置值（未来配置页写入 PluginConfigStore）。
-            plugin.configure(configStore.valuesFor(plugin.pluginId))
-
             if (!PluginCompat.isCompatible(plugin.apiVersion)) {
-                error(
-                    "Plugin '$packageName' apiVersion=${plugin.apiVersion} " +
-                        "is incompatible with host ${PluginApi.VERSION}; skipping."
-                )
+                notices.report(packageName, updateTime, displayName)
+                return null
             }
 
+            // 通过静态声明和实例协议检查后才允许插件初始化与配置回填。
+            plugin.onAttach(context.applicationContext)
+            plugin.configure(configStore.valuesFor(plugin.pluginId))
+
             Log.i(TAG, "Loaded plugin '${plugin.pluginId}' from $packageName")
-            LoadedPlugin(packageName, plugin, lastUpdateTime = lastUpdateTime(packageName))
-        }.getOrElse { error ->
+            LoadedPlugin(packageName, plugin, lastUpdateTime = updateTime)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: LinkageError) {
+            // 声明错误或初始化过程中才解析的 ADK 符号也必须隔离，不能使宿主闪退。
+            Log.w(TAG, "Incompatible plugin '$packageName'", error)
+            notices.report(packageName, updateTime, displayName)
+            null
+        } catch (error: Exception) {
+            val cause = if (error is InvocationTargetException) error.targetException else error
+            if (cause is CancellationException) throw cause
+            if (cause is Error && cause !is LinkageError) throw cause
+            if (cause is LinkageError) notices.report(packageName, updateTime, displayName)
             Log.w(TAG, "Failed to load plugin '$packageName'", error)
             null
         }

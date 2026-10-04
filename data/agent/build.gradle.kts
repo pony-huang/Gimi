@@ -46,8 +46,6 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
     implementation(libs.anthropic.java)
     implementation(libs.google.adk.kotlin.core) {
         exclude(group = "io.modelcontextprotocol.sdk")
@@ -62,9 +60,7 @@ dependencies {
         // exclude the SDK's optional Ktor 3 transport implementation from the Android graph.
         exclude(group = "io.ktor")
     }
-    implementation(libs.gson)
     implementation(libs.kotlinx.coroutines.core)
-    ksp(libs.androidx.room.compiler)
     ksp(libs.google.adk.kotlin.processor)
     kapt(libs.objectbox.processor)
 
@@ -78,10 +74,11 @@ dependencies {
     debugImplementation(libs.opentelemetry.sdk)
 
     testImplementation(project(":core:testing"))
+    // 验证目录实现与 ADK 适配的边界；运行时只依赖 domain 契约。
+    testImplementation(project(":data:modelcatalog"))
     testImplementation(libs.google.adk.kotlin.webserver) {
         exclude(group = "io.modelcontextprotocol.sdk")
     }
-    testImplementation(libs.androidx.room.testing)
     testImplementation(libs.junit)
     testImplementation(libs.org.json)
     testImplementation(libs.kotlinx.coroutines.test)

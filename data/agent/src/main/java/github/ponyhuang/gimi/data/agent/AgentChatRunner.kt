@@ -2,52 +2,31 @@ package github.ponyhuang.gimi.data.agent
 
 import com.google.adk.kt.agents.BaseAgent
 import com.google.adk.kt.agents.ResumabilityConfig
-import com.google.adk.kt.agents.RunConfig
-import com.google.adk.kt.agents.StreamingMode
 import com.google.adk.kt.apps.App
 import com.google.adk.kt.artifacts.ArtifactService
-import com.google.adk.kt.events.Event
 import com.google.adk.kt.memory.MemoryService
 import com.google.adk.kt.plugins.LoggingPlugin
 import com.google.adk.kt.plugins.Plugin
 import com.google.adk.kt.runners.InMemoryRunner
 import com.google.adk.kt.sessions.SessionService
-import com.google.adk.kt.sessions.SessionKey
 import com.google.adk.kt.summarizer.EventsCompactionConfig
-import com.google.adk.kt.types.Content
-import com.google.adk.kt.types.FileData
-import com.google.adk.kt.types.FunctionCall
-import com.google.adk.kt.types.FunctionResponse
-import com.google.adk.kt.types.Part
-import com.google.adk.kt.types.Role
-import github.ponyhuang.gimi.data.agent.AgentChatRunner.Companion.MAX_CACHED_RUNTIMES
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
 import github.ponyhuang.gimi.data.agent.di.AgentModule
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
-import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.onCompletion
-import kotlinx.coroutines.flow.onStart
-import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 import java.util.UUID
-import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
-
 
 /**
- * Agent 聊天运行器 — 把 ADK `InMemoryRunner.runAsync(...)` 封装为 `Flow<Event>`。
+ * 共享 Agent/Runner 的构建与缓存入口，为每轮聊天创建独立的执行句柄。
  *
  * 设计要点：
  * - ADK Runner 本身不持有会话状态（历史、恢复点全部落在 [SessionService] 的 Session
@@ -58,21 +37,21 @@ import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
  * - 会话级工具勾选、确认工具开关通过 `RunConfig.customMetadata`（[ToolRunMetadata]）
  *   按请求透传给各 Toolset 自行过滤，均不参与缓存键 —— 切换勾选或确认开关不会触发
  *   Agent 重建。
- * - 每轮返回显式 [Execution]，直接持有 runner 和配置；缓存淘汰不影响等待中的恢复。
+ * - 每轮返回显式 [AgentChatExecution]，直接持有 runner 和配置；缓存淘汰不影响等待中的恢复。
  * - 构造期由 [AgentModule] 通过 Hilt 注入 [sessionService]、[artifactService]、[plugins]
  *   及 [configuration]；不持有 in-memory 默认实现。
  * - [factory] 仅在缓存未命中时按需调用，保证模型/访问模式切换立即生效。当前正在
  *   `runAsync` 中的会话不受影响（[createExecution] 入口处已快照 runner 引用）。
- * - 不对 `Event` 做任何加工；Event → UI 渲染的合并工作由 `ChatViewModel` 的 reducer 完成。
- * - `runConfig` 默认开启 SSE 流式，便于 UI 端做打字机效果。
+ * - 单轮 SDK 协议交给 [AgentChatExecution]；事件到领域模型的转换由
+ *   `AdkChatAgentRepository` 负责，不在缓存层处理。
  *
- * 线程模型：缓存由 [runnerMutex] 保护，所有调用都通过协程 `Flow` 完成。
+ * 线程模型：缓存查询与构建由 [runnerMutex] 保护；执行句柄独立持有 Runner 引用。
  */
 class AgentChatRunner(
     private val factory: suspend (AgentBuildSpec) -> AgentRuntime,
     private val sessionService: SessionService,
     private val artifactService: ArtifactService?,
-    private val memoryService: MemoryService ?,
+    private val memoryService: MemoryService?,
     private val configuration: () -> AgentBuildConfigurationSnapshot = {
         AgentBuildConfigurationSnapshot(
             revision = Unit,
@@ -137,7 +116,7 @@ class AgentChatRunner(
         selection: ModelSelection? = null,
         allowConfirmationRequiredTools: Boolean = true,
         toolConfiguration: ConversationToolConfiguration? = null,
-    ): Execution {
+    ): AgentChatExecution {
         val toolAccessMode = toolAccessRepository.defaultToolAccessMode.value
         val reasoningEffort = toolConfiguration?.reasoningEffort ?: ReasoningEffort.MEDIUM
         val buildConfiguration = configuration()
@@ -165,143 +144,7 @@ class AgentChatRunner(
                 allowConfirmationRequiredTools = allowConfirmationRequiredTools,
                 mobileUseOwner = UUID.randomUUID().toString(),
             )
-            Execution(userId, sessionId, runtime.runner, metadata, mobileUseRepository)
-        }
-    }
-
-    /** 单轮执行句柄，恢复只使用创建时的 Runner 与元数据，不访问全局配置或 LRU。 */
-    class Execution internal constructor(
-        private val userId: String,
-        private val sessionId: String,
-        private val runner: InMemoryRunner,
-        private val customMetadata: Map<String, Any>,
-        private val mobileUseRepository: MobileUseRepository? = null,
-    ) {
-        /** 把新用户消息发送给本轮 Agent。 */
-        suspend fun send(
-            text: String,
-            fileAttachments: List<FileAttachment> = emptyList(),
-            retry: Boolean = false,
-        ): Flow<Event> {
-            val resumeInvocationId = if (retry) {
-                // 用户事件先于模型输出落盘；即使首个输出前报错，也从 SDK 日志取回原执行。
-                runner.sessionService.getSession(
-                    SessionKey(APP_NAME, userId, sessionId),
-                )?.events?.lastOrNull { it.invocationId != null }?.invocationId
-            } else null
-            val parts = if (resumeInvocationId != null) emptyList() else buildList {
-                text.takeIf(String::isNotBlank)?.let { add(Part(text = it)) }
-                fileAttachments.forEach { attachment ->
-                    add(
-                        Part(
-                            fileData = FileData(
-                                mimeType = attachment.mimeType,
-                                displayName = attachment.displayName,
-                                fileUri = requireNotNull(attachment.payloadReference) {
-                                    "Managed attachment reference is missing"
-                                },
-                            ),
-                        ),
-                    )
-                }
-            }
-            val newMessage = Content(
-                role = Role.USER,
-                parts = parts,
-            )
-            return runner.runAsync(
-                userId = userId,
-                sessionId = sessionId,
-                // 没有已保存的执行时才发送原请求；恢复时不重复写入用户事件。
-                invocationId = resumeInvocationId,
-                newMessage = newMessage.takeIf { resumeInvocationId == null },
-                stateDelta = null,
-                runConfig = RunConfig(
-                    streamingMode = StreamingMode.SSE,
-                    customMetadata = customMetadata,
-                ),
-            ).transform { event ->
-                emit(event)
-                // SDK 错误事件也属于失败；立即结束收集，避免被记为已完成而无法恢复。
-                if (event.errorCode != null || !event.errorMessage.isNullOrBlank()) {
-                    throw IllegalStateException(event.errorMessage ?: event.errorCode)
-                }
-            }.flowOn(Dispatchers.IO).releaseMobileUseOnCompletion()
-        }
-
-        /**
-         * 恢复暂停的 ADK 工具确认请求。
-         *
-         * @param confirmationCallId 工具确认的调用 ID
-         * @param confirmed 用户是否确认
-         * @return Event 流
-         */
-        suspend fun respondToToolConfirmation(
-            confirmationCallId: String,
-            confirmed: Boolean,
-        ): Flow<Event> = resumeWithFunctionResponse(
-            response = FunctionResponse(
-                name = FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME,
-                id = confirmationCallId,
-                response = mapOf("confirmed" to confirmed),
-            ),
-        )
-
-        /**
-         * 用用户答复恢复挂起的用户输入请求（`adk_request_input` / `get_user_choice`）。
-         *
-         * @param callId 挂起的 function call ID
-         * @param toolName 触发挂起的工具名（决定 FunctionResponse.name，需与挂起调用一致）
-         * @param payload 答复负载（键约定见 `UserInputToolProtocol`）
-         * @return Event 流
-         */
-        suspend fun respondToInputRequest(
-            callId: String,
-            toolName: String,
-            payload: Map<String, Any?>,
-        ): Flow<Event> = resumeWithFunctionResponse(
-            response = FunctionResponse(
-                name = toolName,
-                id = callId,
-                response = payload,
-            ),
-        )
-
-        /**
-         * 以 role=user 的 `FunctionResponse` 新消息恢复暂停的 invocation。
-         *
-         * ADK 靠"响应 id 覆盖挂起的长时运行调用 id"判定这是恢复而非新的暂停，
-         * 恢复时挂起工具不重跑，响应直接作为调用结果进入模型上下文。
-         */
-        private suspend fun resumeWithFunctionResponse(
-            response: FunctionResponse,
-        ): Flow<Event> {
-            val resumeMessage = Content(
-                role = Role.USER,
-                parts = listOf(Part(functionResponse = response)),
-            )
-            return runner.runAsync(
-                userId = userId,
-                sessionId = sessionId,
-                invocationId = null,
-                newMessage = resumeMessage,
-                stateDelta = null,
-                // 恢复调用沿用最近一次 send 的工具配置，保证 Toolset 过滤上下文一致。
-                runConfig = RunConfig(
-                    streamingMode = StreamingMode.SSE,
-                    customMetadata = customMetadata,
-                ),
-            ).flowOn(Dispatchers.IO).releaseMobileUseOnCompletion()
-        }
-
-        private fun Flow<Event>.releaseMobileUseOnCompletion(): Flow<Event> = onStart {
-            ToolRunMetadata.mobileUseOwner(customMetadata)?.let { owner ->
-                mobileUseRepository?.registerExecution(owner, sessionId)
-            }
-        }.onCompletion {
-            val owner = ToolRunMetadata.mobileUseOwner(customMetadata) ?: return@onCompletion
-            // 取消也释放本轮占用；画面属于聊天，保留到用户主动关闭。
-            withContext(NonCancellable) { mobileUseRepository?.finishExecution(owner) }
+            AgentChatExecution(userId, sessionId, runtime.runner, metadata, mobileUseRepository)
         }
     }
 

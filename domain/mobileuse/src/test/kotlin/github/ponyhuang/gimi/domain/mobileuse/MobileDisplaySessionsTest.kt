@@ -16,7 +16,7 @@ class MobileDisplaySessionsTest {
         open()
         val screen = sessions.session.value
         assertTrue(sessions.finish("turn1"))
-        assertEquals(screen, sessions.session.value)
+        assertEquals(screen?.copy(completionVersion = 1), sessions.session.value)
         sessions.register("turn2", "chat1")
         assertEquals(MobileExecutionAccess.ALLOWED, sessions.claim("turn2"))
         assertEquals("screen1", sessions.session.value?.id)
@@ -79,4 +79,21 @@ class MobileDisplaySessionsTest {
         sessions.register("turn2", "chat1")
         assertEquals(MobileExecutionAccess.ALLOWED, sessions.claim("turn2"))
     }
+    @Test fun onlyActiveExecutionCompletionRequestsWindowDismissal() {
+        open()
+        sessions.register("other", "chat2")
+        assertFalse(sessions.finish("other"))
+        assertEquals(0L, sessions.session.value?.completionVersion)
+        assertTrue(sessions.finish("turn1"))
+        assertEquals(1L, sessions.session.value?.completionVersion)
+        assertFalse(sessions.finish("turn1"))
+        assertEquals(1L, sessions.session.value?.completionVersion)
+        sessions.update("screen1", 2400, 1080)
+        assertEquals(1L, sessions.session.value?.completionVersion)
+        sessions.register("turn2", "chat1")
+        assertEquals(MobileExecutionAccess.ALLOWED, sessions.claim("turn2"))
+        assertTrue(sessions.finish("turn2"))
+        assertEquals(2L, sessions.session.value?.completionVersion)
+    }
+
 }

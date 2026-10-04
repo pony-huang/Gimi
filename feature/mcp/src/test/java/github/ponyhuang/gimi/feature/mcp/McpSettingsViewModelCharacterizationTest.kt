@@ -21,6 +21,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -231,7 +232,7 @@ class McpSettingsViewModelCharacterizationTest {
     }
 
     @Test
-    fun expandingServerCardFetchesCapabilitiesOnceAndCachesThem() = runTest {
+    fun openingToolsAndExpandingItemsUsesCachedCapabilities() = runTest {
         val server = McpServer(id = "server", name = "Server")
         val repository = repository(listOf(server))
         every { repository.server("server") } returns server
@@ -246,24 +247,21 @@ class McpSettingsViewModelCharacterizationTest {
             var state = awaitItem()
             while (state.servers.isEmpty()) state = awaitItem()
 
-            viewModel.onAction(McpSettingsAction.ServerCardClicked("server"))
+            viewModel.onAction(McpSettingsAction.LoadTools("server"))
             do {
                 state = awaitItem()
             } while (state.capabilities["server"] !is ServerCapabilityState.Loaded)
 
-            assertEquals("server", state.expandedServerId)
+            assertEquals("server", state.toolsServerId)
             val loaded = state.capabilities["server"] as ServerCapabilityState.Loaded
             assertEquals(listOf(McpToolSummary(name = "search", description = "Search things")), loaded.result.tools)
 
-            // 折叠再展开走缓存，不重复探测。
-            viewModel.onAction(McpSettingsAction.ServerCardClicked("server"))
-            do {
-                state = awaitItem()
-            } while (state.expandedServerId != null)
-            viewModel.onAction(McpSettingsAction.ServerCardClicked("server"))
-            do {
-                state = awaitItem()
-            } while (state.expandedServerId != "server")
+            // 展开工具详情不重连，重复进入同一服务器也复用探测结果。
+            viewModel.onAction(McpSettingsAction.ToggleTool("search"))
+            do { state = awaitItem() } while ("search" !in state.expandedToolNames)
+            viewModel.onAction(McpSettingsAction.ToggleTool("search"))
+            do { state = awaitItem() } while (state.expandedToolNames.isNotEmpty())
+            viewModel.onAction(McpSettingsAction.LoadTools("server"))
             advanceUntilIdle()
             coVerify(exactly = 1) { tester.test(any()) }
             cancelAndIgnoreRemainingEvents()
@@ -271,7 +269,7 @@ class McpSettingsViewModelCharacterizationTest {
     }
 
     @Test
-    fun expandingServerCardWithUnexpectedProbeFailureShowsError() = runTest {
+    fun openingToolsWithUnexpectedProbeFailureShowsError() = runTest {
         val server = McpServer(id = "server", name = "Server")
         val repository = repository(listOf(server))
         every { repository.server("server") } returns server
@@ -284,7 +282,7 @@ class McpSettingsViewModelCharacterizationTest {
             var state = awaitItem()
             while (state.servers.isEmpty()) state = awaitItem()
 
-            viewModel.onAction(McpSettingsAction.ServerCardClicked("server"))
+            viewModel.onAction(McpSettingsAction.LoadTools("server"))
             do {
                 state = awaitItem()
             } while (state.capabilities["server"] !is ServerCapabilityState.Failed)
@@ -311,23 +309,101 @@ class McpSettingsViewModelCharacterizationTest {
             var state = awaitItem()
             while (state.servers.isEmpty()) state = awaitItem()
 
-            viewModel.onAction(McpSettingsAction.ServerCardClicked("server"))
+            viewModel.onAction(McpSettingsAction.LoadTools("server"))
             do {
                 state = awaitItem()
             } while (state.capabilities["server"] !is ServerCapabilityState.Loaded)
 
-            // 配置变更（新实例）后重新展开应再次探测。
+            // 配置更新后再次进入详情应重新探测。
             serversFlow.value = listOf(server.copy(endpointUrl = "https://new.example.com/mcp"))
-            viewModel.onAction(McpSettingsAction.ServerCardClicked("server"))
-            do {
-                state = awaitItem()
-            } while (state.expandedServerId != null)
-            viewModel.onAction(McpSettingsAction.ServerCardClicked("server"))
-            do {
-                state = awaitItem()
-            } while (state.capabilities["server"] !is ServerCapabilityState.Loaded)
+            do { state = awaitItem() } while (state.servers.first().endpointUrl != "https://new.example.com/mcp")
+            viewModel.onAction(McpSettingsAction.LoadTools("server"))
+            do { state = awaitItem() } while ((state.capabilities["server"] as? ServerCapabilityState.Loaded)?.serverSnapshot?.endpointUrl != "https://new.example.com/mcp")
             advanceUntilIdle()
             coVerify(exactly = 2) { tester.test(any()) }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun menuDoesNotFetchToolsAndChangingServerClearsExpandedItems() = runTest {
+        val first = McpServer(id = "first", name = "First")
+        val second = McpServer(id = "second", name = "Second")
+        val repository = repository(listOf(first, second))
+        every { repository.server("first") } returns first
+        every { repository.server("second") } returns second
+        val tester = tester(McpProbeResult(reachable = true, tools = listOf(McpToolSummary("search"))))
+        val viewModel = viewModel(repository, tester)
+        viewModel.uiState.test {
+            var state = awaitItem()
+            while (state.servers.isEmpty()) state = awaitItem()
+            viewModel.onAction(McpSettingsAction.ServerMenuChanged("first"))
+            do { state = awaitItem() } while (state.menuServerId != "first")
+            coVerify(exactly = 0) { tester.test(any()) }
+            viewModel.onAction(McpSettingsAction.LoadTools("first"))
+            do { state = awaitItem() } while (state.capabilities["first"] !is ServerCapabilityState.Loaded)
+            assertNull(state.menuServerId)
+            viewModel.onAction(McpSettingsAction.ToggleTool("search"))
+            do { state = awaitItem() } while ("search" !in state.expandedToolNames)
+            viewModel.onAction(McpSettingsAction.LoadTools("second"))
+            do { state = awaitItem() } while (state.capabilities["second"] !is ServerCapabilityState.Loaded)
+            assertEquals("second", state.toolsServerId)
+            assertEquals(emptySet<String>(), state.expandedToolNames)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun failedToolLoadCanBeRetriedExplicitly() = runTest {
+        val server = McpServer(id = "server", name = "Server")
+        val repository = repository(listOf(server))
+        every { repository.server("server") } returns server
+        val tester = mockk<McpConnectionTester> {
+            coEvery { test(any()) } returnsMany listOf(
+                McpProbeResult(reachable = false, errorMessage = "mcp.connection_error"),
+                McpProbeResult(reachable = true, tools = listOf(McpToolSummary("search"))),
+            )
+        }
+        val viewModel = viewModel(repository, tester)
+        viewModel.uiState.test {
+            var state = awaitItem()
+            while (state.servers.isEmpty()) state = awaitItem()
+            viewModel.onAction(McpSettingsAction.LoadTools("server"))
+            do { state = awaitItem() } while (state.capabilities["server"] !is ServerCapabilityState.Failed)
+            viewModel.onAction(McpSettingsAction.RefreshCapabilities("server"))
+            do { state = awaitItem() } while (state.capabilities["server"] !is ServerCapabilityState.Loaded)
+            assertEquals("search", (state.capabilities["server"] as ServerCapabilityState.Loaded).result.tools.single().name)
+            coVerify(exactly = 2) { tester.test(any()) }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun configurationChangeDuringProbeCancelsTheStaleRequest() = runTest {
+        val server = McpServer(id = "server", name = "Server", endpointUrl = "https://old.example/mcp")
+        val changed = server.copy(endpointUrl = "https://new.example/mcp")
+        val servers = MutableStateFlow(listOf(server))
+        val repository = repository()
+        every { repository.observeServers() } returns servers
+        every { repository.server("server") } answers { servers.value.single() }
+        val oldProbe = CompletableDeferred<McpProbeResult>()
+        val tester = mockk<McpConnectionTester> {
+            coEvery { test(server) } coAnswers { oldProbe.await() }
+            coEvery { test(changed) } returns McpProbeResult(reachable = true, tools = listOf(McpToolSummary("new_tool")))
+        }
+        val viewModel = viewModel(repository, tester)
+        viewModel.uiState.test {
+            var state = awaitItem()
+            while (state.servers.isEmpty()) state = awaitItem()
+            viewModel.onAction(McpSettingsAction.LoadTools("server"))
+            do { state = awaitItem() } while (state.capabilities["server"] !is ServerCapabilityState.Loading)
+            servers.value = listOf(changed)
+            do { state = awaitItem() } while (state.servers.single() != changed)
+            viewModel.onAction(McpSettingsAction.LoadTools("server"))
+            do { state = awaitItem() } while (state.capabilities["server"] !is ServerCapabilityState.Loaded)
+            oldProbe.complete(McpProbeResult(reachable = true, tools = listOf(McpToolSummary("old_tool"))))
+            advanceUntilIdle()
+            assertEquals("new_tool", (viewModel.uiState.value.capabilities["server"] as ServerCapabilityState.Loaded).result.tools.single().name)
             cancelAndIgnoreRemainingEvents()
         }
     }

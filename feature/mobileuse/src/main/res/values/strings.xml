@@ -17,9 +17,9 @@
     <string name="mobile_use_root_title">当前为 root 模式</string>
     <string name="mobile_use_root_detail">此功能只接受 Shizuku ADB shell 模式，请改用 ADB 启动。</string>
     <string name="mobile_use_ready_title">已就绪</string>
-    <string name="mobile_use_text_input_ready_title">文字输入 · 已开启</string>
-    <string name="mobile_use_text_input_required_title">文字输入 · 待授权</string>
-    <string name="mobile_use_text_input_required">请开启“Gimi 后台静默操作 · 文字输入”无障碍服务。</string>
+    <string name="mobile_use_text_input_ready_title">文字输入已开启</string>
+    <string name="mobile_use_text_input_required_title">文字输入未开启</string>
+    <string name="mobile_use_text_input_required">请开启“Gimi 文字输入”无障碍服务。</string>
     <string name="mobile_use_text_input_settings">打开无障碍设置</string>
     <string name="mobile_use_busy_title">后台操作正在使用</string>
     <string name="mobile_use_busy_detail">当前聊天保留了一个后台应用，可通过气泡打开；其他聊天使用前请先关闭它。</string>
@@ -27,7 +27,11 @@
     <string name="mobile_use_unsupported_detail">当前设备不支持后台独立运行，无法执行静默操作。</string>
     <string name="background_app_title">后台应用</string>
     <string name="background_app_open">显示后台应用</string>
-    <string name="background_app_back">返回应用</string>
+    <string name="background_app_back">返回</string>
+    <string name="background_app_drag">拖动窗口</string>
+    <string name="background_app_drag_hint">拖动</string>
+    <string name="background_app_resize">调整窗口大小</string>
+    <string name="background_app_resize_hint">拖角缩放</string>
     <string name="background_app_collapse">收起</string>
     <string name="background_app_more">更多</string>
     <string name="background_app_fullscreen">切换为全屏</string>
@@ -41,4 +45,7 @@
     <string name="background_app_disconnected">后台应用已关闭或连接已断开。</string>
     <string name="background_app_preview_unavailable">暂时无法显示画面，请检查应用与连接。安全页面可能不允许显示。</string>
     <string name="background_app_input_unavailable">当前设备或输入控件未接受操作，请检查连接后重试。</string>
+    <string name="background_app_rotate_landscape">切换副屏为横屏</string>
+    <string name="background_app_rotate_portrait">切换副屏为竖屏</string>
+    <string name="background_app_rotation_unavailable">暂时无法切换副屏方向，请检查连接后重试。部分应用可能固定横竖屏。</string>
 </resources>

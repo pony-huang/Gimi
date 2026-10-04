@@ -4,15 +4,13 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
-import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
-import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
-import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurnStatus
-import github.ponyhuang.gimi.domain.conversation.usecase.PrepareChatTurnUseCase
+import github.ponyhuang.gimi.domain.conversation.usecase.PrepareChatSendUseCase
+import github.ponyhuang.gimi.domain.conversation.usecase.ChatHistorySnapshot
+import github.ponyhuang.gimi.domain.conversation.usecase.ValidateChatAttachmentsUseCase
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.appupdate.repository.AppUpdateRepository
 import github.ponyhuang.gimi.domain.appearance.ThemeMode
@@ -20,23 +18,15 @@ import github.ponyhuang.gimi.domain.conversation.repository.ConversationReposito
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.NoAvailableAssistantModelException
 import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
-import github.ponyhuang.gimi.domain.conversation.runtime.AgentRunLease
-import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionBusyException
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
-import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
-import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskSource
 import github.ponyhuang.gimi.domain.conversation.model.Message
-import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
-import github.ponyhuang.gimi.domain.conversation.model.UserInputKind
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.core.notifications.AppNotificationManager
-import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
-import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolAvailability
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.gimi.domain.mcp.model.McpSkippedServer
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
@@ -54,7 +44,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -71,20 +60,20 @@ import javax.inject.Inject
  *
  * 核心算法（参考 `~/.claude/projects/E--workplace-adk-web/memory/chat-streaming-and-thought.md`）：
  * 事件归约算法（partial 合并 / 完整事件构造 / 工具确认捕获）已拆到 [AgentEventReducer]，
- * 本类负责会话编排、运行时生命周期与工具配置。
+ * 本类负责会话编排；运行生命周期由 [ChatRunLifecycleCoordinator] 协调，工具配置由 [ChatToolConfigurationCoordinator]
+ * 协调，失败轮恢复由 [ChatTurnRecoveryCoordinator] 协调。
  *
  * 持久化层：`buildMessageFromParts` 改走 `EventMapper.fromEvent(event)`，保证 streaming 与历史回放共用 `Event.id → Message.id` 映射。
- * 会话管理：通过 [ConversationRepository] 完成"新建 / 切换 / 删除 / 拉取会话列表"；`reset()` 与 `switchSession()` 都走 repository。
+ * 会话管理：通过 [ConversationRepository] 完成"新建 / 切换 / 删除 / 拉取会话列表"；导航和历史刷新由 [ChatSessionNavigationCoordinator] 协调。
  *
  * 取消语义：每个会话以 runToken 隔离事件，已接管的任务可在切换会话后继续。
  *
- * DI：通过 Hilt 注入 [ChatAgentRepository] / [ConversationRepository]；UI 端用
+ * DI：通过 Hilt 注入 [PrepareChatSendUseCase] / [ConversationRepository]；UI 端用
  * `hiltViewModel()` 直接拿到实例，不再走原先的 `ChatViewModel.factory(context)`。
  */
 @HiltViewModel
 class ChatViewModel @Inject constructor(
-    private val runner: ChatAgentRepository,
-    private val agentRuntimeGate: AgentRuntimeGate,
+    agentRuntimeGate: AgentRuntimeGate,
     private val repository: ConversationRepository,
     private val sessionResolver: ConversationSessionResolver,
     private val modelServices: ModelCatalogRepository,
@@ -97,8 +86,9 @@ class ChatViewModel @Inject constructor(
     private val speechPlaybackController: SpeechPlaybackRepository,
     private val speechSettings: SpeechSettingsRepository,
     private val attachments: ChatAttachmentRepository,
-    private val prepareChatTurn: PrepareChatTurnUseCase,
-    private val officialFunctionCatalog: OfficialToolFunctionCatalog,
+    private val prepareChatSend: PrepareChatSendUseCase,
+    private val validateChatAttachments: ValidateChatAttachmentsUseCase,
+    officialFunctionCatalog: OfficialToolFunctionCatalog,
     private val memoryRuntimeStatus: MemoryRuntimeStatus,
     private val appNotificationManager: AppNotificationManager,
     private val appUpdateRepository: AppUpdateRepository,
@@ -108,11 +98,55 @@ class ChatViewModel @Inject constructor(
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     private val sessionRuntimes = linkedMapOf<String, ChatSessionRuntime>()
-    private var sessionLoadJob: Job? = null
-    private var activeSessionLoadToken: Any? = null
-    private var loadingSessionId: String? = null
 
     private val _effects = MutableSharedFlow<ChatEffect>(extraBufferCapacity = 8)
+
+    private val toolConfigurationCoordinator = ChatToolConfigurationCoordinator(
+        uiState = _uiState,
+        scope = viewModelScope,
+        repository = repository,
+        sessionResolver = sessionResolver,
+        modelServices = modelServices,
+        officialFunctionCatalog = officialFunctionCatalog,
+        runtimeFor = ::runtimeFor,
+        publishRuntime = ::publishRuntime,
+    )
+
+    private val turnRecoveryCoordinator = ChatTurnRecoveryCoordinator(
+        uiState = _uiState,
+        runtimeFor = ::runtimeFor,
+        publishRuntime = ::publishRuntime,
+        resend = ::executeFailedTurnResend,
+    )
+
+    private val runLifecycleCoordinator = ChatRunLifecycleCoordinator(
+        uiState = _uiState,
+        scope = viewModelScope,
+        agentRuntimeGate = agentRuntimeGate,
+        repository = repository,
+        toolApproval = toolApproval,
+        appNotificationManager = appNotificationManager,
+        runtimeFor = ::runtimeFor,
+        runtimeOrNull = { sessionRuntimes[it] },
+        publishRuntime = ::publishRuntime,
+        emitNotice = ::emitNotice,
+        eventReducer = { eventReducer },
+        recordFailure = turnRecoveryCoordinator::recordFailure,
+        onForegroundCompleted = ::autoSpeakCompletedReply,
+        refreshVisibleHistoryIfStale = { sessionNavigationCoordinator.refreshVisibleHistoryIfStale() },
+    )
+
+    private val sessionNavigationCoordinator = ChatSessionNavigationCoordinator(
+        uiState = _uiState,
+        scope = viewModelScope,
+        repository = repository,
+        sessionResolver = sessionResolver,
+        runtimeFor = ::runtimeFor,
+        runtimeOrNull = { sessionRuntimes[it] },
+        showRuntime = ::showRuntime,
+        publishRuntime = ::publishRuntime,
+        clearSpeechSession = speechPlaybackController::clearSession,
+    )
 
     /** 一次性 UI 反馈通道（Toast 等），由 Route 消费；见 [ChatEffect]。 */
     val effects = _effects.asSharedFlow()
@@ -122,36 +156,36 @@ class ChatViewModel @Inject constructor(
      */
     fun onAction(action: ChatAction) {
         when (action) {
-            ChatAction.RetryFailedTurn -> retryFailedTurn()
+            ChatAction.RetryFailedTurn -> turnRecoveryCoordinator.retry()
             ChatAction.ResumeChat -> resumeChat()
-            ChatAction.StopStreaming -> stopStreaming()
+            ChatAction.StopStreaming -> runLifecycleCoordinator.stopStreaming()
             is ChatAction.ToggleSpeechPlayback ->
                 toggleSpeechPlayback(action.messageId, action.markdown)
             ChatAction.ToggleAutoSpeak ->
                 speechSettings.setAutoSpeakEnabled(!speechSettings.autoSpeakEnabled.value)
             is ChatAction.ToggleTimeline -> toggleTimeline(action.groupId)
             is ChatAction.RespondToToolConfirmation ->
-                respondToToolConfirmation(action.confirmed, action.alwaysAllow)
+                runLifecycleCoordinator.respondToToolConfirmation(action.confirmed, action.alwaysAllow)
             is ChatAction.RespondToInputRequest ->
-                respondToInputRequest(action.callId, action.value)
+                runLifecycleCoordinator.respondToInputRequest(action.callId, action.value)
             is ChatAction.SetFullAccess -> setFullAccess(action.enabled)
-            ChatAction.RestoreOrCreateSession -> restoreOrCreateSession()
-            ChatAction.NewConversation -> reset()
-            is ChatAction.SwitchSession -> switchSession(action.sessionId)
+            ChatAction.RestoreOrCreateSession -> sessionNavigationCoordinator.restoreOrCreateSession()
+            ChatAction.NewConversation -> sessionNavigationCoordinator.newConversation()
+            is ChatAction.SwitchSession -> sessionNavigationCoordinator.switchSession(action.sessionId)
             ChatAction.RefreshConversations -> refreshConversations()
             is ChatAction.DeleteConversation -> deleteConversation(action.sessionId)
             is ChatAction.SelectModel -> selectModel(action.selection)
-            is ChatAction.SetReasoningEffort -> setReasoningEffort(action.effort)
+            is ChatAction.SetReasoningEffort -> toolConfigurationCoordinator.setReasoningEffort(action.effort)
             is ChatAction.SetMcpServerEnabled ->
-                setMcpServerEnabled(action.serverId, action.enabled)
-            is ChatAction.SetOfficialFunctionEnabled -> setOfficialFunctionEnabled(
+                toolConfigurationCoordinator.setMcpServerEnabled(action.serverId, action.enabled)
+            is ChatAction.SetOfficialFunctionEnabled -> toolConfigurationCoordinator.setOfficialFunctionEnabled(
                 toolId = action.toolId,
                 functionId = action.functionId,
                 enabled = action.enabled,
                 supportedFunctionIds = action.supportedFunctionIds,
             )
-            is ChatAction.LoadOfficialToolFunctions -> loadOfficialToolFunctions(action.toolId)
-            ChatAction.ClearToolConfigurationError -> clearToolConfigurationError()
+            is ChatAction.LoadOfficialToolFunctions -> toolConfigurationCoordinator.loadFunctions(action.toolId)
+            ChatAction.ClearToolConfigurationError -> toolConfigurationCoordinator.clearError()
             is ChatAction.SetThemeMode ->
                 appearanceRepository.setThemeMode(action.mode)
         }
@@ -177,92 +211,6 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    /** Sends the user's decision back to ADK, which then either runs or rejects the paused tool. */
-    private fun respondToToolConfirmation(confirmed: Boolean, alwaysAllow: Boolean = false) {
-        val sessionId = _uiState.value.sessionId
-        if (sessionId.isBlank()) return
-        respondToToolConfirmation(sessionId, confirmed, alwaysAllow)
-    }
-
-    private fun respondToToolConfirmation(
-        sessionId: String,
-        confirmed: Boolean,
-        alwaysAllow: Boolean = false,
-    ) {
-        val runtime = runtimeFor(sessionId)
-        val request = runtime.pendingToolConfirmations.firstOrNull() ?: return
-        runtime.pendingToolConfirmations = runtime.pendingToolConfirmations.filterNot {
-            it.confirmationCallId == request.confirmationCallId
-        }
-        respondToConfirmationRequest(sessionId, runtime, request, confirmed, alwaysAllow)
-    }
-
-    /**
-     * 确认响应核心：用户确认卡片路径与自动放行通道共用。
-     * `request` 由调用方先从对应队列（[ChatSessionRuntime.pendingToolConfirmations] /
-     * [ChatSessionRuntime.autoApprovedConfirmations]）摘除，这里只负责落授权状态并发起恢复 run。
-     */
-    private fun respondToConfirmationRequest(
-        sessionId: String,
-        runtime: ChatSessionRuntime,
-        request: PendingToolConfirmation,
-        confirmed: Boolean,
-        alwaysAllow: Boolean = false,
-    ) {
-        if (confirmed) {
-            if (alwaysAllow) toolApproval.setAlwaysAllowed(request.toolName)
-            runtime.approvedToolsThisTurn += request.toolName
-            runtime.toolStatuses[ToolCallKey(request.originalCallId, request.toolName)] =
-                ToolCallStatus.Running
-        } else {
-            runtime.approvedToolsThisTurn.clear()
-            runtime.toolStatuses[ToolCallKey(request.originalCallId, request.toolName)] =
-                ToolCallStatus.Rejected
-        }
-        val previousJob = cancelRun(runtime, releaseLease = false)
-        launchRun(runtime) { runToken ->
-            previousJob?.join()
-            checkNotNull(runtime.execution) { "No active conversation execution" }.respondToToolConfirmation(
-                confirmationCallId = request.confirmationCallId,
-                confirmed = confirmed,
-            ).collect { event ->
-                eventReducer.applyEvent(sessionId, event, runToken)
-            }
-        }
-    }
-
-    /** 把用户对挂起输入请求的答复送回 ADK，恢复暂停的 invocation。 */
-    private fun respondToInputRequest(callId: String, value: String) {
-        val sessionId = _uiState.value.sessionId
-        if (sessionId.isBlank()) return
-        val runtime = runtimeFor(sessionId)
-        val request = runtime.pendingInputRequests.firstOrNull { it.callId == callId } ?: return
-        runtime.pendingInputRequests = runtime.pendingInputRequests.filterNot {
-            it.callId == callId
-        }
-        // ADK 恢复运行只把用户 FunctionResponse 落盘、不作为事件回流，实时消息流里
-        // 永远收不到这条工具结果 —— 本地补一条响应消息，调用 chip 才能按 id 立即
-        // 配对成 ✓（重启后由历史回放提供同样信息，见 EventMapper 的同规则处理）。
-        runtime.messages += Messages.fromAssistant(
-                    id = "input-response-${request.callId}",
-                ).copy(
-                    functionResponses = listOf(
-                        FunctionResponseView(id = request.callId, name = request.toolName),
-                    ),
-                )
-        val previousJob = cancelRun(runtime, releaseLease = false)
-        launchRun(runtime) { runToken ->
-            previousJob?.join()
-            checkNotNull(runtime.execution) { "No active conversation execution" }.respondToInputRequest(
-                callId = request.callId,
-                toolName = request.toolName,
-                value = value,
-            ).collect { event ->
-                eventReducer.applyEvent(sessionId, event, runToken)
-            }
-        }
-    }
-
     /**
      * 会话列表由 [repository.conversations] 转发到 [uiState] 的 [ChatUiState.conversations]
      * 字段；UI 只订阅 `uiState` 一条流即可同时拿到消息、streaming 标志、会话 id 与会话列表。
@@ -278,7 +226,7 @@ class ChatViewModel @Inject constructor(
                 _uiState.update { state ->
                     state.copy(
                         availableLLMModelSettings = services,
-                        officialToolDescriptors = buildOfficialToolDescriptors(
+                        officialToolDescriptors = toolConfigurationCoordinator.buildDescriptors(
                             selection = state.currentModelSelection,
                             existing = state.officialToolDescriptors,
                         ),
@@ -287,7 +235,7 @@ class ChatViewModel @Inject constructor(
                 val sessionId = _uiState.value.sessionId
                 val runtime = sessionRuntimes[sessionId] ?: return@collect
                 val selection = runtime.modelSelection ?: return@collect
-                initializeOfficialFunctionsForSelection(sessionId, runtime, selection)
+                toolConfigurationCoordinator.initializeForSelection(sessionId, runtime, selection)
                 publishRuntime(runtime)
             }
         }
@@ -333,7 +281,7 @@ class ChatViewModel @Inject constructor(
         }
         viewModelScope.launch {
             repository.conversationContentRevisions.collect {
-                refreshVisibleHistoryIfStale()
+                sessionNavigationCoordinator.refreshVisibleHistoryIfStale()
             }
         }
         viewModelScope.launch {
@@ -370,7 +318,7 @@ class ChatViewModel @Inject constructor(
         if (!enabled) return
         sessionRuntimes.values
             .filter { it.pendingToolConfirmations.isNotEmpty() }
-            .forEach { respondToToolConfirmation(it.sessionId, confirmed = true) }
+            .forEach { runLifecycleCoordinator.respondToToolConfirmation(it.sessionId, confirmed = true) }
     }
 
     private fun notifySkippedMcpServers(skipped: List<McpSkippedServer>) {
@@ -412,7 +360,7 @@ class ChatViewModel @Inject constructor(
                     failedTurn = runtime.failedRecoverableTurn(),
                     currentModelSelection = runtime.modelSelection,
                     toolConfiguration = runtime.toolConfiguration,
-                    officialToolDescriptors = buildOfficialToolDescriptors(
+                    officialToolDescriptors = toolConfigurationCoordinator.buildDescriptors(
                         runtime.modelSelection,
                         state.officialToolDescriptors,
                     ),
@@ -424,10 +372,9 @@ class ChatViewModel @Inject constructor(
                 state.copy(conversationTaskStatuses = statuses)
             }
         }
-        scheduleMarkerExpansion()
+        toolConfigurationCoordinator.expandPendingMarkers()
     }
 
-    private var navigationVersion = 0L
 
     private fun showRuntime(sessionId: String, isInitializing: Boolean = false) {
         val runtime = runtimeFor(sessionId)
@@ -440,7 +387,7 @@ class ChatViewModel @Inject constructor(
                 failedTurn = runtime.failedRecoverableTurn(),
                 currentModelSelection = runtime.modelSelection,
                 toolConfiguration = runtime.toolConfiguration,
-                officialToolDescriptors = buildOfficialToolDescriptors(
+                officialToolDescriptors = toolConfigurationCoordinator.buildDescriptors(
                     runtime.modelSelection,
                     state.officialToolDescriptors,
                 ),
@@ -449,162 +396,8 @@ class ChatViewModel @Inject constructor(
                 isInitializing = isInitializing,
             )
         }
-        scheduleMarkerExpansion()
+        toolConfigurationCoordinator.expandPendingMarkers()
         publishRuntime(runtime)
-    }
-
-    private fun cancelRun(runtime: ChatSessionRuntime, releaseLease: Boolean = true): Job? {
-        runtime.runToken = Any()
-        val job = runtime.job
-        job?.cancel()
-        runtime.job = null
-        if (releaseLease) {
-            runtime.execution = null
-            val lease = runtime.lease
-            runtime.lease = null
-            // 取消请求不等于执行已终止；旧 Job 真正结束前仍阻止同会话的新任务。
-            if (job == null) lease?.release() else job.invokeOnCompletion { lease?.release() }
-        }
-        return job
-    }
-
-    private suspend fun ensureRunLease(runtime: ChatSessionRuntime, token: Any): AgentRunLease {
-        runtime.lease?.let { return it }
-        val lease = agentRuntimeGate.acquire(
-            source = AgentTaskSource.CHAT,
-            sessionId = runtime.sessionId,
-        )
-        try {
-            currentCoroutineContext().ensureActive()
-            if (runtime.runToken !== token) throw CancellationException("Superseded lease")
-            runtime.lease = lease
-            return lease
-        } catch (cancelled: CancellationException) {
-            lease.release()
-            throw cancelled
-        }
-    }
-
-    private fun releaseRunLease(runtime: ChatSessionRuntime) {
-        runtime.lease?.release()
-        runtime.lease = null
-    }
-
-    /** 三种执行入口共同持有一次协程所有权，准备失败、取消和恢复都从同一处收尾。 */
-    private fun launchRun(
-        runtime: ChatSessionRuntime,
-        onFailure: (Throwable) -> Unit = { failure ->
-            runtime.lastTurn?.let { saveFailedTurn(runtime.sessionId, it) }
-        },
-        execute: suspend (Any) -> Unit,
-    ): Job {
-        val token = Any()
-        runtime.runToken = token
-        runtime.isAgentRunning = true
-        runtime.phase = AgentTaskPhase.GENERATING
-        publishRuntime(runtime)
-        // 先登记 job 再执行，避免 Main.immediate 同步结束后把已完成 job 写回 runtime。
-        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
-            var completedNormally = false
-            try {
-                ensureRunLease(runtime, token).updatePhase(AgentTaskPhase.GENERATING)
-                execute(token)
-                completedNormally = true
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: AgentSessionBusyException) {
-                if (runtime.runToken === token) emitNotice(ChatNotice.CurrentConversationBusy)
-            } catch (failure: Exception) {
-                Log.w(TAG, "Chat run failed for session ${runtime.sessionId}", failure)
-                if (runtime.runToken === token) {
-                    eventReducer.applyError(
-                        runtime.sessionId,
-                        failure.message ?: failure::class.simpleName ?: "Unknown error",
-                    )
-                    if (_uiState.value.sessionId.isBlank()) {
-                        emitNotice(ChatNotice.Message(failure.message ?: "Unknown error"))
-                    }
-                    onFailure(failure)
-                }
-            } finally {
-                finishRunIfOwned(runtime.sessionId, token, completedNormally)
-                repository.refreshConversation(runtime.sessionId)
-            }
-        }
-        runtime.job = job
-        job.start()
-        return job
-    }
-
-    private suspend fun finishRunIfOwned(sessionId: String, runToken: Any, completedNormally: Boolean) {
-        val runtime = runtimeFor(sessionId)
-        if (runtime.runToken !== runToken) return
-        runtime.job = null
-        val pending = runtime.pendingToolConfirmations.firstOrNull()
-        val autoApproved = runtime.autoApprovedConfirmations.firstOrNull()
-        val pendingInput = runtime.pendingInputRequests.firstOrNull()
-        runtime.isAgentRunning = pending != null || autoApproved != null || pendingInput != null
-        when {
-            // 用户本轮已手动批准过该工具：后续同工具确认沿用同轮放行通道直接确认。
-            pending != null && pending.toolName in runtime.approvedToolsThisTurn -> {
-                runtime.pendingToolConfirmations = runtime.pendingToolConfirmations.filterNot {
-                    it.confirmationCallId == pending.confirmationCallId
-                }
-                respondToConfirmationRequest(sessionId, runtime, pending, confirmed = true)
-            }
-            // 有用户卡片在等决策时先不排空自动放行队列，保持"用户答复优先"的旧顺序。
-            pending != null -> {
-                runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_CONFIRMATION)
-                appNotificationManager.notifyToolConfirmation(
-                    toolName = pending.toolName,
-                    taskId = sessionId,
-                )
-                publishRuntime(runtime)
-            }
-            // 自动放行通道：不弹卡片，run 流暂停后静默回复 ADK confirmed=true。
-            autoApproved != null -> {
-                runtime.autoApprovedConfirmations = runtime.autoApprovedConfirmations.filterNot {
-                    it.confirmationCallId == autoApproved.confirmationCallId
-                }
-                respondToConfirmationRequest(sessionId, runtime, autoApproved, confirmed = true)
-            }
-            // 挂起的用户输入请求：保持等待态，等用户在输入卡片上答复后恢复运行。
-            pendingInput != null -> {
-                runtime.phase = AgentTaskPhase.WAITING_FOR_INPUT
-                runtime.lease?.updatePhase(AgentTaskPhase.WAITING_FOR_INPUT)
-                when (pendingInput.kind) {
-                    UserInputKind.CHOICE -> appNotificationManager.notifyChoice(sessionId)
-                    UserInputKind.FREE_TEXT -> appNotificationManager.notifyTextInput(sessionId)
-                }
-                publishRuntime(runtime)
-            }
-            else -> {
-                runtime.execution = null
-                if (runtime.failed) {
-                    runtime.lastTurn?.takeIf { it.status != ChatTurnStatus.FAILED }
-                        ?.let { saveFailedTurn(sessionId, it) }
-                } else {
-                    runtime.lastTurn = null
-                }
-                runtime.approvedToolsThisTurn.clear()
-                appNotificationManager.cancelPendingInteractionNotifications(sessionId)
-                if (completedNormally && !runtime.failed) {
-                    appNotificationManager.notifyTaskCompleted(sessionId)
-                }
-                releaseRunLease(runtime)
-                if (_uiState.value.sessionId != sessionId) {
-                    runtime.attention = when {
-                        runtime.failed -> SessionResultAttention.FAILED
-                        completedNormally -> SessionResultAttention.COMPLETED
-                        else -> SessionResultAttention.NONE
-                    }
-                } else if (completedNormally) {
-                    autoSpeakCompletedReply(sessionId, runtime)
-                }
-                publishRuntime(runtime)
-            }
-        }
-        viewModelScope.launch { refreshVisibleHistoryIfStale() }
     }
 
     /**
@@ -627,17 +420,9 @@ class ChatViewModel @Inject constructor(
         speechPlaybackController.play(reply.id, markdownToSpeechText(text))
     }
 
-    private fun clearToolConfirmationState(runtime: ChatSessionRuntime) {
-        runtime.approvedToolsThisTurn.clear()
-        runtime.pendingToolConfirmations = emptyList()
-        runtime.autoApprovedConfirmations = emptyList()
-        runtime.toolStatuses.clear()
-        publishRuntime(runtime)
-    }
-
     override fun onCleared() {
         sessionRuntimes.values.forEach { runtime ->
-            cancelRun(runtime)
+            runLifecycleCoordinator.cancelRun(runtime)
             runtime.closePartChannels()
         }
         speechPlaybackController.clearSession()
@@ -668,31 +453,6 @@ class ChatViewModel @Inject constructor(
         sessionRuntimes[sessionId]?.closePartChannels()
     }
 
-    private fun contentRevision(sessionId: String): Long =
-        repository.conversationContentRevisions.value[sessionId] ?: 0L
-
-    /** 历史只在该会话无执行者时更新；版本留在仓库中，后台会话不依赖瞬时通知。 */
-    private suspend fun refreshVisibleHistoryIfStale() {
-        val sessionId = _uiState.value.sessionId
-        val runtime = sessionRuntimes[sessionId] ?: return
-        fun canReload(): Boolean = _uiState.value.sessionId == sessionId &&
-            !_uiState.value.isInitializing && loadingSessionId == null && !runtime.isActive
-
-        while (canReload()) {
-            val revision = contentRevision(sessionId)
-            if (!runtime.isLoaded || runtime.loadedContentRevision >= revision) return
-            val runToken = runtime.runToken
-            val messages = repository.loadMessages(sessionId) ?: return
-            // 加载期间即使一次新任务已经完成，也不能用旧读取覆盖它的内存结果。
-            if (!canReload() || runtime.runToken !== runToken) return
-            if (runtime.loadedContentRevision > revision) return
-            runtime.closePartChannels()
-            runtime.messages = messages
-            runtime.loadedContentRevision = revision
-            publishRuntime(runtime)
-        }
-    }
-
     private var resolvingSubmission = false
 
     /** 发送只回报真实接管结果；准备过程属于 ViewModel，不依赖输入框协程的生命周期。 */
@@ -709,7 +469,7 @@ class ChatViewModel @Inject constructor(
         val state = _uiState.value
         if (text.isBlank() && draftAttachments.isEmpty() ||
             state.pendingToolConfirmation != null || state.pendingInputRequest != null ||
-            state.isInitializing || loadingSessionId != null
+            state.isInitializing || sessionNavigationCoordinator.loadingSessionId != null
         ) {
             submission.complete(ChatSubmissionResult.REJECTED)
             return
@@ -725,7 +485,7 @@ class ChatViewModel @Inject constructor(
         }
         resolvingSubmission = true
         ownsResolution = true
-        val navigationAtSend = navigationVersion
+        val navigationAtSend = sessionNavigationCoordinator.navigationVersion
         var handedOff = false
         val job = viewModelScope.launch {
             try {
@@ -736,7 +496,7 @@ class ChatViewModel @Inject constructor(
                 }
                 currentCoroutineContext().ensureActive()
                 // 会话解析期间用户已导航，不把旧发送强行切回当前页面。
-                if (navigationVersion != navigationAtSend || loadingSessionId != null) return@launch
+                if (sessionNavigationCoordinator.navigationVersion != navigationAtSend || sessionNavigationCoordinator.loadingSessionId != null) return@launch
                 handedOff = true
                 startSend(
                     snapshot.sessionId, snapshot.modelSelection, text, draftAttachments,
@@ -771,54 +531,56 @@ class ChatViewModel @Inject constructor(
         showAfterAcceptance: Boolean = false,
     ) {
         val runtime = runtimeFor(sessionId)
-        if (runtime.isActive || loadingSessionId != null ||
+        if (runtime.isActive || sessionNavigationCoordinator.loadingSessionId != null ||
             sessionRuntimes.values.count { it.isActive } >= MAX_PARALLEL_TASKS
         ) {
-            if (!runtime.isActive && loadingSessionId == null) {
+            if (!runtime.isActive && sessionNavigationCoordinator.loadingSessionId == null) {
                 emitNotice(ChatNotice.ParallelTaskLimitReached)
             }
             submission.complete(ChatSubmissionResult.REJECTED)
             return
         }
-        validateAttachments(selection, draftAttachments)?.let {
-            emitNotice(it)
+        validateChatAttachments(selection, _uiState.value.availableLLMModelSettings, draftAttachments)?.let {
+            emitNotice(it.toChatNotice())
             submission.complete(ChatSubmissionResult.REJECTED)
             return
         }
-        clearToolConfirmationState(runtime)
+        runLifecycleCoordinator.clearToolConfirmationState(runtime)
         runtime.modelSelection = selection
         runtime.failed = false
         runtime.attention = SessionResultAttention.NONE
-        val navigationAtSend = navigationVersion
+        val navigationAtSend = sessionNavigationCoordinator.navigationVersion
         var preparedTurn: ChatTurn? = null
-        val job = launchRun(runtime, onFailure = { _ ->
-            preparedTurn?.let { saveFailedTurn(sessionId, it) }
+        val job = runLifecycleCoordinator.launchRun(runtime, onFailure = { failure ->
+            preparedTurn?.let { turnRecoveryCoordinator.recordFailure(sessionId, it) }
         }) { runToken ->
             try {
-                // 准备必须在 lease 内完成；配置读取失败不能悄悄沿用旧配置启动。
-                val configuration = sessionResolver.resolveToolConfiguration(sessionId, selection)
-                val revision = contentRevision(sessionId)
-                val history = if (runtime.isLoaded &&
-                    runtime.loadedContentRevision >= revision
-                ) runtime.messages else repository.loadMessages(sessionId).orEmpty()
-                val turn = prepareChatTurn(
+                // 准备流程不持有运行所有权；接管前仍由本类核对 token 与导航版本。
+                val prepared = prepareChatSend(
                     sessionId = sessionId,
+                    selection = selection,
                     text = text,
                     drafts = draftAttachments,
-                    history = history,
+                    cachedHistory = {
+                        runtime.takeIf { it.isLoaded }?.let {
+                            ChatHistorySnapshot(it.messages, it.loadedContentRevision)
+                        }
+                    },
                     retry = retry,
                 )
-                val execution = runner.createExecution(sessionId, selection, configuration)
+                val turn = prepared.turn
+                val execution = prepared.execution
                 currentCoroutineContext().ensureActive()
                 if (runtime.runToken !== runToken) throw CancellationException("Superseded preparation")
                 // 未接管前的导航取消发送；已接管的后台任务则继续执行。
-                if (navigationVersion != navigationAtSend) throw CancellationException("Navigation changed")
+                if (sessionNavigationCoordinator.navigationVersion != navigationAtSend) throw CancellationException("Navigation changed")
                 runtime.execution = execution
-                runtime.toolConfiguration = configuration
+                runtime.toolConfiguration = prepared.toolConfiguration
                 preparedTurn = turn
                 runtime.lastTurn = turn
                 runtime.messages = turn.messages
-                runtime.loadedContentRevision = revision
+                runtime.retryingInvocation = retry != null
+                runtime.loadedContentRevision = prepared.contentRevision
                 runtime.isLoaded = true
                 runtime.failed = false
                 submission.complete(ChatSubmissionResult.ACCEPTED)
@@ -848,20 +610,6 @@ class ChatViewModel @Inject constructor(
         }
         // 覆盖协程尚未开始就被取消的情况。
         job.invokeOnCompletion { submission.complete(ChatSubmissionResult.REJECTED) }
-    }
-
-    /**
-     * 把发送轮落盘为可恢复的 FAILED 轮次（保留部分输出与附件），供错误区的“重试”恢复。
-     * 流式失败与用户主动停止都走这里；重试时由 ADK 恢复原 invocation。
-     */
-    private fun saveFailedTurn(sessionId: String, turn: ChatTurn) {
-        val runtime = runtimeFor(sessionId)
-        val failed = turn.copy(
-            status = ChatTurnStatus.FAILED,
-            messages = runtime.messages,
-        )
-        runtime.lastTurn = failed
-        publishRuntime(runtime)
     }
 
     /**
@@ -901,11 +649,9 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    /** 点击后直接交给 ADK 恢复原执行。 */
-    private fun retryFailedTurn() {
+    /** 原样重试和编辑提交的唯一执行入口。 */
+    private fun executeFailedTurnResend(failedTurn: ChatTurn) {
         val state = _uiState.value
-        if (state.isAgentRunning) return
-        val failedTurn = state.failedTurn ?: return
         val selection = state.currentModelSelection?.takeIf(::isUsableChatSelection) ?: run {
             emitNotice(ChatNotice.ConfigureChatModel)
             return
@@ -918,200 +664,6 @@ class ChatViewModel @Inject constructor(
             draftAttachments = emptyList(),
             retry = failedTurn,
         )
-    }
-
-    private fun validateAttachments(
-        selection: ModelSelection,
-        draftAttachments: List<DraftAttachment>,
-    ): ChatNotice? {
-        if (draftAttachments.isEmpty()) return null
-        if (draftAttachments.mapTo(hashSetOf()) { it.category }.size != 1) {
-            return ChatNotice.MixedAttachmentCategories
-        }
-        val model = _uiState.value.availableLLMModelSettings
-            .firstOrNull { it.id == selection.serviceId }
-            ?.groups?.firstOrNull { it.id == selection.groupId }
-            ?.models?.firstOrNull { it.id == selection.modelId }
-            ?: return ChatNotice.ChatModelUnavailable
-        val (supportedMimeTypes, maxInlineBytes) = when (draftAttachments.first().category) {
-            AttachmentCategory.IMAGE -> model.capabilities.vision?.let {
-                it.supportedMimeTypes to it.maxInlineBytes
-            }
-            AttachmentCategory.AUDIO -> model.capabilities.audioInput?.let {
-                it.supportedMimeTypes to it.maxInlineBytes
-            }
-            AttachmentCategory.DOCUMENT -> model.capabilities.documentInput?.let {
-                it.supportedMimeTypes to it.maxInlineBytes
-            }
-        } ?: return ChatNotice.AttachmentCategoryUnsupported
-        val unsupported = draftAttachments.firstOrNull {
-            it.mimeType !in supportedMimeTypes ||
-                maxInlineBytes?.let { limit -> it.sizeBytes > limit } == true
-        }
-        if (unsupported != null) return ChatNotice.AttachmentUnsupportedOrTooLarge(unsupported.displayName)
-        if (
-            draftAttachments.first().category == AttachmentCategory.DOCUMENT &&
-            draftAttachments.sumOf(DraftAttachment::sizeBytes) > MAX_DOCUMENT_REQUEST_BYTES
-        ) {
-            return ChatNotice.DocumentTotalSizeLimitExceeded
-        }
-        return null
-    }
-
-    /**
-     * 启动期会话恢复：依次尝试
-     * 1. 元数据 RoomDatabase 中 `isLast=true` 的 id（仍在 ADK Room 中）；
-     * 2. Room 中 `lastUpdateTime` 最大的会话（即最近活跃的）；
-     * 3. 创建一个新的空会话（首次安装 / 全部被删的兜底）。
-     *
-     * 供 [ChatRoute] 在 `LaunchedEffect(Unit)` 内调用，让首屏打字前已经有可用 sessionId，
-     * 避免依赖 `send()` 的兜底分支。仅在进程级（`_uiState.value.sessionId` 为空）执行一次；同一 ViewModel 实例内多次调用安全。
-     */
-    private fun restoreOrCreateSession() {
-        if (_uiState.value.sessionId.isNotBlank() || _uiState.value.isInitializing) return
-        val loadToken = Any()
-        activeSessionLoadToken = loadToken
-        _uiState.update { it.copy(isInitializing = true) }
-        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
-            try {
-                val snapshot = sessionResolver.resolveCurrentOrCreate()
-                val revision = contentRevision(snapshot.sessionId)
-                val history = repository.loadMessages(snapshot.sessionId).orEmpty()
-                currentCoroutineContext().ensureActive()
-                if (activeSessionLoadToken !== loadToken) return@launch
-                val runtime = runtimeFor(snapshot.sessionId)
-                runtime.messages = history
-                runtime.modelSelection = snapshot.modelSelection
-                runtime.toolConfiguration = snapshot.toolConfiguration
-                runtime.isLoaded = true
-                runtime.loadedContentRevision = revision
-                showRuntime(snapshot.sessionId)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (failure: Exception) {
-                Log.w(TAG, "Unable to restore current conversation", failure)
-            } finally {
-                if (activeSessionLoadToken === loadToken) {
-                    activeSessionLoadToken = null
-                    sessionLoadJob = null
-                    _uiState.update { it.copy(isInitializing = false) }
-                    refreshVisibleHistoryIfStale()
-                }
-            }
-        }
-        sessionLoadJob = job
-        job.start()
-    }
-
-    /**
-     * 开始一个全新的会话 — 调 [ConversationRepository.createConversation] 创建并切到新会话。
-     *
-     * 即使 [ConversationRepository.createConversation] 失败（例如 Room 暂时不可用），也先清掉
-     * 上一会话遗留的 [partChannels]，避免 channel 跨"空 session"残留。
-     */
-    private fun reset() {
-        navigationVersion++
-        val navigationAtReset = navigationVersion
-        viewModelScope.launch {
-            val newId = createConversationWithDefaults()
-            if (navigationAtReset != navigationVersion) return@launch
-            if (newId.isNotBlank()) {
-                switchSessionUnchecked(newId)
-            } else {
-                Log.w(TAG, "reset() failed to create a new conversation; UI state unchanged.")
-            }
-        }
-    }
-
-    /**
-     * 切换到指定 session
-     */
-    private fun switchSession(sessionId: String) {
-        if (sessionId.isBlank()) return
-        switchSessionUnchecked(sessionId)
-    }
-
-    private fun switchSessionUnchecked(sessionId: String) {
-        if (sessionId.isBlank()) return
-        if (sessionId == _uiState.value.sessionId && !_uiState.value.isInitializing) return
-        navigationVersion++
-        sessionRuntimes[_uiState.value.sessionId]?.closePartChannels()
-        sessionLoadJob?.cancel()
-        speechPlaybackController.clearSession()
-        val loadToken = Any()
-        activeSessionLoadToken = loadToken
-        loadingSessionId = sessionId
-        // 让 MainScreen 中央 spinner 立刻接管，避免重新读取已结束会话时旧 messages
-        // 残留闪烁；运行中的会话仍直接显示内存流，不能被历史读取打断。
-        val targetRuntime = runtimeFor(sessionId)
-        val requiresHistoryLoad = !targetRuntime.isLoaded || !targetRuntime.isActive
-        showRuntime(sessionId, isInitializing = requiresHistoryLoad)
-        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
-            try {
-                val snapshot = sessionResolver.activate(sessionId)
-                currentCoroutineContext().ensureActive()
-                if (activeSessionLoadToken !== loadToken) return@launch
-                targetRuntime.modelSelection = snapshot?.modelSelection
-                targetRuntime.toolConfiguration = snapshot?.toolConfiguration
-                // 运行中的会话必须继续使用内存中的流式状态；已结束的缓存会话则
-                // 每次切入都从持久化历史重建，避免后台完成后把旧的内存快照重新展示。
-                if (targetRuntime.isLoaded && targetRuntime.isActive) {
-                    targetRuntime.attention = SessionResultAttention.NONE
-                    targetRuntime.reseedPartialChannels()
-                    showRuntime(sessionId)
-                    return@launch
-                }
-                val revision = contentRevision(sessionId)
-                val messages = repository.loadMessages(sessionId)
-                if (activeSessionLoadToken !== loadToken) return@launch
-                when {
-                    messages == null -> {
-                        Log.i(TAG, "switchSession($sessionId): session missing; creating a fresh one.")
-                        repository.discardConversationMetadata(sessionId)
-                        val newId = createConversationWithDefaults()
-                        if (activeSessionLoadToken !== loadToken) return@launch
-                        if (newId.isNotBlank()) {
-                            val newRuntime = runtimeFor(newId)
-                            newRuntime.isLoaded = true
-                            if (activeSessionLoadToken !== loadToken) return@launch
-                            showRuntime(newId)
-                        } else {
-                            // create 失败也别把 spinner 永久卡住 — 解锁 UI 让用户能重试。
-                            _uiState.update { it.copy(isInitializing = false) }
-                            Log.w(TAG, "switchSession($sessionId): createConversation failed; isInitializing cleared anyway.")
-                        }
-                    }
-
-                    else -> {
-                        // 命中：history 非空 = 旧 session；history 空 = 刚建的空 session。
-                        // 一次性 commit sessionId + messages + isInitializing=false，
-                        // 避免两次 messages 写导致两帧渲染。
-                        targetRuntime.messages = messages
-                        targetRuntime.isLoaded = true
-                        targetRuntime.loadedContentRevision = revision
-                        targetRuntime.attention = SessionResultAttention.NONE
-                        targetRuntime.reseedPartialChannels()
-                        showRuntime(sessionId)
-                        _uiState.update { state ->
-                            if (state.sessionId == sessionId) {
-                                state.copy(scrollToLatestRequest = state.scrollToLatestRequest + 1L)
-                            } else {
-                                state
-                            }
-                        }
-                    }
-                }
-            } finally {
-                if (activeSessionLoadToken === loadToken) {
-                    activeSessionLoadToken = null
-                    loadingSessionId = null
-                    sessionLoadJob = null
-                    refreshVisibleHistoryIfStale()
-                }
-            }
-        }
-        sessionLoadJob = job
-        job.start()
     }
 
     /**
@@ -1157,319 +709,19 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             repository.setConversationModel(sessionId, ModelSelectionCodec.encode(selection))
             runtime.modelSelection = selection
-            initializeOfficialFunctionsForSelection(sessionId, runtime, selection)
+            toolConfigurationCoordinator.initializeForSelection(sessionId, runtime, selection)
             publishRuntime(runtime)
         }
     }
 
-    /**
-     * 把指定会话持久化的配置装载为当前运行时配置，并重建后续消息使用的 agent。
-     *
-     * 已保存且仍可用的模型优先；新会话或模型已失效时使用当前默认模型。若没有任何
-     * 可用模型，则清空运行时选择和旧 runner，保留空会话等待用户完成模型配置。
-     */
-    private suspend fun createConversationWithDefaults(): String {
-        val snapshot = sessionResolver.createAndActivate()
-        runtimeFor(snapshot.sessionId).apply {
-            modelSelection = snapshot.modelSelection
-            toolConfiguration = snapshot.toolConfiguration
-        }
-        return snapshot.sessionId
-    }
-
-    private suspend fun initializeOfficialFunctionsForSelection(
-        sessionId: String,
-        runtime: ChatSessionRuntime,
-        selection: ModelSelection,
-    ) {
-        val current = runtime.toolConfiguration
-            ?: sessionResolver.resolveToolConfiguration(sessionId, selection)
-        val initialized = current.initializeOfficialFunctions(
-            supportedOfficialToolIds(selection),
-        )
-        if (initialized != current) {
-            if (repository.setConversationToolConfiguration(sessionId, initialized)) {
-                runtime.toolConfiguration = initialized
-            } else {
-                _uiState.update {
-                    it.copy(hasToolConfigurationError = true)
-                }
-            }
-        } else {
-            runtime.toolConfiguration = current
-        }
-    }
-
-    private fun setReasoningEffort(effort: ReasoningEffort) {
-        updateToolConfiguration { configuration ->
-            configuration.copy(reasoningEffort = effort)
-        }
-    }
-
-    private fun setMcpServerEnabled(serverId: String, enabled: Boolean) {
-        updateToolConfiguration { configuration ->
-            configuration.copy(
-                enabledMcpServerIds = if (enabled) {
-                    configuration.enabledMcpServerIds + serverId
-                } else {
-                    configuration.enabledMcpServerIds - serverId
-                },
-            )
-        }
-    }
-
-    /**
-     * Toggle a single function of an official tool. The caller passes the
-     * current catalog of ids so the marker can be expanded before the write.
-     */
-    private fun setOfficialFunctionEnabled(
-        toolId: String,
-        functionId: String,
-        enabled: Boolean,
-        supportedFunctionIds: Set<String>,
-    ) {
-        val selection = _uiState.value.currentModelSelection ?: return
-        updateToolConfiguration { configuration ->
-            configuration.setOfficialFunctionEnabled(
-                toolId = toolId,
-                functionId = functionId,
-                supportedFunctionIds = supportedFunctionIds,
-                enabled = enabled,
-            )
-        }
-    }
-
-    /**
-     * Trigger an async load of the function list for [toolId]. Already loaded
-     * tools only re-run their marker expansion (no network call). On success,
-     * the configuration's marker entry for the tool is replaced with the real
-     * function ids so persistence stays concrete.
-     */
-    private fun loadOfficialToolFunctions(toolId: String) {
-        val descriptors = _uiState.value.officialToolDescriptors
-        val target = descriptors.firstOrNull { it.id == toolId } ?: return
-        if (target.isLoadingFunctions) return
-        if (target.functions.isNotEmpty() && target.loadError == null) {
-            expandMarkerAfterLoad(target)
-            return
-        }
-        fetchAndCacheOfficialToolFunctions(toolId)
-    }
-
-    /**
-     * Walk every descriptor and, for tools whose configuration still uses the
-     * [ConversationToolConfiguration.ALL_FUNCTIONS_MARKER] sentinel, fetch the
-     * function list in the background so the marker is expanded to concrete
-     * ids without forcing the user to open each sub-page first.
-     */
-    private fun scheduleMarkerExpansion() {
-        val configuration = _uiState.value.toolConfiguration ?: return
-        val selection = _uiState.value.currentModelSelection ?: return
-        val descriptors = _uiState.value.officialToolDescriptors
-        descriptors.forEach { descriptor ->
-            val raw = configuration.enabledOfficialFunctionIds(descriptor.id)
-            val needsExpansion = ConversationToolConfiguration.ALL_FUNCTIONS_MARKER in raw
-            val alreadyLoaded = descriptor.functions.isNotEmpty()
-            if (!needsExpansion) return@forEach
-            if (alreadyLoaded) {
-                expandMarkerAfterLoad(descriptor)
-                return@forEach
-            }
-            if (descriptor.isLoadingFunctions || descriptor.loadError != null) return@forEach
-            fetchAndCacheOfficialToolFunctions(descriptor.id)
-        }
-    }
-
-    private fun fetchAndCacheOfficialToolFunctions(toolId: String) {
-        _uiState.update { state ->
-            state.copy(
-                officialToolDescriptors = state.officialToolDescriptors.map { existing ->
-                    if (existing.id == toolId) {
-                        existing.copy(isLoadingFunctions = true, loadError = null)
-                    } else {
-                        existing
-                    }
-                },
-            )
-        }
-        viewModelScope.launch {
-            val outcome = cancellationAwareRunCatching { officialFunctionCatalog.listFunctions(toolId) }
-            val functions = outcome.getOrDefault(emptyList())
-            val loadError = outcome.exceptionOrNull()?.message
-            _uiState.update { state ->
-                state.copy(
-                    officialToolDescriptors = state.officialToolDescriptors.map { existing ->
-                        if (existing.id == toolId) {
-                            existing.copy(
-                                functions = functions,
-                                isLoadingFunctions = false,
-                                loadError = loadError,
-                            )
-                        } else {
-                            existing
-                        }
-                    },
-                )
-            }
-            if (functions.isNotEmpty()) {
-                expandMarkerAfterLoad(
-                    OfficialToolDescriptor(id = toolId, functions = functions),
-                )
-            }
-        }
-    }
-
-    private fun expandMarkerAfterLoad(tool: OfficialToolDescriptor) {
-        val selection = _uiState.value.currentModelSelection ?: return
-        val configuration = _uiState.value.toolConfiguration ?: return
-        val ids = configuration.enabledOfficialFunctionIds(tool.id)
-        if (ConversationToolConfiguration.ALL_FUNCTIONS_MARKER !in ids) return
-        if (tool.functions.isEmpty()) return
-        updateToolConfiguration { configuration ->
-            configuration.expandOfficialFunctionsMarker(
-                tool.id,
-                tool.functions.mapTo(hashSetOf()) { it.id },
-            )
-        }
-    }
-
-    private fun buildOfficialToolDescriptors(
-        selection: ModelSelection?,
-        existing: List<OfficialToolDescriptor>,
-    ): List<OfficialToolDescriptor> {
-        val available = availableOfficialTools(selection)
-        if (available.isEmpty()) return emptyList()
-        val existingById = existing.associateBy { it.id }
-        val services = modelServices.currentServices().associateBy(LLMModelSetting::id)
-        return available.map { tool ->
-            existingById[tool.toolId]
-                ?.takeIf { it.sourceServiceId == tool.serviceId }
-                ?: OfficialToolDescriptor(
-                    id = tool.toolId,
-                    sourceServiceId = tool.serviceId,
-                    sourceServiceName = services[tool.serviceId]?.name.orEmpty(),
-                )
-        }
-    }
-
-    private fun clearToolConfigurationError() {
-        _uiState.update { it.copy(hasToolConfigurationError = false) }
-    }
-
-    private fun updateToolConfiguration(
-        transform: (ConversationToolConfiguration) -> ConversationToolConfiguration,
-    ) {
-        val sessionId = _uiState.value.sessionId
-        if (sessionId.isBlank()) return
-        val runtime = runtimeFor(sessionId)
-        if (runtime.isActive) return
-        val current = runtime.toolConfiguration ?: return
-        val updated = transform(current)
-        if (updated == current) return
-        viewModelScope.launch {
-            if (repository.setConversationToolConfiguration(sessionId, updated)) {
-                runtime.toolConfiguration = updated
-                _uiState.update { it.copy(hasToolConfigurationError = false) }
-                publishRuntime(runtime)
-            } else {
-                _uiState.update {
-                    it.copy(hasToolConfigurationError = true)
-                }
-            }
-        }
-    }
-
-    /**
-     * 当前选择可用的官方工具，包含当前服务原生工具与其它服务独立 API 工具。
-     */
-    private fun supportedOfficialToolIds(selection: ModelSelection?): Set<String> {
-        return availableOfficialTools(selection).mapTo(linkedSetOf()) { it.toolId }
-    }
-
-    private fun availableOfficialTools(
-        selection: ModelSelection?,
-    ): List<OfficialToolAvailability> {
-        val current = selection ?: return emptyList()
-        val service = modelServices.currentServices()
-            .firstOrNull { it.id == current.serviceId }
-            ?: return emptyList()
-        return officialFunctionCatalog.availableTools(
-            activeService = service,
-            activeModelId = current.modelId,
-        )
-    }
-
     private fun isUsableChatSelection(selection: ModelSelection): Boolean =
         modelServices.currentServices().isUsableChatSelection(selection)
-
-    /**
-     * 用户主动中断当前 turn（点击 composer 上的停止按钮）。
-     *
-     * 与 [send] 的 `finally` 块相比，这里**同步**把 `isAgentRunning` 置 false —
-     * `finally` 是协程挂起后才跑，UI 会延迟一帧才解锁输入框，用户感知明显；
-     * 提前在取消的同一帧更新 state 让 stop 按钮 → 输入框 enable 的过渡即时可见。
-     *
-     * `partial = false` 让未完成的 assistant message 在 UI 上结束流式渲染。
-     * 同步把仍在 `partial` 状态的 assistant message 翻成 `partial = false`：因为是用户主动
-     * 中断,不会有 final non-partial event 到达来触发 [appendCompleteEvent] 的就地翻标志位;
-     * 如果不在这里手动翻,那条 message 会一直停留在 `partial = true`,用户后续滚动离开再
-     * 滚回时,LazyColumn 重新 Composition 后 [ChatTextContent] 会用 `partial = true && chunkChannel != null`
-     * 落到 streaming 路径,但本地 `streamingState` 已被重置为空 → 气泡内容丢失。和流式自然
-     * 完成的滚动回看场景是同一个 root cause family,这里一并兜底。
-     *
-     * 没有进行中的 job 时直接 no-op，避免在非 streaming 状态误触。
-     */
-    private fun stopStreaming() {
-        val sessionId = _uiState.value.sessionId
-        val runtime = sessionRuntimes[sessionId] ?: return
-        if (runtime.job?.isActive != true &&
-            runtime.pendingToolConfirmations.isEmpty() &&
-            runtime.pendingInputRequests.isEmpty() &&
-            runtime.autoApprovedConfirmations.isEmpty()
-        ) {
-            return
-        }
-        if (runtime.pendingInputRequests.isNotEmpty()) {
-            // 输入请求没有"拒绝"语义（ADK 协议只认 FunctionResponse 答复），
-            // 停止按钮不消费挂起请求，用户仍可在卡片上答复。
-            return
-        }
-        if (runtime.pendingToolConfirmations.isNotEmpty()) {
-            runtime.approvedToolsThisTurn.clear()
-            respondToToolConfirmation(sessionId, confirmed = false)
-            return
-        }
-        if (runtime.autoApprovedConfirmations.isNotEmpty()) {
-            // 中断仍在流式中的自动放行轮，沿用"停止 = 拒绝挂起确认"的旧语义。
-            val request = runtime.autoApprovedConfirmations.first()
-            runtime.autoApprovedConfirmations = runtime.autoApprovedConfirmations.drop(1)
-            respondToConfirmationRequest(sessionId, runtime, request, confirmed = false)
-            return
-        }
-        cancelRun(runtime)
-        runtime.messages = runtime.messages.map { msg ->
-            if (msg.partial && msg.role == MessageRole.Assistant) {
-                msg.copy(partial = false, turnComplete = false)
-            } else {
-                msg
-            }
-        }
-        runtime.isAgentRunning = false
-        runtime.attention = SessionResultAttention.NONE
-        // 用户主动停止的轮次同样保留“重试”：把已生成的部分回答一并落盘为可恢复轮，
-        // 重试时交给 ADK Runner 恢复原 invocation。
-        runtime.lastTurn?.takeIf { it.status == ChatTurnStatus.RUNNING }?.let { stopped ->
-            saveFailedTurn(sessionId, stopped)
-        }
-        publishRuntime(runtime)
-    }
 
     // ── Helpers ────────────────────────────────────────────────────────────
 
     companion object {
         private const val TAG: String = "ChatViewModel"
         private const val MAX_PARALLEL_TASKS: Int = 3
-        private const val MAX_DOCUMENT_REQUEST_BYTES: Long = 50L * 1024 * 1024
     }
 }
 

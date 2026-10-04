@@ -40,6 +40,7 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
     private VirtualDisplay display;
     private Context shellContext;
     private MobileDisplayGeometry displayGeometry;
+    private Boolean landscapeOverride;
     private Object windowManagerService;
     private Integer previousImePolicy;
     private final MobileFrameBuffer frames = new MobileFrameBuffer();
@@ -326,6 +327,15 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
         return new int[] { displayGeometry.width, displayGeometry.height, displayGeometry.densityDpi };
     }
 
+    @Override public synchronized int[] rotateDisplay(int displayId) {
+        requireDisplay(displayId);
+        boolean landscape = displayGeometry.width <= displayGeometry.height;
+        applyGeometry(displayGeometry.oriented(landscape));
+        // 方向属于本次显示会话；主屏旋转、切换窗口和后续截图均不能覆盖用户选择。
+        landscapeOverride = landscape;
+        return new int[] { displayGeometry.width, displayGeometry.height, displayGeometry.densityDpi };
+    }
+
     @Override public synchronized void stop() {
         if (display != null) {
             try { cancelGesture(display.getDisplay().getDisplayId()); }
@@ -366,6 +376,7 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
         }
         shellContext = null;
         displayGeometry = null;
+        landscapeOverride = null;
     }
 
     /** Shizuku 用固定 transaction 调用 destroy；主动清理并终止非 daemon 服务进程。 */
@@ -400,7 +411,8 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
         DisplayMetrics metrics = new DisplayMetrics();
         main.getRealSize(size);
         main.getRealMetrics(metrics);
-        return new MobileDisplayGeometry(size.x, size.y, metrics.densityDpi);
+        MobileDisplayGeometry geometry = new MobileDisplayGeometry(size.x, size.y, metrics.densityDpi);
+        return landscapeOverride == null ? geometry : geometry.oriented(landscapeOverride);
     }
 
     private ImageReader newReader(MobileDisplayGeometry geometry) {
@@ -442,10 +454,16 @@ public final class ShellMobileUseService extends IMobileUseService.Stub {
 
     private void ensureGeometry() {
         MobileDisplayGeometry current = readGeometry();
+        applyGeometry(current);
+    }
+
+    private void applyGeometry(MobileDisplayGeometry current) {
         if (current.sameAs(displayGeometry)) return;
+        // 分辨率切换由系统向目标应用派发配置变更；不重建显示，任务和预览绑定得以保留。
         cancelGesture(display.getDisplay().getDisplayId());
-        replaceReader(current);
+        // 先让系统接受尺寸；拒绝 resize 时不替换截图 Surface，旧画面仍可继续使用。
         display.resize(current.width, current.height, current.densityDpi);
+        replaceReader(current);
         displayGeometry = current;
     }
 

@@ -94,4 +94,46 @@ class BackgroundAppViewModelTest {
         assertEquals("s2", vm.uiState.value.session?.id)
         assertFalse(vm.uiState.value.inputUnavailable)
     }
+    @Test fun rotatingDropsQueuedTouchesAndPreventsDuplicateRequests() = runTest {
+        coEvery { repository.manualRotate("s1") } coAnswers {
+            delay(100)
+            session.value = session.value!!.copy(width = 2400, height = 1080)
+            MobileUseResult("delivered", "")
+        }
+        val vm = BackgroundAppViewModel(repository)
+        vm.onAction(BackgroundAppAction.Touch("s1", MobileTouch(MobileTouchAction.DOWN, 1f, 2f, 1, 1)))
+        vm.onAction(BackgroundAppAction.Rotate)
+        assertTrue(vm.uiState.value.rotating)
+        vm.onAction(BackgroundAppAction.Rotate)
+        vm.onAction(BackgroundAppAction.Touch("s1", MobileTouch(MobileTouchAction.DOWN, 3f, 4f, 2, 2)))
+        advanceUntilIdle()
+        coVerify(exactly = 1) { repository.manualRotate("s1") }
+        coVerify(exactly = 0) { repository.manualTouch(any(), any()) }
+        assertEquals(2400, vm.uiState.value.session?.width)
+        assertFalse(vm.uiState.value.rotating)
+        assertFalse(vm.uiState.value.rotationUnavailable)
+    }
+
+    @Test fun rotationFailureIsDismissibleAndDoesNotAffectReplacementSession() = runTest {
+        coEvery { repository.manualRotate("s1") } returns MobileUseResult("rotation_unavailable", "")
+        val vm = BackgroundAppViewModel(repository)
+        vm.onAction(BackgroundAppAction.Rotate)
+        runCurrent()
+        assertTrue(vm.uiState.value.rotationUnavailable)
+        assertFalse(vm.uiState.value.rotating)
+        vm.onAction(BackgroundAppAction.DismissRotationError)
+        assertFalse(vm.uiState.value.rotationUnavailable)
+        coEvery { repository.manualRotate("s1") } coAnswers {
+            delay(100)
+            MobileUseResult("rotation_unavailable", "")
+        }
+        vm.onAction(BackgroundAppAction.Rotate)
+        runCurrent()
+        session.value = session.value!!.copy(id = "s2")
+        advanceUntilIdle()
+        assertEquals("s2", vm.uiState.value.session?.id)
+        assertFalse(vm.uiState.value.rotationUnavailable)
+        assertFalse(vm.uiState.value.rotating)
+    }
+
 }

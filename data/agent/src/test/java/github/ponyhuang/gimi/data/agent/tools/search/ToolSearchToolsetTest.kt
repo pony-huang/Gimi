@@ -19,6 +19,11 @@ import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
+import github.ponyhuang.gimi.data.agent.McpToolsetHandle
+import github.ponyhuang.gimi.data.agent.tools.mcp.McpToolset
+import io.mockk.coEvery
+import kotlinx.coroutines.CancellationException
+import org.junit.Assert.assertSame
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -326,6 +331,82 @@ class ToolSearchToolsetTest {
         assertEquals(1, errors.size)
         assertFalse(errors.single().toString().contains("secret.example.com"))
         assertFalse(errors.single().toString().contains("token"))
+    }
+
+    @Test
+    fun failedMcpDiscoveryIsReportedAndRetriedWithoutLosingOtherSources() = runTest {
+        val native = mockk<McpToolset>()
+        var available = false
+        coEvery { native.getTools(any()) } answers {
+            if (!available) error("https://secret.example.com?token=do-not-leak")
+            listOf(tool("remote_files"))
+        }
+        val vector = FakeToolVectorSearch()
+        val search = ToolSearchToolset(
+            sources = listOf(
+                source("local", tool("local_files")),
+                McpServerSource(McpToolsetHandle("remote", "Remote", true, native)),
+            ),
+            vectorSearch = vector,
+        )
+        val first = search.search("files", toolContext(context()))
+        assertEquals(listOf("local_files"), first.loadedToolNames())
+        assertEquals(1, (first["source_errors"] as List<*>).size)
+        assertFalse(first.toString().contains("secret.example.com"))
+        assertFalse(first.toString().contains("token"))
+
+        available = true
+        val recovered = search.search("files", toolContext(context()))
+        assertEquals(listOf("local_files", "remote_files"), recovered.loadedToolNames())
+        assertTrue((recovered["source_errors"] as List<*>).isEmpty())
+        assertEquals(2, vector.lastDocuments.size)
+    }
+
+    @Test
+    fun persistedSelectionAndRepeatedSearchUseCurrentEnablementWithoutReindexing() = runTest {
+        val candidate = tool("clock")
+        var enabled = true
+        var catalogLoads = 0
+        val dynamicSource = object : ToolCandidateSource {
+            override val id = "dynamic"
+            override val displayName = "Dynamic"
+            override suspend fun loadAllTools(readonlyContext: ReadonlyContext?): List<BaseTool> {
+                catalogLoads++
+                return listOf(candidate)
+            }
+            override suspend fun loadEnabledTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
+                if (enabled) listOf(candidate) else emptyList()
+        }
+        val vector = FakeToolVectorSearch()
+        val search = ToolSearchToolset(listOf(dynamicSource), vector)
+        val persisted = context(state = mapOf(ToolSearchToolset.STATE_KEY_LOADED_TOOLS to listOf("clock")))
+        assertEquals(listOf("clock"), search.search("clock", toolContext(persisted)).loadedToolNames())
+        assertEquals(listOf(TOOL_SEARCH_NAME, "clock"), search.getTools(persisted).map(BaseTool::name))
+
+        enabled = false
+        assertEquals(listOf(TOOL_SEARCH_NAME), search.getTools(persisted).map(BaseTool::name))
+        assertTrue(search.search("clock", toolContext(persisted)).loadedToolNames().isEmpty())
+        assertEquals(1, vector.lastDocuments.size)
+
+        enabled = true
+        assertEquals(listOf("clock"), search.search("clock", toolContext(persisted)).loadedToolNames())
+        assertEquals(1, catalogLoads)
+    }
+
+    @Test
+    fun cancelledMcpDiscoveryPropagatesAndCanBeRetried() = runTest {
+        val native = mockk<McpToolset>()
+        val cancellation = CancellationException("discovery cancelled")
+        coEvery { native.getTools(any()) } throws cancellation
+        val search = ToolSearchToolset(
+            listOf(McpServerSource(McpToolsetHandle("remote", "Remote", true, native))),
+            FakeToolVectorSearch(),
+        )
+        val failure = runCatching { search.search("files", toolContext(context())) }.exceptionOrNull()
+        assertSame(cancellation, failure)
+
+        coEvery { native.getTools(any()) } returns listOf(tool("remote_files"))
+        assertEquals(listOf("remote_files"), search.search("files", toolContext(context())).loadedToolNames())
     }
 
     private fun toolset(

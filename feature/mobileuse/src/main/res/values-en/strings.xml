@@ -17,9 +17,9 @@
     <string name="mobile_use_root_title">Root mode is active</string>
     <string name="mobile_use_root_detail">This feature requires Shizuku ADB shell mode. Restart it with ADB.</string>
     <string name="mobile_use_ready_title">Ready</string>
-    <string name="mobile_use_text_input_ready_title">Text input · On</string>
-    <string name="mobile_use_text_input_required_title">Text input · Authorization needed</string>
-    <string name="mobile_use_text_input_required">Enable the “Gimi Background App Control · Text Input” Accessibility service.</string>
+    <string name="mobile_use_text_input_ready_title">Text input enabled</string>
+    <string name="mobile_use_text_input_required_title">Text input disabled</string>
+    <string name="mobile_use_text_input_required">Enable the “Gimi Text Input” Accessibility service.</string>
     <string name="mobile_use_text_input_settings">Open Accessibility settings</string>
     <string name="mobile_use_busy_title">Background control in use</string>
     <string name="mobile_use_busy_detail">A background app is open for a chat. Open it from the bubble, or close it before using another chat.</string>
@@ -27,7 +27,11 @@
     <string name="mobile_use_unsupported_detail">This device does not support independent background app control.</string>
     <string name="background_app_title">Background app</string>
     <string name="background_app_open">Show background app</string>
-    <string name="background_app_back">Back in app</string>
+    <string name="background_app_back">Back</string>
+    <string name="background_app_drag">Move window</string>
+    <string name="background_app_drag_hint">Drag</string>
+    <string name="background_app_resize">Resize window</string>
+    <string name="background_app_resize_hint">Drag to resize</string>
     <string name="background_app_collapse">Collapse</string>
     <string name="background_app_more">More</string>
     <string name="background_app_fullscreen">Switch to full screen</string>
@@ -41,4 +45,7 @@
     <string name="background_app_disconnected">The background app was closed or disconnected.</string>
     <string name="background_app_preview_unavailable">The app screen is unavailable. Check the app and connection. Secure pages may block display.</string>
     <string name="background_app_input_unavailable">The device or input control did not accept this action. Check the connection and try again.</string>
+    <string name="background_app_rotate_landscape">Switch secondary display to landscape</string>
+    <string name="background_app_rotate_portrait">Switch secondary display to portrait</string>
+    <string name="background_app_rotation_unavailable">Could not change display orientation. Check the connection and try again. Some apps may use a fixed orientation.</string>
 </resources>

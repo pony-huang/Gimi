@@ -6,17 +6,18 @@ import github.ponyhuang.gimi.data.agent.AgentContribution
 import github.ponyhuang.gimi.data.agent.AgentToolCatalogContext
 import github.ponyhuang.gimi.data.agent.AgentToolCatalogEntry
 import github.ponyhuang.gimi.data.agent.tools.official.DefaultOfficialToolset
-import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolRegistry
 import github.ponyhuang.gimi.data.agent.tools.search.OfficialToolCandidateSource
 import github.ponyhuang.gimi.data.agent.tools.search.ToolCandidateSource
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSpec
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * 官方(厂商内置)工具集贡献方。
  *
- * - 所有厂商工具由单一 [DefaultOfficialToolset] 在请求期按注册表声明组装,无构建期 revision;
+ * - 所有厂商工具由单一 [DefaultOfficialToolset] 在请求期按目录声明组装,无构建期 revision;
  * - ALWAYS_AVAILABLE 模式全部直接声明;ON_DEMAND 模式下厂商原生工具保持直接声明,
  *   标记为检索候选([OfficialToolSpec.searchCandidate],如 Kimi formulas)的声明
  *   转为 tool_search 检索候选源;
@@ -26,7 +27,7 @@ import javax.inject.Singleton
 @Singleton
 class OfficialToolContribution @Inject constructor(
     private val officialToolset: DefaultOfficialToolset,
-    private val registry: OfficialToolRegistry,
+    private val catalog: OfficialToolFunctionCatalog,
 ) : AgentContribution {
 
     override val id: String = ID
@@ -37,7 +38,7 @@ class OfficialToolContribution @Inject constructor(
 
     override suspend fun candidateSources(spec: AgentBuildSpec): List<ToolCandidateSource> {
         if (spec.toolAccessMode != ToolAccessMode.ON_DEMAND) return emptyList()
-        return registry.enabledSearchCandidateSpecs()
+        return catalog.enabledSearchCandidateSpecs()
             .map { candidate -> OfficialToolCandidateSource(candidate, officialToolset) }
     }
 

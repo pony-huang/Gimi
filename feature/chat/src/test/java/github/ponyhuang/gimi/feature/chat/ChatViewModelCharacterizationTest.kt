@@ -25,6 +25,8 @@ import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import github.ponyhuang.gimi.domain.conversation.usecase.PrepareChatTurnUseCase
+import github.ponyhuang.gimi.domain.conversation.usecase.PrepareChatSendUseCase
+import github.ponyhuang.gimi.domain.conversation.usecase.ValidateChatAttachmentsUseCase
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
@@ -42,6 +44,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolAvailability
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
@@ -156,6 +159,115 @@ class ChatViewModelCharacterizationTest {
         assertFalse(state.messages[1].partial)
         assertFalse(state.isAgentRunning)
         coVerify { fixture.conversations.refreshConversation("session-1") }
+    }
+
+    @Test
+    fun documentTotalLimitRejectsBeforeReadingAttachmentsOrCreatingAnExecution() = runTest {
+        val fixture = fixture(configured = true)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        val drafts = listOf(documentDraft("a.pdf", 26L * 1024 * 1024),
+            documentDraft("b.pdf", 26L * 1024 * 1024))
+        fixture.viewModel.effects.test {
+            val results = mutableListOf<ChatSubmissionResult>()
+            fixture.viewModel.send("文档请求", drafts, results::add)
+            assertEquals(listOf(ChatSubmissionResult.REJECTED), results)
+            assertEquals(ChatEffect.ShowNotice(ChatNotice.DocumentTotalSizeLimitExceeded), awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 0) { fixture.attachments.read(any(), any()) }
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
+    }
+
+    @Test
+    fun mixedAttachmentCategoriesRejectBeforePreparingTheSend() = runTest {
+        val fixture = fixture(configured = true)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        val document = documentDraft("a.pdf", 100)
+        val image = document.copy(reference = "/drafts/a.png", mimeType = "image/png",
+            category = github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory.IMAGE)
+        fixture.viewModel.effects.test {
+            fixture.viewModel.send("混合附件", listOf(document, image))
+            assertEquals(ChatEffect.ShowNotice(ChatNotice.MixedAttachmentCategories), awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
+    }
+
+    private fun fixtureWithExecutedToolFailure(): Fixture {
+        val fixture = fixture(configured = true)
+        coEvery { fixture.execution.send(any(), any(), any()) } returns flow {
+            emit(event().copy(functionCalls = listOf(
+                ChatFunctionCall(id = "executed-tool", name = "compose_message", args = emptyMap()),
+            )))
+            throw java.io.IOException("failed after executing tool")
+        }
+        return fixture
+    }
+
+    private fun documentDraft(name: String, sizeBytes: Long) =
+        github.ponyhuang.gimi.domain.conversation.model.DraftAttachment(
+            reference = "/drafts/$name", displayName = name, mimeType = "application/pdf",
+            sizeBytes = sizeBytes,
+            category = github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory.DOCUMENT,
+        )
+
+    @Test
+    fun stoppedTurnRetryImmediatelyReconcilesWithSavedHistoryWithoutExternalRevision() = runTest {
+        val fixture = fixture(configured = true)
+        coEvery { fixture.execution.send(any(), any(), false) } returns flow {
+            emit(event(text = "没", partial = true, turnComplete = false).copy(id = "stopped-partial"))
+            awaitCancellation()
+        }
+        fixture.viewModel.send("你那死了")
+        runCurrent()
+        val user = fixture.viewModel.uiState.value.messages.first { it.role == MessageRole.User }
+        fixture.viewModel.onAction(ChatAction.StopStreaming)
+        advanceUntilIdle()
+        assertTrue(fixture.viewModel.uiState.value.messages.any { message ->
+            message.textParts.any { it.text == "没" }
+        })
+        val finalEvent = event(text = "没太看懂这句，我还在呢，一切正常。", partial = false, turnComplete = true)
+            .copy(id = "resumed-final")
+        coEvery { fixture.execution.send(any(), any(), true) } returns flowOf(finalEvent)
+        val saved = Messages.fromAssistant(id = "saved-final").copy(
+            textParts = listOf(TextPart(text = "没太看懂这句，我还在呢，一切正常。")),
+        )
+        coEvery { fixture.conversations.loadMessages("session-1") } returns listOf(user, saved)
+
+        fixture.viewModel.onAction(ChatAction.RetryFailedTurn)
+        advanceUntilIdle()
+
+        assertEquals(listOf(user, saved), fixture.viewModel.uiState.value.messages)
+        assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
+        assertEquals(null, fixture.viewModel.uiState.value.failedTurn)
+        assertEquals(0L, fixture.viewModel.runtimeFor("session-1").loadedContentRevision)
+    }
+
+    @Test
+    fun failedStoppedTurnRetryKeepsTheRecoverablePartialWithoutReloadingAfterFailure() = runTest {
+        val fixture = fixture(configured = true)
+        coEvery { fixture.execution.send(any(), any(), false) } returns flow {
+            emit(event(text = "没", partial = true, turnComplete = false))
+            awaitCancellation()
+        }
+        fixture.viewModel.send("你好")
+        runCurrent()
+        fixture.viewModel.onAction(ChatAction.StopStreaming)
+        advanceUntilIdle()
+        coEvery { fixture.execution.send(any(), any(), true) } returns flow { throw java.io.IOException("retry failed") }
+        coEvery { fixture.conversations.loadMessages("session-1") } returns emptyList()
+
+        fixture.viewModel.onAction(ChatAction.RetryFailedTurn)
+        advanceUntilIdle()
+
+        assertTrue(fixture.viewModel.uiState.value.failedTurn?.canRetry == true)
+        assertTrue(fixture.viewModel.uiState.value.messages.any { message ->
+            message.textParts.any { it.text == "没" }
+        })
+        // 重试准备阶段激活会话会读一次；失败收尾不能再次读取并覆盖部分输出。
+        coVerify(exactly = 1) { fixture.conversations.loadMessages("session-1") }
     }
 
     @Test
@@ -685,6 +797,66 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun supersededHistoryLoadCannotReplaceTheNewlySelectedConversation() = runTest {
+        val fixture = fixture(configured = true)
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val late = Messages.fromUser(text = "旧会话晚到的历史")
+        val current = Messages.fromUser(text = "当前会话历史")
+        coEvery { fixture.conversations.loadMessages("session-a") } coAnswers {
+            withContext(NonCancellable) {
+                started.complete(Unit)
+                release.await()
+                listOf(late)
+            }
+        }
+        coEvery { fixture.conversations.loadMessages("session-b") } returns listOf(current)
+
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
+        runCurrent()
+        started.await()
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-b"))
+        runCurrent()
+        release.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals("session-b", fixture.viewModel.uiState.value.sessionId)
+        assertEquals(listOf(current), fixture.viewModel.uiState.value.messages)
+        assertFalse(fixture.viewModel.uiState.value.isInitializing)
+        assertFalse(fixture.viewModel.runtimeFor("session-a").isLoaded)
+    }
+
+    @Test
+    fun staleReloadCannotOverwriteATurnThatCompletedWhileItWasReading() = runTest {
+        val revisions = MutableStateFlow<Map<String, Long>>(emptyMap())
+        val fixture = fixture(configured = true, contentRevisions = revisions)
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
+        advanceUntilIdle()
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val stale = Messages.fromUser(text = "发送前的旧历史")
+        coEvery { fixture.conversations.loadMessages("session-a") } coAnswers {
+            started.complete(Unit)
+            release.await()
+            listOf(stale)
+        }
+        revisions.value = mapOf("session-a" to 1L)
+        runCurrent()
+        started.await()
+        // 发送准备读取当前 runtime 快照；测试模拟它已包含这次外部写入。
+        fixture.viewModel.runtimeFor("session-a").loadedContentRevision = 1L
+        fixture.viewModel.send("新一轮")
+        runCurrent()
+        val completed = fixture.viewModel.uiState.value.messages
+        assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
+        assertTrue(completed.any { it.role == MessageRole.Assistant })
+
+        release.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(completed, fixture.viewModel.uiState.value.messages)
+    }
+
+    @Test
     fun externalWriteDuringHistoryReloadIsNotAcknowledgedByOlderSnapshot() = runTest {
         val revisions = MutableStateFlow<Map<String, Long>>(emptyMap())
         val fixture = fixture(configured = true, contentRevisions = revisions)
@@ -852,6 +1024,37 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun queuedConfirmationsKeepOneLeaseUntilTheFinalResponse() = runTest {
+        val agent = ControllableAgent()
+        val gate = FakeAgentRuntimeGate()
+        val fixture = fixture(configured = true, agentOverride = agent, agentRuntimeGate = gate)
+        fixture.viewModel.send("execute tools")
+        runCurrent()
+        agent.emit("session-1", confirmationEvent(
+            confirmation("confirm-a", "compose_message", emptyMap()),
+            confirmation("confirm-b", "read_file", emptyMap()),
+        ))
+        runCurrent()
+        agent.complete("session-1")
+        advanceUntilIdle()
+        assertEquals(1, gate.acquisitions.size)
+        assertEquals(0, gate.releaseCount)
+
+        fixture.viewModel.onAction(ChatAction.RespondToToolConfirmation(confirmed = true))
+        advanceUntilIdle()
+        assertEquals("confirm-b", fixture.viewModel.uiState.value.pendingToolConfirmation?.confirmationCallId)
+        assertEquals(1, gate.acquisitions.size)
+        assertEquals(0, gate.releaseCount)
+
+        fixture.viewModel.onAction(ChatAction.StopStreaming)
+        advanceUntilIdle()
+        assertEquals(listOf("confirm-a" to true, "confirm-b" to false), agent.confirmationResponses)
+        assertEquals(1, gate.acquisitions.size)
+        assertEquals(1, gate.releaseCount)
+        assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
+    }
+
+    @Test
     fun fullAccessAutoApprovesConfirmationWithoutShowingCard() = runTest {
         val agent = ControllableAgent()
         val fixture = fixture(configured = true, agentOverride = agent)
@@ -876,7 +1079,8 @@ class ChatViewModelCharacterizationTest {
     @Test
     fun inputRequestCaptureAndUserReplyResumeTheRun() = runTest {
         val agent = ControllableAgent()
-        val fixture = fixture(configured = true, agentOverride = agent)
+        val gate = FakeAgentRuntimeGate()
+        val fixture = fixture(configured = true, agentOverride = agent, agentRuntimeGate = gate)
         fixture.viewModel.send("问个问题")
         runCurrent()
         agent.emit(
@@ -900,6 +1104,13 @@ class ChatViewModelCharacterizationTest {
         agent.complete("session-1")
         advanceUntilIdle()
 
+        assertEquals(1, gate.acquisitions.size)
+        assertEquals(0, gate.releaseCount)
+        fixture.viewModel.onAction(ChatAction.StopStreaming)
+        advanceUntilIdle()
+        assertEquals(0, gate.releaseCount)
+        assertTrue(agent.inputResponses.isEmpty())
+
         val state = fixture.viewModel.uiState.value
         assertEquals(listOf("input-call-1"), state.pendingInputRequests.map { it.callId })
         assertEquals(ConversationTaskStatus.WaitingForInput, state.conversationTaskStatuses["session-1"])
@@ -911,6 +1122,8 @@ class ChatViewModelCharacterizationTest {
         fixture.viewModel.onAction(ChatAction.RespondToInputRequest("input-call-1", "A"))
         advanceUntilIdle()
 
+        assertEquals(1, gate.acquisitions.size)
+        assertEquals(1, gate.releaseCount)
         assertEquals(listOf("input-call-1" to "A"), agent.inputResponses)
         assertTrue(fixture.viewModel.uiState.value.pendingInputRequests.isEmpty())
         assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
@@ -1167,6 +1380,132 @@ class ChatViewModelCharacterizationTest {
             runCurrent()
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    @Test
+    fun officialFunctionsExpandTheMarkerAndReuseLoadedDescriptors() = runTest {
+        val catalog = toolFunctionCatalog()
+        val fixture = fixture(configured = true, officialCatalogOverride = catalog)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+
+        assertEquals(setOf("search", "read"), fixture.viewModel.uiState.value.toolConfiguration
+            ?.enabledOfficialFunctionIds("web_search"))
+        coVerify { fixture.conversations.setConversationToolConfiguration("session-1", match {
+            it.enabledOfficialFunctionIds("web_search") == setOf("search", "read")
+        }) }
+        fixture.viewModel.onAction(ChatAction.LoadOfficialToolFunctions("web_search"))
+        advanceUntilIdle()
+        coVerify(exactly = 1) { catalog.listFunctions("web_search") }
+    }
+
+    @Test
+    fun failedOfficialFunctionLoadCanBeRetriedExplicitly() = runTest {
+        val catalog = toolFunctionCatalog()
+        var attempts = 0
+        coEvery { catalog.listFunctions("web_search") } coAnswers {
+            if (++attempts == 1) throw java.io.IOException("catalog offline")
+            toolFunctions()
+        }
+        val fixture = fixture(configured = true, officialCatalogOverride = catalog)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+
+        val failed = fixture.viewModel.uiState.value.officialToolDescriptors.single()
+        assertEquals("catalog offline", failed.loadError)
+        assertFalse(failed.isLoadingFunctions)
+        fixture.viewModel.onAction(ChatAction.LoadOfficialToolFunctions("web_search"))
+        advanceUntilIdle()
+        val recovered = fixture.viewModel.uiState.value.officialToolDescriptors.single()
+        assertNull(recovered.loadError)
+        assertEquals(toolFunctions(), recovered.functions)
+        assertEquals(setOf("search", "read"), fixture.viewModel.uiState.value.toolConfiguration
+            ?.enabledOfficialFunctionIds("web_search"))
+        assertEquals(2, attempts)
+    }
+
+    @Test
+    fun officialFunctionSelectionPersistsWithoutReloadingTheCatalog() = runTest {
+        val catalog = toolFunctionCatalog()
+        val fixture = fixture(configured = true, officialCatalogOverride = catalog)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        fixture.viewModel.onAction(ChatAction.SetOfficialFunctionEnabled(
+            toolId = "web_search", functionId = "search", enabled = false,
+            supportedFunctionIds = setOf("search", "read"),
+        ))
+        advanceUntilIdle()
+        assertEquals(setOf("read"), fixture.viewModel.uiState.value.toolConfiguration
+            ?.enabledOfficialFunctionIds("web_search"))
+        coVerify { fixture.conversations.setConversationToolConfiguration("session-1", match {
+            it.enabledOfficialFunctionIds("web_search") == setOf("read")
+        }) }
+        coVerify(exactly = 1) { catalog.listFunctions("web_search") }
+    }
+
+    @Test
+    fun switchingSessionsReusesTheDirectoryButExpandsEachSessionsConfiguration() = runTest {
+        val catalog = toolFunctionCatalog()
+        val fixture = fixture(configured = true, sessionIds = listOf("session-a", "session-b"),
+            officialCatalogOverride = catalog)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        fixture.viewModel.onAction(ChatAction.NewConversation)
+        advanceUntilIdle()
+        assertEquals("session-b", fixture.viewModel.uiState.value.sessionId)
+        for (sessionId in listOf("session-a", "session-b")) {
+            coVerify { fixture.conversations.setConversationToolConfiguration(sessionId, match {
+                it.enabledOfficialFunctionIds("web_search") == setOf("search", "read")
+            }) }
+        }
+        coVerify(exactly = 1) { catalog.listFunctions("web_search") }
+    }
+
+    @Test
+    fun toolConfigurationWriteFailureKeepsThePreviousSelectionAndCanBeDismissed() = runTest {
+        val fixture = fixture(configured = true, officialCatalogOverride = toolFunctionCatalog())
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        val before = fixture.viewModel.uiState.value.toolConfiguration
+        coEvery { fixture.conversations.setConversationToolConfiguration(any(), any()) } returns false
+        fixture.viewModel.onAction(ChatAction.SetMcpServerEnabled("extra-mcp", true))
+        advanceUntilIdle()
+        assertEquals(before, fixture.viewModel.uiState.value.toolConfiguration)
+        assertTrue(fixture.viewModel.uiState.value.hasToolConfigurationError)
+        fixture.viewModel.onAction(ChatAction.ClearToolConfigurationError)
+        assertFalse(fixture.viewModel.uiState.value.hasToolConfigurationError)
+    }
+
+    @Test
+    fun directoryLoadFinishingAfterASessionSwitchExpandsTheVisibleSessionsMarker() = runTest {
+        val response = CompletableDeferred<List<OfficialToolFunction>>()
+        val catalog = toolFunctionCatalog()
+        coEvery { catalog.listFunctions("web_search") } coAnswers { response.await() }
+        val fixture = fixture(configured = true, sessionIds = listOf("session-a", "session-b"),
+            officialCatalogOverride = catalog)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        runCurrent()
+        assertTrue(fixture.viewModel.uiState.value.officialToolDescriptors.single().isLoadingFunctions)
+        fixture.viewModel.onAction(ChatAction.NewConversation)
+        runCurrent()
+        response.complete(toolFunctions())
+        advanceUntilIdle()
+        assertEquals("session-b", fixture.viewModel.uiState.value.sessionId)
+        assertEquals(setOf("search", "read"), fixture.viewModel.uiState.value.toolConfiguration
+            ?.enabledOfficialFunctionIds("web_search"))
+        assertEquals(setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
+            fixture.viewModel.runtimeFor("session-a").toolConfiguration?.enabledOfficialFunctionIds("web_search"))
+        coVerify(exactly = 1) { catalog.listFunctions("web_search") }
+    }
+
+    private fun toolFunctions() = listOf(
+        OfficialToolFunction("search", "Search", "Search pages"),
+        OfficialToolFunction("read", "Read", "Read pages"),
+    )
+
+    private fun toolFunctionCatalog(): OfficialToolFunctionCatalog = mockk(relaxed = true) {
+        every { availableTools(any(), any()) } returns listOf(OfficialToolAvailability("web_search", "service"))
+        coEvery { listFunctions("web_search") } returns toolFunctions()
     }
 
     @Test
@@ -1552,7 +1891,6 @@ class ChatViewModelCharacterizationTest {
         )
         return Fixture(
             viewModel = ChatViewModel(
-                runner = agent,
                 agentRuntimeGate = agentRuntimeGate,
                 repository = conversations,
                 sessionResolver = sessionResolver,
@@ -1563,7 +1901,8 @@ class ChatViewModelCharacterizationTest {
                 speechPlaybackController = playback,
                 speechSettings = speechSettings,
                 attachments = attachments,
-                prepareChatTurn = prepareChatTurn,
+                prepareChatSend = PrepareChatSendUseCase(sessionResolver, conversations, prepareChatTurn, agent),
+                validateChatAttachments = ValidateChatAttachmentsUseCase(),
                 toolAuthorization = toolAuthorization,
                 mcpRepository = mcpRepository,
                 mcpSkipReporter = mockk {

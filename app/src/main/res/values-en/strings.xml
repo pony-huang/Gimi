@@ -5,4 +5,5 @@
     <string name="background_app_notification">Background app is running</string>
     <string name="background_app_notification_detail">Tap to view, or close the background app.</string>
     <string name="background_app_notification_close">Close background app</string>
+    <string name="plugin_incompatible_upgrade">The “%1$s” plugin is incompatible with this app and was skipped. Please upgrade the plugin.</string>
 </resources>

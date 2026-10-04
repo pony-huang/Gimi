@@ -31,7 +31,7 @@ internal fun BackgroundAppInAppBubble(repository: MobileUseRepository, host: Bac
     val session by repository.displaySession.collectAsStateWithLifecycle()
     val overlay by host.overlayRunning.collectAsStateWithLifecycle()
     val presentation by host.presentation.collectAsStateWithLifecycle()
-    if (session == null || overlay || presentation == BackgroundAppPresentation.FULLSCREEN) return
+    if (session == null || overlay || presentation == BackgroundAppPresentation.FULLSCREEN || presentation == BackgroundAppPresentation.HIDDEN) return
     BoxWithConstraints(modifier = Modifier.fillMaxSize().safeDrawingPadding().clipToBounds()) {
         val density = LocalDensity.current
         val maxX = with(density) { (maxWidth - 56.dp).toPx().coerceAtLeast(0f) }

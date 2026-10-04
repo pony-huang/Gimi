@@ -15,7 +15,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.CloseFullscreen
+import androidx.compose.material.icons.outlined.PanTool
+import androidx.compose.material.icons.outlined.HorizontalRule
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.OpenInFull
+import androidx.compose.material.icons.outlined.SouthEast
+import androidx.compose.material.icons.outlined.ScreenRotation
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -29,6 +39,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.window.Dialog
 
 /** 已批准的画面窗口：窄工具栏之外全部交给同一个应用画面，打开即可触摸。 */
@@ -43,26 +54,35 @@ fun BackgroundAppScreen(
     frame: @Composable (Modifier) -> Unit,
     modifier: Modifier = Modifier,
     toolbarModifier: Modifier = Modifier,
+    resizeModifier: Modifier = Modifier,
     dialogHost: @Composable (onDismiss: () -> Unit, content: @Composable () -> Unit) -> Unit = { dismiss, content ->
         Dialog(onDismissRequest = dismiss, content = content)
     },
 ) {
-    Surface(modifier = modifier, shape = RoundedCornerShape(if (smallWindow) 24.dp else 0.dp)) {
+    Surface(modifier = modifier, shape = RoundedCornerShape(if (smallWindow) 24.dp else 0.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer, shadowElevation = if (smallWindow) 8.dp else 0.dp) {
         Column {
-            Row(modifier = toolbarModifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                val backDescription = stringResource(R.string.background_app_back)
-                TextButton(onClick = { onAction(BackgroundAppAction.Back) }, modifier = Modifier.semantics { contentDescription = backDescription }) {
-                    Text(stringResource(R.string.background_app_back))
+            Row(modifier = Modifier.fillMaxWidth().height(56.dp).padding(start = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                // 拖动入口与窗口按钮分开，应用名称不再让用户误以为这里可以点击。
+                Row(modifier = Modifier.weight(1f).height(56.dp).then(toolbarModifier), verticalAlignment = Alignment.CenterVertically) {
+                    if (smallWindow) {
+                        Icon(Icons.Outlined.PanTool, contentDescription = stringResource(R.string.background_app_drag),
+                            modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.background_app_drag_hint),
+                            modifier = Modifier.padding(start = 8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
-                Box(Modifier.weight(1f))
-                val collapseDescription = stringResource(R.string.background_app_collapse)
-                FilledTonalButton(onClick = onCollapse, modifier = Modifier.semantics { contentDescription = collapseDescription }) {
-                    Text(stringResource(R.string.background_app_collapse))
+                IconButton(onClick = onCollapse, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Outlined.HorizontalRule, contentDescription = stringResource(R.string.background_app_collapse))
+                }
+                IconButton(onClick = onSwitchWindow, modifier = Modifier.size(48.dp)) {
+                    Icon(if (smallWindow) Icons.Outlined.OpenInFull else Icons.Outlined.CloseFullscreen,
+                        contentDescription = stringResource(if (smallWindow) R.string.background_app_fullscreen else R.string.background_app_small_window))
                 }
                 Box {
-                    val moreDescription = stringResource(R.string.background_app_more)
-                    TextButton(onClick = { onAction(BackgroundAppAction.Menu(true)) }, modifier = Modifier.semantics { contentDescription = moreDescription }) {
-                        Text(stringResource(R.string.background_app_more))
+                    IconButton(onClick = { onAction(BackgroundAppAction.Menu(true)) }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.background_app_more))
                     }
                     DropdownMenu(expanded = state.menuExpanded, onDismissRequest = { onAction(BackgroundAppAction.Menu(false)) }) {
                         DropdownMenuItem(text = { Text(stringResource(if (smallWindow) R.string.background_app_fullscreen else R.string.background_app_small_window)) },
@@ -83,6 +103,28 @@ fun BackgroundAppScreen(
                         modifier = Modifier.align(Alignment.Center).padding(24.dp), style = MaterialTheme.typography.bodyMedium)
                 }
             }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(modifier = Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { onAction(BackgroundAppAction.Back) }) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Text(stringResource(R.string.background_app_back), modifier = Modifier.padding(start = 8.dp))
+                }
+                IconButton(onClick = { onAction(BackgroundAppAction.Rotate) },
+                    enabled = state.session != null && !state.rotating, modifier = Modifier.size(48.dp)) {
+                    Icon(Icons.Outlined.ScreenRotation, contentDescription = stringResource(
+                        if (state.session?.let { it.width > it.height } == true) R.string.background_app_rotate_portrait
+                        else R.string.background_app_rotate_landscape))
+                }
+                Box(Modifier.weight(1f))
+                if (smallWindow) {
+                    Text(stringResource(R.string.background_app_resize_hint), style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Box(modifier = Modifier.size(48.dp).then(resizeModifier), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Outlined.SouthEast, contentDescription = stringResource(R.string.background_app_resize),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
         }
     }
     if (state.settingsVisible) {
@@ -101,6 +143,13 @@ fun BackgroundAppScreen(
                     }
                     TextButton(onClick = onOverlayPermission) { Text(stringResource(R.string.background_app_overlay_permission)) }
                 }
+            }
+        }
+    }
+    if (state.rotationUnavailable) {
+        dialogHost({ onAction(BackgroundAppAction.DismissRotationError) }) {
+            BackgroundAppDialogContent(onConfirm = { onAction(BackgroundAppAction.DismissRotationError) }) {
+                Text(stringResource(R.string.background_app_rotation_unavailable))
             }
         }
     }

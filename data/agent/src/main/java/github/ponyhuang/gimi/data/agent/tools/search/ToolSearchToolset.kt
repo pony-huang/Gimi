@@ -186,6 +186,7 @@ internal class ToolSearchToolset(
                         source.loadEnabledTools(readonlyContext)
                     }
                     loaded.also {
+                        // 只缓存成功目录（含真正的空目录）；失败与取消不得写入缓存，允许后续重试。
                         if (useAllTools) allToolsSourceCache[source.id] = it
                     }
                 } catch (error: Throwable) {

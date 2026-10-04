@@ -87,13 +87,7 @@ MiniMax 图像生成可与其他服务的对话模型混用，使用 MiniMax 服
 
 连接远程 MCP 服务器（SSE 或 Streamable HTTP），想加什么工具都行。手动新建，或者把文档里的 `mcpServers` JSON、甚至一条 curl 命令直接粘进来，Gimi 会帮你解析。可设置 Bearer Token 和自定义请求头，测试连接，并查看每个服务器暴露的工具、资源和提示词；可随时停用。
 
-#### 推荐服务器
-
-| 服务器          | 能带来什么                                 | 文档                                                        | 接入方式                                               |
-|-----------------|--------------------------------------------|-------------------------------------------------------------|--------------------------------------------------------|
-| **高德 AMap**   | 地图：地理编码、路径规划、周边搜索、天气      | [lbs.amap.com/api/mcp-server/summary](https://lbs.amap.com/api/mcp-server/summary) | `https://mcp.amap.com/mcp?key=你的Key`（Streamable HTTP） |
-
-在 *设置 → MCP* 里点「导入」，把上面文档中的 `mcpServers` JSON 或 curl 片段粘进去即可。
+在 *设置 → MCP* 里点「导入」，把服务器文档中的 `mcpServers` JSON 或 curl 片段粘进去即可。
 
 ### 插件
 

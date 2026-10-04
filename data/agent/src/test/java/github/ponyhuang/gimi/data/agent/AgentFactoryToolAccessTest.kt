@@ -9,31 +9,32 @@ import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.tools.Toolset
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.ThinkingLevel
+import github.ponyhuang.gimi.data.agent.contribution.BaseToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.LocalToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.McpToolContribution
-import github.ponyhuang.gimi.data.agent.contribution.BaseToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.ModelCatalogContribution
 import github.ponyhuang.gimi.data.agent.contribution.OfficialToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.PluginToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.SkillToolContribution
-import github.ponyhuang.gimi.data.agent.tools.search.TOOL_SEARCH_NAME
-import github.ponyhuang.gimi.data.agent.tools.search.ToolSearchToolset
-import github.ponyhuang.gimi.data.agent.tools.search.ToolVectorSearch
 import github.ponyhuang.gimi.data.agent.tools.mcp.ConversationMcpToolset
 import github.ponyhuang.gimi.data.agent.tools.mcp.McpAuthorizationTool
 import github.ponyhuang.gimi.data.agent.tools.mcp.McpConfigurationTool
 import github.ponyhuang.gimi.data.agent.tools.mcp.McpManualConfigurationTool
 import github.ponyhuang.gimi.data.agent.tools.official.DefaultOfficialToolset
-import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolRegistry
-import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolSpec
-import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolBinding
+import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolFactory
+import github.ponyhuang.gimi.data.agent.tools.search.TOOL_SEARCH_NAME
+import github.ponyhuang.gimi.data.agent.tools.search.ToolSearchToolset
+import github.ponyhuang.gimi.data.agent.tools.search.ToolVectorSearch
 import github.ponyhuang.gimi.data.agent.tools.system.LocalToolset
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
-import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
-import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
+import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolBinding
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSpec
+import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
@@ -212,7 +213,7 @@ class AgentFactoryToolAccessTest {
     private fun fixture(
         localTools: List<BaseTool> = emptyList(),
         confirmationRequiredToolIds: Set<String> = emptySet(),
-        officialRegistry: OfficialToolRegistry = officialRegistry(),
+        officialCatalog: OfficialToolFunctionCatalog = officialCatalog(),
         pluginToolsets: List<Toolset> = emptyList(),
         mcpConfigurationTool: McpConfigurationTool = mockk(relaxed = true) {
             every { name } returns McpConfigurationTool.NAME
@@ -248,7 +249,7 @@ class AgentFactoryToolAccessTest {
         val plugin = FakeAgentPlugin("test", pluginToolsets = pluginToolsets)
         val pluginRuntimeProvider = FakePluginRuntimeProvider(plugins = listOf(plugin))
 
-        val officialToolset = DefaultOfficialToolset(officialRegistry, FakeToolAccessRepository())
+        val officialToolset = DefaultOfficialToolset(officialCatalog, mockk<OfficialToolFactory>(), FakeToolAccessRepository())
         val registry = AgentContributionRegistry(
             setOf(
                 LocalToolContribution(localToolCatalog, localToolset, mockk(relaxed = true), toolAuthorization),
@@ -260,7 +261,7 @@ class AgentFactoryToolAccessTest {
                     mcpManualConfigurationTool = mcpManualConfigurationTool,
                     mcpRepository = mcpRepository,
                 ),
-                OfficialToolContribution(officialToolset, officialRegistry),
+                OfficialToolContribution(officialToolset, officialCatalog),
                 SkillToolContribution(mockk<SkillSource>(relaxed = true)),
                 PluginToolContribution(pluginRuntimeProvider),
                 BaseToolContribution(),
@@ -287,10 +288,10 @@ class AgentFactoryToolAccessTest {
     )
 
     /**
-     * 注册表 mock:暴露一个检索候选声明(Kimi formulas 形态),驱动 ON_DEMAND
+     * 目录 mock:暴露一个检索候选声明(Kimi formulas 形态),驱动 ON_DEMAND
      * 模式的候选源装配路径。
      */
-    private fun officialRegistry(): OfficialToolRegistry = mockk {
+    private fun officialCatalog(): OfficialToolFunctionCatalog = mockk {
         every { enabledSearchCandidateSpecs() } returns emptyList()
         every { all } returns listOf(
             OfficialToolSpec(

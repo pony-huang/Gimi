@@ -1,4 +1,4 @@
 <resources>
-    <string name="mobile_text_accessibility_label">Gimi 后台静默操作 · 文字输入</string>
-    <string name="mobile_text_accessibility_description">用于“后台静默操作”的文字输入：识别副屏输入框并填写内容。</string>
+    <string name="mobile_text_accessibility_label">Gimi 文字输入</string>
+    <string name="mobile_text_accessibility_description">为后台应用填写文字。</string>
 </resources>

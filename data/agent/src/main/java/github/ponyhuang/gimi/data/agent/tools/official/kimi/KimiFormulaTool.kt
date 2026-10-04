@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.data.agent.tools.official.kimi
 import com.google.adk.kt.tools.FunctionTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.types.FunctionDeclaration
+import github.ponyhuang.gimi.domain.modelcatalog.model.FormulaDeclaration
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -37,7 +38,7 @@ internal class KimiFormulaTool(
     override fun declaration(): FunctionDeclaration = FunctionDeclaration(
         name = name,
         description = description,
-        parameters = declaration.parameters,
+        parameters = declaration.parameters?.toAdkSchema(),
     )
 
     override suspend fun execute(context: ToolContext, args: Map<String, Any?>): Any =

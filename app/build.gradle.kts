@@ -92,6 +92,7 @@ dependencies {
     implementation(project(":domain:appearance"))
     implementation(project(":domain:mobileuse"))
     implementation(project(":domain:permissions"))
+    implementation(project(":domain:plugin"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:speech"))
     implementation(project(":domain:appupdate"))

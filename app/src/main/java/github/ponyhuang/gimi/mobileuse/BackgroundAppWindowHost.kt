@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
+import github.ponyhuang.gimi.feature.mobileuse.BackgroundAppWindowGeometry
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -17,7 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/** 本机窗口形态，完全独立于 AI 执行状态。 */
+/** 本机窗口形态；任务结束时隐藏，用户仍可从通知重新打开。 */
 enum class BackgroundAppPresentation { HIDDEN, BUBBLE, FULLSCREEN, SMALL_WINDOW }
 
 /** app 组合窗口与独立前台服务；无悬浮权限仍保留应用内入口。 */
@@ -32,18 +33,27 @@ class BackgroundAppWindowHost @Inject constructor(
     private val mutableOverlayRunning = MutableStateFlow(false)
     val overlayRunning = mutableOverlayRunning.asStateFlow()
     private var started = false
+    // 与显示会话一样只在进程内记忆；收起、全屏切换和服务重建不重置用户布局。
+    internal var smallWindowGeometry: BackgroundAppWindowGeometry? = null
 
     fun start() {
         if (started) return
         started = true
         scope.launch {
             var lastId: String? = null
+            var lastCompletionVersion = 0L
             repository.displaySession.collect { session ->
                 if (session?.id != lastId) {
                     lastId = session?.id
-                    mutablePresentation.value = if (session == null) BackgroundAppPresentation.HIDDEN else BackgroundAppPresentation.BUBBLE
+                    mutablePresentation.value = if (session == null || session.completionVersion > 0) {
+                        BackgroundAppPresentation.HIDDEN
+                    } else BackgroundAppPresentation.BUBBLE
                     if (session != null) ensureService()
+                } else if (session != null && session.completionVersion != lastCompletionVersion) {
+                    // mobile_stop 与流结束的清理共用完成标记；隐藏所有浮窗，不留下气泡。
+                    mutablePresentation.value = BackgroundAppPresentation.HIDDEN
                 }
+                lastCompletionVersion = session?.completionVersion ?: 0L
             }
         }
     }

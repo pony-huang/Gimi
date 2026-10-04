@@ -6,6 +6,14 @@
         android:icon="@drawable/ic_zhihu">
 
         <!-- 声明实现类全名，值须与 PluginApi.CLASS_META_DATA_KEY 一致 -->
+        <!-- 加载插件代码前校验，版本由构建约定自动固化进 APK。 -->
+        <meta-data
+            android:name="github.ponyhuang.gimi.plugin.API_VERSION"
+            android:value="${pluginApiVersion}" />
+        <meta-data
+            android:name="github.ponyhuang.gimi.plugin.ADK_VERSION"
+            android:value="${pluginAdkVersion}" />
+
         <meta-data
             android:name="github.ponyhuang.gimi.plugin.CLASS"
             android:value="github.ponyhuang.gimi.plugin.zhihu.ZhihuPlugin" />

@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.data.agent
 import com.google.adk.kt.logging.LoggerFactory
 import github.ponyhuang.gimi.data.agent.tools.mcp.McpToolException.McpToolLoadingException
 import github.ponyhuang.gimi.data.agent.tools.mcp.McpToolset
+import github.ponyhuang.gimi.data.agent.tools.mcp.McpTool
 import github.ponyhuang.gimi.domain.mcp.model.McpProbeResult
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.model.McpToolSummary
@@ -32,7 +33,9 @@ class AdkMcpConnectionTester @Inject constructor() : McpConnectionTester {
                 val tools = toolset.getTools(null)
                 McpProbeResult(
                     reachable = true,
-                    tools = tools.map { McpToolSummary(name = it.name, description = it.description) },
+                    tools = tools.map { tool ->
+                        if (tool is McpTool) tool.summary() else McpToolSummary(name = tool.name, description = tool.description)
+                    },
                     resources = runCatching { toolset.listResourceNames() }.getOrDefault(emptyList()),
                 )
             }

@@ -6,4 +6,5 @@
     <string name="background_app_notification">后台应用仍在运行</string>
     <string name="background_app_notification_detail">点击查看，或关闭后台应用。</string>
     <string name="background_app_notification_close">关闭后台应用</string>
+    <string name="plugin_incompatible_upgrade">“%1$s”插件版本与当前应用不兼容，已跳过加载，请升级插件。</string>
 </resources>

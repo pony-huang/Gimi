@@ -5,6 +5,14 @@
     <application
         android:label="Gimi 小红书插件"
         android:icon="@drawable/ic_xiaohongshu">
+        <!-- 加载插件代码前校验，版本由构建约定自动固化进 APK。 -->
+        <meta-data
+            android:name="github.ponyhuang.gimi.plugin.API_VERSION"
+            android:value="${pluginApiVersion}" />
+        <meta-data
+            android:name="github.ponyhuang.gimi.plugin.ADK_VERSION"
+            android:value="${pluginAdkVersion}" />
+
         <meta-data
             android:name="github.ponyhuang.gimi.plugin.CLASS"
             android:value="github.ponyhuang.gimi.plugin.xiaohongshu.XiaohongshuPlugin" />

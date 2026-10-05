@@ -27,3 +27,6 @@ local.properties
 / .orca/
 /.zcode/
 /agent/
+
+# Python tooling bytecode
+__pycache__/

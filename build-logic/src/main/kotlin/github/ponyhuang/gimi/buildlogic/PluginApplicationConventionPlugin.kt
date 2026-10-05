@@ -16,10 +16,6 @@ class PluginApplicationConventionPlugin : Plugin<Project> {
             defaultConfig {
                 manifestPlaceholders["pluginApiVersion"] = libs.findVersion("pluginApi").get().requiredVersion
                 manifestPlaceholders["pluginAdkVersion"] = libs.findVersion("googleAdk").get().requiredVersion
-                versionCode = providers.gradleProperty("releaseVersionCode")
-                    .map(String::toInt)
-                    .getOrElse(1)
-                versionName = providers.gradleProperty("releaseVersionName").getOrElse("1.0")
             }
 
             val storeFilePath = providers.gradleProperty("releaseStoreFile").orNull

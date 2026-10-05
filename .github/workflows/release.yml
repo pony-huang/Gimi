@@ -113,6 +113,9 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: android-actions/setup-android@v3
+        with:
+          # 默认的 tools 包已下架；只初始化仍受支持的 platform-tools。
+          packages: platform-tools
       - uses: gradle/actions/setup-gradle@v4
       - name: Prepare signing and Android tools
         run: |

@@ -68,6 +68,7 @@ fun AboutRoute(
     PreferenceScaffold(
         title = stringResource(R.string.settings_about_title),
         onBack = onBack,
+        modifier = modifier,
     ) { scaffoldModifier ->
         AboutScreen(
             appVersionName = appVersionName,

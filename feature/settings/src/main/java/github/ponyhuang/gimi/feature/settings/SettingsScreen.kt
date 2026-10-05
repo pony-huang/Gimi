@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.settings
 
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,9 +32,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.feature.settings.R
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
-import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
-import github.ponyhuang.gimi.ui.preference.PreferenceNavigationCard
+import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
@@ -53,65 +53,69 @@ fun SettingsScreen(
             item { PreferenceSectionTitle(stringResource(R.string.settings_group_model)) }
             item {
                 PreferenceGroupCard {
-                    PreferenceNavigationCard(
-                        icon = Icons.Default.SmartToy,
-                        title = stringResource(R.string.settings_model_service_title),
-                        subtitle = stringResource(R.string.settings_model_service_subtitle),
-                        onClick = { onAction(SettingsAction.OpenModelService) },
-                        showDivider = true,
-                    )
-                    PreferenceNavigationCard(
-                        icon = Icons.Default.Tune,
-                        title = stringResource(R.string.settings_default_model_title),
-                        subtitle = stringResource(R.string.settings_default_model_subtitle),
-                        onClick = { onAction(SettingsAction.OpenDefaultModels) },
+                    SettingsNavigationItems(
+                        items = listOf(
+                            SettingsNavigationItem(
+                                icon = Icons.Default.SmartToy,
+                                title = stringResource(R.string.settings_model_service_title),
+                                subtitle = stringResource(R.string.settings_model_service_subtitle),
+                                action = SettingsAction.OpenModelService,
+                            ),
+                            SettingsNavigationItem(
+                                icon = Icons.Default.Tune,
+                                title = stringResource(R.string.settings_default_model_title),
+                                subtitle = stringResource(R.string.settings_default_model_subtitle),
+                                action = SettingsAction.OpenDefaultModels,
+                            ),
+                        ),
+                        onAction = onAction,
                     )
                 }
             }
             item { PreferenceSectionTitle(stringResource(R.string.settings_group_tools)) }
             item {
                 PreferenceGroupCard {
-                    PreferenceNavigationCard(
-                        icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
-                        title = stringResource(R.string.settings_mcp_title),
-                        subtitle = stringResource(R.string.settings_mcp_subtitle),
-                        onClick = { onAction(SettingsAction.OpenMcpServers) },
-                        showDivider = true,
-                    )
-                    PreferenceNavigationCard(
-                        icon = Icons.Default.Folder,
-                        title = stringResource(R.string.settings_work_files_title),
-                        subtitle = stringResource(R.string.settings_work_files_subtitle),
-                        onClick = { onAction(SettingsAction.OpenWorkFiles) },
-                        showDivider = true,
-                    )
-                    PreferenceNavigationCard(
-                        icon = Icons.Default.School,
-                        title = stringResource(R.string.settings_skills_title),
-                        subtitle = stringResource(R.string.settings_skills_subtitle),
-                        onClick = { onAction(SettingsAction.OpenSkills) },
-                        showDivider = true,
-                    )
-                    PreferenceNavigationCard(
-                        icon = Icons.Default.Extension,
-                        title = stringResource(R.string.settings_plugins_title),
-                        subtitle = stringResource(R.string.settings_plugins_subtitle),
-                        onClick = { onAction(SettingsAction.OpenPlugins) },
-                        showDivider = true,
-                    )
-                    PreferenceNavigationCard(
-                        icon = Icons.Default.FolderOpen,
-                        title = stringResource(R.string.settings_workspace_title),
-                        subtitle = stringResource(R.string.settings_workspace_subtitle),
-                        onClick = { onAction(SettingsAction.OpenWorkspace) },
-                        showDivider = true,
-                    )
-                    PreferenceNavigationCard(
-                        icon = Icons.Default.Rule,
-                        title = stringResource(R.string.settings_tool_authorization_title),
-                        subtitle = stringResource(R.string.settings_tool_authorization_subtitle),
-                        onClick = { onAction(SettingsAction.OpenToolAuthorization) },
-                        showDivider = true,
+                    SettingsNavigationItems(
+                        items = listOf(
+                            SettingsNavigationItem(
+                                icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
+                                title = stringResource(R.string.settings_mcp_title),
+                                subtitle = stringResource(R.string.settings_mcp_subtitle),
+                                action = SettingsAction.OpenMcpServers,
+                            ),
+                            SettingsNavigationItem(
+                                icon = Icons.Default.Folder,
+                                title = stringResource(R.string.settings_work_files_title),
+                                subtitle = stringResource(R.string.settings_work_files_subtitle),
+                                action = SettingsAction.OpenWorkFiles,
+                            ),
+                            SettingsNavigationItem(
+                                icon = Icons.Default.School,
+                                title = stringResource(R.string.settings_skills_title),
+                                subtitle = stringResource(R.string.settings_skills_subtitle),
+                                action = SettingsAction.OpenSkills,
+                            ),
+                            SettingsNavigationItem(
+                                icon = Icons.Default.Extension,
+                                title = stringResource(R.string.settings_plugins_title),
+                                subtitle = stringResource(R.string.settings_plugins_subtitle),
+                                action = SettingsAction.OpenPlugins,
+                            ),
+                            SettingsNavigationItem(
+                                icon = Icons.Default.FolderOpen,
+                                title = stringResource(R.string.settings_workspace_title),
+                                subtitle = stringResource(R.string.settings_workspace_subtitle),
+                                action = SettingsAction.OpenWorkspace,
+                            ),
+                            SettingsNavigationItem(
+                                icon = Icons.Default.Rule,
+                                title = stringResource(R.string.settings_tool_authorization_title),
+                                subtitle = stringResource(R.string.settings_tool_authorization_subtitle),
+                                action = SettingsAction.OpenToolAuthorization,
+                            ),
+                        ),
+                        onAction = onAction,
+                        showLastDivider = true,
                     )
                     // Shizuku 是开关型低频入口，固定在分组末尾，避免干扰上方常用项的定位
                     PreferenceListItem(
@@ -139,36 +143,64 @@ fun SettingsScreen(
             item { PreferenceSectionTitle(stringResource(R.string.settings_group_general)) }
             item {
                 PreferenceGroupCard {
-                    PreferenceNavigationCard(
-                        icon = Icons.Default.Psychology,
-                        title = stringResource(R.string.settings_memory_title),
-                        subtitle = stringResource(R.string.settings_memory_subtitle),
-                        onClick = { onAction(SettingsAction.OpenMemory) },
-                        showDivider = true,
-                    )
-                    PreferenceNavigationCard(
-                        icon = Icons.Default.AutoAwesome,
-                        title = stringResource(R.string.settings_recommendations_title),
-                        subtitle = stringResource(R.string.settings_recommendations_subtitle),
-                        onClick = { onAction(SettingsAction.OpenRecommendations) },
-                        showDivider = true,
-                    )
-                    PreferenceNavigationCard(
-                        icon = Icons.Default.Security,
-                        title = stringResource(R.string.settings_permissions_title),
-                        subtitle = stringResource(R.string.settings_permissions_subtitle),
-                        onClick = { onAction(SettingsAction.OpenPermissions) },
-                        showDivider = true,
-                    )
-                    PreferenceNavigationCard(
-                        icon = Icons.Default.Info,
-                        title = stringResource(R.string.settings_about_title),
-                        subtitle = stringResource(R.string.settings_about_subtitle, appVersionName),
-                        onClick = { onAction(SettingsAction.OpenAbout) },
+                    SettingsNavigationItems(
+                        items = listOf(
+                            SettingsNavigationItem(
+                                icon = Icons.Default.Psychology,
+                                title = stringResource(R.string.settings_memory_title),
+                                subtitle = stringResource(R.string.settings_memory_subtitle),
+                                action = SettingsAction.OpenMemory,
+                            ),
+                            SettingsNavigationItem(
+                                icon = Icons.Default.AutoAwesome,
+                                title = stringResource(R.string.settings_recommendations_title),
+                                subtitle = stringResource(R.string.settings_recommendations_subtitle),
+                                action = SettingsAction.OpenRecommendations,
+                            ),
+                            SettingsNavigationItem(
+                                icon = Icons.Default.Security,
+                                title = stringResource(R.string.settings_permissions_title),
+                                subtitle = stringResource(R.string.settings_permissions_subtitle),
+                                action = SettingsAction.OpenPermissions,
+                            ),
+                            SettingsNavigationItem(
+                                icon = Icons.Default.Info,
+                                title = stringResource(R.string.settings_about_title),
+                                subtitle = stringResource(R.string.settings_about_subtitle, appVersionName),
+                                action = SettingsAction.OpenAbout,
+                            ),
+                        ),
+                        onAction = onAction,
                     )
                 }
             }
         }
+    }
+}
+
+/** 单个首页导航入口的显示内容及点击意图，不持有页面状态或导航控制器。 */
+private data class SettingsNavigationItem(
+    val icon: ImageVector,
+    val title: String,
+    val subtitle: String,
+    val action: SettingsAction,
+)
+
+/** 分隔线由列表位置统一决定；组尾还有其他类型的行时可保留末行分隔线。 */
+@Composable
+private fun ColumnScope.SettingsNavigationItems(
+    items: List<SettingsNavigationItem>,
+    onAction: (SettingsAction) -> Unit,
+    showLastDivider: Boolean = false,
+) {
+    items.forEachIndexed { index, item ->
+        PreferenceListItem(
+            icon = item.icon,
+            title = item.title,
+            subtitle = item.subtitle,
+            onClick = { onAction(item.action) },
+            showDivider = index < items.lastIndex || showLastDivider,
+        )
     }
 }
 

@@ -25,7 +25,6 @@ import github.ponyhuang.gimi.feature.settings.update.UpdateAction
 import github.ponyhuang.gimi.feature.settings.update.UpdateUiState
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
-import github.ponyhuang.gimi.ui.preference.PreferenceNavigationCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
@@ -72,7 +71,7 @@ fun AboutScreen(
                     showDivider = true,
                     onClick = { onUpdateAction(UpdateAction.CheckNow) },
                 )
-                PreferenceNavigationCard(
+                PreferenceListItem(
                     icon = Icons.Default.Language,
                     title = stringResource(R.string.about_project_title),
                     subtitle = stringResource(R.string.about_project_subtitle),

@@ -33,10 +33,11 @@ fun PreferenceScaffold(
     onBack: () -> Unit,
     actions: @Composable () -> Unit = {},
     navigationIcon: (@Composable () -> Unit)? = null,
+    modifier: Modifier = Modifier,
     content: @Composable (Modifier) -> Unit,
 ) {
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
                 title = { Text(title) },

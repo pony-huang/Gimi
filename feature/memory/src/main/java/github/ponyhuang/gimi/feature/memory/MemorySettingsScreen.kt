@@ -22,7 +22,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -43,6 +42,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
+import github.ponyhuang.gimi.ui.preference.PreferenceSwitchItem
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
@@ -65,17 +65,13 @@ fun MemorySettingsScreen(
         ) {
             item {
                 PreferenceGroupCard {
-                    PreferenceListItem(
+                    PreferenceSwitchItem(
                         icon = Icons.Default.Psychology,
                         title = stringResource(R.string.memory_enabled_title),
                         subtitle = stringResource(R.string.memory_enabled_subtitle),
-                        trailingContent = {
-                            Switch(
-                                checked = state.memoryEnabled,
-                                onCheckedChange = {
-                                    onAction(MemorySettingsAction.SetMemoryEnabled(it))
-                                },
-                            )
+                        checked = state.memoryEnabled,
+                        onCheckedChange = {
+                            onAction(MemorySettingsAction.SetMemoryEnabled(it))
                         },
                         onClick = {
                             onAction(MemorySettingsAction.SetMemoryEnabled(!state.memoryEnabled))
@@ -99,7 +95,7 @@ fun MemorySettingsScreen(
             }
             item {
                 PreferenceGroupCard {
-                    PreferenceListItem(
+                    PreferenceSwitchItem(
                         icon = mem0Icon,
                         iconContainer = Color.Transparent,
                         iconTint = Color.Unspecified,
@@ -107,14 +103,10 @@ fun MemorySettingsScreen(
                         title = stringResource(R.string.memory_mem0_enabled_title),
                         subtitle = stringResource(R.string.memory_mem0_enabled_subtitle),
                         showDivider = state.mem0Enabled,
-                        trailingContent = {
-                            Switch(
-                                checked = state.mem0Enabled,
-                                enabled = state.memoryEnabled,
-                                onCheckedChange = {
-                                    onAction(MemorySettingsAction.SetMem0Enabled(it))
-                                },
-                            )
+                        checked = state.mem0Enabled,
+                        switchEnabled = state.memoryEnabled,
+                        onCheckedChange = {
+                            onAction(MemorySettingsAction.SetMem0Enabled(it))
                         },
                         onClick = {
                             if (state.memoryEnabled) {

@@ -20,7 +20,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,6 +35,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationRefreshStatus
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
+import github.ponyhuang.gimi.ui.preference.PreferenceSwitchItem
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
@@ -61,18 +61,14 @@ fun RecommendationSettingsScreen(
             item { PreferenceSectionTitle(stringResource(R.string.recommendation_settings_section)) }
             item {
                 PreferenceGroupCard {
-                    PreferenceListItem(
+                    PreferenceSwitchItem(
                         icon = Icons.Default.AutoAwesome,
                         title = stringResource(R.string.recommendation_enabled_title),
                         subtitle = stringResource(R.string.recommendation_enabled_subtitle),
                         showDivider = state.enabled,
-                        trailingContent = {
-                            Switch(
-                                checked = state.enabled,
-                                onCheckedChange = {
-                                    onAction(RecommendationSettingsAction.SetEnabled(it))
-                                },
-                            )
+                        checked = state.enabled,
+                        onCheckedChange = {
+                            onAction(RecommendationSettingsAction.SetEnabled(it))
                         },
                     )
                     // 更新相关配置仅在推荐开启后展开，关闭时整块隐藏。

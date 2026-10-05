@@ -174,6 +174,13 @@ class ChatViewModel @Inject constructor(
             is ChatAction.SwitchSession -> sessionNavigationCoordinator.switchSession(action.sessionId)
             ChatAction.RefreshConversations -> refreshConversations()
             is ChatAction.DeleteConversation -> deleteConversation(action.sessionId)
+            is ChatAction.RecentConversations -> {
+                if (action.action == RecentConversationsAction.ConfirmDeletion) {
+                    deleteSelectedConversations()
+                } else {
+                    _uiState.update { it.reduceRecentConversations(action.action) }
+                }
+            }
             is ChatAction.SelectModel -> selectModel(action.selection)
             is ChatAction.SetReasoningEffort -> toolConfigurationCoordinator.setReasoningEffort(action.effort)
             is ChatAction.SetMcpServerEnabled ->
@@ -218,7 +225,14 @@ class ChatViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             repository.conversations.collect { convs ->
-                _uiState.update { it.copy(conversations = convs) }
+                _uiState.update { state ->
+                    state.copy(
+                        conversations = convs,
+                        recentConversations = state.recentConversations.copy(
+                            selectedIds = state.recentConversations.selectedIds.intersect(convs.map { it.id }.toSet()),
+                        ),
+                    )
+                }
             }
         }
         viewModelScope.launch {
@@ -673,6 +687,53 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch { repository.refresh() }
     }
 
+    /** 按确认时的 ID 集合逐个删除，保留失败选择并允许重试。 */
+    private fun deleteSelectedConversations() {
+        val state = _uiState.value
+        val recent = state.recentConversations
+        if (recent.isDeleting || recent.pendingDeletionIds.isEmpty()) return
+        val ids = recent.pendingDeletionIds.toList()
+        _uiState.update { it.copy(recentConversations = it.recentConversations.copy(isDeleting = true)) }
+        viewModelScope.launch {
+            val deleted = mutableSetOf<String>()
+            var blocked = false
+            var failed = false
+            try {
+                for (id in ids) {
+                    // 确认框打开后用户可能切换会话或启动任务，每次真正删除前重新校验。
+                    if (id !in _uiState.value.deletableConversationIds() || sessionRuntimes[id]?.isActive == true) {
+                        blocked = true
+                        continue
+                    }
+                    try {
+                        repository.deleteConversation(id)
+                        deleted += id
+                        sessionRuntimes.remove(id)?.closePartChannels()
+                        attachments.deleteSession(id)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        Log.w(TAG, "Failed to delete conversation $id", error)
+                        failed = true
+                    }
+                }
+                if (blocked) emitNotice(ChatNotice.ActiveConversationDeleteBlocked)
+                if (failed) emitNotice(ChatNotice.ConversationDeleteFailed)
+            } finally {
+                _uiState.update { current ->
+                    val remaining = (current.recentConversations.selectedIds - deleted)
+                        .intersect(current.deletableConversationIds())
+                    current.copy(recentConversations = current.recentConversations.copy(
+                        isDeleting = false,
+                        pendingDeletionIds = emptySet(),
+                        selectedIds = remaining,
+                        isSelecting = remaining.isNotEmpty(),
+                    ))
+                }
+            }
+        }
+    }
+
     /**
      * 删除指定 session，并刷新会话列表。
      *
@@ -692,9 +753,16 @@ class ChatViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            repository.deleteConversation(sessionId)
-            attachments.deleteSession(sessionId)
-            sessionRuntimes.remove(sessionId)?.closePartChannels()
+            try {
+                repository.deleteConversation(sessionId)
+                attachments.deleteSession(sessionId)
+                sessionRuntimes.remove(sessionId)?.closePartChannels()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.w(TAG, "Failed to delete conversation $sessionId", error)
+                emitNotice(ChatNotice.ConversationDeleteFailed)
+            }
         }
     }
 

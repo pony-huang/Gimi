@@ -111,8 +111,8 @@
     <string name="chat_time_hours_ago">%1$d hr ago</string>
     <string name="chat_time_days_ago">%1$d d ago</string>
     <string name="chat_time_date">%1$d/%2$d</string>
-<string name="chat_drawer_history_title">Chat History</string>
-    <string name="chat_drawer_empty_history">No history yet</string>
+<string name="chat_drawer_history_title">Recent</string>
+    <string name="chat_drawer_empty_history">No recent conversations</string>
     <string name="chat_drawer_current_session_protected">The current session cannot be deleted</string>
     <string name="chat_drawer_switch_first">Please switch to another session first</string>
     <string name="chat_drawer_delete_conversation">Delete conversation</string>
@@ -183,4 +183,19 @@
     <string name="chat_timeline_tool_rejected">Rejected</string>
     <string name="chat_timeline_tool_awaiting_confirmation">Awaiting confirmation</string>
     <string name="chat_timeline_tool_unknown">Status unknown</string>
+    <string name="chat_drawer_manage">Manage</string>
+    <string name="chat_drawer_done">Done</string>
+    <string name="chat_drawer_search">Search conversations</string>
+    <string name="chat_drawer_clear_search">Clear search</string>
+    <string name="chat_drawer_search_empty">No matching conversations</string>
+    <string name="chat_drawer_selected_count">%1$d selected</string>
+    <string name="chat_drawer_select_all">Select all</string>
+    <string name="chat_drawer_deselect_all">Deselect all</string>
+    <string name="chat_drawer_delete_count">Delete %1$d conversations</string>
+    <string name="chat_drawer_deleting">Deleting…</string>
+    <string name="chat_drawer_delete_confirm_title">Delete %1$d conversations?</string>
+    <string name="chat_drawer_delete_confirm_message">This cannot be undone. The current conversation and active conversations will be kept.</string>
+    <string name="chat_drawer_cancel">Cancel</string>
+    <string name="chat_drawer_current_session_time">%1$s · Current conversation</string>
+    <string name="chat_notice_delete_failed">Some conversations could not be deleted. Please try again.</string>
 </resources>

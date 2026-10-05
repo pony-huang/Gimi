@@ -57,6 +57,8 @@ data class ChatUiState(
      */
     val failedTurn: ChatTurn? = null,
     val conversations: List<Conversation> = emptyList(),
+    /** 最近会话搜索、多选及删除状态，由 ViewModel 维护。 */
+    val recentConversations: RecentConversationsState = RecentConversationsState(),
     val conversationTaskStatuses: Map<String, ConversationTaskStatus> = emptyMap(),
     val isInitializing: Boolean = false,
     val availableLLMModelSettings: List<LLMModelSetting> = emptyList(),

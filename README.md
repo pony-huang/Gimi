@@ -234,3 +234,7 @@ Mem0 services, skill downloads, and GitHub updates. See [PRIVACY.md](PRIVACY.md)
 ## License
 
 [Apache License 2.0](LICENSE)
+
+## Development and release workflow
+
+[See the release guide](docs/releasing.md) for CI checks, automated changelogs, version PRs, signing setup, and release retries.

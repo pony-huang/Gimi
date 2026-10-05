@@ -3,17 +3,61 @@
   "packages": {
     ".": {
       "release-type": "simple",
-      "extra-files": [
-        "app/build.gradle.kts"
-      ],
+      "extra-files": [],
       "changelog-sections": [
-        { "type": "feat", "section": "Features" },
-        { "type": "fix", "section": "Bug Fixes" },
-        { "type": "perf", "section": "Performance" },
-        { "type": "refactor", "section": "Code Refactoring" },
-        { "type": "docs", "section": "Documentation" }
+        {
+          "type": "feat",
+          "section": "新增",
+          "hidden": false
+        },
+        {
+          "type": "fix",
+          "section": "修复",
+          "hidden": false
+        },
+        {
+          "type": "perf",
+          "section": "优化",
+          "hidden": false
+        },
+        {
+          "type": "refactor",
+          "section": "内部重构",
+          "hidden": true
+        },
+        {
+          "type": "docs",
+          "section": "文档",
+          "hidden": true
+        },
+        {
+          "type": "test",
+          "section": "测试",
+          "hidden": true
+        },
+        {
+          "type": "ci",
+          "section": "持续集成",
+          "hidden": true
+        },
+        {
+          "type": "build",
+          "section": "构建",
+          "hidden": true
+        },
+        {
+          "type": "chore",
+          "section": "维护",
+          "hidden": true
+        }
       ],
-      "bump-minor-pre-major": true
+      "bump-minor-pre-major": true,
+      "changelog-path": "CHANGELOG.md"
     }
-  }
+  },
+  "bootstrap-sha": "c53a311cfc95adc2553a610ccccf9e778c436f93",
+  "include-v-in-tag": true,
+  "include-component-in-tag": false,
+  "draft": true,
+  "force-tag-creation": true
 }

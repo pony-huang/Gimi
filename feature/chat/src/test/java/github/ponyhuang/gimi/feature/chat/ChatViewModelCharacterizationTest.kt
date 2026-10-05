@@ -5,6 +5,7 @@ import app.cash.turbine.test
 import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
 import github.ponyhuang.gimi.core.notifications.AppNotificationManager
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
+import github.ponyhuang.gimi.domain.conversation.model.Conversation
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunPart
 import github.ponyhuang.gimi.domain.conversation.model.ChatFunctionCall
@@ -1746,6 +1747,123 @@ class ChatViewModelCharacterizationTest {
             }
 
         }
+    }
+
+    @Test
+    fun batchDeletionRequiresConfirmationAndDeletesSelectedConversationsWithTheirAttachments() = runTest {
+        val fixture = fixture(configured = true)
+        fixture.setRecentConversations("first", "second", "unselected")
+        advanceUntilIdle()
+        fixture.recent(RecentConversationsAction.StartSelection("first"))
+        fixture.recent(RecentConversationsAction.ToggleSelection("second"))
+        fixture.recent(RecentConversationsAction.ConfirmDeletion)
+        advanceUntilIdle()
+        coVerify(exactly = 0) { fixture.conversations.deleteConversation(any()) }
+        fixture.recent(RecentConversationsAction.RequestDeletion)
+        fixture.recent(RecentConversationsAction.ConfirmDeletion)
+        fixture.recent(RecentConversationsAction.ConfirmDeletion)
+        advanceUntilIdle()
+        coVerify(exactly = 1) { fixture.conversations.deleteConversation("first") }
+        coVerify(exactly = 1) { fixture.conversations.deleteConversation("second") }
+        coVerify(exactly = 0) { fixture.conversations.deleteConversation("unselected") }
+        coVerify(exactly = 1) { fixture.attachments.deleteSession("first") }
+        coVerify(exactly = 1) { fixture.attachments.deleteSession("second") }
+        assertFalse(fixture.viewModel.uiState.value.recentConversations.isSelecting)
+        assertFalse(fixture.viewModel.uiState.value.recentConversations.isDeleting)
+    }
+
+    @Test
+    fun batchDeletionContinuesAfterFailureAndKeepsFailedSelectionForRetry() = runTest {
+        val fixture = fixture(configured = true)
+        fixture.setRecentConversations("failed", "success")
+        advanceUntilIdle()
+        coEvery { fixture.conversations.deleteConversation("failed") } throws java.io.IOException("storage failed")
+        fixture.recent(RecentConversationsAction.StartSelection("failed"))
+        fixture.recent(RecentConversationsAction.ToggleSelection("success"))
+        fixture.recent(RecentConversationsAction.RequestDeletion)
+        fixture.viewModel.effects.test {
+            fixture.recent(RecentConversationsAction.ConfirmDeletion)
+            advanceUntilIdle()
+            assertEquals(ChatEffect.ShowNotice(ChatNotice.ConversationDeleteFailed), awaitItem())
+        }
+        coVerify(exactly = 1) { fixture.conversations.deleteConversation("success") }
+        coVerify(exactly = 0) { fixture.attachments.deleteSession("failed") }
+        assertEquals(setOf("failed"), fixture.viewModel.uiState.value.recentConversations.selectedIds)
+        assertFalse(fixture.viewModel.uiState.value.recentConversations.isDeleting)
+    }
+
+    @Test
+    fun batchDeletionRechecksCurrentConversationAfterConfirmationWasOpened() = runTest {
+        val fixture = fixture(configured = true, sessionIds = listOf("session-1"))
+        fixture.setRecentConversations("session-1", "other")
+        advanceUntilIdle()
+        fixture.recent(RecentConversationsAction.StartSelection("session-1"))
+        fixture.recent(RecentConversationsAction.ToggleSelection("other"))
+        fixture.recent(RecentConversationsAction.RequestDeletion)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        assertEquals("session-1", fixture.viewModel.uiState.value.sessionId)
+        fixture.viewModel.effects.test {
+            fixture.recent(RecentConversationsAction.ConfirmDeletion)
+            advanceUntilIdle()
+            assertEquals(ChatEffect.ShowNotice(ChatNotice.ActiveConversationDeleteBlocked), awaitItem())
+        }
+        coVerify(exactly = 0) { fixture.conversations.deleteConversation("session-1") }
+        coVerify(exactly = 1) { fixture.conversations.deleteConversation("other") }
+    }
+
+    @Test
+    fun cancellationDuringBatchDeletionPropagatesAndReleasesDeletingState() = runTest {
+        val fixture = fixture(configured = true)
+        fixture.setRecentConversations("first", "second")
+        advanceUntilIdle()
+        coEvery { fixture.conversations.deleteConversation("first") } throws CancellationException("cancelled")
+        fixture.recent(RecentConversationsAction.StartSelection("first"))
+        fixture.recent(RecentConversationsAction.ToggleSelection("second"))
+        fixture.recent(RecentConversationsAction.RequestDeletion)
+        fixture.recent(RecentConversationsAction.ConfirmDeletion)
+        advanceUntilIdle()
+        coVerify(exactly = 0) { fixture.conversations.deleteConversation("second") }
+        assertFalse(fixture.viewModel.uiState.value.recentConversations.isDeleting)
+        assertEquals(setOf("first", "second"), fixture.viewModel.uiState.value.recentConversations.selectedIds)
+    }
+
+    @Test
+    fun batchDeletionRechecksBackgroundTaskStartedAfterSelection() = runTest {
+        val agent = ControllableAgent()
+        val fixture = fixture(configured = true, agentOverride = agent, sessionIds = listOf("session-a", "session-b"))
+        fixture.setRecentConversations("session-a", "session-b")
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        fixture.viewModel.onAction(ChatAction.NewConversation)
+        advanceUntilIdle()
+        fixture.recent(RecentConversationsAction.StartSelection("session-a"))
+        fixture.recent(RecentConversationsAction.RequestDeletion)
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
+        advanceUntilIdle()
+        fixture.viewModel.send("运行中的任务")
+        runCurrent()
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-b"))
+        advanceUntilIdle()
+        fixture.viewModel.effects.test {
+            fixture.recent(RecentConversationsAction.ConfirmDeletion)
+            advanceUntilIdle()
+            assertEquals(ChatEffect.ShowNotice(ChatNotice.ActiveConversationDeleteBlocked), awaitItem())
+        }
+        coVerify(exactly = 0) { fixture.conversations.deleteConversation("session-a") }
+        fixture.viewModel.onAction(ChatAction.SwitchSession("session-a"))
+        advanceUntilIdle()
+        fixture.viewModel.onAction(ChatAction.StopStreaming)
+        advanceUntilIdle()
+    }
+
+    private fun Fixture.recent(action: RecentConversationsAction) {
+        viewModel.onAction(ChatAction.RecentConversations(action))
+    }
+
+    private fun Fixture.setRecentConversations(vararg ids: String) {
+        val flow = conversations.conversations as MutableStateFlow<List<Conversation>>
+        flow.value = ids.map { Conversation(id = it, title = it) }
     }
 
     private fun fixture(

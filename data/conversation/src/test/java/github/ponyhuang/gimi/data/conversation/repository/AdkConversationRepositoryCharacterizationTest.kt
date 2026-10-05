@@ -104,6 +104,61 @@ class AdkConversationRepositoryCharacterizationTest {
         }
     }
 
+    @Test
+    fun deleteConversationRemovesStorageMetadataAndContentRevision() = runTest {
+        coEvery { sessionService.deleteSession(any()) } returns Unit
+        coEvery { sessionService.listSessions(appName = any(), userId = any()) } returns mockk {
+            every { sessions } returns emptyList()
+        }
+        val repository = repository()
+        repository.notifyConversationContentChanged("session-1")
+        repository.deleteConversation("session-1")
+        coVerify(exactly = 1) { sessionService.deleteSession(match { it.id == "session-1" }) }
+        coVerify(exactly = 1) { metadataDao.delete("session-1") }
+        assertEquals(emptyMap<String, Long>(), repository.conversationContentRevisions.value)
+    }
+
+    @Test
+    fun deleteConversationPropagatesStorageFailureWithoutDeletingMetadata() = runTest {
+        val error = java.io.IOException("storage unavailable")
+        coEvery { sessionService.deleteSession(any()) } throws error
+        val repository = repository()
+        repository.notifyConversationContentChanged("session-1")
+        try {
+            repository.deleteConversation("session-1")
+            throw AssertionError("Deletion failure was swallowed")
+        } catch (actual: java.io.IOException) {
+            assertEquals(error, actual)
+        }
+        coVerify(exactly = 0) { metadataDao.delete(any()) }
+        assertEquals(mapOf("session-1" to 1L), repository.conversationContentRevisions.value)
+    }
+
+    @Test
+    fun deleteConversationPropagatesMetadataFailure() = runTest {
+        coEvery { sessionService.deleteSession(any()) } returns Unit
+        val error = IllegalStateException("metadata unavailable")
+        coEvery { metadataDao.delete("session-1") } throws error
+        try {
+            repository().deleteConversation("session-1")
+            throw AssertionError("Metadata failure was swallowed")
+        } catch (actual: IllegalStateException) {
+            assertEquals(error, actual)
+        }
+    }
+
+    @Test
+    fun deleteConversationPropagatesCancellationWithoutDeletingMetadata() = runTest {
+        coEvery { sessionService.deleteSession(any()) } throws CancellationException("cancelled")
+        try {
+            repository().deleteConversation("session-1")
+            throw AssertionError("Cancellation was swallowed")
+        } catch (_: CancellationException) {
+            // 取消不能转换成删除成功。
+        }
+        coVerify(exactly = 0) { metadataDao.delete(any()) }
+    }
+
     private fun repository() = AdkConversationRepository(
         appName = "test-app",
         userId = "test-user",

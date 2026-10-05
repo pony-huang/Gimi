@@ -64,6 +64,9 @@ sealed interface ChatAction {
     /** 删除指定会话（当前激活或进行中的会话会被拒绝并提示）。 */
     data class DeleteConversation(val sessionId: String) : ChatAction
 
+    /** 最近会话面板的搜索、多选及删除操作。 */
+    data class RecentConversations(val action: RecentConversationsAction) : ChatAction
+
     /** 为当前会话选择聊天模型。 */
     data class SelectModel(val selection: ModelSelection) : ChatAction
 
@@ -113,6 +116,9 @@ sealed interface ChatNotice {
     data object ParallelTaskLimitReached : ChatNotice
     data object CurrentConversationBusy : ChatNotice
     data object ActiveConversationDeleteBlocked : ChatNotice
+
+    /** 有会话删除失败，保留选择以便重试。 */
+    data object ConversationDeleteFailed : ChatNotice
 
     /** 一次发送混入了多种类型的附件。 */
     data object MixedAttachmentCategories : ChatNotice

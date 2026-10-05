@@ -237,13 +237,11 @@ class AdkConversationRepository(
      */
     override suspend fun deleteConversation(sessionId: String) {
         val key = SessionKey(appName = appName, userId = userId, id = sessionId)
-        try {
-            sessionService.deleteSession(key)
-            metadataDao.delete(sessionId)
-            _conversationContentRevisions.update { it - sessionId }
-        } catch (t: Throwable) {
-            recover(t, "deleteConversation($sessionId)", Unit)
-        }
+        // 删除失败必须交给调用方提示和重试，不能把未删除的会话当作成功清理。
+        sessionService.deleteSession(key)
+        metadataDao.delete(sessionId)
+        _conversationContentRevisions.update { it - sessionId }
+        _conversations.update { list -> list.filterNot { it.id == sessionId } }
         refresh()
     }
 

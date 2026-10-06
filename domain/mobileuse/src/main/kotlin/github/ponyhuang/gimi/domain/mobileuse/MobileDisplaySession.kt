@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * @property width 实际画面像素宽度。
  * @property height 实际画面像素高度。
  * @property appName 最近打开的应用名称，尚未打开应用时为空。
+ * @property completionVersion 成功结束执行的计数；宿主据此隐藏窗口，尺寸更新不能重放结束事件。
  */
 data class MobileDisplaySession(
     val id: String,
@@ -20,6 +21,7 @@ data class MobileDisplaySession(
     val width: Int,
     val height: Int,
     val appName: String? = null,
+    val completionVersion: Long = 0,
 )
 
 /** 连续单指手势的阶段。 */
@@ -105,6 +107,8 @@ class MobileDisplaySessions {
         executions.remove(owner)
         if (activeOwner != owner) return false
         activeOwner = null
+        // StateFlow 保留完成标记，宿主尚未订阅或正在切窗时也不会遗漏关闭请求。
+        mutableSession.value = session.value?.let { it.copy(completionVersion = it.completionVersion + 1) }
         return true
     }
 

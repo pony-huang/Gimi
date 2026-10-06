@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.DrawerValue
@@ -16,15 +17,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.core.storage.AndroidAppDirectoryResolver
 import github.ponyhuang.gimi.core.storage.ShareableFileUriFactory
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.compose.LifecycleResumeEffect
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import github.ponyhuang.gimi.domain.conversation.model.LocalFileReference
-import kotlinx.coroutines.launch
 import java.io.File
+import kotlinx.coroutines.launch
 
 /**
  * 自包含的 Chat 入口。该 Composable 拥有 [ChatViewModel]、[ChatRecommendationsViewModel]、
@@ -59,6 +60,7 @@ fun ChatRoute(
     val chatNoticeParallelLimit = stringResource(R.string.chat_notice_parallel_limit)
     val chatNoticeCurrentConversationBusy =
         stringResource(R.string.chat_notice_current_conversation_busy)
+    val chatNoticeDeleteFailed = stringResource(R.string.chat_notice_delete_failed)
     val chatNoticeActiveDeleteBlocked = stringResource(R.string.chat_notice_active_delete_blocked)
     val chatNoticeMixedAttachmentCategories =
         stringResource(R.string.chat_notice_mixed_attachment_categories)
@@ -69,16 +71,12 @@ fun ChatRoute(
         stringResource(R.string.chat_notice_document_total_size_limit)
     val chatNoticeMemorySearchFailed = stringResource(R.string.chat_notice_memory_search_failed)
     val chatNoticeMemoryWriteFailed = stringResource(R.string.chat_notice_memory_write_failed)
-    val chatNoticeEditDraftsRestoreFailed =
-        stringResource(R.string.chat_notice_edit_drafts_restore_failed)
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
     LifecycleResumeEffect(viewModel) {
         viewModel.onAction(ChatAction.ResumeChat)
-        onPauseOrDispose {
-            viewModel.onAction(ChatAction.LeaveChat)
-        }
+        onPauseOrDispose {}
     }
 
     LaunchedEffect(viewModel) {
@@ -95,6 +93,7 @@ fun ChatRoute(
                     ChatNotice.ParallelTaskLimitReached -> chatNoticeParallelLimit
                     ChatNotice.CurrentConversationBusy -> chatNoticeCurrentConversationBusy
                     ChatNotice.ActiveConversationDeleteBlocked -> chatNoticeActiveDeleteBlocked
+                    ChatNotice.ConversationDeleteFailed -> chatNoticeDeleteFailed
                     ChatNotice.MixedAttachmentCategories -> chatNoticeMixedAttachmentCategories
                     ChatNotice.ChatModelUnavailable -> chatNoticeChatModelUnavailable
                     ChatNotice.AttachmentCategoryUnsupported -> chatNoticeAttachmentCategoryUnsupported
@@ -109,11 +108,19 @@ fun ChatRoute(
                     )
                     ChatNotice.MemorySearchFailed -> chatNoticeMemorySearchFailed
                     ChatNotice.MemoryWriteFailed -> chatNoticeMemoryWriteFailed
-                    ChatNotice.EditDraftsRestoreFailed -> chatNoticeEditDraftsRestoreFailed
                     is ChatNotice.Message -> notice.text
                 }
             }
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    BackHandler(enabled = drawerState.isOpen && uiState.recentConversations.isSelecting && !uiState.recentConversations.isDeleting) {
+        viewModel.onAction(ChatAction.RecentConversations(RecentConversationsAction.FinishSelection))
+    }
+    LaunchedEffect(drawerState.currentValue) {
+        if (drawerState.currentValue == DrawerValue.Closed) {
+            viewModel.onAction(ChatAction.RecentConversations(RecentConversationsAction.FinishSelection))
         }
     }
 
@@ -127,9 +134,8 @@ fun ChatRoute(
             onReturnToChat()
             scope.launch { drawerState.close() }
         },
-        onDeleteClick = { conversation ->
-            viewModel.onAction(ChatAction.DeleteConversation(conversation.id))
-        },
+        recentState = uiState.recentConversations,
+        onRecentAction = { viewModel.onAction(ChatAction.RecentConversations(it)) },
         onSettingsClick = {
             onReturnToChat()
             onOpenSettings()
@@ -234,15 +240,6 @@ fun ChatRoute(
             onSharedMediaConsumed = onSharedMediaConsumed,
             onRetryFailedTurn = {
                 viewModel.onAction(ChatAction.RetryFailedTurn)
-            },
-            onEditFailedTurn = {
-                viewModel.onAction(ChatAction.EditFailedTurn)
-            },
-            onCancelEditFailedTurn = {
-                viewModel.onAction(ChatAction.CancelEditFailedTurn)
-            },
-            onRepeatExecutionResolve = { proceed ->
-                viewModel.onAction(ChatAction.ResolveRepeatExecution(proceed))
             },
         )
     }

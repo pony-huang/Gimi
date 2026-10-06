@@ -42,9 +42,9 @@ class AdkChatAgentRepository @Inject constructor(
             override suspend fun send(
                 text: String,
                 fileAttachments: List<FileAttachment>,
-                rewindBeforeInvocationId: String?,
+                retry: Boolean,
             ): Flow<ChatRunEvent> = execution.send(
-                text, fileAttachments, rewindBeforeInvocationId,
+                text, fileAttachments, retry,
             ).map { it.toDomain() }
 
             override suspend fun respondToToolConfirmation(

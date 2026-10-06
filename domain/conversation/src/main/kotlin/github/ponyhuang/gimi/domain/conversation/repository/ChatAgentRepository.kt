@@ -18,10 +18,11 @@ interface ChatAgentRepository {
 
 /** 一轮消息及其确认/输入恢复共用的执行上下文，由会话运行状态持有。 */
 interface ChatAgentExecution {
+    /** retry=true 时恢复 SDK 保存的原执行，不追加用户消息。 */
     suspend fun send(
         text: String,
         fileAttachments: List<FileAttachment>,
-        rewindBeforeInvocationId: String? = null,
+        retry: Boolean = false,
     ): Flow<ChatRunEvent>
 
     suspend fun respondToToolConfirmation(
@@ -36,10 +37,6 @@ interface ChatAgentExecution {
         value: String,
     ): Flow<ChatRunEvent>
 }
-
-/** 官方 ADK Runner 在恢复历史调用边界时失败，且新的 invocation 尚未启动。 */
-class ChatSessionRewindException(cause: Throwable) :
-    IllegalStateException("Failed to rewind the ADK session.", cause)
 
 /**
  * 管理聊天附件从“输入栏草稿”到“可发送消息附件”的生命周期。
@@ -69,12 +66,6 @@ class ChatSessionRewindException(cause: Throwable) :
  * data 层。
  */
 interface ChatAttachmentRepository {
-    /** 校验归档附件仍可读，重试直接复用文件，避免重复压缩图片。 */
-    suspend fun validateSaved(attachments: List<FileAttachment>)
-
-    /** 为编辑建立独立草稿副本，移除草稿不得删除历史消息附件。 */
-    suspend fun createDrafts(attachments: List<FileAttachment>): List<DraftAttachment>
-
     /**
      * 读取并准备本轮要发送的附件。
      *

@@ -16,53 +16,58 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -71,8 +76,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.domain.conversation.model.Conversation
-import github.ponyhuang.gimi.feature.chat.R
 import github.ponyhuang.gimi.feature.chat.ConversationTaskStatus
+import github.ponyhuang.gimi.feature.chat.R
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /**
@@ -86,7 +91,8 @@ import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
  * @param conversations       由 Route/ViewModel 下发的对话列表；组件本身不解析业务依赖。
  * @param currentSessionId    当前正在使用的 session id；与该 id 匹配的 [Conversation] 行 MUST 显示一个禁用的删除按钮（不允许删自己）。
  * @param onConversationClick 点击某个对话时回调（实现方负责关闭抽屉）
- * @param onDeleteClick       删除某个对话时回调（实现方应再次校验不是 currentSessionId）
+ * @param recentState         搜索、多选和删除进度状态
+ * @param onRecentAction      最近会话操作，由 ViewModel 处理并再次校验删除保护
  * @param onSettingsClick     点击底部"设置"按钮时回调（实现方负责关闭抽屉并跳转）
  * @param themeMode           当前夜间模式偏好（跟随系统/浅色/深色）
  * @param onThemeModeChange   点击夜间模式按钮循环到下一模式时回调（实现方负责持久化并应用主题）
@@ -101,7 +107,8 @@ fun ChatDrawer(
     currentSessionId: String,
     conversationTaskStatuses: Map<String, ConversationTaskStatus> = emptyMap(),
     onConversationClick: (Conversation) -> Unit,
-    onDeleteClick: (Conversation) -> Unit,
+    recentState: RecentConversationsState = RecentConversationsState(),
+    onRecentAction: (RecentConversationsAction) -> Unit = {},
     onSettingsClick: () -> Unit,
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
@@ -121,7 +128,8 @@ fun ChatDrawer(
                     currentSessionId = currentSessionId,
                     conversationTaskStatuses = conversationTaskStatuses,
                     onConversationClick = onConversationClick,
-                    onDeleteClick = onDeleteClick,
+                    recentState = recentState,
+                    onRecentAction = onRecentAction,
                     onSettingsClick = onSettingsClick,
                     themeMode = themeMode,
                     onThemeModeChange = onThemeModeChange,
@@ -144,122 +152,187 @@ private fun HistoryDrawerContent(
     currentSessionId: String,
     conversationTaskStatuses: Map<String, ConversationTaskStatus>,
     onConversationClick: (Conversation) -> Unit,
-    onDeleteClick: (Conversation) -> Unit,
+    recentState: RecentConversationsState,
+    onRecentAction: (RecentConversationsAction) -> Unit,
     onSettingsClick: () -> Unit,
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
     showUpdateBadge: Boolean = false,
 ) {
-    var menuConversation by remember { mutableStateOf<Conversation?>(null) }
+    val visible = recentState.visibleConversations(conversations)
+    val eligible = deletableConversationIds(conversations, currentSessionId, conversationTaskStatuses)
+    val selectedIds = recentState.selectedIds.intersect(eligible)
+    val visibleEligible = visible.map { it.id }.toSet().intersect(eligible)
+    val allSelected = visibleEligible.isNotEmpty() && selectedIds.containsAll(visibleEligible)
+    val surface = MaterialTheme.colorScheme.surface
 
-    Column(
-        modifier = Modifier
-            .fillMaxHeight()
-            .statusBarsPadding(),
-    ) {
-        Text(
-            text = stringResource(R.string.chat_drawer_history_title),
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(start = 24.dp, top = 20.dp, bottom = 24.dp),
-        )
-
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 16.dp),
-        ) {
-            if (conversations.isEmpty()) {
-                item {
-                    Text(
-                        text = stringResource(R.string.chat_drawer_empty_history),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 24.dp),
-                    )
-                }
-            }
-            items(
-                items = conversations,
-                key = { it.id }
-            ) { conversation ->
-                ConversationListItem(
-                    conversation = conversation,
-                    isCurrent = conversation.id == currentSessionId,
-                    taskStatus = conversationTaskStatuses[conversation.id],
-                    enabled = true,
-                    onClick = { onConversationClick(conversation) },
-                    onLongClick = { menuConversation = conversation },
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
-            }
-        }
-
-        HorizontalDivider(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            thickness = 0.5.dp,
-            color = MaterialTheme.colorScheme.outlineVariant,
-        )
-
-        // ── 底部固定 - 设置入口 + 夜间模式循环按钮（并列一行）───────
+    Column(Modifier.fillMaxHeight().statusBarsPadding()) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 20.dp)
-                .navigationBarsPadding(),
+            Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 20.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Surface(
-                onClick = onSettingsClick,
-                shape = CircleShape,
-                color = chatCapsuleColor(),
-                shadowElevation = 3.dp,
+            Text(
+                text = stringResource(R.string.chat_drawer_history_title),
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Medium,
+            )
+            Spacer(Modifier.weight(1f))
+            TextButton(
+                enabled = !recentState.isDeleting && (conversations.isNotEmpty() || recentState.isSelecting),
+                onClick = {
+                    onRecentAction(if (recentState.isSelecting) RecentConversationsAction.FinishSelection else RecentConversationsAction.StartSelection())
+                },
             ) {
-                Row(
-                    modifier = Modifier.height(48.dp).padding(horizontal = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                Text(stringResource(if (recentState.isSelecting) R.string.chat_drawer_done else R.string.chat_drawer_manage))
+            }
+        }
+        OutlinedTextField(
+            value = recentState.query,
+            onValueChange = { onRecentAction(RecentConversationsAction.Search(it)) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            enabled = !recentState.isDeleting,
+            placeholder = { Text(stringResource(R.string.chat_drawer_search)) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            trailingIcon = {
+                if (recentState.query.isNotEmpty()) {
+                    IconButton(onClick = { onRecentAction(RecentConversationsAction.Search("")) }) {
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.chat_drawer_clear_search))
+                    }
+                }
+            },
+            singleLine = true,
+            shape = CircleShape,
+        )
+        if (recentState.isSelecting) {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.chat_drawer_selected_count, selectedIds.size), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.weight(1f))
+                TextButton(
+                    enabled = visibleEligible.isNotEmpty() && !recentState.isDeleting,
+                    onClick = { onRecentAction(RecentConversationsAction.ToggleSelectAll) },
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Text(
-                        text = stringResource(R.string.chat_settings),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    if (showUpdateBadge) {
-                        // 有未发现的新版本时在"设置"入口旁点亮提醒点。
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .background(MaterialTheme.colorScheme.error, CircleShape),
+                    Text(stringResource(if (allSelected) R.string.chat_drawer_deselect_all else R.string.chat_drawer_select_all))
+                }
+            }
+        } else {
+            Spacer(Modifier.height(12.dp))
+        }
+        Box(Modifier.weight(1f).navigationBarsPadding().imePadding()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 116.dp),
+            ) {
+                if (visible.isEmpty()) {
+                    item {
+                        Text(
+                            text = stringResource(if (recentState.query.isBlank()) R.string.chat_drawer_empty_history else R.string.chat_drawer_search_empty),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 24.dp),
                         )
                     }
                 }
+                items(items = visible, key = { it.id }) { conversation ->
+                    ConversationListItem(
+                        conversation = conversation,
+                        isCurrent = conversation.id == currentSessionId,
+                        taskStatus = conversationTaskStatuses[conversation.id],
+                        enabled = !recentState.isDeleting && (!recentState.isSelecting || conversation.id in eligible),
+                        isSelecting = recentState.isSelecting,
+                        isSelected = conversation.id in selectedIds,
+                        onClick = {
+                            if (recentState.isSelecting) onRecentAction(RecentConversationsAction.ToggleSelection(conversation.id))
+                            else onConversationClick(conversation)
+                        },
+                        onLongClick = { onRecentAction(RecentConversationsAction.StartSelection(conversation.id)) },
+                        modifier = Modifier.padding(bottom = 2.dp),
+                    )
+                }
             }
-            Spacer(modifier = Modifier.weight(1f))
-            // 两枚胶囊独立消费点击；主题入口循环 跟随系统→浅色→深色。
-            ThemeModeButton(
-                mode = themeMode,
-                onClick = { onThemeModeChange(themeMode.next()) },
+            // 渐变覆盖列表末端而非插入分隔线；底部留白保证最后一项可滚到按钮上方。
+            Box(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(112.dp)
+                    .background(Brush.verticalGradient(listOf(surface.copy(alpha = 0f), surface, surface))),
             )
+            Row(
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 16.dp, vertical = 24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (recentState.isSelecting) {
+                    Button(
+                        enabled = selectedIds.isNotEmpty() && !recentState.isDeleting,
+                        onClick = { onRecentAction(RecentConversationsAction.RequestDeletion) },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = CircleShape,
+                    ) {
+                        if (recentState.isDeleting) {
+                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Delete, contentDescription = null)
+                        }
+                        Spacer(Modifier.size(8.dp))
+                        Text(stringResource(if (recentState.isDeleting) R.string.chat_drawer_deleting else R.string.chat_drawer_delete_count, selectedIds.size))
+                    }
+                } else {
+                    Surface(
+                        onClick = onSettingsClick,
+                        shape = CircleShape,
+                        color = chatCapsuleColor(),
+                        shadowElevation = 3.dp,
+                    ) {
+                        Row(
+                            modifier = Modifier.height(48.dp).padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = stringResource(R.string.chat_settings),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            if (showUpdateBadge) {
+                                // 有未发现的新版本时在"设置"入口旁点亮提醒点。
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .background(MaterialTheme.colorScheme.error, CircleShape),
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    // 两枚胶囊独立消费点击；主题入口循环 跟随系统→浅色→深色。
+                    ThemeModeButton(
+                        mode = themeMode,
+                        onClick = { onThemeModeChange(themeMode.next()) },
+                    )
+                }
+            }
         }
-
-        menuConversation?.let { conversation ->
-            ConversationActionSheet(
-                isCurrent = conversation.id == currentSessionId,
-                isActive = conversationTaskStatuses[conversation.id] is ConversationTaskStatus.Running ||
-                    conversationTaskStatuses[conversation.id] is ConversationTaskStatus.WaitingForConfirmation ||
-                    conversationTaskStatuses[conversation.id] is ConversationTaskStatus.WaitingForInput,
-                onDismiss = { menuConversation = null },
-                onDeleteClick = {
-                    onDeleteClick(conversation)
-                    menuConversation = null
-                },
-            )
-        }
+    }
+    if (recentState.pendingDeletionIds.isNotEmpty() && !recentState.isDeleting) {
+        AlertDialog(
+            onDismissRequest = { onRecentAction(RecentConversationsAction.CancelDeletion) },
+            title = { Text(stringResource(R.string.chat_drawer_delete_confirm_title, recentState.pendingDeletionIds.size)) },
+            text = { Text(stringResource(R.string.chat_drawer_delete_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = { onRecentAction(RecentConversationsAction.ConfirmDeletion) }) {
+                    Text(stringResource(R.string.chat_drawer_delete_conversation))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { onRecentAction(RecentConversationsAction.CancelDeletion) }) {
+                    Text(stringResource(R.string.chat_drawer_cancel))
+                }
+            },
+        )
     }
 }
 
@@ -342,7 +415,7 @@ private fun themeModeLabelRes(mode: ThemeMode): Int = when (mode) {
 // ── 对话列表项 ──────────────────────────────────────────────────
 
 /**
- * 单个对话列表行：点击切换会话，长按打开操作面板。
+ * 单个紧凑会话行：点击切换会话，长按进入多选；多选时点击整行切换勾选。
  *
  * @param isCurrent 当此行是当前正在使用的会话时 MUST 禁用删除按钮（防止用户把自己正在用的会话删掉）。
  */
@@ -352,14 +425,17 @@ private fun ConversationListItem(
     isCurrent: Boolean,
     taskStatus: ConversationTaskStatus?,
     enabled: Boolean,
+    isSelecting: Boolean = false,
+    isSelected: Boolean = false,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // 选中态用品牌 primaryContainer：深/浅主题下都与抽屉 surface 拉开明度差，
     // secondaryContainer 在深色模式 (#383838 on #2F2F2F) 几乎看不出哪条是当前会话。
-    val containerColor = if (isCurrent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-    val contentColor = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+    val highlighted = if (isSelecting) isSelected else isCurrent
+    val containerColor = if (highlighted) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+    val contentColor = if (highlighted) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
     val taskContentDescription = when (taskStatus) {
         is ConversationTaskStatus.Running -> stringResource(R.string.chat_task_running)
         is ConversationTaskStatus.WaitingForConfirmation -> stringResource(
@@ -376,16 +452,20 @@ private fun ConversationListItem(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .heightIn(min = 64.dp)
             .clip(RoundedCornerShape(20.dp))
             .background(containerColor)
-            .combinedClickable(
-                enabled = enabled,
-                onClick = onClick,
-                onLongClick = onLongClick,
+            .then(
+                if (isSelecting) Modifier.toggleable(value = isSelected, enabled = enabled, role = Role.Checkbox, onValueChange = { onClick() })
+                else Modifier.combinedClickable(enabled = enabled, onClick = onClick, onLongClick = onLongClick),
             )
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (isSelecting) {
+            Checkbox(checked = isSelected, onCheckedChange = null, enabled = enabled, modifier = Modifier.size(24.dp))
+            Spacer(Modifier.size(12.dp))
+        }
         Column(
             modifier = Modifier.weight(1f),
         ) {
@@ -399,7 +479,7 @@ private fun ConversationListItem(
             )
             // 副标题是辨识度的来源：标题可能都是"新对话"，时间 + 末条消息才能区分开。
             Text(
-                text = conversation.subtitle(),
+                text = if (isCurrent) stringResource(R.string.chat_drawer_current_session_time, formatRelativeTime(conversation.timestamp)) else conversation.subtitle(),
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -480,45 +560,6 @@ private fun formatRelativeTime(timestamp: Long): String {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ConversationActionSheet(
-    isCurrent: Boolean,
-    isActive: Boolean,
-    onDismiss: () -> Unit,
-    onDeleteClick: () -> Unit,
-) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        ListItem(
-            headlineContent = {
-                Text(
-                    stringResource(
-                        when {
-                            isCurrent -> R.string.chat_drawer_current_session_protected
-                            isActive -> R.string.chat_drawer_active_session_protected
-                            else -> R.string.chat_drawer_delete_conversation
-                        },
-                    ),
-                )
-            },
-            supportingContent = {
-                if (isCurrent) Text(stringResource(R.string.chat_drawer_switch_first))
-            },
-            leadingContent = {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = null,
-                )
-            },
-            modifier = Modifier.combinedClickable(
-                enabled = !isCurrent && !isActive,
-                onClick = onDeleteClick,
-            ),
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        )
-    }
-}
-
 // ── 预览 ────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -558,7 +599,6 @@ private fun ChatDrawerPreview() {
             conversations = sampleConversations,
             currentSessionId = "1",
             onConversationClick = { },
-            onDeleteClick = { },
             onSettingsClick = { },
             themeMode = ThemeMode.SYSTEM,
             onThemeModeChange = { },
@@ -584,7 +624,6 @@ private fun ChatDrawerEmptyPreview() {
             conversations = emptyList(),
             currentSessionId = "",
             onConversationClick = { },
-            onDeleteClick = { },
             onSettingsClick = { },
             themeMode = ThemeMode.SYSTEM,
             onThemeModeChange = { },
@@ -609,7 +648,6 @@ private fun ChatDrawerClosedPreview() {
             conversations = emptyList(),
             currentSessionId = "",
             onConversationClick = { },
-            onDeleteClick = { },
             onSettingsClick = { },
             themeMode = ThemeMode.SYSTEM,
             onThemeModeChange = { },
@@ -620,6 +658,53 @@ private fun ChatDrawerClosedPreview() {
             ) {
                 Text("主屏幕内容（抽屉关闭）")
             }
+        }
+    }
+}
+
+@Preview(name = "最近 · 紧凑多选", widthDp = 360, heightDp = 780, showBackground = true)
+@Composable
+private fun RecentSelectionPreview() = RecentContentPreview(
+    recentState = RecentConversationsState(isSelecting = true, selectedIds = setOf("1", "3", "4")),
+)
+
+@Preview(name = "最近 · 搜索", widthDp = 360, heightDp = 780, showBackground = true)
+@Composable
+private fun RecentSearchPreview() = RecentContentPreview(recentState = RecentConversationsState(query = "相机"))
+
+@Preview(name = "最近 · 深色", widthDp = 360, heightDp = 780, showBackground = true)
+@Composable
+private fun RecentDarkPreview() = RecentContentPreview(darkTheme = true)
+
+@Preview(name = "最近 · 搜索无结果", widthDp = 360, heightDp = 780, showBackground = true)
+@Composable
+private fun RecentNoResultsPreview() = RecentContentPreview(recentState = RecentConversationsState(query = "不存在"))
+
+@Composable
+private fun RecentContentPreview(
+    recentState: RecentConversationsState = RecentConversationsState(),
+    darkTheme: Boolean = false,
+) {
+    val fixtures = listOf(
+        "帮我开空调", "播放周杰伦夜曲", "微信小程序斗地主挂机未完成", "广州早茶推荐清单",
+        "索尼 A7C 夜景参数推荐", "松下相机屏幕偏橙排查", "白鸽潭点向去", "配置高德地图 MCP Server",
+        "周末散步路线", "整理本周工作笔记",
+    ).mapIndexed { index, title ->
+        Conversation(id = index.toString(), title = title, timestamp = System.currentTimeMillis() - (index + 9) * 3_600_000L)
+    }
+    AsssistantaiTheme(darkTheme = darkTheme) {
+        Surface {
+            HistoryDrawerContent(
+                conversations = fixtures,
+                currentSessionId = "0",
+                conversationTaskStatuses = emptyMap(),
+                onConversationClick = {},
+                recentState = recentState,
+                onRecentAction = {},
+                onSettingsClick = {},
+                themeMode = ThemeMode.SYSTEM,
+                onThemeModeChange = {},
+            )
         }
     }
 }

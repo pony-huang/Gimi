@@ -45,4 +45,7 @@
     <string name="background_app_disconnected">The background app was closed or disconnected.</string>
     <string name="background_app_preview_unavailable">The app screen is unavailable. Check the app and connection. Secure pages may block display.</string>
     <string name="background_app_input_unavailable">The device or input control did not accept this action. Check the connection and try again.</string>
+    <string name="background_app_rotate_landscape">Switch secondary display to landscape</string>
+    <string name="background_app_rotate_portrait">Switch secondary display to portrait</string>
+    <string name="background_app_rotation_unavailable">Could not change display orientation. Check the connection and try again. Some apps may use a fixed orientation.</string>
 </resources>

@@ -1,8 +1,8 @@
 package github.ponyhuang.gimi.data.agent
 
-import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolRegistry
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import io.mockk.every
 import io.mockk.mockk
@@ -13,7 +13,7 @@ import org.junit.Test
 
 class RecommendationModelConfigTest {
     private val modelServices = mockk<AgentModelConfigurationSource>()
-    private val factory = AgentLLMModelFactory(modelServices, mockk<OfficialToolRegistry>(), mockk())
+    private val factory = AgentLLMModelFactory(modelServices, mockk<OfficialToolFunctionCatalog>(), mockk())
 
     @Test
     fun localFastModelKeepsNativeConfigurationWithoutRemoteEndpoint() {

@@ -52,15 +52,13 @@ data class ChatUiState(
     /** 需要聊天列表滚到末尾的显式请求（例如后台完成后恢复完整历史）。 */
     val scrollToLatestRequest: Long = 0L,
     /**
-     * 可恢复的最近失败/中断发送轮；非空时在错误区域显示“编辑/重试”。
+     * 可恢复的最近失败/中断发送轮；非空时在错误区域显示“重试”。
      * 一旦用户成功发送新消息或完成当前轮，该字段被清空。
      */
     val failedTurn: ChatTurn? = null,
-    /** 失败轮编辑、重试与重复执行确认的唯一交互状态。 */
-    val failedTurnRecovery: FailedTurnRecoveryState = FailedTurnRecoveryState.Idle,
-    /** 输入框的外部草稿种子；编辑失败消息时用它回填文字与附件。 */
-    val composerSeed: MessageData = MessageData(),
     val conversations: List<Conversation> = emptyList(),
+    /** 最近会话搜索、多选及删除状态，由 ViewModel 维护。 */
+    val recentConversations: RecentConversationsState = RecentConversationsState(),
     val conversationTaskStatuses: Map<String, ConversationTaskStatus> = emptyMap(),
     val isInitializing: Boolean = false,
     val availableLLMModelSettings: List<LLMModelSetting> = emptyList(),
@@ -91,60 +89,6 @@ data class ChatUiState(
      */
     val hasUpdateBadge: Boolean = false,
 )
-
-/** 失败轮恢复交互的封闭状态，避免多个布尔值与 pending 字段形成非法组合。 */
-sealed interface FailedTurnRecoveryState {
-    /** 当前没有编辑或重复执行确认。 */
-    data object Idle : FailedTurnRecoveryState
-
-    /**
-     * 正在编辑失败轮。
-     *
-     * @property sessionId 编辑所属的 conversation session。
-     * @property previousDraft 进入编辑前的普通输入草稿，用户显式取消时恢复。
-     */
-    data class Editing(
-        val sessionId: String,
-        val previousDraft: MessageData,
-    ) : FailedTurnRecoveryState
-
-    /**
-     * 等待用户确认可能重复执行工具的重发请求。
-     *
-     * @property request 确认后要执行的原样重试或编辑提交。
-     * @property previousDraft 编辑提交前的普通输入草稿；原样重试时为 null。
-     */
-    data class AwaitingRepeatConfirmation(
-        val request: FailedTurnResendRequest,
-        val previousDraft: MessageData? = null,
-    ) : FailedTurnRecoveryState
-}
-
-/** 用户确认后可执行的失败轮重发请求。 */
-sealed interface FailedTurnResendRequest {
-    /** 原样重试失败轮的用户消息和附件。 */
-    data object RetryOriginal : FailedTurnResendRequest
-
-    /**
-     * 提交编辑后的失败轮内容。
-     *
-     * @property message 编辑后的文字与草稿附件。
-     */
-    data class SubmitEdit(val message: MessageData) : FailedTurnResendRequest
-}
-
-/** 当前是否仍处于失败轮编辑流程（包含编辑提交的重复执行确认）。 */
-val ChatUiState.editingFailedTurn: Boolean
-    get() = when (val recovery = failedTurnRecovery) {
-        is FailedTurnRecoveryState.Editing -> true
-        is FailedTurnRecoveryState.AwaitingRepeatConfirmation ->
-            recovery.request is FailedTurnResendRequest.SubmitEdit
-        FailedTurnRecoveryState.Idle -> false
-    }
-
-/** 当前是否需要展示重复执行工具确认。 */
-val ChatUiState.toolReexecutionPending: Boolean
-    get() = failedTurnRecovery is FailedTurnRecoveryState.AwaitingRepeatConfirmation
 
 val ChatUiState.pendingToolConfirmation: PendingToolConfirmation?
     get() = pendingToolConfirmations.firstOrNull()

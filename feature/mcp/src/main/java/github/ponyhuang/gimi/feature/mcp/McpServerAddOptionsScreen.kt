@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
-import github.ponyhuang.gimi.ui.preference.PreferenceNavigationCard
+import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 
@@ -31,14 +31,14 @@ fun McpServerAddOptionsScreen(
         ) {
             PreferenceSectionTitle(text = stringResource(R.string.mcp_section_add_methods))
             PreferenceGroupCard {
-                PreferenceNavigationCard(
+                PreferenceListItem(
                     icon = Icons.Default.Add,
                     title = stringResource(R.string.mcp_method_new_title),
                     subtitle = stringResource(R.string.mcp_method_new_subtitle),
                     onClick = onCreate,
                     showDivider = true,
                 )
-                PreferenceNavigationCard(
+                PreferenceListItem(
                     icon = Icons.Default.ContentPaste,
                     title = stringResource(R.string.mcp_method_import_title),
                     subtitle = stringResource(R.string.mcp_method_import_subtitle),

@@ -7,9 +7,9 @@ import com.openai.client.okhttp.OpenAIOkHttpClient
 import github.ponyhuang.gimi.data.agent.execution.AttachmentResolvingModel
 import github.ponyhuang.gimi.data.agent.model.Claude
 import github.ponyhuang.gimi.data.agent.model.Openai
-import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolRegistry
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedAgentModel
 import github.ponyhuang.gimi.domain.modelcatalog.model.LocalModelRuntimeConfig
 import github.ponyhuang.gimi.data.agent.model.LocalInferenceModelFactory
@@ -70,7 +70,7 @@ internal fun ModelConfig.toRuntimeMetadata(): ModelRuntimeMetadata = ModelRuntim
 @Singleton
 class AgentLLMModelFactory @Inject constructor(
     private val modelServices: AgentModelConfigurationSource,
-    private val officialToolRegistry: OfficialToolRegistry,
+    private val officialToolCatalog: OfficialToolFunctionCatalog,
     private val localInferenceModels: LocalInferenceModelFactory,
 ) {
     /**
@@ -137,13 +137,13 @@ class AgentLLMModelFactory @Inject constructor(
     /**
      * 当前服务以厂商原生形态执行的官方内置工具名。
      *
-     * 与官方工具注册表的服务/协议/模型家族门控保持一致:仅注册表中声明为
-     * [github.ponyhuang.gimi.data.agent.tools.official.OfficialToolBinding.ProviderDeclaration]
+     * 与官方工具目录的服务/协议/模型家族门控保持一致:仅目录中声明为
+     * [github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolBinding.ProviderDeclaration]
      * 的工具由厂商远端执行;其余同名声明(GLM 本地搜索、Kimi 公式、MCP 工具)
      * 都是可执行函数,不得转换。
      */
     private fun ModelConfig.providerBuiltInToolNames(): Set<String> =
-        officialToolRegistry.providerDeclaredWireNames(
+        officialToolCatalog.providerDeclaredWireNames(
             serviceId = serviceId,
             protocol = baseType,
             modelId = modelId,

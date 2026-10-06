@@ -8,16 +8,16 @@
     <string name="settings_memory_subtitle">Configure on-device or cloud long-term memory</string>
 
     <string name="settings_model_service_title">API access</string>
-    <string name="settings_model_service_subtitle">Keys · Endpoints · Models</string>
+    <string name="settings_model_service_subtitle">Manage keys and model services</string>
 
     <string name="settings_default_model_title">Default models</string>
-    <string name="settings_default_model_subtitle">Assistant · Quick response · Voice recognition &amp; playback</string>
+    <string name="settings_default_model_subtitle">Choose default models for each feature</string>
 
     <string name="settings_mcp_title">MCP</string>
-    <string name="settings_mcp_subtitle">Remote tool services · Connection &amp; authorization</string>
+    <string name="settings_mcp_subtitle">Connect and authorize remote tools</string>
 
     <string name="settings_plugins_title">Plugins</string>
-    <string name="settings_plugins_subtitle">Dynamically loaded plugins · enable &amp; manage</string>
+    <string name="settings_plugins_subtitle">Enable and manage dynamic plugins</string>
 
     <string name="settings_skills_title">Skills</string>
     <string name="settings_skills_subtitle">Install reusable instructions and resources</string>

@@ -28,6 +28,8 @@ internal class ChatSessionRuntime(
     var isLoaded: Boolean = false
     /** 上次历史加载开始时观察到的外部写入版本，加载期间的新版本留待下一次刷新。 */
     var loadedContentRevision: Long = -1L
+    /** 重试标记跨工具确认和用户输入恢复保留，最终成功时重新读取 SDK 保存的历史。 */
+    var retryingInvocation: Boolean = false
     var isAgentRunning: Boolean = false
     var phase: AgentTaskPhase = AgentTaskPhase.GENERATING
     var pendingToolConfirmations: List<PendingToolConfirmation> = emptyList()

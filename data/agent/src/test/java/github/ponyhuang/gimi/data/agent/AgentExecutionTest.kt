@@ -28,7 +28,7 @@ class AgentExecutionTest {
             )
         } returns emptyFlow()
         val metadata = mapOf<String, Any>("original-tools" to listOf("clock"))
-        val execution = AgentChatRunner.Execution("user", "session", native, metadata)
+        val execution = AgentChatExecution("user", "session", native, metadata)
 
         execution.send("hello")
         execution.respondToToolConfirmation("confirm", true)

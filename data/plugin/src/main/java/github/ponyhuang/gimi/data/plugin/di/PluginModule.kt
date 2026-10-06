@@ -7,14 +7,16 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import github.ponyhuang.gimi.core.storage.StorageRegistry
 import github.ponyhuang.gimi.data.plugin.InstalledApkPluginLoader
 import github.ponyhuang.gimi.data.plugin.PluginConfigStore
+import github.ponyhuang.gimi.data.plugin.PluginLoadNoticeQueue
 import github.ponyhuang.gimi.data.plugin.PluginLoader
 import github.ponyhuang.gimi.data.plugin.PluginManager
 import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
+import github.ponyhuang.gimi.domain.plugin.runtime.PluginLoadNotices
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
-import github.ponyhuang.gimi.core.storage.StorageRegistry
 import javax.inject.Singleton
 
 /** 提供动态插件加载器的进程级单例绑定。 */
@@ -28,13 +30,17 @@ object PluginModule {
         @ApplicationContext context: Context,
         configStore: PluginConfigStore,
         storageRegistry: StorageRegistry,
-    ): PluginLoader = InstalledApkPluginLoader(context, configStore, storageRegistry)
+        notices: PluginLoadNoticeQueue,
+    ): PluginLoader = InstalledApkPluginLoader(context, configStore, storageRegistry, notices)
 }
 
 /** 把插件管理契约绑定到 [PluginManager]。 */
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class PluginRepositoryModule {
+    @Binds
+    abstract fun bindPluginLoadNotices(implementation: PluginLoadNoticeQueue): PluginLoadNotices
+
     @Binds
     @Singleton
     abstract fun bindPluginRepository(implementation: PluginManager): PluginRepository

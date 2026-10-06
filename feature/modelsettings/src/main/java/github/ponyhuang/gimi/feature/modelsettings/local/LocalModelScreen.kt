@@ -40,7 +40,7 @@ fun LocalModelScreen(
                 item { CompactLocalModelSectionTitle(stringResource(R.string.local_model_brands)) }
                 items(state.models.groupBy { it.variant.brandId }.toList(), key = { it.first }) { (id, models) ->
                     PreferenceGroupCard {
-                        PreferenceNavigationCard(
+                        PreferenceListItem(
                             icon = Icons.Default.Memory,
                             title = stringResource(R.string.local_model_gemma4),
                             subtitle = stringResource(R.string.local_model_brand_summary, models.count { it.status == LocalModelDownloadStatus.Ready }, models.count { it.enabled }),

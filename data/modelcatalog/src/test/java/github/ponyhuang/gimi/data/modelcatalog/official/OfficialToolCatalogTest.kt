@@ -1,9 +1,14 @@
-package github.ponyhuang.gimi.data.agent.tools.official
+package github.ponyhuang.gimi.data.modelcatalog.official
 
-import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
-import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolBinding
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSupport
+import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
+import github.ponyhuang.gimi.domain.modelcatalog.repository.KimiFormulaSource
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -11,15 +16,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 官方工具注册表门控行为:服务/协议/模型家族三维匹配与厂商 wire 声明推导。
+ * 官方工具目录门控行为:服务/协议/模型家族三维匹配与厂商 wire 声明推导。
  */
-class OfficialToolRegistryTest {
+class OfficialToolCatalogTest {
 
-    private val registry = OfficialToolRegistry(
-        kimiFormulaCache = testKimiFormulaCache(),
-        httpClient = testHttpClient(),
-        modelServices = emptyServices(),
-    )
+    private val support = OfficialToolSupport()
+    private val registry = catalogFor()
 
     @Test
     fun webSearchIsDeclaredPerVendorWithUniqueToolIds() {
@@ -73,18 +75,14 @@ class OfficialToolRegistryTest {
         assertTrue(registry.providerDeclaredWireNames("openai", ApiProtocol.Standard, "gpt-5.2").isEmpty())
     }
 
-    private fun registryFor(serviceId: String) = OfficialToolRegistry(
-        kimiFormulaCache = testKimiFormulaCache(),
-        httpClient = testHttpClient(),
-        modelServices = servicesWith(serviceId),
-    )
+    private fun registryFor(serviceId: String) = catalogFor(serviceId)
 
     @Test
     fun minimaxImageGenerationUsesLocalToolsForBothSupportedProtocols() {
         for (protocol in setOf(ApiProtocol.Standard, ApiProtocol.Anthropic)) {
             assertEquals(
                 listOf(OfficialToolIds.MINIMAX_IMAGE_GENERATION),
-                registry.specsFor("minimax", protocol, "MiniMax-M2.7")
+                support.specsFor("minimax", protocol, "MiniMax-M2.7")
                     .filter { it.toolId == OfficialToolIds.MINIMAX_IMAGE_GENERATION }
                     .map { it.toolId },
             )
@@ -109,19 +107,19 @@ class OfficialToolRegistryTest {
     fun glmSpecNarrowsByModelFamily() {
         assertEquals(
             listOf("glm_web_search"),
-            registry.specsFor("glm", ApiProtocol.Standard, "glm-4.6").map { it.toolId },
+            support.specsFor("glm", ApiProtocol.Standard, "glm-4.6").map { it.toolId },
         )
         assertEquals(
             listOf("glm_web_search"),
-            registry.specsFor("glm", ApiProtocol.Anthropic, "glm-4.7").map { it.toolId },
+            support.specsFor("glm", ApiProtocol.Anthropic, "glm-4.7").map { it.toolId },
         )
     }
 
     @Test
     fun similarModelNamesDoNotMatchGlmFamily() {
         // glmatrix、前缀分隔符之外的组合都不应误判为 GLM 家族。
-        assertTrue(registry.specsFor("glm", ApiProtocol.Standard, "glmatrix").isEmpty())
-        assertTrue(registry.specsFor("glm", ApiProtocol.Standard, "other-model").isEmpty())
+        assertTrue(support.specsFor("glm", ApiProtocol.Standard, "glmatrix").isEmpty())
+        assertTrue(support.specsFor("glm", ApiProtocol.Standard, "other-model").isEmpty())
     }
 
     @Test
@@ -129,7 +127,7 @@ class OfficialToolRegistryTest {
         // 带厂商路径前缀的模型 ID(如 Gemini 风格 models/glm-4.6)取最后一段匹配。
         assertEquals(
             listOf("glm_web_search"),
-            registry.specsFor("glm", ApiProtocol.Standard, "models/glm-4.6").map { it.toolId },
+            support.specsFor("glm", ApiProtocol.Standard, "models/glm-4.6").map { it.toolId },
         )
     }
 
@@ -137,12 +135,26 @@ class OfficialToolRegistryTest {
     fun kimiMatchesBothFamilySpellingsAndProtocols() {
         assertEquals(
             listOf("kimi_formulas"),
-            registry.specsFor("kimi", ApiProtocol.Standard, "kimi-k2.5").map { it.toolId },
+            support.specsFor("kimi", ApiProtocol.Standard, "kimi-k2.5").map { it.toolId },
         )
         assertEquals(
             listOf("kimi_formulas"),
-            registry.specsFor("kimi", ApiProtocol.Anthropic, "moonshot-v1").map { it.toolId },
+            support.specsFor("kimi", ApiProtocol.Anthropic, "moonshot-v1").map { it.toolId },
         )
-        assertFalse(registry.specsFor("kimi", ApiProtocol.Gemini, "kimi-k2.5").any { it.toolId == "kimi_formulas" })
+        assertFalse(support.specsFor("kimi", ApiProtocol.Gemini, "kimi-k2.5").any { it.toolId == "kimi_formulas" })
+    }
+
+    private fun catalogFor(serviceId: String? = null): DefaultOfficialToolFunctionCatalog {
+        val services = if (serviceId == null) emptyList() else listOf(
+            LLMModelSetting(
+                id = serviceId, name = serviceId, isEnabled = true, apiKey = "key",
+                apiBaseUrl = "https://example.com", apiProtocol = ApiProtocol.Standard,
+                anthropicBaseUrl = "https://example.com", groups = emptyList(),
+            ),
+        )
+        val source = mockk<AgentModelConfigurationSource> {
+            every { currentServices() } returns services
+        }
+        return DefaultOfficialToolFunctionCatalog(support, source, mockk<KimiFormulaSource>())
     }
 }

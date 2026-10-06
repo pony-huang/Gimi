@@ -1,6 +1,6 @@
 package github.ponyhuang.gimi.data.mobileuse;
 
-/** 当前主屏对应的副屏像素边界和密度。 */
+/** 副屏当前像素边界和密度；手动方向可独立于主屏。 */
 public final class MobileDisplayGeometry {
     public final int width;
     public final int height;
@@ -13,6 +13,14 @@ public final class MobileDisplayGeometry {
         this.width = width;
         this.height = height;
         this.densityDpi = densityDpi;
+    }
+
+    /** 保留主屏像素长度和密度，只按用户选择排列长短边。 */
+    public MobileDisplayGeometry oriented(boolean landscape) {
+        int shortSide = Math.min(width, height);
+        int longSide = Math.max(width, height);
+        return new MobileDisplayGeometry(landscape ? longSide : shortSide,
+                landscape ? shortSide : longSide, densityDpi);
     }
 
     public boolean contains(int x, int y) {

@@ -6,13 +6,17 @@ import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.components.SingletonComponent
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.gimi.core.common.coroutine.IoDispatcher
 import github.ponyhuang.gimi.data.modelcatalog.LLMModelRoomDatabase
 import github.ponyhuang.gimi.data.modelcatalog.ModelServiceRepository
+import github.ponyhuang.gimi.data.modelcatalog.official.DefaultOfficialToolFunctionCatalog
+import github.ponyhuang.gimi.data.modelcatalog.official.kimi.KimiFormulaCache
 import github.ponyhuang.gimi.data.modelcatalog.remote.OpenAiCompatibleModelServiceGateway
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
+import github.ponyhuang.gimi.domain.modelcatalog.repository.KimiFormulaSource
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelServiceRemoteGateway
 import javax.inject.Singleton
@@ -22,6 +26,14 @@ import kotlinx.coroutines.Dispatchers
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class ModelCatalogBindingsModule {
+    @Binds
+    abstract fun bindOfficialToolFunctionCatalog(
+        implementation: DefaultOfficialToolFunctionCatalog,
+    ): OfficialToolFunctionCatalog
+
+    @Binds
+    abstract fun bindKimiFormulaSource(implementation: KimiFormulaCache): KimiFormulaSource
+
     @Binds
     @Singleton
     abstract fun bindLocalModelRepository(

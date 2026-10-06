@@ -61,4 +61,24 @@
     <string name="mcp_edit_server">Edit MCP server</string>
 
     <string name="mcp_agent_mutation_blocked">An agent task is running. Please stop it before making changes.</string>
+
+    <!-- 工具详情 -->
+    <string name="mcp_more_action">More actions</string>
+    <string name="mcp_view_tools">View tools</string>
+    <string name="mcp_tools_title">Tools</string>
+    <string name="mcp_tools_count">%1$d tools</string>
+    <string name="mcp_server_missing">Server not found or removed</string>
+    <string name="mcp_tools_empty">This server provides no tools</string>
+    <string name="mcp_tool_expand">Expand details</string>
+    <string name="mcp_tool_collapse">Collapse details</string>
+    <string name="mcp_tool_description">Description</string>
+    <string name="mcp_tool_description_empty">No description provided</string>
+    <string name="mcp_tool_parameters">Parameters</string>
+    <string name="mcp_tool_parameters_empty">No parameters required</string>
+    <string name="mcp_tool_schema_unavailable">Parameter schema not provided</string>
+    <string name="mcp_tool_type_unspecified">Type not specified</string>
+    <string name="mcp_tool_required">Required</string>
+    <string name="mcp_tool_optional">Optional</string>
+    <string name="mcp_tool_default_value">Default: %1$s</string>
+    <string name="mcp_tool_enum_values">Allowed values: %1$s</string>
 </resources>

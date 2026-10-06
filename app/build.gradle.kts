@@ -8,10 +8,7 @@ android {
     namespace = "github.ponyhuang.gimi"
     defaultConfig {
         applicationId = "github.ponyhuang.gimi"
-        // CI 发布流程通过 -P 注入版本（见 .github/workflows/release.yml）；
-        // 未注入时使用本地开发默认值。
-        versionCode = providers.gradleProperty("releaseVersionCode").map(String::toInt).getOrElse(1)
-        versionName = providers.gradleProperty("releaseVersionName").getOrElse("0.6.3") // x-release-please-version
+        // App 与插件的版本由 gimi.android.application 统一读取。
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -92,6 +89,7 @@ dependencies {
     implementation(project(":domain:appearance"))
     implementation(project(":domain:mobileuse"))
     implementation(project(":domain:permissions"))
+    implementation(project(":domain:plugin"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:speech"))
     implementation(project(":domain:appupdate"))

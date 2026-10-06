@@ -4,7 +4,7 @@ package github.ponyhuang.gimi.domain.modelcatalog.model
  * 官方工具目录 ID — 厂商唯一，不跨厂商复用。
  *
  * 这些 ID 会持久化到 `ConversationToolConfiguration` 并透传到 agent 层过滤真实工具集，
- * 属于域级稳定标识：data 层注册表（OfficialToolRegistry）与 UI 展示层共用本文件，
+ * 属于域级稳定标识：官方工具支持矩阵与 Agent 工厂与 UI 展示层共用本文件，
  * 避免多处字面量各说各话。
  */
 public object OfficialToolIds {

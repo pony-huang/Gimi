@@ -35,13 +35,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -51,7 +48,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -150,9 +146,6 @@ fun ChatScaffold(
     recommendations: List<AgentRecommendation> = emptyList(),
     onRecommendationClick: (String) -> Unit = {},
     onRetryFailedTurn: () -> Unit = {},
-    onEditFailedTurn: () -> Unit = {},
-    onCancelEditFailedTurn: () -> Unit = {},
-    onRepeatExecutionResolve: (Boolean) -> Unit = {},
 ) {
 
     val listState = rememberLazyListState()
@@ -300,92 +293,84 @@ fun ChatScaffold(
                 )
             }
             Column(modifier = Modifier.background(fadeBrush)) {
-                AnimatedVisibility(visible = state.editingFailedTurn) {
-                    EditFailedTurnBanner(onCancel = onCancelEditFailedTurn)
-                }
                 key(state.sessionId) {
-                    // 以种子内容为 key：ChatComposer 的内部状态只在组合时从 messageData
-                    // 初始化，编辑失败消息的种子（文字与异步恢复的附件）每次变化都必须
-                    // 重建输入框才能生效；仅以 editingFailedTurn 为 key 会漏掉迟到种子。
-                    key(state.composerSeed) {
-                        // Agent 挂起等待答复（授权 / 输入 / 选项）时，操作面板**取代**输入
-                        // 胶囊本体 —— 两者互斥共用同一槽位，答复后胶囊恢复；期间普通发送
-                        // 本就被 ViewModel 锁定，胶囊没有可用操作。
-                        AnimatedContent(
-                            targetState = state.pendingComposerAction,
-                            contentKey = { it?.key() ?: "composer" },
-                            label = "pendingComposerAction",
-                        ) { action ->
-                            when (action) {
-                                is PendingComposerAction.Confirmation -> PendingConfirmationPanel(
-                                    request = action.request,
-                                    onConfirm = { onToolConfirmation(true) },
-                                    onReject = { onToolConfirmation(false) },
-                                    onAlwaysAllow = onToolConfirmationAlwaysAllow,
-                                )
+                    // Agent 挂起等待答复（授权 / 输入 / 选项）时，操作面板**取代**输入
+                    // 胶囊本体 —— 两者互斥共用同一槽位，答复后胶囊恢复；期间普通发送
+                    // 本就被 ViewModel 锁定，胶囊没有可用操作。
+                    AnimatedContent(
+                        targetState = state.pendingComposerAction,
+                        contentKey = { it?.key() ?: "composer" },
+                        label = "pendingComposerAction",
+                    ) { action ->
+                        when (action) {
+                            is PendingComposerAction.Confirmation -> PendingConfirmationPanel(
+                                request = action.request,
+                                onConfirm = { onToolConfirmation(true) },
+                                onReject = { onToolConfirmation(false) },
+                                onAlwaysAllow = onToolConfirmationAlwaysAllow,
+                            )
 
-                                is PendingComposerAction.Choice -> PendingChoicePanel(
-                                    request = action.request,
-                                    onRespond = { value ->
-                                        onRespondToInputRequest(action.request.callId, value)
-                                    },
-                                )
+                            is PendingComposerAction.Choice -> PendingChoicePanel(
+                                request = action.request,
+                                onRespond = { value ->
+                                    onRespondToInputRequest(action.request.callId, value)
+                                },
+                            )
 
-                                is PendingComposerAction.TextInput -> PendingInputPanel(
-                                    request = action.request,
-                                    onRespond = { value ->
-                                        onRespondToInputRequest(action.request.callId, value)
-                                    },
-                                )
+                            is PendingComposerAction.TextInput -> PendingInputPanel(
+                                request = action.request,
+                                onRespond = { value ->
+                                    onRespondToInputRequest(action.request.callId, value)
+                                },
+                            )
 
-                                null -> ChatComposer(
-                                    modifier = Modifier,
-                                    messageData = state.composerSeed,
-                                    onSendClick = { data, onResult ->
-                                        onSend(data.text, data.attachments, onResult)
+                            null -> ChatComposer(
+                                modifier = Modifier,
+                                messageData = MessageData(),
+                                onSendClick = { data, onResult ->
+                                    onSend(data.text, data.attachments, onResult)
+                                },
+                                onStopClick = onStop,
+                                isGenerating = isAgentRunning,
+                                isVoiceInputAvailable = isSpeechRecognitionAvailable,
+                                onTranscribeVoice = onTranscribeVoice,
+                                addToChatState = ChatAddToChatState(
+                                    configuration = state.toolConfiguration,
+                                    mcpServers = state.availableMcpServers,
+                                    officialTools = state.officialToolDescriptors,
+                                    isMutationBlocked = state.isAgentRunning,
+                                    fullAccess = state.fullAccess,
+                                    errorMessage = if (state.hasToolConfigurationError) {
+                                        stringResource(R.string.chat_session_tool_save_failed)
+                                    } else {
+                                        null
                                     },
-                                    onStopClick = onStop,
-                                    isGenerating = isAgentRunning,
-                                    isVoiceInputAvailable = isSpeechRecognitionAvailable,
-                                    onTranscribeVoice = onTranscribeVoice,
-                                    addToChatState = ChatAddToChatState(
-                                        configuration = state.toolConfiguration,
-                                        mcpServers = state.availableMcpServers,
-                                        officialTools = state.officialToolDescriptors,
-                                        isMutationBlocked = state.isAgentRunning,
-                                        fullAccess = state.fullAccess,
-                                        errorMessage = if (state.hasToolConfigurationError) {
-                                            stringResource(R.string.chat_session_tool_save_failed)
-                                        } else {
-                                            null
+                                ),
+                                attachmentCapabilities = attachmentCapabilities,
+                                onReasoningEffortChange = onReasoningEffortChange,
+                                onMcpServerEnabledChange = onMcpServerEnabledChange,
+                                onFullAccessChange = onFullAccessChange,
+                                onOfficialToolOpened = onOfficialToolOpened,
+                                onOfficialToolFunctionEnabledChange = onOfficialToolFunctionEnabledChange,
+                                onOfficialToolFunctionsRetry = onOfficialToolFunctionsRetry,
+                                sharedMediaUris = sharedMediaUris,
+                                onSharedMediaConsumed = onSharedMediaConsumed,
+                                retainExpanded = isModelPickerVisible,
+                                modelSelectorContent = {
+                                    ModelTitleAndPicker(
+                                        services = state.availableLLMModelSettings,
+                                        currentSelection = state.currentModelSelection,
+                                        loadState = state.modelCatalogLoadState,
+                                        isAgentRunning = isAgentRunning,
+                                        onConfigureModels = onConfigureModels,
+                                        onSelectModel = onSelectModel,
+                                        onModelSwitchBlocked = onModelSwitchBlocked,
+                                        onPickerVisibilityChange = {
+                                            isModelPickerVisible = it
                                         },
-                                    ),
-                                    attachmentCapabilities = attachmentCapabilities,
-                                    onReasoningEffortChange = onReasoningEffortChange,
-                                    onMcpServerEnabledChange = onMcpServerEnabledChange,
-                                    onFullAccessChange = onFullAccessChange,
-                                    onOfficialToolOpened = onOfficialToolOpened,
-                                    onOfficialToolFunctionEnabledChange = onOfficialToolFunctionEnabledChange,
-                                    onOfficialToolFunctionsRetry = onOfficialToolFunctionsRetry,
-                                    sharedMediaUris = sharedMediaUris,
-                                    onSharedMediaConsumed = onSharedMediaConsumed,
-                                    retainExpanded = isModelPickerVisible,
-                                    modelSelectorContent = {
-                                        ModelTitleAndPicker(
-                                            services = state.availableLLMModelSettings,
-                                            currentSelection = state.currentModelSelection,
-                                            loadState = state.modelCatalogLoadState,
-                                            isAgentRunning = isAgentRunning,
-                                            onConfigureModels = onConfigureModels,
-                                            onSelectModel = onSelectModel,
-                                            onModelSwitchBlocked = onModelSwitchBlocked,
-                                            onPickerVisibilityChange = {
-                                                isModelPickerVisible = it
-                                            },
-                                        )
-                                    },
-                                )
-                            }
+                                    )
+                                },
+                            )
                         }
                     }
                 }
@@ -544,14 +529,13 @@ fun ChatScaffold(
                         }
                     }
                     state.failedTurn?.let { failedTurn ->
-                        if (!state.isAgentRunning && !state.editingFailedTurn) {
+                        if (!state.isAgentRunning) {
                             item(
                                 key = "failed-turn-actions:${state.sessionId}",
                                 contentType = "failed_turn_actions",
                             ) {
                                 FailedTurnActions(
                                     onRetry = onRetryFailedTurn,
-                                    onEdit = onEditFailedTurn,
                                 )
                             }
                         }
@@ -567,13 +551,6 @@ fun ChatScaffold(
 
         }
 
-    }
-
-    if (state.toolReexecutionPending) {
-        RepeatExecutionDialog(
-            onConfirm = { onRepeatExecutionResolve(true) },
-            onDismiss = { onRepeatExecutionResolve(false) },
-        )
     }
 }
 
@@ -689,13 +666,11 @@ internal fun ChatHeaderActions(
 }
 
 /**
- * 失败轮次的“编辑/重试”操作行：居右的单胶囊组合，与顶栏操作簇同构；
- * 胶囊内两个入口各自独立可点，用竖分隔线隔开。
+ * 失败轮次的重试入口，使用居右的胶囊按钮。
  */
 @Composable
 private fun FailedTurnActions(
     onRetry: () -> Unit,
-    onEdit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -709,30 +684,6 @@ private fun FailedTurnActions(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Row(
-                    modifier = Modifier
-                        .testTag("failed_turn_edit")
-                        .clickable(onClick = onEdit)
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(
-                        stringResource(R.string.chat_failed_turn_edit),
-                        modifier = Modifier.padding(start = 6.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-                VerticalDivider(
-                    modifier = Modifier.height(20.dp),
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
-                )
                 Row(
                     modifier = Modifier
                         .testTag("failed_turn_retry")
@@ -756,71 +707,6 @@ private fun FailedTurnActions(
             }
         }
     }
-}
-
-/** 编辑失败消息时输入框上方悬浮的 Snackbar 式胶囊提示，带“取消”入口。 */
-@Composable
-private fun EditFailedTurnBanner(
-    onCancel: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier = modifier.fillMaxWidth()) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shadowElevation = 3.dp,
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .padding(horizontal = 16.dp),
-        ) {
-            Row(
-                modifier = Modifier.padding(start = 16.dp, end = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp),
-                )
-                Text(
-                    text = stringResource(R.string.chat_editing_failed_turn),
-                    modifier = Modifier.padding(start = 8.dp),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                TextButton(onClick = onCancel) {
-                    Text(stringResource(R.string.chat_cancel_edit))
-                }
-            }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-    }
-}
-
-/** “重新发送可能重复执行工具操作”确认对话框。 */
-@Composable
-private fun RepeatExecutionDialog(
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Default.Refresh, contentDescription = null) },
-        title = { Text(stringResource(R.string.chat_repeat_execution_title)) },
-        text = { Text(stringResource(R.string.chat_repeat_execution_body)) },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.chat_cancel_edit))
-            }
-        },
-        confirmButton = {
-            Button(onClick = onConfirm) {
-                Text(stringResource(R.string.chat_repeat_execution_confirm))
-            }
-        },
-    )
 }
 
 /**
@@ -979,28 +865,6 @@ private fun FailedTurnActionsPreview() {
     AsssistantaiTheme {
         FailedTurnActions(
             onRetry = {},
-            onEdit = {},
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun EditFailedTurnBannerPreview() {
-    AsssistantaiTheme {
-        EditFailedTurnBanner(
-            onCancel = {},
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun RepeatExecutionDialogPreview() {
-    AsssistantaiTheme {
-        RepeatExecutionDialog(
-            onConfirm = {},
-            onDismiss = {},
         )
     }
 }
@@ -1048,51 +912,6 @@ private fun ChatScaffoldFailedTurnPreview() {
                 messages = messages,
                 listItems = messages.toChatListItems(TimelineActivityState()),
                 failedTurn = previewFailedTurn(),
-            ),
-            partChannelProvider = { null },
-            onSend = { _, _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
-            onStop = {},
-            onTranscribeVoice = { "" },
-            onToggleSpeechPlayback = { _, _ -> },
-            onToggleAutoSpeak = {},
-            onOpenDocument = {},
-            onOpenLocalFile = {},
-            onShowAllLocalFiles = {},
-            onToolConfirmation = {},
-            onToolConfirmationAlwaysAllow = {},
-            onFullAccessChange = {},
-            onSelectModel = {},
-            onModelSwitchBlocked = {},
-            onOpenDrawer = {},
-            onOpenSettings = {},
-            onConfigureModels = {},
-            onNewConversation = {},
-            onReasoningEffortChange = {},
-            onMcpServerEnabledChange = { _, _ -> },
-            onOfficialToolOpened = {},
-            onOfficialToolFunctionEnabledChange = { _, _, _ -> },
-            onOfficialToolFunctionsRetry = {},
-            recommendations = previewChatRecommendations(),
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun ChatScaffoldEditingFailedTurnPreview() {
-    AsssistantaiTheme {
-        val messages = listOf(Messages.fromUser("帮我查一下今天上海的天气"))
-        ChatScaffold(
-            state = ChatUiState(
-                sessionId = "preview-session",
-                messages = messages,
-                listItems = messages.toChatListItems(TimelineActivityState()),
-                failedTurn = previewFailedTurn(),
-                failedTurnRecovery = FailedTurnRecoveryState.Editing(
-                    sessionId = "preview-session",
-                    previousDraft = MessageData(),
-                ),
-                composerSeed = MessageData(text = "帮我查一下今天上海的天气"),
             ),
             partChannelProvider = { null },
             onSend = { _, _, reply -> reply(ChatSubmissionResult.ACCEPTED) },

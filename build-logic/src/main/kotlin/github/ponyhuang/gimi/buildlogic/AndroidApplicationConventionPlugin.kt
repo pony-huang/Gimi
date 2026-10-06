@@ -11,6 +11,13 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
         pluginManager.apply("com.android.application")
         extensions.configure<ApplicationExtension> {
             configureAndroidApplication()
+            defaultConfig {
+                // 唯一版本来源；本地与 CI 打包读取相同值，重试不会改变安装版本。
+                versionName = providers.fileContents(
+                    rootProject.layout.projectDirectory.file("version.txt"),
+                ).asText.get().trim()
+                versionCode = providers.gradleProperty("releaseVersionCode").get().toInt()
+            }
         }
     }
 }

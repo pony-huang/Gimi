@@ -16,7 +16,11 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** 后台应用窗口状态；不包含 AI 占用或人工接管标记，也不保存输入内容。 */
+/**
+ * 后台应用窗口状态；不包含 AI 占用或人工接管标记，也不保存输入内容。
+ * @property rotating 旋转请求进行中，禁止重复点击和使用旧坐标输入。
+ * @property rotationUnavailable 当前会话的旋转请求失败，展示可关闭的提示。
+ */
 data class BackgroundAppUiState(
     val session: MobileDisplaySession? = null,
     val smallWindowEnabled: Boolean = false,
@@ -24,6 +28,8 @@ data class BackgroundAppUiState(
     val settingsVisible: Boolean = false,
     val inputUnavailable: Boolean = false,
     val previewUnavailable: Boolean = false,
+    val rotating: Boolean = false,
+    val rotationUnavailable: Boolean = false,
 )
 
 /** 本地窗口意图，与 Agent 的 observationId 无关。 */
@@ -38,6 +44,10 @@ sealed interface BackgroundAppAction {
     data class Touch(val sessionId: String, val event: MobileTouch) : BackgroundAppAction
     /** 返回当前目标 App。 */
     data object Back : BackgroundAppAction
+    /** 手动切换副屏横竖屏。 */
+    data object Rotate : BackgroundAppAction
+    /** 关闭旋转失败提示。 */
+    data object DismissRotationError : BackgroundAppAction
     /** 用户主动关闭后台应用。 */
     data object Close : BackgroundAppAction
     /** 预览宿主报告绑定失败或恢复。 */
@@ -85,6 +95,25 @@ class BackgroundAppViewModel @Inject constructor(private val repository: MobileU
             is BackgroundAppAction.Menu -> mutableState.update { it.copy(menuExpanded = action.expanded) }
             is BackgroundAppAction.Settings -> mutableState.update { it.copy(settingsVisible = action.visible, menuExpanded = false) }
             is BackgroundAppAction.PreviewFailure -> mutableState.update { it.copy(previewUnavailable = action.failed) }
+            BackgroundAppAction.DismissRotationError -> mutableState.update { it.copy(rotationUnavailable = false) }
+            BackgroundAppAction.Rotate -> {
+                val state = uiState.value
+                val id = state.session?.id ?: return
+                if (state.rotating) return
+                mutableState.update { it.copy(rotating = true, rotationUnavailable = false) }
+                // 尚未发送的旧坐标不能在新的分辨率上复用，服务端会取消已经按下的手势。
+                synchronized(pendingTouches) { pendingTouches.clear() }
+                viewModelScope.launch {
+                    try {
+                        val result = repository.manualRotate(id)
+                        mutableState.update {
+                            if (it.session?.id == id) it.copy(rotationUnavailable = result.status == "rotation_unavailable") else it
+                        }
+                    } finally {
+                        mutableState.update { if (it.session?.id == id) it.copy(rotating = false) else it }
+                    }
+                }
+            }
             BackgroundAppAction.DismissError -> mutableState.update { it.copy(inputUnavailable = false) }
             is BackgroundAppAction.SmallWindow -> viewModelScope.launch { repository.setSmallWindowEnabled(action.enabled) }
             BackgroundAppAction.Close -> uiState.value.session?.id?.let { id -> viewModelScope.launch { repository.closeSession(id) } }
@@ -96,6 +125,7 @@ class BackgroundAppViewModel @Inject constructor(private val repository: MobileU
                 }
             }
             is BackgroundAppAction.Touch -> {
+                if (uiState.value.rotating) return
                 synchronized(pendingTouches) {
                     val previous = pendingTouches.lastOrNull()
                     if (action.event.action == MobileTouchAction.MOVE && previous?.event?.action == MobileTouchAction.MOVE &&

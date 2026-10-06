@@ -1,7 +1,11 @@
-package github.ponyhuang.gimi.data.agent.tools.official.kimi
+package github.ponyhuang.gimi.data.modelcatalog.official.kimi
 
+import github.ponyhuang.gimi.domain.modelcatalog.model.FormulaDeclaration
+import java.util.concurrent.CancellationException
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
+import org.junit.Assert.fail
 import org.junit.Test
 
 class KimiFormulaCacheTest {
@@ -93,6 +97,28 @@ class KimiFormulaCacheTest {
             listOf("recovered"),
             cache.fetch(serviceId = "kimi", apiKey = "key").map { it.name },
         )
+        assertEquals(2, loadCount)
+    }
+
+    @Test
+    fun cancellationPropagatesAndDoesNotPopulateTheCache() = runTest {
+        var loadCount = 0
+        val cancelled = CancellationException("cancelled")
+        val cache = KimiFormulaCache(
+            loader = {
+                loadCount += 1
+                if (loadCount == 1) throw cancelled
+                listOf(declaration("recovered"))
+            },
+            nowMillis = { 0L },
+        )
+        try {
+            cache.fetch("kimi", "key")
+            fail("Cancellation must propagate")
+        } catch (actual: CancellationException) {
+            assertSame(cancelled, actual)
+        }
+        assertEquals(listOf("recovered"), cache.fetch("kimi", "key").map { it.name })
         assertEquals(2, loadCount)
     }
 

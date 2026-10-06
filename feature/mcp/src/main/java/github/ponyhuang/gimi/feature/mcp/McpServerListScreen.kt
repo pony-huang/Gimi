@@ -1,8 +1,6 @@
 package github.ponyhuang.gimi.feature.mcp
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,18 +15,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,6 +52,7 @@ fun McpServerListScreen(
     state: McpSettingsUiState,
     onAction: (McpSettingsAction) -> Unit,
     onNavigateToEditor: (String?) -> Unit,
+    onNavigateToTools: (String) -> Unit,
     onCreateServer: () -> Unit,
     onImportServers: () -> Unit,
     modifier: Modifier = Modifier,
@@ -81,22 +79,20 @@ fun McpServerListScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = 8.dp),
                 ) {
-                    // 每台服务器一张可展开卡片，展开能力详情时保持 One UI 的分组外观。
+                    // 服务器列表仅展示配置；工具信息由菜单进入独立页面。
                     items(state.servers, key = McpServer::id) { server ->
                         PreferenceGroupCard(modifier = Modifier.padding(bottom = 8.dp)) {
                             McpServerCard(
                                 server = server,
                                 mutationEnabled = !state.isMutationBlocked,
-                                expanded = state.expandedServerId == server.id,
+                                menuExpanded = state.menuServerId == server.id,
                                 capabilityState = state.capabilities[server.id],
-                                onClick = { onAction(McpSettingsAction.ServerCardClicked(server.id)) },
+                                onMenuChanged = { onAction(McpSettingsAction.ServerMenuChanged(if (it) server.id else null)) },
                                 onEditClick = { onNavigateToEditor(server.id) },
                                 onToggleEnabled = {
                                     onAction(McpSettingsAction.ToggleServer(server, it))
                                 },
-                                onRetryCapabilities = {
-                                    onAction(McpSettingsAction.RefreshCapabilities(server.id))
-                                },
+                                onViewTools = { onNavigateToTools(server.id) },
                             )
                         }
                     }
@@ -164,12 +160,12 @@ private fun McpEmptyState(
 private fun McpServerCard(
     server: McpServer,
     mutationEnabled: Boolean,
-    expanded: Boolean,
+    menuExpanded: Boolean,
     capabilityState: ServerCapabilityState?,
-    onClick: () -> Unit,
+    onMenuChanged: (Boolean) -> Unit,
     onEditClick: () -> Unit,
     onToggleEnabled: (Boolean) -> Unit,
-    onRetryCapabilities: () -> Unit,
+    onViewTools: () -> Unit,
 ) {
     val probeResult = (capabilityState as? ServerCapabilityState.Loaded)?.result
     // 探测成功后以服务端声明的名称/版本为准；本地配置只在服务端未提供时兜底。
@@ -179,7 +175,6 @@ private fun McpServerCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         McpListRow(
@@ -187,13 +182,17 @@ private fun McpServerCard(
             title = displayName,
             description = displayDescription,
         ) {
-            // 卡片点击改为展开/折叠，编辑入口挪到独立图标保持可发现性。
-            IconButton(onClick = onEditClick) {
-                Icon(
-                    Icons.Default.Edit,
-                    contentDescription = stringResource(R.string.mcp_edit_action),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            Box {
+                IconButton(onClick = { onMenuChanged(true) }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.mcp_more_action),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { onMenuChanged(false) }) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.mcp_edit_action)) },
+                        onClick = { onMenuChanged(false); onEditClick() })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.mcp_view_tools)) },
+                        onClick = { onMenuChanged(false); onViewTools() })
+                }
             }
             Switch(
                 checked = server.isEnabled,
@@ -201,12 +200,7 @@ private fun McpServerCard(
                 enabled = mutationEnabled,
             )
         }
-        AnimatedVisibility(visible = expanded) {
-            McpServerCapabilities(
-                capabilityState = capabilityState,
-                onRetry = onRetryCapabilities,
-            )
-        }
+
     }
 }
 
@@ -260,93 +254,6 @@ private fun McpListRow(
     }
 }
 
-/** 展开区域：展示该 MCP 服务器声明的工具 / 资源 / 提示词。 */
-@Composable
-private fun McpServerCapabilities(
-    capabilityState: ServerCapabilityState?,
-    onRetry: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        when (capabilityState) {
-            null, ServerCapabilityState.Loading -> Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
-                )
-                Text(
-                    stringResource(R.string.mcp_connection_testing),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            is ServerCapabilityState.Failed -> Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    localizeMcpError(capabilityState.message),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(onClick = onRetry) {
-                    Text(stringResource(R.string.mcp_capabilities_retry))
-                }
-            }
-            is ServerCapabilityState.Loaded -> {
-                val result = capabilityState.result
-                result.tools.forEach { tool ->
-                    McpListRow(
-                        icon = Icons.Default.Build,
-                        title = tool.name,
-                        description = tool.description.takeIf(String::isNotBlank),
-                    )
-                }
-                if (result.resources.isNotEmpty()) {
-                    CapabilitySection(
-                        title = stringResource(R.string.mcp_capabilities_resources, result.resources.size),
-                        entries = result.resources,
-                    )
-                }
-                if (result.prompts.isNotEmpty()) {
-                    CapabilitySection(
-                        title = stringResource(R.string.mcp_capabilities_prompts, result.prompts.size),
-                        entries = result.prompts,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CapabilitySection(
-    title: String,
-    entries: List<String>,
-) {
-    Text(
-        title,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    entries.forEach { entry ->
-        Text(
-            entry,
-            style = MaterialTheme.typography.bodySmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
 @Preview(showBackground = true)
 @Composable
 private fun McpServerListScreenEmptyPreview() {
@@ -355,6 +262,7 @@ private fun McpServerListScreenEmptyPreview() {
             state = McpSettingsUiState(),
             onAction = {},
             onNavigateToEditor = {},
+            onNavigateToTools = {},
             onCreateServer = {},
             onImportServers = {},
         )
@@ -375,7 +283,7 @@ private fun McpServerListScreenWithServersPreview() {
         McpServerListScreen(
             state = McpSettingsUiState(
                 servers = listOf(server),
-                expandedServerId = server.id,
+                menuServerId = server.id,
                 capabilities = mapOf(
                     server.id to ServerCapabilityState.Loaded(
                         result = McpProbeResult(
@@ -390,6 +298,7 @@ private fun McpServerListScreenWithServersPreview() {
             ),
             onAction = {},
             onNavigateToEditor = {},
+            onNavigateToTools = {},
             onCreateServer = {},
             onImportServers = {},
         )

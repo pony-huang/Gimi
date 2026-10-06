@@ -4,7 +4,7 @@ import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.models.LlmResponse
 import com.google.adk.kt.models.Model
 import github.ponyhuang.gimi.data.agent.model.LocalInferenceModelFactory
-import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolRegistry
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.gimi.domain.modelcatalog.model.*
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import io.mockk.*
@@ -17,7 +17,7 @@ import org.junit.Test
 class LocalModelRoutingTest {
     @Test fun localConfigurationUsesNativeModelWithoutProviderDeclarations() = runBlocking {
         val source = mockk<AgentModelConfigurationSource>()
-        val registry = mockk<OfficialToolRegistry>()
+        val registry = mockk<OfficialToolFunctionCatalog>()
         val native = mockk<LocalInferenceModelFactory>()
         val file = LocalModelRuntimeConfig("/private/gemma.litertlm", LocalModelBackend.GPU)
         val selection = ModelSelection(LOCAL_GEMMA_SERVICE_ID, LOCAL_GEMMA_GROUP_ID, "gpu")

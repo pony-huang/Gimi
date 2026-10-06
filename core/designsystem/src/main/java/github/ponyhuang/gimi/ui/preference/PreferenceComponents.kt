@@ -23,6 +23,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -227,24 +228,42 @@ fun PreferenceListItem(
     }
 }
 
+/**
+ * 带开关的设置行。开关值由调用方持有，整行点击可独立配置，避免与导航型行混淆。
+ * [switchEnabled] 只控制开关；行点击的可用性由 [onClick] 决定。
+ */
 @Composable
-fun PreferenceNavigationCard(
+fun PreferenceSwitchItem(
     icon: ImageVector,
     title: String,
-    subtitle: String,
-    onClick: () -> Unit,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    subtitle: String? = null,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    switchEnabled: Boolean = true,
     iconContainer: Color = MaterialTheme.colorScheme.primary,
+    iconTint: Color = Color.White,
+    iconSize: Dp = 20.dp,
     showDivider: Boolean = false,
 ) {
     PreferenceListItem(
         icon = icon,
         title = title,
         subtitle = subtitle,
-        onClick = onClick,
         modifier = modifier,
+        onClick = onClick,
         iconContainer = iconContainer,
+        iconTint = iconTint,
+        iconSize = iconSize,
         showDivider = showDivider,
+        trailingContent = {
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                enabled = switchEnabled,
+            )
+        },
     )
 }
 
@@ -380,14 +399,24 @@ private fun PreferenceListItemWithTrailingPreview() {
 
 @Preview(showBackground = true)
 @Composable
-private fun PreferenceNavigationCardPreview() {
+private fun PreferenceSwitchItemPreview() {
     AsssistantaiTheme {
-        PreferenceNavigationCard(
-            icon = Icons.Default.Info,
-            title = "导航入口",
-            subtitle = "进入子页面",
-            onClick = {},
-        )
+        PreferenceGroupCard {
+            PreferenceSwitchItem(
+                icon = Icons.Default.Info,
+                title = "开关设置项",
+                checked = true,
+                onCheckedChange = {},
+                showDivider = true,
+            )
+            PreferenceSwitchItem(
+                icon = Icons.Default.Info,
+                title = "禁用的开关设置项",
+                checked = false,
+                switchEnabled = false,
+                onCheckedChange = {},
+            )
+        }
     }
 }
 

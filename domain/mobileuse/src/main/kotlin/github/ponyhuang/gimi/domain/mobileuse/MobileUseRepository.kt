@@ -87,9 +87,12 @@ interface MobileUseRepository {
     suspend fun swipe(owner: String, observationId: String, x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Int): MobileUseResult
     suspend fun back(owner: String, observationId: String): MobileUseResult
     suspend fun typeText(owner: String, observationId: String, x: Int, y: Int, text: String): MobileUseResult
+    /** 释放当前执行并发布完成标记，窗口随之隐藏，后台应用会话保留。 */
     suspend fun finishExecution(owner: String): MobileUseResult
     suspend fun closeSession(sessionId: String): MobileUseResult
     suspend fun manualTouch(sessionId: String, touch: MobileTouch): MobileUseResult
     suspend fun manualBack(sessionId: String): MobileUseResult
+    /** 切换当前会话横竖屏，保持显示身份；返回实际画面尺寸。 */
+    suspend fun manualRotate(sessionId: String): MobileUseResult
     fun textInputAvailable(): Boolean
 }

@@ -111,13 +111,11 @@ class DefaultOfficialToolsetTest {
 
     @Test
     fun skipsCrossModelToolsWhenTheirServiceDisablesOfficialTools() = runTest {
-        val registry = OfficialToolRegistry(
-            kimiFormulaCache = testKimiFormulaCache(),
-            httpClient = testHttpClient(),
-            modelServices = allServices(officialToolsEnabled = false),
-        )
+        val modelServices = allServices(officialToolsEnabled = false)
+        val catalog = testCatalog(modelServices)
+        val factory = OfficialToolFactory(testKimiFormulaCache(), testHttpClient(), modelServices)
 
-        val tools = DefaultOfficialToolset(registry, FakeToolAccessRepository()).resolveTools(
+        val tools = DefaultOfficialToolset(catalog, factory, FakeToolAccessRepository()).resolveTools(
             config(serviceId = "openai", baseType = ApiProtocol.Standard),
             selection = null,
         )
@@ -248,14 +246,12 @@ class DefaultOfficialToolsetTest {
 
     @Test
     fun glmToolsEmptyWithoutCredentials() = runTest {
-        val registry = OfficialToolRegistry(
-            kimiFormulaCache = testKimiFormulaCache(),
-            httpClient = testHttpClient(),
-            modelServices = emptyServices(),
-        )
+        val modelServices = emptyServices()
+        val catalog = testCatalog(modelServices)
+        val factory = OfficialToolFactory(testKimiFormulaCache(), testHttpClient(), modelServices)
 
         assertTrue(
-            DefaultOfficialToolset(registry, FakeToolAccessRepository())
+            DefaultOfficialToolset(catalog, factory, FakeToolAccessRepository())
                 .resolveTools(config(serviceId = "glm", modelId = "glm-4.6"), selection = null)
                 .isEmpty(),
         )
@@ -357,21 +353,36 @@ class DefaultOfficialToolsetTest {
         assertEquals(listOf("web_search"), tools.map { it.name })
     }
 
-    // ---------------------------------------------------------------- 目录
+    @Test
+    fun catalogAndAgentReuseTheSameCredentialScopedManifest() = runTest {
+        val requests = java.util.concurrent.atomic.AtomicInteger()
+        val client = cannedClient(200, MANIFEST_BODY) { requests.incrementAndGet() }
+        val services = allServices("key")
+        val formulas = testKimiFormulaCache(client)
+        val catalog = testCatalog(services, client, formulas)
+        val factory = OfficialToolFactory(formulas, client, services)
+        val functions = catalog.listFunctions("kimi_formulas")
+        val requestsAfterCatalog = requests.get()
+        val tools = DefaultOfficialToolset(catalog, factory, FakeToolAccessRepository())
+            .resolveTools(config(serviceId = "kimi", modelId = "kimi-k2.5"), selection = null)
+        assertEquals(listOf("translate"), functions.map { it.id })
+        val translated = tools.single { it.name == "translate" }.declaration()
+        assertEquals(listOf("text"), translated?.parameters?.required)
+        assertEquals("Input text", translated?.parameters?.properties?.get("text")?.description)
+        assertTrue(requestsAfterCatalog > 0)
+        assertEquals(requestsAfterCatalog, requests.get())
+    }
 
     @Test
-    fun catalogListsStaticFunctions() = runTest {
-        val registry = registry()
-
-        assertEquals(
-            listOf("openai_web_search"),
-            registry.listFunctions("openai_web_search").map { it.id },
-        )
-        assertEquals(
-            listOf(GlmWebSearchTool.NAME, GlmReaderTool.NAME),
-            registry.listFunctions("glm_web_search").map { it.id },
-        )
-        assertTrue(registry.listFunctions("unknown_tool").isEmpty())
+    fun everyDirectoryBindingHasAnAgentFactory() = runTest {
+        val client = manifestClient(200, MANIFEST_BODY)
+        val services = allServices("key")
+        val formulas = testKimiFormulaCache(client)
+        val catalog = testCatalog(services, client, formulas)
+        val factory = OfficialToolFactory(formulas, client, services)
+        for (spec in catalog.all) {
+            assertTrue("Missing factory for ${spec.toolId}", factory.createTools(spec).isNotEmpty())
+        }
     }
 
     // ---------------------------------------------------------------- 夹具
@@ -380,19 +391,15 @@ class DefaultOfficialToolsetTest {
         httpClient: OkHttpClient = testHttpClient(),
         credential: String = "key",
         toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
-    ): DefaultOfficialToolset = DefaultOfficialToolset(
-        registry(httpClient, credential),
-        FakeToolAccessRepository(toolAccessMode),
-    )
-
-    private fun registry(
-        httpClient: OkHttpClient = testHttpClient(),
-        credential: String = "key",
-    ): OfficialToolRegistry = OfficialToolRegistry(
-        kimiFormulaCache = testKimiFormulaCache(httpClient),
-        httpClient = httpClient,
-        modelServices = allServices(credential),
-    )
+    ): DefaultOfficialToolset {
+        val services = allServices(credential)
+        val kimiFormulas = testKimiFormulaCache(httpClient)
+        return DefaultOfficialToolset(
+            testCatalog(services, httpClient, kimiFormulas),
+            OfficialToolFactory(kimiFormulas, httpClient, services),
+            FakeToolAccessRepository(toolAccessMode),
+        )
+    }
 
     /** 同时提供 glm/kimi 等服务的凭据,便于各厂商用例共用一个注册表。 */
     private fun allServices(credential: String): AgentModelConfigurationSource {
@@ -446,6 +453,6 @@ class DefaultOfficialToolsetTest {
 
     private companion object {
         const val MANIFEST_BODY =
-            """{"tools":[{"function":{"name":"translate","description":"Translate text"}}]}"""
+            """{"tools":[{"function":{"name":"translate","description":"Translate text","parameters":{"properties":{"text":{"description":"Input text"}},"required":["text"]}}}]}"""
     }
 }

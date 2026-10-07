@@ -16,24 +16,25 @@ data class LocalModelVariant(
     val name: String,
     val backend: LocalModelBackend,
     val bytes: Long,
+    /** 此版本的模型说明和许可页面。 */
+    val modelPageUrl: String = "",
 )
 
-/** 单个模型文件及其启用状态，progress 为 0 到 1 的下载进度。 */
+/** 单个已校验模型文件的下载状态，progress 为 0 到 1 的下载进度。 */
 data class LocalModelState(
     val variant: LocalModelVariant,
     val status: LocalModelDownloadStatus = LocalModelDownloadStatus.NotDownloaded,
-    val enabled: Boolean = false,
     val progress: Float = 0f,
     val failure: LocalModelFailure? = null,
 )
 
-/** 本地目录快照；loading 表示尚未完成磁盘文件与启用配置恢复。 */
+/** 本地目录快照；loading 表示尚未完成磁盘文件校验恢复。 */
 data class LocalModelCatalogState(
     val loading: Boolean = true,
     val models: List<LocalModelState> = emptyList(),
 )
 
-/** 已校验并启用的文件运行参数，由 data 提供路径，运行器选择相应 SDK 后端。 */
+/** 已校验文件运行参数，由 data 提供路径，运行器选择相应 SDK 后端。 */
 data class LocalModelRuntimeConfig(
     val modelPath: String,
     val backend: LocalModelBackend,
@@ -42,11 +43,11 @@ data class LocalModelRuntimeConfig(
 const val LOCAL_GEMMA_SERVICE_ID = "local-gemma4"
 const val LOCAL_GEMMA_GROUP_ID = "gemma4"
 
-/** 已下载且启用的版本形成独立本地服务，不伪造 API Key 或远端端点。 */
-fun LocalModelCatalogState.enabledService(): LLMModelSetting = LLMModelSetting(
+/** 已下载且校验通过的版本自动形成独立本地服务，不伪造 API Key 或远端端点。 */
+fun LocalModelCatalogState.downloadedService(): LLMModelSetting = LLMModelSetting(
     id = LOCAL_GEMMA_SERVICE_ID,
     name = "Gemma 4",
-    isEnabled = models.any { it.enabled && it.status == LocalModelDownloadStatus.Ready },
+    isEnabled = models.any { it.status == LocalModelDownloadStatus.Ready },
     isOfficialToolsEnabled = false,
     apiKey = "",
     apiBaseUrl = "",
@@ -57,7 +58,7 @@ fun LocalModelCatalogState.enabledService(): LLMModelSetting = LLMModelSetting(
     groups = listOf(ModelGroup(
         id = LOCAL_GEMMA_GROUP_ID,
         name = "Gemma 4",
-        models = models.filter { it.enabled && it.status == LocalModelDownloadStatus.Ready }
+        models = models.filter { it.status == LocalModelDownloadStatus.Ready }
             .map { Model(id = it.variant.id, name = it.variant.name,
                 capabilities = MultimodalCapabilities(vision = null, audioInput = null, documentInput = null)) },
     )),

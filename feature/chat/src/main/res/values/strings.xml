@@ -208,4 +208,10 @@
     <string name="chat_drawer_cancel">取消</string>
     <string name="chat_drawer_current_session_time">%1$s · 当前会话</string>
     <string name="chat_notice_delete_failed">有会话未能删除，请重试。</string>
+    <string name="chat_local_model_loading">正在加载本地模型…</string>
+    <string name="chat_local_model_loading_hint">加载完成后即可输入消息，首次加载可能需要更长时间。</string>
+    <string name="chat_local_model_load_failed">本地模型加载失败</string>
+    <string name="chat_local_model_load_failed_hint">请重试，或切换到其他模型。</string>
+    <string name="chat_local_model_retry">重新加载</string>
+    <string name="chat_local_model_wait">等待模型加载完成</string>
 </resources>

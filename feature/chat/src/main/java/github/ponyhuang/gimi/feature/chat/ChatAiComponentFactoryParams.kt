@@ -52,6 +52,10 @@ public data class ComposerInputContentParams(
     val onAttachmentsClick: () -> Unit = { },
     val modelSelectorContent: @Composable () -> Unit = { },
     val configurationReady: Boolean = true,
+    /** 本地引擎未就绪时关闭文本、附件、语音和发送入口。 */
+    val inputEnabled: Boolean = true,
+    /** 加载期间的占位文案；null 使用默认输入提示。 */
+    val inputPlaceholder: String? = null,
 )
 
 /** Immutable presentation state for the composer's voice-input session. */

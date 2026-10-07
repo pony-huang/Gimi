@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.chat
 
+import github.ponyhuang.gimi.domain.modelcatalog.repository.LocalModelLoadPhase
 import android.annotation.SuppressLint
 import android.net.Uri
 import androidx.compose.animation.AnimatedContent
@@ -146,6 +147,7 @@ fun ChatScaffold(
     recommendations: List<AgentRecommendation> = emptyList(),
     onRecommendationClick: (String) -> Unit = {},
     onRetryFailedTurn: () -> Unit = {},
+    onRetryLocalModelLoad: () -> Unit = {},
 ) {
 
     val listState = rememberLazyListState()
@@ -293,6 +295,13 @@ fun ChatScaffold(
                 )
             }
             Column(modifier = Modifier.background(fadeBrush)) {
+                if (state.isLocalModelInputBlocked) {
+                    LocalModelLoadPanel(
+                        failed = state.localModelLoadState.modelId == state.selectedLocalModelId &&
+                            state.localModelLoadState.phase == LocalModelLoadPhase.Failed,
+                        onRetry = onRetryLocalModelLoad,
+                    )
+                }
                 key(state.sessionId) {
                     // Agent 挂起等待答复（授权 / 输入 / 选项）时，操作面板**取代**输入
                     // 胶囊本体 —— 两者互斥共用同一槽位，答复后胶囊恢复；期间普通发送
@@ -332,6 +341,8 @@ fun ChatScaffold(
                                 },
                                 onStopClick = onStop,
                                 isGenerating = isAgentRunning,
+                                inputEnabled = !state.isLocalModelInputBlocked,
+                                inputPlaceholder = if (state.isLocalModelInputBlocked) stringResource(R.string.chat_local_model_wait) else null,
                                 isVoiceInputAvailable = isSpeechRecognitionAvailable,
                                 onTranscribeVoice = onTranscribeVoice,
                                 addToChatState = ChatAddToChatState(

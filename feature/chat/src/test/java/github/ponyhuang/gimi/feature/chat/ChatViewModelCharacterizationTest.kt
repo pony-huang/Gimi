@@ -46,6 +46,9 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolAvailability
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
+import github.ponyhuang.gimi.domain.modelcatalog.repository.LocalModelRuntime
+import github.ponyhuang.gimi.domain.modelcatalog.repository.LocalModelLoadState
+import github.ponyhuang.gimi.domain.modelcatalog.repository.LocalModelLoadPhase
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
@@ -109,6 +112,40 @@ class ChatViewModelCharacterizationTest {
     @After
     fun tearDown() {
         unmockkStatic(Log::class)
+    }
+
+    @Test
+    fun localMessagesAreRejectedUntilTheSelectedEngineIsReady() = runTest {
+        val loadState = MutableStateFlow(LocalModelLoadState("model", LocalModelLoadPhase.Loading))
+        val local = mockk<LocalModelRuntime>(relaxed = true) { every { state } returns loadState }
+        val fixture = fixture(configured = true, localService = true, localRuntime = local)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        var result: ChatSubmissionResult? = null
+        fixture.viewModel.send("hello", emptyList()) { result = it }
+        advanceUntilIdle()
+        assertEquals(ChatSubmissionResult.REJECTED, result)
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
+        loadState.value = LocalModelLoadState("model", LocalModelLoadPhase.Ready)
+        advanceUntilIdle()
+        fixture.viewModel.send("hello", emptyList()) { result = it }
+        advanceUntilIdle()
+        assertEquals(ChatSubmissionResult.ACCEPTED, result)
+        coVerify(exactly = 1) { fixture.agent.createExecution(any(), any(), any()) }
+    }
+
+    @Test
+    fun readyStateForAnotherLocalModelCannotAcceptMessage() = runTest {
+        val loadState = MutableStateFlow(LocalModelLoadState("previous-model", LocalModelLoadPhase.Ready))
+        val local = mockk<LocalModelRuntime>(relaxed = true) { every { state } returns loadState }
+        val fixture = fixture(configured = true, localService = true, localRuntime = local)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        var result: ChatSubmissionResult? = null
+        fixture.viewModel.send("hello", emptyList()) { result = it }
+        advanceUntilIdle()
+        assertEquals(ChatSubmissionResult.REJECTED, result)
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
     }
 
     @Test
@@ -1880,9 +1917,11 @@ class ChatViewModelCharacterizationTest {
         contentRevisions: MutableStateFlow<Map<String, Long>> = MutableStateFlow(emptyMap()),
         attachmentReadFailure: Exception? = null,
         sessionResolverOverride: ConversationSessionResolver? = null,
+        localService: Boolean = false,
+        localRuntime: LocalModelRuntime? = null,
     ): Fixture {
         val selection = ModelSelection("service", "chat", "model")
-        val services = if (configured) listOf(service()) else emptyList()
+        val services = if (configured) listOf(service().copy(isLocal = localService)) else emptyList()
         val catalog = mockk<ModelCatalogRepository>(relaxed = true) {
             every { observeServices() } returns MutableStateFlow(services)
             every { observeLoadState() } returns MutableStateFlow(CatalogLoadState.Ready)
@@ -2032,6 +2071,9 @@ class ChatViewModelCharacterizationTest {
                 },
                 appNotificationManager = appNotificationManager,
                 appUpdateRepository = appUpdateRepository,
+                localModelRuntime = localRuntime ?: mockk<LocalModelRuntime>(relaxed = true) {
+                    every { state } returns MutableStateFlow(LocalModelLoadState())
+                },
             ),
             conversations = conversations,
             sessionResolver = sessionResolver,

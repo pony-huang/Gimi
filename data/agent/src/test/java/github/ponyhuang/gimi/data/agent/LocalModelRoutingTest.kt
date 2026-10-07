@@ -23,8 +23,8 @@ class LocalModelRoutingTest {
         val selection = ModelSelection(LOCAL_GEMMA_SERVICE_ID, LOCAL_GEMMA_GROUP_ID, "gpu")
         every { source.resolveChatModel(selection) } returns ResolvedAgentModel(selection.serviceId, ApiProtocol.Standard, "gpu", "", "", file)
         every { source.currentServices() } returns listOf(LocalModelCatalogState(false, listOf(
-            LocalModelState(LocalModelVariant("gpu", "gemma4", "GPU", LocalModelBackend.GPU, 10), LocalModelDownloadStatus.Ready, true),
-        )).enabledService())
+            LocalModelState(LocalModelVariant("gpu", "gemma4", "GPU", LocalModelBackend.GPU, 10), LocalModelDownloadStatus.Ready),
+        )).downloadedService())
         val response = LlmResponse()
         val delegate = mockk<Model> {
             every { name } returns "gpu"

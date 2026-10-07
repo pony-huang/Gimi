@@ -1,7 +1,6 @@
 package github.ponyhuang.gimi.data.modelcatalog.local
 
 import android.content.Context
-import android.content.SharedPreferences
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.domain.modelcatalog.model.*
 import github.ponyhuang.gimi.domain.modelcatalog.repository.LocalModelRepository
@@ -22,14 +21,12 @@ import okhttp3.OkHttpClient
 @Singleton
 class DownloadedLocalModelRepository internal constructor(
     private val directory: File,
-    private val preferences: SharedPreferences,
     private val specs: List<LocalModelDownloadSpec>,
     private val downloader: LocalModelFileDownloader,
 ) : LocalModelRepository {
     @Inject
     constructor(@ApplicationContext context: Context) : this(
         File(context.noBackupFilesDir, "local-models"),
-        context.getSharedPreferences("local_models", Context.MODE_PRIVATE),
         Gemma4Catalog.specs,
         LocalModelFileDownloader(OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).build()),
@@ -45,7 +42,6 @@ class DownloadedLocalModelRepository internal constructor(
     init {
         scope.launch {
             directory.mkdirs()
-            val enabled = preferences.getStringSet("enabled", emptySet()).orEmpty().toSet()
             val restored = specs.map { spec ->
                 File(directory, spec.variant.id + ".litertlm.part").delete()
                 val valid = isVerified(spec)
@@ -56,14 +52,9 @@ class DownloadedLocalModelRepository internal constructor(
                 }
                 LocalModelState(spec.variant,
                     status = if (valid) LocalModelDownloadStatus.Ready else LocalModelDownloadStatus.NotDownloaded,
-                    enabled = valid && spec.variant.id in enabled,
                 )
             }
-            val retained = restored.filter { it.enabled }.mapTo(mutableSetOf()) { it.variant.id }
-            // 清除失效文件的持久化勾选，重新下载后仍须用户明确启用。
-            val persisted = retained == enabled || preferences.edit().putStringSet("enabled", retained).commit()
-            mutableState.value = LocalModelCatalogState(loading = false,
-                models = if (persisted) restored else restored.map { it.copy(enabled = false) })
+            mutableState.value = LocalModelCatalogState(loading = false, models = restored)
             ready.complete(Unit)
         }
     }
@@ -75,7 +66,7 @@ class DownloadedLocalModelRepository internal constructor(
         mutationMutex.withLock {
             val spec = spec(modelId)
             if (jobs[modelId]?.isActive == true || model(modelId).status == LocalModelDownloadStatus.Ready) return
-            update(modelId) { it.copy(status = LocalModelDownloadStatus.Downloading, progress = 0f, failure = null, enabled = false) }
+            update(modelId) { it.copy(status = LocalModelDownloadStatus.Downloading, progress = 0f, failure = null) }
             jobs[modelId] = scope.launch {
                 try {
                     downloader.download(spec, file(modelId),
@@ -115,18 +106,6 @@ class DownloadedLocalModelRepository internal constructor(
         }
     }
 
-    override suspend fun setEnabled(modelId: String, enabled: Boolean) = withContext(Dispatchers.IO) {
-        awaitReady()
-        mutationMutex.withLock {
-            val spec = spec(modelId)
-            check(!enabled || (model(modelId).status == LocalModelDownloadStatus.Ready && isVerified(spec)))
-            val next = state.value.models.filter { it.enabled && it.variant.id != modelId }.mapTo(mutableSetOf()) { it.variant.id }
-            if (enabled) next.add(modelId)
-            check(preferences.edit().putStringSet("enabled", next).commit())
-            update(modelId) { it.copy(enabled = enabled) }
-        }
-    }
-
     override suspend fun remove(modelId: String) = withContext(Dispatchers.IO) {
         awaitReady()
         mutationMutex.withLock {
@@ -140,15 +119,13 @@ class DownloadedLocalModelRepository internal constructor(
             val target = file(modelId)
             if (target.exists() && !target.delete()) throw IOException("Unable to remove local model")
             marker(modelId).delete()
-            val next = state.value.models.filter { it.enabled && it.variant.id != modelId }.mapTo(mutableSetOf()) { it.variant.id }
             update(modelId) { LocalModelState(it.variant) }
-            check(preferences.edit().putStringSet("enabled", next).commit())
         }
     }
 
     override fun resolve(modelId: String): LocalModelRuntimeConfig? {
         val value = state.value.models.firstOrNull { it.variant.id == modelId } ?: return null
-        if (!value.enabled || value.status != LocalModelDownloadStatus.Ready || !isVerified(spec(modelId))) return null
+        if (value.status != LocalModelDownloadStatus.Ready || !isVerified(spec(modelId))) return null
         return LocalModelRuntimeConfig(file(modelId).absolutePath, value.variant.backend)
     }
 

@@ -102,6 +102,8 @@ public fun ChatComposer(
     isGenerating: Boolean,
     modifier: Modifier = Modifier,
     messageData: MessageData = MessageData(),
+    inputEnabled: Boolean = true,
+    inputPlaceholder: String? = null,
     onVoiceInputStart: () -> Unit = { },
     onVoiceInputStop: () -> Unit = { },
     onVoiceAudioChunk: (ByteArray) -> Unit = { },
@@ -146,7 +148,7 @@ public fun ChatComposer(
     val attachmentUnsupportedMessage = stringResource(R.string.chat_attachment_unsupported)
 
     fun acceptSelection(uris: List<Uri>) {
-        if (uris.isEmpty() || isSubmitting) return
+        if (uris.isEmpty() || !inputEnabled || isSubmitting) return
         val imported = mutableListOf<DraftAttachment>()
         val result = runCatching {
             uris.forEach { uri ->
@@ -189,7 +191,7 @@ public fun ChatComposer(
         if (
             voiceInputState != VoiceInputUiState.Idle ||
             !isVoiceInputAvailable ||
-            isGenerating || isSubmitting
+            !inputEnabled || isGenerating || isSubmitting
         ) {
             return
         }
@@ -296,15 +298,19 @@ public fun ChatComposer(
         }
     }
 
-    LaunchedEffect(sharedMediaUris, isSubmitting) {
-        if (sharedMediaUris.isNotEmpty() && !isSubmitting) {
+    LaunchedEffect(sharedMediaUris, isSubmitting, inputEnabled) {
+        if (sharedMediaUris.isNotEmpty() && inputEnabled && !isSubmitting) {
             acceptSelection(sharedMediaUris)
             onSharedMediaConsumed()
         }
     }
 
+    LaunchedEffect(inputEnabled) {
+        if (!inputEnabled) cancelVoiceInput()
+    }
+
     val handleSendClick: () -> Unit = {
-        if (!isSubmitting) {
+        if (inputEnabled && !isSubmitting) {
             keyboardController?.hide()
             val submitted = messageData
             isSubmitting = true
@@ -411,6 +417,8 @@ public fun ChatComposer(
                         ComposerInputContent(
                             ComposerInputContentParams(
                                 messageData = messageData,
+                                inputEnabled = inputEnabled,
+                                inputPlaceholder = inputPlaceholder,
                                 isGenerating = isGenerating || isSubmitting,
                                 configurationReady = addToChatState.configuration != null,
                                 voiceInputState = voiceInputState,
@@ -430,7 +438,7 @@ public fun ChatComposer(
                                 onVoiceInputStart = ::startVoiceInput,
                                 retainExpanded = retainExpanded,
                                 onExpandedChange = onExpandedChange,
-                                onAttachmentsClick = { if (!isSubmitting) showAttachmentOptions = true },
+                                onAttachmentsClick = { if (inputEnabled && !isSubmitting) showAttachmentOptions = true },
                                 modelSelectorContent = modelSelectorContent,
                             ),
                         )

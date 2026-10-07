@@ -5,8 +5,8 @@ import org.junit.Test
 
 class LocalModelsTest {
     @Test
-    fun multipleEnabledVersionsAreAvailableWithoutApiKey() {
-        val service = LocalModelCatalogState(false, listOf(ready("cpu"), ready("gpu"))).enabledService()
+    fun downloadedVersionsAreAutomaticallyAvailableWithoutApiKey() {
+        val service = LocalModelCatalogState(false, listOf(ready("cpu"), ready("gpu"))).downloadedService()
         assertTrue(service.isConfiguredForChat)
         assertEquals("", service.apiKey)
         assertFalse(service.isOfficialToolsEnabled)
@@ -15,20 +15,18 @@ class LocalModelsTest {
     }
 
     @Test
-    fun disabledIncompleteAndFailedFilesCannotBeSelected() {
-        val available = ready("cpu")
+    fun incompleteAndFailedFilesCannotBeSelected() {
         val service = LocalModelCatalogState(false, listOf(
-            available.copy(enabled = false),
             ready("partial").copy(status = LocalModelDownloadStatus.Downloading),
             ready("bad").copy(status = LocalModelDownloadStatus.Failed),
-        )).enabledService()
+        )).downloadedService()
         assertFalse(service.isConfiguredForChat)
         assertTrue(service.groups.single().models.isEmpty())
     }
 
     @Test
     fun remoteServicesStillRequireKeyAndEnabledState() {
-        val local = LocalModelCatalogState(false, listOf(ready("cpu"))).enabledService()
+        val local = LocalModelCatalogState(false, listOf(ready("cpu"))).downloadedService()
         assertFalse(local.copy(isLocal = false).isConfiguredForChat)
         assertTrue(local.copy(isLocal = false, apiKey = "key").isConfiguredForChat)
         assertFalse(local.copy(isEnabled = false).isConfiguredForChat)
@@ -37,6 +35,5 @@ class LocalModelsTest {
     private fun ready(id: String) = LocalModelState(
         LocalModelVariant(id, "gemma4", id, LocalModelBackend.CPU, 16),
         LocalModelDownloadStatus.Ready,
-        enabled = true,
     )
 }

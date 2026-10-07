@@ -17,7 +17,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedAgentModel
 import github.ponyhuang.gimi.domain.modelcatalog.model.LOCAL_GEMMA_SERVICE_ID
 import github.ponyhuang.gimi.domain.modelcatalog.model.LOCAL_GEMMA_GROUP_ID
-import github.ponyhuang.gimi.domain.modelcatalog.model.enabledService
+import github.ponyhuang.gimi.domain.modelcatalog.model.downloadedService
 import github.ponyhuang.gimi.domain.modelcatalog.repository.LocalModelRepository
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
@@ -117,7 +117,7 @@ class ModelServiceRepository @Inject constructor(
 
     init {
         scope.launch {
-            localModels.state.map { it.enabledService() }.distinctUntilChanged().collect {
+            localModels.state.map { it.downloadedService() }.distinctUntilChanged().collect {
                 _configurationRevision.update { revision -> revision + 1 }
             }
         }
@@ -158,7 +158,7 @@ class ModelServiceRepository @Inject constructor(
         .distinctUntilChanged()
 
     override fun observeServices() = combine(services, localModels.state) { providers, local ->
-        providers.map { it.toDomain() } + local.enabledService()
+        providers.map { it.toDomain() } + local.downloadedService()
     }
         .distinctUntilChanged()
 
@@ -184,7 +184,7 @@ class ModelServiceRepository @Inject constructor(
 
     override fun currentService(serviceId: String): LLMModelSetting? = currentServices().firstOrNull { it.id == serviceId }
 
-    override fun currentServices(): List<LLMModelSetting> = services.value.map { it.toDomain() } + localModels.state.value.enabledService()
+    override fun currentServices(): List<LLMModelSetting> = services.value.map { it.toDomain() } + localModels.state.value.downloadedService()
 
     override fun currentAssistantSelection(): ModelSelection? = defaultAssistantSelection.value
 
@@ -329,7 +329,7 @@ class ModelServiceRepository @Inject constructor(
     override fun defaultSelection(): ModelSelection? =
         _defaultAssistantSelection.value?.takeIf { resolveChatModel(it) != null }
             ?: firstAvailableSelection()
-            ?: localModels.state.value.enabledService().groups.firstOrNull()?.models?.firstOrNull()?.let {
+            ?: localModels.state.value.downloadedService().groups.firstOrNull()?.models?.firstOrNull()?.let {
                 ModelSelection(LOCAL_GEMMA_SERVICE_ID, LOCAL_GEMMA_GROUP_ID, it.id)
             }
 

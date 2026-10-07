@@ -14,8 +14,8 @@ import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 @Composable
 private fun LocalModelVariantsPreview() {
     AsssistantaiTheme {
-        PreferenceScaffold(title = "Gemma 4", onBack = {}) { modifier ->
-            LocalModelScreen(previewState(), "gemma4", {}, {}, {}, modifier)
+        PreferenceScaffold(title = "本地模型", onBack = {}) { modifier ->
+            LocalModelScreen(previewState(), {}, {}, modifier)
         }
     }
 }
@@ -26,18 +26,35 @@ private fun LocalModelVariantsPreview() {
 private fun LocalModelRemovalPreview() {
     AsssistantaiTheme {
         val state = previewState()
-        PreferenceScaffold(title = "Gemma 4", onBack = {}) { modifier ->
-            LocalModelScreen(state.copy(pendingRemoval = state.models.first()), "gemma4", {}, {}, {}, modifier)
+        PreferenceScaffold(title = "本地模型", onBack = {}) { modifier ->
+            LocalModelScreen(state.copy(pendingRemoval = state.models.first()), {}, {}, modifier)
         }
     }
 }
 
 private fun previewState(): LocalModelUiState = LocalModelUiState(
     loading = false,
+    expandedModelIds = setOf("e4b-cpu"),
     models = listOf(
-        LocalModelState(LocalModelVariant("e2b-cpu", "gemma4", "Gemma 4 E2B · CPU", LocalModelBackend.CPU, 2588147712), LocalModelDownloadStatus.Ready, enabled = true),
-        LocalModelState(LocalModelVariant("e2b-gpu", "gemma4", "Gemma 4 E2B · GPU", LocalModelBackend.GPU, 2008432640), LocalModelDownloadStatus.Ready, enabled = true),
-        LocalModelState(LocalModelVariant("e4b-cpu", "gemma4", "Gemma 4 E4B · CPU", LocalModelBackend.CPU, 3659530240), LocalModelDownloadStatus.Downloading, progress = 0.42f),
-        LocalModelState(LocalModelVariant("e4b-gpu", "gemma4", "Gemma 4 E4B · GPU", LocalModelBackend.GPU, 2969059328)),
+        LocalModelState(LocalModelVariant("e2b-cpu", "gemma4", "Gemma 4 E2B · CPU", LocalModelBackend.CPU, 2588147712, modelPageUrl = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm"), LocalModelDownloadStatus.Ready),
+        LocalModelState(LocalModelVariant("e2b-gpu", "gemma4", "Gemma 4 E2B · GPU", LocalModelBackend.GPU, 2008432640, modelPageUrl = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm"), LocalModelDownloadStatus.Ready),
+        LocalModelState(LocalModelVariant("e4b-cpu", "gemma4", "Gemma 4 E4B · CPU", LocalModelBackend.CPU, 3659530240, modelPageUrl = "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm"), LocalModelDownloadStatus.Downloading, progress = 0.42f),
+        LocalModelState(LocalModelVariant("e4b-gpu", "gemma4", "Gemma 4 E4B · GPU", LocalModelBackend.GPU, 2969059328, modelPageUrl = "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm")),
     ),
 )
+
+@Preview(name = "Local failures and verification", widthDp = 393, heightDp = 920, showBackground = true)
+@Composable
+private fun LocalModelDownloadStatesPreview() {
+    AsssistantaiTheme {
+        val state = previewState()
+        LocalModelScreen(state.copy(models = state.models.mapIndexed { index, model ->
+            when (index) {
+                0 -> model.copy(status = LocalModelDownloadStatus.Failed,
+                    failure = github.ponyhuang.gimi.domain.modelcatalog.model.LocalModelFailure.Storage)
+                1 -> model.copy(status = LocalModelDownloadStatus.Verifying)
+                else -> model
+            }
+        }), {}, {})
+    }
+}

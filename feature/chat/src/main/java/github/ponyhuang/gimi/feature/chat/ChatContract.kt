@@ -15,6 +15,9 @@ import github.ponyhuang.gimi.domain.appearance.ThemeMode
  * - `partChannelFor(partId)`：渲染期同步查询流式文本增量 channel。
  */
 sealed interface ChatAction {
+    /** 重试当前本地模型的引擎加载。 */
+    data object RetryLocalModelLoad : ChatAction
+
     /** 交给 SDK 恢复最近失败轮次。 */
     data object RetryFailedTurn : ChatAction
 

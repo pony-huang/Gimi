@@ -18,51 +18,49 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class LocalModelViewModelTest {
     @get:Rule val main = MainDispatcherRule()
-    private val model = LocalModelState(LocalModelVariant("cpu", "gemma4", "Gemma 4", LocalModelBackend.CPU, 20), LocalModelDownloadStatus.Ready, true)
+    private val model = LocalModelState(LocalModelVariant("cpu", "gemma4", "Gemma 4", LocalModelBackend.CPU, 20), LocalModelDownloadStatus.Ready)
     private val catalog = MutableStateFlow(LocalModelCatalogState(false, listOf(model)))
     private val repository = mockk<LocalModelRepository>(relaxed = true) { every { state } returns catalog }
 
+    private val runtime = mockk<github.ponyhuang.gimi.domain.modelcatalog.repository.LocalModelRuntime>(relaxed = true)
+
     @Test fun requestingOrDismissingRemovalNeverDeletesFile() = runTest {
-        val vm = LocalModelViewModel(repository, RunWhenAgentIdleUseCase(FakeAgentRuntimeGate()))
+        val vm = LocalModelViewModel(repository, runtime, RunWhenAgentIdleUseCase(FakeAgentRuntimeGate()))
         vm.uiState.test {
             awaitItem(); runCurrent()
             vm.onAction(LocalModelAction.RequestRemoval("cpu")); runCurrent()
             assertEquals("cpu", vm.uiState.value.pendingRemoval?.variant?.id)
-            coVerify(exactly = 0) { repository.remove(any()) }
+            coVerify(exactly = 0) { runtime.remove(any()) }
             vm.onAction(LocalModelAction.DismissRemoval); runCurrent()
             assertNull(vm.uiState.value.pendingRemoval)
-            coVerify(exactly = 0) { repository.remove(any()) }
+            coVerify(exactly = 0) { runtime.remove(any()) }
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test fun confirmationDeletesOnlyPendingVersionOnce() = runTest {
-        val vm = LocalModelViewModel(repository, RunWhenAgentIdleUseCase(FakeAgentRuntimeGate()))
+        val vm = LocalModelViewModel(repository, runtime, RunWhenAgentIdleUseCase(FakeAgentRuntimeGate()))
         vm.onAction(LocalModelAction.ConfirmRemoval); runCurrent()
-        coVerify(exactly = 0) { repository.remove(any()) }
+        coVerify(exactly = 0) { runtime.remove(any()) }
         vm.onAction(LocalModelAction.RequestRemoval("cpu"))
         vm.onAction(LocalModelAction.ConfirmRemoval); runCurrent()
         vm.onAction(LocalModelAction.ConfirmRemoval); runCurrent()
-        coVerify(exactly = 1) { repository.remove("cpu") }
+        coVerify(exactly = 1) { runtime.remove("cpu") }
     }
 
-    @Test fun activeAgentBlocksRemovalAndEnableChanges() = runTest {
-        val vm = LocalModelViewModel(repository, RunWhenAgentIdleUseCase(FakeAgentRuntimeGate.busy()))
+    @Test fun activeAgentBlocksRemoval() = runTest {
+        val vm = LocalModelViewModel(repository, runtime, RunWhenAgentIdleUseCase(FakeAgentRuntimeGate.busy()))
         vm.onAction(LocalModelAction.RequestRemoval("cpu"))
         vm.onAction(LocalModelAction.ConfirmRemoval); runCurrent()
-        vm.onAction(LocalModelAction.SetEnabled("cpu", false)); runCurrent()
-        coVerify(exactly = 0) { repository.remove(any()) }
-        coVerify(exactly = 0) { repository.setEnabled(any(), any()) }
+        coVerify(exactly = 0) { runtime.remove(any()) }
     }
 
-    @Test fun disablingAndCancellingDownloadsDoNotDeleteReadyModels() = runTest {
-        val vm = LocalModelViewModel(repository, RunWhenAgentIdleUseCase(FakeAgentRuntimeGate()))
-        vm.onAction(LocalModelAction.SetEnabled("cpu", false)); runCurrent()
-        coVerify(exactly = 1) { repository.setEnabled("cpu", false) }
+    @Test fun cancellingDownloadsDoesNotDeleteReadyModels() = runTest {
+        val vm = LocalModelViewModel(repository, runtime, RunWhenAgentIdleUseCase(FakeAgentRuntimeGate()))
         vm.onAction(LocalModelAction.Download("gpu")); runCurrent()
         vm.onAction(LocalModelAction.CancelDownload("gpu")); runCurrent()
         coVerify(exactly = 1) { repository.download("gpu") }
         coVerify(exactly = 1) { repository.cancelDownload("gpu") }
-        coVerify(exactly = 0) { repository.remove(any()) }
+        coVerify(exactly = 0) { runtime.remove(any()) }
     }
 }

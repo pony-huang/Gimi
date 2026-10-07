@@ -1,69 +1,57 @@
 package github.ponyhuang.gimi.feature.modelsettings.local
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.modelcatalog.model.*
 import github.ponyhuang.gimi.feature.modelsettings.R
-import github.ponyhuang.gimi.ui.preference.*
+import github.ponyhuang.gimi.ui.preference.PreferenceBanner
+import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import java.util.Locale
 
-/** 品牌目录与版本管理共用的无状态页面，品牌跳转由 Route 回调完成。 */
+/** 扁平的本地模型目录；下载状态和操作进入 ViewModel，展开状态仅控制信息展示。 */
 @Composable
 fun LocalModelScreen(
     state: LocalModelUiState,
-    brandId: String?,
     onAction: (LocalModelAction) -> Unit,
-    onOpenBrand: (String) -> Unit,
-    onOpenSource: () -> Unit,
+    onOpenLicense: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PreferencePageContainer(modifier) {
-        LazyColumn(contentPadding = PaddingValues(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item { CompactLocalModelNote(stringResource(R.string.local_model_description)) }
+    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        LazyColumn(
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                Text(stringResource(R.string.local_model_count, state.models.size),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp))
+            }
             if (state.mutationBlocked) item {
                 PreferenceBanner(stringResource(R.string.modelsettings_agent_mutation_blocked), tone = PreferenceBannerTone.Error)
             }
             state.notice?.let { notice -> item { PreferenceBanner(stringResource(notice), tone = PreferenceBannerTone.Error) } }
-            if (state.loading) item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
-            else if (brandId == null) {
-                item { CompactLocalModelSectionTitle(stringResource(R.string.local_model_brands)) }
-                items(state.models.groupBy { it.variant.brandId }.toList(), key = { it.first }) { (id, models) ->
-                    PreferenceGroupCard {
-                        PreferenceListItem(
-                            icon = Icons.Default.Memory,
-                            title = stringResource(R.string.local_model_gemma4),
-                            subtitle = stringResource(R.string.local_model_brand_summary, models.count { it.status == LocalModelDownloadStatus.Ready }, models.count { it.enabled }),
-                            onClick = { onOpenBrand(id) },
-                        )
-                    }
-                }
+            if (state.loading) item {
+                Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             } else {
-                item { CompactLocalModelSectionTitle(stringResource(R.string.local_model_variants)) }
-                item { CompactLocalModelNote(stringResource(R.string.local_model_enable_hint)) }
-                val models = state.models.filter { it.variant.brandId == brandId }
-                if (models.isNotEmpty()) item {
-                    PreferenceGroupCard {
-                        models.forEachIndexed { index, model ->
-                            LocalModelVersionRow(model, state.operating, state.mutationBlocked, onAction)
-                            if (index < models.lastIndex) {
-                                HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                            }
-                        }
-                    }
+                items(state.models, key = { it.variant.id }) { model ->
+                    LocalModelCard(model, state.operating, state.mutationBlocked, model.variant.id in state.expandedModelIds, onAction, onOpenLicense)
                 }
-                item { CompactLocalModelNote(stringResource(R.string.local_model_backend_hint)) }
-                item { TextButton(onClick = onOpenSource, modifier = Modifier.padding(horizontal = 24.dp)) { Text(stringResource(R.string.local_model_source)) } }
             }
         }
     }
@@ -88,57 +76,79 @@ fun LocalModelScreen(
 }
 
 @Composable
-private fun CompactLocalModelSectionTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 32.dp).padding(top = 4.dp))
-}
-
-@Composable
-private fun CompactLocalModelNote(text: String) {
-    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 32.dp))
-}
-
-@Composable
-private fun LocalModelVersionRow(model: LocalModelState, operating: Boolean, blocked: Boolean, onAction: (LocalModelAction) -> Unit) {
+private fun LocalModelCard(
+    model: LocalModelState,
+    operating: Boolean,
+    blocked: Boolean,
+    expanded: Boolean,
+    onAction: (LocalModelAction) -> Unit,
+    onOpenLicense: (String) -> Unit,
+) {
     val id = model.variant.id
     val ready = model.status == LocalModelDownloadStatus.Ready
-    val downloading = model.status == LocalModelDownloadStatus.Downloading || model.status == LocalModelDownloadStatus.Verifying
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(model.variant.name, style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(R.string.local_model_quantization_size, modelSize(model.variant.bytes)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val downloading = model.status == LocalModelDownloadStatus.Downloading
+    val verifying = model.status == LocalModelDownloadStatus.Verifying
+    val progress = model.progress.coerceIn(0f, 1f)
+    Card(shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(model.variant.name, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                IconButton(onClick = { onAction(LocalModelAction.ToggleDetails(id)) }) {
+                    Icon(if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = stringResource(if (expanded) R.string.local_model_collapse else R.string.local_model_expand))
+                }
             }
-            val label = stringResource(R.string.local_model_enable_description, model.variant.name)
-            Checkbox(checked = model.enabled, enabled = ready && !operating && !blocked,
-                onCheckedChange = { onAction(LocalModelAction.SetEnabled(id, it)) },
-                modifier = Modifier.semantics { contentDescription = label })
-        }
-        val status = when (model.status) {
-            LocalModelDownloadStatus.NotDownloaded -> stringResource(R.string.local_model_not_downloaded)
-            LocalModelDownloadStatus.Downloading -> stringResource(R.string.local_model_downloading, (model.progress * 100).toInt())
-            LocalModelDownloadStatus.Verifying -> stringResource(R.string.local_model_verifying)
-            LocalModelDownloadStatus.Ready -> stringResource(if (model.enabled) R.string.local_model_enabled else R.string.local_model_downloaded)
-            LocalModelDownloadStatus.Failed -> stringResource(when (model.failure) {
-                LocalModelFailure.Storage -> R.string.local_model_storage_error
-                LocalModelFailure.Integrity -> R.string.local_model_integrity_error
-                LocalModelFailure.AccessDenied -> R.string.local_model_access_error
-                else -> R.string.local_model_network_error
-            })
-        }
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(status, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
-                color = if (model.status == LocalModelDownloadStatus.Failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
-            TextButton(enabled = !operating && (!ready || !blocked), contentPadding = PaddingValues(horizontal = 12.dp), onClick = {
-                onAction(when {
-                    ready -> LocalModelAction.RequestRemoval(id)
-                    downloading -> LocalModelAction.CancelDownload(id)
-                    else -> LocalModelAction.Download(id)
+            Text(stringResource(R.string.local_model_quantization_size, modelSize(model.variant.bytes)),
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TextButton(onClick = { onOpenLicense(model.variant.modelPageUrl) },
+                enabled = model.variant.modelPageUrl.isNotBlank(), contentPadding = PaddingValues(0.dp)) {
+                Text(stringResource(R.string.local_model_source))
+            }
+            AnimatedVisibility(visible = expanded) {
+                Text(stringResource(R.string.local_model_backend_hint),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp))
+            }
+            val status = when (model.status) {
+                LocalModelDownloadStatus.NotDownloaded -> stringResource(R.string.local_model_not_downloaded)
+                LocalModelDownloadStatus.Downloading -> stringResource(R.string.local_model_download_bytes,
+                    modelSize((model.variant.bytes * progress).toLong()), modelSize(model.variant.bytes))
+                LocalModelDownloadStatus.Verifying -> stringResource(R.string.local_model_verifying)
+                LocalModelDownloadStatus.Ready -> stringResource(R.string.local_model_downloaded)
+                LocalModelDownloadStatus.Failed -> stringResource(when (model.failure) {
+                    LocalModelFailure.Storage -> R.string.local_model_storage_error
+                    LocalModelFailure.Integrity -> R.string.local_model_integrity_error
+                    LocalModelFailure.AccessDenied -> R.string.local_model_access_error
+                    else -> R.string.local_model_network_error
                 })
-            }) { Text(stringResource(when { ready -> R.string.local_model_remove; downloading -> R.string.local_model_cancel_download; else -> R.string.local_model_download })) }
+            }
+            Text(status, style = MaterialTheme.typography.labelMedium,
+                color = if (model.status == LocalModelDownloadStatus.Failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
+            when {
+                downloading || verifying -> Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                    Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (verifying) LinearProgressIndicator(Modifier.weight(1f))
+                        else {
+                            Text(stringResource(R.string.local_model_progress, (progress * 100).toInt()), style = MaterialTheme.typography.labelLarge)
+                            LinearProgressIndicator(progress = { progress }, modifier = Modifier.weight(1f))
+                        }
+                        IconButton(enabled = !operating, onClick = { onAction(LocalModelAction.CancelDownload(id)) }) {
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.local_model_cancel_download))
+                        }
+                    }
+                }
+                ready -> TextButton(enabled = !operating && !blocked,
+                    onClick = { onAction(LocalModelAction.RequestRemoval(id)) }, modifier = Modifier.align(Alignment.End)) {
+                    Text(stringResource(R.string.local_model_remove), color = MaterialTheme.colorScheme.error)
+                }
+                else -> FilledTonalButton(enabled = !operating, onClick = { onAction(LocalModelAction.Download(id)) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(if (model.status == LocalModelDownloadStatus.Failed) R.string.local_model_retry_download else R.string.local_model_download))
+                }
+            }
         }
-        if (downloading) LinearProgressIndicator(progress = { model.progress }, modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp))
     }
 }
 

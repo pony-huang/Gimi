@@ -198,4 +198,10 @@
     <string name="chat_drawer_cancel">Cancel</string>
     <string name="chat_drawer_current_session_time">%1$s · Current conversation</string>
     <string name="chat_notice_delete_failed">Some conversations could not be deleted. Please try again.</string>
+    <string name="chat_local_model_loading">Loading local model…</string>
+    <string name="chat_local_model_loading_hint">You can type once loading finishes. The first load may take longer.</string>
+    <string name="chat_local_model_load_failed">Local model failed to load</string>
+    <string name="chat_local_model_load_failed_hint">Try again or switch to another model.</string>
+    <string name="chat_local_model_retry">Reload model</string>
+    <string name="chat_local_model_wait">Waiting for the model to load</string>
 </resources>

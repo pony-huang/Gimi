@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.modelsettings.local
 
+import github.ponyhuang.gimi.domain.modelcatalog.repository.LocalModelRuntime
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,18 +23,24 @@ import kotlinx.coroutines.CancellationException
 @HiltViewModel
 class LocalModelViewModel @Inject constructor(
     private val repository: LocalModelRepository,
+    private val localRuntime: LocalModelRuntime,
     private val runWhenAgentIdle: RunWhenAgentIdleUseCase,
 ) : ViewModel() {
+    private val expandedModelIds = MutableStateFlow<Set<String>>(emptySet())
     private val pendingRemoval = MutableStateFlow<String?>(null)
     private val operating = MutableStateFlow(false)
     private val notice = MutableStateFlow<Int?>(null)
     val uiState = combine(repository.state, pendingRemoval, runWhenAgentIdle.state, operating, notice) { catalog, pending, runtime, busy, message ->
         LocalModelUiState(catalog.loading, catalog.models,
             catalog.models.firstOrNull { it.variant.id == pending }, runtime.isBusy, busy, message)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LocalModelUiState())
+    }.combine(expandedModelIds) { state, expanded -> state.copy(expandedModelIds = expanded) }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LocalModelUiState())
 
     fun onAction(action: LocalModelAction) {
         when (action) {
+            is LocalModelAction.ToggleDetails -> {
+                val current = expandedModelIds.value
+                expandedModelIds.value = if (action.id in current) current - action.id else current + action.id
+            }
             is LocalModelAction.RequestRemoval -> {
                 pendingRemoval.value = repository.state.value.models.firstOrNull {
                     it.variant.id == action.id && it.status == LocalModelDownloadStatus.Ready
@@ -42,9 +49,8 @@ class LocalModelViewModel @Inject constructor(
             LocalModelAction.DismissRemoval -> if (!operating.value) pendingRemoval.value = null
             LocalModelAction.ConfirmRemoval -> {
                 val id = pendingRemoval.value ?: return
-                operate(gated = true) { repository.remove(id); pendingRemoval.value = null }
+                operate(gated = true) { localRuntime.remove(id); pendingRemoval.value = null }
             }
-            is LocalModelAction.SetEnabled -> operate(gated = true) { repository.setEnabled(action.id, action.enabled) }
             is LocalModelAction.Download -> operate { repository.download(action.id) }
             is LocalModelAction.CancelDownload -> operate { repository.cancelDownload(action.id) }
         }

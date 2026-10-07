@@ -156,6 +156,7 @@ fun ChatRoute(
             partChannelProvider = viewModel::partChannelFor,
             onSend = viewModel::send,
             onStop = { viewModel.onAction(ChatAction.StopStreaming) },
+            onRetryLocalModelLoad = { viewModel.onAction(ChatAction.RetryLocalModelLoad) },
             onTranscribeVoice = viewModel::transcribeVoice,
             onToggleSpeechPlayback = { messageId, markdown ->
                 viewModel.onAction(ChatAction.ToggleSpeechPlayback(messageId, markdown))

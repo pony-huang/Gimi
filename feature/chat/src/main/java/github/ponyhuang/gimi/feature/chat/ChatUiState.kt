@@ -1,5 +1,8 @@
 package github.ponyhuang.gimi.feature.chat
 
+import github.ponyhuang.gimi.domain.modelcatalog.repository.LocalModelLoadState
+import github.ponyhuang.gimi.domain.modelcatalog.repository.LocalModelLoadPhase
+import github.ponyhuang.gimi.domain.modelcatalog.model.LOCAL_GEMMA_SERVICE_ID
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurn
 import github.ponyhuang.gimi.domain.conversation.model.Conversation
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
@@ -64,6 +67,9 @@ data class ChatUiState(
     val availableLLMModelSettings: List<LLMModelSetting> = emptyList(),
     val modelCatalogLoadState: CatalogLoadState = CatalogLoadState.Loading,
     val currentModelSelection: ModelSelection? = null,
+    /** 本地引擎加载快照；只有匹配当前模型的 Ready 状态允许编辑或发送。 */
+    val localModelLoadState: LocalModelLoadState =
+        LocalModelLoadState(),
     val toolConfiguration: ConversationToolConfiguration? = null,
     val availableMcpServers: List<McpServer> = emptyList(),
     val officialToolDescriptors: List<OfficialToolDescriptor> = emptyList(),
@@ -136,3 +142,16 @@ data class OfficialToolDescriptor(
     val isLoadingFunctions: Boolean = false,
     val loadError: String? = null,
 )
+
+/** 本地服务即使文件已被移除仍需阻止输入，不回退到远端发送。 */
+internal val ChatUiState.selectedLocalModelId: String?
+    get() = currentModelSelection?.takeIf { selection ->
+        selection.serviceId == LOCAL_GEMMA_SERVICE_ID ||
+            availableLLMModelSettings.any { it.id == selection.serviceId && it.isLocal }
+    }?.modelId
+
+internal val ChatUiState.isLocalModelInputBlocked: Boolean
+    get() = selectedLocalModelId?.let { id ->
+        localModelLoadState.modelId != id ||
+            localModelLoadState.phase != LocalModelLoadPhase.Ready
+    } ?: false

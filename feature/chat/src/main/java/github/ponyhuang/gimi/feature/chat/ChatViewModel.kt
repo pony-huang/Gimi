@@ -1,5 +1,8 @@
 package github.ponyhuang.gimi.feature.chat
 
+import github.ponyhuang.gimi.domain.modelcatalog.repository.LocalModelRuntime
+import github.ponyhuang.gimi.domain.modelcatalog.repository.LocalModelLoadPhase
+import github.ponyhuang.gimi.domain.modelcatalog.model.LOCAL_GEMMA_SERVICE_ID
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -92,10 +95,13 @@ class ChatViewModel @Inject constructor(
     private val memoryRuntimeStatus: MemoryRuntimeStatus,
     private val appNotificationManager: AppNotificationManager,
     private val appUpdateRepository: AppUpdateRepository,
+    private val localModelRuntime: LocalModelRuntime,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+
+    private val localModelCoordinator = ChatLocalModelCoordinator(_uiState, viewModelScope, localModelRuntime)
 
     private val sessionRuntimes = linkedMapOf<String, ChatSessionRuntime>()
 
@@ -156,7 +162,8 @@ class ChatViewModel @Inject constructor(
      */
     fun onAction(action: ChatAction) {
         when (action) {
-            ChatAction.RetryFailedTurn -> turnRecoveryCoordinator.retry()
+            ChatAction.RetryLocalModelLoad -> localModelCoordinator.retry()
+            ChatAction.RetryFailedTurn -> if (!_uiState.value.isLocalModelInputBlocked) turnRecoveryCoordinator.retry()
             ChatAction.ResumeChat -> resumeChat()
             ChatAction.StopStreaming -> runLifecycleCoordinator.stopStreaming()
             is ChatAction.ToggleSpeechPlayback ->
@@ -440,6 +447,7 @@ class ChatViewModel @Inject constructor(
             runtime.closePartChannels()
         }
         speechPlaybackController.clearSession()
+        localModelCoordinator.close()
         super.onCleared()
     }
 
@@ -483,7 +491,7 @@ class ChatViewModel @Inject constructor(
         val state = _uiState.value
         if (text.isBlank() && draftAttachments.isEmpty() ||
             state.pendingToolConfirmation != null || state.pendingInputRequest != null ||
-            state.isInitializing || sessionNavigationCoordinator.loadingSessionId != null
+            state.isInitializing || state.isLocalModelInputBlocked || sessionNavigationCoordinator.loadingSessionId != null
         ) {
             submission.complete(ChatSubmissionResult.REJECTED)
             return
@@ -545,6 +553,16 @@ class ChatViewModel @Inject constructor(
         showAfterAcceptance: Boolean = false,
     ) {
         val runtime = runtimeFor(sessionId)
+        val localSelection = selection.serviceId == LOCAL_GEMMA_SERVICE_ID ||
+            modelServices.currentServices().any { it.id == selection.serviceId && it.isLocal }
+        if (localSelection && (localModelRuntime.state.value.modelId != selection.modelId ||
+                localModelRuntime.state.value.phase != LocalModelLoadPhase.Ready)) {
+            // 所有发送入口（推荐词、失败轮重试、首个会话解析）都必须经过同一加载门控。
+            runtime.modelSelection = selection
+            if (showAfterAcceptance) showRuntime(sessionId) else publishRuntime(runtime)
+            submission.complete(ChatSubmissionResult.REJECTED)
+            return
+        }
         if (runtime.isActive || sessionNavigationCoordinator.loadingSessionId != null ||
             sessionRuntimes.values.count { it.isActive } >= MAX_PARALLEL_TASKS
         ) {

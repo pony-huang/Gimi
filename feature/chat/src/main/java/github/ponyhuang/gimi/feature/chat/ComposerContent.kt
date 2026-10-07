@@ -108,7 +108,7 @@ internal fun DefaultComposerInputContent(
 
     val trailingButton = when {
         params.isGenerating -> ComposerTrailingButton.Stop
-        isTranscribing -> null
+        isTranscribing || !params.inputEnabled -> null
         params.messageData.text.isNotBlank() || params.messageData.attachments.isNotEmpty() ->
             ComposerTrailingButton.Send
         else -> null
@@ -159,7 +159,7 @@ internal fun DefaultComposerInputContent(
                             val isBareEnter = event.type == KeyEventType.KeyDown &&
                                 (event.key == Key.Enter || event.key == Key.NumPadEnter) &&
                                 !event.isShiftPressed && !event.isCtrlPressed && !event.isAltPressed
-                            val canSend = !params.isGenerating &&
+                            val canSend = params.inputEnabled && !params.isGenerating &&
                                 (params.messageData.text.isNotBlank() || params.messageData.attachments.isNotEmpty())
                             if (isBareEnter && canSend) {
                                 params.onSendClick()
@@ -171,12 +171,12 @@ internal fun DefaultComposerInputContent(
                         .testTag("chat_composer_text_field"),
                     value = params.messageData.text,
                     onValueChange = params.onTextChange,
-                    enabled = !params.isGenerating,
+                    enabled = params.inputEnabled && !params.isGenerating,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { params.onSendClick() }),
                     textStyle = resolveTextFieldStyle(
                         interactionSource,
-                        disabled = params.isGenerating,
+                        disabled = params.isGenerating || !params.inputEnabled,
                     ),
                     cursorBrush = SolidColor(OutlinedTextFieldDefaults.colors().cursorColor),
                     interactionSource = interactionSource,
@@ -187,6 +187,7 @@ internal fun DefaultComposerInputContent(
                             modifier = Modifier.fillMaxWidth(),
                             text = params.messageData.text,
                             innerTextField = innerTextField,
+                            placeholder = params.inputPlaceholder,
                         )
                     },
                 )
@@ -202,7 +203,7 @@ internal fun DefaultComposerInputContent(
                         ComposerLeadingContent(
                             ComposerLeadingContentParams(
                                 isGenerating = params.isGenerating,
-                                configurationReady = params.configurationReady,
+                                configurationReady = params.configurationReady && params.inputEnabled,
                                 onAttachmentsClick = params.onAttachmentsClick,
                             ),
                         )
@@ -217,7 +218,7 @@ internal fun DefaultComposerInputContent(
 
                     VoiceButton(
                         isGenerating = params.isGenerating,
-                        isVoiceInputAvailable = params.isVoiceInputAvailable,
+                        isVoiceInputAvailable = params.isVoiceInputAvailable && params.inputEnabled,
                         snackbarHostState = snackbarHostState,
                         onVoiceInputStart = params.onVoiceInputStart,
                     )
@@ -315,6 +316,7 @@ private fun TextInput(
     modifier: Modifier,
     text: String,
     innerTextField: @Composable () -> Unit,
+    placeholder: String? = null,
 ) {
     Box(
         modifier = modifier,
@@ -327,7 +329,7 @@ private fun TextInput(
         ) {
             if (text.isBlank()) {
                 Text(
-                    text = stringResource(R.string.stream_ai_compose_composer_input_placeholder),
+                    text = placeholder ?: stringResource(R.string.stream_ai_compose_composer_input_placeholder),
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     style = MaterialTheme.typography.bodyLarge,
                 )

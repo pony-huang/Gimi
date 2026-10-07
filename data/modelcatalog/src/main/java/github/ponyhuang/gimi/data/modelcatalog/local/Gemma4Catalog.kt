@@ -22,7 +22,8 @@ internal object Gemma4Catalog {
     private fun spec(size: String, backend: LocalModelBackend, bytes: Long, revision: String, hash: String): LocalModelDownloadSpec {
         val suffix = if (backend == LocalModelBackend.GPU) "-gpu" else ""
         return LocalModelDownloadSpec(
-            variant = LocalModelVariant("gemma4-${size.lowercase()}-${backend.name.lowercase()}", "gemma4", "Gemma 4 $size · ${backend.name}", backend, bytes),
+            variant = LocalModelVariant("gemma4-${size.lowercase()}-${backend.name.lowercase()}", "gemma4", "Gemma 4 $size · ${backend.name}", backend, bytes,
+                modelPageUrl = "https://huggingface.co/litert-community/gemma-4-$size-it-litert-lm"),
             url = "https://huggingface.co/litert-community/gemma-4-$size-it-litert-lm/resolve/$revision/gemma-4-$size-it$suffix.litertlm",
             sha256 = hash,
         )

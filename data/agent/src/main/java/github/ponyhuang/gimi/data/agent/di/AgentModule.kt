@@ -1,5 +1,7 @@
 package github.ponyhuang.gimi.data.agent.di
 
+import github.ponyhuang.gimi.domain.modelcatalog.repository.LocalModelRuntime
+import github.ponyhuang.gimi.data.agent.model.LocalInferenceModelFactory
 import android.content.Context
 import android.util.Log
 import com.google.adk.kt.artifacts.ArtifactService
@@ -120,6 +122,12 @@ object AgentModule {
     fun provideToolVectorBox(
         store: BoxStore,
     ): Box<ToolVectorEntity> = store.boxFor(ToolVectorEntity::class.java)
+
+    @Provides
+    @Singleton
+    fun provideLocalModelRuntime(
+        implementation: LocalInferenceModelFactory,
+    ): LocalModelRuntime = implementation
 
     @Provides
     @Singleton

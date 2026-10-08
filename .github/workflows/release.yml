@@ -112,7 +112,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           # 默认的 tools 包已下架；只初始化仍受支持的 platform-tools。
           packages: platform-tools

@@ -67,7 +67,7 @@ jobs:
 
       - name: Upload test reports
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: unit-test-reports-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -77,7 +77,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload debug APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: app-debug-apk-${{ github.run_id }}-${{ github.run_attempt }}
           path: app/build/outputs/apk/debug/*.apk

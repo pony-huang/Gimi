@@ -56,7 +56,7 @@ interval in Settings.
 
 Tap the microphone to record, then stop to transcribe speech into the composer. Edit the text before
 sending. Configure speech recognition and synthesis separately in *Settings → Default models*.
-MiniMax speech recognition is supported; choose a voice for reply playback, with online voice-list
+Speech recognition supports MiniMax and MiMo (Xiaomi); choose a voice for reply playback, with online voice-list
 retrieval for MiniMax.
 
 Automatic reading of complete replies is optional and defaults to off on a fresh install. Both voice
@@ -219,6 +219,15 @@ Gimi collects nothing: no analytics, no telemetry, no accounts, no developer ser
 stay on your device; network requests serve configured or enabled model, speech, MCP, plugin, and
 Mem0 services, skill downloads, and GitHub updates. See [PRIVACY.md](PRIVACY.md) ·
 [隐私政策](PRIVACY.zh-CN.md).
+
+## Contributing
+
+Bug reports, feature suggestions, documentation improvements, translations, and code contributions
+are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow and development guidelines.
+
+The project's features and interface design are primarily shaped by the author's own usage habits,
+with inspiration from established products and their interaction patterns. When proposing a change,
+please describe the use case it addresses; discuss substantial feature or interface changes in an issue first.
 
 ## Thanks
 

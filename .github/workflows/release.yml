@@ -140,7 +140,7 @@ jobs:
           python3 .github/scripts/release_tools.py package \
             --aapt "$BUILD_TOOLS/aapt" --apksigner "$BUILD_TOOLS/apksigner"
       - name: Preserve R8 mapping
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: release-mapping-${{ needs.prepare.outputs.tag }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: app/build/outputs/mapping/release/mapping.txt

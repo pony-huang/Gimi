@@ -8,6 +8,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,6 +58,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -171,7 +173,16 @@ fun ChatScaffold(
             ?: MultimodalCapabilities()
     }
     // 只要用户仍停留在底部，就让流式内容增长持续跟随；用户向上浏览历史时则停止抢占滚动。
-    var shouldFollowLatest by remember { mutableStateOf(true) }
+    var shouldFollowLatest by rememberSaveable(state.sessionId) { mutableStateOf(true) }
+    var didInitialScroll by rememberSaveable(state.sessionId) { mutableStateOf(false) }
+    val latestUserMessageId = (listItems.lastOrNull { it is ChatListItem.UserMessage }
+        as? ChatListItem.UserMessage)?.message?.id
+    var previousUserMessageId by rememberSaveable(state.sessionId) {
+        mutableStateOf(latestUserMessageId)
+    }
+    var handledScrollRequest by rememberSaveable(state.sessionId) {
+        mutableStateOf(state.scrollToLatestRequest)
+    }
     var isModelPickerVisible by remember { mutableStateOf(false) }
     val renderedItemCount = remember(listItems) {
         listItems.sumOf { item ->
@@ -192,20 +203,42 @@ fun ChatScaffold(
     val recommendationHorizontalInset = ComposerCollapsedHorizontalInset
 
     LaunchedEffect(
+        state.sessionId,
+        state.isInitializing,
         renderedItemCount,
+        latestUserMessageId,
         state.scrollToLatestRequest,
         pendingToolConfirmation?.confirmationCallId,
         pendingInputRequest?.callId,
     ) {
-        if (state.getCurrentUserMessage() != null) {
+        if (state.isInitializing || state.sessionId.isBlank()) return@LaunchedEffect
+        val shouldScroll = shouldScrollChatToLatest(
+            isInitialPositioning = !didInitialScroll,
+            explicitRequestChanged = state.scrollToLatestRequest != handledScrollRequest,
+            latestUserMessageChanged = latestUserMessageId != previousUserMessageId,
+            followsLatest = shouldFollowLatest,
+        )
+        didInitialScroll = true
+        handledScrollRequest = state.scrollToLatestRequest
+        previousUserMessageId = latestUserMessageId
+        if (renderedItemCount > 0 && shouldScroll) {
+            shouldFollowLatest = true
             delay(100.milliseconds)
-            listState.animateScrollToItem(renderedItemCount)
+            // 等待布局期间用户可能已开始浏览历史，此时取消自动定位。
+            if (shouldFollowLatest) listState.animateScrollToItem(renderedItemCount)
+        }
+    }
+
+    LaunchedEffect(listState) {
+        listState.interactionSource.interactions.collect { interaction ->
+            // 手指开始拖动就交还滚动控制权，不能等拖动结束才停止流式跟随。
+            if (interaction is DragInteraction.Start) shouldFollowLatest = false
         }
     }
 
     // `ChatTextContent` 从 channel 接收增量后只会改变气泡尺寸，不会改变 messages 引用。
     // 监听可见项的布局边界，确保每次气泡增长到新行时都能把底部锚点带回视口。
-    LaunchedEffect(listState, isAgentRunning) {
+    LaunchedEffect(listState, isAgentRunning, state.sessionId) {
         snapshotFlow {
             listState.layoutInfo.visibleItemsInfo.lastOrNull()?.let { item ->
                 item.index to (item.offset + item.size)
@@ -218,13 +251,15 @@ fun ChatScaffold(
     }
 
     // 仅在一次实际滚动结束时更新“跟随最新”意图，避免流式内容自身增长时误判为用户离开底部。
-    LaunchedEffect(listState) {
+    LaunchedEffect(listState, state.sessionId) {
+        var wasScrolling = false
         snapshotFlow { listState.isScrollInProgress }
             .distinctUntilChanged()
             .collect { isScrolling ->
-                if (!isScrolling) {
+                if (wasScrolling && !isScrolling) {
                     shouldFollowLatest = !listState.canScrollForward
                 }
+                wasScrolling = isScrolling
             }
     }
 

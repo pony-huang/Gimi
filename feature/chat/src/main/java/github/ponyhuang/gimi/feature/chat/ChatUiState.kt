@@ -49,7 +49,7 @@ data class ChatUiState(
     val expandedActivityGroupIds: Set<String> = emptySet(),
     val sessionId: String = "",
     val isAgentRunning: Boolean = false,
-    /** 需要聊天列表滚到末尾的显式请求（例如后台完成后恢复完整历史）。 */
+    /** 需要聊天列表滚到末尾的显式请求（例如用户切换会话）。 */
     val scrollToLatestRequest: Long = 0L,
     /**
      * 可恢复的最近失败/中断发送轮；非空时在错误区域显示“重试”。

@@ -32,7 +32,7 @@
     <string name="mcp_field_description">Description</string>
     <string name="mcp_field_type_required">Type *</string>
     <string name="mcp_field_endpoint_required">Server endpoint *</string>
-    <string name="mcp_field_endpoint_placeholder">https://example.com/mcp</string>
+    <string name="mcp_field_endpoint_placeholder">https://example.com/mcp or http://example.com/mcp</string>
     <string name="mcp_field_bearer_token_optional">Bearer token (standard auth, optional)</string>
     <string name="mcp_field_header_optional">Custom headers (for special auth)</string>
     <string name="mcp_field_header_placeholder">Authorization=Token your-token\nX-Client=assistant</string>

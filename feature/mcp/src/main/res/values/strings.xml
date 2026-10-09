@@ -41,7 +41,7 @@
     <string name="mcp_field_description">描述</string>
     <string name="mcp_field_type_required">类型 *</string>
     <string name="mcp_field_endpoint_required">服务器端点 *</string>
-    <string name="mcp_field_endpoint_placeholder">https://example.com/mcp</string>
+    <string name="mcp_field_endpoint_placeholder">https://example.com/mcp  或  http://example.com/mcp</string>
     <string name="mcp_field_bearer_token_optional">Bearer Token（常规认证，可选）</string>
     <string name="mcp_field_header_optional">自定义请求头（特殊认证可用）</string>
     <string name="mcp_field_header_placeholder">Authorization=Token your-token\nX-Client=assistant</string>

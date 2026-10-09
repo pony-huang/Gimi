@@ -114,6 +114,7 @@ dependencies {
     implementation(project(":data:toolauthorization"))
     implementation(project(":data:skills"))
     implementation(project(":data:appupdate"))
+    implementation(project(":data:logging"))
     implementation(project(":data:plugin"))
     implementation(project(":data:recommendation"))
     implementation(project(":data:memory"))

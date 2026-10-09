@@ -1,8 +1,11 @@
 package github.ponyhuang.gimi.feature.settings.about
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -13,6 +16,9 @@ import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.feature.settings.R
+import github.ponyhuang.gimi.feature.settings.about.logs.LogsDialog
+import github.ponyhuang.gimi.feature.settings.about.logs.LogsEffect
+import github.ponyhuang.gimi.feature.settings.about.logs.LogsViewModel
 import github.ponyhuang.gimi.feature.settings.update.UpdateAction
 import github.ponyhuang.gimi.feature.settings.update.UpdateDialog
 import github.ponyhuang.gimi.feature.settings.update.UpdateEffect
@@ -31,9 +37,27 @@ fun AboutRoute(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     updateViewModel: UpdateViewModel = hiltViewModel(),
+    logsViewModel: LogsViewModel = hiltViewModel(),
 ) {
     val updateState by updateViewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val logsState by logsViewModel.uiState.collectAsStateWithLifecycle()
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        logsViewModel.destinationSelected(uri?.toString())
+    }
+    LaunchedEffect(logsViewModel) {
+        logsViewModel.effects.collect { effect ->
+            when (effect) {
+                LogsEffect.ChooseDestination -> try {
+                    exportLauncher.launch("gimi-logs.txt")
+                } catch (_: ActivityNotFoundException) {
+                    logsViewModel.destinationUnavailable()
+                }
+                LogsEffect.ExportSucceeded -> Toast.makeText(context, R.string.logs_export_success, Toast.LENGTH_SHORT).show()
+                LogsEffect.ExportFailed -> Toast.makeText(context, R.string.logs_export_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     LaunchedEffect(updateViewModel) {
         updateViewModel.onAction(UpdateAction.ScreenEntered)
@@ -77,7 +101,15 @@ fun AboutRoute(
             onOpenProjectPage = {
                 context.startActivity(Intent(Intent.ACTION_VIEW, PROJECT_URL.toUri()))
             },
+            onOpenLogs = logsViewModel::open,
             modifier = scaffoldModifier,
+        )
+
+        LogsDialog(
+            state = logsState,
+            onClose = logsViewModel::close,
+            onRetry = logsViewModel::open,
+            onExport = logsViewModel::requestExport,
         )
 
         UpdateDialog(

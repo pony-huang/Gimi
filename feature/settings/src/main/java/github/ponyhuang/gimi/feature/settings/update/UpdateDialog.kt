@@ -1,14 +1,11 @@
 package github.ponyhuang.gimi.feature.settings.update
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -21,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
+import com.mikepenz.markdown.m3.Markdown
 import github.ponyhuang.gimi.domain.appupdate.model.AppUpdateInfo
 import github.ponyhuang.gimi.domain.appupdate.model.AppVersion
 import github.ponyhuang.gimi.domain.appupdate.repository.AppUpdateState
@@ -72,7 +70,7 @@ private fun AvailableDialog(
     )
 }
 
-/** 「发现新版本」弹窗正文：当前版本行 + 更新内容小节 + 平铺提交列表。 */
+/** 「发现新版本」弹窗正文：当前版本行 + 使用默认 Markdown 排版的更新说明。 */
 @Composable
 private fun UpdateChangelogBody(
     currentVersionName: String,
@@ -98,36 +96,12 @@ private fun UpdateChangelogBody(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            Markdown(
+                content = changelog,
                 modifier = Modifier
+                    .fillMaxWidth()
                     .heightIn(max = 280.dp)
                     .verticalScroll(rememberScrollState()),
-            ) {
-                ChangelogEntries(changelog)
-            }
-        }
-    }
-}
-
-/** 逐行解析 changelog，去掉平铺列表前缀后按「• 文本」渲染。 */
-@Composable
-private fun ChangelogEntries(changelog: String) {
-    val entries = changelog.lines()
-        .map { it.trim().removePrefix("-").removePrefix("*").trim() }
-        .filter { it.isNotEmpty() }
-    entries.forEach { entry ->
-        Row {
-            Text(
-                text = "•",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = entry,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
@@ -250,12 +224,25 @@ private fun previewUpdateInfo(): AppUpdateInfo = AppUpdateInfo(
     version = AppVersion(0, 3, 0, null),
     tagName = "v0.3.0",
     title = "Gimi v0.3.0",
-    changelog = "- 新增技能导入\n- 修复若干问题",
+    changelog = """
+        ## 新增功能
+        - 更新说明支持 **Markdown**。
+        - 支持标题、列表、链接和 `行内代码`。
+
+        ### 问题修复
+        1. 切换会话时保留草稿。
+        2. 发送后清理分享附件。
+
+        > 感谢使用 Gimi。
+
+        [查看项目主页](https://github.com/pony-huang/Gimi)
+    """.trimIndent(),
     assets = emptyList(),
     publishedAt = null,
 )
 
-@Preview(showBackground = true)
+@Preview(name = "更新说明 · 浅色", showBackground = true)
+@Preview(name = "更新说明 · 深色", showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun UpdateDialogAvailablePreview() {
     AsssistantaiTheme {
@@ -267,6 +254,22 @@ private fun UpdateDialogAvailablePreview() {
             ),
             onAction = {},
         )
+    }
+}
+
+@Preview(name = "更新说明 · 空状态", showBackground = true)
+@Composable
+private fun UpdateDialogEmptyChangelogPreview() {
+    AsssistantaiTheme {
+        UpdateChangelogBody("0.10.2", "")
+    }
+}
+
+@Preview(name = "更新说明 · 普通文本", showBackground = true)
+@Composable
+private fun UpdateDialogPlainChangelogPreview() {
+    AsssistantaiTheme {
+        UpdateChangelogBody("0.10.2", "改善聊天体验，修复已知问题。")
     }
 }
 

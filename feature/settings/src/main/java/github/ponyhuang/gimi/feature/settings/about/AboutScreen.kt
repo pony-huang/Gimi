@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.MaterialTheme
@@ -31,7 +32,7 @@ import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /**
  * 「关于」页：顶部展示应用名称与当前版本，下方列表提供检查更新（内联状态）与项目主页入口。
- * 后续新增功能（导出日志等）追加到 [PreferenceGroupCard] 内即可。
+ * 日志入口提供最近一天的诊断记录查看与导出。
  */
 @Composable
 fun AboutScreen(
@@ -39,6 +40,7 @@ fun AboutScreen(
     updateState: UpdateUiState,
     onUpdateAction: (UpdateAction) -> Unit,
     onOpenProjectPage: () -> Unit,
+    onOpenLogs: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     PreferencePageContainer(modifier = modifier) {
@@ -75,7 +77,14 @@ fun AboutScreen(
                     icon = Icons.Default.Language,
                     title = stringResource(R.string.about_project_title),
                     subtitle = stringResource(R.string.about_project_subtitle),
+                    showDivider = true,
                     onClick = onOpenProjectPage,
+                )
+                PreferenceListItem(
+                    icon = Icons.Default.Description,
+                    title = stringResource(R.string.logs_title),
+                    subtitle = stringResource(R.string.logs_subtitle),
+                    onClick = onOpenLogs,
                 )
             }
             Spacer(Modifier.height(24.dp))
@@ -107,6 +116,7 @@ private fun AboutScreenPreview() {
                 updateState = UpdateUiState(currentVersionName = "1.0.0"),
                 onUpdateAction = {},
                 onOpenProjectPage = {},
+                onOpenLogs = {},
                 modifier = modifier,
             )
         }
@@ -126,6 +136,7 @@ private fun AboutScreenAvailablePreview() {
                 ),
                 onUpdateAction = {},
                 onOpenProjectPage = {},
+                onOpenLogs = {},
                 modifier = modifier,
             )
         }

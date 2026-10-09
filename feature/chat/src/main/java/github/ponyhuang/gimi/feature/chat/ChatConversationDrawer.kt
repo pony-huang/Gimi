@@ -27,7 +27,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,6 +62,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -116,6 +119,13 @@ fun ChatDrawer(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
+    val historyListState = rememberLazyListState()
+    LaunchedEffect(drawerState.targetValue) {
+        if (drawerState.targetValue == DrawerValue.Open) {
+            // 稳定 key 会保留旧的可见项；打开最近列表时显式回到顶部，避免新会话藏在上方。
+            historyListState.scrollToItem(0)
+        }
+    }
     ModalNavigationDrawer(
         drawerState = drawerState,
         modifier = modifier,
@@ -134,6 +144,7 @@ fun ChatDrawer(
                     themeMode = themeMode,
                     onThemeModeChange = onThemeModeChange,
                     showUpdateBadge = showUpdateBadge,
+                    listState = historyListState,
                 )
             }
         },
@@ -158,6 +169,7 @@ private fun HistoryDrawerContent(
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
     showUpdateBadge: Boolean = false,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     val visible = recentState.visibleConversations(conversations)
     val eligible = deletableConversationIds(conversations, currentSessionId, conversationTaskStatuses)
@@ -222,6 +234,7 @@ private fun HistoryDrawerContent(
         }
         Box(Modifier.weight(1f).navigationBarsPadding().imePadding()) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 116.dp),
             ) {

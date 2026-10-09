@@ -93,7 +93,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * - 顶部浮动操作：抽屉按钮（[onOpenDrawer]）+ 新建对话（[onNewConversation]）+ 设置
  * - 底部输入卡片：文本、附件、模型选择与语音/发送操作。
  * - LazyColumn：消息流 + 流式输入自动跟随滚动 + 用户离开底部时显示「回到最新」FAB
- * - ChatInputBar：草稿由输入组件管理，发送按钮在流式期间被禁用。
+ * - ChatInputBar：草稿由聊天页面共享保存，发送按钮在流式期间被禁用。
  *
  * ## 滚动 / FAB 自洽
  * 列表滚动状态、流式跟随信号、FAB 可见性、`didInitialScroll` 首次守卫都内化在本 Composable 内，
@@ -105,7 +105,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * - **"发送"按钮** — Agent turn 进行期间保持禁用，实际发送由 [ChatComposer] 触发。
  *
  * ## 宿主契约
- * 宿主负责：草稿随 session 重置（`remember(currentSessionId)`）、抽屉开合、session 切换 /
+ * 本页面共享保存未发送草稿，切换或新建会话时继续编辑；宿主负责抽屉开合、session 切换 /
  * 删除、`viewModel.send` 实际调用、模型服务切换时的 runner 重建。本 Composable 不持有这些
  * 副作用。
  */
@@ -151,6 +151,10 @@ fun ChatScaffold(
 ) {
 
     val listState = rememberLazyListState()
+    // 草稿属于输入槽位而非会话，必须放在 session key 与挂起操作面板之外保存。
+    var composerDraft by rememberSaveable(stateSaver = MessageData.Saver) {
+        mutableStateOf(MessageData())
+    }
     val scope = rememberCoroutineScope()
     val listItems = state.listItems
     val isSpeechRecognitionAvailable = state.isSpeechRecognitionAvailable
@@ -361,9 +365,16 @@ fun ChatScaffold(
 
                             null -> ChatComposer(
                                 modifier = Modifier,
-                                messageData = MessageData(),
+                                messageData = composerDraft,
+                                onMessageDataChange = { composerDraft = it },
                                 onSendClick = { data, onResult ->
-                                    onSend(data.text, data.attachments, onResult)
+                                    onSend(data.text, data.attachments) { result ->
+                                        // 回执可能在切换会话后到达；只消费提交快照，不覆盖后续编辑。
+                                        if (result == ChatSubmissionResult.ACCEPTED) {
+                                            composerDraft = consumeAcceptedDraft(composerDraft, data)
+                                        }
+                                        onResult(result)
+                                    }
                                 },
                                 onStopClick = onStop,
                                 isGenerating = isAgentRunning,

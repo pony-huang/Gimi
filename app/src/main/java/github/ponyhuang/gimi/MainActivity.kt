@@ -100,7 +100,7 @@ class MainActivity : ComponentActivity() {
                         assistantPanelInteractor = assistantPanelInteractor,
                         openChatRequest = openChatRequest.value,
                         sharedMediaUris = sharedMediaUris.value,
-                        onSharedMediaConsumed = { sharedMediaUris.value = emptyList() },
+                        onSharedMediaConsumed = ::consumeSharedMedia,
                     )
                     github.ponyhuang.gimi.mobileuse.BackgroundAppInAppBubble(backgroundAppRepository, backgroundAppWindowHost)
                 }
@@ -132,6 +132,18 @@ class MainActivity : ComponentActivity() {
             Intent.ACTION_SEND_MULTIPLE
             -> sharedMediaUris.value = sharedImageUris(intent)
             ACTION_OPEN_CURRENT_CHAT -> openChatRequest.value += 1
+        }
+    }
+
+    private fun consumeSharedMedia() {
+        sharedMediaUris.value = emptyList()
+        if (intent.action == Intent.ACTION_SEND || intent.action == Intent.ACTION_SEND_MULTIPLE) {
+            // 同时清理启动来源，Activity 重新创建时也不能从旧 intent 再次导入附件。
+            setIntent(Intent(intent).apply {
+                action = Intent.ACTION_MAIN
+                removeExtra(Intent.EXTRA_STREAM)
+                clipData = null
+            })
         }
     }
 

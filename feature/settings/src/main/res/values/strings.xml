@@ -39,7 +39,7 @@
 
     <string name="about_app_name">Gimi</string>
     <string name="about_project_title">项目主页</string>
-    <string name="about_project_subtitle">GitHub 仓库 · 更新日志与反馈</string>
+    <string name="about_project_subtitle">喜欢 Gimi？点个 Star，你的支持就是我持续创作的动力。</string>
 
     <string name="settings_update_title">检查更新</string>
     <string name="update_subtitle_current">当前版本 %1$s</string>

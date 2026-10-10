@@ -2,6 +2,24 @@
 
 版本 PR 根据 Conventional Commits 自动生成后续版本记录；合并前请整理用户可见的变化与升级注意事项。
 
+## [0.11.1](https://github.com/pony-huang/Gimi/compare/v0.11.0...v0.11.1) (2026-10-10)
+
+
+### 新增
+
+* **logging:** add log viewer export and 24-hour retention ([017a375](https://github.com/pony-huang/Gimi/commit/017a37543f0e4bafc0b6f98ef326b6285e858d07))
+* **settings:** render update notes with default Markdown ([828df7e](https://github.com/pony-huang/Gimi/commit/828df7ee4b534af2caa479e1a888453fe1d26718))
+
+
+### 修复
+
+* **app:** 支持测试版与正式版共存 ([6f0f8af](https://github.com/pony-huang/Gimi/commit/6f0f8afbf89ccea8bf001b58b8b45f679b857492))
+* **chat:** preserve reading position when returning to app ([f6fa299](https://github.com/pony-huang/Gimi/commit/f6fa299de35c91db5af8b8faa9c9a34e721dbcfe))
+* **chat:** retain unsent drafts and consume shared attachments ([9f63d9d](https://github.com/pony-huang/Gimi/commit/9f63d9d07cad85940fe3e950dbba7e25a670420f))
+* **chat:** show latest conversations when opening drawer ([8a07a0f](https://github.com/pony-huang/Gimi/commit/8a07a0fa3af372a327e8936e529ca3a98cf76796))
+* **mcp:** 允许 Streamable HTTP/SSE 端点使用明文 HTTP ([786c098](https://github.com/pony-huang/Gimi/commit/786c098f4012fc60b73a732e35d7ee67676061dd))
+* **mcp:** 把工具异常兜成 tool_result，避免污染下一轮 Anthropic 请求 ([20fae85](https://github.com/pony-huang/Gimi/commit/20fae85c934c176c971326d05c79dbef77576eb3))
+
 ## [0.11.0](https://github.com/pony-huang/Gimi/compare/v0.10.2...v0.11.0) (2026-10-05)
 
 

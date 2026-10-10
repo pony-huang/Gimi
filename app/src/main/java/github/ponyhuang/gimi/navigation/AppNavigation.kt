@@ -16,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +76,9 @@ fun MainScreen(
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
 ) {
+    // NavEntry 内容可能保留创建时的闭包，必须读取实时分享状态，不能重放已消费的 URI。
+    val currentSharedMediaUris by rememberUpdatedState(sharedMediaUris)
+    val consumeSharedMedia by rememberUpdatedState(onSharedMediaConsumed)
     val backStack = rememberNavBackStack(ChatDestination.Chat)
     val assistantState by assistantSessionCoordinator.state.collectAsStateWithLifecycle()
     val recording by assistantPanelInteractor.recording.collectAsStateWithLifecycle()
@@ -143,8 +147,8 @@ fun MainScreen(
                             navigate(ChatDestination.SearchResults(sessionId, responseId))
                         },
                         onBack = goBack,
-                        sharedMediaUris = sharedMediaUris,
-                        onSharedMediaConsumed = onSharedMediaConsumed,
+                        sharedMediaUris = currentSharedMediaUris,
+                        onSharedMediaConsumed = consumeSharedMedia,
                     ),
                 ) || SettingsEntryProvider(
                     destination = destination,

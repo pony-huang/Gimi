@@ -19,6 +19,7 @@ class MainApplication : Application(), Configuration.Provider {
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var recommendationStartupInitializer: RecommendationStartupInitializer
     @Inject lateinit var appUpdateRepository: AppUpdateRepository
+    @Inject lateinit var appLogRecorder: github.ponyhuang.gimi.data.logging.AppLogRecorder
 
     /**
      * debug 构建绑定 ADK Development WebServer（PC 浏览器经局域网观察 agent 会话）；
@@ -35,6 +36,7 @@ class MainApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        appLogRecorder.start(appScope)
         backgroundAppWindowHost.start()
         appScope.launch {
             recommendationStartupInitializer.reconcile()

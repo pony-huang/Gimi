@@ -39,7 +39,7 @@
 
     <string name="about_app_name">Gimi</string>
     <string name="about_project_title">项目主页</string>
-    <string name="about_project_subtitle">GitHub 仓库 · 更新日志与反馈</string>
+    <string name="about_project_subtitle">喜欢 Gimi？点个 Star，你的支持就是我持续创作的动力。</string>
 
     <string name="settings_update_title">检查更新</string>
     <string name="update_subtitle_current">当前版本 %1$s</string>
@@ -68,4 +68,18 @@
     <string name="update_retry">重试</string>
     <string name="settings_recommendations_title">智能推荐</string>
     <string name="settings_recommendations_subtitle">配置新会话的任务建议与空闲预生成</string>
+
+    <string name="logs_title">日志</string>
+    <string name="logs_subtitle">查看和导出最近 24 小时的日志</string>
+    <string name="logs_retention">仅保留最近 24 小时，过期日志自动清理；总容量最多 4 MB。</string>
+    <string name="logs_loading">正在读取日志…</string>
+    <string name="logs_read_failed">日志读取失败，请重试。</string>
+    <string name="logs_empty">最近 24 小时暂无日志</string>
+    <string name="logs_truncated">仅显示最近部分记录，导出可获取完整保留日志。</string>
+    <string name="logs_retry">重试</string>
+    <string name="logs_export">导出</string>
+    <string name="logs_exporting">正在导出…</string>
+    <string name="logs_close">关闭</string>
+    <string name="logs_export_success">日志已导出</string>
+    <string name="logs_export_failed">日志导出失败，请重试。</string>
 </resources>

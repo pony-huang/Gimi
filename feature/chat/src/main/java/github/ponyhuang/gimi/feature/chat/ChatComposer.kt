@@ -40,6 +40,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -89,7 +90,8 @@ import kotlinx.coroutines.launch
  * @param onVoiceInputError Callback invoked when microphone capture cannot start or fails.
  * @param isGenerating Whether the AI is currently generating a response.
  * @param modifier The modifier to be applied to the composer.
- * @param messageData The initial message data to be displayed in the input field.
+ * @param messageData The current draft owned by the chat screen, shared across conversations.
+ * @param onMessageDataChange Reports edits to the draft; the owner consumes accepted submissions.
  * @param modelSelectorContent Model selection control rendered beside the attachment button.
  * @param retainExpanded Whether an active child surface requires the composer to stay expanded.
  * @param onExpandedChange Callback reporting whether the capsule is currently in its enlarged
@@ -102,6 +104,7 @@ public fun ChatComposer(
     isGenerating: Boolean,
     modifier: Modifier = Modifier,
     messageData: MessageData = MessageData(),
+    onMessageDataChange: (MessageData) -> Unit = {},
     onVoiceInputStart: () -> Unit = { },
     onVoiceInputStop: () -> Unit = { },
     onVoiceAudioChunk: (ByteArray) -> Unit = { },
@@ -122,11 +125,9 @@ public fun ChatComposer(
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
 ) {
-    var messageData by rememberSaveable(stateSaver = MessageData.Saver) {
-        mutableStateOf(messageData)
-    }
+    val currentMessageData by rememberUpdatedState(messageData)
+    val onDraftChange by rememberUpdatedState(onMessageDataChange)
     var isSubmitting by remember { mutableStateOf(false) }
-    var disposed by remember { mutableStateOf(false) }
     var showAttachmentOptions by rememberSaveable { mutableStateOf(false) }
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCameraPath by rememberSaveable { mutableStateOf<String?>(null) }
@@ -180,7 +181,7 @@ public fun ChatComposer(
             is AttachmentSelectionResult.Accepted -> {
                 deleteManagedDrafts(context, result.replaced)
                 deleteManagedDrafts(context, imported.filterNot { it in result.attachments })
-                messageData = messageData.copy(attachments = result.attachments)
+                onDraftChange(currentMessageData.copy(attachments = result.attachments))
             }
         }
     }
@@ -251,8 +252,10 @@ public fun ChatComposer(
             try {
                 cancellationAwareRunCatching { onTranscribeVoice(pcm) }
                     .onSuccess { transcript ->
-                        messageData = messageData.copy(
-                            text = appendTranscript(messageData.text, transcript),
+                        onDraftChange(
+                            currentMessageData.copy(
+                                text = appendTranscript(currentMessageData.text, transcript),
+                            ),
                         )
                     }
                     .onFailure { error ->
@@ -287,19 +290,18 @@ public fun ChatComposer(
 
     DisposableEffect(Unit) {
         onDispose {
-            disposed = true
             voiceRecorder.release()
             voiceAudio.reset()
             deletePendingCameraAttachment(pendingCameraPath)
-            // 准备中的附件仍由发送读取，等待回执后再清理离开页面的草稿。
-            if (!isSubmitting) deleteManagedDrafts(context, messageData.attachments)
+            // 普通附件归页面草稿所有，切换会话或显示挂起操作时不能随输入组件卸载删除。
         }
     }
 
     LaunchedEffect(sharedMediaUris, isSubmitting) {
         if (sharedMediaUris.isNotEmpty() && !isSubmitting) {
-            acceptSelection(sharedMediaUris)
+            // 先消费分享来源，再导入快照；草稿更新或发送回执不能触发同一次分享重新导入。
             onSharedMediaConsumed()
+            acceptSelection(sharedMediaUris)
         }
     }
 
@@ -308,13 +310,8 @@ public fun ChatComposer(
             keyboardController?.hide()
             val submitted = messageData
             isSubmitting = true
-            onSendClick(submitted) { result ->
+            onSendClick(submitted) {
                 isSubmitting = false
-                if (disposed) {
-                    deleteManagedDrafts(context, submitted.attachments)
-                } else if (result == ChatSubmissionResult.ACCEPTED) {
-                    messageData = consumeAcceptedDraft(messageData, submitted)
-                }
             }
         }
     }
@@ -417,11 +414,13 @@ public fun ChatComposer(
                                 isVoiceInputAvailable = isVoiceInputAvailable,
                                 voiceErrorMessage = voiceErrorMessage,
                                 onVoiceErrorShown = { voiceErrorMessage = null },
-                                onTextChange = { messageData = messageData.copy(text = it) },
+                                onTextChange = { onDraftChange(currentMessageData.copy(text = it)) },
                                 onRemoveAttachment = remove@{ uri ->
                                     if (isSubmitting) return@remove
-                                    messageData = messageData.copy(
-                                        attachments = messageData.attachments - uri,
+                                    onDraftChange(
+                                        currentMessageData.copy(
+                                            attachments = currentMessageData.attachments - uri,
+                                        ),
                                     )
                                     deleteManagedDrafts(context, listOf(uri))
                                 },
@@ -552,8 +551,7 @@ public data class MessageData(
                         val category = runCatching {
                             AttachmentCategory.valueOf(values[4])
                         }.getOrNull() ?: return@mapNotNull null
-                        // 草稿文件是发送/离开页面清理的唯一真相：回执到达前胶囊被卸载时
-                        // 快照仍是旧的，文件已被回执删除则说明该附件已消费，不再恢复 chip。
+                        // 草稿文件可能已被发送归档或存储清理；恢复时不再展示已失效的附件。
                         if (!File(values[0]).exists()) return@mapNotNull null
                         DraftAttachment(
                             reference = values[0],

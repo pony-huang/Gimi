@@ -7,6 +7,7 @@ import com.google.adk.kt.types.FunctionDeclaration
 import github.ponyhuang.gimi.data.agent.tools.mcp.McpSchemaConverter.toAdkFunctionDeclaration
 import github.ponyhuang.gimi.data.agent.tools.mcp.McpToolException.McpToolDeclarationException
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.McpException
 import io.modelcontextprotocol.kotlin.sdk.types.McpJson
 import io.modelcontextprotocol.kotlin.sdk.types.Tool as McpSchemaTool
 import io.modelcontextprotocol.kotlin.sdk.types.ToolAnnotations
@@ -66,10 +67,17 @@ internal constructor(
    * so servers are not asked to produce progress that nothing reads.
    */
   override suspend fun run(context: ToolContext, args: Map<String, Any?>): Any {
-    val callResult = retrySessionCall {
-      client.callTool(name = name, arguments = args, options = mcpSessionManager.requestOptions())
+    return runCatching {
+      retrySessionCall {
+        client.callTool(name = name, arguments = args, options = mcpSessionManager.requestOptions())
+      }.toJsonNativeMap()
+    }.getOrElse { error ->
+      if (error is CancellationException) throw error
+      logger.warn(error) { "MCP tool '$name' returned an error: ${error.message}" }
+      // 关键：必须返回 Map 让 ADK 写入 tool_result，否则下一轮 Anthropic 会以
+      // `tool_use ids were found without tool_result blocks` 拒绝整次请求。
+      mapOf("error" to (error.message ?: error::class.java.simpleName))
     }
-    return callResult.toJsonNativeMap()
   }
 
   private suspend fun <T> retrySessionCall(
@@ -84,6 +92,10 @@ internal constructor(
       session = mcpSessionManager.getSession(headers, stale = session)
       try {
         return session.block()
+      } catch (e: McpException) {
+        // MCP server returned a JSON-RPC error response — its decision is final
+        // (quota exhausted, invalid args, denied). Retrying cannot change it.
+        throw e
       } catch (e: Exception) {
         if (e is CancellationException) {
           throw e

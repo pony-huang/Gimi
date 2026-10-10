@@ -652,14 +652,8 @@ class ChatViewModel @Inject constructor(
             runtime.closePartChannels()
             runtime.messages = messages
             runtime.isLoaded = true
+            // 恢复前台只同步完整内容，阅读位置由列表保留，不能当作用户要求回到最新。
             publishRuntime(runtime)
-            _uiState.update { state ->
-                if (state.sessionId == sessionId) {
-                    state.copy(scrollToLatestRequest = state.scrollToLatestRequest + 1L)
-                } else {
-                    state
-                }
-            }
         }
     }
 

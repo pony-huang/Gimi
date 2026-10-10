@@ -39,7 +39,7 @@
 
     <string name="about_app_name">Gimi</string>
     <string name="about_project_title">Project page</string>
-    <string name="about_project_subtitle">GitHub repository · changelog &amp; feedback</string>
+    <string name="about_project_subtitle">Enjoying Gimi? Give it a star—your support keeps me creating.</string>
 
     <string name="settings_update_title">Check for updates</string>
     <string name="update_subtitle_current">Current version %1$s</string>
@@ -68,4 +68,18 @@
     <string name="update_retry">Retry</string>
     <string name="settings_recommendations_title">Smart recommendations</string>
     <string name="settings_recommendations_subtitle">Configure new-chat suggestions and idle pre-generation</string>
+
+    <string name="logs_title">Logs</string>
+    <string name="logs_subtitle">View and export logs from the last 24 hours</string>
+    <string name="logs_retention">Logs expire after 24 hours and are cleaned up automatically. Storage is limited to 4 MB.</string>
+    <string name="logs_loading">Loading logs…</string>
+    <string name="logs_read_failed">Could not read logs. Please retry.</string>
+    <string name="logs_empty">No logs from the last 24 hours</string>
+    <string name="logs_truncated">Showing recent records only. Export includes all retained logs.</string>
+    <string name="logs_retry">Retry</string>
+    <string name="logs_export">Export</string>
+    <string name="logs_exporting">Exporting…</string>
+    <string name="logs_close">Close</string>
+    <string name="logs_export_success">Logs exported</string>
+    <string name="logs_export_failed">Could not export logs. Please retry.</string>
 </resources>

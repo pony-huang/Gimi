@@ -607,12 +607,15 @@ class ChatViewModelCharacterizationTest {
             ),
         )
 
+        val previousScrollRequest = fixture.viewModel.uiState.value.scrollToLatestRequest
+
         fixture.viewModel.onAction(ChatAction.ResumeChat)
         advanceUntilIdle()
 
         val channel = fixture.viewModel.partChannelFor("part-1")
         org.junit.Assert.assertNotNull(channel)
         assertEquals("hello background", channel?.tryReceive()?.getOrNull())
+        assertEquals(previousScrollRequest, fixture.viewModel.uiState.value.scrollToLatestRequest)
     }
 
     @Test
@@ -636,10 +639,13 @@ class ChatViewModelCharacterizationTest {
         )))
         coEvery { fixture.conversations.loadMessages(sessionId) } returns listOf(persisted)
 
+        val previousScrollRequest = fixture.viewModel.uiState.value.scrollToLatestRequest
+
         fixture.viewModel.onAction(ChatAction.ResumeChat)
         advanceUntilIdle()
 
         assertEquals(listOf(persisted), fixture.viewModel.uiState.value.messages)
+        assertEquals(previousScrollRequest, fixture.viewModel.uiState.value.scrollToLatestRequest)
     }
 
     @Test

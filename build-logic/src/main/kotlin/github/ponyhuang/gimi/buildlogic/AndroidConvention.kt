@@ -5,7 +5,7 @@ import com.android.build.api.dsl.LibraryExtension
 import org.gradle.api.JavaVersion
 
 internal fun ApplicationExtension.configureAndroidApplication() {
-    compileSdk { version = release(37) }
+    compileSdk { version = release(37) { minorApiLevel = 1 } }
     defaultConfig {
         minSdk = 34
         targetSdk = 37
@@ -17,7 +17,7 @@ internal fun ApplicationExtension.configureAndroidApplication() {
 }
 
 internal fun LibraryExtension.configureAndroidLibrary() {
-    compileSdk { version = release(37) }
+    compileSdk { version = release(37) { minorApiLevel = 1 } }
     defaultConfig { minSdk = 34 }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

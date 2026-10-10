@@ -57,6 +57,8 @@ android {
     // Baseline 记录现存 lint 问题，lint 继续对新问题报错。
     lint {
         baseline = file("lint-baseline.xml")
+        // AGP 9.x + lifecycle 2.10+ 触发；Kotlin 2.4.0 注解空性判定已被编译器处理。
+        disable += "InvalidNullabilityAnnotation"
     }
     packaging {
         jniLibs {

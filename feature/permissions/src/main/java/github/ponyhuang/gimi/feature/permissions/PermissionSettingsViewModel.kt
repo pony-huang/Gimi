@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.permissions.model.AppPermission
 import github.ponyhuang.gimi.domain.permissions.model.PermissionSnapshot
-import github.ponyhuang.gimi.domain.permissions.model.RuntimeAppPermissions
 import github.ponyhuang.gimi.domain.permissions.usecase.GetPermissionSnapshotUseCase
 import github.ponyhuang.gimi.domain.permissions.usecase.RecordPermanentlyDeniedPermissionsUseCase
 import github.ponyhuang.gimi.domain.permissions.usecase.RecordRequestedPermissionsUseCase
@@ -37,9 +36,6 @@ class PermissionSettingsViewModel @Inject constructor(
     fun onAction(action: PermissionSettingsAction) {
         when (action) {
             PermissionSettingsAction.Refresh -> refresh()
-            PermissionSettingsAction.RequestAllRuntimePermissions -> requestRuntimePermissions(
-                RuntimeAppPermissions.filterNot { permission -> isGranted(permission) },
-            )
             is PermissionSettingsAction.RequestGroup -> requestGroup(action.kind)
             is PermissionSettingsAction.RuntimePermissionsResult -> {
                 pendingRuntimeRequest = null
@@ -52,6 +48,8 @@ class PermissionSettingsViewModel @Inject constructor(
                 requestSettings(PermissionSettingsDestination.WriteSystemSettings)
             PermissionSettingsAction.OpenNotificationAccess ->
                 requestSettings(PermissionSettingsDestination.NotificationListener)
+            PermissionSettingsAction.OpenOverlaySettings ->
+                requestSettings(PermissionSettingsDestination.Overlay)
             PermissionSettingsAction.OpenUsageAccess ->
                 requestSettings(PermissionSettingsDestination.UsageAccess)
             is PermissionSettingsAction.RuntimeRequestHandled -> _uiState.update {
@@ -140,7 +138,7 @@ private fun PermissionSnapshot.toUiState(): PermissionSettingsUiState {
         groups = groups,
         granted = granted,
         permanentlyDenied = permanentlyDenied,
-        allRuntimeGranted = RuntimeAppPermissions.all(::isGranted),
+        overlayGranted = isGranted(AppPermission.DrawOverlays),
         writeSettingsGranted = isGranted(AppPermission.WriteSystemSettings),
         notificationAccessGranted = isGranted(AppPermission.NotificationListener),
         usageAccessGranted = isGranted(AppPermission.UsageStats),

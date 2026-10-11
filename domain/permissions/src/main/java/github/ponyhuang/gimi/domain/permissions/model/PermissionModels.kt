@@ -13,6 +13,7 @@ enum class AppPermission {
     WriteSystemSettings,
     NotificationListener,
     UsageStats,
+    DrawOverlays,
 }
 
 data class PermissionSnapshot(

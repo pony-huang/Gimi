@@ -90,6 +90,10 @@ fun PermissionSettingsRoute(
                 Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                 "package:${context.packageName}".toUri(),
             )
+            PermissionSettingsDestination.Overlay -> Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                "package:${context.packageName}".toUri(),
+            )
             PermissionSettingsDestination.WriteSystemSettings -> Intent(
                 Settings.ACTION_MANAGE_WRITE_SETTINGS,
                 "package:${context.packageName}".toUri(),
@@ -127,5 +131,6 @@ private fun AppPermission.androidName(): String = when (this) {
     AppPermission.WriteSystemSettings,
     AppPermission.NotificationListener,
     AppPermission.UsageStats,
+    AppPermission.DrawOverlays,
     -> error("Special permissions cannot be requested at runtime.")
 }

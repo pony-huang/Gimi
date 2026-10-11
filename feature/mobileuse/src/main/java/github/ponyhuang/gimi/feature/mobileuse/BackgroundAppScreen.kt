@@ -29,7 +29,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -50,7 +49,6 @@ fun BackgroundAppScreen(
     onAction: (BackgroundAppAction) -> Unit,
     onCollapse: () -> Unit,
     onSwitchWindow: () -> Unit,
-    onOverlayPermission: () -> Unit,
     frame: @Composable (Modifier) -> Unit,
     modifier: Modifier = Modifier,
     toolbarModifier: Modifier = Modifier,
@@ -87,8 +85,6 @@ fun BackgroundAppScreen(
                     DropdownMenu(expanded = state.menuExpanded, onDismissRequest = { onAction(BackgroundAppAction.Menu(false)) }) {
                         DropdownMenuItem(text = { Text(stringResource(if (smallWindow) R.string.background_app_fullscreen else R.string.background_app_small_window)) },
                             onClick = { onAction(BackgroundAppAction.Menu(false)); onSwitchWindow() })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.background_app_window_settings)) },
-                            onClick = { onAction(BackgroundAppAction.Settings(true)) })
                         HorizontalDivider()
                         DropdownMenuItem(text = { Text(stringResource(R.string.background_app_close)) },
                             onClick = { onAction(BackgroundAppAction.Close) })
@@ -123,25 +119,6 @@ fun BackgroundAppScreen(
                         Icon(Icons.Outlined.SouthEast, contentDescription = stringResource(R.string.background_app_resize),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                }
-            }
-        }
-    }
-    if (state.settingsVisible) {
-        dialogHost({ onAction(BackgroundAppAction.Settings(false)) }) {
-            BackgroundAppDialogContent(
-                title = stringResource(R.string.background_app_window_settings),
-                onConfirm = { onAction(BackgroundAppAction.Settings(false)) },
-            ) {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(stringResource(R.string.background_app_default_small))
-                            Text(stringResource(R.string.background_app_default_small_detail), style = MaterialTheme.typography.bodySmall)
-                        }
-                        Switch(checked = state.smallWindowEnabled, onCheckedChange = { onAction(BackgroundAppAction.SmallWindow(it)) })
-                    }
-                    TextButton(onClick = onOverlayPermission) { Text(stringResource(R.string.background_app_overlay_permission)) }
                 }
             }
         }

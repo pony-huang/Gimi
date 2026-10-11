@@ -1,9 +1,5 @@
 <resources>
     <string name="permissions_section_regular">Regular permissions</string>
-    <string name="permissions_regular_all_granted">All regular permissions are granted</string>
-    <string name="permissions_grant_all">Grant all regular permissions</string>
-    <string name="permissions_partial_blocked">Some permissions are blocked by the system. Please open the app settings to enable them manually.</string>
-    <string name="permissions_open_settings">Open app settings</string>
 
     <string name="permissions_section_special">Special permissions</string>
     <string name="permissions_special_modify_settings_title">Modify system settings</string>
@@ -30,4 +26,6 @@
 
     <!-- Permission screen title (consumed by :app SettingsScaffold) -->
     <string name="permissions_screen_title">Permissions</string>
+    <string name="permissions_special_overlay_title">Display over other apps</string>
+    <string name="permissions_special_overlay_subtitle">Allow the small window to appear over other apps</string>
 </resources>

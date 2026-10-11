@@ -1,11 +1,7 @@
 package github.ponyhuang.gimi.feature.permissions
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -14,16 +10,13 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -49,51 +42,8 @@ fun PermissionSettingsScreen(
         ) {
             item { PreferenceSectionTitle(text = stringResource(R.string.permissions_section_regular)) }
             item {
+                // 常规权限按组单独申请，永久拒绝时通过对应项目打开应用设置。
                 PreferenceGroupCard {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Button(
-                            onClick = {
-                                onAction(PermissionSettingsAction.RequestAllRuntimePermissions)
-                            },
-                            enabled = !state.allRuntimeGranted,
-                            modifier = Modifier
-                                .fillMaxWidth(0.5f)
-                                .align(Alignment.CenterHorizontally)
-                                .testTag("permissions_grant_all_action"),
-                        ) {
-                            Text(
-                                if (state.allRuntimeGranted) {
-                                    stringResource(R.string.permissions_regular_all_granted)
-                                } else {
-                                    stringResource(R.string.permissions_grant_all)
-                                },
-                            )
-                        }
-                        if (state.permanentlyDenied.isNotEmpty()) {
-                            Text(
-                                text = stringResource(R.string.permissions_partial_blocked),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                            TextButton(
-                                onClick = {
-                                    onAction(PermissionSettingsAction.OpenApplicationSettings)
-                                },
-                            ) {
-                                Text(stringResource(R.string.permissions_open_settings))
-                            }
-                        }
-                    }
-                }
-            }
-            item {
-                // 常规权限组数量有限，整组渲染进同一张卡片；与上方操作卡保持组间距。
-                PreferenceGroupCard(modifier = Modifier.padding(top = 12.dp)) {
                     state.groups.forEachIndexed { index, group ->
                         PreferenceListItem(
                             icon = group.kind.icon,
@@ -119,6 +69,16 @@ fun PermissionSettingsScreen(
             item { PreferenceSectionTitle(text = stringResource(R.string.permissions_section_special)) }
             item {
                 PreferenceGroupCard {
+                    PreferenceListItem(
+                        icon = Icons.Default.Layers,
+                        title = stringResource(R.string.permissions_special_overlay_title),
+                        subtitle = stringResource(R.string.permissions_special_overlay_subtitle),
+                        showDivider = true,
+                        onClick = if (state.overlayGranted) null else {
+                            { onAction(PermissionSettingsAction.OpenOverlaySettings) }
+                        },
+                        trailingContent = { PermissionStatusText(granted = state.overlayGranted) },
+                    )
                     PreferenceListItem(
                         icon = Icons.Default.Tune,
                         title = stringResource(R.string.permissions_special_modify_settings_title),
@@ -246,7 +206,7 @@ private fun PermissionSettingsScreenGrantedPreview() {
                         status = PermissionGroupStatus.Granted,
                     ),
                 ),
-                allRuntimeGranted = true,
+                overlayGranted = true,
                 writeSettingsGranted = true,
                 notificationAccessGranted = true,
                 permanentlyDenied = setOf(AppPermission.RecordAudio),

@@ -36,11 +36,7 @@
     <string name="background_app_more">更多</string>
     <string name="background_app_fullscreen">切换为全屏</string>
     <string name="background_app_small_window">切换为小窗</string>
-    <string name="background_app_window_settings">窗口设置</string>
     <string name="background_app_close">关闭后台应用</string>
-    <string name="background_app_default_small">小窗模式</string>
-    <string name="background_app_default_small_detail">点击气泡时以小窗打开</string>
-    <string name="background_app_overlay_permission">悬浮窗权限</string>
     <string name="background_app_done">确定</string>
     <string name="background_app_disconnected">后台应用已关闭或连接已断开。</string>
     <string name="background_app_preview_unavailable">暂时无法显示画面，请检查应用与连接。安全页面可能不允许显示。</string>

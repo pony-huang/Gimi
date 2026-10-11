@@ -82,6 +82,10 @@ class BackgroundAppWindowHost @Inject constructor(
 
     fun open() {
         val session = repository.displaySession.value ?: return
+        if (repository.smallWindowEnabled.value && !canOverlay()) {
+            openPermissionSettings()
+            return
+        }
         val serviceAvailable = ensureService()
         if (repository.smallWindowEnabled.value && canOverlay() && serviceAvailable) {
             mutablePresentation.value = BackgroundAppPresentation.SMALL_WINDOW
@@ -97,7 +101,18 @@ class BackgroundAppWindowHost @Inject constructor(
         ensureService()
     }
 
+    fun openPermissionSettings() {
+        context.startActivity(Intent(context, github.ponyhuang.gimi.MainActivity::class.java)
+            .setAction(github.ponyhuang.gimi.MainActivity.ACTION_OPEN_PERMISSIONS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+    }
+
     fun switchWindow(small: Boolean) {
+        // 未授权时不保存开启状态，用户授权后可重新启用小窗。
+        if (small && !canOverlay()) {
+            openPermissionSettings()
+            return
+        }
         scope.launch {
             repository.setSmallWindowEnabled(small)
             open()

@@ -1,14 +1,10 @@
 package github.ponyhuang.gimi.mobileuse
 
-import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -29,14 +25,10 @@ internal fun BackgroundAppContent(
     onCollapsed: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
     LaunchedEffect(state.session?.id) { if (state.session == null) onCollapsed() }
     BackgroundAppScreen(state, small, viewModel::onAction,
         onCollapse = { host.collapse(); onCollapsed() },
         onSwitchWindow = { host.switchWindow(!small); if (!small && host.canOverlay()) onCollapsed() },
-        onOverlayPermission = {
-            context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        },
         frame = { frameModifier ->
             state.session?.let { session ->
                 key(session.id) {

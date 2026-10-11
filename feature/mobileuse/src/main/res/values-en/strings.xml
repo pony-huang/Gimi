@@ -36,11 +36,7 @@
     <string name="background_app_more">More</string>
     <string name="background_app_fullscreen">Switch to full screen</string>
     <string name="background_app_small_window">Switch to small window</string>
-    <string name="background_app_window_settings">Window settings</string>
     <string name="background_app_close">Close background app</string>
-    <string name="background_app_default_small">Small window mode</string>
-    <string name="background_app_default_small_detail">Open the bubble in a small window</string>
-    <string name="background_app_overlay_permission">Overlay permission</string>
     <string name="background_app_done">OK</string>
     <string name="background_app_disconnected">The background app was closed or disconnected.</string>
     <string name="background_app_preview_unavailable">The app screen is unavailable. Check the app and connection. Secure pages may block display.</string>

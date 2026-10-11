@@ -73,6 +73,7 @@ fun MainScreen(
     assistantSessionCoordinator: AssistantSessionCoordinator,
     assistantPanelInteractor: AssistantPanelInteractor,
     openChatRequest: Int = 0,
+    openPermissionsRequest: Int = 0,
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
 ) {
@@ -122,6 +123,12 @@ fun MainScreen(
 
     LaunchedEffect(openChatRequest) {
         if (openChatRequest > 0) returnToChat()
+    }
+
+    LaunchedEffect(openPermissionsRequest) {
+        if (openPermissionsRequest > 0 && backStack.lastOrNull() != PermissionDestination.Settings) {
+            backStack.add(PermissionDestination.Settings)
+        }
     }
 
     NavDisplay(

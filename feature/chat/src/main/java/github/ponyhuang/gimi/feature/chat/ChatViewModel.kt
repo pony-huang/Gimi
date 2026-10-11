@@ -97,6 +97,12 @@ class ChatViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
+    private val voiceDictation = VoiceDictationCoordinator(
+        scope = viewModelScope,
+        transcribe = speechRecognitionRepository::transcribe,
+        onModeChange = { mode -> _uiState.update { it.copy(voiceTranscriptionMode = mode) } },
+    )
+
     private val sessionRuntimes = linkedMapOf<String, ChatSessionRuntime>()
 
     private val _effects = MutableSharedFlow<ChatEffect>(extraBufferCapacity = 8)
@@ -155,7 +161,11 @@ class ChatViewModel @Inject constructor(
      * 用户意图统一入口 — 所有"发后即忘"的用户操作都经这里分发，见 [ChatAction]。
      */
     fun onAction(action: ChatAction) {
+        if (action is ChatAction.SwitchSession || action == ChatAction.NewConversation) {
+            voiceDictation.cancel()
+        }
         when (action) {
+            ChatAction.CancelVoiceTranscription -> voiceDictation.cancel()
             ChatAction.RetryFailedTurn -> turnRecoveryCoordinator.retry()
             ChatAction.ResumeChat -> resumeChat()
             ChatAction.StopStreaming -> runLifecycleCoordinator.stopStreaming()
@@ -203,8 +213,14 @@ class ChatViewModel @Inject constructor(
         _effects.tryEmit(ChatEffect.ShowNotice(notice))
     }
 
-    suspend fun transcribeVoice(pcm16: ByteArray): String =
-        speechRecognitionRepository.transcribe(pcm16)
+    fun transcribeVoice(
+        pcm16: ByteArray,
+        mode: VoiceInputMode,
+        draft: MessageData,
+        onResult: (Result<VoiceDictationResult>) -> Unit,
+    ) {
+        voiceDictation.start(pcm16, mode, draft, onResult)
+    }
 
     private fun toggleSpeechPlayback(messageId: String, markdown: String) {
         speechPlaybackController.toggle(messageId, markdownToSpeechText(markdown))
@@ -435,6 +451,7 @@ class ChatViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        voiceDictation.cancel()
         sessionRuntimes.values.forEach { runtime ->
             runLifecycleCoordinator.cancelRun(runtime)
             runtime.closePartChannels()

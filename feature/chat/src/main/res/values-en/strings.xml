@@ -100,7 +100,10 @@
     <string name="chat_voice_recording_failed">Recording failed. Please try again.</string>
     <string name="chat_voice_cancel_recording">Cancel recording</string>
     <string name="chat_voice_finish_recording">Stop and transcribe</string>
+    <string name="chat_voice_transcribe_and_send">Transcribe and send immediately</string>
     <string name="chat_voice_transcribing">Transcribing…</string>
+    <string name="chat_voice_transcribing_and_sending">Transcribing and sending…</string>
+    <string name="chat_voice_no_text_recognized">No text recognized. Please try again.</string>
     <string name="chat_voice_recording_remaining">Recording, %1$d seconds remaining</string>
     <string name="chat_voice_waveform">Live voice waveform</string>
 

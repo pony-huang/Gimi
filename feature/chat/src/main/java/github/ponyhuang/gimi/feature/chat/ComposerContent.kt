@@ -24,7 +24,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -104,7 +103,8 @@ internal fun DefaultComposerInputContent(
     params: ComposerInputContentParams,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
-    val isTranscribing = params.voiceInputState == VoiceInputUiState.Transcribing
+    val transcribing = params.voiceInputState as? VoiceInputUiState.Transcribing
+    val isTranscribing = transcribing != null
 
     val trailingButton = when {
         params.isGenerating -> ComposerTrailingButton.Stop
@@ -136,7 +136,7 @@ internal fun DefaultComposerInputContent(
         SnackbarHost(hostState = snackbarHostState)
 
         if (isTranscribing) {
-            TranscribingContent()
+            TranscribingContent(transcribing.mode)
         } else {
             AttachmentList(
                 attachments = params.messageData.attachments,
@@ -257,19 +257,26 @@ internal fun shouldPerformPendingComposerFocusRestore(
 internal fun composerVerticalPadding(isExpanded: Boolean) = if (isExpanded) 8.dp else 4.dp
 
 @Composable
-private fun TranscribingContent() {
+internal fun TranscribingContent(mode: VoiceInputMode = VoiceInputMode.TRANSCRIBE) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = LocalMinimumInteractiveComponentSize.current)
+            .defaultMinSize(minHeight = 52.dp)
             .padding(horizontal = 16.dp)
             .testTag(VOICE_TRANSCRIBING_TEST_TAG),
-        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+        CircularProgressIndicator(
+            modifier = Modifier.size(18.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            strokeWidth = 2.dp,
+        )
         Text(
-            text = stringResource(R.string.chat_voice_transcribing),
+            text = stringResource(
+                if (mode == VoiceInputMode.SEND) R.string.chat_voice_transcribing_and_sending
+                else R.string.chat_voice_transcribing,
+            ),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -547,7 +554,7 @@ private fun DefaultComposerInputContentTranscribingPreview() {
             params = ComposerInputContentParams(
                 messageData = MessageData(),
                 isGenerating = false,
-                voiceInputState = VoiceInputUiState.Transcribing,
+                voiceInputState = VoiceInputUiState.Transcribing(),
                 isVoiceInputAvailable = true,
                 voiceErrorMessage = null,
                 onVoiceErrorShown = {},
@@ -558,6 +565,20 @@ private fun DefaultComposerInputContentTranscribingPreview() {
                 onVoiceInputStart = {},
             ),
         )
+    }
+}
+
+@Preview(name = "转写并发送 · 居中", showBackground = true, widthDp = 360)
+@Preview(name = "转写并发送 · 深色", showBackground = true, widthDp = 360, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun TranscribingAndSendingContentPreview() {
+    AsssistantaiTheme {
+        androidx.compose.material3.Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+            color = chatCapsuleColor(),
+        ) {
+            TranscribingContent(VoiceInputMode.SEND)
+        }
     }
 }
 

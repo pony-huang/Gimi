@@ -71,6 +71,8 @@ data class ChatUiState(
     /** 夜间模式偏好；由抽屉底部三态选择器写入，MainActivity 据此解析主题。默认跟随系统。 */
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val isSpeechRecognitionAvailable: Boolean = false,
+    /** 当前转写请求的后续意图；null 表示没有识别任务，任务由 ViewModel 管理。 */
+    val voiceTranscriptionMode: VoiceInputMode? = null,
     val pendingToolConfirmations: List<PendingToolConfirmation> = emptyList(),
     /** Agent 在用户输入类长时运行工具上挂起、等待用户答复的请求（选择/输入卡片数据源）。 */
     val pendingInputRequests: List<UserInputRequest> = emptyList(),

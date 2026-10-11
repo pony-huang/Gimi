@@ -57,7 +57,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
-import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.feature.chat.R
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
@@ -110,7 +109,12 @@ public fun ChatComposer(
     onVoiceAudioChunk: (ByteArray) -> Unit = { },
     onVoiceInputError: (Throwable) -> Unit = { },
     isVoiceInputAvailable: Boolean = false,
-    onTranscribeVoice: suspend (ByteArray) -> String = { error("transcription not configured") },
+    onTranscribeVoice: VoiceTranscriptionRequest = { _, _, _, complete ->
+        complete(Result.failure(IllegalStateException("transcription not configured")))
+    },
+    voiceTranscriptionMode: VoiceInputMode? = null,
+    onCancelVoiceTranscription: () -> Unit = {},
+    voiceInputContextKey: String = "",
     retainExpanded: Boolean = false,
     onExpandedChange: (Boolean) -> Unit = { },
     modelSelectorContent: @Composable () -> Unit = { },
@@ -127,6 +131,11 @@ public fun ChatComposer(
 ) {
     val currentMessageData by rememberUpdatedState(messageData)
     val onDraftChange by rememberUpdatedState(onMessageDataChange)
+    val onSubmit by rememberUpdatedState(onSendClick)
+    val onTranscriptionRequest by rememberUpdatedState(onTranscribeVoice)
+    val onCancelTranscription by rememberUpdatedState(onCancelVoiceTranscription)
+    val currentIsGenerating by rememberUpdatedState(isGenerating)
+    val currentTranscriptionMode by rememberUpdatedState(voiceTranscriptionMode)
     var isSubmitting by remember { mutableStateOf(false) }
     var showAttachmentOptions by rememberSaveable { mutableStateOf(false) }
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
@@ -142,12 +151,13 @@ public fun ChatComposer(
     val voiceNoAudioMessage = stringResource(R.string.chat_voice_no_audio_captured)
     val voiceTranscriptionFailedMessage = stringResource(R.string.chat_voice_transcription_failed)
     val voiceRecordingFailedMessage = stringResource(R.string.chat_voice_recording_failed)
+    val voiceNoTextMessage = stringResource(R.string.chat_voice_no_text_recognized)
     val mixedAttachmentMessage = stringResource(R.string.chat_attachment_mixed_types)
     val attachmentReadFailedMessage = stringResource(R.string.chat_attachment_read_failed)
     val attachmentUnsupportedMessage = stringResource(R.string.chat_attachment_unsupported)
 
     fun acceptSelection(uris: List<Uri>) {
-        if (uris.isEmpty() || isSubmitting) return
+        if (uris.isEmpty() || isSubmitting || currentTranscriptionMode != null) return
         val imported = mutableListOf<DraftAttachment>()
         val result = runCatching {
             uris.forEach { uri ->
@@ -189,6 +199,7 @@ public fun ChatComposer(
     fun startVoiceInput() {
         if (
             voiceInputState != VoiceInputUiState.Idle ||
+            currentTranscriptionMode != null ||
             !isVoiceInputAvailable ||
             isGenerating || isSubmitting
         ) {
@@ -237,7 +248,14 @@ public fun ChatComposer(
         onVoiceInputStop()
     }
 
-    fun finishVoiceInput() {
+    fun submitMessage(submitted: MessageData) {
+        if (isSubmitting || currentIsGenerating || (submitted.text.isBlank() && submitted.attachments.isEmpty())) return
+        keyboardController?.hide()
+        isSubmitting = true
+        onSubmit(submitted) { isSubmitting = false }
+    }
+
+    fun finishVoiceInput(mode: VoiceInputMode = VoiceInputMode.TRANSCRIBE) {
         if (voiceInputState !is VoiceInputUiState.Recording) return
         voiceRecorder.stop()
         onVoiceInputStop()
@@ -247,23 +265,19 @@ public fun ChatComposer(
             voiceErrorMessage = voiceNoAudioMessage
             return
         }
-        voiceInputState = VoiceInputUiState.Transcribing
-        coroutineScope.launch {
-            try {
-                cancellationAwareRunCatching { onTranscribeVoice(pcm) }
-                    .onSuccess { transcript ->
-                        onDraftChange(
-                            currentMessageData.copy(
-                                text = appendTranscript(currentMessageData.text, transcript),
-                            ),
-                        )
-                    }
-                    .onFailure { error ->
-                        voiceErrorMessage = error.message ?: voiceTranscriptionFailedMessage
-                        onVoiceInputError(error)
-                    }
-            } finally {
-                voiceInputState = VoiceInputUiState.Idle
+        // 同步退出录音态，重复点击不能再次排入转写或发送；等待状态由 ViewModel 提供。
+        voiceInputState = VoiceInputUiState.Idle
+        onTranscriptionRequest(pcm, mode, currentMessageData) { result ->
+            result.onSuccess { recognized ->
+                onDraftChange(recognized.message)
+                if (recognized.sendImmediately) submitMessage(recognized.message)
+            }.onFailure { error ->
+                voiceErrorMessage = if (error is EmptyVoiceTranscriptException) {
+                    voiceNoTextMessage
+                } else {
+                    error.message ?: voiceTranscriptionFailedMessage
+                }
+                onVoiceInputError(error)
             }
         }
     }
@@ -272,6 +286,11 @@ public fun ChatComposer(
         if (isGenerating && voiceInputState is VoiceInputUiState.Recording) {
             cancelVoiceInput()
         }
+        if (isGenerating) onCancelTranscription()
+    }
+
+    LaunchedEffect(voiceInputContextKey) {
+        cancelVoiceInput()
     }
 
     LaunchedEffect(voiceInputState is VoiceInputUiState.Recording) {
@@ -292,13 +311,14 @@ public fun ChatComposer(
         onDispose {
             voiceRecorder.release()
             voiceAudio.reset()
+            onCancelTranscription()
             deletePendingCameraAttachment(pendingCameraPath)
             // 普通附件归页面草稿所有，切换会话或显示挂起操作时不能随输入组件卸载删除。
         }
     }
 
-    LaunchedEffect(sharedMediaUris, isSubmitting) {
-        if (sharedMediaUris.isNotEmpty() && !isSubmitting) {
+    LaunchedEffect(sharedMediaUris, isSubmitting, voiceTranscriptionMode) {
+        if (sharedMediaUris.isNotEmpty() && !isSubmitting && voiceTranscriptionMode == null) {
             // 先消费分享来源，再导入快照；草稿更新或发送回执不能触发同一次分享重新导入。
             onSharedMediaConsumed()
             acceptSelection(sharedMediaUris)
@@ -306,14 +326,7 @@ public fun ChatComposer(
     }
 
     val handleSendClick: () -> Unit = {
-        if (!isSubmitting) {
-            keyboardController?.hide()
-            val submitted = messageData
-            isSubmitting = true
-            onSendClick(submitted) {
-                isSubmitting = false
-            }
-        }
+        submitMessage(currentMessageData)
     }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -398,7 +411,8 @@ public fun ChatComposer(
                             levels = recordingState.levels,
                             remainingSeconds = recordingState.remainingSeconds,
                             onCancel = ::cancelVoiceInput,
-                            onFinish = ::finishVoiceInput,
+                            onFinish = { finishVoiceInput(VoiceInputMode.TRANSCRIBE) },
+                            onSend = { finishVoiceInput(VoiceInputMode.SEND) },
                         ),
                     )
                 }
@@ -410,7 +424,8 @@ public fun ChatComposer(
                                 messageData = messageData,
                                 isGenerating = isGenerating || isSubmitting,
                                 configurationReady = addToChatState.configuration != null,
-                                voiceInputState = voiceInputState,
+                                voiceInputState = voiceTranscriptionMode?.let { VoiceInputUiState.Transcribing(it) }
+                                    ?: voiceInputState,
                                 isVoiceInputAvailable = isVoiceInputAvailable,
                                 voiceErrorMessage = voiceErrorMessage,
                                 onVoiceErrorShown = { voiceErrorMessage = null },

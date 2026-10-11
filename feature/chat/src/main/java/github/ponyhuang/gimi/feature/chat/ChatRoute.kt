@@ -157,6 +157,7 @@ fun ChatRoute(
             onSend = viewModel::send,
             onStop = { viewModel.onAction(ChatAction.StopStreaming) },
             onTranscribeVoice = viewModel::transcribeVoice,
+            onCancelVoiceTranscription = { viewModel.onAction(ChatAction.CancelVoiceTranscription) },
             onToggleSpeechPlayback = { messageId, markdown ->
                 viewModel.onAction(ChatAction.ToggleSpeechPlayback(messageId, markdown))
             },

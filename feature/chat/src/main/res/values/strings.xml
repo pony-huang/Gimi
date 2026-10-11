@@ -104,8 +104,11 @@
     <string name="chat_voice_transcription_failed">语音识别失败，请重试</string>
     <string name="chat_voice_recording_failed">录音失败，请重试</string>
     <string name="chat_voice_cancel_recording">取消录音</string>
-    <string name="chat_voice_finish_recording">停止并识别</string>
-    <string name="chat_voice_transcribing">正在识别…</string>
+    <string name="chat_voice_finish_recording">停止录音并转写到输入框</string>
+    <string name="chat_voice_transcribe_and_send">转写并直接发送</string>
+    <string name="chat_voice_transcribing">正在转写…</string>
+    <string name="chat_voice_transcribing_and_sending">正在转写并发送…</string>
+    <string name="chat_voice_no_text_recognized">没有识别到文字，请重试</string>
     <string name="chat_voice_recording_remaining">录音中，剩余 %1$d 秒</string>
     <string name="chat_voice_waveform">实时语音波形</string>
 

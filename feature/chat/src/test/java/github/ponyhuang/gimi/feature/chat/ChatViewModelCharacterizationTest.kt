@@ -112,6 +112,52 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun cancelledVoiceTranscriptionClearsViewModelWaitingStateWithoutDeliveringText() = runTest {
+        val transcript = CompletableDeferred<String>()
+        val recognition = mockk<SpeechRecognitionRepository>(relaxed = true) {
+            every { availability } returns MutableStateFlow(true)
+            coEvery { transcribe(any()) } coAnswers { transcript.await() }
+        }
+        val fixture = fixture(configured = true, recognitionOverride = recognition)
+        var deliveries = 0
+        fixture.viewModel.transcribeVoice(byteArrayOf(1, 2), VoiceInputMode.SEND, MessageData("原草稿")) {
+            deliveries++
+        }
+        assertEquals(VoiceInputMode.SEND, fixture.viewModel.uiState.value.voiceTranscriptionMode)
+        runCurrent()
+        fixture.viewModel.onAction(ChatAction.CancelVoiceTranscription)
+        assertNull(fixture.viewModel.uiState.value.voiceTranscriptionMode)
+        transcript.complete("迟到的识别文字")
+        runCurrent()
+        assertEquals(0, deliveries)
+    }
+
+    @Test
+    fun voiceDirectSendUsesOrdinaryValidationAndKeepsRecognizedDraftWhenRejected() = runTest {
+        val recognition = mockk<SpeechRecognitionRepository>(relaxed = true) {
+            every { availability } returns MutableStateFlow(true)
+            coEvery { transcribe(any()) } returns "识别文字"
+        }
+        val fixture = fixture(configured = false, recognitionOverride = recognition)
+        var draft = MessageData("原草稿")
+        var receipt: ChatSubmissionResult? = null
+        fixture.viewModel.transcribeVoice(byteArrayOf(1, 2), VoiceInputMode.SEND, draft) { result ->
+            val recognized = result.getOrThrow()
+            draft = recognized.message
+            if (recognized.sendImmediately) {
+                fixture.viewModel.send(draft.text, draft.attachments) {
+                    receipt = it
+                    if (it == ChatSubmissionResult.ACCEPTED) draft = consumeAcceptedDraft(draft, recognized.message)
+                }
+            }
+        }
+        runCurrent()
+        assertNull(fixture.viewModel.uiState.value.voiceTranscriptionMode)
+        assertEquals(ChatSubmissionResult.REJECTED, receipt)
+        assertEquals("原草稿 识别文字", draft.text)
+    }
+
+    @Test
     fun cancellationWhilePreparingAttachmentsReleasesLeaseAndRunningState() = runTest {
         val gate = FakeAgentRuntimeGate()
         val fixture = fixture(
@@ -1886,6 +1932,7 @@ class ChatViewModelCharacterizationTest {
         contentRevisions: MutableStateFlow<Map<String, Long>> = MutableStateFlow(emptyMap()),
         attachmentReadFailure: Exception? = null,
         sessionResolverOverride: ConversationSessionResolver? = null,
+        recognitionOverride: SpeechRecognitionRepository? = null,
     ): Fixture {
         val selection = ModelSelection("service", "chat", "model")
         val services = if (configured) listOf(service()) else emptyList()
@@ -1915,7 +1962,7 @@ class ChatViewModelCharacterizationTest {
             every { themeMode } returns MutableStateFlow(ThemeMode.SYSTEM)
             every { setThemeMode(any()) } returns Unit
         }
-        val recognition = mockk<SpeechRecognitionRepository>(relaxed = true) {
+        val recognition = recognitionOverride ?: mockk<SpeechRecognitionRepository>(relaxed = true) {
             every { availability } returns MutableStateFlow(false)
         }
         val playback = mockk<SpeechPlaybackRepository>(relaxed = true) {

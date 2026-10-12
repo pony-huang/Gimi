@@ -69,10 +69,10 @@ internal class HttpTransport(private val config: E2BConfig) : Closeable {
             .method(method, value?.let(::jsonBody)).build(), config.requestTimeoutSeconds,
     )
 
-    fun envdRequest(base: String, segments: List<String>, sandboxId: String, token: String?, user: String?): Request.Builder {
+    fun envdRequest(base: String, segments: List<String>, sandboxId: String, token: String?, user: String?, port: Int = 49983): Request.Builder {
         return Request.Builder().url(url(base, *segments.toTypedArray()))
             .header("E2b-Sandbox-Id", sandboxId)
-            .header("E2b-Sandbox-Port", "49983")
+            .header("E2b-Sandbox-Port", port.toString())
             .apply {
                 token?.let { header("X-Access-Token", it) }
                 user?.let { header("Authorization", "Basic " + Base64.getEncoder().encodeToString("$it:".toByteArray(Charsets.UTF_8))) }
@@ -81,10 +81,10 @@ internal class HttpTransport(private val config: E2BConfig) : Closeable {
 
     fun execute(request: Request, timeoutSeconds: Int): Response = network { call(request, timeoutSeconds).execute() }
 
-    fun call(request: Request, timeoutSeconds: Int): Call {
+    fun call(request: Request, timeoutSeconds: Int, readTimeoutSeconds: Int = if (timeoutSeconds == 0) 0 else config.requestTimeoutSeconds): Call {
         check(!closed) { "E2BClient is closed" }
         val configured = client.newBuilder()
-            .readTimeout(if (timeoutSeconds == 0) 0 else config.requestTimeoutSeconds.toLong(), TimeUnit.SECONDS)
+            .readTimeout(readTimeoutSeconds.toLong(), TimeUnit.SECONDS)
             .callTimeout(timeoutSeconds.toLong(), TimeUnit.SECONDS)
             .build()
         return configured.newCall(request.newBuilder().header("User-Agent", "e2b-kotlin/0.1.0").build())
@@ -104,9 +104,11 @@ internal class HttpTransport(private val config: E2BConfig) : Closeable {
         return Json.parse(network { response.body?.string() } ?: throw ProtocolException("Missing response body"))
     }
 
+    fun cancelRequests() = client.dispatcher.cancelAll()
+
     override fun close() {
         closed = true
-        client.dispatcher.cancelAll()
+        cancelRequests()
         client.connectionPool.evictAll()
         client.dispatcher.executorService.shutdown()
     }
@@ -116,7 +118,7 @@ internal class Envd(
     private val http: HttpTransport,
     private val config: E2BConfig,
     val sandboxId: String,
-    domain: String,
+    private val domain: String,
     private val token: String?,
     version: String,
 ) {
@@ -132,6 +134,23 @@ internal class Envd(
 
     fun request(segments: List<String>, username: String? = null): Request.Builder =
         http.envdRequest(base, segments, sandboxId, token, user(username))
+
+    fun executeCode(code: String, options: CodeOptions): Response {
+        val interpreterBase = config.codeInterpreterUrl ?: if (domain in setOf("e2b.app", "e2b.dev", "e2b.pro", "e2b-staging.dev")) {
+            "https://sandbox.$domain"
+        } else "https://49999-$sandboxId.$domain"
+        val request = http.envdRequest(interpreterBase, listOf("execute"), sandboxId, token, null, 49999)
+            .post(http.jsonBody(mapOf("code" to code, "language" to options.language, "env_vars" to options.envs.toMap())))
+            .build()
+        val response = network { http.call(request, options.timeoutSeconds, options.timeoutSeconds).execute() }
+        try {
+            http.check(response)
+            return response
+        } catch (error: Throwable) {
+            response.close()
+            throw error
+        }
+    }
 
     fun unary(service: String, method: String, body: Any, username: String? = null): JsonObject {
         val request = request(listOf(service, method), username)
@@ -166,14 +185,27 @@ internal class Envd(
         }
     }
 
-    fun readFile(path: String, username: String?): ByteArray {
+    fun readFile(path: String, username: String?, maxBytes: Int? = null): ByteArray {
         val builder = http.envdRequest(base, listOf("files"), sandboxId, token, null)
         val url = builder.build().url.newBuilder().addQueryParameter("path", path).apply {
             user(username)?.let { addQueryParameter("username", it) }
         }.build()
         return http.execute(builder.url(url).get().build(), config.requestTimeoutSeconds).use {
             http.check(it)
-            network { it.body?.bytes() } ?: throw ProtocolException("Missing file body")
+            val body = it.body ?: throw ProtocolException("Missing file body")
+            if (maxBytes == null) network { body.bytes() } else {
+                if (body.contentLength() > maxBytes) throw FileSizeLimitException()
+                val output = okio.Buffer()
+                val source = body.source()
+                network {
+                    while (true) {
+                        val read = source.read(output, minOf(8192L, maxBytes.toLong() + 1 - output.size))
+                        if (read == -1L) break
+                        if (output.size > maxBytes) throw FileSizeLimitException()
+                    }
+                    output.readByteArray()
+                }
+            }
         }
     }
 

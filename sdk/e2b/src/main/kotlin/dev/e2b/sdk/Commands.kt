@@ -111,6 +111,11 @@ class CommandHandle internal constructor(
             val completed = CommandResult(pid, stdout.toByteArray().toString(Charsets.UTF_8), stderr.toByteArray().toString(Charsets.UTF_8), code)
             result = completed
             return checked(completed)
+        } catch (failure: E2BException) {
+            // 失败前收到的输出仍有诊断价值，但不能据此把未知执行状态报告成成功。
+            val partial = stdout.toByteArray().toString(Charsets.UTF_8) + stderr.toByteArray().toString(Charsets.UTF_8)
+            if (partial.isEmpty() || failure is CommandExitException) throw failure
+            throw PartialOutputException(failure, partial)
         } finally { close() }
     }
 

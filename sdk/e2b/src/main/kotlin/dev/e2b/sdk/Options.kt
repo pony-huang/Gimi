@@ -9,12 +9,14 @@ class E2BConfig private constructor(
     val domain: String,
     val requestTimeoutSeconds: Int,
     internal val sandboxUrl: String?,
+    internal val codeInterpreterUrl: String?,
 ) {
     class Builder {
         private var apiKey = System.getenv("E2B_API_KEY") ?: ""
         private var domain = System.getenv("E2B_DOMAIN") ?: "e2b.app"
         private var apiUrl: String? = null
         private var sandboxUrl: String? = null
+        private var codeInterpreterUrl: String? = null
         private var requestTimeoutSeconds = 60
 
         fun apiKey(value: String) = apply { apiKey = value }
@@ -22,6 +24,8 @@ class E2BConfig private constructor(
         fun apiUrl(value: String) = apply { apiUrl = value }
         /** Override envd URL for local tests or self-hosting; never use for application ports. */
         fun sandboxUrl(value: String) = apply { sandboxUrl = value }
+        /** Override the interpreter endpoint for tests or self-hosting; independent from envd. */
+        fun codeInterpreterUrl(value: String) = apply { codeInterpreterUrl = value }
         fun requestTimeoutSeconds(value: Int) = apply { requestTimeoutSeconds = value }
         fun build(): E2BConfig {
             require(apiKey.isNotBlank()) { "Set E2B_API_KEY or provide an API key" }
@@ -32,7 +36,10 @@ class E2BConfig private constructor(
             sandboxUrl?.toHttpUrl()?.let {
                 require(it.username.isEmpty() && it.password.isEmpty() && it.query == null && it.fragment == null)
             }
-            return E2BConfig(apiKey, url.toString(), domain, requestTimeoutSeconds, sandboxUrl)
+            codeInterpreterUrl?.toHttpUrl()?.let {
+                require(it.username.isEmpty() && it.password.isEmpty() && it.query == null && it.fragment == null)
+            }
+            return E2BConfig(apiKey, url.toString(), domain, requestTimeoutSeconds, sandboxUrl, codeInterpreterUrl)
         }
     }
 

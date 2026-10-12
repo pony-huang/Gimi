@@ -91,6 +91,9 @@ class E2BClient @JvmOverloads constructor(val config: E2BConfig = E2BConfig.buil
         return Sandbox(this, id, domain, Envd(http, config, id, domain, token, version))
     }
 
+    /** Cancel in-flight local requests without closing this reusable client. */
+    fun cancelRequests() = http.cancelRequests()
+
     override fun close() = http.close()
 
     companion object {

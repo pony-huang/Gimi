@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
@@ -82,6 +83,12 @@ fun SettingsScreen(
                                 title = stringResource(R.string.settings_mcp_title),
                                 subtitle = stringResource(R.string.settings_mcp_subtitle),
                                 action = SettingsAction.OpenMcpServers,
+                            ),
+                            SettingsNavigationItem(
+                                icon = Icons.Default.Code,
+                                title = stringResource(R.string.settings_sandbox_title),
+                                subtitle = stringResource(R.string.settings_sandbox_subtitle),
+                                action = SettingsAction.OpenSandbox,
                             ),
                             SettingsNavigationItem(
                                 icon = Icons.Default.Folder,

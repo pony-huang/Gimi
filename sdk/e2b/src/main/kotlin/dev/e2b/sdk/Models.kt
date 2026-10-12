@@ -59,5 +59,13 @@ class RateLimitException internal constructor(status: Int?, retryAfter: String?)
 class CommandExitException(val result: CommandResult) : E2BException("Command exited with code ${result.exitCode}")
 class ProtocolException internal constructor(message: String) : E2BException(message)
 
+/** A bounded file read exceeded its configured byte limit. */
+class FileSizeLimitException internal constructor() : E2BException("File exceeds configured size limit")
+
+/** Execution failed after output was captured; failure retains the typed underlying SDK error. */
+class PartialOutputException(val failure: E2BException, val partialOutput: String) : E2BException(
+    failure.message ?: "Execution failed", failure.statusCode, failure.rpcCode, failure.retryAfter, failure,
+)
+
 /** Network I/O failure, including a local request deadline or cancelled stream. */
 class TransportException internal constructor(cause: java.io.IOException) : E2BException("E2B transport failed", cause = cause)

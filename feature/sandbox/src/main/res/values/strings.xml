@@ -1,0 +1,35 @@
+<resources>
+    <string name="sandbox_screen_title">沙盒</string>
+    <string name="sandbox_e2b">E2B</string>
+    <string name="sandbox_disabled_description">在隔离环境中执行代码与文件操作</string>
+    <string name="sandbox_pending_description">待配置 · 请填写 API Key 并保存</string>
+    <string name="sandbox_configured_description">已配置 · 按聊天独立使用沙盒</string>
+    <string name="sandbox_domain">Domain</string>
+    <string name="sandbox_domain_help">请填写基础域名，例如 e2b.app</string>
+    <string name="sandbox_api_key">API Key</string>
+    <string name="sandbox_key_required">请填写 API Key</string>
+    <string name="sandbox_key_help">密钥加密保存在本机</string>
+    <string name="sandbox_hide_key">隐藏 API Key</string>
+    <string name="sandbox_show_key">显示 API Key</string>
+    <string name="sandbox_advanced">高级配置</string>
+    <string name="sandbox_advanced_description">模板、闲置超时和环境变量</string>
+    <string name="sandbox_expand_advanced">展开高级配置</string>
+    <string name="sandbox_collapse_advanced">收起高级配置</string>
+    <string name="sandbox_template">Template</string>
+    <string name="sandbox_template_help">模板需支持代码解释器</string>
+    <string name="sandbox_template_required">请填写模板名称或 ID</string>
+    <string name="sandbox_idle_timeout">沙盒闲置超时（秒）</string>
+    <string name="sandbox_timeout_help">闲置超过此时间后销毁环境</string>
+    <string name="sandbox_timeout_invalid">请填写大于 0 的整数秒数</string>
+    <string name="sandbox_environment">环境变量</string>
+    <string name="sandbox_environment_help">创建沙盒时设置，值加密保存在本机</string>
+    <string name="sandbox_environment_name">名称</string>
+    <string name="sandbox_environment_value">值</string>
+    <string name="sandbox_environment_invalid">请填写有效且不重复的变量名称</string>
+    <string name="sandbox_remove_environment">删除环境变量</string>
+    <string name="sandbox_add_environment">添加环境变量</string>
+    <string name="sandbox_save">保存配置</string>
+    <string name="sandbox_saving">正在保存…</string>
+    <string name="sandbox_saved">沙盒配置已保存</string>
+    <string name="sandbox_save_failed">保存失败，请重试</string>
+</resources>

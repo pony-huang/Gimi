@@ -25,6 +25,10 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "asssistantai"
+includeBuild("sdk/e2b") { name = "e2b-sdk" }
+include(":domain:sandbox")
+include(":data:sandbox")
+include(":feature:sandbox")
 include(":app")
 include(":domain:modelcatalog")
 include(":domain:assistant")

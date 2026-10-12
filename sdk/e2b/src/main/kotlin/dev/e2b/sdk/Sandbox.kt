@@ -13,6 +13,7 @@ class Sandbox internal constructor(
 ) : Closeable {
     val commands = Commands(envd)
     val files = Filesystem(envd)
+    val code = CodeInterpreter(envd)
     internal var ownsClient = false
 
     fun getInfo(): SandboxInfo = client.getInfo(sandboxId)

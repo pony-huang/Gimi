@@ -38,6 +38,7 @@ class SettingsViewModel @Inject constructor(
             SettingsAction.OpenModelService -> emitEffect(SettingsEffect.NavigateToModelService)
             SettingsAction.OpenDefaultModels -> emitEffect(SettingsEffect.NavigateToDefaultModels)
             SettingsAction.OpenMcpServers -> emitEffect(SettingsEffect.NavigateToMcpServers)
+            SettingsAction.OpenSandbox -> emitEffect(SettingsEffect.NavigateToSandbox)
             SettingsAction.OpenPlugins -> emitEffect(SettingsEffect.NavigateToPlugins)
             SettingsAction.OpenSkills -> emitEffect(SettingsEffect.NavigateToSkills)
             SettingsAction.OpenWorkFiles -> emitEffect(SettingsEffect.NavigateToWorkFiles)

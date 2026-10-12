@@ -41,6 +41,7 @@ shizuku = "13.1.5"
 mlkitTextRecognition = "16.0.1"
 
 [libraries]
+e2b-sdk = { module = "dev.e2b.community:e2b-sdk", version = "0.1.0-SNAPSHOT" }
 mlkit-text-recognition-chinese = { module = "com.google.mlkit:text-recognition-chinese", version.ref = "mlkitTextRecognition" }
 shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
 shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }

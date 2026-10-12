@@ -17,6 +17,7 @@ fun SettingsRoute(
     onNavigateToModelService: () -> Unit,
     onNavigateToDefaultModels: () -> Unit,
     onNavigateToMcpServers: () -> Unit,
+    onNavigateToSandbox: () -> Unit,
     onNavigateToPlugins: () -> Unit,
     onNavigateToSkills: () -> Unit,
     onNavigateToWorkFiles: () -> Unit,
@@ -38,6 +39,7 @@ fun SettingsRoute(
             SettingsEffect.NavigateToModelService -> onNavigateToModelService()
             SettingsEffect.NavigateToDefaultModels -> onNavigateToDefaultModels()
             SettingsEffect.NavigateToMcpServers -> onNavigateToMcpServers()
+            SettingsEffect.NavigateToSandbox -> onNavigateToSandbox()
             SettingsEffect.NavigateToPlugins -> onNavigateToPlugins()
             SettingsEffect.NavigateToSkills -> onNavigateToSkills()
             SettingsEffect.NavigateToWorkFiles -> onNavigateToWorkFiles()

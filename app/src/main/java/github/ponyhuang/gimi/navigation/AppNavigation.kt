@@ -53,6 +53,8 @@ import github.ponyhuang.gimi.feature.plugin.PluginEntryProvider
 import github.ponyhuang.gimi.feature.recommendation.RecommendationDestination
 import github.ponyhuang.gimi.feature.recommendation.RecommendationEntryProvider
 import github.ponyhuang.gimi.feature.settings.SettingsDestination
+import github.ponyhuang.gimi.feature.sandbox.SandboxDestination
+import github.ponyhuang.gimi.feature.sandbox.SandboxEntryProvider
 import github.ponyhuang.gimi.feature.settings.SettingsEntryProvider
 import github.ponyhuang.gimi.feature.settings.SettingsNavigationCallbacks
 import github.ponyhuang.gimi.feature.skills.SkillsDestination
@@ -162,6 +164,7 @@ fun MainScreen(
                             navigate(ModelSettingsDestination.Defaults)
                         },
                         onNavigateToMcpServers = { navigate(McpDestination.ServerList) },
+                        onNavigateToSandbox = { navigate(SandboxDestination.Settings) },
                         onNavigateToPlugins = { navigate(PluginDestination.Settings) },
                         onNavigateToSkills = { navigate(SkillsDestination.Settings) },
                         onNavigateToWorkFiles = { navigate(WorkFilesDestination.Settings) },
@@ -180,6 +183,7 @@ fun MainScreen(
                         onNavigateToAbout = { navigate(SettingsDestination.About) },
                     ),
                 ) || ModelSettingsEntryProvider(destination, goBack, navigate) ||
+                    SandboxEntryProvider(destination, goBack) ||
                     McpEntryProvider(destination, goBack, navigate, replaceCurrent) ||
                     PluginEntryProvider(destination, goBack, navigate) ||
                     ToolAuthorizationEntryProvider(destination, goBack, navigate) ||

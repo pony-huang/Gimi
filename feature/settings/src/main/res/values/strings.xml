@@ -1,4 +1,6 @@
 <resources>
+    <string name="settings_sandbox_title">沙盒</string>
+    <string name="settings_sandbox_subtitle">配置 E2B 执行环境</string>
     <string name="settings_title">设置</string>
 
     <string name="settings_group_model">模型</string>

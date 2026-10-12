@@ -4,6 +4,11 @@ package dev.e2b.sdk
 class Filesystem internal constructor(private val envd: Envd) {
     @JvmOverloads fun read(path: String, user: String? = null): String = readBytes(path, user).toString(Charsets.UTF_8)
     @JvmOverloads fun readBytes(path: String, user: String? = null): ByteArray = envd.readFile(path, user)
+    /** Read at most maxBytes; rejects oversized files without buffering the entire response. */
+    @JvmOverloads fun readBytes(path: String, maxBytes: Int, user: String? = null): ByteArray {
+        require(maxBytes > 0)
+        return envd.readFile(path, user, maxBytes)
+    }
     @JvmOverloads fun write(path: String, text: String, user: String? = null): WriteInfo = write(path, text.toByteArray(Charsets.UTF_8), user)
     @JvmOverloads fun write(path: String, bytes: ByteArray, user: String? = null): WriteInfo {
         val json = envd.writeFile(path, bytes, user)

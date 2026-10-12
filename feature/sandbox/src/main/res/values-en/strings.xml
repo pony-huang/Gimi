@@ -1,0 +1,35 @@
+<resources>
+    <string name="sandbox_screen_title">Sandbox</string>
+    <string name="sandbox_e2b">E2B</string>
+    <string name="sandbox_disabled_description">Run code and file operations in an isolated environment</string>
+    <string name="sandbox_pending_description">Not configured · Enter an API Key and save</string>
+    <string name="sandbox_configured_description">Configured · Separate sandbox for each conversation</string>
+    <string name="sandbox_domain">Domain</string>
+    <string name="sandbox_domain_help">Enter a base domain, such as e2b.app</string>
+    <string name="sandbox_api_key">API Key</string>
+    <string name="sandbox_key_required">Enter an API Key</string>
+    <string name="sandbox_key_help">The key is encrypted on this device</string>
+    <string name="sandbox_hide_key">Hide API Key</string>
+    <string name="sandbox_show_key">Show API Key</string>
+    <string name="sandbox_advanced">Advanced configuration</string>
+    <string name="sandbox_advanced_description">Template, idle timeout and environment variables</string>
+    <string name="sandbox_expand_advanced">Expand advanced configuration</string>
+    <string name="sandbox_collapse_advanced">Collapse advanced configuration</string>
+    <string name="sandbox_template">Template</string>
+    <string name="sandbox_template_help">The template must support Code Interpreter</string>
+    <string name="sandbox_template_required">Enter a template name or ID</string>
+    <string name="sandbox_idle_timeout">Sandbox idle timeout (seconds)</string>
+    <string name="sandbox_timeout_help">Destroy the environment after this idle period</string>
+    <string name="sandbox_timeout_invalid">Enter a positive integer number of seconds</string>
+    <string name="sandbox_environment">Environment variables</string>
+    <string name="sandbox_environment_help">Set at sandbox creation; values are encrypted on this device</string>
+    <string name="sandbox_environment_name">Name</string>
+    <string name="sandbox_environment_value">Value</string>
+    <string name="sandbox_environment_invalid">Enter a valid, unique variable name</string>
+    <string name="sandbox_remove_environment">Remove environment variable</string>
+    <string name="sandbox_add_environment">Add environment variable</string>
+    <string name="sandbox_save">Save configuration</string>
+    <string name="sandbox_saving">Saving…</string>
+    <string name="sandbox_saved">Sandbox configuration saved</string>
+    <string name="sandbox_save_failed">Could not save. Try again.</string>
+</resources>

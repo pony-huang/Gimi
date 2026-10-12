@@ -80,99 +80,112 @@ fun SandboxSettingsScreen(state: SandboxSettingsUiState, onAction: (SandboxSetti
                         switchEnabled = !state.busy,
                         onCheckedChange = { onAction(SandboxSettingsAction.SetEnabled(it)) },
                         onClick = { onAction(SandboxSettingsAction.SetEnabled(!state.enabled)) },
-                        showDivider = state.enabled,
+                        showDivider = false,
                     )
-                    if (state.enabled) {
-                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            SandboxField(state.domain, { onAction(SandboxSettingsAction.SetDomain(it)) },
-                                stringResource(R.string.sandbox_domain), stringResource(R.string.sandbox_domain_help),
-                                SandboxSettingField.DOMAIN in state.errors, !state.busy)
-                            OutlinedTextField(
-                                value = state.apiKey,
-                                onValueChange = { onAction(SandboxSettingsAction.SetApiKey(it)) },
-                                label = { Text(stringResource(R.string.sandbox_api_key)) },
-                                supportingText = { Text(stringResource(if (SandboxSettingField.API_KEY in state.errors) R.string.sandbox_key_required else R.string.sandbox_key_help)) },
-                                visualTransformation = if (state.keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                                trailingIcon = {
-                                    IconButton(onClick = { onAction(SandboxSettingsAction.ToggleKeyVisibility) }, enabled = !state.busy) {
-                                        Icon(if (state.keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                            contentDescription = stringResource(if (state.keyVisible) R.string.sandbox_hide_key else R.string.sandbox_show_key))
-                                    }
-                                },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                                isError = SandboxSettingField.API_KEY in state.errors,
-                                enabled = !state.busy,
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                        PreferenceListItem(icon = Icons.Default.Tune, title = stringResource(R.string.sandbox_advanced),
-                            subtitle = stringResource(R.string.sandbox_advanced_description), onClick = { onAction(SandboxSettingsAction.ToggleAdvanced) },
-                            trailingContent = {
-                                Icon(Icons.Default.ExpandMore, modifier = Modifier.rotate(advancedArrowRotation),
-                                    contentDescription = stringResource(if (state.advancedExpanded) R.string.sandbox_collapse_advanced else R.string.sandbox_expand_advanced))
-                            })
-                        AnimatedVisibility(
-                            visible = state.advancedExpanded,
-                            enter = expandVertically(
-                                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-                                expandFrom = Alignment.Top,
-                            ) + fadeIn(animationSpec = tween(durationMillis = 200)),
-                            exit = shrinkVertically(
-                                animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-                                shrinkTowards = Alignment.Top,
-                            ) + fadeOut(animationSpec = tween(durationMillis = 150)),
-                        ) {
-                            Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                SandboxField(state.template, { onAction(SandboxSettingsAction.SetTemplate(it)) },
-                                    stringResource(R.string.sandbox_template), stringResource(if (SandboxSettingField.TEMPLATE in state.errors) R.string.sandbox_template_required else R.string.sandbox_template_help),
-                                    SandboxSettingField.TEMPLATE in state.errors, !state.busy)
-                                SandboxField(state.idleTimeoutSeconds, { onAction(SandboxSettingsAction.SetIdleTimeout(it)) },
-                                    stringResource(R.string.sandbox_idle_timeout), stringResource(if (SandboxSettingField.IDLE_TIMEOUT in state.errors) R.string.sandbox_timeout_invalid else R.string.sandbox_timeout_help),
-                                    SandboxSettingField.IDLE_TIMEOUT in state.errors, !state.busy, KeyboardOptions(keyboardType = KeyboardType.Number))
-                                Text(stringResource(R.string.sandbox_environment), style = MaterialTheme.typography.titleSmall)
-                                Text(stringResource(R.string.sandbox_environment_help), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                state.environment.forEach { entry ->
-                                    key(entry.id) {
-                                        Surface(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            shape = MaterialTheme.shapes.large,
-                                            color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                                        ) {
-                                            Column(
-                                                modifier = Modifier.padding(12.dp),
-                                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                    AnimatedVisibility(
+                        visible = state.enabled,
+                        enter = expandVertically(
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                            expandFrom = Alignment.Top,
+                        ) + fadeIn(animationSpec = tween(durationMillis = 200)),
+                        exit = shrinkVertically(
+                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                            shrinkTowards = Alignment.Top,
+                        ) + fadeOut(animationSpec = tween(durationMillis = 150)),
+                    ) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                SandboxField(state.domain, { onAction(SandboxSettingsAction.SetDomain(it)) },
+                                    stringResource(R.string.sandbox_domain), stringResource(R.string.sandbox_domain_help),
+                                    SandboxSettingField.DOMAIN in state.errors, !state.busy)
+                                OutlinedTextField(
+                                    value = state.apiKey,
+                                    onValueChange = { onAction(SandboxSettingsAction.SetApiKey(it)) },
+                                    label = { Text(stringResource(R.string.sandbox_api_key)) },
+                                    supportingText = { Text(stringResource(if (SandboxSettingField.API_KEY in state.errors) R.string.sandbox_key_required else R.string.sandbox_key_help)) },
+                                    visualTransformation = if (state.keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                                    trailingIcon = {
+                                        IconButton(onClick = { onAction(SandboxSettingsAction.ToggleKeyVisibility) }, enabled = !state.busy) {
+                                            Icon(if (state.keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                                contentDescription = stringResource(if (state.keyVisible) R.string.sandbox_hide_key else R.string.sandbox_show_key))
+                                        }
+                                    },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                                    isError = SandboxSettingField.API_KEY in state.errors,
+                                    enabled = !state.busy,
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                            PreferenceListItem(icon = Icons.Default.Tune, title = stringResource(R.string.sandbox_advanced),
+                                subtitle = stringResource(R.string.sandbox_advanced_description), onClick = { onAction(SandboxSettingsAction.ToggleAdvanced) },
+                                trailingContent = {
+                                    Icon(Icons.Default.ExpandMore, modifier = Modifier.rotate(advancedArrowRotation),
+                                        contentDescription = stringResource(if (state.advancedExpanded) R.string.sandbox_collapse_advanced else R.string.sandbox_expand_advanced))
+                                })
+                            AnimatedVisibility(
+                                visible = state.advancedExpanded,
+                                enter = expandVertically(
+                                    animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                                    expandFrom = Alignment.Top,
+                                ) + fadeIn(animationSpec = tween(durationMillis = 200)),
+                                exit = shrinkVertically(
+                                    animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+                                    shrinkTowards = Alignment.Top,
+                                ) + fadeOut(animationSpec = tween(durationMillis = 150)),
+                            ) {
+                                Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    SandboxField(state.template, { onAction(SandboxSettingsAction.SetTemplate(it)) },
+                                        stringResource(R.string.sandbox_template), stringResource(if (SandboxSettingField.TEMPLATE in state.errors) R.string.sandbox_template_required else R.string.sandbox_template_help),
+                                        SandboxSettingField.TEMPLATE in state.errors, !state.busy)
+                                    SandboxField(state.idleTimeoutSeconds, { onAction(SandboxSettingsAction.SetIdleTimeout(it)) },
+                                        stringResource(R.string.sandbox_idle_timeout), stringResource(if (SandboxSettingField.IDLE_TIMEOUT in state.errors) R.string.sandbox_timeout_invalid else R.string.sandbox_timeout_help),
+                                        SandboxSettingField.IDLE_TIMEOUT in state.errors, !state.busy, KeyboardOptions(keyboardType = KeyboardType.Number))
+                                    Text(stringResource(R.string.sandbox_environment), style = MaterialTheme.typography.titleSmall)
+                                    Text(stringResource(R.string.sandbox_environment_help), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    state.environment.forEach { entry ->
+                                        key(entry.id) {
+                                            Surface(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = MaterialTheme.shapes.large,
+                                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                             ) {
-                                                OutlinedTextField(value = entry.name, onValueChange = { onAction(SandboxSettingsAction.SetEnvironmentName(entry.id, it)) },
-                                                    label = { Text(stringResource(R.string.sandbox_environment_name)) }, singleLine = true,
-                                                    enabled = !state.busy, isError = entry.nameError,
-                                                    supportingText = if (entry.nameError) { { Text(stringResource(R.string.sandbox_environment_invalid)) } } else null,
-                                                    modifier = Modifier.fillMaxWidth())
-                                                OutlinedTextField(value = entry.value, onValueChange = { onAction(SandboxSettingsAction.SetEnvironmentValue(entry.id, it)) },
-                                                    label = { Text(stringResource(R.string.sandbox_environment_value)) }, singleLine = true,
-                                                    enabled = !state.busy, modifier = Modifier.fillMaxWidth())
-                                                IconButton(
-                                                    onClick = { onAction(SandboxSettingsAction.RemoveEnvironment(entry.id)) },
-                                                    enabled = !state.busy,
-                                                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                                                Column(
+                                                    modifier = Modifier.padding(12.dp),
+                                                    verticalArrangement = Arrangement.spacedBy(8.dp),
                                                 ) {
-                                                    Icon(Icons.Default.DeleteOutline, contentDescription = stringResource(R.string.sandbox_remove_environment))
+                                                    OutlinedTextField(value = entry.name, onValueChange = { onAction(SandboxSettingsAction.SetEnvironmentName(entry.id, it)) },
+                                                        label = { Text(stringResource(R.string.sandbox_environment_name)) }, singleLine = true,
+                                                        enabled = !state.busy, isError = entry.nameError,
+                                                        supportingText = if (entry.nameError) { { Text(stringResource(R.string.sandbox_environment_invalid)) } } else null,
+                                                        modifier = Modifier.fillMaxWidth())
+                                                    OutlinedTextField(value = entry.value, onValueChange = { onAction(SandboxSettingsAction.SetEnvironmentValue(entry.id, it)) },
+                                                        label = { Text(stringResource(R.string.sandbox_environment_value)) }, singleLine = true,
+                                                        enabled = !state.busy, modifier = Modifier.fillMaxWidth())
+                                                    IconButton(
+                                                        onClick = { onAction(SandboxSettingsAction.RemoveEnvironment(entry.id)) },
+                                                        enabled = !state.busy,
+                                                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                                                    ) {
+                                                        Icon(Icons.Default.DeleteOutline, contentDescription = stringResource(R.string.sandbox_remove_environment))
+                                                    }
                                                 }
                                             }
                                         }
                                     }
-                                }
-                                TextButton(onClick = { onAction(SandboxSettingsAction.AddEnvironment) }, enabled = !state.busy) {
-                                    Icon(Icons.Default.Add, contentDescription = null)
-                                    Text(stringResource(R.string.sandbox_add_environment))
+                                    TextButton(onClick = { onAction(SandboxSettingsAction.AddEnvironment) }, enabled = !state.busy) {
+                                        Icon(Icons.Default.Add, contentDescription = null)
+                                        Text(stringResource(R.string.sandbox_add_environment))
+                                    }
                                 }
                             }
-                        }
-                        Button(onClick = { onAction(SandboxSettingsAction.Save) }, enabled = !state.busy,
-                            modifier = Modifier.align(Alignment.CenterHorizontally).padding(horizontal = 16.dp, vertical = 16.dp).fillMaxWidth(0.5f)) {
-                            Text(stringResource(if (state.busy) R.string.sandbox_saving else R.string.sandbox_save))
+                            Button(onClick = { onAction(SandboxSettingsAction.Save) }, enabled = !state.busy,
+                                modifier = Modifier.align(Alignment.CenterHorizontally).padding(horizontal = 16.dp, vertical = 16.dp).fillMaxWidth(0.5f)) {
+                                Text(stringResource(if (state.busy) R.string.sandbox_saving else R.string.sandbox_save))
+                            }
                         }
                     }
                 }

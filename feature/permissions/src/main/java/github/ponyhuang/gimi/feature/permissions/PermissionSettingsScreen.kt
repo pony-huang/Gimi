@@ -1,18 +1,19 @@
 package github.ponyhuang.gimi.feature.permissions
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,6 +28,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
@@ -35,7 +37,7 @@ fun PermissionSettingsScreen(
     onAction: (PermissionSettingsAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PreferencePageContainer(modifier = modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
@@ -164,6 +166,7 @@ private fun PermissionGroupStatus.label(): String = when (this) {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PermissionSettingsScreenDeniedPreview() {
     AsssistantaiTheme {
@@ -192,6 +195,7 @@ private fun PermissionSettingsScreenDeniedPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PermissionSettingsScreenGrantedPreview() {
     AsssistantaiTheme {

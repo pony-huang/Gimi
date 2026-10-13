@@ -18,6 +18,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.domain.skills.model.SkillImportFailure
 import github.ponyhuang.gimi.feature.skills.R
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 
 @Composable
 fun SkillsSettingsRoute(
@@ -57,6 +58,8 @@ fun SkillsSettingsRoute(
     }
 
     PreferenceScaffold(
+
+        style = PreferenceStyle.Compact,
         title = stringResource(R.string.skills_screen_title),
         onBack = onBack,
     ) { scaffoldModifier ->

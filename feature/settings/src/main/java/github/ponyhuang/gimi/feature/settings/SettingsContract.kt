@@ -14,6 +14,8 @@ sealed interface SettingsAction {
     data object OpenModelService : SettingsAction
     data object OpenDefaultModels : SettingsAction
     data object OpenMcpServers : SettingsAction
+    /** 打开沙盒连接与执行环境配置页。 */
+    data object OpenSandbox : SettingsAction
     data object OpenPlugins : SettingsAction
     data object OpenSkills : SettingsAction
     data object OpenWorkFiles : SettingsAction
@@ -35,6 +37,8 @@ sealed interface SettingsEffect {
     data object NavigateToModelService : SettingsEffect
     data object NavigateToDefaultModels : SettingsEffect
     data object NavigateToMcpServers : SettingsEffect
+    /** 进入沙盒功能拥有的设置目的地。 */
+    data object NavigateToSandbox : SettingsEffect
     data object NavigateToPlugins : SettingsEffect
     data object NavigateToSkills : SettingsEffect
     data object NavigateToWorkFiles : SettingsEffect

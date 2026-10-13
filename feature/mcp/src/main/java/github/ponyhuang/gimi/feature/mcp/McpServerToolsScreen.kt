@@ -33,12 +33,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.mcp.model.McpToolParameter
 import github.ponyhuang.gimi.domain.mcp.model.McpToolSummary
 import github.ponyhuang.gimi.domain.mcp.model.parameters
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
-import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 
 /** 独立的工具列表；展开只显示服务器声明，不执行工具或修改启用状态。 */
 @Composable
@@ -50,7 +51,7 @@ fun McpServerToolsScreen(
 ) {
     val server = state.servers.firstOrNull { it.id == serverId }
     val capability = state.capabilities[serverId]
-    PreferencePageContainer(modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item {

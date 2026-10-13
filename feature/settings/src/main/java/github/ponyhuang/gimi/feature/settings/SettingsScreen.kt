@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.settings
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -7,20 +8,22 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Rule
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SmartToy
-import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.runtime.Composable
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Switch
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -32,10 +35,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.feature.settings.R
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
-import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
+import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
@@ -45,10 +49,10 @@ fun SettingsScreen(
     onAction: (SettingsAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PreferencePageContainer(modifier = modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(vertical = 12.dp),
+            contentPadding = PaddingValues(bottom = 16.dp),
         ) {
             item { PreferenceSectionTitle(stringResource(R.string.settings_group_model)) }
             item {
@@ -72,7 +76,7 @@ fun SettingsScreen(
                     )
                 }
             }
-            item { PreferenceSectionTitle(stringResource(R.string.settings_group_tools)) }
+            item { PreferenceSectionTitle(stringResource(R.string.settings_group_extensions)) }
             item {
                 PreferenceGroupCard {
                     SettingsNavigationItems(
@@ -84,10 +88,10 @@ fun SettingsScreen(
                                 action = SettingsAction.OpenMcpServers,
                             ),
                             SettingsNavigationItem(
-                                icon = Icons.Default.Folder,
-                                title = stringResource(R.string.settings_work_files_title),
-                                subtitle = stringResource(R.string.settings_work_files_subtitle),
-                                action = SettingsAction.OpenWorkFiles,
+                                icon = Icons.Default.Code,
+                                title = stringResource(R.string.settings_sandbox_title),
+                                subtitle = stringResource(R.string.settings_sandbox_subtitle),
+                                action = SettingsAction.OpenSandbox,
                             ),
                             SettingsNavigationItem(
                                 icon = Icons.Default.School,
@@ -101,46 +105,34 @@ fun SettingsScreen(
                                 subtitle = stringResource(R.string.settings_plugins_subtitle),
                                 action = SettingsAction.OpenPlugins,
                             ),
+                        ),
+                        onAction = onAction,
+                    )
+                }
+            }
+            item { PreferenceSectionTitle(stringResource(R.string.settings_group_files)) }
+            item {
+                PreferenceGroupCard {
+                    SettingsNavigationItems(
+                        items = listOf(
+                            SettingsNavigationItem(
+                                icon = Icons.Default.Folder,
+                                title = stringResource(R.string.settings_work_files_title),
+                                subtitle = stringResource(R.string.settings_work_files_subtitle),
+                                action = SettingsAction.OpenWorkFiles,
+                            ),
                             SettingsNavigationItem(
                                 icon = Icons.Default.FolderOpen,
                                 title = stringResource(R.string.settings_workspace_title),
                                 subtitle = stringResource(R.string.settings_workspace_subtitle),
                                 action = SettingsAction.OpenWorkspace,
                             ),
-                            SettingsNavigationItem(
-                                icon = Icons.Default.Rule,
-                                title = stringResource(R.string.settings_tool_authorization_title),
-                                subtitle = stringResource(R.string.settings_tool_authorization_subtitle),
-                                action = SettingsAction.OpenToolAuthorization,
-                            ),
                         ),
                         onAction = onAction,
-                        showLastDivider = true,
-                    )
-                    // Shizuku 是开关型低频入口，固定在分组末尾，避免干扰上方常用项的定位
-                    PreferenceListItem(
-                        icon = Icons.Default.Phonelink,
-                        title = stringResource(R.string.settings_mobile_use_title),
-                        subtitle = stringResource(R.string.settings_mobile_use_subtitle),
-                        onClick = if (state.mobileUseEnabled && !state.mobileUseUpdating) {
-                            { onAction(SettingsAction.OpenMobileUse) }
-                        } else null,
-                        trailingContent = {
-                            val switchDescription = stringResource(R.string.settings_mobile_use_title)
-                            Switch(
-                                checked = state.mobileUseEnabled,
-                                enabled = !state.mobileUseUpdating,
-                                onCheckedChange = { onAction(SettingsAction.SetMobileUseEnabled(it)) },
-                                modifier = Modifier.semantics { contentDescription = switchDescription },
-                            )
-                            if (state.mobileUseEnabled) {
-                                Icon(Icons.Default.ChevronRight, contentDescription = null)
-                            }
-                        },
                     )
                 }
             }
-            item { PreferenceSectionTitle(stringResource(R.string.settings_group_general)) }
+            item { PreferenceSectionTitle(stringResource(R.string.settings_group_assistant)) }
             item {
                 PreferenceGroupCard {
                     SettingsNavigationItems(
@@ -157,12 +149,60 @@ fun SettingsScreen(
                                 subtitle = stringResource(R.string.settings_recommendations_subtitle),
                                 action = SettingsAction.OpenRecommendations,
                             ),
+                        ),
+                        onAction = onAction,
+                    )
+                }
+            }
+            item { PreferenceSectionTitle(stringResource(R.string.settings_group_permissions)) }
+            item {
+                PreferenceGroupCard {
+                    SettingsNavigationItems(
+                        items = listOf(
+                            SettingsNavigationItem(
+                                icon = Icons.Default.Rule,
+                                title = stringResource(R.string.settings_tool_authorization_title),
+                                subtitle = stringResource(R.string.settings_tool_authorization_subtitle),
+                                action = SettingsAction.OpenToolAuthorization,
+                            ),
                             SettingsNavigationItem(
                                 icon = Icons.Default.Security,
                                 title = stringResource(R.string.settings_permissions_title),
                                 subtitle = stringResource(R.string.settings_permissions_subtitle),
                                 action = SettingsAction.OpenPermissions,
                             ),
+                        ),
+                        onAction = onAction,
+                        showLastDivider = true,
+                    )
+                    PreferenceListItem(
+                        icon = Icons.Default.Phonelink,
+                        title = stringResource(R.string.settings_mobile_use_title),
+                        subtitle = stringResource(R.string.settings_mobile_use_subtitle),
+                        trailingContent = {
+                            val switchDescription = stringResource(R.string.settings_mobile_use_title)
+                            Switch(
+                                checked = state.mobileUseEnabled,
+                                enabled = !state.mobileUseUpdating,
+                                onCheckedChange = { onAction(SettingsAction.SetMobileUseEnabled(it)) },
+                                modifier = Modifier.semantics { contentDescription = switchDescription },
+                            )
+                            // 开关与导航拥有独立触控区，切换状态不会顺带进入配置。
+                            IconButton(
+                                enabled = state.mobileUseEnabled && !state.mobileUseUpdating,
+                                onClick = { onAction(SettingsAction.OpenMobileUse) },
+                            ) {
+                                Icon(Icons.Default.ChevronRight, contentDescription = stringResource(R.string.settings_mobile_use_open))
+                            }
+                        },
+                    )
+                }
+            }
+            item { PreferenceSectionTitle(stringResource(R.string.settings_group_about)) }
+            item {
+                PreferenceGroupCard {
+                    SettingsNavigationItems(
+                        items = listOf(
                             SettingsNavigationItem(
                                 icon = Icons.Default.Info,
                                 title = stringResource(R.string.settings_about_title),
@@ -205,6 +245,8 @@ private fun ColumnScope.SettingsNavigationItems(
 }
 
 @Preview(name = "Phone", device = Devices.PHONE, showBackground = true)
+@Preview(name = "Dark", device = Devices.PHONE, showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "Narrow large text", widthDp = 320, heightDp = 780, fontScale = 1.3f)
 @Preview(name = "Foldable", device = Devices.FOLDABLE, showBackground = true)
 @Preview(name = "Tablet", device = Devices.TABLET, showBackground = true)
 private annotation class SettingsFormFactorPreviews
@@ -213,7 +255,7 @@ private annotation class SettingsFormFactorPreviews
 @Composable
 private fun SettingsHomePreview() {
     AsssistantaiTheme {
-        PreferenceScaffold(title = stringResource(R.string.settings_title), onBack = {}) { modifier ->
+        PreferenceScaffold(style = PreferenceStyle.Compact, title = stringResource(R.string.settings_title), onBack = {}) { modifier ->
             SettingsScreen(
                 state = SettingsUiState(),
                 appVersionName = "1.0",

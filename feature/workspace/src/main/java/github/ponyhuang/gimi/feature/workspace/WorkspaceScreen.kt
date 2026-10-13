@@ -46,6 +46,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
@@ -83,6 +84,8 @@ internal fun WorkspaceScreen(
     }
 
     PreferenceScaffold(
+
+        style = PreferenceStyle.Compact,
         title = if (isSelecting) {
             stringResource(R.string.workspace_selected_count, state.selectedPaths.size)
         } else {
@@ -129,7 +132,7 @@ private fun WorkspaceFileList(
     onOpenFile: (WorkspaceFile) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PreferencePageContainer(modifier = modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
@@ -224,7 +227,7 @@ private fun WorkspaceLoadFailed(onRetry: () -> Unit, modifier: Modifier = Modifi
 
 @Composable
 private fun WorkspaceEmpty(modifier: Modifier = Modifier) {
-    PreferencePageContainer(modifier = modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         PreferenceGroupCard(modifier = Modifier.padding(top = 48.dp)) {
             Column(
                 modifier = Modifier

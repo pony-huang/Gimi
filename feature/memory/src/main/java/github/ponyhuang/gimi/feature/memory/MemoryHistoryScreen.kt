@@ -1,5 +1,9 @@
 package github.ponyhuang.gimi.feature.memory
 
+import android.content.res.Configuration
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,9 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -23,33 +24,34 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.style.TextOverflow
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.map
-import java.time.Instant
 import github.ponyhuang.gimi.domain.memory.model.ManagedMemory
 import github.ponyhuang.gimi.domain.memory.model.ManagedMemoryFeedback
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.preference.PreferenceTextField
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import java.time.Instant
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 
 /** 展示 Mem0 当前云端记忆；展开单项后提供删除和反馈操作的无状态页面。 */
 @Composable
@@ -78,7 +80,7 @@ fun MemoryHistoryScreen(
             .filter { it }
             .collect { onAction(MemoryHistoryAction.LoadNextPage) }
     }
-    PreferencePageContainer(modifier = modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         // 下拉刷新；isRefreshing 由 ViewModel 在 refresh() 期间置位。
         PullToRefreshBox(
             isRefreshing = state.refreshing,
@@ -243,7 +245,7 @@ private fun NegativeFeedbackDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.memory_history_negative_feedback)) },
         text = {
-            OutlinedTextField(
+            PreferenceTextField(
                 value = reason,
                 onValueChange = { reason = it },
                 label = { Text(stringResource(R.string.memory_history_feedback_reason)) },
@@ -262,6 +264,7 @@ private fun NegativeFeedbackDialog(
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun MemoryHistoryScreenEmptyPreview() {
     AsssistantaiTheme {
@@ -273,6 +276,7 @@ private fun MemoryHistoryScreenEmptyPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun MemoryHistoryScreenWithMemoriesPreview() {
     AsssistantaiTheme {

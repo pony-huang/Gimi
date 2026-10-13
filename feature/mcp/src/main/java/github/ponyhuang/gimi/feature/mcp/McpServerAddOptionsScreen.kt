@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.mcp
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -9,13 +10,14 @@ import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
 fun McpServerAddOptionsScreen(
@@ -23,7 +25,7 @@ fun McpServerAddOptionsScreen(
     onImport: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PreferencePageContainer(modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -50,6 +52,7 @@ fun McpServerAddOptionsScreen(
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun McpServerAddOptionsScreenPreview() {
     AsssistantaiTheme {

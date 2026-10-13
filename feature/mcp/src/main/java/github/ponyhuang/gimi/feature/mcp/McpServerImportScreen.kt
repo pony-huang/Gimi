@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.mcp
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,7 +16,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -27,6 +27,8 @@ import github.ponyhuang.gimi.domain.mcp.model.McpImportError
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.preference.PreferenceTextField
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
@@ -36,7 +38,7 @@ fun McpServerImportScreen(
     modifier: Modifier = Modifier,
 ) {
     val clipboard = LocalClipboardManager.current
-    PreferencePageContainer(modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -50,7 +52,7 @@ fun McpServerImportScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    OutlinedTextField(
+                    PreferenceTextField(
                         value = state.importJson,
                         onValueChange = { onAction(McpSettingsAction.ImportJsonChanged(it)) },
                         label = { Text(stringResource(R.string.mcp_field_json_label)) },
@@ -128,6 +130,7 @@ private fun importErrorText(error: McpImportError): String = stringResource(
 )
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun McpServerImportScreenEmptyPreview() {
     AsssistantaiTheme {
@@ -139,6 +142,7 @@ private fun McpServerImportScreenEmptyPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun McpServerImportScreenWithJsonPreview() {
     AsssistantaiTheme {

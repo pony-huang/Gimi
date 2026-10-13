@@ -20,6 +20,14 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SettingsViewModelTest {
+    @Test
+    fun sandboxNavigationUsesItsOwnDestinationEffect() = runTest {
+        val viewModel = SettingsViewModel(repository)
+        viewModel.effects.test {
+            viewModel.onAction(SettingsAction.OpenSandbox)
+            assertEquals(SettingsEffect.NavigateToSandbox, awaitItem())
+        }
+    }
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 

@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.ui.preference
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.HorizontalDivider
@@ -67,20 +69,23 @@ fun preferenceGroupCardColor(): Color {
 @Composable
 fun PreferencePageContainer(
     modifier: Modifier = Modifier,
+    style: PreferenceStyle = LocalPreferenceStyle.current,
     content: @Composable () -> Unit,
 ) {
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(preferenceCanvasColor()),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .widthIn(max = 720.dp)
-                .align(Alignment.TopCenter),
+    PreferenceStyleScope(style) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(preferenceCanvasColor()),
         ) {
-            content()
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 720.dp)
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter),
+            ) {
+                content()
+            }
         }
     }
 }
@@ -96,7 +101,7 @@ fun PreferenceSectionTitle(
         style = MaterialTheme.typography.labelLarge,
         fontWeight = FontWeight.SemiBold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.padding(start = 32.dp, end = 32.dp, top = 16.dp, bottom = 8.dp),
+        modifier = modifier.padding(start = 32.dp, end = 32.dp, top = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) 20.dp else 16.dp, bottom = 8.dp),
     )
 }
 
@@ -131,7 +136,7 @@ fun PreferenceGroupCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(if (LocalPreferenceStyle.current == PreferenceStyle.Compact) 16.dp else 24.dp))
             .background(preferenceGroupCardColor()),
         content = content,
     )
@@ -156,17 +161,19 @@ fun PreferenceListItem(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
-    iconContainer: Color = MaterialTheme.colorScheme.primary,
-    iconTint: Color = Color.White,
+    iconContainer: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) Color.Transparent else MaterialTheme.colorScheme.primary,
+    iconTint: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) MaterialTheme.colorScheme.onSurfaceVariant else Color.White,
     iconSize: Dp = 20.dp,
     showDivider: Boolean = false,
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
 ) {
+    val compact = LocalPreferenceStyle.current == PreferenceStyle.Compact
+    val containerSize = if (compact) maxOf(24.dp, iconSize) else 34.dp
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 60.dp)
+                .heightIn(min = if (compact) 64.dp else 60.dp)
                 .then(
                     when {
                         onClick == null -> Modifier
@@ -178,12 +185,12 @@ fun PreferenceListItem(
                         )
                     },
                 )
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = if (compact) 10.dp else 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(containerSize)
                     .background(color = iconContainer, shape = CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
@@ -201,8 +208,8 @@ fun PreferenceListItem(
             ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
+                    style = if (compact) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleMedium,
+                    maxLines = if (compact) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (!subtitle.isNullOrBlank()) {
@@ -217,12 +224,15 @@ fun PreferenceListItem(
                 }
             }
             trailingContent?.invoke(this)
+            if (compact && trailingContent == null && onClick != null && onLongClick == null) {
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         if (showDivider) {
             // 内缩到文字左缘（行内边距 16 + 圆形 34 + 间距 16）。
             HorizontalDivider(
-                modifier = Modifier.padding(start = 66.dp, end = 16.dp),
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                modifier = Modifier.padding(start = 32.dp + containerSize, end = 16.dp),
+                color = if (compact) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
             )
         }
     }
@@ -242,8 +252,8 @@ fun PreferenceSwitchItem(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     switchEnabled: Boolean = true,
-    iconContainer: Color = MaterialTheme.colorScheme.primary,
-    iconTint: Color = Color.White,
+    iconContainer: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) Color.Transparent else MaterialTheme.colorScheme.primary,
+    iconTint: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) MaterialTheme.colorScheme.onSurfaceVariant else Color.White,
     iconSize: Dp = 20.dp,
     showDivider: Boolean = false,
 ) {
@@ -320,6 +330,7 @@ fun PreferenceBanner(
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferencePageContainerPreview() {
     AsssistantaiTheme {
@@ -338,6 +349,7 @@ private fun PreferencePageContainerPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferenceSectionTitlePreview() {
     AsssistantaiTheme {
@@ -346,6 +358,7 @@ private fun PreferenceSectionTitlePreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferenceGroupCardPreview() {
     AsssistantaiTheme {
@@ -366,6 +379,7 @@ private fun PreferenceGroupCardPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferenceListItemPreview() {
     AsssistantaiTheme {
@@ -379,6 +393,7 @@ private fun PreferenceListItemPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferenceListItemWithTrailingPreview() {
     AsssistantaiTheme {
@@ -398,6 +413,7 @@ private fun PreferenceListItemWithTrailingPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferenceSwitchItemPreview() {
     AsssistantaiTheme {
@@ -421,6 +437,7 @@ private fun PreferenceSwitchItemPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferenceBannerInfoPreview() {
     AsssistantaiTheme {
@@ -432,6 +449,7 @@ private fun PreferenceBannerInfoPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferenceBannerErrorPreview() {
     AsssistantaiTheme {

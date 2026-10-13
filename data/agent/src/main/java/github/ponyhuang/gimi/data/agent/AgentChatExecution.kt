@@ -17,6 +17,7 @@ import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.transform
@@ -31,6 +32,9 @@ class AgentChatExecution internal constructor(
     private val customMetadata: Map<String, Any>,
     private val mobileUseRepository: MobileUseRepository? = null,
 ) {
+    private val pendingConfirmationIds = linkedSetOf<String>()
+    private val confirmationResponses = linkedMapOf<String, FunctionResponse>()
+
     /** 把新用户消息发送给本轮 Agent。 */
     suspend fun send(
         text: String,
@@ -75,6 +79,7 @@ class AgentChatExecution internal constructor(
                 customMetadata = customMetadata,
             ),
         ).transform { event ->
+            captureConfirmations(event)
             emit(event)
             // SDK 错误事件也属于失败；立即结束收集，避免被记为已完成而无法恢复。
             if (event.errorCode != null || !event.errorMessage.isNullOrBlank()) {
@@ -93,13 +98,24 @@ class AgentChatExecution internal constructor(
     suspend fun respondToToolConfirmation(
         confirmationCallId: String,
         confirmed: Boolean,
-    ): Flow<Event> = resumeWithFunctionResponse(
-        response = FunctionResponse(
+    ): Flow<Event> {
+        val response = FunctionResponse(
             name = FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME,
             id = confirmationCallId,
             response = mapOf("confirmed" to confirmed),
-        ),
-    )
+        )
+        if (confirmationCallId !in pendingConfirmationIds) {
+            return resumeWithFunctionResponse(response)
+        }
+        confirmationResponses[confirmationCallId] = response
+        // ADK 1.2.0 逐个恢复同批确认时会提前结束 invocation；收齐各自决策再恢复，
+        // 避免后续批准被已结束的 invocation 静默忽略，也不替用户批准其他工具。
+        if (!confirmationResponses.keys.containsAll(pendingConfirmationIds)) return emptyFlow()
+        val responses = pendingConfirmationIds.map { confirmationResponses.getValue(it) }
+        pendingConfirmationIds.clear()
+        confirmationResponses.clear()
+        return resumeWithFunctionResponses(responses)
+    }
 
     /**
      * 用用户答复恢复挂起的用户输入请求（`adk_request_input` / `get_user_choice`）。
@@ -129,10 +145,14 @@ class AgentChatExecution internal constructor(
      */
     private suspend fun resumeWithFunctionResponse(
         response: FunctionResponse,
+    ): Flow<Event> = resumeWithFunctionResponses(listOf(response))
+
+    private suspend fun resumeWithFunctionResponses(
+        responses: List<FunctionResponse>,
     ): Flow<Event> {
         val resumeMessage = Content(
             role = Role.USER,
-            parts = listOf(Part(functionResponse = response)),
+            parts = responses.map { Part(functionResponse = it) },
         )
         return runner.runAsync(
             userId = userId,
@@ -145,7 +165,19 @@ class AgentChatExecution internal constructor(
                 streamingMode = StreamingMode.SSE,
                 customMetadata = customMetadata,
             ),
-        ).flowOn(Dispatchers.IO).releaseMobileUseOnCompletion()
+        ).transform { event ->
+            captureConfirmations(event)
+            emit(event)
+            if (event.errorCode != null || !event.errorMessage.isNullOrBlank()) {
+                throw IllegalStateException(event.errorMessage ?: event.errorCode)
+            }
+        }.flowOn(Dispatchers.IO).releaseMobileUseOnCompletion()
+    }
+
+    private fun captureConfirmations(event: Event) {
+        event.functionCalls().filter {
+            it.name == FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME
+        }.mapNotNullTo(pendingConfirmationIds) { it.id }
     }
 
     private fun Flow<Event>.releaseMobileUseOnCompletion(): Flow<Event> = onStart {

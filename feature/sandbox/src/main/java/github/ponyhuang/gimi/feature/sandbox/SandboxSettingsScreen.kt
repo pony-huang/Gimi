@@ -137,9 +137,7 @@ fun SandboxSettingsScreen(state: SandboxSettingsUiState, onAction: (SandboxSetti
                                 ) + fadeOut(animationSpec = tween(durationMillis = 150)),
                             ) {
                                 Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    SandboxField(state.template, { onAction(SandboxSettingsAction.SetTemplate(it)) },
-                                        stringResource(R.string.sandbox_template), stringResource(if (SandboxSettingField.TEMPLATE in state.errors) R.string.sandbox_template_required else R.string.sandbox_template_help),
-                                        SandboxSettingField.TEMPLATE in state.errors, !state.busy)
+                                    SandboxTemplatePicker(state, onAction)
                                     SandboxField(state.idleTimeoutSeconds, { onAction(SandboxSettingsAction.SetIdleTimeout(it)) },
                                         stringResource(R.string.sandbox_idle_timeout), stringResource(if (SandboxSettingField.IDLE_TIMEOUT in state.errors) R.string.sandbox_timeout_invalid else R.string.sandbox_timeout_help),
                                         SandboxSettingField.IDLE_TIMEOUT in state.errors, !state.busy, KeyboardOptions(keyboardType = KeyboardType.Number))

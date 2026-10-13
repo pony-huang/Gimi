@@ -1,6 +1,10 @@
 package github.ponyhuang.gimi.feature.sandbox
 
 import github.ponyhuang.gimi.domain.sandbox.SandboxSettingField
+import github.ponyhuang.gimi.domain.sandbox.SandboxTemplate
+
+/** 模板列表的业务加载状态，错误由 Screen 映射为本地化文案。 */
+enum class SandboxTemplateLoadState { IDLE, LOADING, LOADED, CREDENTIALS_REQUIRED, AUTHENTICATION, RATE_LIMIT, NETWORK, PROTOCOL, UNAVAILABLE }
 
 /** 环境变量编辑行；id 在修改名称时保持稳定，nameError 表示名称无效或重复。 */
 data class SandboxEnvironmentDraft(val id: Long, val name: String = "", val value: String = "", val nameError: Boolean = false)
@@ -11,6 +15,8 @@ data class SandboxEnvironmentDraft(val id: Long, val name: String = "", val valu
  * @property busy 正在提交设置，期间禁止修改连接字段或开关。
  * @property dirty 草稿是否存在未保存的修改。
  * @property errors 可定位到输入框的业务校验错误。
+ * @property templates 当前草稿凭据查询到的完整列表，仅保存在页面状态中。
+ * @property templateLoadState 模板查询状态，与配置保存的 busy 独立。
  */
 data class SandboxSettingsUiState(
     val enabled: Boolean = false,
@@ -25,11 +31,13 @@ data class SandboxSettingsUiState(
     val busy: Boolean = false,
     val dirty: Boolean = false,
     val errors: Set<SandboxSettingField> = emptySet(),
+    val templates: List<SandboxTemplate> = emptyList(),
+    val templateLoadState: SandboxTemplateLoadState = SandboxTemplateLoadState.IDLE,
 ) {
     override fun toString(): String = "SandboxSettingsUiState(enabled=$enabled, configured=$configured, busy=$busy, credentials=<redacted>)"
 }
 
-/** 设置页意图；字段修改不触发网络调用。 */
+/** 设置页意图；仅显式加载和刷新模板触发网络查询。 */
 sealed interface SandboxSettingsAction {
     /** 即时保存 E2B 开关，保留已保存连接参数。 */
     data class SetEnabled(val enabled: Boolean) : SandboxSettingsAction
@@ -39,6 +47,10 @@ sealed interface SandboxSettingsAction {
     data class SetApiKey(val value: String) : SandboxSettingsAction
     /** 修改模板名称或 ID 草稿。 */
     data class SetTemplate(val value: String) : SandboxSettingsAction
+    /** 首次展开下拉框时查询当前凭据的模板。 */
+    data object LoadTemplates : SandboxSettingsAction
+    /** 显式重新查询模板，不保存连接草稿。 */
+    data object RefreshTemplates : SandboxSettingsAction
     /** 修改闲置超时的数字输入。 */
     data class SetIdleTimeout(val value: String) : SandboxSettingsAction
     /** 修改指定环境变量行名称。 */

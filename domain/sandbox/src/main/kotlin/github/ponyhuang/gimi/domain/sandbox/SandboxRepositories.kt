@@ -10,7 +10,7 @@ interface SandboxSettingsRepository {
     suspend fun saveConnection(connection: SandboxConnection)
 }
 
-/** 五个执行能力共享按聊天隔离的懒创建环境。 */
+/** 执行能力共享按聊天隔离的懒创建环境。 */
 interface SandboxExecutionRepository {
     suspend fun execute(session: SandboxSessionKey, operation: SandboxOperation): SandboxExecutionResult
 }

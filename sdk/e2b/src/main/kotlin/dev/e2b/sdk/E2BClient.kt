@@ -70,6 +70,40 @@ class E2BClient @JvmOverloads constructor(val config: E2BConfig = E2BConfig.buil
         }
     }
 
+    /** Lists one page of templates belonging to the API key's project. Does not create a sandbox. */
+    @JvmOverloads
+    fun listTemplates(limit: Int = 100, nextToken: String? = null): TemplatePage {
+        require(limit in 1..100)
+        val url = http.url(config.apiUrl, "v2", "templates").newBuilder()
+            .addQueryParameter("limit", limit.toString()).apply {
+                nextToken?.let { addQueryParameter("nextToken", it) }
+            }.build()
+        return http.api("GET", url).use { response ->
+            val json = http.readJson(response)
+            if (!json.isJsonArray) throw ProtocolException("Expected a template list")
+            val items = json.asJsonArray.map { item ->
+                val value = Json.obj(item)
+                val id = value.get("templateID")
+                if (id == null || !id.isJsonPrimitive || !id.asJsonPrimitive.isString || id.asString.isBlank()) {
+                    throw ProtocolException("Missing or invalid template ID")
+                }
+                val names = value.get("names")?.takeUnless { it.isJsonNull }?.let { names ->
+                    if (!names.isJsonArray) throw ProtocolException("Invalid template names")
+                    names.asJsonArray.map { name ->
+                        if (!name.isJsonPrimitive || !name.asJsonPrimitive.isString) throw ProtocolException("Invalid template name")
+                        name.asString
+                    }.filter(String::isNotBlank)
+                } ?: emptyList()
+                val status = value.get("buildStatus")?.takeUnless { it.isJsonNull }?.let {
+                    if (!it.isJsonPrimitive || !it.asJsonPrimitive.isString) throw ProtocolException("Invalid template status")
+                    it.asString
+                }
+                TemplateInfo(id.asString, names, status)
+            }
+            TemplatePage(items, response.header("X-Next-Token")?.takeIf(String::isNotBlank))
+        }
+    }
+
     /** Returns false when already paused; a missing sandbox is an error. */
     @JvmOverloads
     fun pause(sandboxId: String, keepMemory: Boolean = true): Boolean =

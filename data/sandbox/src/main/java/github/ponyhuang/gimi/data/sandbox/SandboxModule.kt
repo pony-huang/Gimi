@@ -7,6 +7,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.gimi.domain.sandbox.SandboxExecutionRepository
 import github.ponyhuang.gimi.domain.sandbox.SandboxSettingsRepository
+import github.ponyhuang.gimi.domain.sandbox.SandboxTemplateRepository
 import javax.inject.Qualifier
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +26,7 @@ abstract class SandboxModule {
     @Binds abstract fun settings(implementation: SecureSandboxSettingsRepository): SandboxSettingsRepository
     @Binds abstract fun execution(implementation: SessionSandboxExecutionRepository): SandboxExecutionRepository
     @Binds abstract fun gatewayFactory(implementation: SdkSandboxGatewayFactory): SandboxGatewayFactory
+    @Binds abstract fun templates(implementation: SdkSandboxTemplateRepository): SandboxTemplateRepository
 
     companion object {
         @Provides @Singleton @SandboxRuntimeScope

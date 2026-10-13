@@ -29,14 +29,14 @@ class SandboxToolContributionTest {
     @Test fun allToolsModeDeclaresToolsetAndNoSearchCandidate() = runTest {
         assertEquals(listOf(tools), contribution.toolsets(spec(ToolAccessMode.ALWAYS_AVAILABLE)))
         assertTrue(contribution.candidateSources(spec(ToolAccessMode.ALWAYS_AVAILABLE)).isEmpty())
-        assertEquals(5, contribution.toolCatalog(AgentToolCatalogContext(null)).single().tools.size)
+        assertEquals(6, contribution.toolCatalog(AgentToolCatalogContext(null)).single().tools.size)
     }
     @Test fun onDemandModeUsesSearchSourceAndRechecksItsAvailability() = runTest {
         val spec = spec(ToolAccessMode.ON_DEMAND)
         assertTrue(contribution.toolsets(spec).isEmpty())
         val source = contribution.candidateSources(spec).single()
         assertEquals("sandbox:e2b", source.id)
-        assertEquals(5, source.loadEnabledTools(null).size)
+        assertEquals(6, source.loadEnabledTools(null).size)
         settings.setEnabled(false)
         assertTrue(source.loadEnabledTools(null).isEmpty())
         assertTrue(contribution.candidateSources(spec).isEmpty())

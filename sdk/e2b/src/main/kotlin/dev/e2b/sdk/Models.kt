@@ -19,6 +19,12 @@ data class SandboxPage(val items: List<SandboxInfo>, val nextToken: String?) {
     val hasNext: Boolean get() = nextToken != null
 }
 
+/** Template listing metadata; names retain namespace-qualified names and status describes the latest build. */
+data class TemplateInfo(val templateId: String, val names: List<String>, val buildStatus: String?)
+
+/** One template page; a null nextToken marks the end of the listing. */
+data class TemplatePage(val items: List<TemplateInfo>, val nextToken: String?)
+
 /** File metadata from envd; type and modification time use protobuf JSON representations. */
 data class EntryInfo(
     val name: String,

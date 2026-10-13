@@ -4,11 +4,14 @@
 
 高级配置包含模板、沙盒闲置超时和环境变量。默认模板为 `code-interpreter-v1`，自定义模板必须包含可访问的 Code Interpreter 才能执行代码。默认闲置超时为 300 秒；环境变量在创建环境时注入，名称不能重复，值允许为空。整个配置使用 Android Keystore AES/GCM 加密保存在本机。
 
+模板支持下拉选择和手动输入名称、ID 或带标签名称。首次展开列表时，使用当前 Domain 和 API Key 草稿读取该凭据所属项目的全部模板；无需先保存，不创建沙盒。下拉项显示名称、ID 和最新构建状态，选择后使用模板 ID，仍需点击「保存配置」才能生效。保留默认模板入口，列表为空或查询失败时也可以手动输入。列表只保留在页面状态中，可点击「刷新模板」重新查询；修改 Domain 或 API Key 后旧列表和旧请求响应失效。
+
 ## Agent 工具
 
 | 工具 | 用途 |
 | --- | --- |
 | `sandbox_run_command` | 运行 Shell 命令，返回 stdout、stderr 和 exit_code |
+| `sandbox_start_background_command` | 启动后台命令并立即返回 pid；可选 port 生成 preview_url，服务就绪状态为 unknown |
 | `sandbox_run_code` | 在有状态内核中运行 Python 或 JavaScript，返回日志、主表达式文本和运行错误 |
 | `sandbox_write_file` | 创建或覆盖 UTF-8 文本文件，允许空文件 |
 | `sandbox_read_file` | 读取 UTF-8 文本文件 |
@@ -16,11 +19,17 @@
 
 单次命令或代码调用可提供 `envs` 和 `timeout`；命令还可提供 `cwd`。执行超时默认 60 秒，0 表示不限制，区别于沙盒闲置超时。这些参数由 Agent 按任务填写，无需在设置页逐次填写。E2B 管理密钥不会被注入远端环境或暴露给模型。
 
-`success` 表示工具完成了操作：命令非零退出或代码运行异常仍返回 `success=true`，需要检查 `exit_code` 或 `error`。无法执行时返回 `success=false`，并在可取得时提供 `partial_output`。单个文本输出字段保留最多 10,000 UTF-8 字节，并标明省略字节数。文件读写上限为 1 MiB，不提供二进制附件或后台命令工具。
+`success` 表示工具完成了操作：命令非零退出或代码运行异常仍返回 `success=true`，需要检查 `exit_code` 或 `error`。无法执行时返回 `success=false`，并在可取得时提供 `partial_output`。单个文本输出字段保留最多 10,000 UTF-8 字节，并标明省略字节数。文件读写上限为 1 MiB，不提供二进制附件。
+
+后台命令接受 `command`（必填）、`cwd`、`envs`、`timeout` 和 `port`（1–65535）。收到远端 PID 后立即返回 `command`、`pid`、`preview_url` 和 `success`，不等待命令结束，也不采集 stdout/stderr 或 exit_code。不传 port 时 preview_url 为 null；传 port 时额外返回 `readiness="unknown"`，URL 仅由端口和沙盒域名生成，不代表进程仍在运行或服务已经监听。语义参考 [官方后台工具实现](https://github.com/e2b-dev/e2b-adk-plugin/blob/main/e2b_adk/tools/start_background_command.py)。
+
+例如启动 `python -m http.server 3000 > server.log 2>&1` 并传入 `port=3000`、`timeout=0`，随后可用 `sandbox_read_file` 查看日志，用 `sandbox_run_command` 执行 `kill <pid>` 停止进程。启动响应未知时不自动重试，以免重复启动。
 
 ## 生命周期
 
 首次工具调用懒创建环境，同一用户的同一聊天跨轮复用文件、依赖和各语言内核变量，不同聊天隔离。同一聊天串行执行；操作期间按闲置超时的一半续期，结束后重新开始闲置窗口。命令进程的 `cwd` 和单次环境变量不跨调用保留。
+
+后台启动只在工具调用期间续期；返回 PID 后不会持续心跳，因此后台进程仍随沙盒闲置过期、配置变化或销毁而终止。`timeout=0` 不会关闭沙盒闲置超时。后台启动释放本地监听流，不发送远端 kill；后续同一聊天的工具调用可以立即继续。环境重建后旧 PID 和预览地址失效。
 
 执行前确认环境已过期时创建新环境，工具结果附带 `environment_reset`，表示先前文件和变量已丢失。执行中发生超时或网络中断不会自动重放有副作用的操作。关闭 E2B、修改已保存配置或取消执行会取消该环境的请求并尝试销毁；无法清理时由远端超时兜底。应用进程重启后重新创建环境，第一版不支持暂停恢复。
 
@@ -40,5 +49,6 @@
 4. 写入、读取和列出一个文本文件，再写入空内容并读取。超过 1 MiB 的文件应明确失败；长中文输出应带省略字节数且没有乱码。
 5. 同一聊天的 command 和 code 共享文件；另一个聊天不能访问前一个聊天的文件或内核变量。等待超过闲置时间后调用，应提示环境已重置。
 6. 执行长任务时检查心跳续期；取消任务、关闭 E2B 或保存不同配置后，检查远端环境清理。关闭后保留配置，缓存或按需加载过的旧工具不能继续执行。
+7. 启动后台 HTTP 服务并传 port，确认立即返回 PID、preview_url 和 unknown；随后用同一聊天的命令检查服务是否可访问、读取重定向日志并停止 PID。不传 port 时 preview_url 为 null。检查后台进程随沙盒过期或配置改变被清理，且不因后台运行永久续期。
 
 真实服务验收需要用户自己的 E2B 凭据；不要把密钥或环境变量值附在反馈日志中。

@@ -73,6 +73,12 @@ internal class SdkSandboxGateway(private val connection: SandboxConnection, priv
     ) {
         val resource = current()
         when (operation) {
+            is SandboxOperation.BackgroundCommand -> {
+                // 收到 start/PID 后只关闭本地流，不 await、不 kill；远端进程由沙盒生命周期回收。
+                resource.commands.start(operation.command, CommandOptions(cwd = operation.cwd, envs = operation.envs, timeoutSeconds = operation.timeoutSeconds)).use { handle ->
+                    SandboxOutput.BackgroundCommand(operation.command, handle.pid, operation.port?.let { "https://${resource.getHost(it)}" })
+                }
+            }
             is SandboxOperation.Command -> {
                 val result = try {
                     resource.commands.run(operation.command, CommandOptions(cwd = operation.cwd, envs = operation.envs, timeoutSeconds = operation.timeoutSeconds))

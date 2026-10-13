@@ -18,7 +18,7 @@ import github.ponyhuang.gimi.domain.sandbox.truncateSandboxOutput
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** 五个 E2B 工具的 ADK 声明；不会在枚举工具时创建沙盒或把凭据传给模型。 */
+/** E2B 工具的 ADK 声明；不会在枚举工具时创建沙盒或把凭据传给模型。 */
 @Singleton
 class SandboxTools @Inject constructor(
     private val settings: SandboxSettingsRepository,
@@ -29,6 +29,8 @@ class SandboxTools @Inject constructor(
     private val tools: List<BaseTool> = listOf(
         tool("sandbox_run_command", "Run a shell command in the conversation's isolated E2B sandbox. Returns stdout, stderr and exit_code. cwd and per-call envs do not persist; files and installed packages do.",
             mapOf("command" to string("Shell command to run."), "cwd" to string("Optional working directory."), "envs" to envs, "timeout" to timeout), listOf("command")),
+        tool("sandbox_start_background_command", "Start a long-running shell command in this conversation's E2B sandbox and return its pid immediately, without waiting for exit or service readiness. Optional port returns a syntactic HTTPS preview_url and readiness=unknown. Without port, preview_url is null. success means a PID was received, not that the process is still running. Redirect logs to a file to read them later. The process remains subject to sandbox idle expiry; a returned PID is invalid after environment_reset. To stop it, run kill with that PID in the same sandbox.",
+            mapOf("command" to string("Shell command to start."), "port" to Schema(type = Type.INTEGER, description = "Optional service port, an integer from 1 to 65535. Does not verify the service is listening."), "cwd" to string("Optional working directory."), "envs" to envs, "timeout" to timeout), listOf("command")),
         tool("sandbox_run_code", "Run and verify Python or JavaScript in a stateful Code Interpreter. Variables persist in the same conversation and language. Returns stdout, stderr, the main expression text and any kernel error.",
             mapOf("code" to string("Source code to execute."), "language" to Schema(type = Type.STRING, enum = listOf("python", "javascript"), description = "Optional language; defaults to python."), "envs" to envs, "timeout" to timeout), listOf("code")),
         tool("sandbox_write_file", "Create or overwrite a UTF-8 text file in the remote sandbox, creating parent directories. Empty content is allowed; maximum file size is 1 MiB.",
@@ -94,8 +96,17 @@ internal fun parseSandboxOperation(name: String, args: Map<String, Any?>): Sandb
         }
         return number.toInt()
     }
+    fun port(): Int? {
+        val value = args["port"] ?: return null
+        val number = (value as? Number)?.toDouble() ?: throw SandboxArgumentsException("port must be an integer between 1 and 65535")
+        if (!number.isFinite() || number !in 1.0..65535.0 || number % 1.0 != 0.0) {
+            throw SandboxArgumentsException("port must be an integer between 1 and 65535")
+        }
+        return number.toInt()
+    }
     return when (name) {
         "sandbox_run_command" -> SandboxOperation.Command(required("command"), optionalString("cwd"), envs(), timeout())
+        "sandbox_start_background_command" -> SandboxOperation.BackgroundCommand(required("command"), port(), optionalString("cwd"), envs(), timeout())
         "sandbox_run_code" -> {
             val language = optionalString("language")?.lowercase() ?: "python"
             if (language !in setOf("python", "javascript")) throw SandboxArgumentsException("language must be python or javascript")
@@ -112,6 +123,11 @@ internal fun parseSandboxOperation(name: String, args: Map<String, Any?>): Sandb
 internal fun SandboxExecutionResult.toToolResponse(operation: SandboxOperation): Map<String, Any?> = buildMap {
     if (success) {
         when (val value = output) {
+            is SandboxOutput.BackgroundCommand -> {
+                put("command", truncateSandboxOutput(value.command)); put("pid", value.pid)
+                put("preview_url", value.previewUrl?.let(::truncateSandboxOutput))
+                if ((operation as? SandboxOperation.BackgroundCommand)?.port != null) put("readiness", "unknown")
+            }
             is SandboxOutput.Command -> {
                 put("command", truncateSandboxOutput(value.command)); put("stdout", truncateSandboxOutput(value.stdout))
                 put("stderr", truncateSandboxOutput(value.stderr)); put("exit_code", value.exitCode)
@@ -131,6 +147,7 @@ internal fun SandboxExecutionResult.toToolResponse(operation: SandboxOperation):
     } else {
         put("error", truncateSandboxOutput(error)); put("partial_output", truncateSandboxOutput(partialOutput))
         when (operation) {
+            is SandboxOperation.BackgroundCommand -> put("command", truncateSandboxOutput(operation.command))
             is SandboxOperation.Command -> put("command", truncateSandboxOutput(operation.command))
             is SandboxOperation.ReadFile -> put("path", truncateSandboxOutput(operation.path))
             is SandboxOperation.WriteFile -> put("path", truncateSandboxOutput(operation.path))

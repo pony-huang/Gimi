@@ -20,7 +20,7 @@
 | P1 | 命令输出 callback、真正可取消的 Kotlin suspend/Flow 扩展、流式大文件/批量文件上传 | 交互式 Agent 和大文件的下一步，尚未实现；Java 同步核心保留独立 |
 | P1 | 网络规则、auto-resume/lifecycle、IAM/MCP/volume 挂载创建参数 | 网络控制和高级运行环境；首版仅支持 allowInternetAccess 和 autoPause；完整配置尚未实现 |
 | P1 | 沙箱/团队 metrics、沙箱日志、refresh | 长会话管理、容量观测和排错，尚未实现；已有 setTimeout 可满足基础续期 |
-| P1 | 模板列举/构建列表、别名/标签查询、标签分配/删除 | 应用选取和管理预构建环境；首版可直接使用 template ID/alias 创建沙箱，管理 API 尚未实现 |
+| P1 | 模板列举/构建列表、别名/标签查询、标签分配/删除 | 模板分页列举已实现，可用于选择预构建环境；构建列表、别名/标签查询及标签管理尚未实现 |
 | P2 | 模板创建、构建启动/状态/日志、文件上传 URL、更新/删除、Template 构建 DSL | 构建链较复杂，前期可用官方 CLI 预构建；尚未实现 |
 | P2 | PTY 创建/重连/resize/输入/终止 | 交互终端体验才需要；普通 commands 不等价于 PTY，尚未实现 |
 | P2 | 文件 watcher、文件扩展属性 metadata、压缩传输、签名上传/下载 URL | 文件同步和优化；尚未实现 |

@@ -7,6 +7,9 @@ import github.ponyhuang.gimi.domain.sandbox.SandboxConfiguration
 import github.ponyhuang.gimi.domain.sandbox.SandboxConnection
 import github.ponyhuang.gimi.domain.sandbox.SandboxSettingField
 import github.ponyhuang.gimi.domain.sandbox.SandboxSettingsRepository
+import github.ponyhuang.gimi.domain.sandbox.SandboxTemplateRepository
+import github.ponyhuang.gimi.domain.sandbox.SandboxTemplateException
+import github.ponyhuang.gimi.domain.sandbox.SandboxTemplateFailure
 import github.ponyhuang.gimi.domain.sandbox.isSandboxEnvironmentName
 import github.ponyhuang.gimi.domain.sandbox.validateSandboxConnection
 import java.io.IOException
@@ -18,11 +21,17 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 
 /** 保存草稿与即时开关分开，观察仓库更新时不能覆盖用户尚未保存的字段。 */
 @HiltViewModel
-class SandboxSettingsViewModel @Inject constructor(private val repository: SandboxSettingsRepository) : ViewModel() {
+class SandboxSettingsViewModel @Inject constructor(
+    private val repository: SandboxSettingsRepository,
+    private val templates: SandboxTemplateRepository,
+) : ViewModel() {
     private var nextEnvironmentId = 0L
+    private var templateQuery: Job? = null
+    private var templateGeneration = 0L
     private val mutableState = MutableStateFlow(fromConfiguration(repository.configuration.value))
     val uiState = mutableState.asStateFlow()
     private val mutableEffects = MutableSharedFlow<SandboxSettingsEffect>(extraBufferCapacity = 1)
@@ -31,9 +40,11 @@ class SandboxSettingsViewModel @Inject constructor(private val repository: Sandb
     init {
         viewModelScope.launch {
             repository.configuration.collect { configuration ->
+                val previous = uiState.value
+                if (!previous.dirty && !sameCredentials(configuration.connection, previous)) invalidateTemplates()
                 mutableState.update { state ->
                     if (state.dirty) state.copy(enabled = configuration.enabled, configured = configuration.isConfigured)
-                    else fromConfiguration(configuration).copy(advancedExpanded = state.advancedExpanded, keyVisible = state.keyVisible, busy = state.busy)
+                    else restore(configuration, state)
                 }
             }
         }
@@ -43,9 +54,17 @@ class SandboxSettingsViewModel @Inject constructor(private val repository: Sandb
         if (uiState.value.busy) return
         when (action) {
             is SandboxSettingsAction.SetEnabled -> persist { repository.setEnabled(action.enabled) }
-            is SandboxSettingsAction.SetDomain -> edit(SandboxSettingField.DOMAIN) { it.copy(domain = action.value) }
-            is SandboxSettingsAction.SetApiKey -> edit(SandboxSettingField.API_KEY) { it.copy(apiKey = action.value) }
+            is SandboxSettingsAction.SetDomain -> {
+                if (action.value != uiState.value.domain) invalidateTemplates()
+                edit(SandboxSettingField.DOMAIN) { it.copy(domain = action.value) }
+            }
+            is SandboxSettingsAction.SetApiKey -> {
+                if (action.value != uiState.value.apiKey) invalidateTemplates()
+                edit(SandboxSettingField.API_KEY) { it.copy(apiKey = action.value) }
+            }
             is SandboxSettingsAction.SetTemplate -> edit(SandboxSettingField.TEMPLATE) { it.copy(template = action.value) }
+            SandboxSettingsAction.LoadTemplates -> loadTemplates(refresh = false)
+            SandboxSettingsAction.RefreshTemplates -> loadTemplates(refresh = true)
             is SandboxSettingsAction.SetIdleTimeout -> edit(SandboxSettingField.IDLE_TIMEOUT) { it.copy(idleTimeoutSeconds = action.value) }
             is SandboxSettingsAction.SetEnvironmentName -> edit(SandboxSettingField.ENVIRONMENT) { state ->
                 state.copy(environment = state.environment.map { if (it.id == action.id) it.copy(name = action.value, nameError = false) else it })
@@ -64,6 +83,54 @@ class SandboxSettingsViewModel @Inject constructor(private val repository: Sandb
     private fun edit(field: SandboxSettingField, transform: (SandboxSettingsUiState) -> SandboxSettingsUiState) {
         mutableState.update { transform(it).copy(dirty = true, errors = it.errors - field) }
     }
+
+    private fun invalidateTemplates() {
+        templateGeneration++
+        templateQuery?.cancel()
+        templateQuery = null
+        mutableState.update { it.copy(templates = emptyList(), templateLoadState = SandboxTemplateLoadState.IDLE) }
+    }
+
+    private fun loadTemplates(refresh: Boolean) {
+        val state = uiState.value
+        if (state.templateLoadState == SandboxTemplateLoadState.LOADING) return
+        if (!refresh && state.templateLoadState != SandboxTemplateLoadState.IDLE) return
+        val domain = state.domain.trim().lowercase()
+        val apiKey = state.apiKey.trim()
+        val credentialErrors = validateSandboxConnection(SandboxConnection(domain = domain, apiKey = apiKey))
+            .intersect(setOf(SandboxSettingField.DOMAIN, SandboxSettingField.API_KEY))
+        if (credentialErrors.isNotEmpty()) {
+            mutableState.update { it.copy(templateLoadState = SandboxTemplateLoadState.CREDENTIALS_REQUIRED, errors = it.errors + credentialErrors) }
+            return
+        }
+        val generation = ++templateGeneration
+        mutableState.update { it.copy(templateLoadState = SandboxTemplateLoadState.LOADING) }
+        templateQuery = viewModelScope.launch {
+            try {
+                val result = templates.listTemplates(domain, apiKey)
+                // generation 防止不及时响应取消的远端请求覆盖新凭据或刷新后的列表。
+                if (generation == templateGeneration) mutableState.update { it.copy(templates = result, templateLoadState = SandboxTemplateLoadState.LOADED) }
+            } catch (error: SandboxTemplateException) {
+                if (generation == templateGeneration) mutableState.update { it.copy(templateLoadState = when (error.failure) {
+                    SandboxTemplateFailure.AUTHENTICATION -> SandboxTemplateLoadState.AUTHENTICATION
+                    SandboxTemplateFailure.RATE_LIMIT -> SandboxTemplateLoadState.RATE_LIMIT
+                    SandboxTemplateFailure.NETWORK -> SandboxTemplateLoadState.NETWORK
+                    SandboxTemplateFailure.PROTOCOL -> SandboxTemplateLoadState.PROTOCOL
+                    SandboxTemplateFailure.UNAVAILABLE -> SandboxTemplateLoadState.UNAVAILABLE
+                }) }
+            }
+        }
+    }
+
+    private fun sameCredentials(connection: SandboxConnection, state: SandboxSettingsUiState): Boolean =
+        connection.domain == state.domain.trim().lowercase() && connection.apiKey == state.apiKey.trim()
+
+    private fun restore(configuration: SandboxConfiguration, state: SandboxSettingsUiState): SandboxSettingsUiState =
+        fromConfiguration(configuration).copy(
+            advancedExpanded = state.advancedExpanded, keyVisible = state.keyVisible, busy = state.busy,
+            templates = if (sameCredentials(configuration.connection, state)) state.templates else emptyList(),
+            templateLoadState = if (sameCredentials(configuration.connection, state)) state.templateLoadState else SandboxTemplateLoadState.IDLE,
+        )
 
     private fun save() {
         val state = uiState.value
@@ -84,8 +151,7 @@ class SandboxSettingsViewModel @Inject constructor(private val repository: Sandb
             try {
                 operation()
                 if (connectionSaved) {
-                    mutableState.update { state -> fromConfiguration(repository.configuration.value)
-                        .copy(advancedExpanded = state.advancedExpanded, keyVisible = state.keyVisible) }
+                    mutableState.update { state -> restore(repository.configuration.value, state) }
                     mutableEffects.emit(SandboxSettingsEffect.SAVED)
                 }
             } catch (_: IOException) {

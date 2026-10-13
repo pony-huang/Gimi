@@ -28,7 +28,7 @@
 | POST | `/sandboxes/{sandboxID}/snapshots` | Create snapshot | P2 | 未实现 |
 | GET | `/snapshots` | List snapshots | P2 | 未实现 |
 | POST | `/v3/templates` | Create template (v3) | P2 | 未实现 |
-| GET | `/v2/templates` | List templates (v2) | P1 | 未实现 |
+| GET | `/v2/templates` | List templates (v2) | P1 | 已实现分页查询，返回 ID、names 和构建状态 |
 | GET | `/templates/{templateID}/files/{hash}` | Template build file upload URL | P2 | 未实现 |
 | GET | `/templates/{templateID}` | List template builds | P2 | 未实现 |
 | DELETE | `/templates/{templateID}` | Delete template | P2 | 未实现 |

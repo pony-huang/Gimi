@@ -52,6 +52,36 @@ class SdkSandboxGatewayTest {
         val result = gateway.execute(SandboxOperation.Code("raise ValueError('bad')")) as SandboxOutput.Code
         assertEquals("ValueError: bad\nline 1", result.error)
     }
+    @Test fun backgroundStartReturnsPidWithoutWaitingForExitAndForwardsOptions() = runBlocking {
+        val event = """{"event":{"start":{"pid":123}}}"""
+        // 仅发送 start，不发送退出事件；若误调用 await，工具会失败而非返回 PID。
+        val body = Buffer().writeByte(0).writeInt(event.toByteArray().size).writeUtf8(event)
+        env.enqueue(MockResponse().setHeader("Content-Type", "application/connect+json").setBody(body))
+        val operation = SandboxOperation.BackgroundCommand("server", 3000, "/tmp", mapOf("A" to "B"), 0)
+        val result = gateway.execute(operation) as SandboxOutput.BackgroundCommand
+        assertEquals(SandboxOutput.BackgroundCommand("server", 123, "https://3000-sb.e2b.app"), result)
+        val request = env.takeRequest()
+        assertEquals("/process.Process/Start", request.path)
+        assertNull(request.getHeader("Connect-Timeout-Ms"))
+        assertNull(request.getHeader("X-API-Key"))
+        request.body.readByte()
+        val payload = request.body.readUtf8(request.body.readInt().toLong())
+        assertTrue(payload.contains("\"cwd\":\"/tmp\""))
+        assertTrue(payload.contains("\"envs\":{\"A\":\"B\"}"))
+        assertEquals(1, env.requestCount)
+    }
+    @Test fun backgroundWithoutPortUsesDefaultTimeoutAndNoPreviewUrl() = runBlocking {
+        val event = """{"event":{"start":{"pid":124}}}"""
+        env.enqueue(MockResponse().setHeader("Content-Type", "application/connect+json")
+            .setBody(Buffer().writeByte(0).writeInt(event.toByteArray().size).writeUtf8(event)))
+        assertEquals(SandboxOutput.BackgroundCommand("sleep 30", 124), gateway.execute(SandboxOperation.BackgroundCommand("sleep 30")))
+        assertEquals("60000", env.takeRequest().getHeader("Connect-Timeout-Ms"))
+    }
+    @Test fun backgroundStartFailureIsMappedWithoutReplayOrServerBody() = runBlocking {
+        env.enqueue(MockResponse().setResponseCode(401).setBody("secret diagnostic"))
+        assertFailure(SandboxGatewayFailure.AUTHENTICATION) { gateway.execute(SandboxOperation.BackgroundCommand("server")) }
+        assertEquals(1, env.requestCount)
+    }
     @Test fun emptyTextCanBeWrittenAndCreatedEnvironmentVariablesAreForwarded() = runBlocking {
         env.enqueue(MockResponse().setBody("""[{"name":"empty","path":"empty","type":"FILE_TYPE_FILE"}]"""))
         assertEquals(SandboxOutput.WrittenFile("empty"), gateway.execute(SandboxOperation.WriteFile("empty", "")))

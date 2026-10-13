@@ -27,6 +27,7 @@ class SandboxToolsTest {
         override suspend fun execute(session: SandboxSessionKey, operation: SandboxOperation): SandboxExecutionResult {
             calls++; this.session = session; this.operation = operation
             if (cancelled) throw CancellationException("cancelled")
+            if (operation is SandboxOperation.BackgroundCommand) return SandboxExecutionResult(true, SandboxOutput.BackgroundCommand(operation.command, 123))
             return SandboxExecutionResult(true, SandboxOutput.Command("echo", "ok", "", 0))
         }
     }
@@ -34,12 +35,47 @@ class SandboxToolsTest {
         every { this@mockk.context.session } returns Session(SessionKey("Gimi", "user-1", id))
     }
 
-    @Test fun exposesExactlyFiveToolsWithoutCredentialsOrSandboxCreation() = runTest {
+    @Test fun exposesExactlySixToolsWithoutCredentialsOrSandboxCreation() = runTest {
         val execution = Execution(); val tools = SandboxTools(Settings(), execution).getTools(null)
-        assertEquals(setOf("sandbox_run_command", "sandbox_run_code", "sandbox_write_file", "sandbox_read_file", "sandbox_list_files"), tools.map { it.name }.toSet())
+        assertEquals(setOf("sandbox_run_command", "sandbox_start_background_command", "sandbox_run_code", "sandbox_write_file", "sandbox_read_file", "sandbox_list_files"), tools.map { it.name }.toSet())
         assertEquals(0, execution.calls)
         assertFalse(tools.map { it.declaration() }.toString().contains("private-setting-key"))
         assertEquals(listOf("path", "content"), tools.first { it.name == "sandbox_write_file" }.declaration()!!.parameters!!.required)
+    }
+    @Test fun backgroundCommandArgumentsAndResponsePreserveStartContract() {
+        val operation = parseSandboxOperation("sandbox_start_background_command", mapOf(
+            "command" to "python -m http.server 3000", "port" to 3000.0,
+            "cwd" to "/tmp", "envs" to mapOf("A" to "B"), "timeout" to 0,
+        ))
+        assertEquals(SandboxOperation.BackgroundCommand("python -m http.server 3000", 3000, "/tmp", mapOf("A" to "B"), 0), operation)
+        val response = SandboxExecutionResult(true, SandboxOutput.BackgroundCommand("server", 123, "https://3000-sb.e2b.app"))
+            .toToolResponse(operation)
+        assertEquals(true, response["success"])
+        assertEquals(123, response["pid"])
+        assertEquals("https://3000-sb.e2b.app", response["preview_url"])
+        assertEquals("unknown", response["readiness"])
+        assertFalse(response.containsKey("exit_code"))
+        assertEquals(SandboxOperation.BackgroundCommand("sleep 30"), parseSandboxOperation("sandbox_start_background_command", mapOf("command" to "sleep 30")))
+        val noPort = SandboxExecutionResult(true, SandboxOutput.BackgroundCommand("sleep 30", 124))
+            .toToolResponse(SandboxOperation.BackgroundCommand("sleep 30"))
+        assertTrue(noPort.containsKey("preview_url"))
+        assertNull(noPort["preview_url"])
+        assertFalse(noPort.containsKey("readiness"))
+        val failure = SandboxExecutionResult(false, error = "unknown status").toToolResponse(operation)
+        assertEquals("python -m http.server 3000", failure["command"])
+        assertFalse(failure.containsKey("pid"))
+    }
+    @Test fun invalidBackgroundArgumentsNeverReachExecution() = runTest {
+        val execution = Execution()
+        val tool = SandboxTools(Settings(), execution).getTools(null).first { it.name == "sandbox_start_background_command" }
+        listOf(0, 65536, -1, 1.5, "3000", true, Double.NaN).forEach { port ->
+            assertEquals(false, (tool.run(context(), mapOf("command" to "server", "port" to port)) as Map<*, *>)["success"])
+        }
+        listOf(mapOf("command" to " "), mapOf("command" to "server", "timeout" to -1),
+            mapOf("command" to "server", "envs" to mapOf("A" to 1))).forEach { args ->
+            assertEquals(false, (tool.run(context(), args) as Map<*, *>)["success"])
+        }
+        assertEquals(0, execution.calls)
     }
     @Test fun usesPersistentUserAndConversationIdentityFromContext() = runTest {
         val execution = Execution()
@@ -48,6 +84,19 @@ class SandboxToolsTest {
         assertEquals(true, response["success"])
         assertEquals(SandboxSessionKey("user-1", "chat-1"), execution.session)
         assertEquals(SandboxOperation.Command("echo ok", "/tmp", mapOf("A" to "B"), 0), execution.operation)
+    }
+    @Test fun backgroundToolUsesConversationIdentityAndRechecksCachedAvailability() = runTest {
+        val settings = Settings(); val execution = Execution()
+        val tool = SandboxTools(settings, execution).getTools(null).first { it.name == "sandbox_start_background_command" }
+        val args = mapOf("command" to "sleep 30", "timeout" to 0)
+        val response = tool.run(context(), args) as Map<*, *>
+        assertEquals(SandboxSessionKey("user-1", "chat-1"), execution.session)
+        assertEquals(SandboxOperation.BackgroundCommand("sleep 30", timeoutSeconds = 0), execution.operation)
+        assertEquals(123, response["pid"])
+        assertEquals(true, response["success"])
+        settings.setEnabled(false)
+        assertEquals(false, (tool.run(context(), args) as Map<*, *>)["success"])
+        assertEquals(1, execution.calls)
     }
     @Test fun cachedToolIsBlockedAfterDisablingWithoutCallingExecution() = runTest {
         val settings = Settings(); val execution = Execution(); val toolset = SandboxTools(settings, execution)

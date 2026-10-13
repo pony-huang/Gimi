@@ -32,6 +32,7 @@ class SessionSandboxExecutionRepositoryTest {
         override suspend fun execute(operation: SandboxOperation): SandboxOutput {
             calls++; delay(executeDelay); wait?.await()
             error?.let { throw SandboxGatewayException(it, "captured output") }
+            if (operation is SandboxOperation.BackgroundCommand) return SandboxOutput.BackgroundCommand(operation.command, 123)
             return SandboxOutput.Command("echo", "ok", "", 0)
         }
         override fun cancelRequests() { cancels++; wait?.completeExceptionally(SandboxGatewayException(SandboxGatewayFailure.UNAVAILABLE)) }
@@ -46,6 +47,23 @@ class SessionSandboxExecutionRepositoryTest {
     }
     private val key = SandboxSessionKey("user", "chat-1")
     private val command = SandboxOperation.Command("echo ok")
+
+    @Test fun backgroundStartAllowsNextCallAndDoesNotKeepIdleSandboxAlive() = runTest {
+        val settings = Settings(); val factory = Factory()
+        val repository = SessionSandboxExecutionRepository(settings, factory, backgroundScope)
+        val background = SandboxOperation.BackgroundCommand("sleep 30", timeoutSeconds = 0)
+        val result = repository.execute(key, background)
+        assertEquals(SandboxOutput.BackgroundCommand("sleep 30", 123), result.output)
+        assertTrue(repository.execute(key, command).success)
+        assertEquals(1, factory.instances.single().creates)
+        assertEquals(2, factory.instances.single().calls)
+        val refreshes = factory.instances.single().refreshes
+        advanceTimeBy(600_000); runCurrent()
+        assertEquals(refreshes, factory.instances.single().refreshes)
+        settings.setEnabled(false); runCurrent()
+        assertEquals(1, factory.instances.single().shutdowns)
+        assertFalse(repository.execute(key, background).success)
+    }
 
     @Test fun disabledAndPendingConfigurationsNeverOpenGateway() = runTest {
         val settings = Settings(); val factory = Factory()

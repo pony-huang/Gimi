@@ -11,6 +11,23 @@ data class SandboxSessionKey(val userId: String, val sessionId: String)
 sealed interface SandboxOperation {
     /** Shell 操作；cwd/envs 仅用于本次进程，timeoutSeconds=0 表示不设执行期限。 */
     data class Command(val command: String, val cwd: String? = null, val envs: Map<String, String> = emptyMap(), val timeoutSeconds: Int = 60) : SandboxOperation
+    /**
+     * 启动后立即返回的 Shell 操作，不等待进程退出或服务就绪。
+     * @property command 要启动的命令。
+     * @property port 可选服务端口，仅用于生成预览地址，不检查监听状态。
+     * @property cwd 本次进程的工作目录。
+     * @property envs 仅注入本次进程的环境变量。
+     * @property timeoutSeconds 启动流超时，默认 60 秒，0 表示不设期限；沙盒仍受闲置超时约束。
+     */
+    data class BackgroundCommand(
+        val command: String,
+        val port: Int? = null,
+        val cwd: String? = null,
+        val envs: Map<String, String> = emptyMap(),
+        val timeoutSeconds: Int = 60,
+    ) : SandboxOperation {
+        init { require(port == null || port in 1..65535) }
+    }
     /** 解释器操作；同一聊天的同一语言保留变量，envs 仅用于本次执行。 */
     data class Code(val code: String, val language: String = "python", val envs: Map<String, String> = emptyMap(), val timeoutSeconds: Int = 60) : SandboxOperation
     /** 创建或覆盖 UTF-8 文本文件，content 允许为空。 */
@@ -25,6 +42,13 @@ sealed interface SandboxOperation {
 sealed interface SandboxOutput {
     /** 已运行命令的完整状态，非零退出仍是完成的工具调用。 */
     data class Command(val command: String, val stdout: String, val stderr: String, val exitCode: Int) : SandboxOutput
+    /**
+     * 已收到远端进程 PID 的启动回执，不表示进程仍在运行或服务已就绪。
+     * @property command 已请求启动的命令。
+     * @property pid 当前沙盒内的进程标识，环境重建后失效。
+     * @property previewUrl 可选 HTTPS 预览地址，仅根据沙盒和端口生成。
+     */
+    data class BackgroundCommand(val command: String, val pid: Int, val previewUrl: String? = null) : SandboxOutput
     /** 已运行代码的文本结果，error 表示内核运行异常。 */
     data class Code(val stdout: String, val stderr: String, val text: String, val error: String) : SandboxOutput
     /** 文本写入回执，仅包含沙盒路径。 */

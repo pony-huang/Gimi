@@ -79,4 +79,8 @@
 
     <!-- 共享：Agent 任务进行中 -->
     <string name="modelsettings_agent_mutation_blocked">Agent 任务进行中，请先停止任务后再修改。</string>
+    <string name="modelsettings_service_unconfigured">未配置</string>
+    <string name="modelsettings_service_configured_count">已配置 · %1$d 个模型</string>
+    <string name="modelsettings_service_open">打开 %1$s 配置</string>
+    <string name="modelsettings_key_testing">正在测试…</string>
 </resources>

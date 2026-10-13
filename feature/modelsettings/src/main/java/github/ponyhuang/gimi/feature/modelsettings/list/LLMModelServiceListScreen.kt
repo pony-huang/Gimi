@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.modelsettings.list
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,17 +13,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
+import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
 fun LLMModelServiceListScreen(
@@ -31,7 +33,7 @@ fun LLMModelServiceListScreen(
     onNavigateToDetail: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PreferencePageContainer(modifier = modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         Column(modifier = Modifier.fillMaxSize()) {
             PreferenceSectionTitle(
                 text = stringResource(R.string.modelsettings_list_section_configured),
@@ -82,6 +84,7 @@ fun LLMModelServiceListScreen(
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun LLMModelServiceListScreenPreview() {
     AsssistantaiTheme {

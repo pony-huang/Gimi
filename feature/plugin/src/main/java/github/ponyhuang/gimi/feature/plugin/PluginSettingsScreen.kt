@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.feature.plugin
 
 import android.app.Activity
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -46,7 +47,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -64,6 +64,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
@@ -107,6 +108,7 @@ fun PluginSettingsRoute(
         }
     }
     PreferenceScaffold(
+        style = PreferenceStyle.Compact,
         title = stringResource(R.string.plugin_screen_title),
         onBack = onBack,
     ) { scaffoldModifier ->
@@ -129,7 +131,7 @@ fun PluginSettingsScreen(
     onNavigateToConfig: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PreferencePageContainer(modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         if (state.plugins.isEmpty()) {
             PreferenceBanner(
                 text = stringResource(R.string.plugin_empty),
@@ -203,9 +205,9 @@ private fun PluginRow(
             // 统一「应用图标」样式：白底圆角方片 + 居中 logo，宽版 wordmark（如知乎）等比缩放不拉伸。
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(32.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color.White),
+                    .background(MaterialTheme.colorScheme.surfaceContainer),
                 contentAlignment = Alignment.Center,
             ) {
                 if (icon != null) {
@@ -219,8 +221,8 @@ private fun PluginRow(
                     Icon(
                         imageVector = Icons.Default.Extension,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(26.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp),
                     )
                 }
             }
@@ -232,7 +234,7 @@ private fun PluginRow(
             ) {
                 Text(
                     text = plugin.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.bodyLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -285,7 +287,7 @@ private fun PluginRow(
         if (showDivider) {
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
             )
         }
     }
@@ -321,6 +323,7 @@ private fun UninstallConfirmDialog(
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PluginSettingsScreenEmptyPreview() {
     AsssistantaiTheme {
@@ -334,6 +337,7 @@ private fun PluginSettingsScreenEmptyPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PluginSettingsScreenWithPluginsPreview() {
     AsssistantaiTheme {

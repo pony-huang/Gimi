@@ -12,6 +12,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 
 // effect 携带动态 string res id，无法在组合期用 stringResource 解析，豁免该 lint。
 @SuppressLint("LocalContextGetResourceValueCall")
@@ -38,6 +39,8 @@ fun ModelServiceListRoute(
     }
 
     PreferenceScaffold(
+
+        style = PreferenceStyle.Compact,
         title = stringResource(R.string.modelsettings_list_title),
         onBack = onBack,
     ) { scaffoldModifier ->

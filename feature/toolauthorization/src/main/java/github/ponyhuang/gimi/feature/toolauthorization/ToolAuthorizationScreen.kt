@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.toolauthorization
 
+import android.content.res.Configuration
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -19,23 +20,24 @@ import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import kotlinx.coroutines.flow.SharedFlow
 
 @Composable
@@ -48,6 +50,7 @@ fun ToolAuthorizationRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     ToolAuthorizationEffects(viewModel.effects)
     PreferenceScaffold(
+        style = PreferenceStyle.Compact,
         title = stringResource(R.string.toolauth_screen_title),
         onBack = onBack,
     ) { scaffoldModifier ->
@@ -67,7 +70,7 @@ fun ToolAuthorizationScreen(
     onNavigateToConfiguration: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PreferencePageContainer(modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
@@ -180,6 +183,7 @@ private fun toolAccessModeDescription(mode: ToolAccessMode): String = stringReso
 )
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ToolAuthorizationScreenCustomizationEnabledPreview() {
     AsssistantaiTheme {
@@ -197,6 +201,7 @@ private fun ToolAuthorizationScreenCustomizationEnabledPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ToolAuthorizationScreenToolAccessAlwaysPreview() {
     AsssistantaiTheme {
@@ -209,6 +214,7 @@ private fun ToolAuthorizationScreenToolAccessAlwaysPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ToolAuthorizationScreenMutationBlockedPreview() {
     AsssistantaiTheme {

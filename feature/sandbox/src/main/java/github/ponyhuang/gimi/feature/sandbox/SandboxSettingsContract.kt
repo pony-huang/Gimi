@@ -6,8 +6,17 @@ import github.ponyhuang.gimi.domain.sandbox.SandboxTemplate
 /** 模板列表的业务加载状态，错误由 Screen 映射为本地化文案。 */
 enum class SandboxTemplateLoadState { IDLE, LOADING, LOADED, CREDENTIALS_REQUIRED, AUTHENTICATION, RATE_LIMIT, NETWORK, PROTOCOL, UNAVAILABLE }
 
-/** 环境变量编辑行；id 在修改名称时保持稳定，nameError 表示名称无效或重复。 */
-data class SandboxEnvironmentDraft(val id: Long, val name: String = "", val value: String = "", val nameError: Boolean = false)
+/**
+ * 环境变量编辑行；id 在编辑与保存时保持稳定，nameError 表示名称无效或重复。
+ * @property expanded 只控制该组的编辑区展示；已有变量默认折叠，新增或校验失败时展开。
+ */
+data class SandboxEnvironmentDraft(
+    val id: Long,
+    val name: String = "",
+    val value: String = "",
+    val nameError: Boolean = false,
+    val expanded: Boolean = false,
+)
 
 /**
  * 沙盒页唯一展示状态；连接字段是草稿，开关和 configured 来自成功保存的设置。
@@ -34,6 +43,8 @@ data class SandboxSettingsUiState(
     val templates: List<SandboxTemplate> = emptyList(),
     val templateLoadState: SandboxTemplateLoadState = SandboxTemplateLoadState.IDLE,
 ) {
+    /** 即时开关独立于草稿保存；已配置且无修改时不重复提交。 */
+    val canSave: Boolean get() = enabled && !busy && (dirty || !configured)
     override fun toString(): String = "SandboxSettingsUiState(enabled=$enabled, configured=$configured, busy=$busy, credentials=<redacted>)"
 }
 
@@ -59,6 +70,8 @@ sealed interface SandboxSettingsAction {
     data class SetEnvironmentValue(val id: Long, val value: String) : SandboxSettingsAction
     /** 删除指定编辑行。 */
     data class RemoveEnvironment(val id: Long) : SandboxSettingsAction
+    /** 展开或收起指定环境变量组，不修改配置草稿。 */
+    data class ToggleEnvironment(val id: Long) : SandboxSettingsAction
     /** 添加允许空值的环境变量编辑行。 */
     data object AddEnvironment : SandboxSettingsAction
     /** 展开或折叠高级配置。 */

@@ -70,4 +70,8 @@
     <string name="modelsettings_detail_title">Service details</string>
 
     <string name="modelsettings_agent_mutation_blocked">An agent task is running. Please stop it before making changes.</string>
+    <string name="modelsettings_service_unconfigured">Not configured</string>
+    <string name="modelsettings_service_configured_count">Configured · %1$d models</string>
+    <string name="modelsettings_service_open">Open %1$s settings</string>
+    <string name="modelsettings_key_testing">Testing…</string>
 </resources>

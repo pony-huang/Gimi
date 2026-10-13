@@ -15,8 +15,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -28,6 +28,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /**
@@ -43,7 +44,7 @@ fun AboutScreen(
     onOpenLogs: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PreferencePageContainer(modifier = modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -110,7 +111,7 @@ private fun updateSubtitle(updateState: UpdateUiState): String = when (val statu
 @Composable
 private fun AboutScreenPreview() {
     AsssistantaiTheme {
-        PreferenceScaffold(title = stringResource(R.string.settings_about_title), onBack = {}) { modifier ->
+        PreferenceScaffold(style = PreferenceStyle.Compact, title = stringResource(R.string.settings_about_title), onBack = {}) { modifier ->
             AboutScreen(
                 appVersionName = "1.0.0",
                 updateState = UpdateUiState(currentVersionName = "1.0.0"),
@@ -127,7 +128,7 @@ private fun AboutScreenPreview() {
 @Composable
 private fun AboutScreenAvailablePreview() {
     AsssistantaiTheme {
-        PreferenceScaffold(title = stringResource(R.string.settings_about_title), onBack = {}) { modifier ->
+        PreferenceScaffold(style = PreferenceStyle.Compact, title = stringResource(R.string.settings_about_title), onBack = {}) { modifier ->
             AboutScreen(
                 appVersionName = "1.0.0",
                 updateState = UpdateUiState(

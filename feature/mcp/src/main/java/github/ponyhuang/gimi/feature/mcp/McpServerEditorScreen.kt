@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.mcp
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,17 +15,15 @@ import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,7 +46,10 @@ import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
+import github.ponyhuang.gimi.ui.preference.PreferenceSaveBar
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.preference.PreferenceTextField
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
@@ -59,7 +61,7 @@ fun McpServerEditorScreen(
 ) {
     val draft = state.editor
     if (draft == null) {
-        PreferencePageContainer(modifier) {
+        PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
@@ -67,7 +69,7 @@ fun McpServerEditorScreen(
         return
     }
 
-    PreferencePageContainer(modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -120,7 +122,7 @@ fun McpServerEditorScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    OutlinedTextField(
+                    PreferenceTextField(
                         value = draft.name,
                         onValueChange = {
                             onAction(McpSettingsAction.EditorChanged(draft.copy(name = it)))
@@ -130,7 +132,7 @@ fun McpServerEditorScreen(
                         enabled = !state.isMutationBlocked,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    OutlinedTextField(
+                    PreferenceTextField(
                         value = draft.description,
                         onValueChange = {
                             onAction(McpSettingsAction.EditorChanged(draft.copy(description = it)))
@@ -147,7 +149,7 @@ fun McpServerEditorScreen(
                             }
                         },
                     ) {
-                        OutlinedTextField(
+                        PreferenceTextField(
                             value = draft.transport.displayName(),
                             onValueChange = {},
                             readOnly = true,
@@ -178,7 +180,7 @@ fun McpServerEditorScreen(
                             }
                         }
                     }
-                    OutlinedTextField(
+                    PreferenceTextField(
                         value = draft.endpointUrl,
                         onValueChange = {
                             onAction(McpSettingsAction.EditorChanged(draft.copy(endpointUrl = it)))
@@ -189,7 +191,7 @@ fun McpServerEditorScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     var tokenVisible by remember { mutableStateOf(false) }
-                    OutlinedTextField(
+                    PreferenceTextField(
                         value = draft.bearerToken,
                         onValueChange = {
                             onAction(McpSettingsAction.EditorChanged(draft.copy(bearerToken = it)))
@@ -218,7 +220,7 @@ fun McpServerEditorScreen(
                         },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    OutlinedTextField(
+                    PreferenceTextField(
                         value = draft.headers,
                         onValueChange = {
                             onAction(McpSettingsAction.EditorChanged(draft.copy(headers = it)))
@@ -231,79 +233,66 @@ fun McpServerEditorScreen(
                     )
                 }
             }
-            PreferenceGroupCard {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Button(
-                        onClick = { onAction(McpSettingsAction.SaveEditor) },
-                        enabled = !state.isMutationBlocked && !state.isTestingConnection &&
-                            draft.name.isNotBlank() && draft.endpointUrl.isNotBlank(),
-                        modifier = Modifier
-                            .fillMaxWidth(0.5f)
-                            .align(Alignment.CenterHorizontally)
-                            .testTag("mcp_save_action"),
+            if (state.connectionError != null || !draft.isNew) {
+                PreferenceGroupCard {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(
-                            stringResource(
-                                if (state.isTestingConnection) R.string.mcp_connection_testing
-                                else R.string.mcp_save,
-                            ),
-                        )
-                    }
-                    state.connectionError?.let { error ->
-                        Text(
-                            text = localizeMcpError(error),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                    if (!draft.isNew) {
-                        var showDeleteDialog by remember { mutableStateOf(false) }
-                        TextButton(
-                            onClick = { showDeleteDialog = true },
-                            enabled = !state.isMutationBlocked,
-                            colors = ButtonDefaults.textButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error,
-                            ),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = null)
-                            Text(stringResource(R.string.mcp_delete_server))
-                        }
-                        if (showDeleteDialog) {
-                            AlertDialog(
-                                onDismissRequest = { showDeleteDialog = false },
-                                title = { Text(stringResource(R.string.mcp_delete_confirm_title)) },
-                                text = {
-                                    Text(
-                                        stringResource(
-                                            R.string.mcp_delete_confirm_message,
-                                            draft.name,
-                                        ),
-                                    )
-                                },
-                                confirmButton = {
-                                    TextButton(
-                                        onClick = {
-                                            showDeleteDialog = false
-                                            onAction(McpSettingsAction.DeleteEditor)
-                                        },
-                                        colors = ButtonDefaults.textButtonColors(
-                                            contentColor = MaterialTheme.colorScheme.error,
-                                        ),
-                                    ) {
-                                        Text(stringResource(R.string.mcp_delete_confirm_action))
-                                    }
-                                },
-                                dismissButton = {
-                                    TextButton(onClick = { showDeleteDialog = false }) {
-                                        Text(stringResource(R.string.mcp_cancel))
-                                    }
-                                },
+
+                        state.connectionError?.let { error ->
+                            Text(
+                                text = localizeMcpError(error),
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.fillMaxWidth(),
                             )
+                        }
+                        if (!draft.isNew) {
+                            var showDeleteDialog by remember { mutableStateOf(false) }
+                            TextButton(
+                                onClick = { showDeleteDialog = true },
+                                enabled = !state.isMutationBlocked,
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error,
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = null)
+                                Text(stringResource(R.string.mcp_delete_server))
+                            }
+                            if (showDeleteDialog) {
+                                AlertDialog(
+                                    onDismissRequest = { showDeleteDialog = false },
+                                    title = { Text(stringResource(R.string.mcp_delete_confirm_title)) },
+                                    text = {
+                                        Text(
+                                            stringResource(
+                                                R.string.mcp_delete_confirm_message,
+                                                draft.name,
+                                            ),
+                                        )
+                                    },
+                                    confirmButton = {
+                                        TextButton(
+                                            onClick = {
+                                                showDeleteDialog = false
+                                                onAction(McpSettingsAction.DeleteEditor)
+                                            },
+                                            colors = ButtonDefaults.textButtonColors(
+                                                contentColor = MaterialTheme.colorScheme.error,
+                                            ),
+                                        ) {
+                                            Text(stringResource(R.string.mcp_delete_confirm_action))
+                                        }
+                                    },
+                                    dismissButton = {
+                                        TextButton(onClick = { showDeleteDialog = false }) {
+                                            Text(stringResource(R.string.mcp_cancel))
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -312,7 +301,20 @@ fun McpServerEditorScreen(
     }
 }
 
+/** 编辑页主操作固定在页面底部，连接测试与提交仍使用既有状态和意图。 */
+@Composable
+internal fun McpEditorSaveBar(state: McpSettingsUiState, onAction: (McpSettingsAction) -> Unit) {
+    val draft = state.editor ?: return
+    PreferenceSaveBar(
+        label = stringResource(if (state.isTestingConnection) R.string.mcp_connection_testing else R.string.mcp_save),
+        onSave = { onAction(McpSettingsAction.SaveEditor) },
+        enabled = !state.isMutationBlocked && !state.isTestingConnection && draft.name.isNotBlank() && draft.endpointUrl.isNotBlank(),
+        buttonModifier = Modifier.testTag("mcp_save_action"),
+    )
+}
+
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun McpServerEditorScreenLoadingPreview() {
     AsssistantaiTheme {
@@ -324,6 +326,7 @@ private fun McpServerEditorScreenLoadingPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun McpServerEditorScreenLoadedPreview() {
     AsssistantaiTheme {

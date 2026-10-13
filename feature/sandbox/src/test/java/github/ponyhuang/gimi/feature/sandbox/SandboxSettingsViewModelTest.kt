@@ -3,6 +3,9 @@ package github.ponyhuang.gimi.feature.sandbox
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.sandbox.*
 import java.io.IOException
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runCurrent
@@ -10,9 +13,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SandboxSettingsViewModelTest {
@@ -192,6 +192,56 @@ class SandboxSettingsViewModelTest {
         assertTrue(viewModel.uiState.value.dirty)
         assertEquals("draft", viewModel.uiState.value.apiKey)
         assertEquals("", repository.configuration.value.connection.apiKey)
+    }
+    @Test fun existingVariablesStartCollapsedAndNewVariablesExpandIndependently() = runTest {
+        val repository = Settings()
+        repository.configuration.value = SandboxConfiguration(true, SandboxConnection(apiKey = "key", envs = mapOf("LANG" to "en_US")))
+        val viewModel = SandboxSettingsViewModel(repository, Templates()); runCurrent()
+        val savedId = viewModel.uiState.value.environment.single().id
+        assertFalse(viewModel.uiState.value.environment.single().expanded)
+        viewModel.onAction(SandboxSettingsAction.AddEnvironment)
+        val addedId = viewModel.uiState.value.environment.last().id
+        assertTrue(viewModel.uiState.value.environment.last().expanded)
+        viewModel.onAction(SandboxSettingsAction.ToggleEnvironment(savedId))
+        assertTrue(viewModel.uiState.value.environment.all { it.expanded })
+        viewModel.onAction(SandboxSettingsAction.ToggleEnvironment(addedId))
+        assertTrue(viewModel.uiState.value.environment.first().expanded)
+        assertFalse(viewModel.uiState.value.environment.last().expanded)
+        assertEquals(0, repository.saves)
+    }
+    @Test fun invalidCollapsedVariableExpandsWhenSaving() = runTest {
+        val repository = Settings()
+        val viewModel = SandboxSettingsViewModel(repository, Templates())
+        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
+        viewModel.onAction(SandboxSettingsAction.SetApiKey("key"))
+        viewModel.onAction(SandboxSettingsAction.AddEnvironment)
+        val id = viewModel.uiState.value.environment.single().id
+        viewModel.onAction(SandboxSettingsAction.SetEnvironmentName(id, "INVALID=NAME"))
+        viewModel.onAction(SandboxSettingsAction.ToggleEnvironment(id))
+        assertFalse(viewModel.uiState.value.environment.single().expanded)
+        viewModel.onAction(SandboxSettingsAction.Save); runCurrent()
+        assertTrue(viewModel.uiState.value.environment.single().nameError)
+        assertTrue(viewModel.uiState.value.environment.single().expanded)
+        assertEquals(0, repository.saves)
+    }
+    @Test fun savingPreservesVariableIdentityAndExpansion() = runTest {
+        val repository = Settings()
+        val viewModel = SandboxSettingsViewModel(repository, Templates())
+        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
+        viewModel.onAction(SandboxSettingsAction.SetApiKey("key"))
+        viewModel.onAction(SandboxSettingsAction.AddEnvironment)
+        val id = viewModel.uiState.value.environment.single().id
+        viewModel.onAction(SandboxSettingsAction.SetEnvironmentName(id, " LANG "))
+        viewModel.onAction(SandboxSettingsAction.SetEnvironmentValue(id, "en_US"))
+        viewModel.onAction(SandboxSettingsAction.Save); runCurrent()
+        assertEquals(id, viewModel.uiState.value.environment.single().id)
+        assertEquals("LANG", viewModel.uiState.value.environment.single().name)
+        assertTrue(viewModel.uiState.value.environment.single().expanded)
+        assertFalse(viewModel.uiState.value.dirty)
+        assertFalse(viewModel.uiState.value.canSave)
+        viewModel.onAction(SandboxSettingsAction.ToggleEnvironment(id)); runCurrent()
+        assertFalse(viewModel.uiState.value.dirty)
+        assertFalse(viewModel.uiState.value.environment.single().expanded)
     }
     @Test fun keyVisibilityAndAdvancedDisplayDoNotPersistConnection() = runTest {
         val repository = Settings(); val viewModel = SandboxSettingsViewModel(repository, Templates())

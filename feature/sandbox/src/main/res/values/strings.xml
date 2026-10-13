@@ -1,11 +1,11 @@
 <resources>
     <string name="sandbox_screen_title">沙盒</string>
     <string name="sandbox_e2b">E2B</string>
-    <string name="sandbox_disabled_description">在隔离环境中执行代码与文件操作</string>
+    <string name="sandbox_disabled_description">未启用 · 在隔离环境中执行代码与文件操作</string>
     <string name="sandbox_pending_description">待配置 · 请填写 API Key 并保存</string>
     <string name="sandbox_configured_description">已配置 · 按聊天独立使用沙盒</string>
-    <string name="sandbox_domain">Domain</string>
-    <string name="sandbox_domain_help">请填写基础域名，例如 e2b.app</string>
+    <string name="sandbox_domain">域名</string>
+    <string name="sandbox_domain_help">填写基础域名，无需 https://</string>
     <string name="sandbox_api_key">API Key</string>
     <string name="sandbox_key_required">请填写 API Key</string>
     <string name="sandbox_key_help">密钥加密保存在本机</string>
@@ -15,7 +15,7 @@
     <string name="sandbox_advanced_description">模板、闲置超时和环境变量</string>
     <string name="sandbox_expand_advanced">展开高级配置</string>
     <string name="sandbox_collapse_advanced">收起高级配置</string>
-    <string name="sandbox_template">Template</string>
+    <string name="sandbox_template">模板</string>
     <string name="sandbox_template_help">选择模板或输入名称、ID；执行代码需支持代码解释器</string>
     <string name="sandbox_template_default">默认 · code-interpreter-v1</string>
     <string name="sandbox_template_selected">已选择：%1$s</string>
@@ -50,4 +50,11 @@
     <string name="sandbox_saving">正在保存…</string>
     <string name="sandbox_saved">沙盒配置已保存</string>
     <string name="sandbox_save_failed">保存失败，请重试</string>
+    <string name="sandbox_execution_section">执行环境</string>
+    <string name="sandbox_connection_section">连接配置</string>
+    <string name="sandbox_runtime_configuration">运行配置</string>
+    <string name="sandbox_unsaved_changes">有未保存的修改</string>
+    <string name="sandbox_new_environment">新环境变量</string>
+    <string name="sandbox_expand_environment">展开环境变量</string>
+    <string name="sandbox_collapse_environment">收起环境变量</string>
 </resources>

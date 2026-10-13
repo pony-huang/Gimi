@@ -9,13 +9,13 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
@@ -27,12 +27,10 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -42,6 +40,7 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -49,24 +48,34 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.sandbox.SandboxSettingField
+import github.ponyhuang.gimi.ui.preference.PreferenceFormContent
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
+import github.ponyhuang.gimi.ui.preference.PreferenceSaveBar
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceSwitchItem
+import github.ponyhuang.gimi.ui.preference.PreferenceTextField
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
-/** 无状态设置屏幕；字段保存、校验、展开和密钥展示均由输入状态和事件驱动。 */
+/** 无状态沙盒表单；即时开关、配置草稿与各变量组展开态均由 ViewModel 驱动。 */
 @Composable
-fun SandboxSettingsScreen(state: SandboxSettingsUiState, onAction: (SandboxSettingsAction) -> Unit, modifier: Modifier = Modifier) {
-    val advancedArrowRotation by animateFloatAsState(
-        targetValue = if (state.advancedExpanded) 180f else 0f,
-        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+fun SandboxSettingsScreen(
+    state: SandboxSettingsUiState,
+    onAction: (SandboxSettingsAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val advancedRotation by animateFloatAsState(
+        if (state.advancedExpanded) 180f else 0f,
+        animationSpec = tween(300, easing = FastOutSlowInEasing),
         label = "Advanced arrow rotation",
     )
-    PreferencePageContainer(modifier) {
-        LazyColumn(modifier = Modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(vertical = 12.dp)) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
+        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
             item {
+                PreferenceSectionTitle(stringResource(R.string.sandbox_execution_section))
                 PreferenceGroupCard {
                     PreferenceSwitchItem(
                         icon = Icons.Default.Code,
@@ -79,27 +88,22 @@ fun SandboxSettingsScreen(state: SandboxSettingsUiState, onAction: (SandboxSetti
                         checked = state.enabled,
                         switchEnabled = !state.busy,
                         onCheckedChange = { onAction(SandboxSettingsAction.SetEnabled(it)) },
-                        onClick = { onAction(SandboxSettingsAction.SetEnabled(!state.enabled)) },
-                        showDivider = false,
+                        onClick = if (state.busy) null else { { onAction(SandboxSettingsAction.SetEnabled(!state.enabled)) } },
                     )
-                    AnimatedVisibility(
-                        visible = state.enabled,
-                        enter = expandVertically(
-                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-                            expandFrom = Alignment.Top,
-                        ) + fadeIn(animationSpec = tween(durationMillis = 200)),
-                        exit = shrinkVertically(
-                            animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-                            shrinkTowards = Alignment.Top,
-                        ) + fadeOut(animationSpec = tween(durationMillis = 150)),
-                    ) {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                SandboxField(state.domain, { onAction(SandboxSettingsAction.SetDomain(it)) },
+                }
+            }
+            item {
+                SandboxExpansion(state.enabled) {
+                    Column {
+                        PreferenceSectionTitle(stringResource(R.string.sandbox_connection_section))
+                        PreferenceGroupCard {
+                            PreferenceFormContent {
+                                SandboxField(
+                                    state.domain, { onAction(SandboxSettingsAction.SetDomain(it)) },
                                     stringResource(R.string.sandbox_domain), stringResource(R.string.sandbox_domain_help),
-                                    SandboxSettingField.DOMAIN in state.errors, !state.busy)
-                                OutlinedTextField(
+                                    SandboxSettingField.DOMAIN in state.errors, !state.busy,
+                                )
+                                PreferenceTextField(
                                     value = state.apiKey,
                                     onValueChange = { onAction(SandboxSettingsAction.SetApiKey(it)) },
                                     label = { Text(stringResource(R.string.sandbox_api_key)) },
@@ -107,8 +111,10 @@ fun SandboxSettingsScreen(state: SandboxSettingsUiState, onAction: (SandboxSetti
                                     visualTransformation = if (state.keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
                                     trailingIcon = {
                                         IconButton(onClick = { onAction(SandboxSettingsAction.ToggleKeyVisibility) }, enabled = !state.busy) {
-                                            Icon(if (state.keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                                contentDescription = stringResource(if (state.keyVisible) R.string.sandbox_hide_key else R.string.sandbox_show_key))
+                                            Icon(
+                                                if (state.keyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                                contentDescription = stringResource(if (state.keyVisible) R.string.sandbox_hide_key else R.string.sandbox_show_key),
+                                            )
                                         }
                                     },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -118,71 +124,44 @@ fun SandboxSettingsScreen(state: SandboxSettingsUiState, onAction: (SandboxSetti
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             }
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                            PreferenceListItem(icon = Icons.Default.Tune, title = stringResource(R.string.sandbox_advanced),
-                                subtitle = stringResource(R.string.sandbox_advanced_description), onClick = { onAction(SandboxSettingsAction.ToggleAdvanced) },
+                        }
+                        PreferenceSectionTitle(stringResource(R.string.sandbox_advanced))
+                        PreferenceGroupCard {
+                            PreferenceListItem(
+                                icon = Icons.Default.Tune,
+                                title = stringResource(R.string.sandbox_runtime_configuration),
+                                subtitle = stringResource(R.string.sandbox_advanced_description),
+                                onClick = if (state.busy) null else { { onAction(SandboxSettingsAction.ToggleAdvanced) } },
+                                showDivider = state.advancedExpanded,
                                 trailingContent = {
-                                    Icon(Icons.Default.ExpandMore, modifier = Modifier.rotate(advancedArrowRotation),
-                                        contentDescription = stringResource(if (state.advancedExpanded) R.string.sandbox_collapse_advanced else R.string.sandbox_expand_advanced))
-                                })
-                            AnimatedVisibility(
-                                visible = state.advancedExpanded,
-                                enter = expandVertically(
-                                    animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-                                    expandFrom = Alignment.Top,
-                                ) + fadeIn(animationSpec = tween(durationMillis = 200)),
-                                exit = shrinkVertically(
-                                    animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
-                                    shrinkTowards = Alignment.Top,
-                                ) + fadeOut(animationSpec = tween(durationMillis = 150)),
-                            ) {
-                                Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    IconButton(onClick = { onAction(SandboxSettingsAction.ToggleAdvanced) }, enabled = !state.busy) {
+                                        Icon(
+                                            Icons.Default.ExpandMore, modifier = Modifier.rotate(advancedRotation),
+                                            contentDescription = stringResource(if (state.advancedExpanded) R.string.sandbox_collapse_advanced else R.string.sandbox_expand_advanced),
+                                        )
+                                    }
+                                },
+                            )
+                            SandboxExpansion(state.advancedExpanded) {
+                                PreferenceFormContent {
                                     SandboxTemplatePicker(state, onAction)
-                                    SandboxField(state.idleTimeoutSeconds, { onAction(SandboxSettingsAction.SetIdleTimeout(it)) },
-                                        stringResource(R.string.sandbox_idle_timeout), stringResource(if (SandboxSettingField.IDLE_TIMEOUT in state.errors) R.string.sandbox_timeout_invalid else R.string.sandbox_timeout_help),
-                                        SandboxSettingField.IDLE_TIMEOUT in state.errors, !state.busy, KeyboardOptions(keyboardType = KeyboardType.Number))
+                                    SandboxField(
+                                        state.idleTimeoutSeconds, { onAction(SandboxSettingsAction.SetIdleTimeout(it)) },
+                                        stringResource(R.string.sandbox_idle_timeout),
+                                        stringResource(if (SandboxSettingField.IDLE_TIMEOUT in state.errors) R.string.sandbox_timeout_invalid else R.string.sandbox_timeout_help),
+                                        SandboxSettingField.IDLE_TIMEOUT in state.errors, !state.busy,
+                                        KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    )
                                     Text(stringResource(R.string.sandbox_environment), style = MaterialTheme.typography.titleSmall)
                                     Text(stringResource(R.string.sandbox_environment_help), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     state.environment.forEach { entry ->
-                                        key(entry.id) {
-                                            Surface(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                shape = MaterialTheme.shapes.large,
-                                                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                                            ) {
-                                                Column(
-                                                    modifier = Modifier.padding(12.dp),
-                                                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                                                ) {
-                                                    OutlinedTextField(value = entry.name, onValueChange = { onAction(SandboxSettingsAction.SetEnvironmentName(entry.id, it)) },
-                                                        label = { Text(stringResource(R.string.sandbox_environment_name)) }, singleLine = true,
-                                                        enabled = !state.busy, isError = entry.nameError,
-                                                        supportingText = if (entry.nameError) { { Text(stringResource(R.string.sandbox_environment_invalid)) } } else null,
-                                                        modifier = Modifier.fillMaxWidth())
-                                                    OutlinedTextField(value = entry.value, onValueChange = { onAction(SandboxSettingsAction.SetEnvironmentValue(entry.id, it)) },
-                                                        label = { Text(stringResource(R.string.sandbox_environment_value)) }, singleLine = true,
-                                                        enabled = !state.busy, modifier = Modifier.fillMaxWidth())
-                                                    IconButton(
-                                                        onClick = { onAction(SandboxSettingsAction.RemoveEnvironment(entry.id)) },
-                                                        enabled = !state.busy,
-                                                        modifier = Modifier.align(Alignment.CenterHorizontally),
-                                                    ) {
-                                                        Icon(Icons.Default.DeleteOutline, contentDescription = stringResource(R.string.sandbox_remove_environment))
-                                                    }
-                                                }
-                                            }
-                                        }
+                                        key(entry.id) { SandboxEnvironmentGroup(entry, !state.busy, onAction) }
                                     }
                                     TextButton(onClick = { onAction(SandboxSettingsAction.AddEnvironment) }, enabled = !state.busy) {
                                         Icon(Icons.Default.Add, contentDescription = null)
-                                        Text(stringResource(R.string.sandbox_add_environment))
+                                        Text(stringResource(R.string.sandbox_add_environment), modifier = Modifier.padding(start = 8.dp))
                                     }
                                 }
-                            }
-                            Button(onClick = { onAction(SandboxSettingsAction.Save) }, enabled = !state.busy,
-                                modifier = Modifier.align(Alignment.CenterHorizontally).padding(horizontal = 16.dp, vertical = 16.dp).fillMaxWidth(0.5f)) {
-                                Text(stringResource(if (state.busy) R.string.sandbox_saving else R.string.sandbox_save))
                             }
                         }
                     }
@@ -192,9 +171,71 @@ fun SandboxSettingsScreen(state: SandboxSettingsUiState, onAction: (SandboxSetti
     }
 }
 
+/** 保存区属于页面壳，不随表单滚动；保持连接草稿必须显式保存的语义。 */
+@Composable
+internal fun SandboxSettingsSaveBar(state: SandboxSettingsUiState, onAction: (SandboxSettingsAction) -> Unit) {
+    if (state.enabled) {
+        PreferenceSaveBar(
+            label = stringResource(if (state.busy) R.string.sandbox_saving else R.string.sandbox_save),
+            onSave = { onAction(SandboxSettingsAction.Save) },
+            enabled = state.canSave,
+            notice = if (state.dirty) stringResource(R.string.sandbox_unsaved_changes) else null,
+        )
+    }
+}
+
+@Composable
+private fun SandboxEnvironmentGroup(entry: SandboxEnvironmentDraft, enabled: Boolean, onAction: (SandboxSettingsAction) -> Unit) {
+    val rotation by animateFloatAsState(if (entry.expanded) 180f else 0f, tween(300, easing = FastOutSlowInEasing), label = "Environment arrow")
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Surface(onClick = { onAction(SandboxSettingsAction.ToggleEnvironment(entry.id)) }, enabled = enabled, color = Color.Transparent) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                // 折叠摘要只展示名称；值可能是令牌，不应在浏览列表时直接暴露。
+                Text(entry.name.ifBlank { stringResource(R.string.sandbox_new_environment) }, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                Icon(Icons.Default.ExpandMore, stringResource(if (entry.expanded) R.string.sandbox_collapse_environment else R.string.sandbox_expand_environment), Modifier.rotate(rotation))
+            }
+        }
+        SandboxExpansion(entry.expanded) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                PreferenceTextField(
+                    value = entry.name,
+                    onValueChange = { onAction(SandboxSettingsAction.SetEnvironmentName(entry.id, it)) },
+                    label = { Text(stringResource(R.string.sandbox_environment_name)) },
+                    singleLine = true,
+                    enabled = enabled,
+                    isError = entry.nameError,
+                    supportingText = if (entry.nameError) { { Text(stringResource(R.string.sandbox_environment_invalid)) } } else null,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                PreferenceTextField(
+                    value = entry.value,
+                    onValueChange = { onAction(SandboxSettingsAction.SetEnvironmentValue(entry.id, it)) },
+                    label = { Text(stringResource(R.string.sandbox_environment_value)) },
+                    singleLine = true,
+                    enabled = enabled,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                IconButton(onClick = { onAction(SandboxSettingsAction.RemoveEnvironment(entry.id)) }, enabled = enabled, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                    Icon(Icons.Default.DeleteOutline, stringResource(R.string.sandbox_remove_environment), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+    }
+}
+
+@Composable
+private fun SandboxExpansion(visible: Boolean, content: @Composable () -> Unit) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = expandVertically(tween(300, easing = FastOutSlowInEasing), expandFrom = Alignment.Top) + fadeIn(tween(200)),
+        exit = shrinkVertically(tween(300, easing = FastOutSlowInEasing), shrinkTowards = Alignment.Top) + fadeOut(tween(150)),
+    ) { content() }
+}
+
 @Composable
 private fun SandboxField(value: String, onValueChange: (String) -> Unit, label: String, help: String, error: Boolean, enabled: Boolean, keyboardOptions: KeyboardOptions = KeyboardOptions.Default) {
-    OutlinedTextField(value = value, onValueChange = onValueChange, label = { Text(label) }, supportingText = { Text(help) },
+    PreferenceTextField(value = value, onValueChange = onValueChange, label = { Text(label) }, supportingText = { Text(help) },
         singleLine = true, isError = error, enabled = enabled, keyboardOptions = keyboardOptions, modifier = Modifier.fillMaxWidth())
 }
 
@@ -205,9 +246,10 @@ private fun SandboxConfiguredPreview() = SandboxScreenPreview(SandboxSettingsUiS
 
 @Preview(name = "Advanced light", widthDp = 390, heightDp = 1080)
 @Preview(name = "Advanced dark", widthDp = 390, heightDp = 1080, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "Advanced tablet", widthDp = 840, heightDp = 1080)
 @Composable
 private fun SandboxAdvancedPreview() = SandboxScreenPreview(SandboxSettingsUiState(enabled = true, configured = true, apiKey = "preview-key", advancedExpanded = true,
-    environment = listOf(SandboxEnvironmentDraft(0, "LANG", "zh_CN.UTF-8"))))
+    environment = listOf(SandboxEnvironmentDraft(0, "LANG", "zh_CN.UTF-8"), SandboxEnvironmentDraft(1, expanded = true)), dirty = true))
 
 @Preview(name = "Disabled", widthDp = 390, heightDp = 780)
 @Composable
@@ -217,14 +259,14 @@ private fun SandboxDisabledPreview() = SandboxScreenPreview(SandboxSettingsUiSta
 @Composable
 private fun SandboxPendingPreview() = SandboxScreenPreview(SandboxSettingsUiState(enabled = true))
 
-@Preview(name = "Invalid fields", widthDp = 390, heightDp = 780)
+@Preview(name = "Invalid fields", widthDp = 320, heightDp = 780, fontScale = 1.3f)
 @Composable
 private fun SandboxInvalidPreview() = SandboxScreenPreview(SandboxSettingsUiState(enabled = true, domain = "https://e2b.app", errors = setOf(SandboxSettingField.DOMAIN, SandboxSettingField.API_KEY)))
 
 @Composable
 private fun SandboxScreenPreview(state: SandboxSettingsUiState) {
     AsssistantaiTheme {
-        PreferenceScaffold(title = stringResource(R.string.sandbox_screen_title), onBack = {}) {
+        PreferenceScaffold(title = stringResource(R.string.sandbox_screen_title), onBack = {}, style = PreferenceStyle.Compact, bottomBar = { SandboxSettingsSaveBar(state, {}) }) {
             SandboxSettingsScreen(state, {}, it)
         }
     }

@@ -10,6 +10,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation3.runtime.NavKey
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import kotlinx.serialization.Serializable
 
 /** 沙盒功能拥有的导航目的地。 */
@@ -35,7 +36,12 @@ private fun SandboxSettingsRoute(onBack: () -> Unit, viewModel: SandboxSettingsV
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
     }
-    PreferenceScaffold(title = stringResource(R.string.sandbox_screen_title), onBack = onBack) { modifier ->
+    PreferenceScaffold(
+        style = PreferenceStyle.Compact,
+        title = stringResource(R.string.sandbox_screen_title),
+        onBack = onBack,
+        bottomBar = { SandboxSettingsSaveBar(state, viewModel::onAction) },
+    ) { modifier ->
         SandboxSettingsScreen(state, viewModel::onAction, modifier)
     }
 }

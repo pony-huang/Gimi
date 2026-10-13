@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.ui.preference
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -34,42 +35,49 @@ fun PreferenceScaffold(
     actions: @Composable () -> Unit = {},
     navigationIcon: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
+    style: PreferenceStyle = LocalPreferenceStyle.current,
+    bottomBar: @Composable () -> Unit = {},
     content: @Composable (Modifier) -> Unit,
 ) {
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        topBar = {
-            TopAppBar(
-                title = { Text(title) },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    // 与页面画布同色，让应用栏融入浅灰/深色画布。
-                    containerColor = preferenceCanvasColor(),
-                    titleContentColor = MaterialTheme.colorScheme.onBackground,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
-                ),
-                navigationIcon = navigationIcon ?: {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.common_back),
-                        )
-                    }
-                },
-                actions = { actions() },
-            )
-        },
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-        ) {
-            content(Modifier.fillMaxSize())
+    PreferenceStyleScope(style) {
+        Scaffold(
+            modifier = modifier.fillMaxSize(),
+            containerColor = if (style == PreferenceStyle.Compact) preferenceCanvasColor() else MaterialTheme.colorScheme.background,
+            bottomBar = bottomBar,
+            topBar = {
+                TopAppBar(
+                    title = { Text(title) },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        // 与页面画布同色，让应用栏融入浅灰/深色画布。
+                        containerColor = preferenceCanvasColor(),
+                        titleContentColor = MaterialTheme.colorScheme.onBackground,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
+                    ),
+                    navigationIcon = navigationIcon ?: {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.common_back),
+                            )
+                        }
+                    },
+                    actions = { actions() },
+                )
+            },
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+            ) {
+                content(Modifier.fillMaxSize())
+            }
         }
     }
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferenceScaffoldPreview() {
     AsssistantaiTheme {

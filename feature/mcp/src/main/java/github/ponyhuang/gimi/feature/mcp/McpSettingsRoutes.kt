@@ -14,6 +14,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 
 @Composable
 fun McpServerListRoute(
@@ -28,6 +29,7 @@ fun McpServerListRoute(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     PreferenceScaffold(
+        style = PreferenceStyle.Compact,
         title = stringResource(R.string.mcp_list_title),
         onBack = onBack,
         actions = {
@@ -59,6 +61,7 @@ fun McpServerAddOptionsRoute(
     modifier: Modifier = Modifier,
 ) {
     PreferenceScaffold(
+        style = PreferenceStyle.Compact,
         title = stringResource(R.string.mcp_add_options_title),
         onBack = onBack,
     ) { scaffoldModifier ->
@@ -79,6 +82,7 @@ fun McpServerImportRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     CloseEffect(viewModel, onBack)
     PreferenceScaffold(
+        style = PreferenceStyle.Compact,
         title = stringResource(R.string.mcp_import_title),
         onBack = onBack,
     ) { scaffoldModifier ->
@@ -103,11 +107,13 @@ fun McpServerEditorRoute(
     }
     CloseEffect(viewModel, onBack)
     PreferenceScaffold(
+        style = PreferenceStyle.Compact,
         title = stringResource(
             if (serverId == null) R.string.mcp_add_server
             else R.string.mcp_edit_server,
         ),
         onBack = onBack,
+        bottomBar = { McpEditorSaveBar(state, viewModel::onAction) },
     ) { scaffoldModifier ->
         McpServerEditorScreen(
             state = state,
@@ -148,7 +154,7 @@ fun McpServerToolsRoute(
     LaunchedEffect(serverId, server) {
         if (server != null) viewModel.onAction(McpSettingsAction.LoadTools(serverId))
     }
-    PreferenceScaffold(title = stringResource(R.string.mcp_tools_title), onBack = onBack) { modifier ->
+    PreferenceScaffold(style = PreferenceStyle.Compact, title = stringResource(R.string.mcp_tools_title), onBack = onBack) { modifier ->
         McpServerToolsScreen(serverId, state, viewModel::onAction, modifier)
     }
 }

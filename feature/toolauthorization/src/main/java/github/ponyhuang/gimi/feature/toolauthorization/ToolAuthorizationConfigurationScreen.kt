@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.toolauthorization
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,9 +27,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,6 +39,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
@@ -49,6 +51,7 @@ fun ToolAuthorizationConfigurationRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     ToolAuthorizationEffects(viewModel.effects)
     PreferenceScaffold(
+        style = PreferenceStyle.Compact,
         title = stringResource(R.string.toolauth_configuration_title),
         onBack = onBack,
     ) { scaffoldModifier ->
@@ -67,7 +70,7 @@ fun ToolAuthorizationConfigurationScreen(
     onAction: (ToolAuthorizationConfigurationAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PreferencePageContainer(modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         Column(Modifier.fillMaxSize()) {
             if (state.isMutationBlocked) {
                 PreferenceBanner(
@@ -198,6 +201,7 @@ private fun ToolAuthorizationFilter.labelRes(): Int = when (this) {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ToolAuthorizationConfigurationScreenEmptyPreview() {
     AsssistantaiTheme {
@@ -209,6 +213,7 @@ private fun ToolAuthorizationConfigurationScreenEmptyPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ToolAuthorizationConfigurationScreenWithToolsPreview() {
     AsssistantaiTheme {

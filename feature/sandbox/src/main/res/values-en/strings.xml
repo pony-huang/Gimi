@@ -50,4 +50,11 @@
     <string name="sandbox_saving">Saving…</string>
     <string name="sandbox_saved">Sandbox configuration saved</string>
     <string name="sandbox_save_failed">Could not save. Try again.</string>
+    <string name="sandbox_execution_section">Execution environment</string>
+    <string name="sandbox_connection_section">Connection</string>
+    <string name="sandbox_runtime_configuration">Runtime configuration</string>
+    <string name="sandbox_unsaved_changes">Unsaved changes</string>
+    <string name="sandbox_new_environment">New environment variable</string>
+    <string name="sandbox_expand_environment">Expand environment variable</string>
+    <string name="sandbox_collapse_environment">Collapse environment variable</string>
 </resources>

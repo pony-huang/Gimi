@@ -7,21 +7,21 @@ import github.ponyhuang.gimi.domain.sandbox.SandboxConfiguration
 import github.ponyhuang.gimi.domain.sandbox.SandboxConnection
 import github.ponyhuang.gimi.domain.sandbox.SandboxSettingField
 import github.ponyhuang.gimi.domain.sandbox.SandboxSettingsRepository
-import github.ponyhuang.gimi.domain.sandbox.SandboxTemplateRepository
 import github.ponyhuang.gimi.domain.sandbox.SandboxTemplateException
 import github.ponyhuang.gimi.domain.sandbox.SandboxTemplateFailure
+import github.ponyhuang.gimi.domain.sandbox.SandboxTemplateRepository
 import github.ponyhuang.gimi.domain.sandbox.isSandboxEnvironmentName
 import github.ponyhuang.gimi.domain.sandbox.validateSandboxConnection
 import java.io.IOException
 import java.security.GeneralSecurityException
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Job
 
 /** 保存草稿与即时开关分开，观察仓库更新时不能覆盖用户尚未保存的字段。 */
 @HiltViewModel
@@ -73,7 +73,12 @@ class SandboxSettingsViewModel @Inject constructor(
                 state.copy(environment = state.environment.map { if (it.id == action.id) it.copy(value = action.value) else it })
             }
             is SandboxSettingsAction.RemoveEnvironment -> edit(SandboxSettingField.ENVIRONMENT) { state -> state.copy(environment = state.environment.filterNot { it.id == action.id }) }
-            SandboxSettingsAction.AddEnvironment -> edit(SandboxSettingField.ENVIRONMENT) { state -> state.copy(environment = state.environment + SandboxEnvironmentDraft(nextEnvironmentId++)) }
+            is SandboxSettingsAction.ToggleEnvironment -> mutableState.update { state ->
+                state.copy(environment = state.environment.map { if (it.id == action.id) it.copy(expanded = !it.expanded) else it })
+            }
+            SandboxSettingsAction.AddEnvironment -> edit(SandboxSettingField.ENVIRONMENT) { state ->
+                state.copy(advancedExpanded = true, environment = state.environment + SandboxEnvironmentDraft(nextEnvironmentId++, expanded = true))
+            }
             SandboxSettingsAction.ToggleAdvanced -> mutableState.update { it.copy(advancedExpanded = !it.advancedExpanded) }
             SandboxSettingsAction.ToggleKeyVisibility -> mutableState.update { it.copy(keyVisible = !it.keyVisible) }
             SandboxSettingsAction.Save -> save()
@@ -126,7 +131,7 @@ class SandboxSettingsViewModel @Inject constructor(
         connection.domain == state.domain.trim().lowercase() && connection.apiKey == state.apiKey.trim()
 
     private fun restore(configuration: SandboxConfiguration, state: SandboxSettingsUiState): SandboxSettingsUiState =
-        fromConfiguration(configuration).copy(
+        fromConfiguration(configuration, state).copy(
             advancedExpanded = state.advancedExpanded, keyVisible = state.keyVisible, busy = state.busy,
             templates = if (sameCredentials(configuration.connection, state)) state.templates else emptyList(),
             templateLoadState = if (sameCredentials(configuration.connection, state)) state.templateLoadState else SandboxTemplateLoadState.IDLE,
@@ -136,7 +141,10 @@ class SandboxSettingsViewModel @Inject constructor(
         val state = uiState.value
         if (!state.enabled) return
         val duplicates = state.environment.groupingBy { it.name.trim() }.eachCount().filterValues { it > 1 }.keys
-        val rows = state.environment.map { it.copy(nameError = !isSandboxEnvironmentName(it.name.trim()) || it.name.trim() in duplicates) }
+        val rows = state.environment.map { row ->
+            val invalid = !isSandboxEnvironmentName(row.name.trim()) || row.name.trim() in duplicates
+            row.copy(nameError = invalid, expanded = row.expanded || invalid)
+        }
         val connection = SandboxConnection(state.domain.trim().lowercase(), state.apiKey.trim(), state.template.trim(), state.idleTimeoutSeconds.toIntOrNull() ?: 0,
             rows.associate { it.name.trim() to it.value })
         val errors = validateSandboxConnection(connection) + if (rows.any { it.nameError }) setOf(SandboxSettingField.ENVIRONMENT) else emptySet()
@@ -165,11 +173,16 @@ class SandboxSettingsViewModel @Inject constructor(
         }
     }
 
-    private fun fromConfiguration(configuration: SandboxConfiguration): SandboxSettingsUiState {
+    private fun fromConfiguration(configuration: SandboxConfiguration, previous: SandboxSettingsUiState? = null): SandboxSettingsUiState {
         val connection = configuration.connection
+        // 保存时名称会 trim；使用归一化名称保留当前行 ID 和展开态，避免重建编辑组。
+        val previousRows = previous?.environment.orEmpty().associateBy { it.name.trim() }
         return SandboxSettingsUiState(enabled = configuration.enabled, configured = configuration.isConfigured,
             domain = connection.domain, apiKey = connection.apiKey, template = connection.template,
             idleTimeoutSeconds = connection.idleTimeoutSeconds.toString(),
-            environment = connection.envs.map { (name, value) -> SandboxEnvironmentDraft(nextEnvironmentId++, name, value) })
+            environment = connection.envs.map { (name, value) ->
+                previousRows[name]?.copy(name = name, value = value, nameError = false)
+                    ?: SandboxEnvironmentDraft(nextEnvironmentId++, name, value)
+            })
     }
 }

@@ -13,7 +13,6 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -27,9 +26,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.domain.sandbox.SandboxSettingField
 import github.ponyhuang.gimi.domain.sandbox.SandboxTemplate
+import github.ponyhuang.gimi.ui.preference.PreferenceTextField
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /** 仅管理下拉展开这一展示状态，查询和配置变更通过同步事件交给 ViewModel。 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,7 +43,7 @@ internal fun SandboxTemplatePicker(state: SandboxSettingsUiState, onAction: (San
             menuExpanded = open
             if (open) onAction(SandboxSettingsAction.LoadTemplates)
         }) {
-            OutlinedTextField(
+            PreferenceTextField(
                 value = state.template,
                 onValueChange = { onAction(SandboxSettingsAction.SetTemplate(it)) },
                 label = { Text(stringResource(R.string.sandbox_template)) },

@@ -9,6 +9,7 @@ import com.anthropic.errors.AnthropicServiceException
 import com.anthropic.helpers.MessageAccumulator
 import com.anthropic.models.messages.Base64ImageSource
 import com.anthropic.models.messages.Base64PdfSource
+import com.anthropic.models.messages.CacheControlEphemeral
 import com.anthropic.models.messages.ContentBlock
 import com.anthropic.models.messages.ContentBlockParam
 import com.anthropic.models.messages.ContentBlockParam.Companion.ofDocument
@@ -29,6 +30,9 @@ import com.anthropic.models.messages.ThinkingConfigDisabled
 import com.anthropic.models.messages.ThinkingConfigEnabled
 import com.anthropic.models.messages.ThinkingConfigParam
 import com.anthropic.models.messages.Tool
+import com.anthropic.models.messages.JsonOutputFormat
+import com.anthropic.models.messages.OutputConfig
+import com.anthropic.models.messages.ThinkingConfigAdaptive
 import com.anthropic.models.messages.ToolResultBlockParam
 import com.anthropic.models.messages.ToolUnion
 import com.anthropic.models.messages.ToolUseBlockParam
@@ -38,6 +42,7 @@ import com.anthropic.models.messages.Usage
 import com.anthropic.models.messages.WebSearchTool20250305
 import com.fasterxml.jackson.core.type.TypeReference
 import com.google.adk.kt.logging.LoggerFactory
+import com.google.adk.kt.annotations.FrameworkInternalApi
 import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.models.LlmResponse
 import com.google.adk.kt.models.Model
@@ -49,6 +54,8 @@ import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.ThinkingLevel
+import com.google.adk.kt.serialization.jsonElementToAny
+import com.google.adk.kt.tools.toJsonSchema
 import com.google.adk.kt.types.UsageMetadata
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -56,6 +63,7 @@ import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import java.util.Base64
 import java.util.stream.Collectors
+import kotlin.time.Duration.Companion.hours
 import com.google.adk.kt.types.Tool as AdkTool
 
 /**
@@ -113,6 +121,8 @@ open class Claude(
             ?.mapNotNull { it.text }
             ?.joinToString("\n")
             .orEmpty()
+        // prompt cache 断点：命中时后续轮次直接复用前缀，省掉重复的输入 token。
+        val cacheControl = promptCacheControl(modelName, request)
 
         val messages = request.contents
             .normalizeForAnthropic()
@@ -122,37 +132,118 @@ open class Claude(
 
         val paramsBuilder = MessageCreateParams.builder()
             .model(modelName)
-            .system(systemInstruction)
-            .messages(messages)
+            .messages(if (cacheControl == null) messages else messages.withCacheBreakpoint(cacheControl))
             .maxTokens(resolveMaxTokens(request))
 
+        if (systemInstruction.isNotBlank() && cacheControl != null) {
+            paramsBuilder.systemOfTextBlockParams(
+                listOf(TextBlockParam.builder().text(systemInstruction).cacheControl(cacheControl).build()),
+            )
+        } else {
+            paramsBuilder.system(systemInstruction)
+        }
+
         request.config.thinkingConfig?.let { thinkingConfig ->
-            thinkingConfig.thinkingLevel?.let { level ->
-                val budget = minOf(level.toClaudeThinkingBudget(), resolveMaxTokens(request) - 1)
-                if (budget >= MIN_CLAUDE_THINKING_BUDGET) {
-                    paramsBuilder.thinking(
-                        ThinkingConfigParam.ofEnabled(
-                            ThinkingConfigEnabled.builder().budgetTokens(budget).build(),
-                        ),
-                    )
-                }
-            }
             if (thinkingConfig.includeThoughts == false) {
                 paramsBuilder.thinking(
                     ThinkingConfigParam.ofDisabled(
                         ThinkingConfigDisabled.builder().build()
                     )
                 )
+            } else {
+                thinkingConfig.thinkingLevel?.let { level ->
+                    if (usesAdaptiveThinking(modelName)) {
+                        // 4.5 起只接受 adaptive；带上 summarized 才会把思考内容回传。
+                        paramsBuilder.thinking(
+                            ThinkingConfigParam.ofAdaptive(
+                                ThinkingConfigAdaptive.builder()
+                                    .display(ThinkingConfigAdaptive.Display.SUMMARIZED)
+                                    .build(),
+                            ),
+                        )
+                    } else {
+                        val budget = minOf(level.toClaudeThinkingBudget(), resolveMaxTokens(request) - 1)
+                        if (budget >= MIN_CLAUDE_THINKING_BUDGET) {
+                            paramsBuilder.thinking(
+                                ThinkingConfigParam.ofEnabled(
+                                    ThinkingConfigEnabled.builder().budgetTokens(budget).build(),
+                                ),
+                            )
+                        }
+                    }
+                }
             }
         }
 
         toAnthropicTools(request.config.tools)
             .takeIf { it.isNotEmpty() }
-            ?.let { paramsBuilder.tools(it) }
+            ?.let { paramsBuilder.tools(markLastToolForCache(it, cacheControl)) }
+
+        structuredOutputFormat(request)?.let { format ->
+            paramsBuilder.outputConfig(OutputConfig.builder().format(format).build())
+        }
 
         postProcessParams(paramsBuilder, request)
 
         return paramsBuilder.build()
+    }
+
+    /**
+     * 本次请求的 prompt cache 断点，`null` 表示不打断点。
+     *
+     * 只在原生 Claude 家族启用：其他厂商的 Anthropic 兼容端点未必接受 `cache_control`，
+     * 不替它们做假设。应用若通过 ADK 配置了 [LlmRequest.cacheConfig]，则其最小 token 门槛
+     * 与一小时 TTL 一并生效。
+     */
+    private fun promptCacheControl(modelName: String, request: LlmRequest): CacheControlEphemeral? {
+        if (!modelName.contains("claude", ignoreCase = true)) return null
+        val cache = request.cacheConfig
+        if (cache != null) {
+            val previousPromptTokens = request.cacheableContentsTokenCount
+            if (previousPromptTokens != null && previousPromptTokens < cache.minTokens) return null
+        }
+        return CacheControlEphemeral.builder()
+            .apply {
+                // 一小时是 Claude 保留前缀的上限；更短的寿命走默认的 5 分钟。
+                if (cache != null && cache.ttl >= 1.hours) ttl(CacheControlEphemeral.Ttl.TTL_1H)
+            }
+            .build()
+    }
+
+    /** 只标记 Claude 自家 tool 的最后一项；内置工具没有可标记的 cache 断点。 */
+    private fun markLastToolForCache(
+        tools: List<ToolUnion>,
+        cacheControl: CacheControlEphemeral?,
+    ): List<ToolUnion> {
+        if (cacheControl == null) return tools
+        val last = tools.last()
+        if (!last.isTool()) return tools
+        return tools.dropLast(1) + ToolUnion.ofTool(
+            last.asTool().toBuilder().cacheControl(cacheControl).build(),
+        )
+    }
+
+    /**
+     * 把 ADK 的响应 schema 映射为 Claude 的结构化 JSON 输出格式。
+     *
+     * 仅在请求显式要求 `application/json` 且带 schema 时下发；Claude 的 schema 不接受
+     * 长度/数值边界等关键字，且对象必须禁止未声明字段，这里按官方适配规则改写。
+     */
+    @OptIn(FrameworkInternalApi::class)
+    private fun structuredOutputFormat(request: LlmRequest): JsonOutputFormat? {
+        if (!request.config.responseMimeType.equals("application/json", ignoreCase = true)) return null
+        val schema = request.config.responseSchema ?: return null
+        val adapted = jsonElementToAny(schema.toJsonSchema()).toClaudeOutputSchema() as? Map<*, *>
+            ?: return null
+        return JsonOutputFormat.builder()
+            .schema(
+                JsonOutputFormat.Schema.builder()
+                    .putAllAdditionalProperties(
+                        adapted.entries.associate { (key, value) -> key.toString() to from(value) },
+                    )
+                    .build(),
+            )
+            .build()
     }
 
     /**
@@ -452,6 +543,120 @@ private fun ThinkingLevel.toClaudeThinkingBudget(): Long = when (this) {
     ThinkingLevel.LOW -> 2048L
     ThinkingLevel.MEDIUM -> 4096L
     ThinkingLevel.HIGH, ThinkingLevel.THINKING_LEVEL_UNSPECIFIED -> 6144L
+}
+
+/**
+ * 该模型是否只接受 adaptive thinking。
+ *
+ * Claude 4.5 起用 adaptive 取代固定 budget；按模型名的版本号判断，未知命名一律按旧的
+ * budget 语义处理，避免对不认识的端点发出它可能拒绝的配置。
+ */
+private val CLAUDE_MODEL_VERSION = Regex("""claude-(?:[a-z]+-)?(\d+)(?:[-.](\d+))?""", RegexOption.IGNORE_CASE)
+
+private fun usesAdaptiveThinking(modelName: String): Boolean {
+    val match = CLAUDE_MODEL_VERSION.find(modelName) ?: return false
+    val major = match.groupValues[1].toIntOrNull() ?: return false
+    val minor = match.groupValues[2].toIntOrNull() ?: 0
+    return major > 4 || (major == 4 && minor >= 5)
+}
+
+/**
+ * 把最后一个可缓存的块标上 cache 断点，让下一轮从缓存里读已经形成的对话前缀。
+ *
+ * thinking 块不可标记；整条消息都不可标记时继续向前找。
+ */
+private fun List<MessageParam>.withCacheBreakpoint(
+    cacheControl: CacheControlEphemeral,
+): List<MessageParam> {
+    for (i in indices.reversed()) {
+        val blocks = this[i].content().asBlockParams()
+        for (j in blocks.indices.reversed()) {
+            val marked = blocks[j].withCacheControl(cacheControl) ?: continue
+            val message = this[i].toBuilder()
+                .contentOfBlockParams(blocks.toMutableList().apply { set(j, marked) })
+            return toMutableList().apply { set(i, message.build()) }
+        }
+    }
+    return this
+}
+
+/** 该块带上 cache 断点；thinking 块不能标记，返回 null 继续向前找。 */
+private fun ContentBlockParam.withCacheControl(
+    cacheControl: CacheControlEphemeral,
+): ContentBlockParam? = when {
+    isText() -> ofText(asText().toBuilder().cacheControl(cacheControl).build())
+    isImage() -> ofImage(asImage().toBuilder().cacheControl(cacheControl).build())
+    isDocument() -> ofDocument(asDocument().toBuilder().cacheControl(cacheControl).build())
+    isToolUse() -> ofToolUse(asToolUse().toBuilder().cacheControl(cacheControl).build())
+    isToolResult() -> ofToolResult(asToolResult().toBuilder().cacheControl(cacheControl).build())
+    else -> null
+}
+
+/** Claude 结构化输出拒绝的 schema 关键字，改写到 description 里提示模型。 */
+private val REJECTED_SCHEMA_KEYWORDS = setOf(
+    "minimum",
+    "maximum",
+    "minLength",
+    "maxLength",
+    "maxItems",
+    "minProperties",
+    "maxProperties",
+)
+
+/** Claude 结构化输出支持的字符串格式；其余格式声明必须移除。 */
+private val SUPPORTED_STRING_FORMATS = setOf(
+    "date-time", "time", "date", "duration", "email", "hostname", "uri", "ipv4", "ipv6", "uuid",
+)
+
+/**
+ * 按 Claude 的结构化输出规则改写 JSON Schema：对象禁止未声明字段、被拒关键字降级进
+ * description、`nullable` 改写成显式的 null 选项。
+ */
+private fun Any?.toClaudeOutputSchema(): Any? {
+    if (this !is Map<*, *>) return this
+    val rejected = mutableListOf<String>()
+    val schema = buildMap {
+        for ((key, value) in this@toClaudeOutputSchema) {
+            if (key == "nullable") continue
+            if (isRejectedKeyword(key, value)) {
+                rejected += "$key: $value"
+                continue
+            }
+            this[key.toString()] = when (key) {
+                "properties" -> (value as? Map<*, *>).orEmpty().mapValues { it.value.toClaudeOutputSchema() }
+                "items" -> value.toClaudeOutputSchema()
+                "anyOf" -> (value as? List<*>).orEmpty().map { it.toClaudeOutputSchema() }
+                else -> value
+            }
+        }
+        if (rejected.isNotEmpty()) {
+            val note = rejected.joinToString(", ", prefix = "(", postfix = ")")
+            this["description"] = listOfNotNull(this["description"], note).joinToString(" ")
+        }
+        if (this["type"] == "object") this["additionalProperties"] = false
+    }
+    return if (this["nullable"] == true) schema.allowingNull() else schema
+}
+
+/** 该 schema 再加上显式的 null 选项。 */
+private fun Map<String, Any?>.allowingNull(): Map<String, Any?> {
+    val type = this["type"]
+    val enum = this["enum"] as? List<*>
+    val anyOf = this["anyOf"] as? List<*>
+    return when {
+        // 枚举与类型列表不能共存，枚举本身已经限定了取值。
+        enum != null -> this - "type" + ("enum" to (enum + null))
+        type is String -> this + ("type" to listOf(type, "null"))
+        anyOf != null -> this + ("anyOf" to (anyOf + mapOf("type" to "null")))
+        else -> this
+    }
+}
+
+private fun isRejectedKeyword(key: Any?, value: Any?): Boolean = when (key) {
+    in REJECTED_SCHEMA_KEYWORDS -> true
+    "minItems" -> (value as? Number)?.toInt()?.let { it > 1 } == true
+    "format" -> value !in SUPPORTED_STRING_FORMATS
+    else -> false
 }
 
 

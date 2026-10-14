@@ -76,27 +76,49 @@ class AdkConversationRepository(
     override suspend fun refreshConversation(sessionId: String) {
         if (sessionId.isBlank()) return
         val key = SessionKey(appName = appName, userId = userId, id = sessionId)
-        try {
-            val session = sessionService.getSession(key, GetSessionConfig(numRecentEvents = PREVIEW_EVENT_WINDOW))
-                ?: return
-            val metadata = metadataFor(sessionId)
-            val preview = session.previewText()
-            if (preview.isNotEmpty() && preview != metadata?.lastMessage) {
-                metadataDao.setLastMessage(sessionId, preview)
-            }
-            val updated = session.toConversation(
-                metadata = metadata?.copy(lastMessage = preview),
-                previousTitle = _conversations.value.firstOrNull { it.id == sessionId }?.title,
-            )
-            _conversations.update { conversations ->
-                conversations
-                    .filterNot { it.id == sessionId }
-                    .plus(updated)
-                    .sortedByDescending { it.timestamp }
-            }
+        val session = try {
+            readForDrawerRow(key)
         } catch (t: Throwable) {
-            recover(t, "refreshConversation($sessionId)", Unit)
+            recover(t, "refreshConversation($sessionId) read", Unit)
+            return
+        } ?: return
+        val metadata = metadataFor(sessionId)
+        val preview = session.previewText()
+        // 先发布抽屉行，再做附加的元数据写入：预览落库失败不得让标题/预览停在旧值，
+        // 否则用户只能等下一次整表刷新才看到变化。
+        _conversations.update { conversations ->
+            conversations
+                .filterNot { it.id == sessionId }
+                .plus(
+                    session.toConversation(
+                        metadata = if (preview.isEmpty()) metadata else metadata?.copy(lastMessage = preview),
+                        previousTitle = conversations.firstOrNull { it.id == sessionId }?.title,
+                    ),
+                )
+                .sortedByDescending { it.timestamp }
         }
+        if (preview.isNotEmpty() && preview != metadata?.lastMessage) {
+            try {
+                metadataDao.setLastMessage(sessionId, preview)
+            } catch (t: Throwable) {
+                recover(t, "setLastMessage($sessionId)", Unit)
+            }
+        }
+    }
+
+    /**
+     * 读取抽屉行所需的会话快照。
+     *
+     * 常规路径只取最近 [PREVIEW_EVENT_WINDOW] 条事件，代价与历史长度无关；只有既没有状态
+     * 标题、窗口里也找不到首条用户消息的会话（标题只能靠首条消息回退）才退回整段读取，
+     * 保持旧行为而不会让这类会话的标题退化成默认名。
+     */
+    private suspend fun readForDrawerRow(key: SessionKey): Session? {
+        val windowed = sessionService.getSession(key, GetSessionConfig(numRecentEvents = PREVIEW_EVENT_WINDOW))
+            ?: return null
+        val titleInState = !(windowed.state[CONVERSATION_TITLE_STATE_KEY] as? String).isNullOrBlank()
+        val firstUserInWindow = windowed.events.any { event -> event.author == "user" }
+        return if (titleInState || firstUserInWindow) windowed else sessionService.getSession(key)
     }
 
     /**

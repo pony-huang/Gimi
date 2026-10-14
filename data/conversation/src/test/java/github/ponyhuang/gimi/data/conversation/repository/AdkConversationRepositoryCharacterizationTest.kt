@@ -96,8 +96,8 @@ class AdkConversationRepositoryCharacterizationTest {
     @Test
     fun refreshConversation_readsABoundedWindowAndPersistsThePreview() = runTest {
         val session = sessionWithEvents(
-            Event(content = Content(role = Role.USER, parts = listOf(Part(text = "你好")))),
-            Event(content = Content(role = Role.MODEL, parts = listOf(Part(text = "最后一条回答")))),
+            Event(author = "user", content = Content(role = Role.USER, parts = listOf(Part(text = "你好")))),
+            Event(author = "model", content = Content(role = Role.MODEL, parts = listOf(Part(text = "最后一条回答")))),
         )
         val configs = mutableListOf<GetSessionConfig?>()
         coEvery { sessionService.getSession(any(), captureNullable(configs)) } returns session
@@ -128,6 +128,57 @@ class AdkConversationRepositoryCharacterizationTest {
 
         // ADK 的 listSessions 不返回事件，抽屉行必须依赖应用自己持久化的预览。
         assertEquals("重启后仍然可见的预览", repository.conversations.value.single().lastMessage)
+    }
+
+    @Test
+    fun refreshConversation_publishesTheRowEvenWhenThePreviewWriteFails() = runTest {
+        val session = sessionWithEvents(
+            Event(author = "user", content = Content(role = Role.USER, parts = listOf(Part(text = "你好")))),
+        )
+        coEvery { sessionService.getSession(any(), any()) } returns session
+        coEvery { metadataDao.setLastMessage(any(), any()) } throws IllegalStateException("metadata unavailable")
+        val repository = repository()
+
+        repository.refreshConversation("session-1")
+
+        // 元数据写入是附加收益；失败也必须已经发布抽屉行（标题来自会话状态）。
+        assertEquals("你好", repository.conversations.value.single().title)
+        assertEquals("你好", repository.conversations.value.single().lastMessage)
+    }
+
+    @Test
+    fun refreshConversation_keepsThePersistedPreviewWhenTheWindowHasNoText() = runTest {
+        val session = sessionWithEvents(
+            Event(author = "model", content = Content(role = Role.MODEL, parts = listOf(Part(text = null)))),
+        )
+        coEvery { sessionService.getSession(any(), any()) } returns session
+        coEvery { metadataDao.get("session-1") } returns ConversationMetadataEntity(
+            sessionId = "session-1",
+            lastMessage = "上一次的预览",
+        )
+        val repository = repository()
+
+        repository.refreshConversation("session-1")
+
+        assertEquals("上一次的预览", repository.conversations.value.single().lastMessage)
+    }
+
+    @Test
+    fun refreshConversation_fallsBackToFullHistoryWhenTheWindowCannotTitleTheSession() = runTest {
+        val windowed = sessionWithEvents(
+            Event(author = "model", content = Content(role = Role.MODEL, parts = listOf(Part(text = "最近的回答")))),
+        )
+        val full = sessionWithEvents(
+            Event(author = "user", content = Content(role = Role.USER, parts = listOf(Part(text = "很久以前的首条提问")))),
+            Event(author = "model", content = Content(role = Role.MODEL, parts = listOf(Part(text = "最近的回答")))),
+        )
+        coEvery { sessionService.getSession(any(), any()) } returns windowed
+        coEvery { sessionService.getSession(any()) } returns full
+
+        repository().refreshConversation("session-1")
+
+        // 没有状态标题时，首条用户消息就是标题来源，不能被窗口截断成默认名。
+        coVerify { sessionService.getSession(match { it.id == "session-1" }) }
     }
 
     private fun sessionWithEvents(vararg events: Event): Session = mockk {

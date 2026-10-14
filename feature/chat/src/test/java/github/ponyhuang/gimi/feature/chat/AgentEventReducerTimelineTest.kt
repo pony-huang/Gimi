@@ -15,6 +15,25 @@ import org.junit.Test
 
 class AgentEventReducerTimelineTest {
     @Test
+    fun `error event and subsequent execution exception produce one error bubble`() {
+        val token = Any()
+        runtime.runToken = token
+        reducer.applyEvent(runtime.sessionId, event().copy(errorCode = "MODEL_FAILURE"), token)
+        reducer.applyError(runtime.sessionId, "MODEL_FAILURE")
+        assertEquals(1, runtime.messages.size)
+        assertEquals("MODEL_FAILURE", runtime.messages.single().error)
+        assertEquals("invocation", runtime.messages.single().invocationId)
+        assertFalse(runtime.isAgentRunning)
+    }
+
+    @Test
+    fun `a new running attempt retains its own identical error`() {
+        reducer.applyError(runtime.sessionId, "MODEL_FAILURE", "old")
+        runtime.isAgentRunning = true
+        reducer.applyError(runtime.sessionId, "MODEL_FAILURE", "new")
+        assertEquals(2, runtime.messages.size)
+    }
+    @Test
     fun `same event id across chunks keeps one bubble without duplicating final text`() {
         val runToken = Any()
         runtime.runToken = runToken

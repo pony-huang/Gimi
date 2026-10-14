@@ -173,6 +173,12 @@ internal class AgentEventReducer(
 
     fun applyError(sessionId: String, message: String, invocationId: String? = null) {
         val runtime = runtimeFor(sessionId)
+        val previous = runtime.messages.lastOrNull()
+        // ADK 先发出错误 Event 再抛异常；同一次失败不能重复追加气泡。
+        // 新一轮 launchRun 会置 running=true，仍应保留该轮自己的错误记录。
+        if (runtime.failed && !runtime.isAgentRunning && previous?.error == message &&
+            (invocationId == null || previous.invocationId == invocationId)
+        ) return
         clearToolConfirmationState(runtime)
         runtime.messages = runtime.messages + Messages.fromError(error = message, invocationId = invocationId)
         runtime.isAgentRunning = false

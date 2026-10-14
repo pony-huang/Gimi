@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.data.agent
 
 import com.google.adk.kt.agents.InvocationContext
 import com.google.adk.kt.agents.LlmAgent
+import com.google.adk.kt.agents.ResumabilityConfig
 import com.google.adk.kt.apps.App
 import com.google.adk.kt.callbacks.CallbackChoice
 import com.google.adk.kt.events.Event
@@ -26,12 +27,47 @@ import org.junit.Test
 /** 固定 ADK 1.4 的事件与回调边界，避免升级破坏流式归并、拒绝工具或错误恢复。 */
 class Adk14EventContractTest {
     @Test
+    fun longRunningInputResumesWithTheAnswerWithoutRepeatingTheTool() = runTest {
+        var executions = 0
+        var modelCalls = 0
+        var answerSeen = false
+        val tool = object : BaseTool("get_user_choice", "fixture", isLongRunning = true) {
+            override fun declaration() = FunctionDeclaration(name, description)
+            override suspend fun run(context: ToolContext, args: Map<String, Any?>): Any {
+                executions++
+                context.actions.skipSummarization = true
+                return mapOf("status" to "waiting")
+            }
+        }
+        val model = object : Model {
+            override val name = "input-fixture"
+            override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {
+                if (modelCalls++ == 0) {
+                    emit(LlmResponse(content = Content(role = "model", parts = listOf(
+                        Part(functionCall = FunctionCall(id = "input-1", name = tool.name, args = emptyMap())),
+                    ))))
+                } else {
+                    answerSeen = request.contents.flatMap { it.parts }.any {
+                        it.functionResponse?.id == "input-1" && it.functionResponse?.response?.get("value") == "yes"
+                    }
+                    emit(response("done", false))
+                }
+            }
+        }
+        val execution = execution(model, listOf(tool))
+        execution.send("ask").toList()
+        val resumed = execution.respondToInputRequest("input-1", tool.name, mapOf("value" to "yes")).toList()
+        assertEquals(1, executions)
+        assertTrue(answerSeen)
+        assertTrue(resumed.any { it.content?.parts?.any { part -> part.text == "done" } == true })
+    }
+    @Test
     fun streamedChunksKeepOneIdEvenWhenPluginReplacesEvents() = runTest {
         val pluginIds = mutableListOf<String>()
         val plugin = object : Plugin {
             override val name = "replace-event"
             override suspend fun onEvent(invocationContext: InvocationContext, event: Event): Event {
-                if (event.author == "agent") pluginIds += event.id
+                if (event.author == "agent" && event.content != null) pluginIds += event.id
                 return event.copy(id = "replacement-id")
             }
         }
@@ -39,7 +75,7 @@ class Adk14EventContractTest {
             listOf(response("a", true), response("b", true), response("ab", false))
         }
         val execution = execution(model, plugins = listOf(plugin))
-        val events = execution.send("hello").toList().filter { it.author == "agent" }
+        val events = execution.send("hello").toList().filter { it.author == "agent" && it.content != null }
         assertEquals(3, events.size)
         assertEquals(1, events.map { it.id }.distinct().size)
         assertEquals(pluginIds, events.map { it.id })
@@ -96,6 +132,7 @@ class Adk14EventContractTest {
             appName = AgentChatRunner.APP_NAME,
             rootAgent = LlmAgent(name = "agent", model = model, tools = tools),
             plugins = plugins,
+            resumabilityConfig = ResumabilityConfig(isResumable = true),
         )), emptyMap())
 
     private fun fixtureModel(responses: () -> List<LlmResponse>): Model = object : Model {

@@ -127,7 +127,6 @@ class SecureMcpServerRepository @Inject constructor(
             }
             val transport = when (config.string("type")?.lowercase()) {
                 "http", "streamablehttp", "streamable_http" -> McpTransport.STREAMABLE_HTTP
-                "sse" -> McpTransport.SSE
                 null -> McpTransport.STREAMABLE_HTTP
                 else -> null
             }
@@ -192,7 +191,12 @@ class SecureMcpServerRepository @Inject constructor(
     }
 
     private fun load(): List<McpServer> = runCatching {
-        json.decodeFromString<List<McpServer>>(storage.read() ?: "[]")
+        // 已移除 SSE，不把旧协议强制解释成 HTTP；其余有效配置仍可独立加载。
+        val values = json.parseToJsonElement(storage.read() ?: "[]") as kotlinx.serialization.json.JsonArray
+        values.filter { value ->
+            val transport = (value as? kotlinx.serialization.json.JsonObject)?.get("transport")?.toString()?.trim('"')
+            transport == null || transport == "STREAMABLE_HTTP"
+        }.map { json.decodeFromJsonElement(McpServer.serializer(), it) }
     }.getOrDefault(emptyList())
 
     private fun persist(value: List<McpServer>) {
@@ -278,10 +282,7 @@ private fun curlToPortableJson(content: String): String? {
         if (name.isNotBlank() && value.isNotBlank()) headers[name] = value
     }
     val transport = if (
-        url.trimEnd('/').endsWith("/sse", ignoreCase = true) ||
-        headers.entries.any { (name, value) ->
-            name.equals("Accept", ignoreCase = true) && value.equals("text/event-stream", ignoreCase = true)
-        }
+        url.trimEnd('/').endsWith("/sse", ignoreCase = true)
     ) {
         "sse"
     } else {

@@ -1,66 +1,94 @@
 package github.ponyhuang.gimi.data.agent
 
-import com.google.adk.kt.logging.LoggerFactory
-import github.ponyhuang.gimi.data.agent.tools.mcp.McpToolException.McpToolLoadingException
-import github.ponyhuang.gimi.data.agent.tools.mcp.McpToolset
-import github.ponyhuang.gimi.data.agent.tools.mcp.McpTool
+import com.google.adk.kt.tools.mcp.McpTransportConfig
 import github.ponyhuang.gimi.domain.mcp.model.McpProbeResult
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.model.McpToolSummary
 import github.ponyhuang.gimi.domain.mcp.repository.McpConnectionTester
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.withTimeout
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.sse.SSE
+import io.ktor.http.encodedPath
+import io.modelcontextprotocol.kotlin.sdk.client.Client
+import io.modelcontextprotocol.kotlin.sdk.client.StreamableHttpClientTransport
+import io.modelcontextprotocol.kotlin.sdk.types.Implementation
+import io.modelcontextprotocol.kotlin.sdk.types.ListResourcesRequest
+import io.modelcontextprotocol.kotlin.sdk.types.ListToolsRequest
+import io.modelcontextprotocol.kotlin.sdk.types.McpException
+import io.modelcontextprotocol.kotlin.sdk.types.McpJson
+import io.modelcontextprotocol.kotlin.sdk.types.PaginatedRequestParams
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.JsonObject
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * [McpConnectionTester] 的生产实现：对给定配置做一次真实的连接握手 + 能力列举。
- *
- * 通过 [McpServer.toMcpToolset] 构建一次性 [McpToolset]，用 [McpToolset.getTools] 完成握手并
- * 拉取工具列表，探测完成后立即 [McpToolset.close]，因此不会污染 [McpToolsetRegistry] 的会话池，
- * 失败探测也不会留下缓存。
- */
+/** 设置页元数据探测独立使用官方 SDK；不构造自有 ADK 工具，也不污染聊天连接池。 */
 @Singleton
 class AdkMcpConnectionTester @Inject constructor() : McpConnectionTester {
-
     override suspend fun test(server: McpServer): McpProbeResult {
-        val toolset = server.toMcpToolset()
-        try {
-            return withTimeout(PROBE_TIMEOUT) {
-                // getTools 内部完成会话建立 + 握手 + 工具列举，失败会重试后抛出。
-                val tools = toolset.getTools(null)
-                McpProbeResult(
-                    reachable = true,
-                    tools = tools.map { tool ->
-                        if (tool is McpTool) tool.summary() else McpToolSummary(name = tool.name, description = tool.description)
-                    },
-                    resources = runCatching { toolset.listResourceNames() }.getOrDefault(emptyList()),
-                )
+        val http = HttpClient(OkHttp) {
+            install(SSE)
+            install(HttpTimeout) {
+                connectTimeoutMillis = 5_000
+                requestTimeoutMillis = 60_000
+                socketTimeoutMillis = 60_000
             }
-        } catch (e: TimeoutCancellationException) {
-            logger.warn { "MCP probe timed out for ${server.endpointUrl}" }
-            return unreachable("连接超时，请检查服务器地址与网络")
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            logger.warn(e) { "MCP probe failed for ${server.endpointUrl}: ${e.message}" }
-            val detail = (e as? McpToolLoadingException)?.cause?.message ?: e.message
-            return unreachable(detail)
-        } finally {
-            toolset.close()
         }
-    }
-
-    private fun unreachable(detail: String?) = McpProbeResult(
-        reachable = false,
-        errorMessage = detail?.takeIf { it.isNotBlank() }?.let { "无法连接到服务器：$it" }
-            ?: "无法连接到服务器",
-    )
-
-    private companion object {
-        val PROBE_TIMEOUT = 60.seconds
-        val logger = LoggerFactory.getLogger(AdkMcpConnectionTester::class)
+        val client = Client(Implementation("gimi-probe", "1.0"))
+        try {
+            return withTimeout(60.seconds) {
+                val config = server.toOfficialMcpConfig().transport as McpTransportConfig.StreamableHttp
+                val endpoint = io.ktor.http.URLBuilder(config.url).apply {
+                    if (encodedPath.isBlank() || encodedPath == "/") encodedPath = "/mcp"
+                }.buildString()
+                client.connect(StreamableHttpClientTransport(http, endpoint) {
+                    config.headers.forEach { (name, value) -> headers.append(name, value) }
+                })
+                val tools = mutableListOf<McpToolSummary>()
+                var cursor: String? = null
+                do {
+                    val page = client.listTools(ListToolsRequest(PaginatedRequestParams(cursor)))
+                    tools += page.tools.map { tool ->
+                        McpToolSummary(
+                            name = tool.name,
+                            description = tool.description.orEmpty(),
+                            inputSchema = McpJson.encodeToJsonElement(ToolSchema.serializer(), tool.inputSchema) as JsonObject,
+                        )
+                    }
+                    cursor = page.nextCursor
+                } while (cursor != null)
+                val resources = mutableListOf<String>()
+                if (client.serverCapabilities?.resources != null) {
+                    try {
+                        do {
+                            val page = client.listResources(ListResourcesRequest(PaginatedRequestParams(cursor)))
+                            resources += page.resources.map { it.name }
+                            cursor = page.nextCursor
+                        } while (cursor != null)
+                    } catch (_: McpException) {
+                        // 可选资源接口拒绝不应把已经完成的工具握手判为失败。
+                    }
+                }
+                McpProbeResult(reachable = true, tools = tools, resources = resources)
+            }
+        } catch (_: TimeoutCancellationException) {
+            return McpProbeResult(reachable = false, errorMessage = "mcp.connection_error")
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // SDK 错误可能包含请求头或服务端正文，不向 UI 输出原始异常。
+            return McpProbeResult(reachable = false, errorMessage = "mcp.connection_error")
+        } finally {
+            withContext(NonCancellable) {
+                try { withTimeout(5.seconds) { client.close() } } finally { http.close() }
+            }
+        }
     }
 }

@@ -760,7 +760,6 @@ private fun McpServerRow(
         icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
         label = server.name.ifBlank { server.id },
         description = when (server.transport) {
-            McpTransport.SSE -> stringResource(R.string.chat_mcp_transport_sse)
             McpTransport.STREAMABLE_HTTP ->
                 stringResource(R.string.chat_mcp_transport_streamable_http)
         },
@@ -966,7 +965,7 @@ private fun previewAddToChatState(
     configuration = configuration,
     mcpServers = listOf(
         McpServer(id = "server-1", name = "文件检索服务", transport = McpTransport.STREAMABLE_HTTP),
-        McpServer(id = "server-2", name = "浏览器服务", transport = McpTransport.SSE),
+        McpServer(id = "server-2", name = "浏览器服务", transport = McpTransport.STREAMABLE_HTTP),
     ),
     officialTools = listOf(
         OfficialToolDescriptor(

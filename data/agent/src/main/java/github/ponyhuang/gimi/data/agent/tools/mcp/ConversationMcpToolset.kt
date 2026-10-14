@@ -27,7 +27,7 @@ import kotlinx.coroutines.withTimeout
  *
  * 每次模型请求时从 invocation 上下文（RunConfig metadata）读取会话勾选的
  * MCP server ID，委托 [McpToolsetRegistry] 惰性解析；metadata 未携带会话配置时
- * 回退到全局启用集合。连接池化由 registry 与各 [McpToolset] 负责。
+ * 回退到全局启用集合。连接复用由 registry 与官方远端工具集负责。
  *
  * 失败降级：首次 `getTools` 即连通性探测。单个 server 加载失败（含超时）只丢弃该
  * server 的工具并记录到失败缓存，不再把异常抛给 ADK runner（避免会话中出现

@@ -36,7 +36,6 @@
     <string name="chat_session_none_enabled">None enabled</string>
     <string name="chat_session_mcp_not_configured">MCP is not configured</string>
     <string name="chat_session_tool_save_failed">Could not save this chat\'s tool settings</string>
-    <string name="chat_mcp_transport_sse">SSE</string>
     <string name="chat_mcp_transport_streamable_http">Streamable HTTP</string>
     <string name="chat_session_mcp_empty_title">MCP is not configured</string>
     <string name="chat_session_mcp_empty_description">Add a server from MCP in Settings first.</string>

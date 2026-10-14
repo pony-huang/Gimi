@@ -1,8 +1,8 @@
 package github.ponyhuang.gimi.data.agent
 
 import github.ponyhuang.gimi.data.agent.tools.mcp.ConversationMcpToolset
-import github.ponyhuang.gimi.data.agent.tools.mcp.McpToolException.McpToolLoadingException
-import github.ponyhuang.gimi.data.agent.tools.mcp.McpToolset
+import com.google.adk.kt.tools.mcp.McpToolException.McpToolLoadingException
+import com.google.adk.kt.tools.Toolset
 import com.google.adk.kt.tools.BaseTool
 import github.ponyhuang.gimi.domain.mcp.model.McpSkippedServer
 import github.ponyhuang.gimi.domain.mcp.repository.McpSkipReporter
@@ -85,11 +85,11 @@ class ConversationMcpToolsetProbeTest {
         assertEquals(listOf(goodTool), toolset.getTools(null))
     }
 
-    private fun toolsetReturning(tools: List<BaseTool>): McpToolset = mockk {
+    private fun toolsetReturning(tools: List<BaseTool>): Toolset = mockk {
         coEvery { getTools(any()) } returns tools
     }
 
-    private fun toolsetThrowing(error: Throwable): McpToolset = mockk {
+    private fun toolsetThrowing(error: Throwable): Toolset = mockk {
         coEvery { getTools(any()) } throws error
     }
 

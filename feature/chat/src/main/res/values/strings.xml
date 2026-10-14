@@ -38,7 +38,6 @@
     <string name="chat_session_none_enabled">未启用</string>
     <string name="chat_session_mcp_not_configured">尚未配置 MCP</string>
     <string name="chat_session_tool_save_failed">无法保存当前会话的工具设置</string>
-    <string name="chat_mcp_transport_sse">SSE</string>
     <string name="chat_mcp_transport_streamable_http">Streamable HTTP</string>
     <string name="chat_session_mcp_empty_title">尚未配置 MCP</string>
     <string name="chat_session_mcp_empty_description">请先前往设置中的 MCP 页面添加服务器。</string>

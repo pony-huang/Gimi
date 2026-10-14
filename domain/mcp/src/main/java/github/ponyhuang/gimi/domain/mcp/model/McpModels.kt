@@ -5,11 +5,11 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 enum class McpTransport {
-    SSE,
     STREAMABLE_HTTP,
 }
 
 @Serializable
+/** 已配置的 Streamable HTTP MCP 服务及用户提供的连接信息。 */
 data class McpServer(
     val id: String = UUID.randomUUID().toString(),
     // 新建时留空，由编辑器 placeholder 引导用户命名；避免所有服务器同叫一个默认名。

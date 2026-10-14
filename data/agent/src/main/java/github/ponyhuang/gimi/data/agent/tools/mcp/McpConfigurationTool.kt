@@ -104,7 +104,7 @@ class McpConfigurationTool @Inject constructor(
         private const val DESCRIPTION: String =
             "Imports or updates remote MCP server configurations from JSON or curl explicitly pasted " +
                 "by the user and enables them for the current conversation. Call this only when " +
-                "the content is clearly an MCP configuration. Supports SSE and Streamable HTTP; " +
+                "the content is clearly an MCP configuration. Supports Streamable HTTP; " +
                 "stdio entries are skipped."
         private const val MCP_IMPORT_INSTRUCTION: String =
             "When a user message clearly contains an MCP server configuration, call " +

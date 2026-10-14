@@ -5,7 +5,7 @@
     <string name="mcp_empty_action_import">Import JSON configuration</string>
     <string name="mcp_section_add_methods">Add methods</string>
     <string name="mcp_method_new_title">New</string>
-    <string name="mcp_method_new_subtitle">Manually configure an SSE or Streamable HTTP service</string>
+    <string name="mcp_method_new_subtitle">Manually configure a Streamable HTTP service</string>
     <string name="mcp_method_import_title">Import</string>
     <string name="mcp_method_import_subtitle">Paste an mcpServers JSON configuration</string>
     <string name="mcp_section_import_mcp">Import MCP configuration</string>
@@ -23,7 +23,6 @@
     <string name="mcp_field_json_label">MCP JSON</string>
     <string name="mcp_field_json_placeholder">{\n  \"mcpServers\": { … }\n}</string>
     <string name="mcp_stdio_skip_notice">stdio entries containing command / args will be skipped because Android apps cannot safely spawn local processes.</string>
-    <string name="mcp_transport_sse">SSE</string>
     <string name="mcp_transport_streamable_http">Streamable HTTP</string>
 
     <string name="mcp_section_basic_info">Basic information</string>

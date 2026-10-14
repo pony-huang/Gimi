@@ -44,7 +44,7 @@ class McpManualConfigurationTool @Inject constructor(
                 ),
                 ARG_TRANSPORT to Schema(
                     type = Type.STRING,
-                    enum = listOf("sse", "streamable_http"),
+                    enum = listOf("streamable_http"),
                     description = "Transport protocol. Defaults to streamable_http.",
                 ),
                 ARG_DESCRIPTION to Schema(
@@ -88,7 +88,7 @@ class McpManualConfigurationTool @Inject constructor(
             return failure("name and endpoint_url are required.")
         }
         val transport = parseTransport(args[ARG_TRANSPORT] as? String)
-            ?: return failure("transport must be \"sse\" or \"streamable_http\".")
+            ?: return failure("transport must be \"streamable_http\".")
         val sessionId = context.context.session.key.id
         if (sessionId.isNullOrBlank()) {
             return failure("The current conversation has no persistent session id.")
@@ -127,7 +127,6 @@ class McpManualConfigurationTool @Inject constructor(
     }
 
     private fun parseTransport(value: String?): McpTransport? = when (value?.lowercase()) {
-        "sse" -> McpTransport.SSE
         "streamable_http", "streamablehttp", null, "" -> McpTransport.STREAMABLE_HTTP
         else -> null
     }
@@ -156,7 +155,7 @@ class McpManualConfigurationTool @Inject constructor(
                 "it for the current conversation. Use this when the user describes an MCP " +
                 "server's settings directly but does not provide a complete JSON or curl " +
                 "configuration; import_mcp_servers remains the tool for full config content. " +
-                "Supports SSE and Streamable HTTP. Never invent endpoint URLs, tokens, or headers."
+                "Supports Streamable HTTP. Never invent endpoint URLs, tokens, or headers."
         private const val MANUAL_CONFIG_INSTRUCTION: String =
             "When a user message clearly describes an MCP server to add or update using " +
                 "individual details such as a name, endpoint URL, transport type, token, or " +

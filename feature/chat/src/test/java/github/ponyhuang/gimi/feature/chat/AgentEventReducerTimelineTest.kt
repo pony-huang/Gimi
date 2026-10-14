@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.feature.chat
 
 import github.ponyhuang.gimi.domain.conversation.model.AdkRequestConfirmationToolName
 import github.ponyhuang.gimi.domain.conversation.model.ChatFunctionCall
+import github.ponyhuang.gimi.domain.conversation.model.ChatFunctionResponse
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunEvent
 import github.ponyhuang.gimi.domain.conversation.model.ChatRunPart
 import github.ponyhuang.gimi.domain.conversation.model.ToolConfirmationRequest
@@ -14,6 +15,39 @@ import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class AgentEventReducerTimelineTest {
+    @Test
+    fun `one merged event completes every parallel tool response`() {
+        val runToken = Any()
+        runtime.runToken = runToken
+        reducer.applyEvent(
+            runtime.sessionId,
+            event(
+                functionCalls = listOf(
+                    ChatFunctionCall(id = "call-a", name = "alpha", args = emptyMap()),
+                    ChatFunctionCall(id = "call-b", name = "beta", args = emptyMap()),
+                ),
+            ),
+            runToken,
+        )
+        assertEquals(ToolCallStatus.Running, runtime.toolStatuses[ToolCallKey("call-a", "alpha")])
+        assertEquals(ToolCallStatus.Running, runtime.toolStatuses[ToolCallKey("call-b", "beta")])
+
+        // ADK 1.4 把同一批并发工具的响应合并进一个事件。
+        reducer.applyEvent(
+            runtime.sessionId,
+            event(
+                functionResponses = listOf(
+                    ChatFunctionResponse(id = "call-a", name = "alpha"),
+                    ChatFunctionResponse(id = "call-b", name = "beta"),
+                ),
+            ),
+            runToken,
+        )
+
+        assertEquals(ToolCallStatus.Completed, runtime.toolStatuses[ToolCallKey("call-a", "alpha")])
+        assertEquals(ToolCallStatus.Completed, runtime.toolStatuses[ToolCallKey("call-b", "beta")])
+    }
+
     @Test
     fun `error event and subsequent execution exception produce one error bubble`() {
         val token = Any()
@@ -118,13 +152,14 @@ class AgentEventReducerTimelineTest {
         timestamp: Long = 1L,
         text: String? = null,
         functionCalls: List<ChatFunctionCall> = emptyList(),
+        functionResponses: List<ChatFunctionResponse> = emptyList(),
     ) = ChatRunEvent(
         id = id,
         invocationId = "invocation",
         author = "assistant",
         parts = text?.let { listOf(ChatRunPart(text = it)) }.orEmpty(),
         functionCalls = functionCalls,
-        functionResponses = emptyList(),
+        functionResponses = functionResponses,
         partial = partial,
         turnComplete = !partial,
         errorCode = null,

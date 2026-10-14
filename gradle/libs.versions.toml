@@ -1,6 +1,6 @@
 [versions]
 agp = "9.2.1"
-anthropicJava = "2.44.1"
+anthropicJava = "2.65.0"
 coreKtx = "1.19.0"
 googleAdk = "1.4.0"
 pluginApi = "4"

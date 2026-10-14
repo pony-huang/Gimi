@@ -14,6 +14,20 @@ import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class AgentEventReducerTimelineTest {
+    @Test
+    fun `same event id across chunks keeps one bubble without duplicating final text`() {
+        val runToken = Any()
+        runtime.runToken = runToken
+        reducer.applyEvent(runtime.sessionId, event(id = "stream", partial = true, text = "a"), runToken)
+        val partId = runtime.messages.single().textParts.single().id
+        reducer.applyEvent(runtime.sessionId, event(id = "stream", partial = true, text = "b"), runToken)
+        reducer.applyEvent(runtime.sessionId, event(id = "stream", text = "ab"), runToken)
+        val message = runtime.messages.single()
+        assertEquals("stream", message.id)
+        assertEquals("ab", message.textParts.single().text)
+        assertEquals(partId, message.textParts.single().id)
+        assertFalse(message.partial)
+    }
 
     private val runtime = ChatSessionRuntime("session")
     private val reducer = AgentEventReducer(

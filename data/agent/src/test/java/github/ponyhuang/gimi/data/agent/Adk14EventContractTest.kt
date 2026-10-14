@@ -17,6 +17,8 @@ import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Part
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
@@ -26,6 +28,47 @@ import org.junit.Test
 
 /** 固定 ADK 1.4 的事件与回调边界，避免升级破坏流式归并、拒绝工具或错误恢复。 */
 class Adk14EventContractTest {
+    /**
+     * ADK 1.4 起同一批次的工具调用并发执行，并把各响应合并成一个事件。
+     *
+     * 这条契约同时约束两侧：工具实现必须能承受同批并发调用，UI 也必须处理
+     * 单个事件里携带多个 functionResponse 的情况。顺序执行会让第一个工具
+     * 等不到第二个工具启动而超时失败，因此不会有假绿。
+     */
+    @Test
+    fun batchToolCallsRunInParallelAndMergeResponsesIntoOneEvent() = runTest {
+        var modelCalls = 0
+        val bothStarted = CompletableDeferred<Unit>()
+        val started = java.util.concurrent.atomic.AtomicInteger(0)
+        val tools = listOf("alpha", "beta").map { name ->
+            object : BaseTool(name, "fixture") {
+                override fun declaration() = FunctionDeclaration(name, "fixture")
+                override suspend fun run(context: ToolContext, args: Map<String, Any?>): Any {
+                    if (started.incrementAndGet() == 2) bothStarted.complete(Unit)
+                    withTimeout(5_000) { bothStarted.await() }
+                    return mapOf("tool" to name)
+                }
+            }
+        }
+        val model = fixtureModel {
+            if (modelCalls++ == 0) {
+                listOf(LlmResponse(content = Content(role = "model", parts = tools.map { tool ->
+                    Part(functionCall = FunctionCall(id = "call-${tool.name}", name = tool.name, args = emptyMap()))
+                })))
+            } else listOf(response("done", false))
+        }
+
+        val events = execution(model, tools).send("run both").toList()
+        val responseEvents = events.filter { it.functionResponses().isNotEmpty() }
+
+        assertEquals(2, started.get())
+        assertEquals(1, responseEvents.size)
+        assertEquals(
+            setOf("alpha", "beta"),
+            responseEvents.single().functionResponses().map { it.response["tool"] }.toSet(),
+        )
+    }
+
     @Test
     fun longRunningInputResumesWithTheAnswerWithoutRepeatingTheTool() = runTest {
         var executions = 0

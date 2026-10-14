@@ -13,6 +13,7 @@ import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Part
+import java.util.Collections
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.toList
@@ -38,7 +39,8 @@ class AgentConfirmationResumeTest {
 
     private suspend fun verifyDecisions(decisions: List<Boolean>, expected: List<String>) {
         val names = listOf("first", "second").take(decisions.size)
-        val executed = mutableListOf<String>()
+        // ADK 1.4 在同批确认恢复时并发执行各工具，夹具必须线程安全。
+        val executed = Collections.synchronizedList(mutableListOf<String>())
         var modelCalls = 0
         val model = object : Model {
             override val name = "confirmation-fixture"

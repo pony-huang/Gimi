@@ -34,6 +34,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
+import github.ponyhuang.gimi.ui.preference.LocalPreferenceStyle
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /**
@@ -122,26 +124,32 @@ fun GimiBottomSheetOptionRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+    val compact = LocalPreferenceStyle.current == PreferenceStyle.Compact
+    val contentColor = when {
+        compact && !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        selected && !compact -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurface
+    }
     androidx.compose.foundation.layout.Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 80.dp)
+            .heightIn(min = if (compact) 64.dp else 80.dp)
             .selectable(
                 selected = selected,
                 enabled = enabled,
                 role = Role.RadioButton,
                 onClick = onClick,
             )
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = if (compact) 16.dp else 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         androidx.compose.foundation.layout.Column(modifier = Modifier.weight(1f)) {
-            Text(text = label, style = MaterialTheme.typography.titleMedium, color = contentColor)
+            Text(text = label, style = if (compact) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleMedium, color = contentColor)
             Text(
                 text = description,
                 style = MaterialTheme.typography.bodySmall,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (compact && !enabled) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                    else if (selected && !compact) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
@@ -172,20 +180,28 @@ fun GimiBottomSheetSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val compact = LocalPreferenceStyle.current == PreferenceStyle.Compact
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 80.dp)
+            .heightIn(min = if (compact) 64.dp else 80.dp)
             .toggleable(
                 value = checked,
                 enabled = enabled,
                 role = Role.Switch,
                 onValueChange = onCheckedChange,
             )
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = if (compact) 16.dp else 20.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Surface(
+        if (compact) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.38f),
+                modifier = Modifier.size(24.dp).padding(2.dp),
+            )
+        } else Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(36.dp),
@@ -202,15 +218,21 @@ fun GimiBottomSheetSwitchRow(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(start = 12.dp, end = 12.dp),
+                .padding(start = if (compact) 16.dp else 12.dp, end = 12.dp),
         ) {
-            Text(text = label, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = label,
+                style = if (compact) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (!compact || enabled) 1f else 0.38f),
+                maxLines = if (compact) 2 else Int.MAX_VALUE,
+                overflow = TextOverflow.Ellipsis,
+            )
             Text(
                 text = description,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (!compact || enabled) 1f else 0.38f),
                 modifier = Modifier.padding(top = 2.dp),
             )
         }

@@ -130,7 +130,7 @@ class AdkAgentDebugWebServer @Inject constructor(
      *
      * @property buildAgent 挂起构建 Agent 的闭包。
      */
-    private class LazySingleAgentLoader(
+    internal class LazySingleAgentLoader(
         private val buildAgent: suspend () -> BaseAgent,
     ) : AppLoader {
         private val mutex = Mutex()

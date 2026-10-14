@@ -262,7 +262,7 @@ class AgentFactoryToolAccessTest {
                     mcpRepository = mcpRepository,
                 ),
                 OfficialToolContribution(officialToolset, officialCatalog),
-                SkillToolContribution(mockk<SkillSource>(relaxed = true)),
+                SkillToolContribution(mockk<SkillSource>(relaxed = true), mockk<github.ponyhuang.gimi.domain.sandbox.SandboxSettingsRepository> { every { configuration } returns kotlinx.coroutines.flow.MutableStateFlow(github.ponyhuang.gimi.domain.sandbox.SandboxConfiguration()) }, mockk()),
                 PluginToolContribution(pluginRuntimeProvider),
                 BaseToolContribution(),
                 ModelCatalogContribution(modelServices),

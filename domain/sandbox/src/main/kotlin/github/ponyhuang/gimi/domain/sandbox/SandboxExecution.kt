@@ -34,6 +34,10 @@ sealed interface SandboxOperation {
     data class WriteFile(val path: String, val content: String) : SandboxOperation
     /** 读取远端沙盒的 UTF-8 文本文件。 */
     data class ReadFile(val path: String) : SandboxOperation
+    /** 写入原始文件字节，供技能资产与环境工具使用，不经过 UTF-8 转换。 */
+    data class WriteBytes(val path: String, val content: ByteArray) : SandboxOperation
+    /** 读取原始文件字节，不截断或转换文本。 */
+    data class ReadBytes(val path: String) : SandboxOperation
     /** 列出目录的直接子项，path 缺省为当前目录。 */
     data class ListFiles(val path: String = ".") : SandboxOperation
 }
@@ -55,6 +59,8 @@ sealed interface SandboxOutput {
     data class WrittenFile(val path: String) : SandboxOutput
     /** 读取到的 UTF-8 文本内容。 */
     data class ReadFile(val path: String, val content: String) : SandboxOutput
+    /** 读取到的原始字节；只有环境适配边界消费，不直接进入模型历史。 */
+    data class ReadBytes(val path: String, val content: ByteArray) : SandboxOutput
     /** 目录内容及其请求路径。 */
     data class Files(val path: String, val entries: List<SandboxFileEntry>) : SandboxOutput
 }

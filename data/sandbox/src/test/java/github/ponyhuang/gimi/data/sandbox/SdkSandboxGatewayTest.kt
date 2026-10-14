@@ -20,6 +20,23 @@ import org.junit.Before
 import org.junit.Test
 
 class SdkSandboxGatewayTest {
+    @Test fun environmentReadsRawBytesWithoutUtf8Decoding() = runBlocking {
+        val bytes = byteArrayOf(0, -1, 7)
+        env.enqueue(MockResponse().setBody(Buffer().write(bytes)))
+        val output = gateway.execute(SandboxOperation.ReadBytes("/asset.bin")) as SandboxOutput.ReadBytes
+        assertArrayEquals(bytes, output.content)
+    }
+
+    @Test fun environmentWritesRawBytesAndRejectsOversizedAssets() = runBlocking {
+        env.enqueue(MockResponse().setBody("""[{"name":"asset.bin","type":"FILE_TYPE_FILE","path":"/asset.bin"}]"""))
+        val bytes = byteArrayOf(0, -1, 7)
+        gateway.execute(SandboxOperation.WriteBytes("/asset.bin", bytes))
+        assertTrue(env.takeRequest().body.readByteArray().toList().windowed(bytes.size).any { it == bytes.toList() })
+        try {
+            gateway.execute(SandboxOperation.WriteBytes("/big.bin", ByteArray(1024 * 1024 + 1)))
+            fail("Oversized assets must fail before upload")
+        } catch (error: SandboxGatewayException) { assertEquals(SandboxGatewayFailure.TOO_LARGE, error.failure) }
+    }
     private val api = MockWebServer()
     private val env = MockWebServer()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

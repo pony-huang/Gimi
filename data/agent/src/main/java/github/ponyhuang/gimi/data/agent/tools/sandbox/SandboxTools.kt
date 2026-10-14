@@ -138,6 +138,7 @@ internal fun SandboxExecutionResult.toToolResponse(operation: SandboxOperation):
             }
             is SandboxOutput.WrittenFile -> put("path", truncateSandboxOutput(value.path))
             is SandboxOutput.ReadFile -> { put("path", truncateSandboxOutput(value.path)); put("content", truncateSandboxOutput(value.content)) }
+            is SandboxOutput.ReadBytes -> put("path", truncateSandboxOutput(value.path))
             is SandboxOutput.Files -> {
                 put("path", truncateSandboxOutput(value.path))
                 put("entries", value.entries.map { mapOf("name" to truncateSandboxOutput(it.name), "type" to it.type) })
@@ -151,6 +152,8 @@ internal fun SandboxExecutionResult.toToolResponse(operation: SandboxOperation):
             is SandboxOperation.Command -> put("command", truncateSandboxOutput(operation.command))
             is SandboxOperation.ReadFile -> put("path", truncateSandboxOutput(operation.path))
             is SandboxOperation.WriteFile -> put("path", truncateSandboxOutput(operation.path))
+            is SandboxOperation.ReadBytes -> put("path", truncateSandboxOutput(operation.path))
+            is SandboxOperation.WriteBytes -> put("path", truncateSandboxOutput(operation.path))
             is SandboxOperation.ListFiles -> put("path", truncateSandboxOutput(operation.path))
             is SandboxOperation.Code -> Unit
         }

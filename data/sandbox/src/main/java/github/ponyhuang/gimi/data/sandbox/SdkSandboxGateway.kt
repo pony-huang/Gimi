@@ -67,12 +67,18 @@ internal class SdkSandboxGateway(private val connection: SandboxConnection, priv
     override suspend fun execute(operation: SandboxOperation): SandboxOutput = sdk(
         when (operation) {
             is SandboxOperation.Code -> SandboxGatewayFailure.INTERPRETER
-            is SandboxOperation.ReadFile, is SandboxOperation.ListFiles -> SandboxGatewayFailure.FILE_NOT_FOUND
+            is SandboxOperation.ReadFile, is SandboxOperation.ReadBytes, is SandboxOperation.ListFiles -> SandboxGatewayFailure.FILE_NOT_FOUND
             else -> SandboxGatewayFailure.FAILED
         },
     ) {
         val resource = current()
         when (operation) {
+            is SandboxOperation.WriteBytes -> {
+                if (operation.content.size > MAX_FILE_BYTES) throw SandboxGatewayException(SandboxGatewayFailure.TOO_LARGE)
+                resource.files.write(operation.path, operation.content)
+                SandboxOutput.WrittenFile(operation.path)
+            }
+            is SandboxOperation.ReadBytes -> SandboxOutput.ReadBytes(operation.path, resource.files.readBytes(operation.path, MAX_FILE_BYTES))
             is SandboxOperation.BackgroundCommand -> {
                 // 收到 start/PID 后只关闭本地流，不 await、不 kill；远端进程由沙盒生命周期回收。
                 resource.commands.start(operation.command, CommandOptions(cwd = operation.cwd, envs = operation.envs, timeoutSeconds = operation.timeoutSeconds)).use { handle ->

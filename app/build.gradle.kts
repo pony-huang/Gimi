@@ -64,6 +64,8 @@ android {
             excludes += "**/libmediapipe_tasks_textgenai_jni.so"
         }
         resources {
+            // 新版 Netty 各平台 QUIC 包携带同名许可证，保留一份避免 Java 资源合并冲突。
+            pickFirsts += "META-INF/license/**"
             excludes += setOf(
                 "META-INF/INDEX.LIST",
                 "META-INF/io.netty.versions.properties",

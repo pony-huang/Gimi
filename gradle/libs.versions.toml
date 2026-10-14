@@ -2,7 +2,7 @@
 agp = "9.2.1"
 anthropicJava = "2.44.1"
 coreKtx = "1.19.0"
-googleAdk = "1.2.0"
+googleAdk = "1.4.0"
 pluginApi = "4"
 gson = "2.14.0"
 hilt = "2.60"
@@ -21,9 +21,10 @@ kotlinxCoroutines = "1.11.0"
 mockk = "1.14.9"
 turbine = "1.2.1"
 mcpKotlin = "0.15.0"
+ktor = "3.6.0"
 composeBom = "2026.02.01"
 openaiJava = "4.41.0"
-okhttp = "4.12.0"
+okhttp = "5.3.2"
 objectbox = "6.0.0-beta"
 multiplatformMarkdownRenderer = "0.43.0"
 room = "2.8.4"
@@ -106,6 +107,7 @@ multiplatform-markdown-renderer-m3 = { group = "com.mikepenz", name = "multiplat
 multiplatform-markdown-renderer-coil3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-coil3", version.ref = "multiplatformMarkdownRenderer" }
 multiplatform-markdown-renderer-code = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-code", version.ref = "multiplatformMarkdownRenderer" }
 mcp-kotlin-client = { module = "io.modelcontextprotocol:kotlin-sdk-client", version.ref = "mcpKotlin" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }

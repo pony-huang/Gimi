@@ -6,7 +6,9 @@ import com.google.adk.kt.artifacts.ArtifactService
 import com.google.adk.kt.sessions.SessionService
 import com.google.adk.kt.webserver.AdkServerConfig
 import com.google.adk.kt.webserver.dev.AdkDevServer
-import com.google.adk.kt.webserver.loaders.AgentLoader
+import com.google.adk.kt.webserver.loaders.AppLoader
+import com.google.adk.kt.apps.App
+import github.ponyhuang.gimi.data.agent.AgentChatRunner
 import com.google.adk.kt.webserver.telemetry.ApiServerSpanExporter
 import github.ponyhuang.gimi.data.agent.AgentBuildSpec
 import github.ponyhuang.gimi.data.agent.AgentFactory
@@ -66,7 +68,7 @@ class AdkAgentDebugWebServer @Inject constructor(
                         port = AgentDebugWebServer.DEFAULT_PORT,
                         sessionService = sessionService,
                         artifactService = artifactService,
-                        agentLoader = LazySingleAgentLoader(::buildAgent),
+                        appLoader = LazySingleAgentLoader(::buildAgent),
                         apiServerSpanExporter = ApiServerSpanExporter(),
                         captureMessageContent = true,
                         plugins = emptyList(),
@@ -120,9 +122,9 @@ class AdkAgentDebugWebServer @Inject constructor(
     }
 
     /**
-     * 首次被 Dev UI 请求时才构建 Agent 的 [AgentLoader]。
+     * 首次被 Dev UI 请求时才构建 Agent 的 [AppLoader]。
      *
-     * ADK `AgentLoader` 是阻塞签名而 Agent 构建需要挂起（模型配置就绪等待），
+     * ADK `AppLoader` 是阻塞签名而 Agent 构建需要挂起（模型配置就绪等待），
      * 这里用 [runBlocking] 在 Ktor 工作线程上桥接；仅首次触发昂贵构建，
      * 结果缓存后复用。
      *
@@ -130,7 +132,7 @@ class AdkAgentDebugWebServer @Inject constructor(
      */
     private class LazySingleAgentLoader(
         private val buildAgent: suspend () -> BaseAgent,
-    ) : AgentLoader {
+    ) : AppLoader {
         private val mutex = Mutex()
 
         @Volatile
@@ -139,11 +141,11 @@ class AdkAgentDebugWebServer @Inject constructor(
         private suspend fun agent(): BaseAgent =
             cached ?: mutex.withLock { cached ?: buildAgent().also { cached = it } }
 
-        override fun listAgents(): List<String> = listOf(runBlocking { agent() }.name)
+        override fun listApps(): List<String> = listOf(AgentChatRunner.APP_NAME)
 
-        override fun loadAgent(agentName: String): BaseAgent = runBlocking {
+        override fun loadApp(appName: String): App? = if (appName != AgentChatRunner.APP_NAME) null else runBlocking {
             try {
-                agent()
+                App(appName = appName, rootAgent = agent())
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

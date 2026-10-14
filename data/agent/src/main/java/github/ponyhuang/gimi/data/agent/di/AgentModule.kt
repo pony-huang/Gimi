@@ -25,6 +25,7 @@ import github.ponyhuang.gimi.data.agent.LocalToolCatalog
 import github.ponyhuang.gimi.data.agent.conversation.AdkChatAgentRepository
 import github.ponyhuang.gimi.data.agent.plugins.ConversationGenerateTitlePlugin
 import github.ponyhuang.gimi.data.agent.plugins.MemoryPersistencePlugin
+import github.ponyhuang.gimi.data.agent.plugins.AgentToolRetryPolicy
 import github.ponyhuang.gimi.data.agent.tools.search.MediaPipeToolEmbeddingModel
 import github.ponyhuang.gimi.data.agent.tools.search.MyObjectBox
 import github.ponyhuang.gimi.data.agent.tools.search.ObjectBoxToolVectorSearch
@@ -175,6 +176,7 @@ object AgentModule {
             buildList<Plugin> {
                 add(ConversationGenerateTitlePlugin(agentLLMModelFactory))
                 add(MemoryPersistencePlugin())
+                add(AgentToolRetryPolicy.plugin())
                 addAll(pluginRuntime.enabledPlugins)
             }
         },

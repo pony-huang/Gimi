@@ -29,7 +29,8 @@ class OfficialToolFactory @Inject constructor(
 ) {
     /** 凭据仅在构造本地执行实例时读取，不进入 invocation metadata。 */
     suspend fun createTools(spec: OfficialToolSpec): List<BaseTool> = when (val binding = spec.binding) {
-        is OfficialToolBinding.ProviderDeclaration -> listOf(OfficialBuiltInTool(binding.wireName))
+        is OfficialToolBinding.ProviderDeclaration ->
+            listOf(OfficialBuiltInTool(binding.declarationName))
         OfficialToolBinding.ProviderNative -> listOf(
             when (spec.toolId) {
                 OfficialToolIds.GEMINI_WEB_SEARCH -> GoogleSearchTool()

@@ -27,8 +27,13 @@ data class OfficialToolSpec(
 
 /** 官方工具的接入方式；具体 SDK 适配与执行由 Agent 实现。 */
 sealed interface OfficialToolBinding {
-    /** 厂商远端执行的协议声明，wireName 是 API 保留字面量。 */
-    data class ProviderDeclaration(val wireName: String) : OfficialToolBinding
+    /**
+     * 厂商远端执行的协议声明。
+     *
+     * [declarationName] 是本地声明名（如 [OfficialToolIds.PROVIDER_WEB_SEARCH]），不是厂商
+     * wire 字面量：同名声明可能是本地可执行函数，协议适配器按声明名决定下发哪种形态。
+     */
+    data class ProviderDeclaration(val declarationName: String) : OfficialToolBinding
 
     /** 由 Agent SDK 透传的原生工具。 */
     data object ProviderNative : OfficialToolBinding

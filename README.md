@@ -105,16 +105,16 @@ API protocol, model, and credentials.
 
 | Provider | Capabilities |
 |----------|--------------|
-| **OpenAI** | Web search |
 | **Anthropic** | Web search |
 | **MiniMax** | Web search, text-to-image, reference-image generation |
-| **MiMo (Xiaomi)** | Web search |
 | **GLM (Zhipu)** | Web search, webpage reading |
 | **Kimi** | Kimi tool collection (formulas) |
 
-MiniMax image generation can be used with chat models from other providers, using the MiniMax
-service's credentials. Native capabilities such as web search remain subject to provider and
-protocol restrictions.
+Provider-executed web search (Anthropic, MiniMax) runs on the provider's side and is offered only
+under the service's Anthropic protocol; OpenAI and MiMo (Xiaomi) native search needs their own tool
+declaration on the OpenAI-compatible channel, which currently carries function tools only, so it is
+not offered yet. MiniMax image generation can be used with chat models from other providers, using
+the MiniMax service's credentials.
 
 ### MCP
 

@@ -12,6 +12,7 @@ import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import io.mockk.every
 import io.mockk.mockk
@@ -33,11 +34,14 @@ class DefaultOfficialToolsetTest {
     // ---------------------------------------------------------------- 厂商声明
 
     @Test
-    fun resolvesProviderDeclarationWithVendorWireName() = runTest {
-        val tools = toolset().resolveTools(config(serviceId = "openai"), selection = null)
+    fun resolvesProviderDeclarationWithItsLocalName() = runTest {
+        val tools = toolset().resolveTools(
+            config(serviceId = "anthropic", baseType = ApiProtocol.Anthropic),
+            selection = null,
+        )
 
-        // 目录 ID 是 openai_web_search,但线上声明字面量保持厂商规定的 web_search。
-        assertTrue(tools.any { it.name == "web_search" })
+        // 远端执行的声明用本地专用名,再各协议适配器翻译成厂商 wire 形态。
+        assertTrue(tools.any { it.name == OfficialToolIds.PROVIDER_WEB_SEARCH })
     }
 
     @Test
@@ -50,10 +54,13 @@ class DefaultOfficialToolsetTest {
     }
 
     @Test
-    fun ignoresOpenaiServiceUsingAnthropicProtocol() = runTest {
+    fun ignoresMinimaxWebSearchUnderAnOpenAiCompatibleProtocol() = runTest {
         assertTrue(
             toolset()
-                .resolveTools(config(serviceId = "openai", baseType = ApiProtocol.Anthropic), null)
+                .resolveTools(
+                    config(serviceId = "minimax", baseType = ApiProtocol.OpenaiChatcompletions),
+                    null,
+                )
                 .none { it is OfficialBuiltInTool },
         )
     }
@@ -66,14 +73,15 @@ class DefaultOfficialToolsetTest {
                 config(serviceId = serviceId, baseType = ApiProtocol.Anthropic),
                 selection = null,
             )
-            assertTrue("service: $serviceId", tools.any { it.name == "web_search" })
+            assertTrue("service: $serviceId", tools.any { it.name == OfficialToolIds.PROVIDER_WEB_SEARCH })
         }
+        // OpenAI 兼容通道下发不了厂商原生声明,这两个服务不声明联网搜索。
         for (serviceId in listOf("openai", "mimo")) {
             val tools = toolset.resolveTools(
                 config(serviceId = serviceId, baseType = ApiProtocol.OpenaiChatcompletions),
                 selection = null,
             )
-            assertTrue("service: $serviceId", tools.any { it.name == "web_search" })
+            assertTrue("service: $serviceId", tools.none { it is OfficialBuiltInTool })
         }
     }
 
@@ -100,13 +108,13 @@ class DefaultOfficialToolsetTest {
     }
 
     @Test
-    fun doesNotMixMinimaxRemoteWebSearchIntoAnotherChatModel() = runTest {
+    fun doesNotCrossRemoteWebSearchDeclarationIntoAnotherChatModel() = runTest {
         val tools = toolset().resolveTools(
             config(serviceId = "openai", baseType = ApiProtocol.OpenaiChatcompletions),
             selection = null,
         )
 
-        assertEquals(listOf("web_search"), tools.filterIsInstance<OfficialBuiltInTool>().map { it.name })
+        assertTrue(tools.filterIsInstance<OfficialBuiltInTool>().isEmpty())
     }
 
     @Test
@@ -126,11 +134,16 @@ class DefaultOfficialToolsetTest {
     @Test
     fun dropsToolWhenConversationSelectionExcludesIt() = runTest {
         val selection = ConversationToolConfiguration(
-            enabledOfficialFunctionIds = mapOf("openai_web_search" to emptySet()),
+            enabledOfficialFunctionIds = mapOf("anthropic_web_search" to emptySet()),
         )
 
         assertTrue(
-            toolset().resolveTools(config(serviceId = "openai"), selection).isEmpty(),
+            toolset()
+                .resolveTools(
+                    config(serviceId = "anthropic", baseType = ApiProtocol.Anthropic),
+                    selection,
+                )
+                .isEmpty(),
         )
     }
 
@@ -343,14 +356,14 @@ class DefaultOfficialToolsetTest {
     fun nonCandidateToolsStayDirectlyDeclaredInOnDemandMode() = runTest {
         val selection = ConversationToolConfiguration(
             enabledOfficialFunctionIds = mapOf(
-                "openai_web_search" to setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
+                "anthropic_web_search" to setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
             ),
         )
 
         val tools = toolset(toolAccessMode = ToolAccessMode.ON_DEMAND)
-            .resolveTools(config(serviceId = "openai"), selection)
+            .resolveTools(config(serviceId = "anthropic", baseType = ApiProtocol.Anthropic), selection)
 
-        assertEquals(listOf("web_search"), tools.map { it.name })
+        assertEquals(listOf(OfficialToolIds.PROVIDER_WEB_SEARCH), tools.map { it.name })
     }
 
     @Test

@@ -4,23 +4,22 @@ import javax.inject.Inject
 
 /** 官方工具唯一的厂商支持矩阵与可用性规则；设置目录与 Agent 共用。 */
 class OfficialToolSupport @Inject constructor() {
-    /** 全部官方工具声明，顺序决定目录展示及请求期组装顺序。 */
+    /**
+     * 全部官方工具声明，顺序决定目录展示及请求期组装顺序。
+     *
+     * OpenAI 与 MiMo 的联网搜索是厂商原生声明（OpenAI 只有 Responses API、MiMo 也只有
+     * Chat Completions 的 `tools[].type = "web_search"`），而应用当前的 OpenAI 兼容通道
+     * 只能下发 function 工具，无法表达这类声明，因此不做声明；等 OpenAI 兼容通道能下发
+     * 厂商 wire 形态时再补回。
+     */
     val all: List<OfficialToolSpec> = listOf(
-        OfficialToolSpec(
-            toolId = OfficialToolIds.OPENAI_WEB_SEARCH,
-            serviceId = "openai",
-            protocols = setOf(ApiProtocol.OpenaiChatcompletions),
-            displayName = "OpenAI web search",
-            staticFunctionIds = listOf(OfficialToolIds.OPENAI_WEB_SEARCH),
-            binding = OfficialToolBinding.ProviderDeclaration(wireName = "web_search"),
-        ),
         OfficialToolSpec(
             toolId = OfficialToolIds.ANTHROPIC_WEB_SEARCH,
             serviceId = "anthropic",
             protocols = setOf(ApiProtocol.Anthropic),
             displayName = "Anthropic web search",
             staticFunctionIds = listOf(OfficialToolIds.ANTHROPIC_WEB_SEARCH),
-            binding = OfficialToolBinding.ProviderDeclaration(wireName = "web_search"),
+            binding = OfficialToolBinding.ProviderDeclaration(OfficialToolIds.PROVIDER_WEB_SEARCH),
         ),
         OfficialToolSpec(
             toolId = OfficialToolIds.MINIMAX_WEB_SEARCH,
@@ -28,7 +27,7 @@ class OfficialToolSupport @Inject constructor() {
             protocols = setOf(ApiProtocol.Anthropic),
             displayName = "MiniMax web search",
             staticFunctionIds = listOf(OfficialToolIds.MINIMAX_WEB_SEARCH),
-            binding = OfficialToolBinding.ProviderDeclaration(wireName = "web_search"),
+            binding = OfficialToolBinding.ProviderDeclaration(OfficialToolIds.PROVIDER_WEB_SEARCH),
         ),
         OfficialToolSpec(
             toolId = OfficialToolIds.MINIMAX_IMAGE_GENERATION,
@@ -42,14 +41,6 @@ class OfficialToolSupport @Inject constructor() {
             // 图像生成通过独立 REST API 调用，函数名也为厂商唯一，可安全供其它模型使用。
             canBeUsedAcrossModels = true,
             binding = OfficialToolBinding.LocalFunctions,
-        ),
-        OfficialToolSpec(
-            toolId = OfficialToolIds.MIMO_WEB_SEARCH,
-            serviceId = "mimo",
-            protocols = setOf(ApiProtocol.OpenaiChatcompletions),
-            displayName = "MiMo web search",
-            staticFunctionIds = listOf(OfficialToolIds.MIMO_WEB_SEARCH),
-            binding = OfficialToolBinding.ProviderDeclaration(wireName = "web_search"),
         ),
         OfficialToolSpec(
             toolId = OfficialToolIds.GEMINI_WEB_SEARCH,

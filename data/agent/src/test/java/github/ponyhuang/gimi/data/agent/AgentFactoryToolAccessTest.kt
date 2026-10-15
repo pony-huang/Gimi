@@ -300,7 +300,7 @@ class AgentFactoryToolAccessTest {
                 protocols = setOf(ApiProtocol.OpenaiChatcompletions),
                 displayName = "Kimi formulas",
                 searchCandidate = true,
-                binding = OfficialToolBinding.ProviderDeclaration(wireName = "formula_tool"),
+                binding = OfficialToolBinding.ProviderDeclaration("formula_tool"),
             ),
         )
     }

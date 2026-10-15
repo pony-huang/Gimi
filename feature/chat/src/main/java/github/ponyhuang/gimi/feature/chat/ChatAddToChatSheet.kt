@@ -892,10 +892,8 @@ private fun reasoningEffortDescription(effort: ReasoningEffort): String = string
 
 @Composable
 private fun officialToolLabel(toolId: String): String = when (toolId) {
-    OfficialToolIds.OPENAI_WEB_SEARCH,
     OfficialToolIds.ANTHROPIC_WEB_SEARCH,
     OfficialToolIds.MINIMAX_WEB_SEARCH,
-    OfficialToolIds.MIMO_WEB_SEARCH,
     OfficialToolIds.GEMINI_WEB_SEARCH,
     -> stringResource(R.string.chat_official_tool_web_search)
     OfficialToolIds.KIMI_FORMULAS -> stringResource(R.string.chat_official_tool_kimi_formulas)
@@ -907,10 +905,8 @@ private fun officialToolLabel(toolId: String): String = when (toolId) {
 
 @Composable
 private fun officialToolDescription(toolId: String): String = when (toolId) {
-    OfficialToolIds.OPENAI_WEB_SEARCH,
     OfficialToolIds.ANTHROPIC_WEB_SEARCH,
     OfficialToolIds.MINIMAX_WEB_SEARCH,
-    OfficialToolIds.MIMO_WEB_SEARCH,
     OfficialToolIds.GEMINI_WEB_SEARCH,
     -> stringResource(R.string.chat_official_tool_web_search_description)
     OfficialToolIds.KIMI_FORMULAS ->
@@ -969,10 +965,10 @@ private fun previewAddToChatState(
     ),
     officialTools = listOf(
         OfficialToolDescriptor(
-            id = OfficialToolIds.OPENAI_WEB_SEARCH,
+            id = OfficialToolIds.ANTHROPIC_WEB_SEARCH,
             functions = listOf(
                 OfficialToolFunction(
-                    id = OfficialToolIds.OPENAI_WEB_SEARCH,
+                    id = OfficialToolIds.ANTHROPIC_WEB_SEARCH,
                     name = "Web Search",
                     description = "Search the web for up-to-date information.",
                 ),

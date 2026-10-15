@@ -15,6 +15,7 @@ import com.google.adk.kt.types.ThinkingLevel
 import com.google.adk.kt.types.Tool
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.data.agent.model.Claude
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -79,19 +80,37 @@ class ClaudeRequestPayloadTest {
     }
 
     @Test
-    fun ordinaryToolNamesArePreservedWithoutProviderSpecificRewriting() {
-        val body = capture("claude-sonnet-4-6", LlmRequest(
-            contents = listOf(userContent()),
-            config = GenerateContentConfig(tools = listOf(Tool(functionDeclarations = listOf(
-                FunctionDeclaration(name = "web_search", description = "Search"),
-                FunctionDeclaration(name = "custom_clock_42", description = "Clock"),
-            )))),
-        ))
+    fun sameNamedLocalFunctionKeepsItsOrdinaryShape() {
+        val body = capture("glm-4.6", toolsRequest("web_search", "custom_clock_42"))
 
         val tools = body["tools"]!!.jsonArray.map { it.jsonObject }
         assertEquals(listOf("web_search", "custom_clock_42"), tools.map { it["name"].text() })
         assertTrue(tools.all { "input_schema" in it && it["type"].text() != "web_search_20250305" })
         assertTrue(tools.all { it["input_schema"]!!.jsonObject["properties"] is JsonObject })
+    }
+
+    @Test
+    fun providerDeclaredWebSearchKeepsItsVendorShape() {
+        val body = capture("MiniMax-M3", toolsRequest(OfficialToolIds.PROVIDER_WEB_SEARCH))
+
+        val tool = body["tools"]!!.jsonArray.single().jsonObject
+        assertEquals("web_search_20250305", tool["type"].text())
+        assertEquals("web_search", tool["name"].text())
+        assertNull("厂商原生声明不带 input_schema", tool["input_schema"])
+    }
+
+    @Test
+    fun nativeServerToolDoesNotTakeTheToolCacheBreakpoint() {
+        // 厂商原生声明没有可标记的 cache_control；最后一项是它时不得崩，也不得把断点打在它上面。
+        val body = capture(
+            "claude-sonnet-4-5",
+            toolsRequest("clock", OfficialToolIds.PROVIDER_WEB_SEARCH),
+        )
+
+        val tools = body["tools"]!!.jsonArray.map { it.jsonObject }
+        assertEquals(listOf("clock", "web_search"), tools.map { it["name"].text() })
+        assertNull(tools.last()["cache_control"])
+        assertNull(tools.first()["cache_control"])
     }
 
     @Test
@@ -327,6 +346,15 @@ class ClaudeRequestPayloadTest {
                     ),
                 ),
             ),
+        ),
+    )
+
+    private fun toolsRequest(vararg names: String) = LlmRequest(
+        contents = listOf(userContent()),
+        config = GenerateContentConfig(
+            tools = listOf(Tool(functionDeclarations = names.map {
+                FunctionDeclaration(name = it, description = it)
+            })),
         ),
     )
 

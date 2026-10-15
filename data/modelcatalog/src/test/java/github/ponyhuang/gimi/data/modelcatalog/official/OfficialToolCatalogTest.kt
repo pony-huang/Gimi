@@ -15,9 +15,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * 官方工具目录门控行为:服务/协议/模型家族三维匹配与厂商 wire 声明推导。
- */
+/** 官方工具目录门控行为:服务/协议/模型家族三维匹配与厂商声明推导。 */
 class OfficialToolCatalogTest {
 
     private val support = OfficialToolSupport()
@@ -30,8 +28,28 @@ class OfficialToolCatalogTest {
             .map { it.toolId }
 
         assertEquals(
-            listOf("openai_web_search", "anthropic_web_search", "minimax_web_search", "mimo_web_search"),
+            listOf("anthropic_web_search", "minimax_web_search"),
             wireToolIds,
+        )
+    }
+
+    @Test
+    fun openAiCompatibleOnlyServicesDeclareNoProviderNativeTools() {
+        // OpenAI 兼容通道只能下发 function 工具，OpenAI/MiMo 的原生联网搜索因此不做声明。
+        assertTrue(registry.all.none { it.serviceId == "openai" || it.serviceId == "mimo" })
+        assertTrue(registry.supportedToolIds("openai", ApiProtocol.OpenaiChatcompletions).isEmpty())
+        assertTrue(registry.supportedToolIds("mimo", ApiProtocol.OpenaiChatcompletions).isEmpty())
+    }
+
+    @Test
+    fun providerDeclaredWebSearchUsesTheLocalDeclarationName() {
+        // 远端执行的声明统一使用本地专用名，与 GLM 本地函数 `web_search` 区分开；
+        // 各协议适配器按这个名字决定下发哪种厂商 wire 形态。
+        assertEquals(
+            setOf(OfficialToolIds.PROVIDER_WEB_SEARCH),
+            registry.all
+                .mapNotNull { (it.binding as? OfficialToolBinding.ProviderDeclaration)?.declarationName }
+                .toSet(),
         )
     }
 
@@ -45,37 +63,6 @@ class OfficialToolCatalogTest {
             registry.listFunctions(OfficialToolIds.MINIMAX_IMAGE_GENERATION).map { it.id },
         )
     }
-
-    @Test
-    fun providerWireNamesAreScopedByServiceAndProtocol() {
-        assertEquals(
-            setOf("web_search"),
-            registryFor("openai").providerDeclaredWireNames("openai", ApiProtocol.OpenaiChatcompletions, "gpt-5.2"),
-        )
-        assertEquals(
-            setOf("web_search"),
-            registryFor("mimo").providerDeclaredWireNames("mimo", ApiProtocol.OpenaiChatcompletions, "mimo-model"),
-        )
-        assertEquals(
-            setOf("web_search"),
-            registryFor("minimax").providerDeclaredWireNames("minimax", ApiProtocol.Anthropic, "minimax-model"),
-        )
-        // GLM 的本地搜索是可执行函数,不得转换为厂商 wire 形态。
-        assertTrue(
-            registryFor("glm").providerDeclaredWireNames("glm", ApiProtocol.OpenaiChatcompletions, "glm-4.6").isEmpty(),
-        )
-        // 协议不匹配的服务没有 wire 声明。
-        assertTrue(
-            registryFor("openai").providerDeclaredWireNames("openai", ApiProtocol.Anthropic, "gpt-5.2").isEmpty(),
-        )
-    }
-
-    @Test
-    fun providerWireNamesAreAbsentWhenTheSourceServiceIsMissing() {
-        assertTrue(registry.providerDeclaredWireNames("openai", ApiProtocol.OpenaiChatcompletions, "gpt-5.2").isEmpty())
-    }
-
-    private fun registryFor(serviceId: String) = catalogFor(serviceId)
 
     @Test
     fun minimaxImageGenerationUsesLocalToolsForBothSupportedProtocols() {
@@ -96,9 +83,11 @@ class OfficialToolCatalogTest {
             registry.supportedToolIds("gemini", ApiProtocol.Gemini),
         )
         assertEquals(
-            setOf("openai_web_search"),
-            registry.supportedToolIds("openai", ApiProtocol.OpenaiChatcompletions),
+            setOf("anthropic_web_search"),
+            registry.supportedToolIds("anthropic", ApiProtocol.Anthropic),
         )
+        // 同一服务换协议不再提供任何声明。
+        assertTrue(registry.supportedToolIds("anthropic", ApiProtocol.OpenaiChatcompletions).isEmpty())
         assertTrue(registry.supportedToolIds("openai", ApiProtocol.Gemini).isEmpty())
         assertTrue(registry.supportedToolIds("unknown-service", ApiProtocol.OpenaiChatcompletions).isEmpty())
     }

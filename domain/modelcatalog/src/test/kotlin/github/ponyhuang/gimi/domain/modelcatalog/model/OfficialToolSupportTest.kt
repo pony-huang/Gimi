@@ -22,9 +22,11 @@ class OfficialToolSupportTest {
 
     @Test
     fun crossModelAvailabilityIncludesOnlyIndependentApiTools() {
-        val specs = available(listOf(service("openai"), service("minimax"), service("kimi")))
+        val specs = available(
+            listOf(service("anthropic"), service("openai"), service("minimax"), service("kimi")),
+        )
         assertEquals(
-            listOf(OfficialToolIds.OPENAI_WEB_SEARCH, OfficialToolIds.MINIMAX_IMAGE_GENERATION),
+            listOf(OfficialToolIds.ANTHROPIC_WEB_SEARCH, OfficialToolIds.MINIMAX_IMAGE_GENERATION),
             specs.map { it.toolId },
         )
         assertFalse(specs.any { it.toolId == OfficialToolIds.MINIMAX_WEB_SEARCH })
@@ -55,7 +57,7 @@ class OfficialToolSupportTest {
     }
 
     private fun available(services: List<LLMModelSetting>) = support.availableSpecsFor(
-        "openai", ApiProtocol.OpenaiChatcompletions, "gpt-5.2", services,
+        "anthropic", ApiProtocol.Anthropic, "claude-sonnet-4-6", services,
     )
 
     private fun service(id: String) = LLMModelSetting(

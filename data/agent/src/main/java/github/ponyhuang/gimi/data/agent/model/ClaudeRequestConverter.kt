@@ -28,6 +28,7 @@ import com.anthropic.models.messages.ToolUnion
 import com.anthropic.models.messages.ToolUseBlockParam
 import com.anthropic.models.messages.UrlImageSource
 import com.anthropic.models.messages.UrlPdfSource
+import com.anthropic.models.messages.WebSearchTool20250305
 import com.google.adk.kt.annotations.FrameworkInternalApi
 import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.serialization.jsonElementToAny
@@ -41,6 +42,7 @@ import com.google.adk.kt.types.Schema
 import java.util.Base64
 import kotlin.time.Duration.Companion.hours
 import com.google.adk.kt.types.Tool as AdkTool
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 
 /** 纯请求转换：处理历史、媒体、普通工具、缓存及 schema；传输与产品思考规则分别维护。 */
 internal class ClaudeRequestConverter(private val name: String, private val defaultMaxTokens: Int) {
@@ -106,13 +108,14 @@ internal class ClaudeRequestConverter(private val name: String, private val defa
             .build()
     }
 
-    /** 普通工具列表的最后一项作为缓存前缀断点。 */
+    /** 普通工具列表的最后一项作为缓存前缀断点；厂商原生工具没有可标记的 cache 字段。 */
     private fun markLastToolForCache(
         tools: List<ToolUnion>,
         cacheControl: CacheControlEphemeral?,
     ): List<ToolUnion> {
         if (cacheControl == null) return tools
         val last = tools.last()
+        if (!last.isTool()) return tools
         return tools.dropLast(1) + ToolUnion.ofTool(
             last.asTool().toBuilder().cacheControl(cacheControl).build(),
         )
@@ -291,7 +294,25 @@ internal class ClaudeRequestConverter(private val name: String, private val defa
 
     private fun toAnthropicTools(tools: List<AdkTool>?): List<ToolUnion> =
         tools.orEmpty().flatMap { it.functionDeclarations.orEmpty() }
-            .map { ToolUnion.ofTool(it.toAnthropicTool()) }
+            .map(::toAnthropicToolUnion)
+
+    /**
+     * 厂商远端执行的声明必须保留厂商 wire 形态：下成普通函数会让模型把它当成客户端函数
+     * 并要求本地执行，而本地运行时没有可执行的实现。
+     */
+    private fun toAnthropicToolUnion(declaration: FunctionDeclaration): ToolUnion =
+        nativeProviderTool(declaration.name) ?: ToolUnion.ofTool(declaration.toAnthropicTool())
+
+    /**
+     * 已支持的厂商原生声明；本地声明名不在这里的（普通函数、MCP 工具、GLM 本地搜索）
+     * 一律按普通函数下发。
+     */
+    private fun nativeProviderTool(declarationName: String): ToolUnion? = when (declarationName) {
+        OfficialToolIds.PROVIDER_WEB_SEARCH ->
+            ToolUnion.ofWebSearchTool20250305(WebSearchTool20250305.builder().build())
+
+        else -> null
+    }
 
     private fun Schema.toClaudeParameters(): Map<String, JsonValue> {
         val result = mutableMapOf<String, JsonValue>()

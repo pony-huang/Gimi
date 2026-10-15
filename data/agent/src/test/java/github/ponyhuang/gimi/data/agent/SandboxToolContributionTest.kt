@@ -3,6 +3,9 @@ package github.ponyhuang.gimi.data.agent
 import github.ponyhuang.gimi.data.agent.contribution.SandboxToolContribution
 import github.ponyhuang.gimi.data.agent.tools.sandbox.SandboxTools
 import github.ponyhuang.gimi.data.agent.tools.sandbox.SandboxEnvironment
+import github.ponyhuang.gimi.data.agent.tools.skills.InstallSkillFromSandboxTool
+import github.ponyhuang.gimi.data.agent.tools.skills.SandboxSkillInstaller
+import github.ponyhuang.gimi.domain.skills.usecase.InstallSkillArchiveUseCase
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.sandbox.SandboxConfiguration
 import github.ponyhuang.gimi.domain.sandbox.SandboxConnection
@@ -24,13 +27,24 @@ class SandboxToolContributionTest {
     private val settings = Settings()
     private val execution = mockk<SandboxExecutionRepository>()
     private val tools = SandboxTools(settings, execution)
-    private val contribution = SandboxToolContribution(tools, settings, SandboxEnvironment(execution))
+    private val installSkill = InstallSkillFromSandboxTool(SandboxSkillInstaller(settings, execution, InstallSkillArchiveUseCase(mockk())))
+    private val contribution = SandboxToolContribution(tools, settings, SandboxEnvironment(execution), installSkill)
     private fun spec(mode: ToolAccessMode) = AgentBuildSpec(toolAccessMode = mode, pluginRuntime = mockk())
+
+    @Test fun installationIsDiscoverableInBothAccessModes() = runTest {
+        val name = "install_skill_from_sandbox"
+        val always = contribution.toolsets(spec(ToolAccessMode.ALWAYS_AVAILABLE))
+            .flatMap { it.getTools(null) }.map { it.name }
+        val onDemand = contribution.candidateSources(spec(ToolAccessMode.ON_DEMAND))
+            .flatMap { it.loadEnabledTools(null) }.map { it.name }
+        assertTrue("Local skill installation must be available with sandbox tools", name in always)
+        assertTrue("Local skill installation must be searchable", name in onDemand)
+    }
 
     @Test fun allToolsModeDeclaresToolsetAndNoSearchCandidate() = runTest {
         assertEquals(2, contribution.toolsets(spec(ToolAccessMode.ALWAYS_AVAILABLE)).size)
         assertTrue(contribution.candidateSources(spec(ToolAccessMode.ALWAYS_AVAILABLE)).isEmpty())
-        assertEquals(10, contribution.toolCatalog(AgentToolCatalogContext(null)).single().tools.size)
+        assertEquals(11, contribution.toolCatalog(AgentToolCatalogContext(null)).single().tools.size)
     }
     @Test fun onDemandModeUsesSearchSourceAndRechecksItsAvailability() = runTest {
         val spec = spec(ToolAccessMode.ON_DEMAND)
@@ -38,7 +52,7 @@ class SandboxToolContributionTest {
         val sources = contribution.candidateSources(spec)
         val source = sources.first()
         assertEquals("sandbox:e2b", source.id)
-        assertEquals(6, source.loadEnabledTools(null).size)
+        assertEquals(7, source.loadEnabledTools(null).size)
         settings.setEnabled(false)
         assertTrue(source.loadEnabledTools(null).isEmpty())
         assertTrue(sources.last().loadEnabledTools(null).isEmpty())

@@ -20,6 +20,31 @@ import org.junit.Before
 import org.junit.Test
 
 class SdkSandboxGatewayTest {
+    @Test fun archiveReadsCanExceedDefaultAssetLimitWithoutChangingDefaultReads() = runBlocking {
+        val bytes = ByteArray(1024 * 1024 + 1) { 0xff.toByte() }
+        env.enqueue(MockResponse().setBody(Buffer().write(bytes)))
+        assertFailure(SandboxGatewayFailure.TOO_LARGE) { gateway.execute(SandboxOperation.ReadBytes("/skill.zip")) }
+        env.enqueue(MockResponse().setBody(Buffer().write(bytes)))
+        val output = gateway.execute(SandboxOperation.ReadBytes("/skill.zip", 20 * 1024 * 1024)) as SandboxOutput.ReadBytes
+        assertArrayEquals(bytes, output.content)
+    }
+
+    @Test fun archiveLimitRejectsOversizedChunkedResponseDuringRead() = runBlocking {
+        env.enqueue(MockResponse().setChunkedBody(Buffer().write(ByteArray(20 * 1024 * 1024 + 1)), 8192))
+        assertFailure(SandboxGatewayFailure.TOO_LARGE) {
+            gateway.execute(SandboxOperation.ReadBytes("/large.zip", 20 * 1024 * 1024))
+        }
+    }
+
+    @Test fun invalidBinaryReadBudgetsAreRejected() {
+        listOf(0, -1, 20 * 1024 * 1024 + 1).forEach { limit ->
+            try {
+                SandboxOperation.ReadBytes("/skill.zip", limit)
+                fail("Invalid transfer budget must be rejected")
+            } catch (_: IllegalArgumentException) { }
+        }
+    }
+
     @Test fun environmentReadsRawBytesWithoutUtf8Decoding() = runBlocking {
         val bytes = byteArrayOf(0, -1, 7)
         env.enqueue(MockResponse().setBody(Buffer().write(bytes)))

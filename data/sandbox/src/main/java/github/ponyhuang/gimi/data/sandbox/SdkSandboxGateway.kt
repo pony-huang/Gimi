@@ -78,7 +78,7 @@ internal class SdkSandboxGateway(private val connection: SandboxConnection, priv
                 resource.files.write(operation.path, operation.content)
                 SandboxOutput.WrittenFile(operation.path)
             }
-            is SandboxOperation.ReadBytes -> SandboxOutput.ReadBytes(operation.path, resource.files.readBytes(operation.path, MAX_FILE_BYTES))
+            is SandboxOperation.ReadBytes -> SandboxOutput.ReadBytes(operation.path, resource.files.readBytes(operation.path, operation.maxBytes))
             is SandboxOperation.BackgroundCommand -> {
                 // 收到 start/PID 后只关闭本地流，不 await、不 kill；远端进程由沙盒生命周期回收。
                 resource.commands.start(operation.command, CommandOptions(cwd = operation.cwd, envs = operation.envs, timeoutSeconds = operation.timeoutSeconds)).use { handle ->

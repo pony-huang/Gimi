@@ -7,6 +7,7 @@ import github.ponyhuang.gimi.data.agent.AgentToolCatalogContext
 import github.ponyhuang.gimi.data.agent.AgentToolCatalogEntry
 import github.ponyhuang.gimi.data.agent.tools.sandbox.SandboxTools
 import github.ponyhuang.gimi.data.agent.tools.sandbox.SandboxEnvironment
+import github.ponyhuang.gimi.data.agent.tools.skills.InstallSkillFromSandboxTool
 import com.google.adk.kt.tools.environment.EnvironmentToolset
 import com.google.adk.kt.annotations.ExperimentalEnvironmentApi
 import com.google.adk.kt.agents.ReadonlyContext
@@ -27,7 +28,13 @@ class SandboxToolContribution @Inject constructor(
     private val tools: SandboxTools,
     private val settings: SandboxSettingsRepository,
     environment: SandboxEnvironment,
+    private val installSkill: InstallSkillFromSandboxTool,
 ) : AgentContribution {
+    private val sandboxTools = object : Toolset {
+        override suspend fun getTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
+            if (settings.configuration.value.isReady) tools.getTools(readonlyContext) + installSkill else emptyList()
+        override fun close() = tools.close()
+    }
     private val environmentTools = object : Toolset {
         private val delegate = EnvironmentToolset(environment)
         override suspend fun getTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
@@ -39,11 +46,11 @@ class SandboxToolContribution @Inject constructor(
     override val id: String = "sandbox"
     override fun revision(): Any = settings.revision.value
     override fun toolsets(spec: AgentBuildSpec): List<Toolset> =
-        if (spec.toolAccessMode == ToolAccessMode.ALWAYS_AVAILABLE && settings.configuration.value.isReady) listOf(tools, environmentTools) else emptyList()
+        if (spec.toolAccessMode == ToolAccessMode.ALWAYS_AVAILABLE && settings.configuration.value.isReady) listOf(sandboxTools, environmentTools) else emptyList()
     override suspend fun candidateSources(spec: AgentBuildSpec): List<ToolCandidateSource> =
         if (spec.toolAccessMode == ToolAccessMode.ON_DEMAND && settings.configuration.value.isReady) {
-            listOf(ToolsetCandidateSource("sandbox:e2b", "E2B sandbox", tools), ToolsetCandidateSource("environment:e2b", "E2B environment", environmentTools))
+            listOf(ToolsetCandidateSource("sandbox:e2b", "E2B sandbox", sandboxTools), ToolsetCandidateSource("environment:e2b", "E2B environment", environmentTools))
         } else emptyList()
     override suspend fun toolCatalog(context: AgentToolCatalogContext): List<AgentToolCatalogEntry> =
-        if (settings.configuration.value.isReady) listOf(AgentToolCatalogEntry("sandbox:e2b", tools.getTools(null) + environmentTools.getTools(null))) else emptyList()
+        if (settings.configuration.value.isReady) listOf(AgentToolCatalogEntry("sandbox:e2b", sandboxTools.getTools(null) + environmentTools.getTools(null))) else emptyList()
 }

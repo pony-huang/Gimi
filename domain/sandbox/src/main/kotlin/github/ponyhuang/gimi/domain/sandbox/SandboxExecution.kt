@@ -36,8 +36,14 @@ sealed interface SandboxOperation {
     data class ReadFile(val path: String) : SandboxOperation
     /** 写入原始文件字节，供技能资产与环境工具使用，不经过 UTF-8 转换。 */
     data class WriteBytes(val path: String, val content: ByteArray) : SandboxOperation
-    /** 读取原始文件字节，不截断或转换文本。 */
-    data class ReadBytes(val path: String) : SandboxOperation
+    /**
+     * 读取原始文件字节，不截断或转换文本。
+     * @property path 远端沙箱文件路径。
+     * @property maxBytes 本次传输预算；默认 1 MiB，压缩包导入最多可使用 20 MiB。
+     */
+    data class ReadBytes(val path: String, val maxBytes: Int = 1024 * 1024) : SandboxOperation {
+        init { require(maxBytes in 1..20 * 1024 * 1024) }
+    }
     /** 列出目录的直接子项，path 缺省为当前目录。 */
     data class ListFiles(val path: String = ".") : SandboxOperation
 }

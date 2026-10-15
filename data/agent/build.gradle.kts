@@ -31,6 +31,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":domain:skills"))
     implementation(project(":domain:sandbox"))
     implementation(project(":domain:mobileuse"))
     implementation(project(":domain:recommendation"))

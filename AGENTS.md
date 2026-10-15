@@ -82,6 +82,9 @@ domain/data/core -X-> feature or app
 ### Preview-first UI design review
 
 - Any UI adjustment or UI iteration must begin with a preview design draft before implementation: a `@Preview @Composable`-based draft (using fake/fixture data, themable for light and dark) that renders the proposed layout, new states, and interaction entry points.
+- At the start of each UI task, ask whether the user wants rendered design images for remote review, unless they have already stated a preference for that task. Wait for the answer before choosing the image-delivery branch; draft preparation may continue meanwhile.
+- If requested, render the actual Compose draft, visually inspect the captures, and return viewable images in the conversation before asking for design approval. Include light/dark themes and the relevant changed states; keep image artifacts under `temp/`. Source files, file links, and compilation success alone do not fulfill image delivery. If rendering is unavailable, explain the specific blocker and agree on an alternative with the user.
+- If declined, skip image rendering and delivery and present the draft with a concise description. Declining images does not waive the design approval below unless the user explicitly says so.
 - Present the draft to the user for review; implementation work may start only after the user explicitly confirms the design. Do not skip this step for small visual tweaks unless the user says otherwise.
 - Keep the draft isolated from production wiring (no ViewModel/repository changes yet); once approved, merge it into the real screens, wire up state, and delete the draft file and any preview-only dependencies it required.
 

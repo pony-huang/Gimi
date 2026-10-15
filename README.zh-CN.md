@@ -6,7 +6,7 @@
 
 **Android AI 助手，对话、附件和配置保存在设备本地。**
 
-支持文本与语音交互、手机工具调用、后台静默操作，以及官方工具、APK 插件、MCP 和技能扩展。
+支持文本与语音交互、手机工具调用、后台静默操作，以及官方工具、APK 插件、MCP、技能和云端沙盒扩展。
 
 [![CI](https://github.com/pony-huang/Gimi/actions/workflows/ci.yml/badge.svg)](https://github.com/pony-huang/Gimi/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/pony-huang/Gimi)](https://github.com/pony-huang/Gimi/releases/latest)
@@ -20,7 +20,7 @@
 
 ## 功能概述
 
-配置自己的 API Key 后，可在对话中查询日程、设置闹钟、播放媒体、调节亮度、搜索和读取已授权文件，也可调用模型服务的官方工具、插件和远程 MCP 工具。完成 Shizuku 授权后，支持图片理解的模型还可在后台查看和操作其他应用。
+配置自己的 API Key 后，可在对话中查询日程、设置闹钟、播放媒体、调节亮度、搜索和读取已授权文件，也可调用模型服务的官方工具、插件和远程 MCP 工具。完成 Shizuku 授权后，支持图片理解的模型还可在后台查看和操作其他应用。配置 E2B API Key 后，还可在隔离的云端沙盒中执行命令和代码。
 
 ## 功能说明
 
@@ -28,9 +28,7 @@
 
 流式回复，支持拍照、相册发图，以及按模型能力添加文档或音频附件，也可接收其他应用分享的图片。图片和本地文件搜索结果可直接在对话中查看；思考内容、工具调用和返回结果按轮次分组展示，可展开查看。
 
-每个会话可单独选择模型、MCP 连接、官方工具和推理强度。工具加载方式（按需加载或全量加载）是全局设置，位于“设置 → 工具授权”页，新安装默认全量加载；权限模式（“请求批准”/“完全批准”）同样为全局开关，可在输入栏的“添加到聊天”面板里切换。Agent 需要补充信息时，会在输入栏中请求文字回复或让你从选项中选择。
-
-最新一轮因失败、中断或手动停止而未完成时，可编辑原消息或重试；若这一轮已调用工具，重新发送前会提醒你操作可能再次执行，已完成的操作不会撤销。
+每个会话可单独选择模型、MCP 连接、官方工具和推理强度。工具加载方式（按需加载或全量加载）是全局设置，位于“设置 → 工具授权”页，新安装默认全量加载；权限模式（“请求批准”/“完全批准”）同样为全局开关，可在输入栏的“添加到聊天”面板里切换。Agent 需要补充信息时，会在输入栏中请求文字回复或让你从选项中选择。输入栏会显示当前模型，点按后可从底部抽屉切换所有已启用服务下的模型。
 
 任务可在应用切到后台后继续运行。允许通知后，工具执行、需要批准或补充输入，以及任务完成时可收到通知；返回会话可继续查看回复和任务状态。
 
@@ -38,9 +36,9 @@
 
 ### 语音
 
-点按麦克风录音，停止后识别为输入栏中的文字，可编辑后发送。语音识别和语音合成模型分别在“设置 → 默认模型”配置；语音识别支持 MiniMax 和 MiMo（小米），并可选择回复朗读的音色，MiniMax 音色列表支持在线获取。
+点按麦克风录音；点击停止按钮会把转写结果写入输入栏，可编辑后发送，点击发送按钮则转写后直接发出。语音识别和语音合成模型分别在“设置 → 默认模型”配置；语音识别支持 MiniMax 和 MiMo（小米），并可选择回复朗读的音色，MiniMax 音色列表支持在线获取。
 
-可开启自动朗读完整回复，新安装默认关闭。语音输入与回复朗读均需要配置对应的在线模型。
+可自动朗读完整回复。
 
 ### 内置工具
 
@@ -58,19 +56,21 @@
 | **网页** | 联网搜索、打开链接          |
 | **设置** | 跳转系统设置页            |
 
-在“设置 → 工具授权”中开启“自定义工具”后，可逐项选择允许使用的本地工具；关闭时全部本地工具可用，具体操作仍受系统权限和权限模式约束。
+在“设置 → 工具授权”中开启“自定义工具”后，可逐项选择允许使用的本地工具；关闭时全部本地工具可用。
 
 ### 后台静默操作
 
-让 Agent 在后台查看和操作其他应用，不打断当前手机上的操作。支持打开应用、查看界面、按界面元素点击或填写文字、坐标点击、滑动、返回和等待；操作后会重新观察界面，过期的界面目标会被拒绝。
+让 Agent 在后台查看和操作其他应用，不打断当前手机上的操作。支持打开应用、查看界面、按界面元素点击或填写文字、坐标点击、滑动、返回和等待；操作后会重新观察界面。
 
-使用前需安装 Shizuku，以无线调试或 ADB 启动 ADB shell 模式服务，并在“设置 → 后台静默操作”授权 Gimi。当前不支持 Shizuku root 模式；所选对话模型需支持图片理解。Shizuku 运行时会自动提供相关工具，无需在本地工具列表中逐项开启。
+使用前需安装 Shizuku，以无线调试或 ADB 启动 ADB shell 模式服务，然后在“设置 → Shizuku”中开启后台操作并授权 Gimi。所选对话模型需支持图片理解；Shizuku 运行时会自动提供相关工具，无需在本地工具列表中逐项开启。
 
-文字输入和原生界面元素操作还需开启“Gimi”无障碍服务。设备和目标应用需支持后台独立运行，同一时间只支持一个后台操作任务；设置页可查看运行状态和授权情况。
+文字输入和原生界面元素操作还需开启“Gimi”无障碍服务；设置页可查看运行状态和授权情况。
+
+后台应用以小窗浮层显示，需在“设置 → 权限管理”开启“悬浮窗”权限。
 
 ### 官方工具
 
-在“设置 → API 接入”中配置并启用对应服务及其官方工具，再在会话的“官方工具”面板选择使用的能力。可用工具取决于服务、接口协议、模型和凭据配置。
+在“设置 → API 接入”中配置并启用对应服务及其官方工具，再在会话的“官方工具”面板选择使用的能力。
 
 | 服务 | 能力 |
 |------|------|
@@ -79,13 +79,21 @@
 | **智谱 GLM** | 联网搜索、网页读取 |
 | **Kimi** | Kimi 工具集（formulas） |
 
-厂商原生执行的联网搜索（Anthropic、MiniMax）由厂商远端完成检索，只在对应服务的 Anthropic 协议下提供；OpenAI 与小米 MiMo 的原生搜索需要 OpenAI 兼容通道下发厂商自己的工具声明，当前通道只能下发函数工具，因此暂不提供。MiniMax 图像生成可与其他服务的对话模型混用，使用 MiniMax 服务的凭据。
+厂商原生执行的联网搜索（Anthropic、MiniMax）由厂商远端完成检索，在对应服务的 Anthropic 协议下提供。MiniMax 图像生成可与其他服务的对话模型混用，使用 MiniMax 服务的凭据。
 
 ### MCP
 
-连接远程 MCP 服务器（SSE 或 Streamable HTTP），想加什么工具都行。手动新建，或者把文档里的 `mcpServers` JSON、甚至一条 curl 命令直接粘进来，Gimi 会帮你解析。可设置 Bearer Token 和自定义请求头，测试连接，并查看每个服务器暴露的工具、资源和提示词；可随时停用。
+连接远程 MCP 服务器（Streamable HTTP），想加什么工具都行。手动新建，或者把文档里的 `mcpServers` JSON、甚至一条 curl 命令直接粘进来，Gimi 会帮你解析。可设置 Bearer Token 和自定义请求头，测试连接，并查看每个服务器暴露的工具和资源；可随时停用。
 
 在 *设置 → MCP* 里点「导入」，把服务器文档中的 `mcpServers` JSON 或 curl 片段粘进去即可。
+
+### 云端沙盒
+
+在隔离的云端环境中执行命令和代码。在“设置 → 沙盒”中开启 E2B，填写域名和 API Key；密钥、环境变量和其余配置都使用 Android Keystore 加密保存在本机。模板默认 `code-interpreter-v1`，自定义模板需包含可访问的 Code Interpreter 才能执行代码；闲置超时默认 300 秒。
+
+每个会话拥有独立环境：同一会话跨轮保留文件、安装的依赖和各语言内核变量，不同会话相互隔离。命令和代码调用可传入单次环境变量和超时，命令还可指定工作目录；Agent 可运行 Python 或 JavaScript 并在有状态内核中保留变量、启动后台命令并获取进程 ID（传入端口时还会返回预览地址），也可读写和列出文本文件（上限 1 MiB）。环境在首次调用时创建，闲置超时或配置变更、关闭后销毁。
+
+详见 [E2B 文档](https://e2b.dev/docs)。
 
 ### 插件
 
@@ -99,27 +107,23 @@
 - **微博**：热搜、智搜摘要、授权账号微博，以及超话浏览、发帖、评论与回复（需配置 App ID 和 App Secret）
 - **小红书**：登录、浏览推荐与搜索、查看主页和笔记、评论与互动、通知，以及图文和视频发布
 
-**小红书说明**：插件直接通过设备上的 WebView 操作网页，不需要 MCP 服务器或中转地址，但目前稳定性有限。建议优先使用 MCP 服务器 [xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp)。
+**小红书说明**：插件直接通过设备上的 WebView 操作网页，不需要 MCP 服务器或中转地址。
 
 第三方也可以通过公开的插件 API 自行开发。
 
 ### 记忆
 
-默认使用设备本地记忆，在后续对话中保存和召回相关信息；也可在 *设置 → 记忆* 启用 Mem0 长期记忆。关闭记忆后不再保存或召回对话记忆；Mem0 Token 安全保存在设备上。
+默认使用设备本地记忆，在后续对话中保存和召回相关信息；也可在 *设置 → 记忆* 启用 Mem0 长期记忆；Mem0 Token 安全保存在设备上。
 
 ### 技能
 
-从链接或本地 ZIP 安装技能包。技能就是一份指引和资源，装好后需要用的时候助手会自动调用。(不支持脚本执行)
+在“设置 → Skills”中从链接或本地 ZIP 安装技能包。技能包含说明文档和配套资源；配置云端沙盒后，助手可在该会话的沙盒中运行技能脚本，也可以直接在沙盒里打包并安装技能。
 
 ### 文件夹与工作区
 
 “设置 → 文件夹”用于授权助手搜索本机文档目录，可随时撤销；共享图片、视频和音频的搜索使用对应系统权限。
 
-聊天中发送的附件统一保存在设备本地工作区，可在“设置 → 工作区”查看、打开和批量删除。删除会话不会自动删除这些附件，文件由用户自行管理。
-
-### 应用更新
-
-应用冷启动时会在后台检查 GitHub 更新，发现新版本后显示设置入口提示。也可在“设置 → 关于 → 检查更新”手动检查，查看更新内容并下载安装。
+聊天中发送的附件统一保存在设备本地工作区，可在“设置 → 缓存区”查看、打开和批量删除。
 
 ### 授权与数据
 
@@ -129,19 +133,19 @@
 - 权限管理页面说明每项权限的用途。
 - API Key 保存在设备本地，仅用于调用对应的已配置服务。
 
-## 模型服务
+## 模型
 
-自带 API Key。Gimi 内置以下服务商的预设，也兼容任何 OpenAI API 或 Anthropic API 端点。
+自带 API Key。Gimi 内置以下服务商的预设，也兼容任何 Chat Completions 或 Anthropic API 端点。
 
 | 服务商                                                                                              | 接口协议                |
 |-----------------------------------------------------------------------------------------------------|-------------------------|
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/openai.svg" width="16" alt="OpenAI" /> **OpenAI** | OpenAI API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/openai.svg" width="16" alt="OpenAI" /> **OpenAI** | Chat Completions |
 | <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/anthropic.svg" width="16" alt="Anthropic" /> **Anthropic** | Anthropic API |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/deepseek-color.svg" width="16" alt="DeepSeek" /> **DeepSeek** | OpenAI API / Anthropic API |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/kimi-color.svg" width="16" alt="Moonshot" /> **月之暗面 Kimi** | OpenAI API / Anthropic API |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/zhipu-color.svg" width="16" alt="GLM" /> **智谱 GLM** | OpenAI API / Anthropic API |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/minimax-color.svg" width="16" alt="MiniMax" /> **MiniMax** | OpenAI API / Anthropic API |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/xiaomimimo.svg" width="16" alt="MiMo" /> **小米 MiMo** | OpenAI API / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/deepseek-color.svg" width="16" alt="DeepSeek" /> **DeepSeek** | Chat Completions / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/kimi-color.svg" width="16" alt="Moonshot" /> **月之暗面 Kimi** | Chat Completions / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/zhipu-color.svg" width="16" alt="GLM" /> **智谱 GLM** | Chat Completions / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/minimax-color.svg" width="16" alt="MiniMax" /> **MiniMax** | Chat Completions / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/xiaomimimo.svg" width="16" alt="MiMo" /> **小米 MiMo** | Chat Completions / Anthropic API |
 
 可分别配置默认对话模型、快速模型（会话标题与任务推荐）、语音识别模型、语音合成模型及播放音色。附件、推理和工具调用能力以所选模型的支持范围为准。
 
@@ -155,12 +159,12 @@
 6. 可选：在 *设置 → 记忆* 配置本地或 Mem0 记忆，在 *设置 → 智能推荐* 管理空会话任务建议。
 7. 开始对话。
 
-可选扩展：添加 MCP 服务器、安装插件或技能、启用官方工具、授权文件夹，以及配置 Shizuku 后台静默操作。
+可选扩展：添加 MCP 服务器、安装插件或技能、启用官方工具、授权文件夹、配置 E2B 云端沙盒，以及配置 Shizuku 后台静默操作。
 
 ## 隐私
 
 Gimi 不收集任何数据：无统计埋点、无遥测、无账号，开发者也没有服务器。对话保存在你的设备上，
-网络请求用于已配置或启用的模型、语音、MCP、插件、Mem0 等服务，以及技能下载和 GitHub 更新。
+网络请求用于已配置或启用的模型、语音、MCP、插件、Mem0 等服务，以及技能下载、E2B 沙盒使用和 GitHub 更新。
 详见[隐私政策](PRIVACY.zh-CN.md) · [Privacy Policy](PRIVACY.md)。
 
 ## 参与贡献

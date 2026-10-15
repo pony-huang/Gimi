@@ -253,4 +253,4 @@ please describe the use case it addresses; discuss substantial feature or interf
 
 ## Development and release workflow
 
-[See the release guide](docs/releasing.md) for CI checks, automated changelogs, version PRs, signing setup, and release retries.
+[See the release guide](spec/en/releasing.md) for CI checks, automated changelogs, version PRs, signing setup, and release retries.

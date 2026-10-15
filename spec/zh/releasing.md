@@ -1,5 +1,7 @@
 # 开发、验证与发布
 
+[English](../en/releasing.md) · 简体中文
+
 ## 首次启用
 
 发布基线已按 GitHub 最新正式版校准为 `0.10.2`，同步记录在 `version.txt`、`.release-please-manifest.json` 和 `CHANGELOG.md`；旧代码中的 `0.6.x` 不再作为版本依据。`bootstrap-sha` 指向 v0.10.2 对应提交 `c53a311cfc95adc2553a610ccccf9e778c436f93`，在找不到历史 Release 时作为提交扫描起点。后续版本 PR 从已发布版本继续推进，不重新发布 v0.10.2。

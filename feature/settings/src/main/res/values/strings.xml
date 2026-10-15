@@ -87,5 +87,4 @@
     <string name="settings_group_assistant">助手偏好</string>
     <string name="settings_group_permissions">权限与设备</string>
     <string name="settings_group_about">关于</string>
-    <string name="settings_mobile_use_open">打开 Shizuku 设置</string>
 </resources>

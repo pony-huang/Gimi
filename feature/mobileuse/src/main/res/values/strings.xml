@@ -1,8 +1,10 @@
 <resources>
     <string name="mobile_use_title">Shizuku</string>
     <string name="mobile_use_intro">让 Agent 在后台操作其他应用，不打断你当前的操作。</string>
-    <string name="mobile_use_disabled_title">后台操作已关闭</string>
-    <string name="mobile_use_disabled_detail">请在设置页开启 Shizuku 后再管理授权。</string>
+    <string name="mobile_use_switch_section">后台操作</string>
+    <string name="mobile_use_switch_title">启用后台操作</string>
+    <string name="mobile_use_section_status">运行状态</string>
+    <string name="mobile_use_section_actions">操作</string>
     <string name="mobile_use_authorize">授权 Gimi</string>
     <string name="mobile_use_refresh">刷新状态</string>
     <string name="mobile_use_open_shizuku">打开 Shizuku</string>

@@ -7,7 +7,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 
@@ -32,8 +31,6 @@ fun SettingsRoute(
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-
     // 收集器随 ViewModel 保持稳定，但每次导航都使用最新的路由回调。
     val handleEffect by rememberUpdatedState<(SettingsEffect) -> Unit> { effect ->
         when (effect) {
@@ -65,7 +62,6 @@ fun SettingsRoute(
         modifier = modifier,
     ) { scaffoldModifier ->
         SettingsScreen(
-            state = state,
             appVersionName = appVersionName,
             onAction = viewModel::onAction,
             modifier = scaffoldModifier,

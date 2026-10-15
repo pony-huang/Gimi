@@ -26,6 +26,7 @@ fun MobileUseRoute(
     PreferenceScaffold(style = PreferenceStyle.Compact, title = stringResource(R.string.mobile_use_title), onBack = onBack) { modifier ->
         MobileUseScreen(
             state = state,
+            onEnabledChange = viewModel::setEnabled,
             onAuthorize = viewModel::requestPermission,
             onRefresh = viewModel::refresh,
             onOpenShizuku = {

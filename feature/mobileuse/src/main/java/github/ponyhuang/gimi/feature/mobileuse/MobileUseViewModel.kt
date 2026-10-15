@@ -9,9 +9,10 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** 仅暴露 Shizuku 当前状态，权限对话框由 Route 的用户操作触发。 */
+/** 暴露 Shizuku 开关与当前状态；权限对话框由 Route 的用户操作触发。 */
 @HiltViewModel
 class MobileUseViewModel @Inject constructor(
     private val repository: MobileUseRepository,
@@ -24,7 +25,21 @@ class MobileUseViewModel @Inject constructor(
     }
 
     fun refresh() {
-        mutableUiState.value = currentState()
+        // 保留进行中的保存标记：开关请求由 setEnabled 独占，refresh 只负责刷新仓库读数。
+        mutableUiState.update { currentState().copy(updating = it.updating) }
+    }
+
+    /** 保存开关；关闭时仓库释放后台任务，页面随即收起状态与操作区。 */
+    fun setEnabled(enabled: Boolean) {
+        if (mutableUiState.value.updating) return
+        mutableUiState.update { it.copy(updating = true) }
+        viewModelScope.launch {
+            try {
+                repository.setEnabled(enabled)
+            } finally {
+                mutableUiState.value = currentState()
+            }
+        }
     }
 
     fun requestPermission() {
@@ -39,6 +54,7 @@ class MobileUseViewModel @Inject constructor(
         return MobileUseUiState(
             availability = availability,
             textInputAvailable = availability != MobileUseAvailability.DISABLED && repository.textInputAvailable(),
+            enabled = repository.enabled.value,
         )
     }
 

@@ -1,8 +1,10 @@
 <resources>
     <string name="mobile_use_title">Shizuku</string>
-    <string name="mobile_use_disabled_title">Background app control is off</string>
-    <string name="mobile_use_disabled_detail">Enable Shizuku in Settings to manage permissions.</string>
     <string name="mobile_use_intro">Let the Agent use other apps without interrupting your current activity.</string>
+    <string name="mobile_use_switch_section">Background app control</string>
+    <string name="mobile_use_switch_title">Enable background app control</string>
+    <string name="mobile_use_section_status">Status</string>
+    <string name="mobile_use_section_actions">Actions</string>
     <string name="mobile_use_authorize">Authorize Gimi</string>
     <string name="mobile_use_refresh">Refresh status</string>
     <string name="mobile_use_open_shizuku">Open Shizuku</string>

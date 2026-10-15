@@ -28,7 +28,8 @@ import java.io.File
  *
  * 设计：
  * - `Message.id` = `Event.id`（不是新生成的 UUID），让 Compose LazyColumn 的 `key = message.id` 在重渲染时稳定。
- * - `TextPart.id` 由 `Event.id + ":" + partIndex` 派生；同一 Event 在 reducer 与 repository 路径下生成相同的 id。
+ * - `TextPart.id` 由 `Event.id + ":" + 消息内文本段序号` 派生；同一 Event 在 reducer 与 repository
+ *   路径下生成相同的 id，且同一消息内思考段与正文段必然不同 id（详见 [appendTextPart]）。
  * - 空内容 Event（无 text part、无 tool call/response、无 error）返回 `null`，调用方负责 filter — 与 `ChatViewModel.appendCompleteEvent` 的"空 Event 跳过"行为一致。
  */
 object EventMapper {
@@ -196,11 +197,11 @@ object EventMapper {
             author = event.author,
             timestamp = event.timestamp,
         )
-        parts.forEachIndexed { index, part ->
+        parts.forEach { part ->
             val text = part.text
             if (!text.isNullOrEmpty()) {
                 val thought = part.thought == true
-                working = appendTextPart(working, event, index, text, thought)
+                working = appendTextPart(working, event, text, thought)
             }
         }
         val callViews = calls.map { it.toView() }
@@ -220,12 +221,14 @@ object EventMapper {
     /**
      * 与 adk-web `addTextToParts` 等价：末段 `thought` 标志相同 → 追加；异则新建段。
      *
-     * `TextPart.id` 由 `Event.id + ":" + partIndex` 派生，确保 reducer 与 repository 共用映射。
+     * `TextPart.id` 由 `Event.id + ":" + 消息内文本段序号` 派生，确保 reducer 与 repository
+     * 共用同一映射：序号取 `message.textParts.size`（消息内文本段只增不减，序号唯一且稳定），
+     * 而不是事件内 part 下标 —— 流式增量事件共享同一个 `Event.id`，事件内下标无法区分
+     * 思考段与正文段。
      */
     private fun appendTextPart(
         message: Message,
         event: Event,
-        partIndex: Int,
         text: String,
         thought: Boolean,
     ): Message {
@@ -234,14 +237,14 @@ object EventMapper {
         if (last != null && last.thought == thought) {
             parts[parts.lastIndex] = last.copy(text = last.text + text)
         } else {
-            parts += textPartFor(event, partIndex, text, thought)
+            parts += textPartFor(event, parts.size, text, thought)
         }
         return message.copy(textParts = parts)
     }
 
-    private fun textPartFor(event: Event, partIndex: Int, text: String, thought: Boolean): TextPart =
+    private fun textPartFor(event: Event, partOrdinal: Int, text: String, thought: Boolean): TextPart =
         TextPart(
-            id = "${event.id}:$partIndex",
+            id = "${event.id}:$partOrdinal",
             text = text,
             thought = thought,
         )

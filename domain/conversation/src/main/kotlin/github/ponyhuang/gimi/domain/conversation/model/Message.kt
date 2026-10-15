@@ -169,6 +169,8 @@ data class FileAttachment(
  *
  * @param id 稳定 id；用于把 reducer 产生的文本 delta 路由到对应的渲染订阅者
  *           （`StreamingMarkdownState`）。同一段文本在 partial 合并中保持 id 不变。
+ *           同一消息内必须唯一：id 是 delta channel 的键，两段撞 id 会让两段文本的增量
+ *           汇入同一个订阅者（例如思考段被正文段吃掉）。
  * @param text 文本内容
  * @param thought 是否是思考段；与上一段 `thought` 不同时将开启新的分段
  */

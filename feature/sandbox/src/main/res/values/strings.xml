@@ -11,10 +11,6 @@
     <string name="sandbox_key_help">密钥加密保存在本机</string>
     <string name="sandbox_hide_key">隐藏 API Key</string>
     <string name="sandbox_show_key">显示 API Key</string>
-    <string name="sandbox_advanced">高级配置</string>
-    <string name="sandbox_advanced_description">模板、闲置超时和环境变量</string>
-    <string name="sandbox_expand_advanced">展开高级配置</string>
-    <string name="sandbox_collapse_advanced">收起高级配置</string>
     <string name="sandbox_template">模板</string>
     <string name="sandbox_template_help">选择模板或输入名称、ID；执行代码需支持代码解释器</string>
     <string name="sandbox_template_default">默认 · code-interpreter-v1</string>
@@ -57,4 +53,7 @@
     <string name="sandbox_new_environment">新环境变量</string>
     <string name="sandbox_expand_environment">展开环境变量</string>
     <string name="sandbox_collapse_environment">收起环境变量</string>
+    <string name="sandbox_documentation">E2B 文档</string>
+    <string name="sandbox_expand_configuration">展开配置</string>
+    <string name="sandbox_collapse_configuration">收起配置</string>
 </resources>

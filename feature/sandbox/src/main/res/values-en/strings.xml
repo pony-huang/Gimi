@@ -11,10 +11,6 @@
     <string name="sandbox_key_help">The key is encrypted on this device</string>
     <string name="sandbox_hide_key">Hide API Key</string>
     <string name="sandbox_show_key">Show API Key</string>
-    <string name="sandbox_advanced">Advanced configuration</string>
-    <string name="sandbox_advanced_description">Template, idle timeout and environment variables</string>
-    <string name="sandbox_expand_advanced">Expand advanced configuration</string>
-    <string name="sandbox_collapse_advanced">Collapse advanced configuration</string>
     <string name="sandbox_template">Template</string>
     <string name="sandbox_template_help">Select a template or enter a name or ID; code execution requires Code Interpreter</string>
     <string name="sandbox_template_default">Default · code-interpreter-v1</string>
@@ -57,4 +53,7 @@
     <string name="sandbox_new_environment">New environment variable</string>
     <string name="sandbox_expand_environment">Expand environment variable</string>
     <string name="sandbox_collapse_environment">Collapse environment variable</string>
+    <string name="sandbox_documentation">E2B documentation</string>
+    <string name="sandbox_expand_configuration">Expand configuration</string>
+    <string name="sandbox_collapse_configuration">Collapse configuration</string>
 </resources>

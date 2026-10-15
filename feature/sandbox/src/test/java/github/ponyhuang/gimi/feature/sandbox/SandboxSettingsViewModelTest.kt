@@ -144,14 +144,13 @@ class SandboxSettingsViewModelTest {
         assertEquals("saved", repository.configuration.value.connection.apiKey)
         assertFalse(viewModel.uiState.value.enabled)
     }
-    @Test fun invalidDomainKeyAndTimeoutAreNotSavedAndAdvancedErrorsExpand() = runTest {
+    @Test fun invalidDomainKeyAndTimeoutAreNotSaved() = runTest {
         val repository = Settings(); val viewModel = SandboxSettingsViewModel(repository, Templates())
         viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
         viewModel.onAction(SandboxSettingsAction.SetDomain("https://e2b.app"))
         viewModel.onAction(SandboxSettingsAction.SetIdleTimeout("0"))
         viewModel.onAction(SandboxSettingsAction.Save); runCurrent()
         assertTrue(viewModel.uiState.value.errors.containsAll(setOf(SandboxSettingField.DOMAIN, SandboxSettingField.API_KEY, SandboxSettingField.IDLE_TIMEOUT)))
-        assertTrue(viewModel.uiState.value.advancedExpanded)
         assertEquals(0, repository.saves)
     }
     @Test fun rejectsDuplicateAndBlankEnvironmentNamesBeforeMapping() = runTest {
@@ -243,13 +242,42 @@ class SandboxSettingsViewModelTest {
         assertFalse(viewModel.uiState.value.dirty)
         assertFalse(viewModel.uiState.value.environment.single().expanded)
     }
-    @Test fun keyVisibilityAndAdvancedDisplayDoNotPersistConnection() = runTest {
+    @Test fun keyVisibilityDoesNotPersistConnection() = runTest {
         val repository = Settings(); val viewModel = SandboxSettingsViewModel(repository, Templates())
-        viewModel.onAction(SandboxSettingsAction.ToggleAdvanced)
         viewModel.onAction(SandboxSettingsAction.ToggleKeyVisibility); runCurrent()
-        assertTrue(viewModel.uiState.value.advancedExpanded)
         assertTrue(viewModel.uiState.value.keyVisible)
         assertEquals(0, repository.saves)
         assertEquals(0L, repository.revision.value)
     }
+    @Test fun configurationCanExpandWhileDisabledWithoutPersistingSettings() = runTest {
+        val repository = Settings()
+        val viewModel = SandboxSettingsViewModel(repository, Templates()); runCurrent()
+        viewModel.onAction(SandboxSettingsAction.ToggleConfiguration)
+        assertTrue(viewModel.uiState.value.configurationExpanded)
+        assertFalse(viewModel.uiState.value.enabled)
+        assertFalse(viewModel.uiState.value.dirty)
+        assertEquals(0L, repository.revision.value)
+        viewModel.onAction(SandboxSettingsAction.ToggleConfiguration)
+        assertFalse(viewModel.uiState.value.configurationExpanded)
+        assertEquals(0, repository.saves)
+    }
+
+    @Test fun enablingAndDisablingPreservesIndependentConfigurationExpansion() = runTest {
+        val repository = Settings()
+        val viewModel = SandboxSettingsViewModel(repository, Templates()); runCurrent()
+        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
+        assertTrue(viewModel.uiState.value.enabled)
+        assertFalse(viewModel.uiState.value.configurationExpanded)
+        viewModel.onAction(SandboxSettingsAction.ToggleConfiguration)
+        viewModel.onAction(SandboxSettingsAction.SetEnabled(false)); runCurrent()
+        assertFalse(viewModel.uiState.value.enabled)
+        assertTrue(viewModel.uiState.value.configurationExpanded)
+        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
+        assertTrue(viewModel.uiState.value.configurationExpanded)
+        viewModel.onAction(SandboxSettingsAction.SetApiKey("key"))
+        viewModel.onAction(SandboxSettingsAction.Save); runCurrent()
+        assertEquals(1, repository.saves)
+        assertTrue(viewModel.uiState.value.configurationExpanded)
+    }
+
 }

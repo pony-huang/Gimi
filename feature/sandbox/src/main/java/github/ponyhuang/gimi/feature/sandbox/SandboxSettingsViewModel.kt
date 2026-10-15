@@ -77,9 +77,9 @@ class SandboxSettingsViewModel @Inject constructor(
                 state.copy(environment = state.environment.map { if (it.id == action.id) it.copy(expanded = !it.expanded) else it })
             }
             SandboxSettingsAction.AddEnvironment -> edit(SandboxSettingField.ENVIRONMENT) { state ->
-                state.copy(advancedExpanded = true, environment = state.environment + SandboxEnvironmentDraft(nextEnvironmentId++, expanded = true))
+                state.copy(environment = state.environment + SandboxEnvironmentDraft(nextEnvironmentId++, expanded = true))
             }
-            SandboxSettingsAction.ToggleAdvanced -> mutableState.update { it.copy(advancedExpanded = !it.advancedExpanded) }
+            SandboxSettingsAction.ToggleConfiguration -> mutableState.update { it.copy(configurationExpanded = !it.configurationExpanded) }
             SandboxSettingsAction.ToggleKeyVisibility -> mutableState.update { it.copy(keyVisible = !it.keyVisible) }
             SandboxSettingsAction.Save -> save()
         }
@@ -132,7 +132,7 @@ class SandboxSettingsViewModel @Inject constructor(
 
     private fun restore(configuration: SandboxConfiguration, state: SandboxSettingsUiState): SandboxSettingsUiState =
         fromConfiguration(configuration, state).copy(
-            advancedExpanded = state.advancedExpanded, keyVisible = state.keyVisible, busy = state.busy,
+            configurationExpanded = state.configurationExpanded, keyVisible = state.keyVisible, busy = state.busy,
             templates = if (sameCredentials(configuration.connection, state)) state.templates else emptyList(),
             templateLoadState = if (sameCredentials(configuration.connection, state)) state.templateLoadState else SandboxTemplateLoadState.IDLE,
         )
@@ -148,7 +148,7 @@ class SandboxSettingsViewModel @Inject constructor(
         val connection = SandboxConnection(state.domain.trim().lowercase(), state.apiKey.trim(), state.template.trim(), state.idleTimeoutSeconds.toIntOrNull() ?: 0,
             rows.associate { it.name.trim() to it.value })
         val errors = validateSandboxConnection(connection) + if (rows.any { it.nameError }) setOf(SandboxSettingField.ENVIRONMENT) else emptySet()
-        mutableState.update { it.copy(errors = errors, environment = rows, advancedExpanded = it.advancedExpanded || errors.any { field -> field in setOf(SandboxSettingField.TEMPLATE, SandboxSettingField.IDLE_TIMEOUT, SandboxSettingField.ENVIRONMENT) }) }
+        mutableState.update { it.copy(errors = errors, environment = rows) }
         if (errors.isNotEmpty()) return
         persist(connectionSaved = true) { repository.saveConnection(connection) }
     }

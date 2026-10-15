@@ -1,6 +1,6 @@
 <resources>
     <string name="settings_sandbox_title">Sandbox</string>
-    <string name="settings_sandbox_subtitle">Configure code execution</string>
+    <string name="settings_sandbox_subtitle">Configure the E2B sandbox execution environment</string>
     <string name="settings_title">Settings</string>
 
     <string name="settings_group_model">Models</string>
@@ -20,11 +20,11 @@
     <string name="settings_plugins_subtitle">Enable and manage dynamic plugins</string>
 
     <string name="settings_skills_title">Skills</string>
-    <string name="settings_skills_subtitle">Install reusable instructions and resources</string>
+    <string name="settings_skills_subtitle">Install Skills</string>
 
     <string name="settings_work_files_title">Folders</string>
     <string name="settings_work_files_subtitle">Allow access to local folders</string>
-    <string name="settings_workspace_title">Workspace</string>
+    <string name="settings_workspace_title">Cache</string>
     <string name="settings_workspace_subtitle">Manage chat attachments</string>
 
     <string name="settings_tool_authorization_title">Tool access</string>

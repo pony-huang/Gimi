@@ -4,6 +4,7 @@ import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -30,6 +31,7 @@ fun SandboxEntryProvider(destination: NavKey, onBack: () -> Unit): Boolean = whe
 private fun SandboxSettingsRoute(onBack: () -> Unit, viewModel: SandboxSettingsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
             val message = when (effect) { SandboxSettingsEffect.SAVED -> R.string.sandbox_saved; SandboxSettingsEffect.SAVE_FAILED -> R.string.sandbox_save_failed }
@@ -42,6 +44,11 @@ private fun SandboxSettingsRoute(onBack: () -> Unit, viewModel: SandboxSettingsV
         onBack = onBack,
         bottomBar = { SandboxSettingsSaveBar(state, viewModel::onAction) },
     ) { modifier ->
-        SandboxSettingsScreen(state, viewModel::onAction, modifier)
+        SandboxSettingsScreen(
+            state = state,
+            onAction = viewModel::onAction,
+            onOpenDocumentation = { uriHandler.openUri("https://github.com/e2b-dev/E2B") },
+            modifier = modifier,
+        )
     }
 }

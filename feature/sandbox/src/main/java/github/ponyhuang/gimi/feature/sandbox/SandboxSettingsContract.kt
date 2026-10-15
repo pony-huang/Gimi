@@ -21,6 +21,7 @@ data class SandboxEnvironmentDraft(
 /**
  * 沙盒页唯一展示状态；连接字段是草稿，开关和 configured 来自成功保存的设置。
  * @property idleTimeoutSeconds 秒数字符串，保留输入中的空值以提供校验反馈。
+ * @property configurationExpanded 配置区独立展开态，与 E2B 是否启用无关。
  * @property busy 正在提交设置，期间禁止修改连接字段或开关。
  * @property dirty 草稿是否存在未保存的修改。
  * @property errors 可定位到输入框的业务校验错误。
@@ -35,7 +36,7 @@ data class SandboxSettingsUiState(
     val template: String = "code-interpreter-v1",
     val idleTimeoutSeconds: String = "300",
     val environment: List<SandboxEnvironmentDraft> = emptyList(),
-    val advancedExpanded: Boolean = false,
+    val configurationExpanded: Boolean = false,
     val keyVisible: Boolean = false,
     val busy: Boolean = false,
     val dirty: Boolean = false,
@@ -74,8 +75,8 @@ sealed interface SandboxSettingsAction {
     data class ToggleEnvironment(val id: Long) : SandboxSettingsAction
     /** 添加允许空值的环境变量编辑行。 */
     data object AddEnvironment : SandboxSettingsAction
-    /** 展开或折叠高级配置。 */
-    data object ToggleAdvanced : SandboxSettingsAction
+    /** 展开或收起连接、运行配置和环境变量，不修改启用状态。 */
+    data object ToggleConfiguration : SandboxSettingsAction
     /** 切换密钥遮罩，仅影响展示。 */
     data object ToggleKeyVisibility : SandboxSettingsAction
     /** 校验并保存连接草稿。 */

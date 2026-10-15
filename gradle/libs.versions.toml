@@ -60,6 +60,7 @@ androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "
 androidx-room-testing = { module = "androidx.room:room-testing", version.ref = "room" }
 anthropic-java = { module = "com.anthropic:anthropic-java", version.ref = "anthropicJava" }
 google-adk-kotlin-core = { module = "com.google.adk:google-adk-kotlin-core", version.ref = "googleAdk" }
+google-adk-kotlin-integrations-openai = { module = "com.google.adk:google-adk-kotlin-integrations-openai", version.ref = "googleAdk" }
 google-adk-kotlin-processor = { module = "com.google.adk:google-adk-kotlin-processor", version.ref = "googleAdk" }
 google-adk-kotlin-webserver = { module = "com.google.adk:google-adk-kotlin-webserver", version.ref = "googleAdk" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }

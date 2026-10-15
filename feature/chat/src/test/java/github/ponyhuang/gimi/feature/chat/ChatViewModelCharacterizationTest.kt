@@ -2176,7 +2176,7 @@ class ChatViewModelCharacterizationTest {
         isEnabled = true,
         apiKey = "key",
         apiBaseUrl = "https://example.test",
-        apiProtocol = ApiProtocol.Standard,
+        apiProtocol = ApiProtocol.OpenaiChatcompletions,
         anthropicBaseUrl = "",
         groups = listOf(
             ModelGroup(

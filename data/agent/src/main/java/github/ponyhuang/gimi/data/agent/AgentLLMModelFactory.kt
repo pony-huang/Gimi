@@ -3,10 +3,10 @@ package github.ponyhuang.gimi.data.agent
 import com.anthropic.client.okhttp.AnthropicOkHttpClient
 import com.google.adk.kt.models.Gemini
 import com.google.adk.kt.models.Model
-import com.openai.client.okhttp.OpenAIOkHttpClient
+import com.google.adk.kt.models.openai.ChatCompletions
+import com.google.adk.kt.types.HttpOptions
 import github.ponyhuang.gimi.data.agent.execution.AttachmentResolvingModel
 import github.ponyhuang.gimi.data.agent.model.Claude
-import github.ponyhuang.gimi.data.agent.model.Openai
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
@@ -103,13 +103,11 @@ class AgentLLMModelFactory @Inject constructor(
 
     fun createModel(cfg: ModelConfig): Model = AttachmentResolvingModel(
         delegate = when (cfg.baseType) {
-            ApiProtocol.Standard -> Openai(
+            // OpenaiChatcompletions 完全采用官方后端的能力边界，不补思考流、非图片媒体或厂商原生工具。
+            ApiProtocol.OpenaiChatcompletions -> ChatCompletions(
                 name = cfg.modelId,
-                client = OpenAIOkHttpClient.builder()
-                    .baseUrl(cfg.fullBaseUrl)
-                    .apiKey(cfg.apiKey)
-                    .build(),
-                providerBuiltInToolNames = cfg.providerBuiltInToolNames(),
+                apiKey = cfg.apiKey,
+                httpOptions = HttpOptions(baseUrl = cfg.fullBaseUrl),
             )
 
             ApiProtocol.Anthropic -> Claude(
@@ -152,19 +150,19 @@ class AgentLLMModelFactory @Inject constructor(
 
     /** 格式化推荐只走快速模型所属服务的 OpenAI 兼容端点，不沿用聊天协议。 */
     fun forRecommendationJson(config: ModelConfig): ModelConfig {
-        if (config.baseType == ApiProtocol.Standard) {
+        if (config.baseType == ApiProtocol.OpenaiChatcompletions) {
             return config
         }
         val service = modelServices.currentServices()
             .firstOrNull { it.id == config.serviceId }
-        check(service != null && ApiProtocol.Standard in service.supportedProtocols) {
+        check(service != null && ApiProtocol.OpenaiChatcompletions in service.supportedProtocols) {
             "The fast model service does not support OpenAI-compatible JSON output."
         }
-        val standardBaseUrl = service.openAiCompatibleBaseUrl
-        check(standardBaseUrl.isNotBlank()) {
+        val chatCompletionsBaseUrl = service.openAiCompatibleBaseUrl
+        check(chatCompletionsBaseUrl.isNotBlank()) {
             "The fast model service has no OpenAI-compatible base URL."
         }
-        return config.copy(baseType = ApiProtocol.Standard, fullBaseUrl = standardBaseUrl)
+        return config.copy(baseType = ApiProtocol.OpenaiChatcompletions, fullBaseUrl = chatCompletionsBaseUrl)
     }
 
     private fun ResolvedAgentModel.toModelConfig(): ModelConfig = ModelConfig(

@@ -49,7 +49,7 @@ private data class ModelServiceSettings(
     val isOfficialToolsEnabled: Boolean = isEnabled,
     val apiKey: String = "",
     val apiBaseUrl: String = "",
-    val baseType: ApiBaseType = ApiBaseType.Standard,
+    val baseType: ApiBaseType = ApiBaseType.OpenaiChatcompletions,
     val anthropicBaseUrl: String = "",
     val disabledOfficialTools: Set<String> = emptySet(),
 )
@@ -203,7 +203,7 @@ class ModelServiceRepository @Inject constructor(
     override fun updateBaseUrl(serviceId: String, value: String) {
         updateService(serviceId) { provider ->
             when (provider.baseType) {
-                ApiBaseType.Standard -> provider.copy(apiBaseUrl = value)
+                ApiBaseType.OpenaiChatcompletions -> provider.copy(apiBaseUrl = value)
                 ApiBaseType.Anthropic -> provider.copy(anthropicBaseUrl = value)
                 // Gemini 不暴露地址编辑；即使写入也只影响测试 / 刷新用的兼容端点。
                 ApiBaseType.Gemini -> provider.copy(apiBaseUrl = value)
@@ -439,7 +439,7 @@ class ModelServiceRepository @Inject constructor(
                 isOfficialToolsEnabled = false,
                 apiKey = "",
                 apiBaseUrl = "",
-                baseType = ApiBaseType.Standard,
+                baseType = ApiBaseType.OpenaiChatcompletions,
                 anthropicBaseUrl = "",
             )
         // 接口标准白名单是静态元数据，按 serviceId 从默认清单回填；

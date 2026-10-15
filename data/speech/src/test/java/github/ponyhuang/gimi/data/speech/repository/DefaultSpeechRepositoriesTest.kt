@@ -103,7 +103,7 @@ class DefaultSpeechRepositoriesTest {
         isEnabled = true,
         apiKey = apiKey,
         apiBaseUrl = "https://example.test/v1/",
-        apiProtocol = ApiProtocol.Standard,
+        apiProtocol = ApiProtocol.OpenaiChatcompletions,
         anthropicBaseUrl = "",
         groups = listOf(
             ModelGroup(

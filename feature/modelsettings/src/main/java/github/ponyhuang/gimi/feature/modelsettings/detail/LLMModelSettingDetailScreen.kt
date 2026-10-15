@@ -153,7 +153,7 @@ private fun LLMModelSettingDetailScreenPreview() {
             isEnabled = true,
             apiKey = "sk-test",
             apiBaseUrl = "https://api.openai.com/v1",
-            apiProtocol = ApiProtocol.Standard,
+            apiProtocol = ApiProtocol.OpenaiChatcompletions,
             anthropicBaseUrl = "https://api.anthropic.com",
             groups = listOf(
                 ModelGroup(

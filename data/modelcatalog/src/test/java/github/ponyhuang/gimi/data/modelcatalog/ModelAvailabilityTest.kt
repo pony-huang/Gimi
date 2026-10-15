@@ -21,8 +21,8 @@ class ModelAvailabilityTest {
 
         val openAi = providers.getValue(LLMModelType.OpenAI.serviceId)
         assertFalse(openAi.isEnabled)
-        assertEquals(listOf(ApiBaseType.Standard), openAi.supportedBaseTypes)
-        assertEquals(ApiBaseType.Standard, openAi.baseType)
+        assertEquals(listOf(ApiBaseType.OpenaiChatcompletions), openAi.supportedBaseTypes)
+        assertEquals(ApiBaseType.OpenaiChatcompletions, openAi.baseType)
 
         val anthropic = providers.getValue(LLMModelType.Anthropic.serviceId)
         assertFalse(anthropic.isEnabled)
@@ -31,7 +31,7 @@ class ModelAvailabilityTest {
 
         val kimi = providers.getValue(LLMModelType.Moonshot.serviceId)
         assertFalse(kimi.isEnabled)
-        assertTrue(ApiBaseType.Standard in kimi.supportedBaseTypes)
+        assertTrue(ApiBaseType.OpenaiChatcompletions in kimi.supportedBaseTypes)
         assertTrue(ApiBaseType.Anthropic in kimi.supportedBaseTypes)
     }
 

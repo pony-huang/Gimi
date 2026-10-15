@@ -34,11 +34,11 @@ fun ApiBaseUrlSection(
     enabled: Boolean = true,
 ) {
     val allOptions = listOf(
-        ApiProtocol.Standard to stringResource(R.string.modelsettings_api_protocol_standard),
+        ApiProtocol.OpenaiChatcompletions to stringResource(R.string.modelsettings_api_protocol_standard),
         ApiProtocol.Anthropic to stringResource(R.string.modelsettings_api_protocol_anthropic),
         ApiProtocol.Gemini to stringResource(R.string.modelsettings_api_protocol_gemini),
     )
-    // 单协议厂商（OpenAI 仅 Standard、Anthropic 仅 Anthropic、Gemini 仅 Gemini）只展示其支持的接口标准。
+    // 单协议厂商（OpenAI 仅 OpenaiChatcompletions、Anthropic 仅 Anthropic、Gemini 仅 Gemini）只展示其支持的接口标准。
     val options = allOptions.filter { it.first in service.supportedProtocols }
     val currentLabel = options.firstOrNull { it.first == service.apiProtocol }?.second
         ?: options.first().second
@@ -114,7 +114,7 @@ private fun ApiBaseUrlSectionPreview() {
                 isEnabled = true,
                 apiKey = "sk-test",
                 apiBaseUrl = "https://api.openai.com/v1",
-                apiProtocol = ApiProtocol.Standard,
+                apiProtocol = ApiProtocol.OpenaiChatcompletions,
                 anthropicBaseUrl = "https://api.anthropic.com",
                 groups = emptyList(),
             ),

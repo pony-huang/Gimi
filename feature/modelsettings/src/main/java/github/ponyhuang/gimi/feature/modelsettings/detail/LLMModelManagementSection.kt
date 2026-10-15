@@ -240,7 +240,7 @@ private fun LLMModelManagementSectionPreview() {
             isEnabled = true,
             apiKey = "sk-test",
             apiBaseUrl = "https://api.openai.com/v1",
-            apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Standard,
+            apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.OpenaiChatcompletions,
             anthropicBaseUrl = "https://api.anthropic.com",
             groups = listOf(
                 github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup(
@@ -285,7 +285,7 @@ private fun LLMModelManagementSectionAddDialogPreview() {
                 isEnabled = true,
                 apiKey = "sk-test",
                 apiBaseUrl = "https://api.openai.com/v1",
-                apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Standard,
+                apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.OpenaiChatcompletions,
                 anthropicBaseUrl = "https://api.anthropic.com",
                 groups = emptyList(),
             ),

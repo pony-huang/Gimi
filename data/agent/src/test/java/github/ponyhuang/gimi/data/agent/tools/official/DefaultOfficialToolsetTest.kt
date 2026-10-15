@@ -70,7 +70,7 @@ class DefaultOfficialToolsetTest {
         }
         for (serviceId in listOf("openai", "mimo")) {
             val tools = toolset.resolveTools(
-                config(serviceId = serviceId, baseType = ApiProtocol.Standard),
+                config(serviceId = serviceId, baseType = ApiProtocol.OpenaiChatcompletions),
                 selection = null,
             )
             assertTrue("service: $serviceId", tools.any { it.name == "web_search" })
@@ -91,7 +91,7 @@ class DefaultOfficialToolsetTest {
     @Test
     fun resolvesEnabledMinimaxImageGenerationForAnotherChatModel() = runTest {
         val tools = toolset().resolveTools(
-            config(serviceId = "openai", baseType = ApiProtocol.Standard),
+            config(serviceId = "openai", baseType = ApiProtocol.OpenaiChatcompletions),
             selection = null,
         )
 
@@ -102,7 +102,7 @@ class DefaultOfficialToolsetTest {
     @Test
     fun doesNotMixMinimaxRemoteWebSearchIntoAnotherChatModel() = runTest {
         val tools = toolset().resolveTools(
-            config(serviceId = "openai", baseType = ApiProtocol.Standard),
+            config(serviceId = "openai", baseType = ApiProtocol.OpenaiChatcompletions),
             selection = null,
         )
 
@@ -116,7 +116,7 @@ class DefaultOfficialToolsetTest {
         val factory = OfficialToolFactory(testKimiFormulaCache(), testHttpClient(), modelServices)
 
         val tools = DefaultOfficialToolset(catalog, factory, FakeToolAccessRepository()).resolveTools(
-            config(serviceId = "openai", baseType = ApiProtocol.Standard),
+            config(serviceId = "openai", baseType = ApiProtocol.OpenaiChatcompletions),
             selection = null,
         )
 
@@ -152,7 +152,7 @@ class DefaultOfficialToolsetTest {
     fun ignoresGeminiServiceUsingNonGeminiProtocol() = runTest {
         assertTrue(
             toolset()
-                .resolveTools(config(serviceId = "gemini", baseType = ApiProtocol.Standard), null)
+                .resolveTools(config(serviceId = "gemini", baseType = ApiProtocol.OpenaiChatcompletions), null)
                 .none { it is GoogleSearchTool || it is UrlContextTool || it is GoogleMapsTool },
         )
     }
@@ -417,7 +417,7 @@ class DefaultOfficialToolsetTest {
                 every { isEnabled } returns true
                 every { isOfficialToolsEnabled } returns officialToolsEnabled
                 every { apiKey } returns credential
-                every { apiProtocol } returns ApiProtocol.Standard
+                every { apiProtocol } returns ApiProtocol.OpenaiChatcompletions
                 every { activeApiBaseUrl } returns "https://example.com"
             }
         }
@@ -431,7 +431,7 @@ class DefaultOfficialToolsetTest {
 
     private fun config(
         serviceId: String,
-        baseType: ApiProtocol = ApiProtocol.Standard,
+        baseType: ApiProtocol = ApiProtocol.OpenaiChatcompletions,
         modelId: String = "model",
     ) = ModelRuntimeMetadata(
         serviceId = serviceId,

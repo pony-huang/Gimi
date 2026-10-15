@@ -52,7 +52,7 @@ dependencies {
     implementation(libs.google.adk.kotlin.core) {
         exclude(group = "io.modelcontextprotocol.sdk")
     }
-    implementation(libs.openai.java)
+    implementation(libs.google.adk.kotlin.integrations.openai)
     implementation(libs.okhttp)
     implementation(libs.objectbox.android)
     implementation(libs.objectbox.kotlin)

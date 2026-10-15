@@ -281,7 +281,7 @@ class AgentFactoryToolAccessTest {
 
     private fun modelConfig() = ModelConfig(
         serviceId = SERVICE_ID,
-        baseType = ApiProtocol.Standard,
+        baseType = ApiProtocol.OpenaiChatcompletions,
         modelId = "model",
         apiKey = "key",
         fullBaseUrl = "https://example.com",
@@ -297,7 +297,7 @@ class AgentFactoryToolAccessTest {
             OfficialToolSpec(
                 toolId = "kimi_formulas",
                 serviceId = "kimi",
-                protocols = setOf(ApiProtocol.Standard),
+                protocols = setOf(ApiProtocol.OpenaiChatcompletions),
                 displayName = "Kimi formulas",
                 searchCandidate = true,
                 binding = OfficialToolBinding.ProviderDeclaration(wireName = "formula_tool"),

@@ -1,10 +1,25 @@
 package github.ponyhuang.gimi.data.modelcatalog
 
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ModelCatalogMappersTest {
+    @Test
+    fun chatCompletionsProtocolRoundTripsThroughStorageAndDomain() {
+        val provider = LLMModelConfigs.services.single { it.serviceId == "openai" }
+
+        val encoded = modelCatalogJson.encodeToString(ApiBaseType.serializer(), provider.baseType)
+        assertEquals("\"OpenaiChatcompletions\"", encoded)
+        val restored = modelCatalogJson.decodeFromString(ApiBaseType.serializer(), encoded)
+        val domain = provider.copy(baseType = restored).toDomain()
+
+        assertEquals("OpenaiChatcompletions", domain.apiProtocol.name)
+        assertEquals(restored, domain.apiProtocol.toData())
+        assertEquals(provider.apiBaseUrl, domain.activeApiBaseUrl)
+    }
+
     @Test
     fun legacyChatModelWithoutCapabilitiesIsExposedAsMultimodal() {
         val provider = LLMModelProvider(

@@ -9,7 +9,7 @@ class OfficialToolSupport @Inject constructor() {
         OfficialToolSpec(
             toolId = OfficialToolIds.OPENAI_WEB_SEARCH,
             serviceId = "openai",
-            protocols = setOf(ApiProtocol.Standard),
+            protocols = setOf(ApiProtocol.OpenaiChatcompletions),
             displayName = "OpenAI web search",
             staticFunctionIds = listOf(OfficialToolIds.OPENAI_WEB_SEARCH),
             binding = OfficialToolBinding.ProviderDeclaration(wireName = "web_search"),
@@ -33,7 +33,7 @@ class OfficialToolSupport @Inject constructor() {
         OfficialToolSpec(
             toolId = OfficialToolIds.MINIMAX_IMAGE_GENERATION,
             serviceId = "minimax",
-            protocols = setOf(ApiProtocol.Standard, ApiProtocol.Anthropic),
+            protocols = setOf(ApiProtocol.OpenaiChatcompletions, ApiProtocol.Anthropic),
             displayName = "MiniMax image generation",
             staticFunctionIds = listOf(
                 OfficialToolIds.MINIMAX_TEXT_TO_IMAGE,
@@ -46,7 +46,7 @@ class OfficialToolSupport @Inject constructor() {
         OfficialToolSpec(
             toolId = OfficialToolIds.MIMO_WEB_SEARCH,
             serviceId = "mimo",
-            protocols = setOf(ApiProtocol.Standard),
+            protocols = setOf(ApiProtocol.OpenaiChatcompletions),
             displayName = "MiMo web search",
             staticFunctionIds = listOf(OfficialToolIds.MIMO_WEB_SEARCH),
             binding = OfficialToolBinding.ProviderDeclaration(wireName = "web_search"),
@@ -78,7 +78,7 @@ class OfficialToolSupport @Inject constructor() {
         OfficialToolSpec(
             toolId = OfficialToolIds.GLM_WEB_SEARCH,
             serviceId = "glm",
-            protocols = setOf(ApiProtocol.Standard, ApiProtocol.Anthropic),
+            protocols = setOf(ApiProtocol.OpenaiChatcompletions, ApiProtocol.Anthropic),
             modelFamilies = setOf("glm"),
             displayName = "GLM web tools",
             staticFunctionIds = listOf(OfficialToolIds.GLM_WEB_SEARCH_FUNCTION, OfficialToolIds.GLM_WEB_READER_FUNCTION),
@@ -87,7 +87,7 @@ class OfficialToolSupport @Inject constructor() {
         OfficialToolSpec(
             toolId = OfficialToolIds.KIMI_FORMULAS,
             serviceId = "kimi",
-            protocols = setOf(ApiProtocol.Standard, ApiProtocol.Anthropic),
+            protocols = setOf(ApiProtocol.OpenaiChatcompletions, ApiProtocol.Anthropic),
             modelFamilies = setOf("kimi", "moonshot"),
             displayName = "Kimi formulas",
             staticFunctionIds = emptyList(),

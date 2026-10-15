@@ -82,7 +82,7 @@ class OpenAiCompatibleLLMModelSettingGatewayTest {
         isEnabled = true,
         apiKey = " secret ",
         apiBaseUrl = server.url("/").toString(),
-        apiProtocol = ApiProtocol.Standard,
+        apiProtocol = ApiProtocol.OpenaiChatcompletions,
         anthropicBaseUrl = server.url("/anthropic").toString(),
         groups = emptyList(),
     )

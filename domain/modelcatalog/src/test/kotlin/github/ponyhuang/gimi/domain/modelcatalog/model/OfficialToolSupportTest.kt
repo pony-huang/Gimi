@@ -14,10 +14,10 @@ class OfficialToolSupportTest {
         for (modelId in listOf("GLM", "models/GLM-4.6", "glm_4", "glm.4")) {
             assertEquals(
                 listOf(OfficialToolIds.GLM_WEB_SEARCH),
-                support.specsFor("glm", ApiProtocol.Standard, modelId).map { it.toolId },
+                support.specsFor("glm", ApiProtocol.OpenaiChatcompletions, modelId).map { it.toolId },
             )
         }
-        assertTrue(support.specsFor("glm", ApiProtocol.Standard, "glmatrix").isEmpty())
+        assertTrue(support.specsFor("glm", ApiProtocol.OpenaiChatcompletions, "glmatrix").isEmpty())
     }
 
     @Test
@@ -55,12 +55,12 @@ class OfficialToolSupportTest {
     }
 
     private fun available(services: List<LLMModelSetting>) = support.availableSpecsFor(
-        "openai", ApiProtocol.Standard, "gpt-5.2", services,
+        "openai", ApiProtocol.OpenaiChatcompletions, "gpt-5.2", services,
     )
 
     private fun service(id: String) = LLMModelSetting(
         id = id, name = id, isEnabled = true, apiKey = "key",
-        apiBaseUrl = "https://example.com", apiProtocol = ApiProtocol.Standard,
+        apiBaseUrl = "https://example.com", apiProtocol = ApiProtocol.OpenaiChatcompletions,
         anthropicBaseUrl = "https://example.com", groups = emptyList(),
     )
 }

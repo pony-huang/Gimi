@@ -146,7 +146,7 @@ class DefaultModelSettingsViewModelCharacterizationTest {
         isEnabled = true,
         apiKey = "key",
         apiBaseUrl = "https://example.com",
-        apiProtocol = ApiProtocol.Standard,
+        apiProtocol = ApiProtocol.OpenaiChatcompletions,
         anthropicBaseUrl = "https://example.com/anthropic",
         groups = listOf(
             ModelGroup(

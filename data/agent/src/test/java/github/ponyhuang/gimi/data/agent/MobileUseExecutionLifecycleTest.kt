@@ -27,7 +27,7 @@ class MobileUseExecutionLifecycleTest {
         val runner = mockk<InMemoryRunner>()
         coEvery { runner.runAsync(any(), any(), any(), any(), any(), any()) } returns events
         val metadata = ToolRunMetadata.of(
-            ModelRuntimeMetadata("service", ApiProtocol.Standard, "vision", "https://example.com", true),
+            ModelRuntimeMetadata("service", ApiProtocol.OpenaiChatcompletions, "vision", "https://example.com", true),
             null, true, mobileUseOwner = "turn",
         )
         return AgentChatExecution("user", "chat", runner, metadata, repository)

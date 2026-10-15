@@ -17,7 +17,6 @@ import com.google.adk.kt.types.ThinkingLevel
 import com.google.adk.kt.types.Tool
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
-import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import io.mockk.mockk
 import java.io.File
@@ -51,7 +50,6 @@ class ChatCompletionsIntegrationTest {
     private lateinit var server: MockWebServer
     private val factory = AgentLLMModelFactory(
         mockk<AgentModelConfigurationSource>(),
-        mockk<OfficialToolFunctionCatalog>(relaxed = true),
     )
 
     @Before

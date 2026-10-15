@@ -9,7 +9,6 @@ import github.ponyhuang.gimi.data.agent.execution.AttachmentResolvingModel
 import github.ponyhuang.gimi.data.agent.model.Claude
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedAgentModel
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import javax.inject.Inject
@@ -66,7 +65,6 @@ internal fun ModelConfig.toRuntimeMetadata(): ModelRuntimeMetadata = ModelRuntim
 @Singleton
 class AgentLLMModelFactory @Inject constructor(
     private val modelServices: AgentModelConfigurationSource,
-    private val officialToolCatalog: OfficialToolFunctionCatalog,
 ) {
     /**
      * 从 [AgentModelConfigurationSource] 选当前模型配置。
@@ -116,7 +114,6 @@ class AgentLLMModelFactory @Inject constructor(
                     .baseUrl(cfg.fullBaseUrl)
                     .apiKey(cfg.apiKey)
                     .build(),
-                providerBuiltInToolNames = cfg.providerBuiltInToolNames(),
             )
 
             // ADK 原生 Gemini：只需 API Key，端点固定为 Google 默认地址。
@@ -126,21 +123,6 @@ class AgentLLMModelFactory @Inject constructor(
             )
         },
     )
-
-    /**
-     * 当前服务以厂商原生形态执行的官方内置工具名。
-     *
-     * 与官方工具目录的服务/协议/模型家族门控保持一致:仅目录中声明为
-     * [github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolBinding.ProviderDeclaration]
-     * 的工具由厂商远端执行;其余同名声明(GLM 本地搜索、Kimi 公式、MCP 工具)
-     * 都是可执行函数,不得转换。
-     */
-    private fun ModelConfig.providerBuiltInToolNames(): Set<String> =
-        officialToolCatalog.providerDeclaredWireNames(
-            serviceId = serviceId,
-            protocol = baseType,
-            modelId = modelId,
-        )
 
     fun selectFastModelConfig(): ModelConfig? {
         val resolved = modelServices.resolveChatModel(modelServices.fastSelection.value)

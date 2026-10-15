@@ -14,21 +14,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeBlock
 import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeFence
 import com.mikepenz.markdown.m3.Markdown
-import com.mikepenz.markdown.m3.markdownTypography
 import com.mikepenz.markdown.model.rememberStreamingMarkdownState
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
+import github.ponyhuang.gimi.ui.theme.markdownContentTypography
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.ReceiveChannel
 
@@ -181,7 +177,7 @@ private fun ChatTextContentBody(
                 imageTransformer = Coil3ImageTransformerImpl,
                 components = components,
                 modifier = markdownModifier,
-                typography = chatContentMarkdownTypography(),
+                typography = markdownContentTypography(),
             )
         } else {
             Markdown(
@@ -189,38 +185,11 @@ private fun ChatTextContentBody(
                 imageTransformer = Coil3ImageTransformerImpl,
                 components = components,
                 modifier = markdownModifier,
-                typography = chatContentMarkdownTypography(),
+                typography = markdownContentTypography(),
             )
         }
     }
 }
-
-/**
- * 聊天气泡内的 markdown 排版 —— 相比 MaterialTheme 默认值整体收敛一档，
- * 让长 markdown 在手机端更易读，不与全局 bodyLarge 冲突。
- *
- * 默认值（m3-markdown 提供）：
- *   text  = bodyLarge  (16sp)  →  14sp
- *   h1    = displayLarge(57sp)  →  22sp
- *   h2    = displayMedium(45sp) →  20sp
- *   h3    = displaySmall(36sp)  →  18sp
- *   h4    = headlineMedium(28sp)→  16sp
- *   h5    = headlineSmall(24sp) →  15sp
- *   h6    = titleLarge(22sp)    →  14sp
- *   code  = bodyMedium Monospace →  13sp
- */
-@Composable
-private fun chatContentMarkdownTypography() = markdownTypography(
-    h1 = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold),
-    h2 = TextStyle(fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold),
-    h3 = TextStyle(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
-    h4 = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold),
-    h5 = TextStyle(fontSize = 15.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold),
-    h6 = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold),
-    text = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Normal),
-    paragraph = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
-    code = TextStyle(fontSize = 13.sp, lineHeight = 20.sp, fontFamily = FontFamily.Monospace),
-)
 
 @Preview
 @Composable

@@ -399,9 +399,9 @@ public fun ChatComposer(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("chat_composer_surface"),
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(24.dp),
             color = chatCapsuleColor(),
-            shadowElevation = 3.dp,
+            shadowElevation = 1.dp,
             tonalElevation = 0.dp,
         ) {
             if (recordingState != null) {

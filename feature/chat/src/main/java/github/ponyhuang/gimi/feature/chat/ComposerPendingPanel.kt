@@ -251,9 +251,9 @@ private fun PendingPanelContainer(
         Surface(
             modifier = Modifier
                 .fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(24.dp),
             // 与胶囊同为中性容器色：面板是输入栏的替身，不能比胶囊更“重”。
-            color = MaterialTheme.colorScheme.surfaceContainer,
+            color = chatCapsuleColor(),
             tonalElevation = 0.dp,
         ) {
             Column(

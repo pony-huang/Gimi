@@ -574,7 +574,7 @@ private fun DefaultComposerInputContentTranscribingPreview() {
 private fun TranscribingAndSendingContentPreview() {
     AsssistantaiTheme {
         androidx.compose.material3.Surface(
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
             color = chatCapsuleColor(),
         ) {
             TranscribingContent(VoiceInputMode.SEND)

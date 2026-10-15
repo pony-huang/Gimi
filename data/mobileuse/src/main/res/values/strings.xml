@@ -1,4 +1,4 @@
 <resources>
-    <string name="mobile_text_accessibility_label">Gimi 文字输入</string>
+    <string name="mobile_text_accessibility_label">Gimi</string>
     <string name="mobile_text_accessibility_description">为后台应用填写文字。</string>
 </resources>

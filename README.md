@@ -93,8 +93,8 @@ Gimi in *Settings → Background app control*. Shizuku root mode is currently un
 model must support image understanding. Relevant tools are provided automatically while Shizuku is
 running and do not need to be enabled individually in the local tool list.
 
-Text input and native element actions also require the *Gimi Background App Control · Text Input*
-Accessibility service. The device and target app must support independent background operation.
+Text input and native element actions also require the *Gimi* Accessibility service. The device and
+target app must support independent background operation.
 Only one background app-control task can run at a time; the settings page shows status and permissions.
 
 ### Official tools

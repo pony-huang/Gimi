@@ -21,7 +21,7 @@
     <string name="mobile_use_ready_title">已就绪</string>
     <string name="mobile_use_text_input_ready_title">文字输入已开启</string>
     <string name="mobile_use_text_input_required_title">文字输入未开启</string>
-    <string name="mobile_use_text_input_required">请开启“Gimi 文字输入”无障碍服务。</string>
+    <string name="mobile_use_text_input_required">请开启“Gimi”无障碍服务。</string>
     <string name="mobile_use_text_input_settings">打开无障碍设置</string>
     <string name="mobile_use_busy_title">后台操作正在使用</string>
     <string name="mobile_use_busy_detail">当前聊天保留了一个后台应用，可通过气泡打开；其他聊天使用前请先关闭它。</string>

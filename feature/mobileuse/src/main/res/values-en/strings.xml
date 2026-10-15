@@ -21,7 +21,7 @@
     <string name="mobile_use_ready_title">Ready</string>
     <string name="mobile_use_text_input_ready_title">Text input enabled</string>
     <string name="mobile_use_text_input_required_title">Text input disabled</string>
-    <string name="mobile_use_text_input_required">Enable the “Gimi Text Input” Accessibility service.</string>
+    <string name="mobile_use_text_input_required">Enable the “Gimi” Accessibility service.</string>
     <string name="mobile_use_text_input_settings">Open Accessibility settings</string>
     <string name="mobile_use_busy_title">Background control in use</string>
     <string name="mobile_use_busy_detail">A background app is open for a chat. Open it from the bubble, or close it before using another chat.</string>

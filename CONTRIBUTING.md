@@ -100,7 +100,6 @@ or UI behavior that JVM tests cannot establish, preferably on a physical device.
 
 Documentation-only changes need diff and link review, without a build or test suite. Report
 compilation, JVM tests, APK assembly, and device verification separately, including any blockers.
-See the [release guide](docs/releasing.md) for CI and release details.
 
 ## Pull requests
 

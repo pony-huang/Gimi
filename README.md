@@ -250,7 +250,3 @@ please describe the use case it addresses; discuss substantial feature or interf
 ## License
 
 [Apache License 2.0](LICENSE)
-
-## Development and release workflow
-
-[See the release guide](docs/releasing.md) for CI checks, automated changelogs, version PRs, signing setup, and release retries.

@@ -8,7 +8,7 @@
 
 已检查 GitHub v0.10.2 的 universal 主 App APK：`versionName=0.10.2`、`versionCode=54`。`gradle.properties` 已与该安装版本对齐，下一版本 PR 自动递增到 55。发布脚本还会下载语义版本最高的已公开 Release 的主 App APK，验证覆盖升级所需的递增关系；不会沿用工作流运行次数。
 
-仓库 Settings → Actions → General 中允许 GitHub Actions 创建 Pull Request，并允许工作流所声明的写权限。release-please 使用默认 `GITHUB_TOKEN`，无需 PAT。它创建的版本 PR 不会触发普通 `pull_request` 事件，因此 Prepare Release 显式通过 `workflow_dispatch` 启动 CI；它创建的 tag 也通过可复用工作流显式发布。
+仓库 Settings → Actions → General 中允许 GitHub Actions 创建 Pull Request，并允许工作流所声明的写权限。release-please 使用默认 `GITHUB_TOKEN`，无需 PAT。版本 PR 只自动分配安装版本号，不派发 CI；它创建的 tag 通过可复用工作流显式发布。
 
 配置四个仓库 Actions Secrets，使用与已分发 APK 相同的正式密钥：
 
@@ -17,28 +17,28 @@
 - `RELEASE_KEY_ALIAS`：签名别名。
 - `RELEASE_KEY_PASSWORD`：私钥密码。
 
-在 main 的分支规则中要求 PR 和 `Build & Test` 检查通过，禁止直接推送；为 `v*` tag 配置禁止更新和删除的规则，允许发布机器人创建 tag。这些 GitHub 设置需要仓库管理员配置，修改 YAML 不会自动启用。
+在 main 的分支规则中要求 PR，禁止直接推送。CI 仅在开发分支推送时运行，版本 PR 不产生 `Build & Test`；若现有规则将其设为所有 PR 的必需检查，须调整该规则，避免版本 PR 无法合并。为 `v*` tag 配置禁止更新和删除的规则，允许发布机器人创建 tag。这些 GitHub 设置需要仓库管理员配置，修改 YAML 不会自动启用。
 
 ## 日常开发
 
 1. 从 main 建功能分支，使用 `feat`、`fix`、`perf` 等 Conventional Commits。使用 squash merge 时，PR 标题就是最终提交标题，应描述完整的用户变化。
 2. 本地运行受影响模块的编译与行为测试；涉及资源、DI、构建配置时组装 Debug App。UI 工作遵循 AGENTS.md 中先预览、后实现的要求。
-3. 提交 PR，说明改动与实际验证结果。CI 运行发布脚本测试、架构检查、JVM 单测、App Debug 打包、插件编译和 Lint。
-4. Review 与必要检查通过后合并 main。main 再次运行 CI，Prepare Release 根据提交维护版本 PR。
+3. 推送开发分支时运行 CI，覆盖发布脚本测试、架构检查、JVM 单测、App Debug 打包、插件编译和 Lint。开发分支指除 `main`、`release-please--**`、`backup/**` 和 `dependabot/**` 外的分支；本地 commit 不会触发远程 CI。
+4. 提交 PR，说明改动与实际验证结果。PR 创建或更新、main 合并、版本 PR、tag 和手动派发均不触发 CI。Prepare Release 只维护版本 PR 和调度发布。
 
 ## 版本 PR 与更新日志
 
 唯一的版本名称文件是 `version.txt`，App 和所有插件通过公共 convention plugin 读取相同的版本名称与 `releaseVersionCode`。
 
-release-please 自动更新 `version.txt`、`.release-please-manifest.json` 和 `CHANGELOG.md`，按提交分类生成“新增 / 修复 / 优化”。内部重构、文档、CI、测试和维护默认不显示；影响用户的此类变化应在版本 PR 中主动补充。
+release-please 自动更新 `version.txt`、`.release-please-manifest.json` 和 `CHANGELOG.md`，按提交分类生成英文标题“Features / Bug Fixes / Performance Improvements”。内部重构、文档、CI、测试和维护默认不显示；影响用户的此类变化应在版本 PR 中主动补充。
 
-机器人根据 main 的安装版本号为版本 PR 自动分配 `versionCode + 1`，提交到该分支后再触发 CI。同一个 PR 重复更新不会连续增加；发布重试也不增加，因此日常发版不需要手动编辑 `gradle.properties`。
+机器人根据 main 的安装版本号为版本 PR 自动分配 `versionCode + 1`，提交到该分支，不触发 CI。同一个 PR 重复更新不会连续增加；发布重试也不增加，因此日常发版不需要手动编辑 `gradle.properties`。
 
 合并版本 PR 前：
 
-1. 确认机器人已经更新 `gradle.properties` 的 `releaseVersionCode`。版本 PR 的 CI 会检查版本号改变时安装版本也增加。
+1. 确认机器人已经更新 `gradle.properties` 的 `releaseVersionCode`。发布时会检查覆盖升级所需的安装版本号递增关系。
 2. 将提交摘要整理为中文用户说明，合并重复条目，补充权限、插件、协议和数据重置等注意事项。直接编辑当前版本的 CHANGELOG 段落。
-3. 确认版本 PR 的 CI 通过，完成需要的真机安装、核心功能和插件验证。
+3. 确认待发布功能在开发分支的 CI 已通过，完成需要的真机安装、核心功能和插件验证。
 4. 合并版本 PR。release-please 创建 `vX.Y.Z` tag 和 Draft Release，显式启动发布。
 
 release-please 后续提交可能重新生成当前版本草稿，因此在版本 PR 准备合并时做最后整理；若随后有新功能合并，重新检查日志。旧版本条目保持在 CHANGELOG.md 中。
@@ -47,9 +47,9 @@ Release 正文在构建时从对应版本的 CHANGELOG 段落提取，覆盖 Dra
 
 ## 正式构建与发布
 
-发布工作流只允许 `vX.Y.Z` 与 `vX.Y.Z-rc.N`，检查 tag、文件版本、manifest 一致，且 tag 指向 main 历史中的准确提交。后续 CI 和发布都 checkout 已解析的 commit SHA。
+发布工作流只允许 `vX.Y.Z` 与 `vX.Y.Z-rc.N`，检查 tag、文件版本、manifest 一致，且 tag 指向 main 历史中的准确提交。发布 checkout 已解析的 commit SHA。
 
-先重新执行完整验证，再构建主 App 和五个插件。缺少正式签名配置时停止；密码通过 Gradle 环境变量传递，不拼入命令。每个 APK 都检查 applicationId、versionName、versionCode 和签名证书，主 App 检查上一已公开版本的安装版本号。
+发版不重复执行完整 CI，直接构建主 App 和五个插件，并保留版本、签名和产物校验。缺少正式签名配置时停止；密码通过 Gradle 环境变量传递，不拼入命令。每个 APK 都检查 applicationId、versionName、versionCode 和签名证书，主 App 检查上一已公开版本的安装版本号。
 
 全部产物通过后上传到 Draft Release，核对附件名称和大小，最后公开。附件包含 arm64-v8a / universal App APK、五个插件 APK、`SHA256SUMS` 和包含 commit / 版本 / 证书指纹的 `release-metadata.json`。主 App 文件名保留 ABI 后缀，适配应用内更新选择逻辑。R8 mapping 作为内部 Actions Artifact 保存 90 天，应在过期前另行归档长期需要的文件。
 

@@ -7,47 +7,47 @@
       "changelog-sections": [
         {
           "type": "feat",
-          "section": "新增",
+          "section": "Features",
           "hidden": false
         },
         {
           "type": "fix",
-          "section": "修复",
+          "section": "Bug Fixes",
           "hidden": false
         },
         {
           "type": "perf",
-          "section": "优化",
+          "section": "Performance Improvements",
           "hidden": false
         },
         {
           "type": "refactor",
-          "section": "内部重构",
+          "section": "Code Refactoring",
           "hidden": true
         },
         {
           "type": "docs",
-          "section": "文档",
+          "section": "Documentation",
           "hidden": true
         },
         {
           "type": "test",
-          "section": "测试",
+          "section": "Tests",
           "hidden": true
         },
         {
           "type": "ci",
-          "section": "持续集成",
+          "section": "Continuous Integration",
           "hidden": true
         },
         {
           "type": "build",
-          "section": "构建",
+          "section": "Build System",
           "hidden": true
         },
         {
           "type": "chore",
-          "section": "维护",
+          "section": "Miscellaneous Chores",
           "hidden": true
         }
       ],

@@ -10,7 +10,7 @@ data class SandboxTemplate(val templateId: String, val names: List<String>, val 
 
 /** 使用设置草稿查询模板，不提交设置、不创建远端执行环境。 */
 interface SandboxTemplateRepository {
-    suspend fun listTemplates(domain: String, apiKey: String): List<SandboxTemplate>
+    suspend fun listTemplates(apiUrl: String, apiKey: String): List<SandboxTemplate>
 }
 
 /** 供页面映射本地化提示的查询失败类型。 */

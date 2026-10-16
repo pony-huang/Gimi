@@ -126,9 +126,18 @@ fun SandboxSettingsScreen(
                         PreferenceGroupCard {
                             PreferenceFormContent {
                                 SandboxField(
-                                    state.domain, { onAction(SandboxSettingsAction.SetDomain(it)) },
-                                    stringResource(R.string.sandbox_domain), stringResource(R.string.sandbox_domain_help),
-                                    SandboxSettingField.DOMAIN in state.errors, !state.busy,
+                                    state.apiUrl, { onAction(SandboxSettingsAction.SetApiUrl(it)) },
+                                    stringResource(R.string.sandbox_api_url),
+                                    stringResource(if (SandboxSettingField.API_URL in state.errors) R.string.sandbox_url_invalid else R.string.sandbox_api_url_help),
+                                    SandboxSettingField.API_URL in state.errors, !state.busy,
+                                    KeyboardOptions(keyboardType = KeyboardType.Uri),
+                                )
+                                SandboxField(
+                                    state.sandboxUrl, { onAction(SandboxSettingsAction.SetSandboxUrl(it)) },
+                                    stringResource(R.string.sandbox_proxy_url),
+                                    stringResource(if (SandboxSettingField.SANDBOX_URL in state.errors) R.string.sandbox_url_invalid else R.string.sandbox_proxy_url_help),
+                                    SandboxSettingField.SANDBOX_URL in state.errors, !state.busy,
+                                    KeyboardOptions(keyboardType = KeyboardType.Uri),
                                 )
                                 PreferenceTextField(
                                     value = state.apiKey,
@@ -281,7 +290,13 @@ private fun SandboxPendingPreview() = SandboxScreenPreview(SandboxSettingsUiStat
 
 @Preview(name = "Invalid fields", widthDp = 320, heightDp = 780, fontScale = 1.3f)
 @Composable
-private fun SandboxInvalidPreview() = SandboxScreenPreview(SandboxSettingsUiState(enabled = true, configurationExpanded = true, domain = "https://e2b.app", errors = setOf(SandboxSettingField.DOMAIN, SandboxSettingField.API_KEY)))
+private fun SandboxInvalidPreview() = SandboxScreenPreview(SandboxSettingsUiState(enabled = true, configurationExpanded = true, apiUrl = "192.168.1.10:3000", errors = setOf(SandboxSettingField.API_URL, SandboxSettingField.API_KEY)))
+
+@Preview(name = "Local HTTP light", widthDp = 390, heightDp = 1080)
+@Preview(name = "Local HTTP dark", widthDp = 390, heightDp = 1080, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun SandboxLocalHttpPreview() = SandboxScreenPreview(SandboxSettingsUiState(enabled = true, configurationExpanded = true,
+    apiUrl = "http://192.168.1.10:3000", sandboxUrl = "http://192.168.1.10:3002", apiKey = "preview-key", template = "base"))
 
 @Composable
 private fun SandboxScreenPreview(state: SandboxSettingsUiState) {

@@ -20,6 +20,8 @@ data class SandboxEnvironmentDraft(
 
 /**
  * 沙盒页唯一展示状态；连接字段是草稿，开关和 configured 来自成功保存的设置。
+ * @property apiUrl 管理 API 的完整地址，保留端口及路径大小写。
+ * @property sandboxUrl 可选沙箱代理完整地址，留空时使用服务端返回的域名。
  * @property idleTimeoutSeconds 秒数字符串，保留输入中的空值以提供校验反馈。
  * @property configurationExpanded 配置区独立展开态，与 E2B 是否启用无关。
  * @property busy 正在提交设置，期间禁止修改连接字段或开关。
@@ -31,7 +33,8 @@ data class SandboxEnvironmentDraft(
 data class SandboxSettingsUiState(
     val enabled: Boolean = false,
     val configured: Boolean = false,
-    val domain: String = "e2b.app",
+    val apiUrl: String = "https://api.e2b.app",
+    val sandboxUrl: String = "",
     val apiKey: String = "",
     val template: String = "code-interpreter-v1",
     val idleTimeoutSeconds: String = "300",
@@ -53,8 +56,10 @@ data class SandboxSettingsUiState(
 sealed interface SandboxSettingsAction {
     /** 即时保存 E2B 开关，保留已保存连接参数。 */
     data class SetEnabled(val enabled: Boolean) : SandboxSettingsAction
-    /** 修改基础域名草稿。 */
-    data class SetDomain(val value: String) : SandboxSettingsAction
+    /** 修改完整 API 地址草稿。 */
+    data class SetApiUrl(val value: String) : SandboxSettingsAction
+    /** 修改可选沙箱代理地址草稿。 */
+    data class SetSandboxUrl(val value: String) : SandboxSettingsAction
     /** 修改 API 密钥草稿。 */
     data class SetApiKey(val value: String) : SandboxSettingsAction
     /** 修改模板名称或 ID 草稿。 */

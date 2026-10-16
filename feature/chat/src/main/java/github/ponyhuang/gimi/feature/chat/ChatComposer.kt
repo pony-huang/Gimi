@@ -12,6 +12,7 @@ import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -401,7 +402,7 @@ public fun ChatComposer(
                 .testTag("chat_composer_surface"),
             shape = RoundedCornerShape(24.dp),
             color = chatCapsuleColor(),
-            shadowElevation = 1.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
             tonalElevation = 0.dp,
         ) {
             if (recordingState != null) {

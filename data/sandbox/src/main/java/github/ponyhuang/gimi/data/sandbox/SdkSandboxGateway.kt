@@ -44,7 +44,14 @@ internal class SdkSandboxGateway(private val connection: SandboxConnection, priv
     private var sandbox: Sandbox? = null
 
     private fun config(requestTimeout: Int = 60): E2BConfig = E2BConfig.builder()
-        .apiKey(connection.apiKey).domain(connection.domain).requestTimeoutSeconds(requestTimeout).build()
+        .apiKey(connection.apiKey).apiUrl(connection.apiUrl).requestTimeoutSeconds(requestTimeout)
+        .apply {
+            connection.sandboxUrl.takeIf { it.isNotBlank() }?.let { proxy ->
+                // 本地代理按 E2b-Sandbox-Port 分流，解释器与 envd 复用同一入口。
+                sandboxUrl(proxy)
+                codeInterpreterUrl(proxy)
+            }
+        }.build()
 
     override suspend fun create() = sdk(SandboxGatewayFailure.TEMPLATE) {
         if (closed.get()) throw SandboxGatewayException(SandboxGatewayFailure.UNAVAILABLE)

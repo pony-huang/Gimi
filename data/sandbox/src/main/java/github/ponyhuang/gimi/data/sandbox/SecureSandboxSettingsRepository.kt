@@ -29,7 +29,8 @@ class SecureSandboxSettingsRepository @Inject constructor(private val storage: S
     override suspend fun saveConnection(connection: SandboxConnection) = mutex.withLock {
         require(connection.envs.keys.map(String::trim).distinct().size == connection.envs.size) { "Duplicate environment names" }
         val normalized = connection.copy(
-            domain = connection.domain.trim().lowercase(),
+            apiUrl = connection.apiUrl.trim(),
+            sandboxUrl = connection.sandboxUrl.trim(),
             apiKey = connection.apiKey.trim(),
             template = connection.template.trim(),
             envs = connection.envs.mapKeys { it.key.trim() }.toMap(),

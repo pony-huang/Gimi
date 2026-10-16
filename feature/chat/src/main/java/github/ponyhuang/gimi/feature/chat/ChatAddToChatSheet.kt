@@ -479,6 +479,12 @@ private fun ReasoningEffortPage(
 ) {
     Column(Modifier.wrapContentHeight().testTag("reasoning-effort-page")) {
         PageStatus(state)
+        Text(
+            text = stringResource(R.string.chat_reasoning_effort_openai_notice),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
+        )
         LazyColumn(
             modifier = Modifier.wrapContentHeight(),
             contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),

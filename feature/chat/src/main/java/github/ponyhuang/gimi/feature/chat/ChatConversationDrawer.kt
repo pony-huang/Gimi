@@ -396,7 +396,6 @@ private fun DrawerFooterActionGroup(
         modifier = modifier,
         shape = CircleShape,
         color = preferenceGroupCardColor(),
-        shadowElevation = 1.dp,
     ) {
         Row(
             modifier = Modifier.height(48.dp),

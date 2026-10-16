@@ -4,8 +4,8 @@
     <string name="sandbox_disabled_description">未启用 · 在隔离环境中执行代码与文件操作</string>
     <string name="sandbox_pending_description">待配置 · 请填写 API Key 并保存</string>
     <string name="sandbox_configured_description">已配置 · 按聊天独立使用沙盒</string>
-    <string name="sandbox_domain">域名</string>
-    <string name="sandbox_domain_help">填写基础域名，无需 https://</string>
+    <string name="sandbox_api_url">API 地址</string>
+    <string name="sandbox_api_url_help">例如 https://api.e2b.app 或 http://192.168.1.10:3000</string>
     <string name="sandbox_api_key">API Key</string>
     <string name="sandbox_key_required">请填写 API Key</string>
     <string name="sandbox_key_help">密钥加密保存在本机</string>
@@ -25,7 +25,7 @@
     <string name="sandbox_templates_loading">正在加载模板…</string>
     <string name="sandbox_templates_empty">项目暂无模板，可使用默认模板或手动输入</string>
     <string name="sandbox_templates_count">已加载 %1$d 个项目模板</string>
-    <string name="sandbox_templates_credentials">请先填写有效的 Domain 和 API Key</string>
+    <string name="sandbox_templates_credentials">请先填写有效的 API 地址和 API Key</string>
     <string name="sandbox_templates_authentication">无法访问模板，请检查 API Key 和项目权限</string>
     <string name="sandbox_templates_rate_limit">请求过于频繁，请稍后刷新</string>
     <string name="sandbox_templates_network">网络连接失败，可重试或手动输入模板</string>
@@ -56,4 +56,7 @@
     <string name="sandbox_documentation">E2B 文档</string>
     <string name="sandbox_expand_configuration">展开配置</string>
     <string name="sandbox_collapse_configuration">收起配置</string>
+    <string name="sandbox_proxy_url">沙箱访问地址（可选）</string>
+    <string name="sandbox_proxy_url_help">本地填写代理地址，如 http://192.168.1.10:3002；云服务可留空。手机请使用电脑可访问的 IP。</string>
+    <string name="sandbox_url_invalid">请输入完整 HTTP 或 HTTPS 地址，不含用户名、密码、查询参数或片段</string>
 </resources>

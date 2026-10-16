@@ -9,7 +9,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import com.google.adk.kt.types.Type
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -147,13 +146,9 @@ class RecommendationOutputParserTest {
     }
 
     @Test
-    fun structuredOutputConfigRequiresRecommendationJsonShape() {
-        val schema = RecommendationOutputFormat.config.responseSchema
-
+    fun outputConfigUsesJsonObjectWithoutRequiringStrictSchemaSupport() {
         assertEquals("application/json", RecommendationOutputFormat.config.responseMimeType)
-        assertEquals(Type.OBJECT, schema?.type)
-        assertEquals(Type.ARRAY, schema?.properties?.get("recommendations")?.type)
-        assertEquals(2, schema?.properties?.get("recommendations")?.items?.properties?.size)
+        org.junit.Assert.assertNull(RecommendationOutputFormat.config.responseSchema)
     }
 
     @Test

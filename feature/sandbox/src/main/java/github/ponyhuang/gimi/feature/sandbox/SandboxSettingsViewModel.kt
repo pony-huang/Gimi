@@ -54,10 +54,11 @@ class SandboxSettingsViewModel @Inject constructor(
         if (uiState.value.busy) return
         when (action) {
             is SandboxSettingsAction.SetEnabled -> persist { repository.setEnabled(action.enabled) }
-            is SandboxSettingsAction.SetDomain -> {
-                if (action.value != uiState.value.domain) invalidateTemplates()
-                edit(SandboxSettingField.DOMAIN) { it.copy(domain = action.value) }
+            is SandboxSettingsAction.SetApiUrl -> {
+                if (action.value != uiState.value.apiUrl) invalidateTemplates()
+                edit(SandboxSettingField.API_URL) { it.copy(apiUrl = action.value) }
             }
+            is SandboxSettingsAction.SetSandboxUrl -> edit(SandboxSettingField.SANDBOX_URL) { it.copy(sandboxUrl = action.value) }
             is SandboxSettingsAction.SetApiKey -> {
                 if (action.value != uiState.value.apiKey) invalidateTemplates()
                 edit(SandboxSettingField.API_KEY) { it.copy(apiKey = action.value) }
@@ -100,10 +101,10 @@ class SandboxSettingsViewModel @Inject constructor(
         val state = uiState.value
         if (state.templateLoadState == SandboxTemplateLoadState.LOADING) return
         if (!refresh && state.templateLoadState != SandboxTemplateLoadState.IDLE) return
-        val domain = state.domain.trim().lowercase()
+        val apiUrl = state.apiUrl.trim()
         val apiKey = state.apiKey.trim()
-        val credentialErrors = validateSandboxConnection(SandboxConnection(domain = domain, apiKey = apiKey))
-            .intersect(setOf(SandboxSettingField.DOMAIN, SandboxSettingField.API_KEY))
+        val credentialErrors = validateSandboxConnection(SandboxConnection(apiUrl = apiUrl, apiKey = apiKey))
+            .intersect(setOf(SandboxSettingField.API_URL, SandboxSettingField.API_KEY))
         if (credentialErrors.isNotEmpty()) {
             mutableState.update { it.copy(templateLoadState = SandboxTemplateLoadState.CREDENTIALS_REQUIRED, errors = it.errors + credentialErrors) }
             return
@@ -112,7 +113,7 @@ class SandboxSettingsViewModel @Inject constructor(
         mutableState.update { it.copy(templateLoadState = SandboxTemplateLoadState.LOADING) }
         templateQuery = viewModelScope.launch {
             try {
-                val result = templates.listTemplates(domain, apiKey)
+                val result = templates.listTemplates(apiUrl, apiKey)
                 // generation 防止不及时响应取消的远端请求覆盖新凭据或刷新后的列表。
                 if (generation == templateGeneration) mutableState.update { it.copy(templates = result, templateLoadState = SandboxTemplateLoadState.LOADED) }
             } catch (error: SandboxTemplateException) {
@@ -128,7 +129,7 @@ class SandboxSettingsViewModel @Inject constructor(
     }
 
     private fun sameCredentials(connection: SandboxConnection, state: SandboxSettingsUiState): Boolean =
-        connection.domain == state.domain.trim().lowercase() && connection.apiKey == state.apiKey.trim()
+        connection.apiUrl == state.apiUrl.trim() && connection.apiKey == state.apiKey.trim()
 
     private fun restore(configuration: SandboxConfiguration, state: SandboxSettingsUiState): SandboxSettingsUiState =
         fromConfiguration(configuration, state).copy(
@@ -145,8 +146,8 @@ class SandboxSettingsViewModel @Inject constructor(
             val invalid = !isSandboxEnvironmentName(row.name.trim()) || row.name.trim() in duplicates
             row.copy(nameError = invalid, expanded = row.expanded || invalid)
         }
-        val connection = SandboxConnection(state.domain.trim().lowercase(), state.apiKey.trim(), state.template.trim(), state.idleTimeoutSeconds.toIntOrNull() ?: 0,
-            rows.associate { it.name.trim() to it.value })
+        val connection = SandboxConnection(state.apiUrl.trim(), state.apiKey.trim(), state.template.trim(), state.idleTimeoutSeconds.toIntOrNull() ?: 0,
+            rows.associate { it.name.trim() to it.value }, state.sandboxUrl.trim())
         val errors = validateSandboxConnection(connection) + if (rows.any { it.nameError }) setOf(SandboxSettingField.ENVIRONMENT) else emptySet()
         mutableState.update { it.copy(errors = errors, environment = rows) }
         if (errors.isNotEmpty()) return
@@ -178,7 +179,7 @@ class SandboxSettingsViewModel @Inject constructor(
         // 保存时名称会 trim；使用归一化名称保留当前行 ID 和展开态，避免重建编辑组。
         val previousRows = previous?.environment.orEmpty().associateBy { it.name.trim() }
         return SandboxSettingsUiState(enabled = configuration.enabled, configured = configuration.isConfigured,
-            domain = connection.domain, apiKey = connection.apiKey, template = connection.template,
+            apiUrl = connection.apiUrl, sandboxUrl = connection.sandboxUrl, apiKey = connection.apiKey, template = connection.template,
             idleTimeoutSeconds = connection.idleTimeoutSeconds.toString(),
             environment = connection.envs.map { (name, value) ->
                 previousRows[name]?.copy(name = name, value = value, nameError = false)

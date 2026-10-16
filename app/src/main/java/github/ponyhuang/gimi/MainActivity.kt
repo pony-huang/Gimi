@@ -76,12 +76,21 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val incompatiblePluginMessage = stringResource(R.string.plugin_incompatible_upgrade)
-            LaunchedEffect(pluginLoadNotices, incompatiblePluginMessage) {
+            val incompatiblePluginsMessage = stringResource(R.string.plugins_incompatible_upgrade)
+            val pluginNameSeparator = stringResource(R.string.plugin_name_separator)
+            LaunchedEffect(pluginLoadNotices, incompatiblePluginMessage, incompatiblePluginsMessage, pluginNameSeparator) {
                 lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                    pluginLoadNotices.incompatiblePluginNames.collect { name ->
+                    pluginLoadNotices.incompatiblePluginNames.collect { names ->
                         Toast.makeText(
                             this@MainActivity,
-                            incompatiblePluginMessage.format(name),
+                            if (names.size == 1) {
+                                incompatiblePluginMessage.format(names.single())
+                            } else {
+                                incompatiblePluginsMessage.format(
+                                    pluginUpgradeNameSummary(names, pluginNameSeparator),
+                                    names.size,
+                                )
+                            },
                             Toast.LENGTH_LONG,
                         ).show()
                     }

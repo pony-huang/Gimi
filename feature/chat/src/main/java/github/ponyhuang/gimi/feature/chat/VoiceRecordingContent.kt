@@ -69,8 +69,8 @@ internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
                 .size(48.dp)
                 .testTag(VOICE_CANCEL_TEST_TAG),
             colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                contentColor = MaterialTheme.colorScheme.onSurface,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
             ),
         ) {
             Icon(
@@ -96,8 +96,8 @@ internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
                 .size(48.dp)
                 .testTag(VOICE_FINISH_TEST_TAG),
             colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                contentColor = MaterialTheme.colorScheme.onSurface,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
             ),
         ) {
             Icon(
@@ -111,8 +111,8 @@ internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
             onClick = params.onSend,
             modifier = Modifier.size(48.dp).testTag(VOICE_SEND_TEST_TAG),
             colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.onSurface,
-                contentColor = MaterialTheme.colorScheme.surface,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
             ),
         ) {
             Icon(

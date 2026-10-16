@@ -25,12 +25,12 @@ class SdkSandboxTemplateRepository internal constructor(
     private val scope: CoroutineScope,
     private val clientFactory: (String, String) -> E2BClient,
 ) : SandboxTemplateRepository {
-    @Inject constructor(@SandboxRuntimeScope scope: CoroutineScope) : this(scope, { domain, apiKey ->
-        E2BClient(E2BConfig.builder().domain(domain).apiKey(apiKey).build())
+    @Inject constructor(@SandboxRuntimeScope scope: CoroutineScope) : this(scope, { apiUrl, apiKey ->
+        E2BClient(E2BConfig.builder().apiUrl(apiUrl).apiKey(apiKey).build())
     })
 
-    override suspend fun listTemplates(domain: String, apiKey: String): List<SandboxTemplate> = suspendCancellableCoroutine { continuation ->
-        val client = clientFactory(domain, apiKey)
+    override suspend fun listTemplates(apiUrl: String, apiKey: String): List<SandboxTemplate> = suspendCancellableCoroutine { continuation ->
+        val client = clientFactory(apiUrl, apiKey)
         val worker = scope.launch {
             client.use {
                 try {

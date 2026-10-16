@@ -8,10 +8,8 @@ import com.google.adk.kt.types.FunctionCallingConfig
 import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
-import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.ThinkingConfig
 import com.google.adk.kt.types.ToolConfig
-import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.data.agent.AgentContributionRegistry
 import github.ponyhuang.gimi.data.agent.AgentLLMModelFactory
 import github.ponyhuang.gimi.data.agent.AgentPrompts
@@ -48,12 +46,15 @@ object RecommendationPromptBuilder {
         }
         appendLine()
         appendLine("Generate exactly ${RecommendationSnapshot.RECOMMENDATION_COUNT} distinct tasks the user can send directly to this assistant.")
-        // OpenAI 兼容桥接层只把 responseMimeType 转成 json_object 模式，responseSchema 不会上线，
-        // 因此结构契约必须写进提示本身，否则模型会自行编造键名，解析必然落空。
+        // 推荐只请求 json_object，不依赖服务端 Schema 支持；结构契约必须写进提示，
+        // 避免模型自行编造键名，并由本地解析器拒绝不合规结果。
         appendLine("Respond with a single JSON object and nothing else, in exactly this shape:")
         appendLine(OUTPUT_SHAPE)
         appendLine("The \"recommendations\" array must contain exactly ${RecommendationSnapshot.RECOMMENDATION_COUNT} objects, each with a non-empty \"prompt\" and a \"category\" that is one of: ${CATEGORIES}.")
         appendLine("Use the user's locale and only capabilities supported by the information above.")
+        appendLine("Keep each prompt to one short, natural sentence expressing a single core task. For Chinese, aim for 12–20 characters and never exceed 24 characters including punctuation; for other languages, use at most 12 words.")
+        appendLine("Include only context essential to identify the task. Omit background explanations, inferred motivations, step-by-step instructions, lists, and detailed output requirements. Do not add greetings or introductory phrases.")
+        appendLine("Examples of concise Chinese prompts: 找一家附近适合晚餐的餐厅；规划明早去公司的路线；把会议记录整理成待办清单。")
         // 引导模型结合时间/位置/最近应用等上下文推测用户当前与接下来的日常活动。
         appendLine(
             "Use the context above (especially localDateTime, timeZone, cachedLocation, and recentForegroundApp) " +
@@ -63,42 +64,22 @@ object RecommendationPromptBuilder {
         )
         appendLine("Prefer meaningful tasks that produce a useful result, save effort, or support a decision.")
         appendLine("Do not recommend querying directly visible status such as battery level, current time, or network state.")
-        appendLine("Prefer concrete multi-step assistance over trivial lookups, generic greetings, or redundant actions.")
+        appendLine("Prefer useful tasks over trivial lookups, generic greetings, or redundant actions. A task may require multiple steps to execute, but its prompt must only state the goal concisely; leave execution details for the assistant after the user sends it.")
     }
 
-    /** 与 [RecommendationOutputFormat] 的 responseSchema 保持一致的最小结构示例。 */
+    /** 最小结构示例，由 [RecommendationOutputParser] 校验。 */
     private const val OUTPUT_SHAPE: String =
         """{"recommendations":[{"prompt":"<task>","category":"<category>"}]}"""
 
-    /** schema enum 使用小写类别名，提示文本必须与之同源。 */
+    /** 提示中的类别名与本地枚举校验同源。 */
     private val CATEGORIES: String = RecommendationCategory.entries.joinToString(", ") { it.name.lowercase() }
 }
 
-/** 强制推荐模型返回稳定的 JSON 对象，避免 Markdown fence 或额外解释混入结果。 */
+/** 兼容的 JSON Object 模式。 */
 object RecommendationOutputFormat {
-    val config = GenerateContentConfig(
-        responseMimeType = "application/json",
-        responseSchema = Schema(
-            type = Type.OBJECT,
-            properties = mapOf(
-                "recommendations" to Schema(
-                    type = Type.ARRAY,
-                    items = Schema(
-                        type = Type.OBJECT,
-                        properties = mapOf(
-                            "prompt" to Schema(type = Type.STRING),
-                            "category" to Schema(
-                                type = Type.STRING,
-                                enum = RecommendationCategory.entries.map { it.name.lowercase() },
-                            ),
-                        ),
-                        required = listOf("prompt", "category"),
-                    ),
-                ),
-            ),
-            required = listOf("recommendations"),
-        ),
-    )
+    // 官方后端会把 responseSchema 升级成严格 json_schema；兼容服务未必支持该模式。
+    // 这里只指定 MIME，保持替换官方组件前的 json_object 请求契约。
+    val config = GenerateContentConfig(responseMimeType = "application/json")
 }
 
 /**
@@ -218,7 +199,6 @@ class AgentRecommendationGenerator @Inject constructor(
                 maxOutputTokens = 1_024,
                 thinkingConfig = ThinkingConfig(false),
                 responseMimeType = RecommendationOutputFormat.config.responseMimeType,
-                responseSchema = RecommendationOutputFormat.config.responseSchema,
                 toolConfig = ToolConfig(
                     functionCallingConfig = FunctionCallingConfig(
                         allowedFunctionNames = READ_ONLY_STATUS_TOOLS,
@@ -292,13 +272,16 @@ class AgentRecommendationGenerator @Inject constructor(
         """.trimIndent()
 
 
-        /** 必须执行的工具，此处用于获取当前信息状态，更加个性化推荐 */
+        /** 推荐生成允许使用的只读工具，用于获取当前状态和了解可用技能。 */
         val READ_ONLY_STATUS_TOOLS = listOf(
             "get_current_location",
             "get_current_time",
             "list_installed_apps",
             "get_upcoming_calendar_events",
             "list_calendars",
+            "list_skills",
+            "load_skill",
+            "load_skill_resource",
         )
     }
 }

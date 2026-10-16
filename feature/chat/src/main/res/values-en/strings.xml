@@ -20,6 +20,7 @@
     <string name="chat_attachment_unsupported">The current model does not support this attachment type</string>
     <string name="chat_attachment_open_failed">No app is available to open this document</string>
     <string name="chat_reasoning_effort_title">Reasoning effort</string>
+    <string name="chat_reasoning_effort_openai_notice">Reasoning effort settings are currently unsupported when using the OpenAI Chat Completions API.</string>
     <string name="chat_reasoning_effort_minimal">Minimal</string>
     <string name="chat_reasoning_effort_minimal_description">Fastest responses for simple questions</string>
     <string name="chat_reasoning_effort_low">Low</string>

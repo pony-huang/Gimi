@@ -19,6 +19,11 @@ import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import io.mockk.mockk
+import io.mockk.every
+import github.ponyhuang.gimi.data.agent.recommendation.AgentRecommendationGenerator
+import github.ponyhuang.gimi.domain.recommendation.model.RecommendationContext
+import github.ponyhuang.gimi.domain.recommendation.model.RecommendationGenerationInput
+import github.ponyhuang.gimi.domain.recommendation.model.RecommendationSnapshot
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
@@ -61,6 +66,39 @@ class ChatCompletionsIntegrationTest {
     @After
     fun tearDown() {
         server.shutdown()
+    }
+
+    @Test
+    fun recommendationUsesCompatibleJsonObjectThroughOfficialBackend() = runBlocking {
+        val payload = JSONObject().put("recommendations", org.json.JSONArray().apply {
+            repeat(RecommendationSnapshot.RECOMMENDATION_COUNT) { index ->
+                put(JSONObject().put("prompt", "Task $index").put("category", "general"))
+            }
+        }).toString()
+        server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody(
+            JSONObject().put("choices", org.json.JSONArray().put(JSONObject()
+                .put("index", 0)
+                .put("message", JSONObject().put("role", "assistant").put("content", payload))
+                .put("finish_reason", "stop"))).toString(),
+        ))
+        val config = ModelConfig("compatible", ApiProtocol.OpenaiChatcompletions,
+            "test-model", "test-key", server.url("/custom/v1/").toString())
+        val recommendationFactory = mockk<AgentLLMModelFactory>()
+        every { recommendationFactory.selectFastModelConfig() } returns config
+        every { recommendationFactory.forRecommendationJson(config) } returns config
+        every { recommendationFactory.createModel(config) } answers { factory.createModel(config) }
+        val generator = AgentRecommendationGenerator(
+            recommendationFactory, AgentContributionRegistry(emptySet()),
+        )
+
+        val recommendations = generator.generate(RecommendationGenerationInput(
+            systemInstruction = "", capabilities = emptyList(),
+            context = RecommendationContext(emptyMap()),
+        ))
+
+        assertEquals("json_object", takeBody().getJSONObject("response_format").getString("type"))
+        assertEquals(RecommendationSnapshot.RECOMMENDATION_COUNT, recommendations.size)
+        assertEquals("Task 0", recommendations.first().prompt)
     }
 
     @Test

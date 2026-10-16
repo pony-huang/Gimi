@@ -4,6 +4,11 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SandboxConfigurationTest {
+    @Test fun acceptsCompleteHttpAndHttpsEndpoints() {
+        listOf("http://192.168.1.10:3000", "http://localhost:3000", "https://api.e2b.app", "https://example.com/E2B/api").forEach {
+            assertTrue("Expected endpoint to be accepted: $it", validateSandboxConnection(SandboxConnection(apiUrl = it, apiKey = "key")).isEmpty())
+        }
+    }
     @Test fun defaultSettingsAreDisabledAndUnconfigured() {
         val settings = SandboxConfiguration()
         assertFalse(settings.enabled)
@@ -17,11 +22,15 @@ class SandboxConfigurationTest {
         assertFalse(settings.isReady)
         assertTrue(settings.copy(enabled = true).isReady)
     }
-    @Test fun rejectsUrlsPortsInvalidLabelsAndNonpositiveIdleTimeout() {
-        listOf("https://e2b.app", "e2b.app/api", "e2b.app:443", "bad_domain.app", "-bad.app", "e2b..app").forEach {
-            assertTrue(validateSandboxConnection(SandboxConnection(domain = it, apiKey = "key")).contains(SandboxSettingField.DOMAIN))
+    @Test fun rejectsInvalidEndpointsAndNonpositiveIdleTimeout() {
+        listOf("e2b.app", "e2b.app:443", "ftp://example.com", "http://", "http://bad_domain.app", "https://e2b..app", "http://host:0", "http://host:65536", "https://user:secret@host", "https://host?key=secret", "https://host#fragment", "https://host?", "https://host#").forEach {
+            assertTrue(validateSandboxConnection(SandboxConnection(apiUrl = it, apiKey = "key")).contains(SandboxSettingField.API_URL))
         }
         assertTrue(validateSandboxConnection(SandboxConnection(apiKey = "key", idleTimeoutSeconds = 0)).contains(SandboxSettingField.IDLE_TIMEOUT))
+    }
+    @Test fun proxyIsOptionalButMustBeACompleteEndpointWhenPresent() {
+        assertTrue(validateSandboxConnection(SandboxConnection(apiKey = "key", sandboxUrl = "http://[::1]:3002/Proxy")).isEmpty())
+        assertTrue(validateSandboxConnection(SandboxConnection(apiKey = "key", sandboxUrl = "host:3002")).contains(SandboxSettingField.SANDBOX_URL))
     }
     @Test fun emptyEnvironmentValuesAreAllowedButInvalidNamesAreNot() {
         assertTrue(validateSandboxConnection(SandboxConnection(apiKey = "key", envs = mapOf("EMPTY" to ""))).isEmpty())

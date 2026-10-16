@@ -22,11 +22,12 @@ interface SandboxSettingsStorage {
 @Serializable
 private data class StoredSandboxSettings(
     val enabled: Boolean = false,
-    val domain: String = "e2b.app",
+    val apiUrl: String = "https://api.e2b.app",
     val apiKey: String = "",
     val template: String = "code-interpreter-v1",
     val idleTimeoutSeconds: Int = 300,
     val envs: Map<String, String> = emptyMap(),
+    val sandboxUrl: String = "",
 )
 
 /** 使用独立 Keystore alias 加密整个沙盒配置，损坏时回到关闭且未配置状态。 */
@@ -44,12 +45,12 @@ class KeystoreSandboxSettingsStorage @Inject constructor(@ApplicationContext con
         } catch (_: SerializationException) {
             return null
         }
-        return SandboxConfiguration(stored.enabled, SandboxConnection(stored.domain, stored.apiKey, stored.template, stored.idleTimeoutSeconds, stored.envs.toMap()))
+        return SandboxConfiguration(stored.enabled, SandboxConnection(stored.apiUrl, stored.apiKey, stored.template, stored.idleTimeoutSeconds, stored.envs.toMap(), stored.sandboxUrl))
     }
 
     override fun write(configuration: SandboxConfiguration) {
         val connection = configuration.connection
-        val stored = StoredSandboxSettings(configuration.enabled, connection.domain, connection.apiKey, connection.template, connection.idleTimeoutSeconds, connection.envs.toMap())
+        val stored = StoredSandboxSettings(configuration.enabled, connection.apiUrl, connection.apiKey, connection.template, connection.idleTimeoutSeconds, connection.envs.toMap(), connection.sandboxUrl)
         val encrypted = cipher.encryptOrThrow(json.encodeToString(StoredSandboxSettings.serializer(), stored))
         if (!preferences.edit().putString("encrypted_settings", encrypted).commit()) {
             throw IOException("Unable to save sandbox settings")

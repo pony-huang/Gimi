@@ -627,7 +627,6 @@ internal fun ChatHeaderActions(
                 modifier = Modifier.size(44.dp),
                 shape = CircleShape,
                 color = chatCapsuleColor(),
-                shadowElevation = 1.dp,
             ) {}
             IconButton(
                 onClick = onOpenDrawer,
@@ -647,7 +646,6 @@ internal fun ChatHeaderActions(
                 modifier = Modifier.matchParentSize().padding(vertical = 2.dp),
                 shape = CircleShape,
                 color = chatCapsuleColor(),
-                shadowElevation = 1.dp,
             ) {}
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // 自动语音播报全局开关：开启态用 primary 高亮，关闭态回到普通前景色。

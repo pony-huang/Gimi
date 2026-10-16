@@ -34,10 +34,10 @@ class SandboxSettingsViewModelTest {
         val calls = mutableListOf<Pair<String, String>>()
         var result = listOf(SandboxTemplate("cli-id", listOf("project/cli"), "ready"))
         var failure: SandboxTemplateFailure? = null
-        override suspend fun listTemplates(domain: String, apiKey: String): List<SandboxTemplate> {
-            calls += domain to apiKey
+        override suspend fun listTemplates(apiUrl: String, apiKey: String): List<SandboxTemplate> {
+            calls += apiUrl to apiKey
             failure?.let { throw SandboxTemplateException(it) }
-            return load?.invoke(domain, apiKey) ?: result
+            return load?.invoke(apiUrl, apiKey) ?: result
         }
     }
 
@@ -45,10 +45,10 @@ class SandboxSettingsViewModelTest {
         val settings = Settings(); val templates = Templates()
         val viewModel = SandboxSettingsViewModel(settings, templates)
         viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
-        viewModel.onAction(SandboxSettingsAction.SetDomain(" E2B.APP "))
+        viewModel.onAction(SandboxSettingsAction.SetApiUrl(" http://localhost:3000/Control "))
         viewModel.onAction(SandboxSettingsAction.SetApiKey(" draft-key "))
         viewModel.onAction(SandboxSettingsAction.LoadTemplates); runCurrent()
-        assertEquals(listOf("e2b.app" to "draft-key"), templates.calls)
+        assertEquals(listOf("http://localhost:3000/Control" to "draft-key"), templates.calls)
         assertEquals(SandboxTemplateLoadState.LOADED, viewModel.uiState.value.templateLoadState)
         assertEquals("code-interpreter-v1", viewModel.uiState.value.template)
         assertEquals(0, settings.saves)
@@ -66,7 +66,7 @@ class SandboxSettingsViewModelTest {
         viewModel.onAction(SandboxSettingsAction.LoadTemplates); runCurrent()
         assertEquals(SandboxTemplateLoadState.CREDENTIALS_REQUIRED, viewModel.uiState.value.templateLoadState)
         viewModel.onAction(SandboxSettingsAction.SetApiKey("key"))
-        viewModel.onAction(SandboxSettingsAction.SetDomain("https://e2b.app"))
+        viewModel.onAction(SandboxSettingsAction.SetApiUrl("e2b.app"))
         viewModel.onAction(SandboxSettingsAction.RefreshTemplates); runCurrent()
         assertEquals(SandboxTemplateLoadState.CREDENTIALS_REQUIRED, viewModel.uiState.value.templateLoadState)
         assertTrue(templates.calls.isEmpty())
@@ -103,7 +103,7 @@ class SandboxSettingsViewModelTest {
         old.resume(listOf(SandboxTemplate("old-id", emptyList(), "ready"))); runCurrent()
         assertEquals(newTemplates, viewModel.uiState.value.templates)
         assertEquals(SandboxTemplateLoadState.LOADED, viewModel.uiState.value.templateLoadState)
-        viewModel.onAction(SandboxSettingsAction.SetDomain("e2b.pro"))
+        viewModel.onAction(SandboxSettingsAction.SetApiUrl("https://api.e2b.pro"))
         assertTrue(viewModel.uiState.value.templates.isEmpty())
         assertEquals(SandboxTemplateLoadState.IDLE, viewModel.uiState.value.templateLoadState)
     }
@@ -121,6 +121,38 @@ class SandboxSettingsViewModelTest {
         pending.resume(emptyList()); runCurrent()
         assertEquals(SandboxTemplateLoadState.LOADED, viewModel.uiState.value.templateLoadState)
         assertEquals("manual:v1", viewModel.uiState.value.template)
+    }
+    @Test fun savesAndRestoresHttpEndpointsWithoutChangingPathCase() = runTest {
+        val settings = Settings(); val templates = Templates()
+        val viewModel = SandboxSettingsViewModel(settings, templates)
+        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
+        viewModel.onAction(SandboxSettingsAction.SetApiUrl(" http://localhost:3000/Control "))
+        viewModel.onAction(SandboxSettingsAction.SetSandboxUrl(" http://localhost:3002/Proxy "))
+        viewModel.onAction(SandboxSettingsAction.SetApiKey("key"))
+        viewModel.onAction(SandboxSettingsAction.Save); runCurrent()
+        val saved = settings.configuration.value.connection
+        assertEquals("http://localhost:3000/Control", saved.apiUrl)
+        assertEquals("http://localhost:3002/Proxy", saved.sandboxUrl)
+        val restored = SandboxSettingsViewModel(settings, templates).uiState.value
+        assertEquals(saved.apiUrl, restored.apiUrl)
+        assertEquals(saved.sandboxUrl, restored.sandboxUrl)
+        assertFalse(viewModel.uiState.value.dirty)
+    }
+    @Test fun invalidProxyBlocksSaveButDoesNotBlockTemplateQuery() = runTest {
+        val settings = Settings(); val templates = Templates()
+        val viewModel = SandboxSettingsViewModel(settings, templates)
+        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
+        viewModel.onAction(SandboxSettingsAction.SetApiKey("key"))
+        viewModel.onAction(SandboxSettingsAction.SetSandboxUrl("localhost:3002"))
+        viewModel.onAction(SandboxSettingsAction.LoadTemplates); runCurrent()
+        assertEquals(SandboxTemplateLoadState.LOADED, viewModel.uiState.value.templateLoadState)
+        viewModel.onAction(SandboxSettingsAction.Save); runCurrent()
+        assertTrue(SandboxSettingField.SANDBOX_URL in viewModel.uiState.value.errors)
+        assertEquals(0, settings.saves)
+        viewModel.onAction(SandboxSettingsAction.SetSandboxUrl(""))
+        assertFalse(SandboxSettingField.SANDBOX_URL in viewModel.uiState.value.errors)
+        viewModel.onAction(SandboxSettingsAction.Save); runCurrent()
+        assertEquals(1, settings.saves)
     }
     @Test fun toggleIsImmediateAndConnectionEditsWaitForSave() = runTest {
         val repository = Settings(); val viewModel = SandboxSettingsViewModel(repository, Templates())
@@ -147,10 +179,10 @@ class SandboxSettingsViewModelTest {
     @Test fun invalidDomainKeyAndTimeoutAreNotSaved() = runTest {
         val repository = Settings(); val viewModel = SandboxSettingsViewModel(repository, Templates())
         viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
-        viewModel.onAction(SandboxSettingsAction.SetDomain("https://e2b.app"))
+        viewModel.onAction(SandboxSettingsAction.SetApiUrl("e2b.app"))
         viewModel.onAction(SandboxSettingsAction.SetIdleTimeout("0"))
         viewModel.onAction(SandboxSettingsAction.Save); runCurrent()
-        assertTrue(viewModel.uiState.value.errors.containsAll(setOf(SandboxSettingField.DOMAIN, SandboxSettingField.API_KEY, SandboxSettingField.IDLE_TIMEOUT)))
+        assertTrue(viewModel.uiState.value.errors.containsAll(setOf(SandboxSettingField.API_URL, SandboxSettingField.API_KEY, SandboxSettingField.IDLE_TIMEOUT)))
         assertEquals(0, repository.saves)
     }
     @Test fun rejectsDuplicateAndBlankEnvironmentNamesBeforeMapping() = runTest {

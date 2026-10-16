@@ -73,7 +73,7 @@ class InstalledApkPluginLoaderTest {
         val loader = InstalledApkPluginLoader(context, configStore, storageRegistry, notices)
 
         assertTrue(loader.load().isEmpty())
-        assertEquals("Old plugin", notices.incompatiblePluginNames.first())
+        assertEquals(listOf("Old plugin"), notices.incompatiblePluginNames.first())
         assertTrue(loader.refresh().isEmpty())
         assertFalse(root.resolve("plugin.old").exists())
         verify(exactly = 0) { context.classLoader }

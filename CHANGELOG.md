@@ -2,6 +2,61 @@
 
 版本 PR 根据 Conventional Commits 自动生成后续版本记录；合并前请整理用户可见的变化与升级注意事项。
 
+## [0.12.0](https://github.com/pony-huang/Gimi/compare/v0.11.1...v0.12.0) (2026-10-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* **agent:** OfficialToolBinding.ProviderDeclaration.wireName is renamed to declarationName, and the openai_web_search and mimo_web_search catalog entries are removed.
+* **agent:** separate Claude mapping and streaming
+* **agent:** adopt ADK ChatCompletions backend
+* **mcp:** MCP supports Streamable HTTP only. Existing SSE configurations are ignored and must be replaced with HTTP endpoints.
+
+### 新增
+
+* **agent:** add bounded reflection retries for read tools ([478d7ed](https://github.com/pony-huang/Gimi/commit/478d7ed9dd9927430f1454023f1249a486057e45))
+* **agent:** add Claude prompt caching, JSON output and adaptive thinking ([3742387](https://github.com/pony-huang/Gimi/commit/3742387b86b83d44f4e1d21e522106cedc2ad0c8))
+* **chat:** align bottom sheets with compact settings style ([b5944a6](https://github.com/pony-huang/Gimi/commit/b5944a63f55027db56e6427645ba610540282334))
+* **chat:** unify controls and use a model bottom sheet ([f80a95d](https://github.com/pony-huang/Gimi/commit/f80a95d0600c15ce91088553b529d770a5604e82))
+* **chat:** 支持听写转写与直接发送 ([99b2cbb](https://github.com/pony-huang/Gimi/commit/99b2cbb58eec251ad4a8c8c93dc03fac721e5a87))
+* improve sandbox endpoints, recommendations, and UI ([a0dfc83](https://github.com/pony-huang/Gimi/commit/a0dfc83e5654d383fd1fe624d12cb916a0bbbed8))
+* **mcp:** adopt official toolset and remove SSE support ([9a4bce7](https://github.com/pony-huang/Gimi/commit/9a4bce7f6a0f829ba2c0bec8b15eacb3a0195bc1))
+* **mobileuse:** rename the accessibility service to Gimi ([562dc69](https://github.com/pony-huang/Gimi/commit/562dc69180c92f9b9648b930ea18cbbb6b165cba))
+* **permissions:** 统一悬浮窗授权并移除小窗设置 ([dfe6a2c](https://github.com/pony-huang/Gimi/commit/dfe6a2cbda64d083e0bafe69e2405ec5ac3d9662))
+* **sandbox:** add account template dropdown selection ([c907a0e](https://github.com/pony-huang/Gimi/commit/c907a0e3a3b942a2805073c90b45b08d8016f47d))
+* **sandbox:** add E2B settings and conversation tools ([4423ee1](https://github.com/pony-huang/Gimi/commit/4423ee1d3a33c34c1ab9b12066500f6a90efe9b8))
+* **settings:** move the Shizuku switch into its own page ([2c1b823](https://github.com/pony-huang/Gimi/commit/2c1b823a8ff3e7b37070fc0be3bb274bb281c12b))
+* **settings:** refine sandbox configuration and menu labels ([7eec979](https://github.com/pony-huang/Gimi/commit/7eec9796196c61b9254fbc8af94061af71bff43d))
+* **settings:** unify settings and model configuration UI ([c1651ea](https://github.com/pony-huang/Gimi/commit/c1651ea4cec84da807c21dc531335cf8667e6cbe))
+* **skills:** connect environment tools and scripts to E2B ([fdb254a](https://github.com/pony-huang/Gimi/commit/fdb254a3dff180f5ad86e12c519914def9bc4bad))
+* **skills:** install skill archives from the cloud sandbox ([9b29345](https://github.com/pony-huang/Gimi/commit/9b2934581a6e884e4eead61ca1b47674360b0c8b))
+
+
+### 修复
+
+* **agent:** batch tool confirmations before resuming invocation ([549c7a1](https://github.com/pony-huang/Gimi/commit/549c7a182e160d7ec15c2b04120e622a103f9ec6))
+* **agent:** declare official tools in each protocol's native form ([ac50fe0](https://github.com/pony-huang/Gimi/commit/ac50fe026d99ab6fd7942cedcddb8291318f9425))
+* **chat:** dedupe the error bubble an ADK error event and turn failure share ([4e01a0e](https://github.com/pony-huang/Gimi/commit/4e01a0e4012ab03d490ed35c1c61b0ac1a0c6817))
+* **chat:** keep every text part id unique within a message ([322a380](https://github.com/pony-huang/Gimi/commit/322a38002b394b7c3159b941b51004e708fdbca3))
+* **chat:** stabilize the model picker sheet height ([f4e7d08](https://github.com/pony-huang/Gimi/commit/f4e7d08d80e902e49a47ce3c1e373ea4c05cac24))
+* **conversation:** publish the drawer row before persisting its preview ([dfb1c8d](https://github.com/pony-huang/Gimi/commit/dfb1c8da3f0f4ded3b4fc131f5d131bfc4e5d061))
+* **mcp:** align tool details with settings UI style ([54eb507](https://github.com/pony-huang/Gimi/commit/54eb507f4bd89bdd559495344aa427b31f7c1f44))
+* **sandbox:** animate E2B configuration toggle ([fe9ddeb](https://github.com/pony-huang/Gimi/commit/fe9ddebcdf1ce400671c79976f9e7129bc62224e))
+* **sandbox:** center template refresh button and status ([1d68b8b](https://github.com/pony-huang/Gimi/commit/1d68b8b0e8708c856bbd341e33ec9b90199a778f))
+* **sandbox:** smooth advanced settings and group environment fields ([614fe21](https://github.com/pony-huang/Gimi/commit/614fe2122401f0a074e1db079d4bfccc2b500ec1))
+* **settings:** shrink the update changelog typography ([1251bd9](https://github.com/pony-huang/Gimi/commit/1251bd9a62027df6e89d4e8b28acf7aec72be5e3))
+
+
+### 优化
+
+* **conversation:** read a bounded event window and persist the drawer preview ([b022be1](https://github.com/pony-huang/Gimi/commit/b022be1a998f8ff2bd5c9cacf79fa32624bb3330))
+
+
+### 内部重构
+
+* **agent:** adopt ADK ChatCompletions backend ([3b9e5b4](https://github.com/pony-huang/Gimi/commit/3b9e5b448e708df626ff0524928ae25fe3d93f40))
+* **agent:** separate Claude mapping and streaming ([f0a3266](https://github.com/pony-huang/Gimi/commit/f0a32663e99a85d4688f186258f9e1c3cdef9a07))
+
 ## [0.11.1](https://github.com/pony-huang/Gimi/compare/v0.11.0...v0.11.1) (2026-10-10)
 
 

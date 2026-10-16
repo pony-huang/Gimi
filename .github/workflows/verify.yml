@@ -41,9 +41,10 @@ jobs:
 
       - name: Unit tests
         timeout-minutes: 15
-        # 插件实例只编译，不运行测试；宿主的插件管理与协议测试仍保留。
+        # 插件实例和 E2B SDK 只编译，不运行测试；宿主的插件管理与协议测试仍保留。
         run: |
           ./gradlew testDebugUnitTest \
+            :domain:sandbox:test \
             -x :plugins:zhihu:testDebugUnitTest \
             -x :plugins:spotify:testDebugUnitTest \
             -x :plugins:xiaohongshu:testDebugUnitTest \
@@ -73,6 +74,8 @@ jobs:
           path: |
             **/build/test-results/testDebugUnitTest/TEST-*.xml
             **/build/reports/tests/testDebugUnitTest/**
+            domain/sandbox/build/test-results/test/TEST-*.xml
+            domain/sandbox/build/reports/tests/test/**
           retention-days: 7
           if-no-files-found: ignore
 

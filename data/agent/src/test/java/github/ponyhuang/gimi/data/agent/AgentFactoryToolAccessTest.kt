@@ -262,7 +262,7 @@ class AgentFactoryToolAccessTest {
                     mcpRepository = mcpRepository,
                 ),
                 OfficialToolContribution(officialToolset, officialCatalog),
-                SkillToolContribution(mockk<SkillSource>(relaxed = true)),
+                SkillToolContribution(mockk<SkillSource>(relaxed = true), mockk<github.ponyhuang.gimi.domain.sandbox.SandboxSettingsRepository> { every { configuration } returns kotlinx.coroutines.flow.MutableStateFlow(github.ponyhuang.gimi.domain.sandbox.SandboxConfiguration()) }, mockk()),
                 PluginToolContribution(pluginRuntimeProvider),
                 BaseToolContribution(),
                 ModelCatalogContribution(modelServices),
@@ -281,7 +281,7 @@ class AgentFactoryToolAccessTest {
 
     private fun modelConfig() = ModelConfig(
         serviceId = SERVICE_ID,
-        baseType = ApiProtocol.Standard,
+        baseType = ApiProtocol.OpenaiChatcompletions,
         modelId = "model",
         apiKey = "key",
         fullBaseUrl = "https://example.com",
@@ -297,10 +297,10 @@ class AgentFactoryToolAccessTest {
             OfficialToolSpec(
                 toolId = "kimi_formulas",
                 serviceId = "kimi",
-                protocols = setOf(ApiProtocol.Standard),
+                protocols = setOf(ApiProtocol.OpenaiChatcompletions),
                 displayName = "Kimi formulas",
                 searchCandidate = true,
-                binding = OfficialToolBinding.ProviderDeclaration(wireName = "formula_tool"),
+                binding = OfficialToolBinding.ProviderDeclaration("formula_tool"),
             ),
         )
     }

@@ -376,7 +376,7 @@ class AgentChatRunnerCacheTest {
         agent = mockk<LlmAgent>(relaxed = true),
         modelRuntime = ModelRuntimeMetadata(
             serviceId = selection?.serviceId ?: "service",
-            baseType = ApiProtocol.Standard,
+            baseType = ApiProtocol.OpenaiChatcompletions,
             modelId = selection?.modelId ?: "model",
             fullBaseUrl = "https://example.com",
         ),

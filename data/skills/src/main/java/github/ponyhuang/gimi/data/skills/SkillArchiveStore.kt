@@ -13,6 +13,7 @@ import java.nio.file.StandardCopyOption
 import java.util.UUID
 import java.util.zip.ZipException
 import java.util.zip.ZipInputStream
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -70,6 +71,9 @@ internal class SkillArchiveStore(
                 description = frontmatter.description,
                 replacesExisting = File(skillsRoot, frontmatter.name).exists(),
             )
+        } catch (cancelled: CancellationException) {
+            pendingRoot.deleteRecursively()
+            throw cancelled
         } catch (failure: SkillImportFailure) {
             pendingRoot.deleteRecursively()
             throw failure

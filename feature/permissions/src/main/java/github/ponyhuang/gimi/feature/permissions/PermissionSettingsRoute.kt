@@ -22,6 +22,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.domain.permissions.model.AppPermission
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 
 @Composable
 fun PermissionSettingsRoute(
@@ -90,6 +91,10 @@ fun PermissionSettingsRoute(
                 Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                 "package:${context.packageName}".toUri(),
             )
+            PermissionSettingsDestination.Overlay -> Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                "package:${context.packageName}".toUri(),
+            )
             PermissionSettingsDestination.WriteSystemSettings -> Intent(
                 Settings.ACTION_MANAGE_WRITE_SETTINGS,
                 "package:${context.packageName}".toUri(),
@@ -103,6 +108,8 @@ fun PermissionSettingsRoute(
     }
 
     PreferenceScaffold(
+
+        style = PreferenceStyle.Compact,
         title = stringResource(R.string.permissions_screen_title),
         onBack = onBack,
     ) { scaffoldModifier ->
@@ -127,5 +134,6 @@ private fun AppPermission.androidName(): String = when (this) {
     AppPermission.WriteSystemSettings,
     AppPermission.NotificationListener,
     AppPermission.UsageStats,
+    AppPermission.DrawOverlays,
     -> error("Special permissions cannot be requested at runtime.")
 }

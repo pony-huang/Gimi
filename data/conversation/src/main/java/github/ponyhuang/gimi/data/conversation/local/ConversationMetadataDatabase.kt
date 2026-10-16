@@ -11,7 +11,12 @@ import androidx.room.Query
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
 
-/** Metadata owned by the app for an ADK session. Session events remain in ADK's database. */
+/**
+ * Metadata owned by the app for an ADK session. Session events remain in ADK's database.
+ *
+ * `lastMessage` 是抽屉行的预览文本：ADK 的 `listSessions` 不返回事件，若每行都去读会话
+ * 全量历史只为算预览，代价随会话长度线性增长。预览是应用自己的展示数据，因此在这里持久化。
+ */
 @Entity(
     tableName = "conversation_metadata",
     indices = [
@@ -27,6 +32,7 @@ data class ConversationMetadataEntity(
     val model: String = "",
     val isLast: Boolean = false,
     val toolConfigurationJson: String = "",
+    val lastMessage: String = "",
 )
 
 @Dao
@@ -56,6 +62,10 @@ interface ConversationMetadataDao {
     )
     suspend fun setToolConfiguration(sessionId: String, configurationJson: String)
 
+    /** 更新抽屉行预览；只改一列，不重写整行。 */
+    @Query("UPDATE conversation_metadata SET lastMessage = :lastMessage WHERE sessionId = :sessionId")
+    suspend fun setLastMessage(sessionId: String, lastMessage: String)
+
     /** Atomically makes [sessionId] the sole current conversation. */
     @Transaction
     suspend fun activate(sessionId: String, defaultModel: String): ConversationMetadataEntity {
@@ -81,7 +91,7 @@ interface ConversationMetadataDao {
 
 @Database(
     entities = [ConversationMetadataEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class ConversationMetadataDatabase : RoomDatabase() {

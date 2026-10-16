@@ -27,15 +27,6 @@ interface OfficialToolFunctionCatalog {
     /** 按需检索可以发现的已开启本地工具来源。 */
     fun enabledSearchCandidateSpecs(): List<OfficialToolSpec>
 
-    /** 请求协议需要保留为厂商远端执行声明的名字。 */
-    fun providerDeclaredWireNames(
-        serviceId: String,
-        protocol: ApiProtocol,
-        modelId: String,
-    ): Set<String> = availableSpecsFor(serviceId, protocol, modelId)
-        .mapNotNull { (it.binding as? OfficialToolBinding.ProviderDeclaration)?.wireName }
-        .toSet()
-
     /**
      * Returns the tool ids the given service supports under [protocol],
      * regardless of the concrete model. Tool ids are vendor-unique; model

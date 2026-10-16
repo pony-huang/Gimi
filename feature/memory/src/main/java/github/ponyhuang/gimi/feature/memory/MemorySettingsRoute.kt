@@ -11,6 +11,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 
 @Composable
 fun MemorySettingsRoute(
@@ -32,6 +33,7 @@ fun MemorySettingsRoute(
         }
     }
     PreferenceScaffold(
+        style = PreferenceStyle.Compact,
         title = stringResource(R.string.memory_screen_title),
         onBack = onBack,
     ) { scaffoldModifier ->

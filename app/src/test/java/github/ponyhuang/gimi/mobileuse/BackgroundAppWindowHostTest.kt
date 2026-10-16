@@ -6,6 +6,8 @@ import github.ponyhuang.gimi.domain.mobileuse.MobileDisplaySession
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.coVerify
+import io.mockk.verify
 import io.mockk.spyk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -77,5 +79,23 @@ class BackgroundAppWindowHostTest {
         assertEquals(BackgroundAppPresentation.HIDDEN, host.presentation.value)
         host.open()
         assertEquals(BackgroundAppPresentation.SMALL_WINDOW, host.presentation.value)
+    }
+    @Test fun enablingSmallWindowWithoutPermissionRoutesWithoutSavingPreference() {
+        val windowHost = host
+        every { windowHost.canOverlay() } returns false
+        every { windowHost.openPermissionSettings() } returns Unit
+        windowHost.switchWindow(true)
+        verify { windowHost.openPermissionSettings() }
+        coVerify(exactly = 0) { repository.setSmallWindowEnabled(any()) }
+    }
+
+    @Test fun reopeningPreferredSmallWindowWithoutPermissionRoutesToPermissions() {
+        val windowHost = host
+        session.value = MobileDisplaySession("s1", "chat", 10, 1080, 2400)
+        every { windowHost.canOverlay() } returns false
+        every { windowHost.openPermissionSettings() } returns Unit
+        windowHost.open()
+        verify { windowHost.openPermissionSettings() }
+        verify(exactly = 0) { windowHost.ensureService() }
     }
 }

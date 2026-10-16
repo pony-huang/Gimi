@@ -1,8 +1,8 @@
 [versions]
 agp = "9.2.1"
-anthropicJava = "2.44.1"
+anthropicJava = "2.65.0"
 coreKtx = "1.19.0"
-googleAdk = "1.2.0"
+googleAdk = "1.4.0"
 pluginApi = "4"
 gson = "2.14.0"
 hilt = "2.60"
@@ -21,9 +21,10 @@ kotlinxCoroutines = "1.11.0"
 mockk = "1.14.9"
 turbine = "1.2.1"
 mcpKotlin = "0.15.0"
+ktor = "3.6.0"
 composeBom = "2026.02.01"
 openaiJava = "4.41.0"
-okhttp = "4.12.0"
+okhttp = "5.3.2"
 objectbox = "6.0.0-beta"
 multiplatformMarkdownRenderer = "0.43.0"
 room = "2.8.4"
@@ -41,6 +42,7 @@ shizuku = "13.1.5"
 mlkitTextRecognition = "16.0.1"
 
 [libraries]
+e2b-sdk = { module = "dev.e2b.community:e2b-sdk", version = "0.1.0-SNAPSHOT" }
 mlkit-text-recognition-chinese = { module = "com.google.mlkit:text-recognition-chinese", version.ref = "mlkitTextRecognition" }
 shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
 shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
@@ -58,6 +60,7 @@ androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "
 androidx-room-testing = { module = "androidx.room:room-testing", version.ref = "room" }
 anthropic-java = { module = "com.anthropic:anthropic-java", version.ref = "anthropicJava" }
 google-adk-kotlin-core = { module = "com.google.adk:google-adk-kotlin-core", version.ref = "googleAdk" }
+google-adk-kotlin-integrations-openai = { module = "com.google.adk:google-adk-kotlin-integrations-openai", version.ref = "googleAdk" }
 google-adk-kotlin-processor = { module = "com.google.adk:google-adk-kotlin-processor", version.ref = "googleAdk" }
 google-adk-kotlin-webserver = { module = "com.google.adk:google-adk-kotlin-webserver", version.ref = "googleAdk" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
@@ -82,6 +85,7 @@ androidx-navigation3-ui = { module = "androidx.navigation3:navigation3-ui", vers
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-compose-animation-core = { group = "androidx.compose.animation", name = "animation-core" }
+androidx-compose-animation = { group = "androidx.compose.animation", name = "animation" }
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
@@ -104,6 +108,7 @@ multiplatform-markdown-renderer-m3 = { group = "com.mikepenz", name = "multiplat
 multiplatform-markdown-renderer-coil3 = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-coil3", version.ref = "multiplatformMarkdownRenderer" }
 multiplatform-markdown-renderer-code = { group = "com.mikepenz", name = "multiplatform-markdown-renderer-code", version.ref = "multiplatformMarkdownRenderer" }
 mcp-kotlin-client = { module = "io.modelcontextprotocol:kotlin-sdk-client", version.ref = "mcpKotlin" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }

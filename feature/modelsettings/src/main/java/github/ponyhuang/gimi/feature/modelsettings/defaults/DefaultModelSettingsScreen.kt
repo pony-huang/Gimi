@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.modelsettings.defaults
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -24,7 +25,6 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.speech.model.TtsVoice
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.ui.components.PickerSingleChoiceDialog
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
@@ -32,6 +32,8 @@ import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionNote
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
 fun DefaultModelSettingsScreen(
@@ -39,7 +41,7 @@ fun DefaultModelSettingsScreen(
     onAction: (DefaultModelSettingsAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PreferencePageContainer(modifier = modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
@@ -126,16 +128,11 @@ fun DefaultModelSettingsScreen(
                         } else {
                             null
                         },
-                        // 禁用态用灰色圆底 + 灰字形表达不可选，替代原来的 outline 裸图标。
-                        iconContainer = if (enabled) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.surfaceVariant
-                        },
+                        iconContainer = Color.Transparent,
                         iconTint = if (enabled) {
-                            Color.White
-                        } else {
                             MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                         },
                     )
                 }
@@ -247,6 +244,7 @@ private fun ModelChoiceDialog(
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun DefaultModelSettingsScreenPreview() {
     AsssistantaiTheme {
@@ -256,7 +254,7 @@ private fun DefaultModelSettingsScreenPreview() {
             isEnabled = true,
             apiKey = "sk-test",
             apiBaseUrl = "https://api.openai.com/v1",
-            apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Standard,
+            apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.OpenaiChatcompletions,
             anthropicBaseUrl = "https://api.anthropic.com",
             groups = listOf(
                 ModelGroup(

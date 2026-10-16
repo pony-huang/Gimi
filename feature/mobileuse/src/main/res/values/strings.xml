@@ -1,8 +1,10 @@
 <resources>
     <string name="mobile_use_title">Shizuku</string>
     <string name="mobile_use_intro">让 Agent 在后台操作其他应用，不打断你当前的操作。</string>
-    <string name="mobile_use_disabled_title">后台操作已关闭</string>
-    <string name="mobile_use_disabled_detail">请在设置页开启 Shizuku 后再管理授权。</string>
+    <string name="mobile_use_switch_section">后台操作</string>
+    <string name="mobile_use_switch_title">启用后台操作</string>
+    <string name="mobile_use_section_status">运行状态</string>
+    <string name="mobile_use_section_actions">操作</string>
     <string name="mobile_use_authorize">授权 Gimi</string>
     <string name="mobile_use_refresh">刷新状态</string>
     <string name="mobile_use_open_shizuku">打开 Shizuku</string>
@@ -19,7 +21,7 @@
     <string name="mobile_use_ready_title">已就绪</string>
     <string name="mobile_use_text_input_ready_title">文字输入已开启</string>
     <string name="mobile_use_text_input_required_title">文字输入未开启</string>
-    <string name="mobile_use_text_input_required">请开启“Gimi 文字输入”无障碍服务。</string>
+    <string name="mobile_use_text_input_required">请开启“Gimi”无障碍服务。</string>
     <string name="mobile_use_text_input_settings">打开无障碍设置</string>
     <string name="mobile_use_busy_title">后台操作正在使用</string>
     <string name="mobile_use_busy_detail">当前聊天保留了一个后台应用，可通过气泡打开；其他聊天使用前请先关闭它。</string>
@@ -36,11 +38,7 @@
     <string name="background_app_more">更多</string>
     <string name="background_app_fullscreen">切换为全屏</string>
     <string name="background_app_small_window">切换为小窗</string>
-    <string name="background_app_window_settings">窗口设置</string>
     <string name="background_app_close">关闭后台应用</string>
-    <string name="background_app_default_small">小窗模式</string>
-    <string name="background_app_default_small_detail">点击气泡时以小窗打开</string>
-    <string name="background_app_overlay_permission">悬浮窗权限</string>
     <string name="background_app_done">确定</string>
     <string name="background_app_disconnected">后台应用已关闭或连接已断开。</string>
     <string name="background_app_preview_unavailable">暂时无法显示画面，请检查应用与连接。安全页面可能不允许显示。</string>

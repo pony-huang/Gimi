@@ -12,7 +12,7 @@
 - `:domain:<capability>` — domain models, repository interfaces, and use cases.
 - `:data:<capability>` — repository implementations, Room/Preferences/Keystore storage, Android gateways, network clients, and third-party SDK adapters.
 - `:feature:<capability>` — feature UI, routes, contracts, ViewModels, and feature-specific components.
-- `gradle/libs.versions.toml` — dependency/version catalog. Project working notes and temporary artifacts live under ignored `temp/`; long-lived documentation belongs in `docs/` only after that directory is introduced.
+- `gradle/libs.versions.toml` — dependency/version catalog. Project working notes and temporary artifacts live under ignored `temp/`; long-lived documentation belongs in `spec/<lang>/` only after that directory is introduced.
 
 ### Capabilities
 
@@ -82,6 +82,9 @@ domain/data/core -X-> feature or app
 ### Preview-first UI design review
 
 - Any UI adjustment or UI iteration must begin with a preview design draft before implementation: a `@Preview @Composable`-based draft (using fake/fixture data, themable for light and dark) that renders the proposed layout, new states, and interaction entry points.
+- At the start of each UI task, ask whether the user wants rendered design images for remote review, unless they have already stated a preference for that task. Wait for the answer before choosing the image-delivery branch; draft preparation may continue meanwhile.
+- If requested, render the actual Compose draft, visually inspect the captures, and return viewable images in the conversation before asking for design approval. Include light/dark themes and the relevant changed states; keep image artifacts under `temp/`. Source files, file links, and compilation success alone do not fulfill image delivery. If rendering is unavailable, explain the specific blocker and agree on an alternative with the user.
+- If declined, skip image rendering and delivery and present the draft with a concise description. Declining images does not waive the design approval below unless the user explicitly says so.
 - Present the draft to the user for review; implementation work may start only after the user explicitly confirms the design. Do not skip this step for small visual tweaks unless the user says otherwise.
 - Keep the draft isolated from production wiring (no ViewModel/repository changes yet); once approved, merge it into the real screens, wire up state, and delete the draft file and any preview-only dependencies it required.
 
@@ -130,7 +133,7 @@ Android Studio may run the `app` debug configuration on a device or emulator.
 - `ci.yml` delegates to `verify.yml`: push/PR to `main` and explicit `workflow_dispatch` run Python release-tool tests, architecture checks, `testDebugUnitTest`, `assembleDebug`, plugin compilation, and `app:lintDebug` on JDK 21 (Ubuntu).
 - `release-please.yml`: main pushes maintain a Conventional Commits version PR updating `version.txt`, `.release-please-manifest.json`, and `CHANGELOG.md`; `prepare_version_pr.py` assigns `releaseVersionCode` in `gradle.properties` from main + 1 before explicitly dispatching CI. Re-running the same version PR retains its assigned code. On merge, release-please creates a tag and Draft Release and explicitly calls `release.yml`, avoiding `GITHUB_TOKEN` event suppression.
 - `release.yml`: `vX.Y.Z` / `vX.Y.Z-rc.N` tag pushes, manual dispatch with a required existing tag, or reusable calls verify the exact tagged commit, then build and validate formally signed App/plugin APKs. All four signing secrets are mandatory for publication; local signing priority remains CI properties > IDE wizard > debug fallback. CHANGELOG.md is the Release body source. Complete artifacts are uploaded to Draft before publication; published releases are immutable. R8 mapping is kept internally as an Actions Artifact. No Google Play publishing.
-- App and plugins share `version.txt` and `gradle.properties`'s `releaseVersionCode` through `gimi.android.application`. See `docs/releasing.md` for setup, version PR review, RCs, and retries.
+- App and plugins share `version.txt` and `gradle.properties`'s `releaseVersionCode` through `gimi.android.application`. See `spec/en/releasing.md` for setup, version PR review, RCs, and retries.
 
 ### Testing rules
 

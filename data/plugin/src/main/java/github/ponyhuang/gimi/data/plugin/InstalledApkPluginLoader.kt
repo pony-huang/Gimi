@@ -78,8 +78,12 @@ class InstalledApkPluginLoader @Inject constructor(
             return emptyList()
         }
         Log.d(TAG, "Discovered ${services.size} plugin package(s)")
-        return services.mapNotNull { resolveInfo ->
-            loadPlugin(resolveInfo.serviceInfo?.packageName)
+        return try {
+            services.mapNotNull { resolveInfo ->
+                loadPlugin(resolveInfo.serviceInfo?.packageName)
+            }
+        } finally {
+            notices.flush()
         }
     }
 

@@ -11,9 +11,9 @@ import kotlinx.serialization.Serializable
  * @property isOfficialToolsEnabled 是否允许该服务的独立官方 API 工具参与跨模型会话。
  * @property apiKey API 密钥；可填多个，逗号分隔（UI HelperText 已说明）。
  * @property baseType 接口标准类型，决定预览拼接路径。
- * @property supportedBaseTypes 该厂商允许的接口标准集合。OpenAI 仅支持 Standard，
+ * @property supportedBaseTypes 该厂商允许的接口标准集合。OpenAI 仅支持 OpenaiChatcompletions，
  *                  Anthropic 仅支持 Anthropic，Gemini 仅支持 Gemini（ADK 原生实现，无需填写
- *                  API 地址），其余厂商 Standard / Anthropic 皆可。UI 协议下拉按此过滤，
+ *                  API 地址），其余厂商 OpenaiChatcompletions / Anthropic 皆可。UI 协议下拉按此过滤，
  *                  持久化的非法取值会在加载时回退到集合首项。
  * @property lLMModelGroups 该服务下的模型组列表。
  * @property iconRes 品牌图标 drawable 资源 ID；null 时回退到默认机器人图标。
@@ -29,7 +29,7 @@ data class LLMModelProvider(
     val isOfficialToolsEnabled: Boolean = isEnabled,
     val apiKey: String,
     val apiBaseUrl: String,
-    val baseType: ApiBaseType = ApiBaseType.Standard,
+    val baseType: ApiBaseType = ApiBaseType.OpenaiChatcompletions,
     val supportedBaseTypes: List<ApiBaseType> = DUAL_API_BASE_TYPES,
     val anthropicBaseUrl: String = apiBaseUrl,
     val lLMModelGroups: List<LLMModelGroup> = emptyList(),
@@ -40,7 +40,7 @@ data class LLMModelProvider(
     /** 当前 [baseType] 对应的实际请求地址。两种协议的地址分别保存，切换时互不覆盖。 */
     val activeApiBaseUrl: String
         get() = when (baseType) {
-            ApiBaseType.Standard -> apiBaseUrl
+            ApiBaseType.OpenaiChatcompletions -> apiBaseUrl
             ApiBaseType.Anthropic -> anthropicBaseUrl
             // Gemini 走 ADK 原生实现，无需请求地址；apiBaseUrl 仅供连接测试 / 模型刷新。
             ApiBaseType.Gemini -> apiBaseUrl
@@ -97,13 +97,14 @@ val LLMModelProvider.isConfiguredForChat: Boolean
  */
 @Serializable
 enum class ApiBaseType() {
-    Standard,
+    /** OpenAI Chat Completions 及兼容协议的持久化标识。 */
+    OpenaiChatcompletions,
     Anthropic,
     Gemini,
 }
 
 /** 双协议厂商（OpenAI 兼容 + Anthropic 兼容）允许的接口标准集合；Gemini 仅自家厂商使用。 */
-val DUAL_API_BASE_TYPES: List<ApiBaseType> = listOf(ApiBaseType.Standard, ApiBaseType.Anthropic)
+val DUAL_API_BASE_TYPES: List<ApiBaseType> = listOf(ApiBaseType.OpenaiChatcompletions, ApiBaseType.Anthropic)
 
 enum class LLMModelType(
     val serviceId: String,
@@ -130,7 +131,7 @@ enum class LLMModelType(
         serviceId = "minimax",
         serviceName = "MiniMax",
         defaultBaseUrl = "https://api.minimaxi.com/v1",
-        defaultBaseType = ApiBaseType.Standard,
+        defaultBaseType = ApiBaseType.OpenaiChatcompletions,
         supportedBaseTypes = DUAL_API_BASE_TYPES,
         defaultAnthropicBaseUrl = "https://api.minimaxi.com/anthropic",
         homepageUrl = "https://www.minimaxi.com/",
@@ -140,7 +141,7 @@ enum class LLMModelType(
         serviceId = "mimo",
         serviceName = "MIMO",
         defaultBaseUrl = "https://api.xiaomimimo.com/v1",
-        defaultBaseType = ApiBaseType.Standard,
+        defaultBaseType = ApiBaseType.OpenaiChatcompletions,
         supportedBaseTypes = DUAL_API_BASE_TYPES,
         defaultAnthropicBaseUrl = "https://api.xiaomimimo.com/anthropic",
         homepageUrl = "https://mimo.mi.com/",
@@ -150,8 +151,8 @@ enum class LLMModelType(
         serviceId = "openai",
         serviceName = "OpenAI",
         defaultBaseUrl = "https://api.openai.com/v1",
-        defaultBaseType = ApiBaseType.Standard,
-        supportedBaseTypes = listOf(ApiBaseType.Standard),
+        defaultBaseType = ApiBaseType.OpenaiChatcompletions,
+        supportedBaseTypes = listOf(ApiBaseType.OpenaiChatcompletions),
         homepageUrl = "https://openai.com/",
         keyHelpUrl = "https://platform.openai.com/api-keys",
     ),
@@ -180,7 +181,7 @@ enum class LLMModelType(
         serviceId = "kimi",
         serviceName = "Moonshot",
         defaultBaseUrl = "https://api.moonshot.cn/v1",
-        defaultBaseType = ApiBaseType.Standard,
+        defaultBaseType = ApiBaseType.OpenaiChatcompletions,
         supportedBaseTypes = DUAL_API_BASE_TYPES,
         defaultAnthropicBaseUrl = "https://api.moonshot.cn/anthropic",
         homepageUrl = "https://www.kimi.com/",

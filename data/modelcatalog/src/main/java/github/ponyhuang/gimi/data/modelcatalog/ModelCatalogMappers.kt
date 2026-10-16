@@ -31,13 +31,13 @@ fun Model.toData(): LLMModelItem = LLMModelItem(
 )
 
 fun ApiProtocol.toData(): ApiBaseType = when (this) {
-    ApiProtocol.Standard -> ApiBaseType.Standard
+    ApiProtocol.OpenaiChatcompletions -> ApiBaseType.OpenaiChatcompletions
     ApiProtocol.Anthropic -> ApiBaseType.Anthropic
     ApiProtocol.Gemini -> ApiBaseType.Gemini
 }
 
 fun ApiBaseType.toDomain(): ApiProtocol = when (this) {
-    ApiBaseType.Standard -> ApiProtocol.Standard
+    ApiBaseType.OpenaiChatcompletions -> ApiProtocol.OpenaiChatcompletions
     ApiBaseType.Anthropic -> ApiProtocol.Anthropic
     ApiBaseType.Gemini -> ApiProtocol.Gemini
 }

@@ -11,10 +11,13 @@ import github.ponyhuang.gimi.domain.appearance.ThemeMode
  *
  * 返回值式 API 不完全走 action 语义：
  * - `send(text, attachments, onResult)`：异步接管回执驱动草稿清理；所有发送使用同一入口；
- * - `transcribeVoice(pcm16)`：suspend 请求-响应调用，由语音输入组件 await 结果；
+ * - `transcribeVoice(pcm16, mode, draft, onResult)`：ViewModel 管理转写并回传草稿快照；
  * - `partChannelFor(partId)`：渲染期同步查询流式文本增量 channel。
  */
 sealed interface ChatAction {
+    /** 输入栏卸载或切换上下文时取消听写，禁止迟到结果回写或自动发送。 */
+    data object CancelVoiceTranscription : ChatAction
+
     /** 交给 SDK 恢复最近失败轮次。 */
     data object RetryFailedTurn : ChatAction
 

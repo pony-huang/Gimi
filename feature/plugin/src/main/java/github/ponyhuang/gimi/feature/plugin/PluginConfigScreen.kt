@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.plugin
 
+import android.content.res.Configuration
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,7 +16,6 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,7 +36,10 @@ import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
+import github.ponyhuang.gimi.ui.preference.PreferenceSaveBar
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.preference.PreferenceTextField
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
@@ -77,6 +80,7 @@ fun PluginConfigScreen(
 ) {
     val callback = state.callback
     PreferenceScaffold(
+        style = PreferenceStyle.Compact,
         title = stringResource(
             if (callback == null) R.string.plugin_config_title else R.string.plugin_action_callback_title,
         ),
@@ -84,6 +88,15 @@ fun PluginConfigScreen(
             onBack
         } else {
             { onAction(PluginConfigAction.DismissActionCallback) }
+        },
+        bottomBar = {
+            if (callback == null && state.hasFields) {
+                PreferenceSaveBar(
+                    label = stringResource(R.string.plugin_config_save),
+                    onSave = { onAction(PluginConfigAction.Save) },
+                    enabled = true,
+                )
+            }
         },
     ) { contentModifier ->
         if (callback != null) {
@@ -110,7 +123,7 @@ private fun PluginConfigContent(
     onAction: (PluginConfigAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    PreferencePageContainer(modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         Column(modifier = Modifier.fillMaxSize()) {
             if (!state.hasFields && !state.hasActions) {
                 PreferenceBanner(
@@ -164,16 +177,7 @@ private fun PluginConfigContent(
                     }
                 }
             }
-            if (state.hasFields) {
-                Button(
-                    onClick = { onAction(PluginConfigAction.Save) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                ) {
-                    Text(stringResource(R.string.plugin_config_save))
-                }
-            }
+
         }
     }
 }
@@ -183,7 +187,7 @@ private fun PluginTextField(
     field: PluginConfigFieldUiState,
     onValueChange: (String) -> Unit,
 ) {
-    OutlinedTextField(
+    PreferenceTextField(
         value = field.value,
         onValueChange = onValueChange,
         label = { Text(field.label) },
@@ -248,6 +252,7 @@ private fun PluginSelectField(
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PluginConfigScreenEmptyPreview() {
     AsssistantaiTheme {
@@ -259,6 +264,7 @@ private fun PluginConfigScreenEmptyPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PluginConfigScreenWithFieldsPreview() {
     AsssistantaiTheme {

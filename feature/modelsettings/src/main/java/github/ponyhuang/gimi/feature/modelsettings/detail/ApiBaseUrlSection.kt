@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.modelsettings.detail
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,17 +9,17 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.feature.modelsettings.R
+import github.ponyhuang.gimi.ui.preference.PreferenceTextField
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,13 +31,14 @@ fun ApiBaseUrlSection(
     onProtocolChange: (ApiProtocol) -> Unit,
     onBaseUrlChange: (String) -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val allOptions = listOf(
-        ApiProtocol.Standard to stringResource(R.string.modelsettings_api_protocol_standard),
+        ApiProtocol.OpenaiChatcompletions to stringResource(R.string.modelsettings_api_protocol_standard),
         ApiProtocol.Anthropic to stringResource(R.string.modelsettings_api_protocol_anthropic),
         ApiProtocol.Gemini to stringResource(R.string.modelsettings_api_protocol_gemini),
     )
-    // 单协议厂商（OpenAI 仅 Standard、Anthropic 仅 Anthropic、Gemini 仅 Gemini）只展示其支持的接口标准。
+    // 单协议厂商（OpenAI 仅 OpenaiChatcompletions、Anthropic 仅 Anthropic、Gemini 仅 Gemini）只展示其支持的接口标准。
     val options = allOptions.filter { it.first in service.supportedProtocols }
     val currentLabel = options.firstOrNull { it.first == service.apiProtocol }?.second
         ?: options.first().second
@@ -45,11 +47,11 @@ fun ApiBaseUrlSection(
 
     Column(
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         if (options.size == 1) {
             // 协议被厂商约束锁定时，用禁用的只读输入框展示当前唯一可用协议。
-            OutlinedTextField(
+            PreferenceTextField(
                 value = currentLabel,
                 onValueChange = {},
                 readOnly = true,
@@ -60,12 +62,13 @@ fun ApiBaseUrlSection(
         } else {
             ExposedDropdownMenuBox(
                 expanded = isMenuExpanded,
-                onExpandedChange = { onToggleMenu() },
+                onExpandedChange = { if (enabled) onToggleMenu() },
             ) {
-                OutlinedTextField(
+                PreferenceTextField(
                     value = currentLabel,
                     onValueChange = {},
                     readOnly = true,
+                    enabled = enabled,
                     label = { Text(stringResource(R.string.modelsettings_api_protocol_label)) },
                     trailingIcon = {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = isMenuExpanded)
@@ -87,10 +90,11 @@ fun ApiBaseUrlSection(
         }
 
         if (showsBaseUrlField) {
-            OutlinedTextField(
+            PreferenceTextField(
                 value = service.activeApiBaseUrl,
                 onValueChange = onBaseUrlChange,
                 singleLine = true,
+                enabled = enabled,
                 label = { Text(stringResource(R.string.modelsettings_api_url_label)) },
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -99,6 +103,7 @@ fun ApiBaseUrlSection(
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ApiBaseUrlSectionPreview() {
     AsssistantaiTheme {
@@ -109,7 +114,7 @@ private fun ApiBaseUrlSectionPreview() {
                 isEnabled = true,
                 apiKey = "sk-test",
                 apiBaseUrl = "https://api.openai.com/v1",
-                apiProtocol = ApiProtocol.Standard,
+                apiProtocol = ApiProtocol.OpenaiChatcompletions,
                 anthropicBaseUrl = "https://api.anthropic.com",
                 groups = emptyList(),
             ),
@@ -123,6 +128,7 @@ private fun ApiBaseUrlSectionPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ApiBaseUrlSectionLockedProtocolPreview() {
     AsssistantaiTheme {

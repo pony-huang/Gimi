@@ -3,16 +3,16 @@ package github.ponyhuang.gimi.data.agent
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
-import github.ponyhuang.gimi.data.agent.tools.mcp.McpToolset
+import com.google.adk.kt.tools.Toolset
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * 将持久化的 [McpServer] 配置转换为 [McpToolset] 实例，供 [AgentFactory] 注入 agent。
+ * 将持久化的 [McpServer] 配置转换为官方 [Toolset] 实例，供 [AgentFactory] 注入 agent。
  *
- * 替代了旧的 [McpToolRegistry]，采用 [McpToolset] 的会话池化、自动恢复和重试机制，
+ * 使用官方远端工具集的会话复用机制，
  * 代替原来每次发现和执行都新建连接的方式。
  *
  * 工具集按 `(revision, selectedServerIds)` 做小容量 LRU 缓存；revision 变化时
@@ -116,7 +116,7 @@ data class McpToolsetHandle(
     val serverId: String,
     val displayName: String,
     val isGloballyEnabled: Boolean,
-    val toolset: McpToolset,
+    val toolset: Toolset,
 )
 
 /**

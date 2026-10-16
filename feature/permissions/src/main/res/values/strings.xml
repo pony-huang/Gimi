@@ -2,10 +2,6 @@
     <!-- PermissionSettingsScreen -->
     <string name="permissions_screen_title">权限管理</string>
     <string name="permissions_section_regular">普通权限</string>
-    <string name="permissions_regular_all_granted">普通权限已全部授权</string>
-    <string name="permissions_grant_all">一键授权普通权限</string>
-    <string name="permissions_partial_blocked">部分权限已被系统阻止，请前往应用设置手动开启。</string>
-    <string name="permissions_open_settings">打开应用设置</string>
 
     <string name="permissions_section_special">特殊权限</string>
     <string name="permissions_special_modify_settings_title">修改系统设置</string>
@@ -30,4 +26,6 @@
     <string name="permission_desc_notifications">用于显示后台语音任务的运行状态</string>
     <string name="permissions_special_usage_access_title">应用使用情况</string>
     <string name="permissions_special_usage_access_subtitle">允许智能推荐读取最近使用的应用；不会保存应用使用记录</string>
+    <string name="permissions_special_overlay_title">悬浮窗</string>
+    <string name="permissions_special_overlay_subtitle">允许小窗显示在其他应用上方</string>
 </resources>

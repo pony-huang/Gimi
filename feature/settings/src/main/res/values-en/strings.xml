@@ -1,11 +1,11 @@
 <resources>
+    <string name="settings_sandbox_title">Sandbox</string>
+    <string name="settings_sandbox_subtitle">Configure the E2B sandbox execution environment</string>
     <string name="settings_title">Settings</string>
 
     <string name="settings_group_model">Models</string>
-    <string name="settings_group_tools">Tools</string>
-    <string name="settings_group_general">General</string>
     <string name="settings_memory_title">Memory</string>
-    <string name="settings_memory_subtitle">Configure on-device or cloud long-term memory</string>
+    <string name="settings_memory_subtitle">Configure local and cloud memory</string>
 
     <string name="settings_model_service_title">API access</string>
     <string name="settings_model_service_subtitle">Manage keys and model services</string>
@@ -14,25 +14,25 @@
     <string name="settings_default_model_subtitle">Choose default models for each feature</string>
 
     <string name="settings_mcp_title">MCP</string>
-    <string name="settings_mcp_subtitle">Connect and authorize remote tools</string>
+    <string name="settings_mcp_subtitle">Connect remote tool services</string>
 
     <string name="settings_plugins_title">Plugins</string>
     <string name="settings_plugins_subtitle">Enable and manage dynamic plugins</string>
 
     <string name="settings_skills_title">Skills</string>
-    <string name="settings_skills_subtitle">Install reusable instructions and resources</string>
+    <string name="settings_skills_subtitle">Install Skills</string>
 
     <string name="settings_work_files_title">Folders</string>
-    <string name="settings_work_files_subtitle">Authorize folders the assistant can search</string>
-    <string name="settings_workspace_title">Workspace</string>
-    <string name="settings_workspace_subtitle">View and manage chat attachment files</string>
+    <string name="settings_work_files_subtitle">Allow access to local folders</string>
+    <string name="settings_workspace_title">Cache</string>
+    <string name="settings_workspace_subtitle">Manage chat attachments</string>
 
     <string name="settings_tool_authorization_title">Tool access</string>
     <string name="settings_tool_authorization_subtitle">Choose which local tools the assistant may use</string>
     <string name="settings_mobile_use_title">Shizuku</string>
     <string name="settings_mobile_use_subtitle">Let the Agent use other apps in the background</string>
     <string name="settings_permissions_title">Permissions</string>
-    <string name="settings_permissions_subtitle">Pre-grant permissions needed for chat and voice features</string>
+    <string name="settings_permissions_subtitle">Manage system access</string>
 
     <string name="settings_about_title">About</string>
     <string name="settings_about_subtitle">Version %1$s</string>
@@ -67,7 +67,7 @@
     <string name="update_failed_title">Update failed</string>
     <string name="update_retry">Retry</string>
     <string name="settings_recommendations_title">Smart recommendations</string>
-    <string name="settings_recommendations_subtitle">Configure new-chat suggestions and idle pre-generation</string>
+    <string name="settings_recommendations_subtitle">Configure suggestions and pre-generation</string>
 
     <string name="logs_title">Logs</string>
     <string name="logs_subtitle">View and export logs from the last 24 hours</string>
@@ -82,4 +82,9 @@
     <string name="logs_close">Close</string>
     <string name="logs_export_success">Logs exported</string>
     <string name="logs_export_failed">Could not export logs. Please retry.</string>
+    <string name="settings_group_extensions">Extensions</string>
+    <string name="settings_group_files">Files and workspace</string>
+    <string name="settings_group_assistant">Assistant preferences</string>
+    <string name="settings_group_permissions">Permissions and device</string>
+    <string name="settings_group_about">About</string>
 </resources>

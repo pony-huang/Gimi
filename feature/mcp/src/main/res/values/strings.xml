@@ -13,7 +13,7 @@
     <string name="mcp_empty_action_import">导入 JSON 配置</string>
     <string name="mcp_section_add_methods">添加方式</string>
     <string name="mcp_method_new_title">新建</string>
-    <string name="mcp_method_new_subtitle">手动配置 SSE 或 Streamable HTTP 服务</string>
+    <string name="mcp_method_new_subtitle">手动配置 Streamable HTTP 服务</string>
     <string name="mcp_method_import_title">导入</string>
     <string name="mcp_method_import_subtitle">粘贴 mcpServers JSON 配置</string>
     <string name="mcp_section_import_mcp">导入 MCP 配置</string>
@@ -31,7 +31,6 @@
     <string name="mcp_field_json_label">MCP JSON</string>
     <string name="mcp_field_json_placeholder">{\n  \"mcpServers\": { … }\n}</string>
     <string name="mcp_stdio_skip_notice">包含 command / args 的 stdio 配置会被跳过，因为 Android 应用无法安全启动本机命令。</string>
-    <string name="mcp_transport_sse">SSE</string>
     <string name="mcp_transport_streamable_http">Streamable HTTP</string>
 
     <!-- McpServerEditorScreen -->

@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.modelsettings.detail
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -11,19 +12,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
 fun LLMModelSettingDetailScreen(
@@ -41,7 +43,7 @@ fun LLMModelSettingDetailScreen(
     // Agent 任务进行中时整页配置降透明度提示只读，改配置动作被 dispatch 屏蔽。
     val blockedAlpha = if (state.isMutationBlocked) 0.6f else 1f
 
-    PreferencePageContainer(modifier = modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -58,6 +60,7 @@ fun LLMModelSettingDetailScreen(
             PreferenceGroupCard(modifier = Modifier.alpha(blockedAlpha)) {
                 HeaderSection(
                     service = service,
+                    mutationEnabled = !state.isMutationBlocked,
                     onToggleEnabled = {
                         dispatch(LLMModelSettingDetailAction.EnabledChanged(it))
                     },
@@ -76,6 +79,7 @@ fun LLMModelSettingDetailScreen(
             )
             PreferenceGroupCard(modifier = Modifier.alpha(blockedAlpha)) {
                 ApiKeySection(
+                    enabled = !state.isMutationBlocked,
                     apiKey = service.apiKey,
                     keyHelpUrl = service.keyHelpUrl,
                     isVisible = state.isApiKeyVisible,
@@ -96,6 +100,7 @@ fun LLMModelSettingDetailScreen(
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
                 )
                 ApiBaseUrlSection(
+                    enabled = !state.isMutationBlocked,
                     service = service,
                     isMenuExpanded = state.isProtocolMenuExpanded,
                     onToggleMenu = { dispatch(LLMModelSettingDetailAction.ToggleProtocolMenu) },
@@ -138,6 +143,7 @@ private fun LLMModelSettingDetailAction.changesAgentConfiguration(): Boolean = w
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun LLMModelSettingDetailScreenPreview() {
     AsssistantaiTheme {
@@ -147,7 +153,7 @@ private fun LLMModelSettingDetailScreenPreview() {
             isEnabled = true,
             apiKey = "sk-test",
             apiBaseUrl = "https://api.openai.com/v1",
-            apiProtocol = ApiProtocol.Standard,
+            apiProtocol = ApiProtocol.OpenaiChatcompletions,
             anthropicBaseUrl = "https://api.anthropic.com",
             groups = listOf(
                 ModelGroup(

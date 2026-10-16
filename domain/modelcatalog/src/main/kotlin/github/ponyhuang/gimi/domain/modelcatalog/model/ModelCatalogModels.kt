@@ -21,7 +21,7 @@ data class LLMModelSetting(
 ) {
     val activeApiBaseUrl: String
         get() = when (apiProtocol) {
-            ApiProtocol.Standard -> apiBaseUrl
+            ApiProtocol.OpenaiChatcompletions -> apiBaseUrl
             ApiProtocol.Anthropic -> anthropicBaseUrl
             // Gemini 走 ADK 原生实现，无需请求地址；保留 apiBaseUrl 仅供连接测试 / 模型刷新。
             ApiProtocol.Gemini -> apiBaseUrl
@@ -63,13 +63,14 @@ data class DefaultModelSettings(
 )
 
 enum class ApiProtocol {
-    Standard,
+    /** OpenAI Chat Completions 及兼容协议，与未来的 Responses 协议分别建模。 */
+    OpenaiChatcompletions,
     Anthropic,
     Gemini,
 }
 
 /** 双协议厂商（OpenAI 兼容 + Anthropic 兼容）允许的接口协议集合；Gemini 仅自家厂商使用。 */
-val DUAL_API_PROTOCOLS: List<ApiProtocol> = listOf(ApiProtocol.Standard, ApiProtocol.Anthropic)
+val DUAL_API_PROTOCOLS: List<ApiProtocol> = listOf(ApiProtocol.OpenaiChatcompletions, ApiProtocol.Anthropic)
 
 sealed interface CatalogLoadState {
     data object Loading : CatalogLoadState

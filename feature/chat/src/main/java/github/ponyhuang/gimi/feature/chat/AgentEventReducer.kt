@@ -173,6 +173,12 @@ internal class AgentEventReducer(
 
     fun applyError(sessionId: String, message: String, invocationId: String? = null) {
         val runtime = runtimeFor(sessionId)
+        val previous = runtime.messages.lastOrNull()
+        // ADK 先发出错误 Event 再抛异常；同一次失败不能重复追加气泡。
+        // 新一轮 launchRun 会置 running=true，仍应保留该轮自己的错误记录。
+        if (runtime.failed && !runtime.isAgentRunning && previous?.error == message &&
+            (invocationId == null || previous.invocationId == invocationId)
+        ) return
         clearToolConfirmationState(runtime)
         runtime.messages = runtime.messages + Messages.fromError(error = message, invocationId = invocationId)
         runtime.isAgentRunning = false
@@ -290,11 +296,10 @@ internal class AgentEventReducer(
     private fun mergeInto(sessionId: String, message: Message, event: ChatRunEvent): Message {
         val parts = event.parts
         var working = message
-        parts.forEachIndexed { index, part ->
+        parts.forEach { part ->
             val text = part.text
             if (!text.isNullOrEmpty()) {
-                val thought = part.thought
-                working = appendTextPart(sessionId, working, event, index, text, thought)
+                working = appendTextPart(sessionId, working, event, text, part.thought)
             }
         }
         val newCalls = event.functionCalls.map { it.toView() }
@@ -316,12 +321,18 @@ internal class AgentEventReducer(
      * - 若末段的 `thought` 标志与本次相同 → 追加；
      * - 否则新建段。
      * - 同时把新增的文本作为 delta 推到对应 TextPart 的 channel，供渲染端做增量 markdown 解析。
+     *
+     * 新段 id = 「事件 id + 该消息已有文本段数」：
+     * ADK 同一次模型调用的所有流式事件共享同一个 `Event.id`（只有收尾的完整事件换新 id），
+     * 思考增量与正文增量因此来自两个不同事件、part 下标却都是 0。若沿用「事件内 part 下标」，
+     * 同一消息里的思考段与正文段会撞成同一个 id，两条 delta 落进同一个 channel ——
+     * 思考段被 `MessageBubble` 过滤后无人消费它的 channel，正文气泡于是把思考文本也渲染出来。
+     * 消息内文本段只增不减，用已有段数做序号即可保证 id 唯一且创建后稳定。
      */
     private fun appendTextPart(
         sessionId: String,
         message: Message,
         event: ChatRunEvent,
-        partIndex: Int,
         text: String,
         thought: Boolean,
     ): Message {
@@ -333,7 +344,7 @@ internal class AgentEventReducer(
             emitPartDelta(sessionId, last.id, text)
         } else {
             val newPart = TextPart(
-                id = "${event.id}:$partIndex",
+                id = "${event.id}:${parts.size}",
                 text = text,
                 thought = thought,
             )

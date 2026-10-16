@@ -30,6 +30,7 @@ class AndroidPermissionRepository @Inject constructor(
                     permission.androidName(),
                 ) == PackageManager.PERMISSION_GRANTED
             }
+            if (Settings.canDrawOverlays(context)) add(AppPermission.DrawOverlays)
             if (Settings.System.canWrite(context)) add(AppPermission.WriteSystemSettings)
             if (
                 NotificationManagerCompat.getEnabledListenerPackages(context)
@@ -97,6 +98,7 @@ class AndroidPermissionRepository @Inject constructor(
         AppPermission.WriteSystemSettings,
         AppPermission.NotificationListener,
         AppPermission.UsageStats,
+        AppPermission.DrawOverlays,
         -> error("Special permissions do not have runtime permission names.")
     }
 

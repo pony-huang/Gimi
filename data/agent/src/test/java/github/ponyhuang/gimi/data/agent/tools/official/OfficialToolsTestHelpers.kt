@@ -37,7 +37,7 @@ fun servicesWith(
         every { isEnabled } returns true
         every { isOfficialToolsEnabled } returns true
         every { this@mockk.apiKey } returns apiKey
-        every { apiProtocol } returns ApiProtocol.Standard
+        every { apiProtocol } returns ApiProtocol.OpenaiChatcompletions
     }
     return mockk {
         every { currentServices() } returns listOf(service)

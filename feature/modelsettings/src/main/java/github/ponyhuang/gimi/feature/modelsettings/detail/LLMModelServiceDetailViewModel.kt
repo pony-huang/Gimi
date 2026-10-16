@@ -141,7 +141,7 @@ class ModelServiceDetailViewModel @Inject constructor(
                 val service = state.service ?: return@update state
                 state.copy(
                     service = when (service.apiProtocol) {
-                        ApiProtocol.Standard -> service.copy(apiBaseUrl = value)
+                        ApiProtocol.OpenaiChatcompletions -> service.copy(apiBaseUrl = value)
                         ApiProtocol.Anthropic -> service.copy(anthropicBaseUrl = value)
                         ApiProtocol.Gemini -> service.copy(apiBaseUrl = value)
                     },

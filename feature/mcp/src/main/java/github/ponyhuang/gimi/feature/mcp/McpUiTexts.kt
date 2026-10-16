@@ -15,6 +15,5 @@ internal fun localizeMcpError(error: String): String = when (error) {
 
 @Composable
 internal fun McpTransport.displayName(): String = when (this) {
-    McpTransport.SSE -> stringResource(R.string.mcp_transport_sse)
     McpTransport.STREAMABLE_HTTP -> stringResource(R.string.mcp_transport_streamable_http)
 }

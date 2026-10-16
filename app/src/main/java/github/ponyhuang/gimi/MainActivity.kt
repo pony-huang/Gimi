@@ -56,6 +56,7 @@ class MainActivity : ComponentActivity() {
 
     private val sharedMediaUris = mutableStateOf<List<Uri>>(emptyList())
     private val openChatRequest = mutableStateOf(0)
+    private val openPermissionsRequest = mutableStateOf(0)
 
     override fun onStart() {
         super.onStart()
@@ -70,16 +71,26 @@ class MainActivity : ComponentActivity() {
             ?.getStringArrayList(KEY_SHARED_MEDIA_URIS)
             ?.map(Uri::parse)
             ?: sharedImageUris(intent)
+        if (savedInstanceState == null && intent.action == ACTION_OPEN_PERMISSIONS) openPermissionsRequest.value += 1
         if (intent.action == ACTION_OPEN_CURRENT_CHAT) openChatRequest.value += 1
         enableEdgeToEdge()
         setContent {
             val incompatiblePluginMessage = stringResource(R.string.plugin_incompatible_upgrade)
-            LaunchedEffect(pluginLoadNotices, incompatiblePluginMessage) {
+            val incompatiblePluginsMessage = stringResource(R.string.plugins_incompatible_upgrade)
+            val pluginNameSeparator = stringResource(R.string.plugin_name_separator)
+            LaunchedEffect(pluginLoadNotices, incompatiblePluginMessage, incompatiblePluginsMessage, pluginNameSeparator) {
                 lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                    pluginLoadNotices.incompatiblePluginNames.collect { name ->
+                    pluginLoadNotices.incompatiblePluginNames.collect { names ->
                         Toast.makeText(
                             this@MainActivity,
-                            incompatiblePluginMessage.format(name),
+                            if (names.size == 1) {
+                                incompatiblePluginMessage.format(names.single())
+                            } else {
+                                incompatiblePluginsMessage.format(
+                                    pluginUpgradeNameSummary(names, pluginNameSeparator),
+                                    names.size,
+                                )
+                            },
                             Toast.LENGTH_LONG,
                         ).show()
                     }
@@ -99,6 +110,7 @@ class MainActivity : ComponentActivity() {
                         assistantSessionCoordinator = assistantSessionCoordinator,
                         assistantPanelInteractor = assistantPanelInteractor,
                         openChatRequest = openChatRequest.value,
+                        openPermissionsRequest = openPermissionsRequest.value,
                         sharedMediaUris = sharedMediaUris.value,
                         onSharedMediaConsumed = ::consumeSharedMedia,
                     )
@@ -131,6 +143,7 @@ class MainActivity : ComponentActivity() {
             Intent.ACTION_SEND,
             Intent.ACTION_SEND_MULTIPLE
             -> sharedMediaUris.value = sharedImageUris(intent)
+            ACTION_OPEN_PERMISSIONS -> openPermissionsRequest.value += 1
             ACTION_OPEN_CURRENT_CHAT -> openChatRequest.value += 1
         }
     }
@@ -157,6 +170,7 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val KEY_SHARED_MEDIA_URIS = "shared_media_uris"
+        const val ACTION_OPEN_PERMISSIONS = "github.ponyhuang.gimi.action.OPEN_PERMISSIONS"
         const val ACTION_OPEN_CURRENT_CHAT = "github.ponyhuang.gimi.action.OPEN_CURRENT_CHAT"
     }
 }

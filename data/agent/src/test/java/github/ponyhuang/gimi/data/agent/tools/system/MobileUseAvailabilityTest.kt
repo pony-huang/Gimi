@@ -60,7 +60,7 @@ class MobileUseAvailabilityTest {
         every { runConfig } returns RunConfig(
             customMetadata = ToolRunMetadata.of(
                 ModelRuntimeMetadata(
-                    "service", ApiProtocol.Standard, "model", "https://example.com", supportsImages,
+                    "service", ApiProtocol.OpenaiChatcompletions, "model", "https://example.com", supportsImages,
                 ),
                 null,
                 true,

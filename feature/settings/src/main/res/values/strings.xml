@@ -1,11 +1,11 @@
 <resources>
+    <string name="settings_sandbox_title">沙盒</string>
+    <string name="settings_sandbox_subtitle">配置执行E2B沙盒环境</string>
     <string name="settings_title">设置</string>
 
     <string name="settings_group_model">模型</string>
-    <string name="settings_group_tools">工具</string>
-    <string name="settings_group_general">通用</string>
     <string name="settings_memory_title">记忆</string>
-    <string name="settings_memory_subtitle">配置本地记忆或云端长期记忆</string>
+    <string name="settings_memory_subtitle">配置本地与云端记忆</string>
 
     <string name="settings_model_service_title">API 接入</string>
     <string name="settings_model_service_subtitle">管理密钥和模型服务</string>
@@ -14,25 +14,25 @@
     <string name="settings_default_model_subtitle">配置各项功能的默认模型</string>
 
     <string name="settings_mcp_title">MCP</string>
-    <string name="settings_mcp_subtitle">连接和授权远程工具服务</string>
+    <string name="settings_mcp_subtitle">连接远程工具服务</string>
 
     <string name="settings_plugins_title">插件</string>
     <string name="settings_plugins_subtitle">启用和管理动态插件</string>
 
     <string name="settings_skills_title">Skills</string>
-    <string name="settings_skills_subtitle">安装可复用的说明与资源</string>
+    <string name="settings_skills_subtitle">安装Skills</string>
 
     <string name="settings_work_files_title">文件夹</string>
-    <string name="settings_work_files_subtitle">授权助手搜索的本机文件夹</string>
-    <string name="settings_workspace_title">工作区</string>
-    <string name="settings_workspace_subtitle">查看与管理聊天附件文件</string>
+    <string name="settings_work_files_subtitle">授权助手访问本机文件夹</string>
+    <string name="settings_workspace_title">缓存区</string>
+    <string name="settings_workspace_subtitle">管理聊天附件文件</string>
 
     <string name="settings_tool_authorization_title">工具授权</string>
     <string name="settings_tool_authorization_subtitle">选择允许助手使用的本地工具</string>
     <string name="settings_mobile_use_title">Shizuku</string>
     <string name="settings_mobile_use_subtitle">Agent 后台操作其他应用</string>
     <string name="settings_permissions_title">权限管理</string>
-    <string name="settings_permissions_subtitle">预先授权聊天任务和语音功能所需权限</string>
+    <string name="settings_permissions_subtitle">管理系统访问权限</string>
 
     <string name="settings_about_title">关于</string>
     <string name="settings_about_subtitle">版本 %1$s</string>
@@ -67,7 +67,7 @@
     <string name="update_failed_title">更新失败</string>
     <string name="update_retry">重试</string>
     <string name="settings_recommendations_title">智能推荐</string>
-    <string name="settings_recommendations_subtitle">配置新会话的任务建议与空闲预生成</string>
+    <string name="settings_recommendations_subtitle">配置任务建议与预生成</string>
 
     <string name="logs_title">日志</string>
     <string name="logs_subtitle">查看和导出最近 24 小时的日志</string>
@@ -82,4 +82,9 @@
     <string name="logs_close">关闭</string>
     <string name="logs_export_success">日志已导出</string>
     <string name="logs_export_failed">日志导出失败，请重试。</string>
+    <string name="settings_group_extensions">能力扩展</string>
+    <string name="settings_group_files">文件与工作区</string>
+    <string name="settings_group_assistant">助手偏好</string>
+    <string name="settings_group_permissions">权限与设备</string>
+    <string name="settings_group_about">关于</string>
 </resources>

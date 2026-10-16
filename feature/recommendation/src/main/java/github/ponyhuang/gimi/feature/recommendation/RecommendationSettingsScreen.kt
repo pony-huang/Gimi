@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.recommendation
 
+import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -35,10 +36,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationRefreshStatus
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
-import github.ponyhuang.gimi.ui.preference.PreferenceSwitchItem
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.preference.PreferenceSwitchItem
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import java.time.Instant
 import java.time.ZoneId
@@ -53,7 +55,7 @@ fun RecommendationSettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     var showIntervalDialog by remember { mutableStateOf(false) }
-    PreferencePageContainer(modifier = modifier) {
+    PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(vertical = 12.dp),
@@ -189,6 +191,7 @@ private fun recommendationStatusText(state: RecommendationSettingsUiState): Stri
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun RecommendationSettingsScreenEnabledPreview() {
     AsssistantaiTheme {
@@ -206,6 +209,7 @@ private fun RecommendationSettingsScreenEnabledPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun RecommendationSettingsScreenRetryPreview() {
     AsssistantaiTheme {
@@ -224,6 +228,7 @@ private fun RecommendationSettingsScreenRetryPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun RecommendationSettingsScreenDisabledPreview() {
     AsssistantaiTheme {

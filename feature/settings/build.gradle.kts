@@ -21,7 +21,6 @@ dependencies {
     implementation(project(":domain:logging"))
     implementation(libs.androidx.activity.compose)
     implementation(project(":domain:conversation"))
-    implementation(project(":domain:mobileuse"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.compose.foundation)

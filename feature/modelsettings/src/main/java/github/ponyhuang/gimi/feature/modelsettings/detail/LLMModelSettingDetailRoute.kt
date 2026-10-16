@@ -11,11 +11,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
-import androidx.core.net.toUri
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 
 // ModelsSynchronized 的 count 为运行时参数，文案只能在 effect 消费时解析，豁免该 lint。
 @SuppressLint("LocalContextGetResourceValueCall")
@@ -64,6 +65,8 @@ fun LLMModelSettingDetailRoute(
     }
 
     PreferenceScaffold(
+
+        style = PreferenceStyle.Compact,
         title = stringResource(R.string.modelsettings_detail_title),
         onBack = onBack,
     ) { scaffoldModifier ->

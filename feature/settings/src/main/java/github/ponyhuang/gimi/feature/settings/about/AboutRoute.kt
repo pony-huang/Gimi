@@ -24,6 +24,7 @@ import github.ponyhuang.gimi.feature.settings.update.UpdateDialog
 import github.ponyhuang.gimi.feature.settings.update.UpdateEffect
 import github.ponyhuang.gimi.feature.settings.update.UpdateViewModel
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 
 private const val PROJECT_URL = "https://github.com/pony-huang/Gimi"
 
@@ -90,6 +91,8 @@ fun AboutRoute(
     }
 
     PreferenceScaffold(
+
+        style = PreferenceStyle.Compact,
         title = stringResource(R.string.settings_about_title),
         onBack = onBack,
         modifier = modifier,

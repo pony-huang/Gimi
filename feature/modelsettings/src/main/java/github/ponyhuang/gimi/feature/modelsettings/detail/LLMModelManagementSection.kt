@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.modelsettings.detail
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -18,7 +19,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,12 +29,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
+import github.ponyhuang.gimi.ui.preference.PreferenceTextField
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /**
  * 「模型」管理区：刷新后按目录顺序平铺模型，避免来源分组和折叠增加查找成本。
@@ -194,7 +195,7 @@ private fun AddModelDialog(
         title = { Text(stringResource(R.string.modelsettings_dialog_add_custom_model_title)) },
         text = {
             Column {
-                OutlinedTextField(
+                PreferenceTextField(
                     value = input,
                     onValueChange = onInputChange,
                     singleLine = true,
@@ -229,6 +230,7 @@ private fun AddModelDialog(
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun LLMModelManagementSectionPreview() {
     AsssistantaiTheme {
@@ -238,7 +240,7 @@ private fun LLMModelManagementSectionPreview() {
             isEnabled = true,
             apiKey = "sk-test",
             apiBaseUrl = "https://api.openai.com/v1",
-            apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Standard,
+            apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.OpenaiChatcompletions,
             anthropicBaseUrl = "https://api.anthropic.com",
             groups = listOf(
                 github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup(
@@ -272,6 +274,7 @@ private fun LLMModelManagementSectionPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun LLMModelManagementSectionAddDialogPreview() {
     AsssistantaiTheme {
@@ -282,7 +285,7 @@ private fun LLMModelManagementSectionAddDialogPreview() {
                 isEnabled = true,
                 apiKey = "sk-test",
                 apiBaseUrl = "https://api.openai.com/v1",
-                apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Standard,
+                apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.OpenaiChatcompletions,
                 anthropicBaseUrl = "https://api.anthropic.com",
                 groups = emptyList(),
             ),

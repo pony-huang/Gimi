@@ -31,7 +31,7 @@ class DefaultTtsVoiceRepositoryTest {
             isEnabled = true,
             apiKey = "key123",
             apiBaseUrl = "https://api.test.com",
-            apiProtocol = ApiProtocol.Standard,
+            apiProtocol = ApiProtocol.OpenaiChatcompletions,
             anthropicBaseUrl = "",
             groups = emptyList(),
         )

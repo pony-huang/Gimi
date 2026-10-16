@@ -14,17 +14,19 @@ class OfficialToolSupportTest {
         for (modelId in listOf("GLM", "models/GLM-4.6", "glm_4", "glm.4")) {
             assertEquals(
                 listOf(OfficialToolIds.GLM_WEB_SEARCH),
-                support.specsFor("glm", ApiProtocol.Standard, modelId).map { it.toolId },
+                support.specsFor("glm", ApiProtocol.OpenaiChatcompletions, modelId).map { it.toolId },
             )
         }
-        assertTrue(support.specsFor("glm", ApiProtocol.Standard, "glmatrix").isEmpty())
+        assertTrue(support.specsFor("glm", ApiProtocol.OpenaiChatcompletions, "glmatrix").isEmpty())
     }
 
     @Test
     fun crossModelAvailabilityIncludesOnlyIndependentApiTools() {
-        val specs = available(listOf(service("openai"), service("minimax"), service("kimi")))
+        val specs = available(
+            listOf(service("anthropic"), service("openai"), service("minimax"), service("kimi")),
+        )
         assertEquals(
-            listOf(OfficialToolIds.OPENAI_WEB_SEARCH, OfficialToolIds.MINIMAX_IMAGE_GENERATION),
+            listOf(OfficialToolIds.ANTHROPIC_WEB_SEARCH, OfficialToolIds.MINIMAX_IMAGE_GENERATION),
             specs.map { it.toolId },
         )
         assertFalse(specs.any { it.toolId == OfficialToolIds.MINIMAX_WEB_SEARCH })
@@ -55,12 +57,12 @@ class OfficialToolSupportTest {
     }
 
     private fun available(services: List<LLMModelSetting>) = support.availableSpecsFor(
-        "openai", ApiProtocol.Standard, "gpt-5.2", services,
+        "anthropic", ApiProtocol.Anthropic, "claude-sonnet-4-6", services,
     )
 
     private fun service(id: String) = LLMModelSetting(
         id = id, name = id, isEnabled = true, apiKey = "key",
-        apiBaseUrl = "https://example.com", apiProtocol = ApiProtocol.Standard,
+        apiBaseUrl = "https://example.com", apiProtocol = ApiProtocol.OpenaiChatcompletions,
         anthropicBaseUrl = "https://example.com", groups = emptyList(),
     )
 }

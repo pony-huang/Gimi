@@ -9,12 +9,19 @@ import org.junit.Test
 
 class SecureMcpServerRepositoryCharacterizationTest {
     @Test
-    fun importCurlCreatesSseServerAndMarksPlaceholderAuthorizationAsPending() {
+    fun removedSseEntriesAreNotReinterpretedAsHttp() {
+        val storage = FakeStorage("""[{"id":"old","transport":"SSE","endpointUrl":"https://example.com/sse"},{"id":"http","transport":"STREAMABLE_HTTP","endpointUrl":"https://example.com/mcp"}]""")
+        val repository = SecureMcpServerRepository(storage)
+        assertEquals(listOf("http"), repository.currentServers().map { it.id })
+    }
+
+    @Test
+    fun importCurlCreatesHttpServerAndMarksPlaceholderAuthorizationAsPending() {
         val repository = SecureMcpServerRepository(FakeStorage())
 
         val result = repository.importConfiguration(
             """
-            curl -N 'https://developer.zhihu.com/api/mcp/global_search/v1/sse' \
+            curl -N 'https://developer.zhihu.com/api/mcp/global_search/v1/mcp' \
               -H 'Authorization: Bearer <your_access_secret>' \
               -H 'Accept: text/event-stream'
             """.trimIndent(),
@@ -24,9 +31,9 @@ class SecureMcpServerRepositoryCharacterizationTest {
         assertEquals(1, result.created)
         assertEquals(setOf(server.id), result.credentialRequiredServerIds)
         assertEquals("zhihu-global-search", server.name)
-        assertEquals(McpTransport.SSE, server.transport)
+        assertEquals(McpTransport.STREAMABLE_HTTP, server.transport)
         assertEquals(
-            "https://developer.zhihu.com/api/mcp/global_search/v1/sse",
+            "https://developer.zhihu.com/api/mcp/global_search/v1/mcp",
             server.endpointUrl,
         )
         assertEquals("Accept=text/event-stream", server.headers)
@@ -37,7 +44,7 @@ class SecureMcpServerRepositoryCharacterizationTest {
         val repository = SecureMcpServerRepository(FakeStorage())
         val imported = repository.importConfiguration(
             """
-            curl -N 'https://developer.zhihu.com/api/mcp/global_search/v1/sse' \
+            curl -N 'https://developer.zhihu.com/api/mcp/global_search/v1/mcp' \
               -H 'Authorization: Bearer <your_access_secret>' \
               -H 'Accept: text/event-stream'
             """.trimIndent(),
@@ -60,15 +67,15 @@ class SecureMcpServerRepositoryCharacterizationTest {
             McpServer(
                 id = "stable-id",
                 name = "zhihu-global-search",
-                endpointUrl = "https://old.example.com/sse",
-                transport = McpTransport.SSE,
+                endpointUrl = "https://old.example.com/mcp",
+                transport = McpTransport.STREAMABLE_HTTP,
                 headers = "Authorization=Bearer existing-secret\nX-Trace=keep-if-not-replaced",
             ),
         )
 
         val result = repository.importConfiguration(
             """
-            curl -N 'https://developer.zhihu.com/api/mcp/global_search/v1/sse' \
+            curl -N 'https://developer.zhihu.com/api/mcp/global_search/v1/mcp' \
               -H 'Authorization: Bearer <your_access_secret>' \
               -H 'Accept: text/event-stream'
             """.trimIndent(),
@@ -101,8 +108,8 @@ class SecureMcpServerRepositoryCharacterizationTest {
             {
               "mcpServers": {
                 " github ": {
-                  "type": "sse",
-                  "url": " https://new.example.com/sse ",
+                  "type": "streamable_http",
+                  "url": " https://new.example.com/mcp ",
                   "headers": { "Authorization": "Bearer new-token" }
                 },
                 "maps": {
@@ -120,8 +127,8 @@ class SecureMcpServerRepositoryCharacterizationTest {
         assertEquals(2, repository.currentServers().size)
         assertEquals(
             original.copy(
-                endpointUrl = "https://new.example.com/sse",
-                transport = McpTransport.SSE,
+                endpointUrl = "https://new.example.com/mcp",
+                transport = McpTransport.STREAMABLE_HTTP,
                 bearerToken = "",
                 headers = "Authorization=Bearer new-token",
             ),
@@ -130,7 +137,7 @@ class SecureMcpServerRepositoryCharacterizationTest {
     }
 
     @Test
-    fun importPortableJsonAcceptsHttpAndSseAndSkipsStdio() {
+    fun importPortableJsonAcceptsHttpAndSkipsSseAndStdio() {
         val storage = FakeStorage()
         val repository = SecureMcpServerRepository(storage)
 
@@ -156,12 +163,11 @@ class SecureMcpServerRepositoryCharacterizationTest {
             """.trimIndent(),
         )
 
-        assertEquals(2, result.imported)
-        assertEquals(1, result.skipped)
-        assertEquals(2, repository.currentServers().size)
+        assertEquals(1, result.imported)
+        assertEquals(2, result.skipped)
+        assertEquals(1, repository.currentServers().size)
         assertEquals(McpTransport.STREAMABLE_HTTP, repository.currentServers()[0].transport)
         assertEquals("X-Api-Key=secret", repository.currentServers()[0].headers)
-        assertEquals(McpTransport.SSE, repository.currentServers()[1].transport)
         assertNotNull(storage.value)
     }
 

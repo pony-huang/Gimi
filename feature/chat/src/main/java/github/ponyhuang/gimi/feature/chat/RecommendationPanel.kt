@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
@@ -26,6 +27,7 @@ import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -62,18 +64,21 @@ internal fun RecommendationPanel(
             .fillMaxWidth()
             .padding(horizontal = 12.dp), // 与 ChatMessageBubble 用户气泡的横向内缩对齐
         horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Text(
             text = stringResource(R.string.chat_recommendations_title),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        recommendations.forEach { recommendation ->
-            RecommendationAction(
-                recommendation = recommendation,
-                onClick = { onRecommendationClick(recommendation.prompt) },
-            )
+        // 小气泡不额外占满默认的 48dp 高度，否则缩小正文会把空隙转移到气泡外。
+        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+            recommendations.forEach { recommendation ->
+                RecommendationAction(
+                    recommendation = recommendation,
+                    onClick = { onRecommendationClick(recommendation.prompt) },
+                )
+            }
         }
     }
 }

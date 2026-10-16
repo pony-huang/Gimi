@@ -49,7 +49,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -121,7 +120,8 @@ fun ChatScaffold(
     partChannelProvider: (String) -> ReceiveChannel<String>?,
     onSend: (String, List<DraftAttachment>, (ChatSubmissionResult) -> Unit) -> Unit,
     onStop: () -> Unit,
-    onTranscribeVoice: suspend (ByteArray) -> String,
+    onTranscribeVoice: VoiceTranscriptionRequest,
+    onCancelVoiceTranscription: () -> Unit = {},
     onToggleSpeechPlayback: (String, String) -> Unit,
     onToggleAutoSpeak: () -> Unit,
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit,
@@ -380,6 +380,9 @@ fun ChatScaffold(
                                 isGenerating = isAgentRunning,
                                 isVoiceInputAvailable = isSpeechRecognitionAvailable,
                                 onTranscribeVoice = onTranscribeVoice,
+                                voiceTranscriptionMode = state.voiceTranscriptionMode,
+                                onCancelVoiceTranscription = onCancelVoiceTranscription,
+                                voiceInputContextKey = state.sessionId,
                                 addToChatState = ChatAddToChatState(
                                     configuration = state.toolConfiguration,
                                     mcpServers = state.availableMcpServers,
@@ -614,32 +617,36 @@ internal fun ChatHeaderActions(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Surface(
-            onClick = onOpenDrawer,
-            shape = CircleShape,
-            color = chatCapsuleColor(),
-            shadowElevation = 3.dp,
-        ) {
-            Box(
+        // 视觉容器为 44dp，点击区仍为 48dp；背景不承接事件，避免缩小触摸范围。
+        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            Surface(
+                modifier = Modifier.size(44.dp),
+                shape = CircleShape,
+                color = chatCapsuleColor(),
+            ) {}
+            IconButton(
+                onClick = onOpenDrawer,
                 modifier = Modifier.size(48.dp),
-                contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Default.Menu,
                     contentDescription = stringResource(R.string.chat_open_drawer),
+                    modifier = Modifier.size(22.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
 
-        Surface(
-            shape = CircleShape,
-            color = chatCapsuleColor(),
-            shadowElevation = 3.dp,
-        ) {
+        Box(contentAlignment = Alignment.Center) {
+            Surface(
+                modifier = Modifier.matchParentSize().padding(vertical = 2.dp),
+                shape = CircleShape,
+                color = chatCapsuleColor(),
+            ) {}
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // 自动语音播报全局开关：开启态用 primary 高亮，关闭态回到普通前景色。
                 IconButton(
@@ -657,7 +664,7 @@ internal fun ChatHeaderActions(
                                 R.string.chat_auto_speak_off
                             },
                         ),
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(22.dp),
                         tint = if (autoSpeakEnabled) {
                             MaterialTheme.colorScheme.primary
                         } else {
@@ -665,10 +672,6 @@ internal fun ChatHeaderActions(
                         },
                     )
                 }
-                VerticalDivider(
-                    modifier = Modifier.height(24.dp),
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
-                )
                 IconButton(
                     onClick = onNewConversation,
                     modifier = Modifier.size(48.dp),
@@ -676,12 +679,10 @@ internal fun ChatHeaderActions(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
                         contentDescription = stringResource(R.string.chat_new_conversation),
+                        modifier = Modifier.size(22.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                VerticalDivider(
-                    modifier = Modifier.height(24.dp),
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f),
-                )
                 Box {
                     IconButton(
                         onClick = onOpenSettings,
@@ -692,7 +693,8 @@ internal fun ChatHeaderActions(
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = stringResource(R.string.chat_settings),
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(22.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     if (showUpdateBadge) {
@@ -700,8 +702,8 @@ internal fun ChatHeaderActions(
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
-                                .padding(top = 8.dp, end = 8.dp)
-                                .size(10.dp)
+                                .padding(top = 10.dp, end = 10.dp)
+                                .size(8.dp)
                                 .background(MaterialTheme.colorScheme.error, CircleShape),
                         )
                     }
@@ -812,7 +814,7 @@ private fun ChatScaffoldEmptyPreview() {
             partChannelProvider = { null },
             onSend = { _, _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
             onStop = {},
-            onTranscribeVoice = { "" },
+            onTranscribeVoice = { _, _, _, _ -> },
             onToggleSpeechPlayback = { _, _ -> },
             onToggleAutoSpeak = {},
             onOpenDocument = {},
@@ -858,7 +860,7 @@ private fun ChatScaffoldWithMessagesPreview() {
             partChannelProvider = { null },
             onSend = { _, _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
             onStop = {},
-            onTranscribeVoice = { "" },
+            onTranscribeVoice = { _, _, _, _ -> },
             onToggleSpeechPlayback = { _, _ -> },
             onToggleAutoSpeak = {},
             onOpenDocument = {},
@@ -883,6 +885,7 @@ private fun ChatScaffoldWithMessagesPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "顶部操作 · 深色", showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ChatHeaderActionsPreview() {
     AsssistantaiTheme {
@@ -892,6 +895,21 @@ private fun ChatHeaderActionsPreview() {
             onNewConversation = {},
             onOpenSettings = {},
             onToggleAutoSpeak = {},
+        )
+    }
+}
+
+@Preview(name = "顶部操作 · 更新提醒", showBackground = true)
+@Composable
+private fun ChatHeaderActionsUpdatePreview() {
+    AsssistantaiTheme {
+        ChatHeaderActions(
+            autoSpeakEnabled = false,
+            onOpenDrawer = {},
+            onNewConversation = {},
+            onOpenSettings = {},
+            onToggleAutoSpeak = {},
+            showUpdateBadge = true,
         )
     }
 }
@@ -962,7 +980,7 @@ private fun ChatScaffoldFailedTurnPreview() {
             partChannelProvider = { null },
             onSend = { _, _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
             onStop = {},
-            onTranscribeVoice = { "" },
+            onTranscribeVoice = { _, _, _, _ -> },
             onToggleSpeechPlayback = { _, _ -> },
             onToggleAutoSpeak = {},
             onOpenDocument = {},

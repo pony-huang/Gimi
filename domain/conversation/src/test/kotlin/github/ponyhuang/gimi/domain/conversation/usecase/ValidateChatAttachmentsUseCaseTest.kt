@@ -19,7 +19,7 @@ class ValidateChatAttachmentsUseCaseTest {
     private val model = Model("model", "Model")
     private val service = LLMModelSetting(
         id = "service", name = "Service", isEnabled = true, apiKey = "key",
-        apiBaseUrl = "https://example.com", apiProtocol = ApiProtocol.Standard, anthropicBaseUrl = "",
+        apiBaseUrl = "https://example.com", apiProtocol = ApiProtocol.OpenaiChatcompletions, anthropicBaseUrl = "",
         groups = listOf(ModelGroup("group", "Group", listOf(model))),
     )
 

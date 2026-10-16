@@ -12,6 +12,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 
 /** 持有导航和外部 Shizuku 应用打开动作的页面入口。 */
 @Composable
@@ -22,9 +23,10 @@ fun MobileUseRoute(
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refresh() }
-    PreferenceScaffold(title = stringResource(R.string.mobile_use_title), onBack = onBack) { modifier ->
+    PreferenceScaffold(style = PreferenceStyle.Compact, title = stringResource(R.string.mobile_use_title), onBack = onBack) { modifier ->
         MobileUseScreen(
             state = state,
+            onEnabledChange = viewModel::setEnabled,
             onAuthorize = viewModel::requestPermission,
             onRefresh = viewModel::refresh,
             onOpenShizuku = {

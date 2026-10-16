@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.modelsettings.detail
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,7 +13,6 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,10 +26,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.feature.modelsettings.R
+import github.ponyhuang.gimi.ui.preference.PreferenceTextField
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
 fun ApiKeySection(
@@ -42,16 +43,18 @@ fun ApiKeySection(
     onTest: () -> Unit,
     onOpenKeyHelp: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     Column(
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        OutlinedTextField(
+        PreferenceTextField(
             value = apiKey,
             onValueChange = onApiKeyChange,
             label = { Text(stringResource(R.string.modelsettings_api_key_label)) },
             singleLine = true,
+            enabled = enabled,
             visualTransformation = if (isVisible) {
                 VisualTransformation.None
             } else {
@@ -61,23 +64,20 @@ fun ApiKeySection(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onToggleVisibility) {
                         Icon(
-                            imageVector = if (isVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            imageVector = if (isVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                             contentDescription = stringResource(
                                 if (isVisible) R.string.modelsettings_api_key_hide
                                 else R.string.modelsettings_api_key_show,
                             ),
                         )
                     }
-                    TextButton(
-                        enabled = apiKey.isNotBlank() && !isTesting,
-                        onClick = onTest,
-                    ) {
-                        Text(stringResource(R.string.modelsettings_api_key_test))
-                    }
                 }
             },
             modifier = Modifier.fillMaxWidth(),
         )
+        TextButton(enabled = enabled && apiKey.isNotBlank() && !isTesting, onClick = onTest) {
+            Text(stringResource(if (isTesting) R.string.modelsettings_key_testing else R.string.modelsettings_api_key_test))
+        }
 
         val primary = MaterialTheme.colorScheme.primary
         val text = buildAnnotatedString {
@@ -103,6 +103,7 @@ fun ApiKeySection(
 private const val TAG_KEY_HELP = "key_help"
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ApiKeySectionPreview() {
     AsssistantaiTheme {
@@ -120,6 +121,7 @@ private fun ApiKeySectionPreview() {
 }
 
 @Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ApiKeySectionTestingPreview() {
     AsssistantaiTheme {

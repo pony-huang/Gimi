@@ -15,6 +15,12 @@ internal class SkillArchiveReader(
     fun open(source: SkillImportSource): InputStream = when (source) {
         is SkillImportSource.LocalDocument -> openLocal(source.uri)
         is SkillImportSource.Url -> openUrl(source.value)
+        is SkillImportSource.ArchiveBytes -> {
+            if (source.content.size > MAX_ARCHIVE_BYTES) {
+                throw SkillImportFailure(SkillImportFailure.Reason.ArchiveTooLarge, "The ZIP archive is too large.")
+            }
+            source.content.inputStream()
+        }
     }
 
     private fun openLocal(uri: String): InputStream {

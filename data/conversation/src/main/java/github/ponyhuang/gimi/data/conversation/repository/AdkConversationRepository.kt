@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.data.conversation.repository
 import android.content.Context
 import android.util.Log
 import com.google.adk.kt.sessions.Session
+import com.google.adk.kt.sessions.GetSessionConfig
 import com.google.adk.kt.sessions.SessionKey
 import com.google.adk.kt.sessions.SessionService
 import github.ponyhuang.gimi.data.conversation.R
@@ -66,22 +67,58 @@ class AdkConversationRepository(
         }
     }
 
-    /** Reloads and replaces one changed session without rebuilding the entire drawer list. */
+    /**
+     * Reloads and replaces one changed session without rebuilding the entire drawer list.
+     *
+     * 只取最近 [PREVIEW_EVENT_WINDOW] 条事件：抽屉行需要的预览与标题回退都在末尾事件里，
+     * 读全量历史会让每轮成本随会话长度增长。预览顺手写回元数据，使列表刷新无需再读事件。
+     */
     override suspend fun refreshConversation(sessionId: String) {
         if (sessionId.isBlank()) return
         val key = SessionKey(appName = appName, userId = userId, id = sessionId)
-        try {
-            val session = sessionService.getSession(key) ?: return
-            val updated = session.toConversation(metadataFor(sessionId))
-            _conversations.update { conversations ->
-                conversations
-                    .filterNot { it.id == sessionId }
-                    .plus(updated)
-                    .sortedByDescending { it.timestamp }
-            }
+        val session = try {
+            readForDrawerRow(key)
         } catch (t: Throwable) {
-            recover(t, "refreshConversation($sessionId)", Unit)
+            recover(t, "refreshConversation($sessionId) read", Unit)
+            return
+        } ?: return
+        val metadata = metadataFor(sessionId)
+        val preview = session.previewText()
+        // 先发布抽屉行，再做附加的元数据写入：预览落库失败不得让标题/预览停在旧值，
+        // 否则用户只能等下一次整表刷新才看到变化。
+        _conversations.update { conversations ->
+            conversations
+                .filterNot { it.id == sessionId }
+                .plus(
+                    session.toConversation(
+                        metadata = if (preview.isEmpty()) metadata else metadata?.copy(lastMessage = preview),
+                        previousTitle = conversations.firstOrNull { it.id == sessionId }?.title,
+                    ),
+                )
+                .sortedByDescending { it.timestamp }
         }
+        if (preview.isNotEmpty() && preview != metadata?.lastMessage) {
+            try {
+                metadataDao.setLastMessage(sessionId, preview)
+            } catch (t: Throwable) {
+                recover(t, "setLastMessage($sessionId)", Unit)
+            }
+        }
+    }
+
+    /**
+     * 读取抽屉行所需的会话快照。
+     *
+     * 常规路径只取最近 [PREVIEW_EVENT_WINDOW] 条事件，代价与历史长度无关；只有既没有状态
+     * 标题、窗口里也找不到首条用户消息的会话（标题只能靠首条消息回退）才退回整段读取，
+     * 保持旧行为而不会让这类会话的标题退化成默认名。
+     */
+    private suspend fun readForDrawerRow(key: SessionKey): Session? {
+        val windowed = sessionService.getSession(key, GetSessionConfig(numRecentEvents = PREVIEW_EVENT_WINDOW))
+            ?: return null
+        val titleInState = !(windowed.state[CONVERSATION_TITLE_STATE_KEY] as? String).isNullOrBlank()
+        val firstUserInWindow = windowed.events.any { event -> event.author == "user" }
+        return if (titleInState || firstUserInWindow) windowed else sessionService.getSession(key)
     }
 
     /**
@@ -279,7 +316,10 @@ class AdkConversationRepository(
      * - lastMessage：最后一条非空 text（按事件遍历顺序，截断 64 字符）。
      * - timestamp：`session.lastUpdateTime.toEpochMilliseconds()`。
      */
-    private fun Session.toConversation(metadata: ConversationMetadataEntity?): Conversation {
+    private fun Session.toConversation(
+        metadata: ConversationMetadataEntity?,
+        previousTitle: String? = null,
+    ): Conversation {
         val sessionId = key.id.orEmpty()
         val persistedTitle = state[CONVERSATION_TITLE_STATE_KEY] as? String
         val titleSource: String? = events.firstOrNull { it.author == "user" }
@@ -294,16 +334,14 @@ class AdkConversationRepository(
             }
         }?.let { context.getString(R.string.conversation_attachment_message_title) }
             ?: context.getString(R.string.conversation_default_title)
-        val title = persistedTitle?.takeIf(String::isNotBlank) ?: fallbackTitle
+        // 窗口读不到首条用户消息时保留既有标题，避免把已有标题降级成默认名。
+        val defaultTitle = context.getString(R.string.conversation_default_title)
+        val title = persistedTitle?.takeIf(String::isNotBlank)
+            ?: fallbackTitle.takeUnless { it == defaultTitle }
+            ?: previousTitle?.takeIf(String::isNotBlank)
+            ?: fallbackTitle
 
-        val lastMessage: String = events.lastOrNull { e ->
-            val parts = e.content?.parts.orEmpty()
-            parts.any { !it.text.isNullOrEmpty() }
-        }?.content?.parts?.firstNotNullOfOrNull { it.text?.takeIf(String::isNotEmpty) }
-            ?.let {
-                if (it.length > LAST_MESSAGE_MAX_LENGTH) it.take(LAST_MESSAGE_MAX_LENGTH) + "…" else it
-            }
-            ?: ""
+        val lastMessage = previewTextFromEvents().ifEmpty { metadata?.lastMessage.orEmpty() }
 
         return Conversation(
             id = sessionId,
@@ -315,11 +353,31 @@ class AdkConversationRepository(
         )
     }
 
+    /**
+     * 会话最后一条非空文本，作为抽屉行预览；超出上限按行宽截断。
+     *
+     * 只读传入会话携带的事件，因此调用方用 [GetSessionConfig] 限定窗口后，代价与窗口大小
+     * 而不是历史长度相关。
+     */
+    private fun Session.previewText(): String = previewTextFromEvents()
+
+    private fun Session.previewTextFromEvents(): String = events.lastOrNull { event ->
+        val parts = event.content?.parts.orEmpty()
+        parts.any { !it.text.isNullOrEmpty() }
+    }?.content?.parts?.firstNotNullOfOrNull { it.text?.takeIf(String::isNotEmpty) }
+        ?.let {
+            if (it.length > LAST_MESSAGE_MAX_LENGTH) it.take(LAST_MESSAGE_MAX_LENGTH) + "…" else it
+        }
+        ?: ""
+
     companion object {
         private const val TAG: String = "ConversationRepository"
         private const val TITLE_MAX_LENGTH: Int = 32
         private const val LAST_MESSAGE_MAX_LENGTH: Int = 64
         private const val CONVERSATION_TITLE_STATE_KEY: String = "conversation.title"
+
+        /** 刷新单行会话时读取的最近事件条数；预览与标题回退都在这个窗口内。 */
+        private const val PREVIEW_EVENT_WINDOW: Int = 20
     }
 }
 

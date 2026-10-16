@@ -124,7 +124,7 @@ class McpUseCasesTest {
             sessionId = "session-1",
             name = "maps",
             endpointUrl = "https://example.com/mcp",
-            transport = McpTransport.SSE,
+            transport = McpTransport.STREAMABLE_HTTP,
             description = "Maps server",
             bearerToken = "secret-token",
             headers = "X-Client=assistant",
@@ -137,7 +137,7 @@ class McpUseCasesTest {
         val saved = repository.savedServers.single()
         assertEquals("maps", saved.name)
         assertEquals("https://example.com/mcp", saved.endpointUrl)
-        assertEquals(McpTransport.SSE, saved.transport)
+        assertEquals(McpTransport.STREAMABLE_HTTP, saved.transport)
         assertEquals("secret-token", saved.bearerToken)
         assertEquals("X-Client=assistant", saved.headers)
         assertEquals(setOf("mcp-a", saved.id), conversations.savedConfiguration?.enabledMcpServerIds)

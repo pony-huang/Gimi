@@ -20,7 +20,7 @@ import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.data.agent.McpToolsetHandle
-import github.ponyhuang.gimi.data.agent.tools.mcp.McpToolset
+import com.google.adk.kt.tools.Toolset
 import io.mockk.coEvery
 import kotlinx.coroutines.CancellationException
 import org.junit.Assert.assertSame
@@ -335,7 +335,7 @@ class ToolSearchToolsetTest {
 
     @Test
     fun failedMcpDiscoveryIsReportedAndRetriedWithoutLosingOtherSources() = runTest {
-        val native = mockk<McpToolset>()
+        val native = mockk<Toolset>()
         var available = false
         coEvery { native.getTools(any()) } answers {
             if (!available) error("https://secret.example.com?token=do-not-leak")
@@ -395,7 +395,7 @@ class ToolSearchToolsetTest {
 
     @Test
     fun cancelledMcpDiscoveryPropagatesAndCanBeRetried() = runTest {
-        val native = mockk<McpToolset>()
+        val native = mockk<Toolset>()
         val cancellation = CancellationException("discovery cancelled")
         coEvery { native.getTools(any()) } throws cancellation
         val search = ToolSearchToolset(

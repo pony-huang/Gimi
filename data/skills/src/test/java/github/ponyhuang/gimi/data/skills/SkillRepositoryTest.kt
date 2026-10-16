@@ -1,8 +1,10 @@
 package github.ponyhuang.gimi.data.skills
 
 import app.cash.turbine.test
+import com.google.adk.kt.skills.NewFileSystemSource
 import github.ponyhuang.gimi.domain.skills.model.SkillImportFailure
 import github.ponyhuang.gimi.domain.skills.model.SkillImportSource
+import github.ponyhuang.gimi.domain.skills.usecase.InstallSkillArchiveUseCase
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -10,6 +12,9 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.io.path.createTempDirectory
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
@@ -35,6 +40,61 @@ class SkillRepositoryTest {
     @After
     fun tearDown() {
         root.deleteRecursively()
+    }
+
+    @Test
+    fun binaryArchiveUsesExistingInstallerAndIsImmediatelyDiscoverable() = runTest {
+        val repository = repository(SkillArchiveReader(OkHttpClient()) { error("No URI expected") }, this)
+        val liveSource = NewFileSystemSource(File(root, "skills").absolutePath)
+        assertTrue(liveSource.listFrontmatters().getOrThrow().isEmpty())
+        val source = SkillImportSource.ArchiveBytes(validArchive("sandbox-skill", "Sandbox skill"))
+        val installed = InstallSkillArchiveUseCase(repository)(source)
+
+        assertEquals("sandbox-skill", installed.name)
+        assertEquals("sandbox-skill", liveSource.listFrontmatters().getOrThrow().single().name)
+        assertTrue(liveSource.loadInstructions("sandbox-skill").getOrThrow().contains("# Instructions"))
+        assertTrue(liveSource.loadResource("sandbox-skill", "assets/data.bin").getOrThrow()
+            .contentEquals(byteArrayOf(0, -1, 7)))
+        assertTrue(File(root, "skills/sandbox-skill/SKILL.md").readText().contains("# Instructions"))
+        assertTrue(File(root, "staging").listFiles().orEmpty().isEmpty())
+    }
+
+    @Test
+    fun binaryArchiveStillRejectsInvalidStructureAndCleansStaging() = runTest {
+        val repository = repository(SkillArchiveReader(OkHttpClient()) { null }, this)
+        val failure = runCatching {
+            repository.prepareImport(SkillImportSource.ArchiveBytes("not a zip".toByteArray()))
+        }.exceptionOrNull() as SkillImportFailure
+        assertEquals(SkillImportFailure.Reason.InvalidStructure, failure.reason)
+        assertTrue(File(root, "staging").listFiles().orEmpty().isEmpty())
+    }
+
+    @Test
+    fun binaryInputRejectsOversizedArchiveBeforeExtraction() = runTest {
+        val reader = SkillArchiveReader(OkHttpClient()) { null }
+        val failure = runCatching {
+            reader.open(SkillImportSource.ArchiveBytes(ByteArray(20 * 1024 * 1024 + 1)))
+        }.exceptionOrNull() as SkillImportFailure
+        assertEquals(SkillImportFailure.Reason.ArchiveTooLarge, failure.reason)
+    }
+
+    @Test
+    fun cancellationWhilePreparingDoesNotLeaveAnUnownedImport() = runTest {
+        val importing = Job()
+        val archive = validArchive("cancelled-skill", "Cancelled")
+        val reader = SkillArchiveReader(OkHttpClient()) {
+            importing.cancel()
+            ByteArrayInputStream(archive)
+        }
+        val repository = repository(reader, this)
+        try {
+            withContext(importing) {
+                repository.prepareImport(SkillImportSource.LocalDocument("content://cancelled"))
+            }
+            org.junit.Assert.fail("Cancellation must propagate")
+        } catch (_: CancellationException) { }
+        assertTrue(File(root, "staging").listFiles().orEmpty().isEmpty())
+        assertTrue(File(root, "skills").listFiles().orEmpty().isEmpty())
     }
 
     @Test
@@ -162,6 +222,9 @@ class SkillRepositoryTest {
                     # Instructions
                 """.trimIndent().toByteArray(),
             )
+            zip.closeEntry()
+            zip.putNextEntry(ZipEntry("$name/assets/data.bin"))
+            zip.write(byteArrayOf(0, -1, 7))
             zip.closeEntry()
         }
         return bytes.toByteArray()

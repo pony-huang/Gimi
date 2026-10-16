@@ -132,6 +132,22 @@ class PermissionSettingsViewModelTest {
         )
     }
 
+    @Test
+    fun overlaySettingsRefreshesGrantedStateWithoutRuntimeRequest() {
+        val repository = repository(PermissionSnapshot(emptySet(), emptySet()))
+        val viewModel = viewModel(repository)
+        assertEquals(false, viewModel.uiState.value.overlayGranted)
+        viewModel.onAction(PermissionSettingsAction.OpenOverlaySettings)
+        assertEquals(PermissionSettingsDestination.Overlay, viewModel.uiState.value.settingsRequest?.destination)
+        assertNull(viewModel.uiState.value.runtimeRequest)
+        every { repository.snapshot() } returns PermissionSnapshot(setOf(AppPermission.DrawOverlays), emptySet())
+        viewModel.onAction(PermissionSettingsAction.Refresh)
+        assertTrue(viewModel.uiState.value.overlayGranted)
+        every { repository.snapshot() } returns PermissionSnapshot(emptySet(), emptySet())
+        viewModel.onAction(PermissionSettingsAction.Refresh)
+        assertEquals(false, viewModel.uiState.value.overlayGranted)
+    }
+
     private fun viewModel(repository: PermissionRepository) = PermissionSettingsViewModel(
         getSnapshot = GetPermissionSnapshotUseCase(repository),
         recordPermanentlyDenied = RecordPermanentlyDeniedPermissionsUseCase(repository),

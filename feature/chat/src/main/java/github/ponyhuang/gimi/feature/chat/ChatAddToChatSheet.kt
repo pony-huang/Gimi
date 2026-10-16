@@ -7,8 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,13 +25,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Functions
@@ -41,12 +38,10 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -58,19 +53,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
@@ -83,6 +75,13 @@ import github.ponyhuang.gimi.ui.components.GimiBottomSheetOptionRow
 import github.ponyhuang.gimi.ui.components.GimiBottomSheetSwitchRow
 import androidx.compose.ui.tooling.preview.Preview
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.gimi.ui.preference.PreferenceBanner
+import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
+import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
+import github.ponyhuang.gimi.ui.preference.PreferenceListItem
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.preference.PreferenceStyleScope
+import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
@@ -117,125 +116,127 @@ internal fun ChatAddToChatSheet(
         page = AddToChatPage.HOME
     }
 
-    GimiBottomSheet(onDismissRequest = onDismiss) {
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val maximumPageHeight = maxHeight * 0.92f
-            AnimatedContent(
-                targetState = page,
-                transitionSpec = {
-                    val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
-                    slideIntoContainer(
-                        towards = if (direction > 0) {
-                            AnimatedContentTransitionScope.SlideDirection.Left
-                        } else {
-                            AnimatedContentTransitionScope.SlideDirection.Right
-                        },
-                        animationSpec = tween(220),
-                    ) + fadeIn(tween(160)) togetherWith
-                        slideOutOfContainer(
+    PreferenceStyleScope(PreferenceStyle.Compact) {
+        GimiBottomSheet(onDismissRequest = onDismiss) {
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val maximumPageHeight = maxHeight * 0.92f
+                AnimatedContent(
+                    targetState = page,
+                    transitionSpec = {
+                        val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                        slideIntoContainer(
                             towards = if (direction > 0) {
                                 AnimatedContentTransitionScope.SlideDirection.Left
                             } else {
                                 AnimatedContentTransitionScope.SlideDirection.Right
                             },
                             animationSpec = tween(220),
-                        ) + fadeOut(tween(120))
-                },
-                label = "add-to-chat-page",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = maximumPageHeight)
-                    .testTag("add-to-chat-sheet-content"),
-            ) { currentPage ->
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.TopCenter,
-                ) {
-                    val isFullHeightPage = when (currentPage) {
-                        AddToChatPage.MCP -> state.mcpServers.size > COMPACT_SHEET_ITEM_LIMIT
-                        AddToChatPage.OFFICIAL_TOOL -> state.officialTools.sumOf { it.functions.size } >
-                            COMPACT_SHEET_ITEM_LIMIT
-                        else -> false
-                    }
-                    val pageHeightModifier = if (isFullHeightPage) {
-                        Modifier.height(maximumPageHeight)
-                    } else {
-                        Modifier.wrapContentHeight()
-                    }
-                    Column(
-                        modifier = pageHeightModifier
-                            .widthIn(max = 640.dp),
+                        ) + fadeIn(tween(160)) togetherWith
+                            slideOutOfContainer(
+                                towards = if (direction > 0) {
+                                    AnimatedContentTransitionScope.SlideDirection.Left
+                                } else {
+                                    AnimatedContentTransitionScope.SlideDirection.Right
+                                },
+                                animationSpec = tween(220),
+                            ) + fadeOut(tween(120))
+                    },
+                    label = "add-to-chat-page",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = maximumPageHeight)
+                        .testTag("add-to-chat-sheet-content"),
+                ) { currentPage ->
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.TopCenter,
                     ) {
-                        GimiBottomSheetHeader(
-                            title = when (currentPage) {
-                                AddToChatPage.HOME -> stringResource(R.string.chat_add_to_chat_title)
-                                AddToChatPage.PERMISSION_MODE ->
-                                    stringResource(R.string.chat_permission_mode_title)
-                                AddToChatPage.REASONING_EFFORT ->
-                                    stringResource(R.string.chat_reasoning_effort_title)
-                                AddToChatPage.MCP -> stringResource(R.string.chat_session_mcp_title)
-                                AddToChatPage.OFFICIAL_TOOL ->
-                                    stringResource(R.string.chat_official_tools_title)
-                            },
-                            navigationIcon = if (currentPage == AddToChatPage.HOME) {
-                                Icons.Default.Close
-                            } else {
-                                Icons.AutoMirrored.Filled.ArrowBack
-                            },
-                            navigationContentDescription = stringResource(
-                                if (currentPage == AddToChatPage.HOME) {
-                                    R.string.chat_add_to_chat_close
+                        val isFullHeightPage = when (currentPage) {
+                            AddToChatPage.MCP -> state.mcpServers.size > COMPACT_SHEET_ITEM_LIMIT
+                            AddToChatPage.OFFICIAL_TOOL -> state.officialTools.sumOf { it.functions.size } >
+                                COMPACT_SHEET_ITEM_LIMIT
+                            else -> false
+                        }
+                        val pageHeightModifier = if (isFullHeightPage) {
+                            Modifier.height(maximumPageHeight)
+                        } else {
+                            Modifier.wrapContentHeight()
+                        }
+                        Column(
+                            modifier = pageHeightModifier
+                                .widthIn(max = 640.dp),
+                        ) {
+                            GimiBottomSheetHeader(
+                                title = when (currentPage) {
+                                    AddToChatPage.HOME -> stringResource(R.string.chat_add_to_chat_title)
+                                    AddToChatPage.PERMISSION_MODE ->
+                                        stringResource(R.string.chat_permission_mode_title)
+                                    AddToChatPage.REASONING_EFFORT ->
+                                        stringResource(R.string.chat_reasoning_effort_title)
+                                    AddToChatPage.MCP -> stringResource(R.string.chat_session_mcp_title)
+                                    AddToChatPage.OFFICIAL_TOOL ->
+                                        stringResource(R.string.chat_official_tools_title)
+                                },
+                                navigationIcon = if (currentPage == AddToChatPage.HOME) {
+                                    Icons.Default.Close
                                 } else {
-                                    R.string.chat_add_to_chat_back
+                                    Icons.AutoMirrored.Filled.ArrowBack
                                 },
-                            ),
-                            onNavigationClick = {
-                                if (currentPage == AddToChatPage.HOME) onDismiss()
-                                else page = AddToChatPage.HOME
-                            },
-                            navigationModifier = Modifier.testTag(
-                                if (currentPage == AddToChatPage.HOME) {
-                                    "add-to-chat-close"
-                                } else {
-                                    "add-to-chat-back"
+                                navigationContentDescription = stringResource(
+                                    if (currentPage == AddToChatPage.HOME) {
+                                        R.string.chat_add_to_chat_close
+                                    } else {
+                                        R.string.chat_add_to_chat_back
+                                    },
+                                ),
+                                onNavigationClick = {
+                                    if (currentPage == AddToChatPage.HOME) onDismiss()
+                                    else page = AddToChatPage.HOME
                                 },
-                            ),
-                        )
-                        when (currentPage) {
-                            AddToChatPage.HOME -> AddToChatHome(
-                                state = state,
-                                onTakePhoto = onTakePhoto,
-                                onChoosePhotos = onChoosePhotos,
-                                onChooseFiles = onChooseFiles,
-                                imagesEnabled = imagesEnabled,
-                                filesEnabled = filesEnabled,
-                                onOpenReasoningEffort = { page = AddToChatPage.REASONING_EFFORT },
-                                onOpenMcp = { page = AddToChatPage.MCP },
-                                onOpenPermissionMode = { page = AddToChatPage.PERMISSION_MODE },
-                                onOpenOfficialTools = {
-                                    state.officialTools.forEach { tool ->
-                                        onOfficialToolOpened(tool.id)
-                                    }
-                                    page = AddToChatPage.OFFICIAL_TOOL
-                                },
+                                navigationModifier = Modifier.testTag(
+                                    if (currentPage == AddToChatPage.HOME) {
+                                        "add-to-chat-close"
+                                    } else {
+                                        "add-to-chat-back"
+                                    },
+                                ),
                             )
-                            AddToChatPage.PERMISSION_MODE -> PermissionModePage(
-                                fullAccess = state.fullAccess,
-                                onFullAccessChange = onFullAccessChange,
-                            )
-                            AddToChatPage.REASONING_EFFORT -> ReasoningEffortPage(
-                                state = state,
-                                onEffortChange = onReasoningEffortChange,
-                            )
-                            AddToChatPage.MCP -> McpServersPage(
-                                state = state,
-                                onEnabledChange = onMcpServerEnabledChange,
-                            )
-                            AddToChatPage.OFFICIAL_TOOL -> OfficialToolsDetailPage(
-                                state = state,
-                                onFunctionEnabledChange = onOfficialToolFunctionEnabledChange,
-                                onRetry = onOfficialToolFunctionsRetry,
-                            )
+                            when (currentPage) {
+                                AddToChatPage.HOME -> AddToChatHome(
+                                    state = state,
+                                    onTakePhoto = onTakePhoto,
+                                    onChoosePhotos = onChoosePhotos,
+                                    onChooseFiles = onChooseFiles,
+                                    imagesEnabled = imagesEnabled,
+                                    filesEnabled = filesEnabled,
+                                    onOpenReasoningEffort = { page = AddToChatPage.REASONING_EFFORT },
+                                    onOpenMcp = { page = AddToChatPage.MCP },
+                                    onOpenPermissionMode = { page = AddToChatPage.PERMISSION_MODE },
+                                    onOpenOfficialTools = {
+                                        state.officialTools.forEach { tool ->
+                                            onOfficialToolOpened(tool.id)
+                                        }
+                                        page = AddToChatPage.OFFICIAL_TOOL
+                                    },
+                                )
+                                AddToChatPage.PERMISSION_MODE -> PermissionModePage(
+                                    fullAccess = state.fullAccess,
+                                    onFullAccessChange = onFullAccessChange,
+                                )
+                                AddToChatPage.REASONING_EFFORT -> ReasoningEffortPage(
+                                    state = state,
+                                    onEffortChange = onReasoningEffortChange,
+                                )
+                                AddToChatPage.MCP -> McpServersPage(
+                                    state = state,
+                                    onEnabledChange = onMcpServerEnabledChange,
+                                )
+                                AddToChatPage.OFFICIAL_TOOL -> OfficialToolsDetailPage(
+                                    state = state,
+                                    onFunctionEnabledChange = onOfficialToolFunctionEnabledChange,
+                                    onRetry = onOfficialToolFunctionsRetry,
+                                )
+                            }
                         }
                     }
                 }
@@ -264,13 +265,13 @@ private fun AddToChatHome(
             .wrapContentHeight()
             .nestedScroll(rememberLowerBoundaryNestedScrollConnection(listState))
             .testTag("add-to-chat-home"),
-        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             ) {
                 AttachmentShortcut(
                     icon = Icons.Default.CameraAlt,
@@ -314,10 +315,7 @@ private fun AddToChatHome(
                     onClick = onOpenPermissionMode,
                     testTag = "permission-mode-nav",
                 )
-                HorizontalDivider(
-                    modifier = Modifier.padding(start = 66.dp, end = 16.dp),
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                )
+                SheetDivider()
                 NavigationRow(
                     icon = Icons.Default.Psychology,
                     title = stringResource(R.string.chat_reasoning_effort_title),
@@ -327,10 +325,7 @@ private fun AddToChatHome(
                     onClick = onOpenReasoningEffort,
                     testTag = "reasoning-effort-nav",
                 )
-                HorizontalDivider(
-                    modifier = Modifier.padding(start = 66.dp, end = 16.dp),
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                )
+                SheetDivider()
                 NavigationRow(
                     icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
                     title = stringResource(R.string.chat_session_mcp_title),
@@ -345,7 +340,7 @@ private fun AddToChatHome(
             }
         }
         state.errorMessage?.let { error ->
-            item { InlineNotice(error, isError = true) }
+            item { PreferenceBanner(text = error, tone = PreferenceBannerTone.Error) }
         }
     }
 }
@@ -361,18 +356,19 @@ private fun AttachmentShortcut(
     Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(108.dp),
-        shape = RoundedCornerShape(24.dp),
+        modifier = modifier.height(96.dp),
+        shape = RoundedCornerShape(16.dp),
         color = preferenceGroupCardColor(),
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            IconBubble(icon)
+            ShortcutIcon(icon, enabled)
             Text(
                 text = label,
-                style = MaterialTheme.typography.titleSmall,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f),
                 modifier = Modifier.padding(top = 8.dp),
             )
         }
@@ -384,13 +380,40 @@ private fun GroupedCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    PreferenceGroupCard(modifier = modifier, content = content)
+}
+
+/** 分段绘制分组背景，保留 LazyColumn 每行独立组合与滚动的行为。 */
+@Composable
+private fun GroupedListItem(
+    first: Boolean,
+    last: Boolean,
+    withIcon: Boolean = true,
+    content: @Composable () -> Unit,
+) {
     Surface(
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(
+            topStart = if (first) 16.dp else 0.dp,
+            topEnd = if (first) 16.dp else 0.dp,
+            bottomStart = if (last) 16.dp else 0.dp,
+            bottomEnd = if (last) 16.dp else 0.dp,
+        ),
         color = preferenceGroupCardColor(),
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
     ) {
-        Column(content = content)
+        Column {
+            content()
+            if (!last) SheetDivider(withIcon)
+        }
     }
+}
+
+@Composable
+private fun SheetDivider(withIcon: Boolean = true) {
+    HorizontalDivider(
+        modifier = Modifier.padding(start = if (withIcon) 56.dp else 16.dp, end = 16.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+    )
 }
 
 @Composable
@@ -401,30 +424,13 @@ private fun NavigationRow(
     onClick: () -> Unit,
     testTag: String,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 60.dp)
-            .clickable(onClick = onClick)
-            .testTag(testTag)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        IconBubble(icon)
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 16.dp),
-        ) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-    }
+    PreferenceListItem(
+        icon = icon,
+        title = title,
+        subtitle = subtitle,
+        onClick = onClick,
+        modifier = Modifier.testTag(testTag),
+    )
 }
 
 @Composable
@@ -439,20 +445,23 @@ private fun PermissionModePage(
             .padding(bottom = 24.dp),
     ) {
         // 权限模式沿用全局审批开关，运行中也允许切换以放行挂起的确认。
-        listOf(false, true).forEach { approveAll ->
-            GimiBottomSheetOptionRow(
-                selected = fullAccess == approveAll,
-                enabled = true,
-                onClick = { onFullAccessChange(approveAll) },
-                label = permissionModeLabel(approveAll),
-                description = stringResource(
-                    if (approveAll) R.string.chat_permission_mode_full_description
-                    else R.string.chat_permission_mode_request_description,
-                ),
-                modifier = Modifier.testTag(
-                    if (approveAll) "permission-mode-full" else "permission-mode-request",
-                ),
-            )
+        GroupedCard(modifier = Modifier.padding(top = 8.dp)) {
+            listOf(false, true).forEach { approveAll ->
+                GimiBottomSheetOptionRow(
+                    selected = fullAccess == approveAll,
+                    enabled = true,
+                    onClick = { onFullAccessChange(approveAll) },
+                    label = permissionModeLabel(approveAll),
+                    description = stringResource(
+                        if (approveAll) R.string.chat_permission_mode_full_description
+                        else R.string.chat_permission_mode_request_description,
+                    ),
+                    modifier = Modifier.testTag(
+                        if (approveAll) "permission-mode-full" else "permission-mode-request",
+                    ),
+                )
+                if (!approveAll) SheetDivider(withIcon = false)
+            }
         }
     }
 }
@@ -470,19 +479,27 @@ private fun ReasoningEffortPage(
 ) {
     Column(Modifier.wrapContentHeight().testTag("reasoning-effort-page")) {
         PageStatus(state)
+        Text(
+            text = stringResource(R.string.chat_reasoning_effort_openai_notice),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
+        )
         LazyColumn(
             modifier = Modifier.wrapContentHeight(),
-            contentPadding = PaddingValues(bottom = 24.dp),
+            contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
         ) {
-            items(ReasoningEffort.entries, key = ReasoningEffort::name) { effort ->
-                GimiBottomSheetOptionRow(
-                    selected = state.configuration?.reasoningEffort == effort,
-                    enabled = state.configuration != null && !state.isMutationBlocked,
-                    onClick = { onEffortChange(effort) },
-                    label = reasoningEffortLabel(effort),
-                    description = reasoningEffortDescription(effort),
-                    modifier = Modifier.testTag("reasoning-effort-${effort.name.lowercase()}"),
-                )
+            itemsIndexed(ReasoningEffort.entries, key = { _, effort -> effort.name }) { index, effort ->
+                GroupedListItem(first = index == 0, last = index == ReasoningEffort.entries.lastIndex, withIcon = false) {
+                    GimiBottomSheetOptionRow(
+                        selected = state.configuration?.reasoningEffort == effort,
+                        enabled = state.configuration != null && !state.isMutationBlocked,
+                        onClick = { onEffortChange(effort) },
+                        label = reasoningEffortLabel(effort),
+                        description = reasoningEffortDescription(effort),
+                        modifier = Modifier.testTag("reasoning-effort-${effort.name.lowercase()}"),
+                    )
+                }
             }
         }
     }
@@ -543,7 +560,7 @@ private fun OfficialToolsDetailPage(
                 val listState = rememberLazyListState()
                 LazyColumn(
                     state = listState,
-                    contentPadding = PaddingValues(bottom = 24.dp),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
                     modifier = Modifier
                         .then(if (isScrollable) Modifier.fillMaxSize() else Modifier.wrapContentHeight())
                         .nestedScroll(rememberLowerBoundaryNestedScrollConnection(listState)),
@@ -559,34 +576,36 @@ private fun OfficialToolsDetailPage(
                                     isFirst = sourceIndex == 0,
                                 )
                             }
-                            sourceTools.forEach { tool ->
-                                if (tool.functions.isEmpty() && tool.isLoadingFunctions) {
-                                    item(key = "loading-${tool.id}") {
-                                        LoadingState(compact = true)
-                                    }
-                                } else if (tool.functions.isEmpty() && tool.loadError != null) {
-                                    item(key = "error-${tool.id}") {
-                                        ErrorState(
-                                            message = tool.loadError,
-                                            onRetry = { onRetry(tool.id) },
-                                            compact = true,
-                                        )
-                                    }
-                                } else {
-                                    items(tool.functions, key = { "${tool.id}-${it.id}" }) { function ->
-                                        OfficialToolFunctionRow(
+                            // 每个来源形成一组；逐行保持稳定 key，避免整组成为一个大列表项。
+                            val entries = sourceTools.flatMap { tool ->
+                                if (tool.functions.isEmpty()) listOf(tool to null)
+                                else tool.functions.map { function -> tool to function }
+                            }
+                            itemsIndexed(entries, key = { _, entry ->
+                                "${entry.first.id}-${entry.second?.id ?: "status"}"
+                            }) { index, (tool, function) ->
+                                GroupedListItem(first = index == 0, last = index == entries.lastIndex) {
+                                    when {
+                                        function != null -> OfficialToolFunctionRow(
                                             toolId = tool.id,
                                             function = function,
                                             enabled = state.isOfficialFunctionEnabled(tool.id, function.id),
-                                            mutationEnabled = !state.isMutationBlocked &&
-                                                state.configuration != null,
+                                            mutationEnabled = !state.isMutationBlocked && state.configuration != null,
                                             onEnabledChange = {
                                                 onFunctionEnabledChange(tool.id, function.id, it)
                                             },
                                         )
-                                        HorizontalDivider(
-                                            modifier = Modifier.padding(start = 66.dp, end = 16.dp),
-                                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                        tool.isLoadingFunctions -> LoadingState(compact = true)
+                                        tool.loadError != null -> ErrorState(
+                                            message = tool.loadError,
+                                            onRetry = { onRetry(tool.id) },
+                                            compact = true,
+                                        )
+                                        else -> Text(
+                                            stringResource(R.string.chat_official_tool_functions_empty),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.padding(16.dp),
                                         )
                                     }
                                 }
@@ -662,58 +681,15 @@ private fun OfficialToolFunctionRow(
     mutationEnabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 64.dp)
-            .testTag("official-tool-function-$toolId-${function.id}")
-            .toggleable(
-                value = enabled,
-                enabled = mutationEnabled,
-                role = Role.Switch,
-                onValueChange = onEnabledChange,
-            )
-            .padding(horizontal = 20.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(32.dp),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Functions,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = 12.dp, end = 12.dp),
-        ) {
-            Text(
-                text = officialFunctionLabel(toolId, function.id),
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Text(
-                text = officialFunctionDescription(toolId, function.id, function.description),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-        }
-        Switch(
-            checked = enabled,
-            onCheckedChange = null,
-            enabled = mutationEnabled,
-        )
-    }
+    GimiBottomSheetSwitchRow(
+        icon = Icons.Default.Functions,
+        label = officialFunctionLabel(toolId, function.id),
+        description = officialFunctionDescription(toolId, function.id, function.description),
+        checked = enabled,
+        enabled = mutationEnabled,
+        onCheckedChange = onEnabledChange,
+        modifier = Modifier.testTag("official-tool-function-$toolId-${function.id}"),
+    )
 }
 
 @Composable
@@ -757,24 +733,22 @@ private fun McpServersPage(
         } else {
             LazyColumn(
                 state = listState,
-                contentPadding = PaddingValues(bottom = 24.dp),
+                contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
                 modifier = Modifier
                     .then(if (isScrollable) Modifier.fillMaxSize() else Modifier.wrapContentHeight())
                     .nestedScroll(rememberLowerBoundaryNestedScrollConnection(listState)),
             ) {
-                items(state.mcpServers, key = McpServer::id) { server ->
-                    McpServerRow(
-                        server = server,
-                        enabled = server.id in
-                            state.configuration?.enabledMcpServerIds.orEmpty(),
-                        mutationEnabled = !state.isMutationBlocked &&
-                            state.configuration != null,
-                        onEnabledChange = { onEnabledChange(server.id, it) },
-                    )
-                    HorizontalDivider(
-                    modifier = Modifier.padding(start = 66.dp, end = 16.dp),
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                )
+                itemsIndexed(state.mcpServers, key = { _, server -> server.id }) { index, server ->
+                    GroupedListItem(first = index == 0, last = index == state.mcpServers.lastIndex) {
+                        McpServerRow(
+                            server = server,
+                            enabled = server.id in
+                                state.configuration?.enabledMcpServerIds.orEmpty(),
+                            mutationEnabled = !state.isMutationBlocked &&
+                                state.configuration != null,
+                            onEnabledChange = { onEnabledChange(server.id, it) },
+                        )
+                    }
                 }
             }
         }
@@ -792,7 +766,6 @@ private fun McpServerRow(
         icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
         label = server.name.ifBlank { server.id },
         description = when (server.transport) {
-            McpTransport.SSE -> stringResource(R.string.chat_mcp_transport_sse)
             McpTransport.STREAMABLE_HTTP ->
                 stringResource(R.string.chat_mcp_transport_streamable_http)
         },
@@ -863,71 +836,34 @@ private fun PageStatus(state: ChatAddToChatState) {
     Column {
         Text(
             stringResource(R.string.chat_session_only_notice),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
         )
         if (state.isMutationBlocked) {
-            InlineNotice(
+            PreferenceBanner(
                 text = stringResource(R.string.chat_session_tools_running_notice),
-                isError = false,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                modifier = Modifier.padding(vertical = 4.dp),
             )
         }
         state.errorMessage?.let {
-            InlineNotice(
+            PreferenceBanner(
                 text = it,
-                isError = true,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                tone = PreferenceBannerTone.Error,
+                modifier = Modifier.padding(vertical = 4.dp),
             )
         }
     }
 }
 
 @Composable
-private fun InlineNotice(
-    text: String,
-    isError: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        color = if (isError) {
-            MaterialTheme.colorScheme.errorContainer
-        } else {
-            MaterialTheme.colorScheme.secondaryContainer
-        },
-        contentColor = if (isError) {
-            MaterialTheme.colorScheme.onErrorContainer
-        } else {
-            MaterialTheme.colorScheme.onSecondaryContainer
-        },
-        shape = RoundedCornerShape(18.dp),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        Text(
-            text,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-        )
-    }
-}
-
-@Composable
-private fun IconBubble(icon: ImageVector) {
-    Surface(
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.size(34.dp),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(20.dp),
-            )
-        }
-    }
+private fun ShortcutIcon(icon: ImageVector, enabled: Boolean) {
+    Icon(
+        imageVector = icon,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.38f),
+        modifier = Modifier.size(24.dp),
+    )
 }
 
 @Composable
@@ -962,10 +898,8 @@ private fun reasoningEffortDescription(effort: ReasoningEffort): String = string
 
 @Composable
 private fun officialToolLabel(toolId: String): String = when (toolId) {
-    OfficialToolIds.OPENAI_WEB_SEARCH,
     OfficialToolIds.ANTHROPIC_WEB_SEARCH,
     OfficialToolIds.MINIMAX_WEB_SEARCH,
-    OfficialToolIds.MIMO_WEB_SEARCH,
     OfficialToolIds.GEMINI_WEB_SEARCH,
     -> stringResource(R.string.chat_official_tool_web_search)
     OfficialToolIds.KIMI_FORMULAS -> stringResource(R.string.chat_official_tool_kimi_formulas)
@@ -977,10 +911,8 @@ private fun officialToolLabel(toolId: String): String = when (toolId) {
 
 @Composable
 private fun officialToolDescription(toolId: String): String = when (toolId) {
-    OfficialToolIds.OPENAI_WEB_SEARCH,
     OfficialToolIds.ANTHROPIC_WEB_SEARCH,
     OfficialToolIds.MINIMAX_WEB_SEARCH,
-    OfficialToolIds.MIMO_WEB_SEARCH,
     OfficialToolIds.GEMINI_WEB_SEARCH,
     -> stringResource(R.string.chat_official_tool_web_search_description)
     OfficialToolIds.KIMI_FORMULAS ->
@@ -1035,14 +967,14 @@ private fun previewAddToChatState(
     configuration = configuration,
     mcpServers = listOf(
         McpServer(id = "server-1", name = "文件检索服务", transport = McpTransport.STREAMABLE_HTTP),
-        McpServer(id = "server-2", name = "浏览器服务", transport = McpTransport.SSE),
+        McpServer(id = "server-2", name = "浏览器服务", transport = McpTransport.STREAMABLE_HTTP),
     ),
     officialTools = listOf(
         OfficialToolDescriptor(
-            id = OfficialToolIds.OPENAI_WEB_SEARCH,
+            id = OfficialToolIds.ANTHROPIC_WEB_SEARCH,
             functions = listOf(
                 OfficialToolFunction(
-                    id = OfficialToolIds.OPENAI_WEB_SEARCH,
+                    id = OfficialToolIds.ANTHROPIC_WEB_SEARCH,
                     name = "Web Search",
                     description = "Search the web for up-to-date information.",
                 ),
@@ -1052,10 +984,11 @@ private fun previewAddToChatState(
     errorMessage = errorMessage,
 )
 
-@Preview(showBackground = true)
+@Preview(name = "浅色", showBackground = true, widthDp = 390, locale = "zh")
+@Preview(name = "深色", showBackground = true, widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ChatAddToChatHomePreview() {
-    AsssistantaiTheme {
+    ChatSheetPreviewTheme {
         AddToChatHome(
             state = previewAddToChatState(),
             onTakePhoto = {},
@@ -1075,21 +1008,23 @@ private fun ChatAddToChatHomePreview() {
 private fun OfficialToolSourceHeader(title: String, isFirst: Boolean) {
     Text(
         text = title,
-        style = MaterialTheme.typography.titleMedium,
+        style = MaterialTheme.typography.labelLarge,
         fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(
-            start = 20.dp,
-            end = 20.dp,
-            top = if (isFirst) 4.dp else 18.dp,
+            start = 32.dp,
+            end = 32.dp,
+            top = if (isFirst) 4.dp else 20.dp,
             bottom = 8.dp,
         ),
     )
 }
 
-@Preview(showBackground = true)
+@Preview(name = "浅色", showBackground = true, widthDp = 390, locale = "zh")
+@Preview(name = "深色", showBackground = true, widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ChatAddToChatHomeWithErrorPreview() {
-    AsssistantaiTheme {
+    ChatSheetPreviewTheme {
         AddToChatHome(
             state = previewAddToChatState(errorMessage = "工具配置保存失败，请重试。"),
             onTakePhoto = {},
@@ -1105,10 +1040,11 @@ private fun ChatAddToChatHomeWithErrorPreview() {
     }
 }
 
-@Preview(showBackground = true)
+@Preview(name = "浅色", showBackground = true, widthDp = 390, locale = "zh")
+@Preview(name = "深色", showBackground = true, widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ChatAddToChatReasoningEffortPagePreview() {
-    AsssistantaiTheme {
+    ChatSheetPreviewTheme {
         ReasoningEffortPage(
             state = previewAddToChatState(),
             onEffortChange = {},
@@ -1116,10 +1052,11 @@ private fun ChatAddToChatReasoningEffortPagePreview() {
     }
 }
 
-@Preview(showBackground = true)
+@Preview(name = "浅色", showBackground = true, widthDp = 390, locale = "zh")
+@Preview(name = "深色", showBackground = true, widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ChatAddToChatMcpServersPagePreview() {
-    AsssistantaiTheme {
+    ChatSheetPreviewTheme {
         McpServersPage(
             state = previewAddToChatState(
                 configuration = ConversationToolConfiguration(enabledMcpServerIds = setOf("server-1")),
@@ -1167,7 +1104,7 @@ private fun previewMinimaxOfficialToolsState(): ChatAddToChatState =
 @Preview(name = "官方工具-浅色", showBackground = true)
 @Composable
 private fun ChatAddToChatOfficialToolsDetailPagePreview() {
-    AsssistantaiTheme(darkTheme = false) {
+    ChatSheetPreviewTheme(darkTheme = false) {
         OfficialToolsDetailPage(
             state = previewMinimaxOfficialToolsState(),
             onFunctionEnabledChange = { _, _, _ -> },
@@ -1179,9 +1116,96 @@ private fun ChatAddToChatOfficialToolsDetailPagePreview() {
 @Preview(name = "官方工具-深色", showBackground = true)
 @Composable
 private fun ChatAddToChatOfficialToolsDetailPageDarkPreview() {
-    AsssistantaiTheme(darkTheme = true) {
+    ChatSheetPreviewTheme(darkTheme = true) {
         OfficialToolsDetailPage(
             state = previewMinimaxOfficialToolsState(),
+            onFunctionEnabledChange = { _, _, _ -> },
+            onRetry = {},
+        )
+    }
+}
+
+@Composable
+private fun ChatSheetPreviewTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit,
+) {
+    AsssistantaiTheme(darkTheme = darkTheme) {
+        PreferenceStyleScope(PreferenceStyle.Compact) {
+            Surface(color = preferenceCanvasColor()) { content() }
+        }
+    }
+}
+
+
+@Preview(name = "权限 · 浅色", widthDp = 390, locale = "zh")
+@Preview(name = "权限 · 深色", widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun ChatPermissionModePagePreview() {
+    ChatSheetPreviewTheme {
+        PermissionModePage(fullAccess = false, onFullAccessChange = {})
+    }
+}
+
+@Preview(name = "MCP · 长标题与长列表", widthDp = 320, heightDp = 600, locale = "zh")
+@Composable
+private fun ChatMcpLongListPreview() {
+    ChatSheetPreviewTheme {
+        McpServersPage(
+            state = previewAddToChatState().copy(
+                mcpServers = (1..8).map { index ->
+                    McpServer(id = "server-$index", name = "团队共享资料与项目知识库服务器 $index", transport = McpTransport.STREAMABLE_HTTP)
+                },
+            ),
+            onEnabledChange = { _, _ -> },
+        )
+    }
+}
+
+@Preview(name = "MCP · 禁用", widthDp = 390, locale = "zh")
+@Composable
+private fun ChatMcpBlockedPreview() {
+    ChatSheetPreviewTheme(darkTheme = true) {
+        McpServersPage(
+            state = previewAddToChatState().copy(isMutationBlocked = true),
+            onEnabledChange = { _, _ -> },
+        )
+    }
+}
+
+@Preview(name = "MCP · 空列表", widthDp = 390, heightDp = 320, locale = "zh")
+@Composable
+private fun ChatMcpEmptyPreview() {
+    ChatSheetPreviewTheme {
+        McpServersPage(
+            state = previewAddToChatState().copy(mcpServers = emptyList()),
+            onEnabledChange = { _, _ -> },
+        )
+    }
+}
+
+@Preview(name = "官方工具 · 加载", widthDp = 390, heightDp = 320, locale = "zh")
+@Composable
+private fun ChatOfficialToolsLoadingPreview() {
+    ChatSheetPreviewTheme {
+        OfficialToolsDetailPage(
+            state = previewAddToChatState().let { state ->
+                state.copy(officialTools = state.officialTools.map { it.copy(functions = emptyList(), isLoadingFunctions = true) })
+            },
+            onFunctionEnabledChange = { _, _, _ -> },
+            onRetry = {},
+        )
+    }
+}
+
+@Preview(name = "官方工具 · 加载失败", widthDp = 390, heightDp = 320, locale = "zh")
+@Composable
+private fun ChatOfficialToolsErrorPreview() {
+    ChatSheetPreviewTheme(darkTheme = true) {
+        OfficialToolsDetailPage(
+            state = previewAddToChatState().let { state ->
+                state.copy(officialTools = state.officialTools.map { it.copy(functions = emptyList(), loadError = "工具加载失败，请重试") })
+            },
             onFunctionEnabledChange = { _, _, _ -> },
             onRetry = {},
         )

@@ -127,7 +127,7 @@ class OfficialToolsetRequestTest {
         modelId: String = "model",
     ) = ModelRuntimeMetadata(
         serviceId = "service",
-        baseType = ApiProtocol.Standard,
+        baseType = ApiProtocol.OpenaiChatcompletions,
         modelId = modelId,
         fullBaseUrl = "https://example.com",
     )

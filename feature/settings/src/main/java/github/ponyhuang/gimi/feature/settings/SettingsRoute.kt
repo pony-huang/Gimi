@@ -7,8 +7,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 
 @Composable
 fun SettingsRoute(
@@ -17,6 +17,7 @@ fun SettingsRoute(
     onNavigateToModelService: () -> Unit,
     onNavigateToDefaultModels: () -> Unit,
     onNavigateToMcpServers: () -> Unit,
+    onNavigateToSandbox: () -> Unit,
     onNavigateToPlugins: () -> Unit,
     onNavigateToSkills: () -> Unit,
     onNavigateToWorkFiles: () -> Unit,
@@ -30,14 +31,13 @@ fun SettingsRoute(
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-
     // 收集器随 ViewModel 保持稳定，但每次导航都使用最新的路由回调。
     val handleEffect by rememberUpdatedState<(SettingsEffect) -> Unit> { effect ->
         when (effect) {
             SettingsEffect.NavigateToModelService -> onNavigateToModelService()
             SettingsEffect.NavigateToDefaultModels -> onNavigateToDefaultModels()
             SettingsEffect.NavigateToMcpServers -> onNavigateToMcpServers()
+            SettingsEffect.NavigateToSandbox -> onNavigateToSandbox()
             SettingsEffect.NavigateToPlugins -> onNavigateToPlugins()
             SettingsEffect.NavigateToSkills -> onNavigateToSkills()
             SettingsEffect.NavigateToWorkFiles -> onNavigateToWorkFiles()
@@ -55,12 +55,13 @@ fun SettingsRoute(
     }
 
     PreferenceScaffold(
+
+        style = PreferenceStyle.Compact,
         title = stringResource(R.string.settings_title),
         onBack = onBack,
         modifier = modifier,
     ) { scaffoldModifier ->
         SettingsScreen(
-            state = state,
             appVersionName = appVersionName,
             onAction = viewModel::onAction,
             modifier = scaffoldModifier,

@@ -15,9 +15,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/**
- * 官方工具目录门控行为:服务/协议/模型家族三维匹配与厂商 wire 声明推导。
- */
+/** 官方工具目录门控行为:服务/协议/模型家族三维匹配与厂商声明推导。 */
 class OfficialToolCatalogTest {
 
     private val support = OfficialToolSupport()
@@ -30,8 +28,28 @@ class OfficialToolCatalogTest {
             .map { it.toolId }
 
         assertEquals(
-            listOf("openai_web_search", "anthropic_web_search", "minimax_web_search", "mimo_web_search"),
+            listOf("anthropic_web_search", "minimax_web_search"),
             wireToolIds,
+        )
+    }
+
+    @Test
+    fun openAiCompatibleOnlyServicesDeclareNoProviderNativeTools() {
+        // OpenAI 兼容通道只能下发 function 工具，OpenAI/MiMo 的原生联网搜索因此不做声明。
+        assertTrue(registry.all.none { it.serviceId == "openai" || it.serviceId == "mimo" })
+        assertTrue(registry.supportedToolIds("openai", ApiProtocol.OpenaiChatcompletions).isEmpty())
+        assertTrue(registry.supportedToolIds("mimo", ApiProtocol.OpenaiChatcompletions).isEmpty())
+    }
+
+    @Test
+    fun providerDeclaredWebSearchUsesTheLocalDeclarationName() {
+        // 远端执行的声明统一使用本地专用名，与 GLM 本地函数 `web_search` 区分开；
+        // 各协议适配器按这个名字决定下发哪种厂商 wire 形态。
+        assertEquals(
+            setOf(OfficialToolIds.PROVIDER_WEB_SEARCH),
+            registry.all
+                .mapNotNull { (it.binding as? OfficialToolBinding.ProviderDeclaration)?.declarationName }
+                .toSet(),
         )
     }
 
@@ -47,39 +65,8 @@ class OfficialToolCatalogTest {
     }
 
     @Test
-    fun providerWireNamesAreScopedByServiceAndProtocol() {
-        assertEquals(
-            setOf("web_search"),
-            registryFor("openai").providerDeclaredWireNames("openai", ApiProtocol.Standard, "gpt-5.2"),
-        )
-        assertEquals(
-            setOf("web_search"),
-            registryFor("mimo").providerDeclaredWireNames("mimo", ApiProtocol.Standard, "mimo-model"),
-        )
-        assertEquals(
-            setOf("web_search"),
-            registryFor("minimax").providerDeclaredWireNames("minimax", ApiProtocol.Anthropic, "minimax-model"),
-        )
-        // GLM 的本地搜索是可执行函数,不得转换为厂商 wire 形态。
-        assertTrue(
-            registryFor("glm").providerDeclaredWireNames("glm", ApiProtocol.Standard, "glm-4.6").isEmpty(),
-        )
-        // 协议不匹配的服务没有 wire 声明。
-        assertTrue(
-            registryFor("openai").providerDeclaredWireNames("openai", ApiProtocol.Anthropic, "gpt-5.2").isEmpty(),
-        )
-    }
-
-    @Test
-    fun providerWireNamesAreAbsentWhenTheSourceServiceIsMissing() {
-        assertTrue(registry.providerDeclaredWireNames("openai", ApiProtocol.Standard, "gpt-5.2").isEmpty())
-    }
-
-    private fun registryFor(serviceId: String) = catalogFor(serviceId)
-
-    @Test
     fun minimaxImageGenerationUsesLocalToolsForBothSupportedProtocols() {
-        for (protocol in setOf(ApiProtocol.Standard, ApiProtocol.Anthropic)) {
+        for (protocol in setOf(ApiProtocol.OpenaiChatcompletions, ApiProtocol.Anthropic)) {
             assertEquals(
                 listOf(OfficialToolIds.MINIMAX_IMAGE_GENERATION),
                 support.specsFor("minimax", protocol, "MiniMax-M2.7")
@@ -96,18 +83,20 @@ class OfficialToolCatalogTest {
             registry.supportedToolIds("gemini", ApiProtocol.Gemini),
         )
         assertEquals(
-            setOf("openai_web_search"),
-            registry.supportedToolIds("openai", ApiProtocol.Standard),
+            setOf("anthropic_web_search"),
+            registry.supportedToolIds("anthropic", ApiProtocol.Anthropic),
         )
+        // 同一服务换协议不再提供任何声明。
+        assertTrue(registry.supportedToolIds("anthropic", ApiProtocol.OpenaiChatcompletions).isEmpty())
         assertTrue(registry.supportedToolIds("openai", ApiProtocol.Gemini).isEmpty())
-        assertTrue(registry.supportedToolIds("unknown-service", ApiProtocol.Standard).isEmpty())
+        assertTrue(registry.supportedToolIds("unknown-service", ApiProtocol.OpenaiChatcompletions).isEmpty())
     }
 
     @Test
     fun glmSpecNarrowsByModelFamily() {
         assertEquals(
             listOf("glm_web_search"),
-            support.specsFor("glm", ApiProtocol.Standard, "glm-4.6").map { it.toolId },
+            support.specsFor("glm", ApiProtocol.OpenaiChatcompletions, "glm-4.6").map { it.toolId },
         )
         assertEquals(
             listOf("glm_web_search"),
@@ -118,8 +107,8 @@ class OfficialToolCatalogTest {
     @Test
     fun similarModelNamesDoNotMatchGlmFamily() {
         // glmatrix、前缀分隔符之外的组合都不应误判为 GLM 家族。
-        assertTrue(support.specsFor("glm", ApiProtocol.Standard, "glmatrix").isEmpty())
-        assertTrue(support.specsFor("glm", ApiProtocol.Standard, "other-model").isEmpty())
+        assertTrue(support.specsFor("glm", ApiProtocol.OpenaiChatcompletions, "glmatrix").isEmpty())
+        assertTrue(support.specsFor("glm", ApiProtocol.OpenaiChatcompletions, "other-model").isEmpty())
     }
 
     @Test
@@ -127,7 +116,7 @@ class OfficialToolCatalogTest {
         // 带厂商路径前缀的模型 ID(如 Gemini 风格 models/glm-4.6)取最后一段匹配。
         assertEquals(
             listOf("glm_web_search"),
-            support.specsFor("glm", ApiProtocol.Standard, "models/glm-4.6").map { it.toolId },
+            support.specsFor("glm", ApiProtocol.OpenaiChatcompletions, "models/glm-4.6").map { it.toolId },
         )
     }
 
@@ -135,7 +124,7 @@ class OfficialToolCatalogTest {
     fun kimiMatchesBothFamilySpellingsAndProtocols() {
         assertEquals(
             listOf("kimi_formulas"),
-            support.specsFor("kimi", ApiProtocol.Standard, "kimi-k2.5").map { it.toolId },
+            support.specsFor("kimi", ApiProtocol.OpenaiChatcompletions, "kimi-k2.5").map { it.toolId },
         )
         assertEquals(
             listOf("kimi_formulas"),
@@ -148,7 +137,7 @@ class OfficialToolCatalogTest {
         val services = if (serviceId == null) emptyList() else listOf(
             LLMModelSetting(
                 id = serviceId, name = serviceId, isEnabled = true, apiKey = "key",
-                apiBaseUrl = "https://example.com", apiProtocol = ApiProtocol.Standard,
+                apiBaseUrl = "https://example.com", apiProtocol = ApiProtocol.OpenaiChatcompletions,
                 anthropicBaseUrl = "https://example.com", groups = emptyList(),
             ),
         )

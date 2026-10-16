@@ -10,6 +10,7 @@ import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
 import github.ponyhuang.gimi.data.agent.tools.modelRuntimeMetadataOrNull
 import github.ponyhuang.gimi.data.agent.tools.toolConfigurationOrNull
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 
 /**
@@ -64,8 +65,11 @@ internal fun ConversationToolConfiguration?.isOfficialToolEnabled(
 /**
  * Declaration-only tool executed by the remote model provider, never by the local Agent runtime.
  *
- * @property declarationName 发给厂商 API 的保留声明字面量(如 `web_search`),由各协议
- * 模型适配层转换为厂商原生 wire 格式;目录级厂商唯一 ID 不用于线上声明。
+ * 本地声明名是应用自己的名字（如 [OfficialToolIds.PROVIDER_WEB_SEARCH]），不是厂商 wire
+ * 字面量：它要避开本地真实函数（GLM 本地搜索、MCP 工具都叫 `web_search`），各协议模型
+ * 适配层再按这个名字翻译成厂商原生 wire 格式；目录级厂商唯一 ID 不用于线上声明。
+ *
+ * @property declarationName 本地的厂商远端执行声明名，由协议适配层转换为厂商原生形态。
  */
 internal class OfficialBuiltInTool(
     val declarationName: String,

@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import com.mikepenz.markdown.m3.Markdown
 import github.ponyhuang.gimi.domain.appupdate.model.AppUpdateInfo
@@ -25,6 +26,7 @@ import github.ponyhuang.gimi.domain.appupdate.repository.AppUpdateState
 import github.ponyhuang.gimi.domain.appupdate.repository.UpdateFailure
 import github.ponyhuang.gimi.feature.settings.R
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.markdownContentTypography
 
 /** 检查更新对话框：发现新版本 → 下载中 → 下载完成/失败。 */
 @Composable
@@ -70,7 +72,12 @@ private fun AvailableDialog(
     )
 }
 
-/** 「发现新版本」弹窗正文：当前版本行 + 使用默认 Markdown 排版的更新说明。 */
+/**
+ * 「发现新版本」弹窗正文：当前版本行 + 更新说明。
+ *
+ * 更新说明走 [markdownContentTypography]，比助手气泡基准小 2sp：弹窗是次级阅读场景，
+ * 而 m3-markdown 的默认排版（正文 16sp、h2 45sp）在弹窗里会明显压过标题与按钮。
+ */
 @Composable
 private fun UpdateChangelogBody(
     currentVersionName: String,
@@ -92,7 +99,8 @@ private fun UpdateChangelogBody(
         if (changelog.isBlank()) {
             Text(
                 text = stringResource(R.string.update_changelog_empty),
-                style = MaterialTheme.typography.bodyMedium,
+                // 与更新说明正文同档：助手气泡基准 14sp 再小 2sp。
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, lineHeight = 18.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else {
@@ -102,6 +110,7 @@ private fun UpdateChangelogBody(
                     .fillMaxWidth()
                     .heightIn(max = 280.dp)
                     .verticalScroll(rememberScrollState()),
+                typography = markdownContentTypography(fontSizeOffsetSp = -2),
             )
         }
     }

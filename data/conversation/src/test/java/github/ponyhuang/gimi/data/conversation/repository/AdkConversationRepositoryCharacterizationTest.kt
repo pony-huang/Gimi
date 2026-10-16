@@ -4,6 +4,13 @@ import android.content.Context
 import android.util.Log
 import app.cash.turbine.test
 import com.google.adk.kt.sessions.SessionService
+import com.google.adk.kt.sessions.GetSessionConfig
+import com.google.adk.kt.sessions.Session
+import com.google.adk.kt.sessions.SessionKey
+import com.google.adk.kt.events.Event
+import com.google.adk.kt.types.Content
+import com.google.adk.kt.types.Part
+import com.google.adk.kt.types.Role
 import github.ponyhuang.gimi.data.conversation.local.ConversationMetadataDao
 import github.ponyhuang.gimi.data.conversation.local.ConversationMetadataEntity
 import github.ponyhuang.gimi.data.conversation.local.ConversationToolConfigurationCodec
@@ -84,6 +91,101 @@ class AdkConversationRepositoryCharacterizationTest {
         )
 
         assertEquals(expected, repository().conversationToolConfiguration("session-1"))
+    }
+
+    @Test
+    fun refreshConversation_readsABoundedWindowAndPersistsThePreview() = runTest {
+        val session = sessionWithEvents(
+            Event(author = "user", content = Content(role = Role.USER, parts = listOf(Part(text = "你好")))),
+            Event(author = "model", content = Content(role = Role.MODEL, parts = listOf(Part(text = "最后一条回答")))),
+        )
+        val configs = mutableListOf<GetSessionConfig?>()
+        coEvery { sessionService.getSession(any(), captureNullable(configs)) } returns session
+        val repository = repository()
+
+        repository.refreshConversation("session-1")
+
+        // 只读窗口，不再反序列化整段历史。
+        assertEquals(20, configs.single()?.numRecentEvents)
+        coVerify { metadataDao.setLastMessage("session-1", "最后一条回答") }
+        assertEquals("最后一条回答", repository.conversations.value.single().lastMessage)
+    }
+
+    @Test
+    fun listConversations_keepsThePersistedPreviewWhenSessionsCarryNoEvents() = runTest {
+        coEvery { sessionService.listSessions(appName = any(), userId = any()) } returns mockk {
+            every { sessions } returns listOf(sessionWithEvents())
+        }
+        coEvery { metadataDao.getAll() } returns listOf(
+            ConversationMetadataEntity(
+                sessionId = "session-1",
+                lastMessage = "重启后仍然可见的预览",
+            ),
+        )
+
+        val repository = repository()
+        repository.refresh()
+
+        // ADK 的 listSessions 不返回事件，抽屉行必须依赖应用自己持久化的预览。
+        assertEquals("重启后仍然可见的预览", repository.conversations.value.single().lastMessage)
+    }
+
+    @Test
+    fun refreshConversation_publishesTheRowEvenWhenThePreviewWriteFails() = runTest {
+        val session = sessionWithEvents(
+            Event(author = "user", content = Content(role = Role.USER, parts = listOf(Part(text = "你好")))),
+        )
+        coEvery { sessionService.getSession(any(), any()) } returns session
+        coEvery { metadataDao.setLastMessage(any(), any()) } throws IllegalStateException("metadata unavailable")
+        val repository = repository()
+
+        repository.refreshConversation("session-1")
+
+        // 元数据写入是附加收益；失败也必须已经发布抽屉行（标题来自会话状态）。
+        assertEquals("你好", repository.conversations.value.single().title)
+        assertEquals("你好", repository.conversations.value.single().lastMessage)
+    }
+
+    @Test
+    fun refreshConversation_keepsThePersistedPreviewWhenTheWindowHasNoText() = runTest {
+        val session = sessionWithEvents(
+            Event(author = "model", content = Content(role = Role.MODEL, parts = listOf(Part(text = null)))),
+        )
+        coEvery { sessionService.getSession(any(), any()) } returns session
+        coEvery { metadataDao.get("session-1") } returns ConversationMetadataEntity(
+            sessionId = "session-1",
+            lastMessage = "上一次的预览",
+        )
+        val repository = repository()
+
+        repository.refreshConversation("session-1")
+
+        assertEquals("上一次的预览", repository.conversations.value.single().lastMessage)
+    }
+
+    @Test
+    fun refreshConversation_fallsBackToFullHistoryWhenTheWindowCannotTitleTheSession() = runTest {
+        val windowed = sessionWithEvents(
+            Event(author = "model", content = Content(role = Role.MODEL, parts = listOf(Part(text = "最近的回答")))),
+        )
+        val full = sessionWithEvents(
+            Event(author = "user", content = Content(role = Role.USER, parts = listOf(Part(text = "很久以前的首条提问")))),
+            Event(author = "model", content = Content(role = Role.MODEL, parts = listOf(Part(text = "最近的回答")))),
+        )
+        coEvery { sessionService.getSession(any(), any()) } returns windowed
+        coEvery { sessionService.getSession(any()) } returns full
+
+        repository().refreshConversation("session-1")
+
+        // 没有状态标题时，首条用户消息就是标题来源，不能被窗口截断成默认名。
+        coVerify { sessionService.getSession(match { it.id == "session-1" }) }
+    }
+
+    private fun sessionWithEvents(vararg events: Event): Session = mockk {
+        every { key } returns SessionKey("test-app", "test-user", "session-1")
+        every { this@mockk.events } returns events.toMutableList()
+        every { lastUpdateTime } returns kotlin.time.Instant.fromEpochMilliseconds(1_000L)
+        every { state } returns com.google.adk.kt.sessions.State()
     }
 
     @Test

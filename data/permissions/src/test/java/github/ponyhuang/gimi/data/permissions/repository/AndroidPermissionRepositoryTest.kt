@@ -52,12 +52,14 @@ class AndroidPermissionRepositoryTest {
         mockkStatic(
             ContextCompat::class,
             Settings.System::class,
+            Settings::class,
             NotificationManagerCompat::class,
         )
         every {
             ContextCompat.checkSelfPermission(any(), any())
         } returns PackageManager.PERMISSION_DENIED
         every { Settings.System.canWrite(any()) } returns false
+        every { Settings.canDrawOverlays(any()) } returns false
         every {
             NotificationManagerCompat.getEnabledListenerPackages(any())
         } returns emptySet<String>()
@@ -88,6 +90,15 @@ class AndroidPermissionRepositoryTest {
         val snapshot = repository.snapshot()
 
         assertTrue(RuntimeAppPermissions.none { snapshot.isGranted(it) })
+    }
+
+    @Test
+    fun snapshotRefreshesOverlayPermissionAfterGrantAndRevocation() {
+        assertFalse(repository.snapshot().isGranted(AppPermission.DrawOverlays))
+        every { Settings.canDrawOverlays(context) } returns true
+        assertTrue(repository.snapshot().isGranted(AppPermission.DrawOverlays))
+        every { Settings.canDrawOverlays(context) } returns false
+        assertFalse(repository.snapshot().isGranted(AppPermission.DrawOverlays))
     }
 
     @Test
@@ -239,6 +250,7 @@ class AndroidPermissionRepositoryTest {
         AppPermission.WriteSystemSettings,
         AppPermission.NotificationListener,
         AppPermission.UsageStats,
+        AppPermission.DrawOverlays,
         -> error("Special permissions do not have runtime permission names.")
     }
 

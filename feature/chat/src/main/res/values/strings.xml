@@ -22,6 +22,7 @@
     <string name="chat_attachment_unsupported">当前模型不支持此类附件</string>
     <string name="chat_attachment_open_failed">没有可用于打开此文档的应用</string>
     <string name="chat_reasoning_effort_title">推理强度</string>
+    <string name="chat_reasoning_effort_openai_notice">选择 OpenAI Chat Completions 接口时，暂不支持推理强度设置。</string>
     <string name="chat_reasoning_effort_minimal">极简</string>
     <string name="chat_reasoning_effort_minimal_description">最快响应，适合简单问题</string>
     <string name="chat_reasoning_effort_low">低</string>
@@ -38,7 +39,6 @@
     <string name="chat_session_none_enabled">未启用</string>
     <string name="chat_session_mcp_not_configured">尚未配置 MCP</string>
     <string name="chat_session_tool_save_failed">无法保存当前会话的工具设置</string>
-    <string name="chat_mcp_transport_sse">SSE</string>
     <string name="chat_mcp_transport_streamable_http">Streamable HTTP</string>
     <string name="chat_session_mcp_empty_title">尚未配置 MCP</string>
     <string name="chat_session_mcp_empty_description">请先前往设置中的 MCP 页面添加服务器。</string>
@@ -104,8 +104,11 @@
     <string name="chat_voice_transcription_failed">语音识别失败，请重试</string>
     <string name="chat_voice_recording_failed">录音失败，请重试</string>
     <string name="chat_voice_cancel_recording">取消录音</string>
-    <string name="chat_voice_finish_recording">停止并识别</string>
-    <string name="chat_voice_transcribing">正在识别…</string>
+    <string name="chat_voice_finish_recording">停止录音并转写到输入框</string>
+    <string name="chat_voice_transcribe_and_send">转写并直接发送</string>
+    <string name="chat_voice_transcribing">正在转写…</string>
+    <string name="chat_voice_transcribing_and_sending">正在转写并发送…</string>
+    <string name="chat_voice_no_text_recognized">没有识别到文字，请重试</string>
     <string name="chat_voice_recording_remaining">录音中，剩余 %1$d 秒</string>
     <string name="chat_voice_waveform">实时语音波形</string>
 

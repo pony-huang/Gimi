@@ -36,6 +36,7 @@ enum class PermissionSettingsDestination {
     WriteSystemSettings,
     NotificationListener,
     UsageAccess,
+    Overlay,
 }
 
 data class PermissionSettingsRequest(
@@ -43,11 +44,12 @@ data class PermissionSettingsRequest(
     val destination: PermissionSettingsDestination,
 )
 
+/** 权限管理页面状态；overlayGranted 表示系统允许在其他应用上方显示窗口。 */
 data class PermissionSettingsUiState(
     val groups: List<PermissionGroupUiModel> = emptyList(),
     val granted: Set<AppPermission> = emptySet(),
     val permanentlyDenied: Set<AppPermission> = emptySet(),
-    val allRuntimeGranted: Boolean = false,
+    val overlayGranted: Boolean = false,
     val writeSettingsGranted: Boolean = false,
     val notificationAccessGranted: Boolean = false,
     val usageAccessGranted: Boolean = false,
@@ -57,7 +59,6 @@ data class PermissionSettingsUiState(
 
 sealed interface PermissionSettingsAction {
     data object Refresh : PermissionSettingsAction
-    data object RequestAllRuntimePermissions : PermissionSettingsAction
     data class RequestGroup(val kind: PermissionGroupKind) : PermissionSettingsAction
     data class RuntimePermissionsResult(
         val permanentlyDenied: Set<AppPermission>,
@@ -65,6 +66,8 @@ sealed interface PermissionSettingsAction {
     data object OpenApplicationSettings : PermissionSettingsAction
     data object OpenWriteSettings : PermissionSettingsAction
     data object OpenNotificationAccess : PermissionSettingsAction
+    /** 打开系统悬浮窗授权页面。 */
+    data object OpenOverlaySettings : PermissionSettingsAction
     data object OpenUsageAccess : PermissionSettingsAction
     data class RuntimeRequestHandled(val requestId: Int) : PermissionSettingsAction
     data class SettingsRequestHandled(val requestId: Int) : PermissionSettingsAction

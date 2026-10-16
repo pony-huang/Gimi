@@ -13,6 +13,7 @@ import github.ponyhuang.gimi.data.agent.contribution.ModelCatalogContribution
 import github.ponyhuang.gimi.data.agent.contribution.OfficialToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.PluginToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.SkillToolContribution
+import github.ponyhuang.gimi.data.agent.contribution.SandboxToolContribution
 
 /**
  * Agent 能力贡献方多绑定注册。
@@ -24,6 +25,10 @@ import github.ponyhuang.gimi.data.agent.contribution.SkillToolContribution
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class AgentContributionModule {
+
+    @Binds
+    @IntoSet
+    abstract fun bindSandboxToolContribution(implementation: SandboxToolContribution): AgentContribution
 
     @Binds
     @IntoSet

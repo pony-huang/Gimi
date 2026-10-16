@@ -156,7 +156,7 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
     @Test
     fun protocolChangeToUnsupportedProtocolIsRejected() = runTest {
         val provider = service(apiKey = "key").copy(
-            supportedProtocols = listOf(ApiProtocol.Standard),
+            supportedProtocols = listOf(ApiProtocol.OpenaiChatcompletions),
         )
         val fixture = fixture(provider)
         fixture.viewModel.onAction(LLMModelSettingDetailAction.Load(provider.id))
@@ -167,7 +167,7 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
         )
         advanceUntilIdle()
 
-        assertEquals(ApiProtocol.Standard, fixture.viewModel.uiState.value.service?.apiProtocol)
+        assertEquals(ApiProtocol.OpenaiChatcompletions, fixture.viewModel.uiState.value.service?.apiProtocol)
         io.mockk.verify(exactly = 0) {
             fixture.repository.updateApiProtocol(any(), ApiProtocol.Anthropic)
         }
@@ -219,7 +219,7 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
         isEnabled = true,
         apiKey = apiKey,
         apiBaseUrl = "https://api.deepseek.com",
-        apiProtocol = ApiProtocol.Standard,
+        apiProtocol = ApiProtocol.OpenaiChatcompletions,
         anthropicBaseUrl = "https://api.deepseek.com/anthropic",
         groups = listOf(
             ModelGroup(

@@ -71,14 +71,16 @@ object ChatRunEventMapper {
             author = event.author,
             timestamp = event.timestamp,
         )
-        event.parts.forEachIndexed { index, part ->
-            val text = part.text?.takeIf(String::isNotEmpty) ?: return@forEachIndexed
+        event.parts.forEach { part ->
+            val text = part.text?.takeIf(String::isNotEmpty) ?: return@forEach
             val current = message.textParts.toMutableList()
             val last = current.lastOrNull()
             if (last != null && last.thought == part.thought) {
                 current[current.lastIndex] = last.copy(text = last.text + text)
             } else {
-                current += TextPart("${event.id}:$index", text, part.thought)
+                // 段序号取「消息内已有文本段数」而非事件内下标：所有流式增量事件共享同一个
+                // Event.id，思考段与正文段的事件内下标都是 0，用下标会让两段撞成同一个 id。
+                current += TextPart("${event.id}:${current.size}", text, part.thought)
             }
             message = message.copy(textParts = current)
         }

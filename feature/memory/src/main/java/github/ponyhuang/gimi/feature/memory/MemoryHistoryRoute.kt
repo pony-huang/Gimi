@@ -10,6 +10,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 
 /** 将云端记忆历史状态接入导航和短暂 UI 提示。 */
 @Composable
@@ -31,6 +32,7 @@ fun MemoryHistoryRoute(
         }
     }
     PreferenceScaffold(
+        style = PreferenceStyle.Compact,
         title = stringResource(R.string.memory_history_screen_title),
         onBack = onBack,
     ) { scaffoldModifier ->

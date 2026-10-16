@@ -12,7 +12,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -23,9 +22,7 @@ import kotlinx.coroutines.launch
  */
 data class BackgroundAppUiState(
     val session: MobileDisplaySession? = null,
-    val smallWindowEnabled: Boolean = false,
     val menuExpanded: Boolean = false,
-    val settingsVisible: Boolean = false,
     val inputUnavailable: Boolean = false,
     val previewUnavailable: Boolean = false,
     val rotating: Boolean = false,
@@ -36,10 +33,6 @@ data class BackgroundAppUiState(
 sealed interface BackgroundAppAction {
     /** 切换更多菜单。 */
     data class Menu(val expanded: Boolean) : BackgroundAppAction
-    /** 显示或隐藏窗口设置。 */
-    data class Settings(val visible: Boolean) : BackgroundAppAction
-    /** 保存下次打开窗口的模式。 */
-    data class SmallWindow(val enabled: Boolean) : BackgroundAppAction
     /** 单指输入；保留源窗口会话身份，拒绝旧窗口事件。 */
     data class Touch(val sessionId: String, val event: MobileTouch) : BackgroundAppAction
     /** 返回当前目标 App。 */
@@ -62,17 +55,17 @@ sealed interface BackgroundAppAction {
  */
 @HiltViewModel
 class BackgroundAppViewModel @Inject constructor(private val repository: MobileUseRepository) : ViewModel() {
-    private val mutableState = MutableStateFlow(BackgroundAppUiState(repository.displaySession.value, repository.smallWindowEnabled.value))
+    private val mutableState = MutableStateFlow(BackgroundAppUiState(repository.displaySession.value))
     val uiState: StateFlow<BackgroundAppUiState> = mutableState.asStateFlow()
     private val pendingTouches = ArrayDeque<BackgroundAppAction.Touch>()
     private val wakeInput = Channel<Unit>(Channel.CONFLATED)
 
     init {
         viewModelScope.launch {
-            combine(repository.displaySession, repository.smallWindowEnabled) { session, small -> session to small }.collect { (session, small) ->
+            repository.displaySession.collect { session ->
                 mutableState.update {
-                    if (it.session?.id != session?.id) BackgroundAppUiState(session, small)
-                    else it.copy(session = session, smallWindowEnabled = small)
+                    if (it.session?.id != session?.id) BackgroundAppUiState(session)
+                    else it.copy(session = session)
                 }
             }
         }
@@ -93,7 +86,6 @@ class BackgroundAppViewModel @Inject constructor(private val repository: MobileU
     fun onAction(action: BackgroundAppAction) {
         when (action) {
             is BackgroundAppAction.Menu -> mutableState.update { it.copy(menuExpanded = action.expanded) }
-            is BackgroundAppAction.Settings -> mutableState.update { it.copy(settingsVisible = action.visible, menuExpanded = false) }
             is BackgroundAppAction.PreviewFailure -> mutableState.update { it.copy(previewUnavailable = action.failed) }
             BackgroundAppAction.DismissRotationError -> mutableState.update { it.copy(rotationUnavailable = false) }
             BackgroundAppAction.Rotate -> {
@@ -115,7 +107,6 @@ class BackgroundAppViewModel @Inject constructor(private val repository: MobileU
                 }
             }
             BackgroundAppAction.DismissError -> mutableState.update { it.copy(inputUnavailable = false) }
-            is BackgroundAppAction.SmallWindow -> viewModelScope.launch { repository.setSmallWindowEnabled(action.enabled) }
             BackgroundAppAction.Close -> uiState.value.session?.id?.let { id -> viewModelScope.launch { repository.closeSession(id) } }
             BackgroundAppAction.Back -> uiState.value.session?.id?.let { id ->
                 viewModelScope.launch {

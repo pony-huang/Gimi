@@ -6,7 +6,7 @@
 
 **An Android AI assistant with conversations, attachments, and settings stored on the device.**
 
-Supports text and voice interaction, phone tools, background app control, and extensions through official tools, APK plugins, MCP, and skills.
+Supports text and voice interaction, phone tools, background app control, and extensions through official tools, APK plugins, MCP, skills, and a cloud sandbox.
 
 [![CI](https://github.com/pony-huang/Gimi/actions/workflows/ci.yml/badge.svg)](https://github.com/pony-huang/Gimi/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/pony-huang/Gimi)](https://github.com/pony-huang/Gimi/releases/latest)
@@ -23,7 +23,8 @@ Supports text and voice interaction, phone tools, background app control, and ex
 With your own API key, use chat to check your calendar, set alarms, play media, adjust brightness,
 search and read authorized files, and call official provider tools, plugins, and remote MCP tools.
 After Shizuku authorization, models with image understanding can also inspect and operate other apps
-in the background.
+in the background. With an E2B API key, it can also run shell commands and code in an isolated cloud
+sandbox.
 
 ## Feature reference
 
@@ -38,11 +39,8 @@ effort. Tool loading mode (load on demand or load everything each turn) is a glo
 *Settings → Tool access*, with load-all as the default on a fresh install. The permission mode
 (request approval or full approval) is global too, and can be toggled from the *Add to chat* panel
 in the composer. When it needs more
-information, the Agent can ask for typed input or offer choices right in the composer.
-
-If the latest turn fails, is interrupted, or is stopped, edit the original message or retry it. If that
-turn already called a tool, Gimi warns that resending may run the operation again; completed actions are
-not undone.
+information, the Agent can ask for typed input or offer choices right in the composer. The composer
+shows the current model; tap it to switch models from a bottom sheet listing every enabled service.
 
 Tasks can continue when the app moves to the background. With notifications allowed, Gimi can notify
 you about tool execution, requests for approval or input, and task completion. Return to the
@@ -54,13 +52,13 @@ interval in Settings.
 
 ### Voice
 
-Tap the microphone to record, then stop to transcribe speech into the composer. Edit the text before
-sending. Configure speech recognition and synthesis separately in *Settings → Default models*.
+Tap the microphone to record. Stop to transcribe into the composer and edit the text before sending,
+or use the send button to transcribe and send in one step. Configure speech recognition and synthesis
+separately in *Settings → Default models*.
 Speech recognition supports MiniMax and MiMo (Xiaomi); choose a voice for reply playback, with online voice-list
 retrieval for MiniMax.
 
-Automatic reading of complete replies is optional and defaults to off on a fresh install. Both voice
-input and reply playback require the corresponding online model to be configured.
+Complete replies can be read aloud automatically.
 
 ### Built-in tools
 
@@ -78,53 +76,68 @@ input and reply playback require the corresponding online model to be configured
 | **Web**      | Web search, open links                                |
 | **Settings** | Jump to system settings pages                         |
 
-Enable *Custom tools* in *Settings → Tool access* to choose individual local tools. When it is off,
-all local tools are available, subject to system permissions and the permission mode.
+Enable *Custom tools* in *Settings → Tool access* to choose individual local tools; when it is off,
+all local tools are available.
 
 ### Background app control
 
 Let the Agent inspect and operate other apps in the background while you continue using your phone.
 Supported actions include opening apps, observing screens, clicking elements, filling text fields,
-coordinate taps, swipes, Back, and waits. The screen is observed again after actions, and stale
-targets are rejected.
+coordinate taps, swipes, Back, and waits. The screen is observed again after each action.
 
-Install Shizuku, start its service in ADB shell mode through wireless debugging or ADB, then authorize
-Gimi in *Settings → Background app control*. Shizuku root mode is currently unsupported. The chat
-model must support image understanding. Relevant tools are provided automatically while Shizuku is
-running and do not need to be enabled individually in the local tool list.
+Install Shizuku, start its service in ADB shell mode through wireless debugging or ADB, then turn on
+background app control and authorize Gimi in *Settings → Shizuku*. The chat model must support image
+understanding. Relevant tools are provided automatically while Shizuku is running and do not need to
+be enabled individually in the local tool list.
 
-Text input and native element actions also require the *Gimi Background App Control · Text Input*
-Accessibility service. The device and target app must support independent background operation.
-Only one background app-control task can run at a time; the settings page shows status and permissions.
+Text input and native element actions also require the *Gimi* Accessibility service. The settings page
+shows status and permissions.
+
+The background app is shown in a floating small window and needs the display-over-other-apps
+permission from *Settings → Permissions*.
 
 ### Official tools
 
 Configure and enable the provider and its official tools in *Settings → API access*, then choose
-capabilities in the conversation's *Official tools* panel. Availability depends on the provider,
-API protocol, model, and credentials.
+capabilities in the conversation's *Official tools* panel.
 
 | Provider | Capabilities |
 |----------|--------------|
-| **OpenAI** | Web search |
 | **Anthropic** | Web search |
 | **MiniMax** | Web search, text-to-image, reference-image generation |
-| **MiMo (Xiaomi)** | Web search |
 | **GLM (Zhipu)** | Web search, webpage reading |
 | **Kimi** | Kimi tool collection (formulas) |
 
-MiniMax image generation can be used with chat models from other providers, using the MiniMax
-service's credentials. Native capabilities such as web search remain subject to provider and
-protocol restrictions.
+Provider-executed web search (Anthropic, MiniMax) runs on the provider's side and is offered under
+the service's Anthropic protocol. MiniMax image generation can be used with chat models from other
+providers, using the MiniMax service's credentials.
 
 ### MCP
 
-Connect remote MCP servers (SSE or Streamable HTTP) to give the assistant any tools you want. Add a
+Connect remote MCP servers over Streamable HTTP to give the assistant any tools you want. Add a
 server manually, or paste an `mcpServers` JSON or a curl snippet straight from the docs — Gimi parses
-it for you. Set a bearer token or custom headers, test the connection, and inspect the tools,
-resources, and prompts each server exposes. Disable any server anytime.
+it for you. Set a bearer token or custom headers, test the connection, and inspect the tools and
+resources each server exposes. Disable any server anytime.
 
 In *Settings → MCP*, tap **Import** and paste the `mcpServers` JSON or curl snippet from the server
 documentation.
+
+### Cloud sandbox
+
+Run shell commands and code in an isolated cloud environment. Enable E2B in *Settings → Sandbox* and
+enter the domain and API key; the key, the environment variables, and the rest of the configuration
+are encrypted on this device. The template defaults to `code-interpreter-v1` — a custom template must
+provide a Code Interpreter to run code — and the idle timeout defaults to 300 seconds.
+
+Every conversation gets its own environment, so files, installed dependencies, and interpreter
+variables carry over between turns of that conversation and stay isolated from other conversations.
+Commands and code calls accept optional environment variables and a timeout; commands also accept a
+working directory. The Agent can run Python or JavaScript in a persistent kernel, start a background
+command and get back its process ID and, when a port is given, a preview URL, and read, write, or
+list text files up to 1 MiB. Environments are created on first use and destroyed after the idle
+timeout or when the configuration changes or is disabled.
+
+See the [E2B documentation](https://e2b.dev/docs).
 
 ### Plugins
 
@@ -139,22 +152,23 @@ The project provides these plugin APKs as separate GitHub Release downloads; ins
 - **微博 Weibo**: trending searches, AI search summaries, posts from the authorized account, and Super Topic browsing, posting, comments, and replies (requires App ID and App Secret)
 - **小红书 Xiaohongshu**: login, feeds and search, profiles and notes, comments and interactions, notifications, and image/video publishing
 
-**About Xiaohongshu**: The plugin operates the website directly with an on-device WebView, without
-an MCP server or relay URL, but it is currently less stable. Prefer the
-[xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp) MCP server.
+**About Xiaohongshu**: The plugin operates the website directly with an on-device WebView, without an
+MCP server or relay URL.
 
 Third parties can build their own with the public plugin API.
 
 ### Memory
 
 On-device memory is used by default to save and recall relevant information in later conversations.
-You can enable Mem0 long-term memory in *Settings → Memory*. Turning memory off stops both saving
-and recall; the Mem0 token is stored securely on the device.
+You can enable Mem0 long-term memory in *Settings → Memory*; the Mem0 token is stored securely on the
+device.
 
 ### Skills
 
-Install instruction packs from a URL or local ZIP. A skill bundles guidance and resources the
-assistant can use when needed. (No script execution)
+Install skill packs from a URL or a local ZIP in *Settings → Skills*. A skill bundles instructions
+and supporting resources. With the cloud sandbox configured, the Agent can run a skill's scripts
+inside that conversation's sandbox and can also prepare and install a skill archive from the sandbox
+itself.
 
 ### Folders and workspace
 
@@ -162,14 +176,7 @@ Authorize local document folders in *Settings → Folders* and revoke access any
 photos, videos, and audio uses the corresponding system permissions.
 
 Chat attachments are saved in a local workspace. View, open, or delete multiple files in
-*Settings → Workspace*. Deleting a conversation does not automatically delete its attachments;
-users manage those files themselves.
-
-### App updates
-
-The app checks GitHub for updates in the background on a cold start and shows an indicator on the
-Settings entry when a new version is available. Use *Settings → About → Check for updates* to check
-manually, review release notes, and download and install an update.
+*Settings → Cache*.
 
 ### Authorization and data
 
@@ -180,20 +187,20 @@ manually, review release notes, and download and install an update.
 - The Permissions page describes the purpose of each permission.
 - API keys are stored on the device and used only to call the corresponding configured services.
 
-## Model services
+## Model
 
 Bring your own API key. Gimi ships with presets for the providers below, and works with any
-OpenAI API or Anthropic API endpoint.
+Chat Completions or Anthropic API endpoint.
 
 | Provider                                                                                             | API protocol            |
 |------------------------------------------------------------------------------------------------------|-------------------------|
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/openai.svg" width="16" alt="OpenAI" /> **OpenAI** | OpenAI API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/openai.svg" width="16" alt="OpenAI" /> **OpenAI** | Chat Completions |
 | <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/anthropic.svg" width="16" alt="Anthropic" /> **Anthropic** | Anthropic API |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/deepseek-color.svg" width="16" alt="DeepSeek" /> **DeepSeek** | OpenAI API / Anthropic API |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/kimi-color.svg" width="16" alt="Moonshot" /> **Moonshot (Kimi)** | OpenAI API / Anthropic API |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/zhipu-color.svg" width="16" alt="GLM" /> **GLM (Zhipu)** | OpenAI API / Anthropic API |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/minimax-color.svg" width="16" alt="MiniMax" /> **MiniMax** | OpenAI API / Anthropic API |
-| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/xiaomimimo.svg" width="16" alt="MiMo" /> **MiMo (Xiaomi)** | OpenAI API / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/deepseek-color.svg" width="16" alt="DeepSeek" /> **DeepSeek** | Chat Completions / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/kimi-color.svg" width="16" alt="Moonshot" /> **Moonshot (Kimi)** | Chat Completions / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/zhipu-color.svg" width="16" alt="GLM" /> **GLM (Zhipu)** | Chat Completions / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/minimax-color.svg" width="16" alt="MiniMax" /> **MiniMax** | Chat Completions / Anthropic API |
+| <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-svg/icons/xiaomimimo.svg" width="16" alt="MiMo" /> **MiMo (Xiaomi)** | Chat Completions / Anthropic API |
 
 Configure the default chat model, a quick model for conversation titles and task suggestions, speech
 recognition, speech synthesis, and a playback voice separately. Attachment, reasoning, and tool-call
@@ -210,14 +217,14 @@ capabilities depend on the selected model.
    suggestions in *Settings → Smart recommendations*.
 7. Start chatting.
 
-Optional extensions include MCP servers, plugins, skills, official tools, authorized folders, and
-Shizuku background app control.
+Optional extensions include MCP servers, plugins, skills, official tools, authorized folders, the
+E2B cloud sandbox, and Shizuku background app control.
 
 ## Privacy
 
 Gimi collects nothing: no analytics, no telemetry, no accounts, no developer servers. Conversations
 stay on your device; network requests serve configured or enabled model, speech, MCP, plugin, and
-Mem0 services, skill downloads, and GitHub updates. See [PRIVACY.md](PRIVACY.md) ·
+Mem0 services, skill downloads, the E2B sandbox, and GitHub updates. See [PRIVACY.md](PRIVACY.md) ·
 [隐私政策](PRIVACY.zh-CN.md).
 
 ## Contributing
@@ -246,4 +253,4 @@ please describe the use case it addresses; discuss substantial feature or interf
 
 ## Development and release workflow
 
-[See the release guide](docs/releasing.md) for CI checks, automated changelogs, version PRs, signing setup, and release retries.
+[See the release guide](spec/en/releasing.md) for CI checks, automated changelogs, version PRs, signing setup, and release retries.

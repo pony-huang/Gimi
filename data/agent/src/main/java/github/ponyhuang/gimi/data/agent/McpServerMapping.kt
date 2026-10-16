@@ -1,54 +1,31 @@
 package github.ponyhuang.gimi.data.agent
 
-import github.ponyhuang.gimi.data.agent.tools.mcp.McpConnectionParameters
-import github.ponyhuang.gimi.data.agent.tools.mcp.McpToolset
+import com.google.adk.kt.tools.Toolset
+import com.google.adk.kt.tools.mcp.McpTransportConfig
+import com.google.adk.kt.tools.mcp.RemoteMcpToolsetConfig
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
-import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 
-/**
- * 将领域模型 [McpServer] 映射为 [McpConnectionParameters]。
- *
- * 按 transport 枚举选择 SSE 或 Streamable HTTP 参数，并将 bearer token 和自定义 headers
- * 解析到 headers map 中。
- */
-internal fun McpServer.toMcpConnectionParameters(): McpConnectionParameters {
-    val headers: Map<String, String> = buildMap {
-        bearerToken.takeIf { it.isNotBlank() }?.let {
-            put("Authorization", "Bearer $it")
-        }
-        this@toMcpConnectionParameters.headers.lineSequence()
-            .map { it.trim() }
-            .filter { it.isNotEmpty() && '=' in it }
-            .forEach { line ->
-                val (name, value) = line.split('=', limit = 2)
-                if (name.isNotBlank()) put(name.trim(), value.trim())
+/** 用户配置直接映射到官方远端 MCP，显式保留自定义 header 覆盖 bearer token 的顺序。 */
+internal fun McpServer.toOfficialMcpConfig(): RemoteMcpToolsetConfig {
+    val requestHeaders = buildMap {
+        bearerToken.takeIf(String::isNotBlank)?.let { put("Authorization", "Bearer $it") }
+        headers.lineSequence().map(String::trim).filter { '=' in it }.forEach { line ->
+            val (name, value) = line.split('=', limit = 2)
+            if (name.isNotBlank()) {
+                keys.firstOrNull { it.equals(name.trim(), ignoreCase = true) }?.let(::remove)
+                put(name.trim(), value.trim())
             }
+        }
     }
-    return when (transport) {
-        McpTransport.STREAMABLE_HTTP -> McpConnectionParameters.StreamableHttp(
-            url = endpointUrl.trim(),
-            headers = headers,
-        )
-        McpTransport.SSE -> McpConnectionParameters.Sse(
-            url = endpointUrl.trim(),
-            sseEndpoint = "",
-            headers = headers,
-        )
-    }
+    val endpoint = endpointUrl.trim()
+    return RemoteMcpToolsetConfig(
+        transport = McpTransportConfig.StreamableHttp(
+            url = endpoint,
+            headers = requestHeaders,
+            allowInsecureHttp = endpoint.startsWith("http://", ignoreCase = true),
+        ),
+        useMcpResources = true,
+    )
 }
 
-/**
- * 将 [McpServer] 映射为 [McpToolset]，通过 [McpToolset.McpToolsetConfig] 构建。
- *
- * Header 是静态的（来自配置），因此不传 `headerProvider`，[McpToolset] 内部会缓存工具列表。
- */
-internal fun McpServer.toMcpToolset(): McpToolset {
-    val config = when (val params = toMcpConnectionParameters()) {
-        is McpConnectionParameters.Sse ->
-            McpToolset.McpToolsetConfig(sseConnectionParams = params)
-        is McpConnectionParameters.StreamableHttp ->
-            McpToolset.McpToolsetConfig(streamableHttpConnectionParams = params)
-        else -> error("Unsupported transport: ${params::class.simpleName}")
-    }
-    return config.toToolset()
-}
+internal fun McpServer.toMcpToolset(): Toolset = toOfficialMcpConfig().toToolset()

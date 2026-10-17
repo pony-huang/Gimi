@@ -32,7 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Functions
+import androidx.compose.material.icons.outlined.Handyman
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Psychology
@@ -511,7 +511,7 @@ private fun OfficialToolsNavigationRow(
     onClick: () -> Unit,
 ) {
     NavigationRow(
-        icon = Icons.Default.Functions,
+        icon = Icons.Outlined.Handyman,
         title = stringResource(R.string.chat_official_tools_title),
         subtitle = enabledCountText(enabledCount, isMcp = false),
         onClick = onClick,
@@ -682,7 +682,7 @@ private fun OfficialToolFunctionRow(
     onEnabledChange: (Boolean) -> Unit,
 ) {
     GimiBottomSheetSwitchRow(
-        icon = Icons.Default.Functions,
+        icon = Icons.Outlined.Handyman,
         label = officialFunctionLabel(toolId, function.id),
         description = officialFunctionDescription(toolId, function.id, function.description),
         checked = enabled,
@@ -898,6 +898,8 @@ private fun reasoningEffortDescription(effort: ReasoningEffort): String = string
 
 @Composable
 private fun officialToolLabel(toolId: String): String = when (toolId) {
+    OfficialToolIds.DEEPSEEK_WEB_SEARCH -> stringResource(R.string.chat_official_tool_deepseek_web_search)
+    OfficialToolIds.DEEPSEEK_WEB_FETCH -> stringResource(R.string.chat_official_tool_deepseek_web_fetch)
     OfficialToolIds.ANTHROPIC_WEB_SEARCH,
     OfficialToolIds.MINIMAX_WEB_SEARCH,
     OfficialToolIds.GEMINI_WEB_SEARCH,
@@ -911,6 +913,10 @@ private fun officialToolLabel(toolId: String): String = when (toolId) {
 
 @Composable
 private fun officialToolDescription(toolId: String): String = when (toolId) {
+    OfficialToolIds.DEEPSEEK_WEB_SEARCH ->
+        stringResource(R.string.chat_official_tool_deepseek_web_search_description)
+    OfficialToolIds.DEEPSEEK_WEB_FETCH ->
+        stringResource(R.string.chat_official_tool_deepseek_web_fetch_description)
     OfficialToolIds.ANTHROPIC_WEB_SEARCH,
     OfficialToolIds.MINIMAX_WEB_SEARCH,
     OfficialToolIds.GEMINI_WEB_SEARCH,
@@ -1206,6 +1212,33 @@ private fun ChatOfficialToolsErrorPreview() {
             state = previewAddToChatState().let { state ->
                 state.copy(officialTools = state.officialTools.map { it.copy(functions = emptyList(), loadError = "工具加载失败，请重试") })
             },
+            onFunctionEnabledChange = { _, _, _ -> },
+            onRetry = {},
+        )
+    }
+}
+
+@Preview(name = "DeepSeek-浅色", showBackground = true)
+@Preview(name = "DeepSeek-深色", showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun DeepSeekOfficialToolsPreview() {
+    ChatSheetPreviewTheme {
+        OfficialToolsDetailPage(
+            state = previewAddToChatState().copy(
+                configuration = ConversationToolConfiguration(
+                    enabledOfficialFunctionIds = mapOf(
+                        OfficialToolIds.DEEPSEEK_WEB_SEARCH to setOf(OfficialToolIds.DEEPSEEK_WEB_SEARCH),
+                    ),
+                ),
+                officialTools = listOf(OfficialToolIds.DEEPSEEK_WEB_SEARCH, OfficialToolIds.DEEPSEEK_WEB_FETCH).map { id ->
+                    OfficialToolDescriptor(
+                        id = id,
+                        sourceServiceId = "deepseek",
+                        sourceServiceName = "DeepSeek",
+                        functions = listOf(OfficialToolFunction(id = id, name = id, description = id)),
+                    )
+                },
+            ),
             onFunctionEnabledChange = { _, _, _ -> },
             onRetry = {},
         )

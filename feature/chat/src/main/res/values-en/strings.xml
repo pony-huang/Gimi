@@ -196,4 +196,8 @@
     <string name="chat_notice_delete_failed">Some conversations could not be deleted. Please try again.</string>
     <string name="chat_choice_show_full_text">Show full option</string>
     <string name="chat_choice_close_full_text">Close</string>
+    <string name="chat_official_tool_deepseek_web_search">DeepSeek web search</string>
+    <string name="chat_official_tool_deepseek_web_fetch">DeepSeek web fetch</string>
+    <string name="chat_official_tool_deepseek_web_search_description">Search the web for links, summaries, and optional page content.</string>
+    <string name="chat_official_tool_deepseek_web_fetch_description">Fetch a web page and return its title and Markdown content.</string>
 </resources>

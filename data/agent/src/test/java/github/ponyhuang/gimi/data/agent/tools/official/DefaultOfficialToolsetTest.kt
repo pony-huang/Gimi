@@ -45,9 +45,10 @@ class DefaultOfficialToolsetTest {
     }
 
     @Test
-    fun serviceWithoutNativeDeclarationsOnlyReceivesCrossModelImageFunctions() = runTest {
+    fun deepSeekReceivesItsWebToolsAndCrossModelImageFunctions() = runTest {
         assertEquals(
-            setOf("minimax_text_to_image", "minimax_image_to_image"),
+            setOf("minimax_text_to_image", "minimax_image_to_image",
+                OfficialToolIds.DEEPSEEK_WEB_SEARCH, OfficialToolIds.DEEPSEEK_WEB_FETCH),
             toolset().resolveTools(config(serviceId = "deepseek"), selection = null)
                 .map { it.name }.toSet(),
         )
@@ -423,7 +424,7 @@ class DefaultOfficialToolsetTest {
         credential: String = "key",
         officialToolsEnabled: Boolean,
     ): AgentModelConfigurationSource {
-        val serviceIds = listOf("openai", "anthropic", "minimax", "mimo", "gemini", "glm", "kimi")
+        val serviceIds = listOf("deepseek", "openai", "anthropic", "minimax", "mimo", "gemini", "glm", "kimi")
         val services = serviceIds.map { serviceId ->
             mockk<LLMModelSetting> {
                 every { id } returns serviceId

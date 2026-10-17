@@ -206,4 +206,8 @@
     <string name="chat_notice_delete_failed">有会话未能删除，请重试。</string>
     <string name="chat_choice_show_full_text">查看选项全文</string>
     <string name="chat_choice_close_full_text">关闭</string>
+    <string name="chat_official_tool_deepseek_web_search">DeepSeek 网页搜索</string>
+    <string name="chat_official_tool_deepseek_web_fetch">DeepSeek 网页抓取</string>
+    <string name="chat_official_tool_deepseek_web_search_description">搜索网页，返回链接、摘要和可选正文。</string>
+    <string name="chat_official_tool_deepseek_web_fetch_description">抓取指定网页，返回标题和 Markdown 正文。</string>
 </resources>

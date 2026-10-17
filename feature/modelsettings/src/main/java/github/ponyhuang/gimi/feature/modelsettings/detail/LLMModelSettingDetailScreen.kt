@@ -67,6 +67,7 @@ fun LLMModelSettingDetailScreen(
                 )
             }
             OfficialToolsSection(
+                serviceId = service.id,
                 enabled = service.isOfficialToolsEnabled,
                 serviceEnabled = service.isEnabled,
                 onEnabledChange = {

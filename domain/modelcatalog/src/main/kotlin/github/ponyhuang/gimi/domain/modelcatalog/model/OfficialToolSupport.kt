@@ -14,6 +14,24 @@ class OfficialToolSupport @Inject constructor() {
      */
     val all: List<OfficialToolSpec> = listOf(
         OfficialToolSpec(
+            toolId = OfficialToolIds.DEEPSEEK_WEB_SEARCH,
+            serviceId = "deepseek",
+            protocols = setOf(ApiProtocol.OpenaiChatcompletions, ApiProtocol.Anthropic),
+            displayName = "DeepSeek web search",
+            staticFunctionIds = listOf(OfficialToolIds.DEEPSEEK_WEB_SEARCH),
+            canBeUsedAcrossModels = true,
+            binding = OfficialToolBinding.LocalFunctions,
+        ),
+        OfficialToolSpec(
+            toolId = OfficialToolIds.DEEPSEEK_WEB_FETCH,
+            serviceId = "deepseek",
+            protocols = setOf(ApiProtocol.OpenaiChatcompletions, ApiProtocol.Anthropic),
+            displayName = "DeepSeek web fetch",
+            staticFunctionIds = listOf(OfficialToolIds.DEEPSEEK_WEB_FETCH),
+            canBeUsedAcrossModels = true,
+            binding = OfficialToolBinding.LocalFunctions,
+        ),
+        OfficialToolSpec(
             toolId = OfficialToolIds.ANTHROPIC_WEB_SEARCH,
             serviceId = "anthropic",
             protocols = setOf(ApiProtocol.Anthropic),

@@ -8,6 +8,8 @@ package github.ponyhuang.gimi.domain.modelcatalog.model
  * 避免多处字面量各说各话。
  */
 public object OfficialToolIds {
+    public const val DEEPSEEK_WEB_SEARCH: String = "deepseek_web_search"
+    public const val DEEPSEEK_WEB_FETCH: String = "deepseek_web_fetch"
     public const val ANTHROPIC_WEB_SEARCH: String = "anthropic_web_search"
     public const val MINIMAX_WEB_SEARCH: String = "minimax_web_search"
     public const val MINIMAX_IMAGE_GENERATION: String = "minimax_image_generation"

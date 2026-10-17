@@ -151,6 +151,7 @@ fun PreferenceGroupCard(
  * @property iconContainer 图标圆形底色，默认主题蓝。
  * @property iconTint 圆底上的字形色，默认白色；禁用等特殊态可改为灰色组合。
  * @property iconSize 图标本身的尺寸；品牌图标可使用与容器相同的尺寸以保留原始外观。
+ * @property subtitleMaxLines 说明文字的最大行数；需要完整解释功能的设置项可单独放宽。
  * @property onLongClick 长按行为；提供后行改为 combinedClickable，用于进入多选等模式。
  */
 @Composable
@@ -165,6 +166,7 @@ fun PreferenceListItem(
     iconTint: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) MaterialTheme.colorScheme.onSurfaceVariant else Color.White,
     iconSize: Dp = 20.dp,
     showDivider: Boolean = false,
+    subtitleMaxLines: Int = 2,
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
 ) {
     val compact = LocalPreferenceStyle.current == PreferenceStyle.Compact
@@ -217,7 +219,7 @@ fun PreferenceListItem(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
+                        maxLines = subtitleMaxLines,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 1.dp),
                     )

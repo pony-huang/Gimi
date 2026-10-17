@@ -4,6 +4,8 @@ import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.GoogleMapsTool
 import com.google.adk.kt.tools.GoogleSearchTool
 import com.google.adk.kt.tools.UrlContextTool
+import github.ponyhuang.gimi.data.agent.tools.official.deepseek.DeepSeekWebTool
+import github.ponyhuang.gimi.data.agent.tools.official.deepseek.DeepSeekWebToolApi
 import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmReaderTool
 import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmWebSearchTool
 import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmWebToolApi
@@ -44,6 +46,9 @@ class OfficialToolFactory @Inject constructor(
                 it.id == spec.serviceId && it.canProvideOfficialTools()
             }
             if (service == null) emptyList() else when (spec.toolId) {
+                OfficialToolIds.DEEPSEEK_WEB_SEARCH,
+                OfficialToolIds.DEEPSEEK_WEB_FETCH,
+                -> listOf(DeepSeekWebTool(spec.toolId, DeepSeekWebToolApi(service.apiKey, httpClient)))
                 OfficialToolIds.MINIMAX_IMAGE_GENERATION -> {
                     val api = MinimaxImageGenerationApi(service.apiKey, httpClient)
                     listOf(

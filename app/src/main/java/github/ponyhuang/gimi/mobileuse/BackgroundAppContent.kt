@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.mobileuse
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,10 +32,14 @@ internal fun BackgroundAppContent(
         frame = { frameModifier ->
             state.session?.let { session ->
                 key(session.id) {
-                    AndroidView(modifier = frameModifier,
-                        factory = { MobilePreviewView(it, gateway, session, interactive = !small, onAction = viewModel::onAction) },
-                        update = { it.updateSession(session) },
-                        onRelease = { it.cancelGesture() })
+                    Box(frameModifier) {
+                        AndroidView(modifier = Modifier.matchParentSize(),
+                            factory = { MobilePreviewView(it, gateway, session, interactive = !small, onAction = viewModel::onAction) },
+                            update = { it.updateSession(session) },
+                            onRelease = { it.cancelGesture() })
+                        // 在原生只读画面上方承接拖动，避免 TextureView 先消费触摸；贴边后仍能拉回。
+                        if (small) Box(Modifier.matchParentSize().then(toolbarModifier))
+                    }
                 }
             }
         }, modifier = modifier, toolbarModifier = toolbarModifier,

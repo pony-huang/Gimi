@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -197,7 +199,53 @@ private fun SmallWindowPreview(dark: Boolean, menu: Boolean = false, landscape: 
                 menuExpanded = menu,
             ), smallWindow = true, onAction = {}, onCollapse = {}, onSwitchWindow = {},
             frame = { modifier -> Box(modifier.background(MaterialTheme.colorScheme.background)) },
-            modifier = Modifier.size(width = if (landscape) 144.dp else 129.dp, height = if (landscape) 66.dp else 280.dp),
+            modifier = Modifier.size(width = if (landscape) 160.dp else 143.dp, height = if (landscape) 73.dp else 310.dp),
         )
+    }
+}
+
+/** 屏幕范围、贴边和键盘避让的静态预览；仅使用假数据。 */
+@Preview(name = "自由拖动 · 浅色", widthDp = 412, heightDp = 892)
+@Composable
+private fun WindowPlacementLightPreview() = WindowPlacementPreview(dark = false)
+
+@Preview(name = "贴边保留拖动入口 · 深色", widthDp = 412, heightDp = 892)
+@Composable
+private fun WindowPlacementEdgePreview() = WindowPlacementPreview(dark = true, edge = true)
+
+@Preview(name = "键盘弹出临时避让", widthDp = 412, heightDp = 892)
+@Composable
+private fun WindowPlacementKeyboardPreview() = WindowPlacementPreview(dark = false, keyboard = true)
+
+@Composable
+private fun WindowPlacementPreview(dark: Boolean, edge: Boolean = false, keyboard: Boolean = false) {
+    AsssistantaiTheme(darkTheme = dark) {
+        Surface {
+            Box(Modifier.fillMaxSize()) {
+                Text("07:30", Modifier.align(Alignment.TopStart).padding(16.dp))
+                Text("聊天内容", Modifier.align(Alignment.Center))
+                Text("输入消息", Modifier.align(Alignment.BottomStart).padding(24.dp))
+                if (keyboard) {
+                    Box(Modifier.align(Alignment.BottomCenter).height(300.dp).fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)) {
+                        Text("键盘区域", Modifier.align(Alignment.Center))
+                    }
+                }
+                Box(Modifier.offset(x = if (edge) 364.dp else 252.dp,
+                    y = if (keyboard) 282.dp else 530.dp).size(160.dp, 310.dp)) {
+                    BackgroundAppViewport(
+                        state = BackgroundAppUiState(session = MobileDisplaySession("draft", "draft", 1, 1600, 3100)),
+                        smallWindow = true,
+                        onAction = {}, onCollapse = {}, onSwitchWindow = {},
+                        frame = { modifier ->
+                            Box(modifier.background(MaterialTheme.colorScheme.secondaryContainer)) {
+                                Text("副屏画面 · 可拖动", Modifier.align(Alignment.Center))
+                            }
+                        },
+                        toolbarModifier = Modifier,
+                    )
+                }
+            }
+        }
     }
 }

@@ -171,12 +171,13 @@ class BackgroundAppWindowService : Service() {
         val layout = WindowManager.LayoutParams(width, height, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                (if (!small) WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS else 0),
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT).apply {
             gravity = Gravity.TOP or Gravity.START
             x = if (small) (metrics.bounds.width() - width) / 2 else metrics.bounds.width() - width
             y = (metrics.bounds.height() - height) / 2
-            softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            softInputMode = if (small) WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+                else WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
         }
         params = layout
         val view = ComposeView(windowContext).apply {
@@ -197,8 +198,8 @@ class BackgroundAppWindowService : Service() {
                             moveWindow(delta)
                         }
                     }
-                    if (small) BackgroundAppContent(viewModel, gateway, host, small = true, modifier = Modifier.fillMaxSize(),
-                        toolbarModifier = dragModifier)
+                    if (small) BackgroundAppContent(viewModel, gateway, host, small = true,
+                        modifier = Modifier.fillMaxSize(), toolbarModifier = dragModifier)
                     else BackgroundAppBubble(onOpen = host::open, icon = { BackgroundAppIcon() }, modifier = dragModifier)
                 }
             }
@@ -231,7 +232,7 @@ class BackgroundAppWindowService : Service() {
             applyBubblePosition()
         } else {
             val bounds = smallWindowBounds ?: return
-            host.smallWindowGeometry = host.smallWindowGeometry?.moveBy(delta.x, delta.y, bounds)
+            host.smallWindowGeometry = host.smallWindowGeometry?.moveBy(delta.x, delta.y, bounds, dp(48).toFloat())
             updateBounds()
         }
     }
@@ -262,9 +263,9 @@ class BackgroundAppWindowService : Service() {
         val bottom = maxOf(safe.bottom, keyboardBottom, mainScreenKeyboard)
         if (shown == BackgroundAppPresentation.SMALL_WINDOW) {
             val bounds = BackgroundAppWindowBounds(
-                left = (safe.left + dp(8)).toFloat(), top = (safe.top + dp(8)).toFloat(),
-                right = (metrics.bounds.width() - safe.right - dp(8)).toFloat(),
-                bottom = (metrics.bounds.height() - bottom - dp(8)).toFloat(),
+                left = safe.left.toFloat(), top = safe.top.toFloat(),
+                right = (metrics.bounds.width() - safe.right).toFloat(),
+                bottom = (metrics.bounds.height() - safe.bottom).toFloat(),
             )
             smallWindowBounds = bounds
             val session = repository.displaySession.value ?: return
@@ -275,7 +276,10 @@ class BackgroundAppWindowService : Service() {
             // 旋转后固定预览也必须使用新比例；安全区域约束仍只改变可见尺寸。
             host.smallWindowGeometry = requested
             // 安全区域约束只改变可见尺寸，键盘关闭后恢复固定预览尺寸。
-            val visible = requested.constrain(bounds)
+            // 保存位置始终按完整屏幕约束；键盘避让只影响当前显示，收起后恢复。
+            val visible = requested.constrain(bounds.copy(
+                bottom = maxOf(bounds.top + 1f, (metrics.bounds.height() - bottom).toFloat()),
+            ), dp(48).toFloat())
             layout.width = visible.width.roundToInt()
             layout.height = visible.height.roundToInt()
             layout.x = visible.left.roundToInt()
@@ -296,7 +300,7 @@ class BackgroundAppWindowService : Service() {
             ))
             layout.x = motion.position.x.roundToInt()
             layout.y = motion.position.y.roundToInt()
-        } else {
+        } else if (shown != BackgroundAppPresentation.SMALL_WINDOW) {
             layout.x = layout.x.coerceIn(safe.left, maxOf(safe.left, metrics.bounds.width() - safe.right - layout.width))
             layout.y = layout.y.coerceIn(safe.top, maxOf(safe.top, metrics.bounds.height() - bottom - layout.height))
         }
@@ -315,8 +319,8 @@ class BackgroundAppWindowService : Service() {
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) { super.onConfigurationChanged(newConfig); updateBounds() }
-    // 固定预览最多 144dp × 280dp，按副屏比例取更小的一边，不保留可调尺寸。
-    private fun smallWindowWidth(aspectRatio: Float): Float = minOf(dp(144).toFloat(), dp(280) * aspectRatio)
+    // 固定预览最多 160dp × 310dp，按副屏比例取更小的一边，不保留可调尺寸。
+    private fun smallWindowWidth(aspectRatio: Float): Float = minOf(dp(160).toFloat(), dp(310) * aspectRatio)
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun removeWindow() {

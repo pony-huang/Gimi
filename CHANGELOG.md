@@ -2,6 +2,14 @@
 
 版本 PR 根据 Conventional Commits 自动生成后续版本记录；合并前请整理用户可见的变化与升级注意事项。
 
+## [0.12.2](https://github.com/pony-huang/Gimi/compare/v0.12.1...v0.12.2) (2026-10-17)
+
+
+### Features
+
+* **deepseek:** add official search and fetch tools ([7f2f706](https://github.com/pony-huang/Gimi/commit/7f2f70614060fc9776f77e67ab67805b484ea7d6))
+* **deepseek:** support official search and fetch tools ([1457951](https://github.com/pony-huang/Gimi/commit/14579511f593b45de52bf824ae88a9f5ea7591f1))
+
 ## [0.12.1](https://github.com/pony-huang/Gimi/compare/v0.12.0...v0.12.1) (2026-10-17)
 
 

@@ -2,6 +2,23 @@
 
 版本 PR 根据 Conventional Commits 自动生成后续版本记录；合并前请整理用户可见的变化与升级注意事项。
 
+## [0.13.0](https://github.com/pony-huang/Gimi/compare/v0.12.0...v0.13.0) (2026-10-17)
+
+
+### Features
+
+* **agent:** add flashlight tools and remove unused categories ([cf3a50e](https://github.com/pony-huang/Gimi/commit/cf3a50eea76c75152211b227ec5892a26d63cabb))
+* **chat:** remove search result cards and clarify local images ([a439eb3](https://github.com/pony-huang/Gimi/commit/a439eb3184515bb4fdb5bdbe892a4e70114f60ed))
+* **chat:** support copying input request prompts ([1b9d2d1](https://github.com/pony-huang/Gimi/commit/1b9d2d102e68cdb4413a51b4e45b32d79a72112a))
+* **chat:** unify request cards and reuse voice composer ([edb2fae](https://github.com/pony-huang/Gimi/commit/edb2faed48488eb036945a6c54cfd2dd2fc77e2d))
+* **mobileuse:** refine display controls and sandbox tools ([9d60f15](https://github.com/pony-huang/Gimi/commit/9d60f159f592a0d0a24873b85998e87fa7d35cb9))
+* **sandbox:** clarify capabilities and refine settings layout ([4474ca1](https://github.com/pony-huang/Gimi/commit/4474ca18706ced3748f916fad846c77d0e9bc727))
+
+
+### Bug Fixes
+
+* **mobileuse:** enlarge preview and expand window movement ([c891251](https://github.com/pony-huang/Gimi/commit/c891251963b038d9b671a9b26bdf0541b10a7971))
+
 ## [0.12.0](https://github.com/pony-huang/Gimi/compare/v0.11.1...v0.12.0) (2026-10-16)
 
 

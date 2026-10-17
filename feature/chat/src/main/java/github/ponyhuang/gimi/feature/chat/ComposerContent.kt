@@ -198,7 +198,7 @@ internal fun DefaultComposerInputContent(
                     horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    with(LocalChatAiComponentFactory.current) {
+                    if (params.attachmentsEnabled) with(LocalChatAiComponentFactory.current) {
                         ComposerLeadingContent(
                             ComposerLeadingContentParams(
                                 isGenerating = params.isGenerating,

@@ -201,4 +201,6 @@
     <string name="chat_drawer_cancel">Cancel</string>
     <string name="chat_drawer_current_session_time">%1$s · Current conversation</string>
     <string name="chat_notice_delete_failed">Some conversations could not be deleted. Please try again.</string>
+    <string name="chat_choice_show_full_text">Show full option</string>
+    <string name="chat_choice_close_full_text">Close</string>
 </resources>

@@ -211,4 +211,6 @@
     <string name="chat_drawer_cancel">取消</string>
     <string name="chat_drawer_current_session_time">%1$s · 当前会话</string>
     <string name="chat_notice_delete_failed">有会话未能删除，请重试。</string>
+    <string name="chat_choice_show_full_text">查看选项全文</string>
+    <string name="chat_choice_close_full_text">关闭</string>
 </resources>

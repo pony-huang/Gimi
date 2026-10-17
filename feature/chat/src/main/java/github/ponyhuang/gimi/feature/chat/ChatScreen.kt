@@ -358,6 +358,10 @@ fun ChatScaffold(
 
                             is PendingComposerAction.TextInput -> PendingInputPanel(
                                 request = action.request,
+                                isVoiceInputAvailable = isSpeechRecognitionAvailable,
+                                onTranscribeVoice = onTranscribeVoice,
+                                voiceTranscriptionMode = state.voiceTranscriptionMode,
+                                onCancelVoiceTranscription = onCancelVoiceTranscription,
                                 onRespond = { value ->
                                     onRespondToInputRequest(action.request.callId, value)
                                 },

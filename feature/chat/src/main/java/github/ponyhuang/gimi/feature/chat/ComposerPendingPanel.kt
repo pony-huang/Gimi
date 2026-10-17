@@ -181,11 +181,13 @@ internal fun PendingInputPanel(
     )
 }
 
-/** 长提示拥有独立滚动区域，输入控件不随提示滚出视口。 */
+/** 长提示可选择复制并独立滚动，输入控件不随提示滚出视口。 */
 @Composable
 private fun PendingRequestMessage(message: String) {
-    Text(message, modifier = Modifier.fillMaxWidth().heightIn(max = 128.dp)
-        .verticalScroll(rememberScrollState()), style = MaterialTheme.typography.bodyMedium)
+    androidx.compose.foundation.text.selection.SelectionContainer {
+        Text(message, modifier = Modifier.fillMaxWidth().heightIn(max = 128.dp)
+            .verticalScroll(rememberScrollState()), style = MaterialTheme.typography.bodyMedium)
+    }
 }
 
 /**

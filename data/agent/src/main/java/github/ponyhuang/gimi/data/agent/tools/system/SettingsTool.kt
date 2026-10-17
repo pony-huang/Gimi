@@ -9,8 +9,6 @@ import javax.inject.Singleton
 
 /**
  * 系统设置导航工具：跳转到各类系统设置页。
- *
- * 对应 [github.ponyhuang.gimi.domain.toolauthorization.model.LocalToolCategory.SETTINGS]。
  */
 @Singleton
 class SettingsTool @Inject constructor(private val queue: IntentActionQueue) {

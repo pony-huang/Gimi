@@ -6,6 +6,7 @@ import github.ponyhuang.gimi.data.agent.tools.system.CalendarTool
 import github.ponyhuang.gimi.data.agent.tools.system.ClockTool
 import github.ponyhuang.gimi.data.agent.tools.system.CommunicationTool
 import github.ponyhuang.gimi.data.agent.tools.system.DeviceTool
+import github.ponyhuang.gimi.data.agent.tools.system.FlashlightTool
 import github.ponyhuang.gimi.data.agent.tools.system.FilesTool
 import github.ponyhuang.gimi.data.agent.tools.system.LaunchersTool
 import github.ponyhuang.gimi.data.agent.tools.system.LocationTool
@@ -74,6 +75,8 @@ class LocalToolCatalogTest {
         assertTrue("list_calendars" in confirmationIds)
         assertTrue("get_current_location" in confirmationIds)
         assertFalse("get_current_time" in confirmationIds)
+        assertTrue("set_flashlight" in confirmationIds)
+        assertFalse("request_flashlight_permission" in confirmationIds)
     }
 
     private fun catalog() = LocalToolCatalog(
@@ -83,6 +86,7 @@ class LocalToolCatalogTest {
         communicationTool = mockk<CommunicationTool>(relaxed = true),
         deviceTool = mockk<DeviceTool>(relaxed = true),
         filesTool = mockk<FilesTool>(relaxed = true),
+        flashlightTool = mockk<FlashlightTool>(relaxed = true),
         launchersTool = mockk<LaunchersTool>(relaxed = true),
         locationTool = mockk<LocationTool>(relaxed = true),
         mediaTool = mockk<MediaTool>(relaxed = true),

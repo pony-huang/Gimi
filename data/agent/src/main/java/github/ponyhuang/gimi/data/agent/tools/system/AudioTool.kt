@@ -10,9 +10,6 @@ import javax.inject.Singleton
 
 /**
  * 音频域工具：读取 / 设置设备媒体音量。
- *
- * 类与 [github.ponyhuang.gimi.domain.toolauthorization.model.LocalToolCategory.AUDIO]
- * 一一对应，由 [LocalToolCatalog] 按类别聚合后暴露给 Agent。
  */
 @Singleton
 class AudioTool @Inject constructor(

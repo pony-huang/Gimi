@@ -18,8 +18,6 @@ import androidx.core.net.toUri
 
 /**
  * 文件域工具：文件选择、共享媒体搜索、文档目录递归搜索、预览打开。
- *
- * 对应 [github.ponyhuang.gimi.domain.toolauthorization.model.LocalToolCategory.FILES]。
  */
 @Singleton
 class FilesTool @Inject constructor(

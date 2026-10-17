@@ -12,8 +12,6 @@ import javax.inject.Singleton
 
 /**
  * 设备域工具：屏幕亮度、自动亮度、屏幕超时。
- *
- * 对应 [github.ponyhuang.gimi.domain.toolauthorization.model.LocalToolCategory.DEVICE]。
  */
 @Singleton
 class DeviceTool @Inject constructor(

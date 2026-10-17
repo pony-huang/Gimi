@@ -10,8 +10,6 @@ import javax.inject.Singleton
 
 /**
  * Web 域工具：调用系统搜索意图直接在搜索类应用中检索，以及打开 HTTP/HTTPS URL。
- *
- * 对应 [github.ponyhuang.gimi.domain.toolauthorization.model.LocalToolCategory.WEB]。
  */
 @Singleton
 class WebTool @Inject constructor(private val queue: IntentActionQueue) {

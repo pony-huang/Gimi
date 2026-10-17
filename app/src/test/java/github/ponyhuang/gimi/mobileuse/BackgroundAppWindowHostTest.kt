@@ -32,7 +32,7 @@ class BackgroundAppWindowHostTest {
         }
     }
 
-    @Test fun executionCompletionHidesSmallWindowAndBubbleWhileKeepingSessionReopenable() = runTest {
+    @Test fun executionCompletionKeepsSmallWindowAndBubbleWhileDisplayExists() = runTest {
         host.start()
         runCurrent()
         session.value = MobileDisplaySession("s1", "chat", 10, 1080, 2400)
@@ -42,7 +42,7 @@ class BackgroundAppWindowHostTest {
         assertEquals(BackgroundAppPresentation.SMALL_WINDOW, host.presentation.value)
         session.value = session.value!!.copy(completionVersion = 1)
         runCurrent()
-        assertEquals(BackgroundAppPresentation.HIDDEN, host.presentation.value)
+        assertEquals(BackgroundAppPresentation.SMALL_WINDOW, host.presentation.value)
         assertEquals("s1", session.value?.id)
         host.open()
         assertEquals(BackgroundAppPresentation.SMALL_WINDOW, host.presentation.value)
@@ -53,17 +53,17 @@ class BackgroundAppWindowHostTest {
         assertEquals(BackgroundAppPresentation.BUBBLE, host.presentation.value)
         session.value = session.value!!.copy(completionVersion = 2)
         runCurrent()
-        assertEquals(BackgroundAppPresentation.HIDDEN, host.presentation.value)
+        assertEquals(BackgroundAppPresentation.BUBBLE, host.presentation.value)
     }
 
-    @Test fun fullscreenAlsoClosesOnCompletionAndNewSessionGetsItsOwnEntry() = runTest {
+    @Test fun fullscreenStaysOnCompletionAndNewSessionGetsItsOwnEntry() = runTest {
         host.start()
         session.value = MobileDisplaySession("s1", "chat", 10, 1080, 2400)
         runCurrent()
         host.activateFullscreen("s1")
         session.value = session.value!!.copy(completionVersion = 1)
         runCurrent()
-        assertEquals(BackgroundAppPresentation.HIDDEN, host.presentation.value)
+        assertEquals(BackgroundAppPresentation.FULLSCREEN, host.presentation.value)
         session.value = MobileDisplaySession("s2", "chat2", 11, 1080, 2400)
         runCurrent()
         assertEquals(BackgroundAppPresentation.BUBBLE, host.presentation.value)
@@ -72,11 +72,11 @@ class BackgroundAppWindowHostTest {
         assertEquals(BackgroundAppPresentation.HIDDEN, host.presentation.value)
     }
 
-    @Test fun hostStartingAfterExecutionFinishesDoesNotShowFloatingWindows() = runTest {
+    @Test fun hostStartingAfterExecutionFinishesShowsExistingDisplayEntry() = runTest {
         session.value = MobileDisplaySession("s1", "chat", 10, 1080, 2400, completionVersion = 1)
         host.start()
         runCurrent()
-        assertEquals(BackgroundAppPresentation.HIDDEN, host.presentation.value)
+        assertEquals(BackgroundAppPresentation.BUBBLE, host.presentation.value)
         host.open()
         assertEquals(BackgroundAppPresentation.SMALL_WINDOW, host.presentation.value)
     }

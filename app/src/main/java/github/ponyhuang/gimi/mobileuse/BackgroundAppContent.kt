@@ -21,7 +21,6 @@ internal fun BackgroundAppContent(
     small: Boolean,
     modifier: Modifier = Modifier,
     toolbarModifier: Modifier = Modifier,
-    resizeModifier: Modifier = Modifier,
     onCollapsed: () -> Unit = {},
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -33,12 +32,12 @@ internal fun BackgroundAppContent(
             state.session?.let { session ->
                 key(session.id) {
                     AndroidView(modifier = frameModifier,
-                        factory = { MobilePreviewView(it, gateway, session, viewModel::onAction) },
+                        factory = { MobilePreviewView(it, gateway, session, interactive = !small, onAction = viewModel::onAction) },
                         update = { it.updateSession(session) },
                         onRelease = { it.cancelGesture() })
                 }
             }
-        }, modifier = modifier, toolbarModifier = toolbarModifier, resizeModifier = resizeModifier,
+        }, modifier = modifier, toolbarModifier = toolbarModifier,
         dialogHost = { dismiss, content ->
             if (small) BackgroundAppOverlayDialog(dismiss, content)
             else Dialog(onDismissRequest = dismiss, content = content)

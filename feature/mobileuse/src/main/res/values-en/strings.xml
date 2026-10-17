@@ -31,11 +31,9 @@
     <string name="background_app_open">Show background app</string>
     <string name="background_app_back">Back</string>
     <string name="background_app_drag">Move window</string>
-    <string name="background_app_drag_hint">Drag</string>
-    <string name="background_app_resize">Resize window</string>
-    <string name="background_app_resize_hint">Drag to resize</string>
     <string name="background_app_collapse">Collapse</string>
     <string name="background_app_more">More</string>
+    <string name="background_app_hide_controls">Hide controls</string>
     <string name="background_app_fullscreen">Switch to full screen</string>
     <string name="background_app_small_window">Switch to small window</string>
     <string name="background_app_close">Close background app</string>
@@ -46,4 +44,5 @@
     <string name="background_app_rotate_landscape">Switch secondary display to landscape</string>
     <string name="background_app_rotate_portrait">Switch secondary display to portrait</string>
     <string name="background_app_rotation_unavailable">Could not change display orientation. Check the connection and try again. Some apps may use a fixed orientation.</string>
+    <string name="background_app_preview_controls">Tap to show controls; drag to move the preview</string>
 </resources>

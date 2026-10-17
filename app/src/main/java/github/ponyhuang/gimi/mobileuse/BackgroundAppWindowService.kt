@@ -157,15 +157,15 @@ class BackgroundAppWindowService : Service() {
         val small = presentation == BackgroundAppPresentation.SMALL_WINDOW
         val metrics = windowManager.currentWindowMetrics
         val bubbleSize = dp(56)
-        val width = if (small) minOf(dp(320), metrics.bounds.width() - dp(16)) else bubbleSize
-        val height = if (small) minOf(dp(620), (metrics.bounds.height() * .76f).toInt()) else bubbleSize
+        val session = repository.displaySession.value ?: return
+        val ratio = session.width.toFloat() / session.height
+        val width = if (small) smallWindowWidth(ratio).roundToInt() else bubbleSize
+        val height = if (small) (width / ratio).roundToInt() else bubbleSize
         if (small && host.smallWindowGeometry == null) {
-            val session = repository.displaySession.value ?: return
-            val ratio = session.width.toFloat() / session.height
             host.smallWindowGeometry = BackgroundAppWindowGeometry(
                 left = (metrics.bounds.width() - width) / 2f,
                 top = (metrics.bounds.height() - height) / 2f,
-                width = width.toFloat(), aspectRatio = ratio, chromeHeight = dp(112).toFloat(),
+                width = width.toFloat(), aspectRatio = ratio,
             )
         }
         val layout = WindowManager.LayoutParams(width, height, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -197,14 +197,8 @@ class BackgroundAppWindowService : Service() {
                             moveWindow(delta)
                         }
                     }
-                    val resizeModifier = Modifier.pointerInput(presentation) {
-                        detectDragGestures(onDragStart = { beginWindowGesture() }) { change, delta ->
-                            change.consume()
-                            resizeWindow(delta)
-                        }
-                    }
                     if (small) BackgroundAppContent(viewModel, gateway, host, small = true, modifier = Modifier.fillMaxSize(),
-                        toolbarModifier = dragModifier, resizeModifier = resizeModifier)
+                        toolbarModifier = dragModifier)
                     else BackgroundAppBubble(onOpen = host::open, icon = { BackgroundAppIcon() }, modifier = dragModifier)
                 }
             }
@@ -246,15 +240,8 @@ class BackgroundAppWindowService : Service() {
         val layout = params ?: return
         // 从当前可见几何开始手势，键盘曾压缩窗口时也不会突然跳回屏外。
         host.smallWindowGeometry = host.smallWindowGeometry?.copy(
-            left = layout.x.toFloat(), top = layout.y.toFloat(), width = layout.width.toFloat(),
+            left = layout.x.toFloat(), top = layout.y.toFloat(),
         )
-    }
-
-    private fun resizeWindow(delta: Offset) {
-        if (shown != BackgroundAppPresentation.SMALL_WINDOW) return
-        val bounds = smallWindowBounds ?: return
-        host.smallWindowGeometry = host.smallWindowGeometry?.resizeBy(delta.x, delta.y, bounds)
-        updateBounds()
     }
 
     private fun applyBubblePosition() {
@@ -277,16 +264,17 @@ class BackgroundAppWindowService : Service() {
             val bounds = BackgroundAppWindowBounds(
                 left = (safe.left + dp(8)).toFloat(), top = (safe.top + dp(8)).toFloat(),
                 right = (metrics.bounds.width() - safe.right - dp(8)).toFloat(),
-                bottom = (metrics.bounds.height() - bottom - dp(8)).toFloat(), minWidth = dp(280).toFloat(),
+                bottom = (metrics.bounds.height() - bottom - dp(8)).toFloat(),
             )
             smallWindowBounds = bounds
             val session = repository.displaySession.value ?: return
             val requested = host.smallWindowGeometry?.copy(
-                aspectRatio = session.width.toFloat() / session.height, chromeHeight = dp(112).toFloat(),
+                aspectRatio = session.width.toFloat() / session.height,
+                width = smallWindowWidth(session.width.toFloat() / session.height),
             ) ?: return
-            // 旋转后拖动和缩放也必须使用新比例；安全区域约束仍只改变可见尺寸。
+            // 旋转后固定预览也必须使用新比例；安全区域约束仍只改变可见尺寸。
             host.smallWindowGeometry = requested
-            // 安全区域约束只改变可见尺寸，键盘关闭后恢复用户选择的尺寸。
+            // 安全区域约束只改变可见尺寸，键盘关闭后恢复固定预览尺寸。
             val visible = requested.constrain(bounds)
             layout.width = visible.width.roundToInt()
             layout.height = visible.height.roundToInt()
@@ -327,6 +315,8 @@ class BackgroundAppWindowService : Service() {
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) { super.onConfigurationChanged(newConfig); updateBounds() }
+    // 固定预览最多 144dp × 280dp，按副屏比例取更小的一边，不保留可调尺寸。
+    private fun smallWindowWidth(aspectRatio: Float): Float = minOf(dp(144).toFloat(), dp(280) * aspectRatio)
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun removeWindow() {

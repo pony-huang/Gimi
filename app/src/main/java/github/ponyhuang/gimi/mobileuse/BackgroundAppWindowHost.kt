@@ -18,7 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/** 本机窗口形态；任务结束时隐藏，用户仍可从通知重新打开。 */
+/** 本机窗口形态；随副屏会话保留，用户可主动收起或关闭。 */
 enum class BackgroundAppPresentation { HIDDEN, BUBBLE, FULLSCREEN, SMALL_WINDOW }
 
 /** app 组合窗口与独立前台服务；无悬浮权限仍保留应用内入口。 */
@@ -33,7 +33,7 @@ class BackgroundAppWindowHost @Inject constructor(
     private val mutableOverlayRunning = MutableStateFlow(false)
     val overlayRunning = mutableOverlayRunning.asStateFlow()
     private var started = false
-    // 与显示会话一样只在进程内记忆；收起、全屏切换和服务重建不重置用户布局。
+    // 与显示会话一样只在进程内记忆；收起、全屏切换和服务重建不重置用户位置。
     internal var smallWindowGeometry: BackgroundAppWindowGeometry? = null
 
     fun start() {
@@ -41,19 +41,15 @@ class BackgroundAppWindowHost @Inject constructor(
         started = true
         scope.launch {
             var lastId: String? = null
-            var lastCompletionVersion = 0L
             repository.displaySession.collect { session ->
                 if (session?.id != lastId) {
                     lastId = session?.id
-                    mutablePresentation.value = if (session == null || session.completionVersion > 0) {
+                    mutablePresentation.value = if (session == null) {
                         BackgroundAppPresentation.HIDDEN
                     } else BackgroundAppPresentation.BUBBLE
                     if (session != null) ensureService()
-                } else if (session != null && session.completionVersion != lastCompletionVersion) {
-                    // mobile_stop 与流结束的清理共用完成标记；隐藏所有浮窗，不留下气泡。
-                    mutablePresentation.value = BackgroundAppPresentation.HIDDEN
                 }
-                lastCompletionVersion = session?.completionVersion ?: 0L
+                // 单轮执行完成不代表副屏关闭；同一会话保持用户当前选择的窗口形态。
             }
         }
     }

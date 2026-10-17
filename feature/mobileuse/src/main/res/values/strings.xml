@@ -31,11 +31,9 @@
     <string name="background_app_open">显示后台应用</string>
     <string name="background_app_back">返回</string>
     <string name="background_app_drag">拖动窗口</string>
-    <string name="background_app_drag_hint">拖动</string>
-    <string name="background_app_resize">调整窗口大小</string>
-    <string name="background_app_resize_hint">拖角缩放</string>
     <string name="background_app_collapse">收起</string>
     <string name="background_app_more">更多</string>
+    <string name="background_app_hide_controls">收起控制</string>
     <string name="background_app_fullscreen">切换为全屏</string>
     <string name="background_app_small_window">切换为小窗</string>
     <string name="background_app_close">关闭后台应用</string>
@@ -46,4 +44,5 @@
     <string name="background_app_rotate_landscape">切换副屏为横屏</string>
     <string name="background_app_rotate_portrait">切换副屏为竖屏</string>
     <string name="background_app_rotation_unavailable">暂时无法切换副屏方向，请检查连接后重试。部分应用可能固定横竖屏。</string>
+    <string name="background_app_preview_controls">点击展开控件，拖动移动小窗</string>
 </resources>

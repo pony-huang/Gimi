@@ -49,10 +49,10 @@ class MobileUseAvailabilityTest {
             .mapNotNull { it.text }.joinToString("\n")
             .replace(Regex("\\s+"), " ")
         assertTrue(instructions.contains("background display associated with this chat"))
-        assertTrue(instructions.contains("call mobile_stop when done"))
-        assertTrue(instructions.contains("releases this execution and hides preview windows"))
-        assertTrue(instructions.contains("the background app remains available for this chat"))
-        assertTrue(instructions.contains("can be reopened by the user from the notification"))
+        assertTrue(instructions.contains("Normal turn completion releases this execution"))
+        assertTrue(instructions.contains("keeping the background display and preview windows available"))
+        assertTrue(instructions.contains("Call mobile_stop only when the user requests closing"))
+        assertTrue(instructions.contains("closes the background display and preview windows"))
         assertTrue(instructions.contains("request passwords or verification codes in chat or tool arguments"))
     }
 

@@ -87,8 +87,10 @@ interface MobileUseRepository {
     suspend fun swipe(owner: String, observationId: String, x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Int): MobileUseResult
     suspend fun back(owner: String, observationId: String): MobileUseResult
     suspend fun typeText(owner: String, observationId: String, x: Int, y: Int, text: String): MobileUseResult
-    /** 释放当前执行并发布完成标记，窗口随之隐藏，后台应用会话保留。 */
+    /** 自然结束时释放当前执行，保留后台应用会话和窗口。 */
     suspend fun finishExecution(owner: String): MobileUseResult
+    /** 显式停止当前执行所属的副屏，释放显示资源并关闭窗口；不得影响其他聊天。 */
+    suspend fun stopExecution(owner: String): MobileUseResult
     suspend fun closeSession(sessionId: String): MobileUseResult
     suspend fun manualTouch(sessionId: String, touch: MobileTouch): MobileUseResult
     suspend fun manualBack(sessionId: String): MobileUseResult

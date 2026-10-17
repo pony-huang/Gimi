@@ -94,6 +94,8 @@ import kotlinx.coroutines.launch
  * @param onMessageDataChange Reports edits to the draft; the owner consumes accepted submissions.
  * @param modelSelectorContent Model selection control rendered beside the attachment button.
  * @param retainExpanded Whether an active child surface requires the composer to stay expanded.
+ * @param attachmentsEnabled Whether attachment selection is available for this input.
+ * @param headerContent Optional request prompt displayed above both text and recording states.
  * @param onExpandedChange Callback reporting whether the capsule is currently in its enlarged
  * state, so surrounding content can align with it.
  */
@@ -129,6 +131,8 @@ public fun ChatComposer(
     attachmentCapabilities: MultimodalCapabilities = MultimodalCapabilities(),
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
+    attachmentsEnabled: Boolean = true,
+    headerContent: @Composable () -> Unit = {},
 ) {
     val currentMessageData by rememberUpdatedState(messageData)
     val onDraftChange by rememberUpdatedState(onMessageDataChange)
@@ -405,58 +409,61 @@ public fun ChatComposer(
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
             tonalElevation = 0.dp,
         ) {
-            if (recordingState != null) {
-                with(componentFactory) {
-                    VoiceRecordingContent(
-                        VoiceRecordingContentParams(
-                            levels = recordingState.levels,
-                            remainingSeconds = recordingState.remainingSeconds,
-                            onCancel = ::cancelVoiceInput,
-                            onFinish = { finishVoiceInput(VoiceInputMode.TRANSCRIBE) },
-                            onSend = { finishVoiceInput(VoiceInputMode.SEND) },
-                        ),
-                    )
-                }
-            } else {
-                Row(modifier = Modifier.fillMaxWidth()) {
+            Column {
+                headerContent()
+                if (recordingState != null) {
                     with(componentFactory) {
-                        ComposerInputContent(
-                            ComposerInputContentParams(
-                                messageData = messageData,
-                                isGenerating = isGenerating || isSubmitting,
-                                configurationReady = addToChatState.configuration != null,
-                                voiceInputState = voiceTranscriptionMode?.let { VoiceInputUiState.Transcribing(it) }
-                                    ?: voiceInputState,
-                                isVoiceInputAvailable = isVoiceInputAvailable,
-                                voiceErrorMessage = voiceErrorMessage,
-                                onVoiceErrorShown = { voiceErrorMessage = null },
-                                onTextChange = { onDraftChange(currentMessageData.copy(text = it)) },
-                                onRemoveAttachment = remove@{ uri ->
-                                    if (isSubmitting) return@remove
-                                    onDraftChange(
-                                        currentMessageData.copy(
-                                            attachments = currentMessageData.attachments - uri,
-                                        ),
-                                    )
-                                    deleteManagedDrafts(context, listOf(uri))
-                                },
-                                onSendClick = handleSendClick,
-                                onStopClick = onStopClick,
-                                onVoiceInputStart = ::startVoiceInput,
-                                retainExpanded = retainExpanded,
-                                onExpandedChange = onExpandedChange,
-                                onAttachmentsClick = { if (!isSubmitting) showAttachmentOptions = true },
-                                modelSelectorContent = modelSelectorContent,
+                        VoiceRecordingContent(
+                            VoiceRecordingContentParams(
+                                levels = recordingState.levels,
+                                remainingSeconds = recordingState.remainingSeconds,
+                                onCancel = ::cancelVoiceInput,
+                                onFinish = { finishVoiceInput(VoiceInputMode.TRANSCRIBE) },
+                                onSend = { finishVoiceInput(VoiceInputMode.SEND) },
                             ),
                         )
+                    }
+                } else {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        with(componentFactory) {
+                            ComposerInputContent(
+                                ComposerInputContentParams(
+                                    messageData = messageData,
+                                    isGenerating = isGenerating || isSubmitting,
+                                    configurationReady = addToChatState.configuration != null,
+                                    voiceInputState = voiceTranscriptionMode?.let { VoiceInputUiState.Transcribing(it) }
+                                        ?: voiceInputState,
+                                    isVoiceInputAvailable = isVoiceInputAvailable,
+                                    voiceErrorMessage = voiceErrorMessage,
+                                    onVoiceErrorShown = { voiceErrorMessage = null },
+                                    onTextChange = { onDraftChange(currentMessageData.copy(text = it)) },
+                                    onRemoveAttachment = remove@{ uri ->
+                                        if (isSubmitting) return@remove
+                                        onDraftChange(
+                                            currentMessageData.copy(
+                                                attachments = currentMessageData.attachments - uri,
+                                            ),
+                                        )
+                                        deleteManagedDrafts(context, listOf(uri))
+                                    },
+                                    onSendClick = handleSendClick,
+                                    onStopClick = onStopClick,
+                                    onVoiceInputStart = ::startVoiceInput,
+                                    retainExpanded = retainExpanded,
+                                    onExpandedChange = onExpandedChange,
+                                    onAttachmentsClick = { if (!isSubmitting) showAttachmentOptions = true },
+                                    modelSelectorContent = modelSelectorContent,
+                                    attachmentsEnabled = attachmentsEnabled,
+                                ),
+                            )
+                        }
                     }
                 }
             }
         }
-
     }
 
-    if (showAttachmentOptions) {
+    if (showAttachmentOptions && attachmentsEnabled) {
         ChatAddToChatSheet(
             state = addToChatState,
             onDismiss = { showAttachmentOptions = false },

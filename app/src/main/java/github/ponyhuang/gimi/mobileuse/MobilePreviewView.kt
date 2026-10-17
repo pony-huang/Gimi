@@ -25,6 +25,7 @@ internal class MobilePreviewView(
     context: Context,
     private val gateway: MobileDisplayPreviewGateway,
     session: MobileDisplaySession,
+    private val interactive: Boolean,
     private val onAction: (BackgroundAppAction) -> Unit,
 ) : TextureView(context), TextureView.SurfaceTextureListener {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -87,6 +88,8 @@ internal class MobilePreviewView(
     override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        // 小窗只读：消费本地触摸但不生成副屏输入，避免误操作目标应用。
+        if (!interactive) return true
         if (event.pointerCount > 1 || event.actionMasked == MotionEvent.ACTION_CANCEL) {
             cancelGesture()
             return true

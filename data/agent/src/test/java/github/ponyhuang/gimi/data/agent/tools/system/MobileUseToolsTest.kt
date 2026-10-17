@@ -219,11 +219,12 @@ class MobileUseToolsTest {
     }
 
     @Test
-    fun stopFinishesOnlyTheExecutionAndKeepsTheDisplayForTheUser() = runTest {
-        coEvery { repository.finishExecution("turn-1") } returns MobileUseResult("execution_finished", "App remains open.")
+    fun stopClosesTheDisplayThroughTheOwningExecution() = runTest {
+        coEvery { repository.stopExecution("turn-1") } returns MobileUseResult("closed", "Background app closed.")
         val result = tools.getValue("mobile_stop").execute(context("turn-1"), emptyMap()) as Map<*, *>
-        assertEquals("execution_finished", result["status"])
-        coVerify(exactly = 1) { repository.finishExecution("turn-1") }
+        assertEquals("closed", result["status"])
+        coVerify(exactly = 1) { repository.stopExecution("turn-1") }
+        coVerify(exactly = 0) { repository.finishExecution(any()) }
         coVerify(exactly = 0) { repository.closeSession(any()) }
     }
 

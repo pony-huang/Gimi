@@ -10,8 +10,6 @@ import javax.inject.Singleton
 
 /**
  * 通讯域工具：拨号、起草短信。
- *
- * 对应 [github.ponyhuang.gimi.domain.toolauthorization.model.LocalToolCategory.COMMUNICATION]。
  */
 @Singleton
 class CommunicationTool @Inject constructor(

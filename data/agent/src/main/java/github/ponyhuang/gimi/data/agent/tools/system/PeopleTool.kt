@@ -10,8 +10,6 @@ import javax.inject.Singleton
 
 /**
  * 联系人域工具：查看 / 编辑 / 创建联系人。
- *
- * 对应 [github.ponyhuang.gimi.domain.toolauthorization.model.LocalToolCategory.PEOPLE]。
  */
 @Singleton
 class PeopleTool @Inject constructor(private val queue: IntentActionQueue) {

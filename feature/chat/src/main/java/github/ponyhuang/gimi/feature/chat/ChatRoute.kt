@@ -23,7 +23,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.core.storage.AndroidAppDirectoryResolver
 import github.ponyhuang.gimi.core.storage.ShareableFileUriFactory
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
-import github.ponyhuang.gimi.domain.conversation.model.LocalFileReference
 import java.io.File
 import kotlinx.coroutines.launch
 
@@ -44,11 +43,10 @@ fun ChatRoute(
     onReturnToChat: () -> Unit,
     onOpenSettings: () -> Unit,
     onConfigureModels: () -> Unit,
-    onShowAllLocalFiles: (sessionId: String, responseId: String) -> Unit,
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
 ) {
-    // Activity 作用域：与“查看全部”等子目的地共享同一份会话状态（见 activityScopedChatViewModel）。
+    // 保持聊天状态与宿主 Activity 生命周期一致。
     val viewModel: ChatViewModel = activityScopedChatViewModel()
     val recommendationViewModel: ChatRecommendationsViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -165,12 +163,6 @@ fun ChatRoute(
             onOpenDocument = { attachment ->
                 openDocumentAttachment(context, attachment)
             },
-            onOpenLocalFile = { file ->
-                openLocalFile(context, file)
-            },
-            onShowAllLocalFiles = { responseId ->
-                onShowAllLocalFiles(currentSessionId, responseId)
-            },
             onToggleTimeline = { groupId ->
                 viewModel.onAction(ChatAction.ToggleTimeline(groupId))
             },
@@ -269,22 +261,6 @@ private fun openDocumentAttachment(context: Context, attachment: FileAttachment)
         context.startActivity(
             Intent(Intent.ACTION_VIEW)
                 .setDataAndType(uri, attachment.mimeType)
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
-        )
-    }.onFailure {
-        Toast.makeText(
-            context,
-            context.getString(R.string.chat_attachment_open_failed),
-            Toast.LENGTH_SHORT,
-        ).show()
-    }
-}
-
-internal fun openLocalFile(context: Context, file: LocalFileReference) {
-    runCatching {
-        context.startActivity(
-            Intent(Intent.ACTION_VIEW)
-                .setDataAndType(Uri.parse(file.contentUri), file.mimeType)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
         )
     }.onFailure {

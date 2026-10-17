@@ -42,6 +42,49 @@ class ShizukuMobileUseRepositoryTest {
     fun tearDown() = unmockkAll()
 
     @Test
+    fun explicitStopClosesDisplayAndBlocksReopeningUntilANewExecution() = runBlocking {
+        val remote = connectRemote()
+        repository.setEnabled(true)
+        repository.registerExecution("first", "chat")
+        repository.observe("first")
+        val id = repository.displaySession.value!!.id
+        assertEquals("closed", repository.stopExecution("first").status)
+        assertEquals(null, repository.displaySession.value)
+        assertEquals("session_lost", repository.manualBack(id).status)
+        assertEquals("session_closed", repository.observe("first").status)
+        assertEquals("not_active", repository.stopExecution("first").status)
+        repository.finishExecution("first")
+        verify(exactly = 1) { remote.stop() }
+        repository.registerExecution("next", "chat")
+        repository.observe("next")
+        assertFalse(id == repository.displaySession.value!!.id)
+        repository.setEnabled(false)
+    }
+
+    @Test
+    fun explicitStopRejectsOtherChatsUnregisteredAndBusyExecutions() = runBlocking {
+        val remote = connectRemote()
+        repository.setEnabled(true)
+        repository.registerExecution("first", "chat")
+        repository.observe("first")
+        val before = repository.displaySession.value
+        assertEquals("execution_finished", repository.stopExecution("unknown").status)
+        repository.registerExecution("other", "other-chat")
+        assertEquals("busy", repository.stopExecution("other").status)
+        repository.registerExecution("parallel", "chat")
+        assertEquals("busy", repository.stopExecution("parallel").status)
+        assertEquals(before, repository.displaySession.value)
+        verify(exactly = 0) { remote.stop() }
+        repository.finishExecution("first")
+        assertEquals("execution_finished", repository.stopExecution("first").status)
+        assertEquals(before?.id, repository.displaySession.value?.id)
+        assertEquals("closed", repository.stopExecution("parallel").status)
+        assertEquals(null, repository.displaySession.value)
+        verify(exactly = 1) { remote.stop() }
+        repository.setEnabled(false)
+    }
+
+    @Test
     fun disabledFeatureRejectsEveryDisplayActionWithoutAccessingShizuku() = runBlocking {
         assertEquals(MobileUseAvailability.DISABLED, repository.availability())
         assertEquals("disabled", repository.observe("task").status)

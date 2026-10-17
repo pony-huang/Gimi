@@ -20,8 +20,6 @@ import javax.inject.Singleton
 
 /**
  * 日历域工具：列举设备日历、查询近期事件、直接创建事件。
- *
- * 对应 [github.ponyhuang.gimi.domain.toolauthorization.model.LocalToolCategory.CALENDAR]。
  */
 @Singleton
 class CalendarTool @Inject constructor(

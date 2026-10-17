@@ -54,7 +54,7 @@ class TurnTimelineTest {
     }
 
     @Test
-    fun `thought tool and file results become timeline entries while only confirmation stays hidden`() {
+    fun `thought and tools remain visible without file result entries`() {
         val fileResult = localFileResult("plan.md")
         val assistant = assistantMessage(
             id = "assistant",
@@ -81,7 +81,7 @@ class TurnTimelineTest {
         val timeline = (items[1] as ChatListItem.AssistantTurn).timeline
 
         // 按需加载的检索调用是与业务工具同级的用户可见活动；确认信令只是握手，继续隐藏。
-        assertEquals(4, timeline.entries.size)
+        assertEquals(3, timeline.entries.size)
         assertEquals("thought", (timeline.entries[0] as TimelineEntry.Thought).partId)
         val tool = timeline.entries[1] as TimelineEntry.ToolCall
         assertEquals("call-1", tool.callId)
@@ -90,13 +90,12 @@ class TurnTimelineTest {
         assertEquals(ToolSearchProtocolName, search.name)
         assertEquals("(query=项目计划)", search.argsSummary)
         assertEquals(ToolCallStatus.Completed, search.status)
-        assertEquals(fileResult, (timeline.entries[3] as TimelineEntry.FileResults).response.localFileSearchResult)
         assertFalse(timeline.entries.any { it is TimelineEntry.ToolCall && it.name == ConfirmationToolName })
         assertEquals(listOf("assistant"), timeline.answerMessages.map { it.id })
     }
 
     @Test
-    fun `duplicate placeholder response is replaced by structured result`() {
+    fun `duplicate file responses produce only one completed tool entry`() {
         val call = assistantMessage(
             id = "call-message",
             timestamp = 200L,
@@ -119,9 +118,8 @@ class TurnTimelineTest {
             .toChatListItems(TimelineActivityState())[1] as ChatListItem.AssistantTurn).timeline
 
         assertEquals(1, timeline.entries.filterIsInstance<TimelineEntry.ToolCall>().size)
-        val files = timeline.entries.filterIsInstance<TimelineEntry.FileResults>()
-        assertEquals(1, files.size)
-        assertEquals("plan.md", files.single().response.localFileSearchResult?.files?.single()?.displayName)
+        assertEquals(1, timeline.entries.size)
+        assertEquals(ToolCallStatus.Completed, (timeline.entries.single() as TimelineEntry.ToolCall).status)
     }
 
     @Test
@@ -146,7 +144,7 @@ class TurnTimelineTest {
     }
 
     @Test
-    fun `structured response replaces placeholder in the same event`() {
+    fun `file responses in the same event produce only one completed tool entry`() {
         val combined = assistantMessage(
             timestamp = 200L,
             functionCalls = listOf(FunctionCallView("call-1", "search_documents", "()")),
@@ -159,9 +157,8 @@ class TurnTimelineTest {
         val timeline = (listOf(userMessage(timestamp = 100L), combined)
             .toChatListItems(TimelineActivityState())[1] as ChatListItem.AssistantTurn).timeline
 
-        val files = timeline.entries.filterIsInstance<TimelineEntry.FileResults>()
-        assertEquals(1, files.size)
-        assertEquals("plan.md", files.single().response.localFileSearchResult?.files?.single()?.displayName)
+        assertEquals(1, timeline.entries.size)
+        assertEquals(ToolCallStatus.Completed, (timeline.entries.single() as TimelineEntry.ToolCall).status)
     }
 
     @Test

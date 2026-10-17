@@ -12,8 +12,6 @@ import javax.inject.Singleton
 
 /**
  * 应用启动域工具：系统相机拍照 / 录像、安装应用列表 / 搜索 / 打开。
- *
- * 对应 [github.ponyhuang.gimi.domain.toolauthorization.model.LocalToolCategory.LAUNCHERS]。
  */
 @Singleton
 class LaunchersTool @Inject constructor(

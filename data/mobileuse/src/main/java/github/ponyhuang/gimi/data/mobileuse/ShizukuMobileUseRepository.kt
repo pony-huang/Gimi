@@ -260,8 +260,24 @@ class ShizukuMobileUseRepository @Inject constructor(
                 return@withLock invalid("not_active", "This execution no longer owns the display.")
             }
             guard.reset()
-            MobileUseResult("execution_finished", "Execution released and preview windows hidden. Background app remains available for this chat.", displayId,
+            MobileUseResult("execution_finished", "Execution released. Background app and preview windows remain available for this chat.", displayId,
                 actionStatus = "delivered")
+        }
+    }
+
+    override suspend fun stopExecution(owner: String): MobileUseResult = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            if (displaySession.value == null) return@withLock invalid("not_active", "Display session already closed.")
+            // 在同一临界区验证执行归属并关闭，不能读取会话 ID 后跨锁误关其他轮次的副屏。
+            when (sessions.claim(owner)) {
+                MobileExecutionAccess.ALLOWED -> Unit
+                MobileExecutionAccess.CLOSED -> return@withLock invalid("session_closed", "This execution's display was closed.")
+                MobileExecutionAccess.UNREGISTERED -> return@withLock invalid("execution_finished", "This execution ended; it cannot close the display.")
+                MobileExecutionAccess.OTHER_CHAT -> return@withLock invalid("busy", "Another chat has an open background app.")
+                MobileExecutionAccess.BUSY -> return@withLock invalid("busy", "Another execution is using the display.")
+            }
+            inputMutex.withLock { closeLocked() }
+            MobileUseResult("closed", "Background display and preview windows closed.", actionStatus = "delivered")
         }
     }
 

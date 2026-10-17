@@ -23,8 +23,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * 位置域工具：读取设备地理位置、在地图应用展示位置。
- *
- * 对应 [github.ponyhuang.gimi.domain.toolauthorization.model.LocalToolCategory.LOCATION]。
  */
 @Singleton
 class LocationTool @Inject constructor(

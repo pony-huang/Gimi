@@ -1,4 +1,4 @@
-"""Assign a stable Android install version to release-please PRs before CI."""
+"""Assign a stable Android install version without dispatching version PR CI."""
 import base64
 import json
 import os
@@ -59,7 +59,6 @@ def prepare(number, repo, base_version, base_code):
             'message': f'chore(release): set Android versionCode for {version}',
             'content': base64.b64encode(updated.encode('utf-8')).decode('ascii'),
         })
-    subprocess.run(['gh', 'workflow', 'run', 'ci.yml', '--ref', branch], check=True)
 
 
 if __name__ == '__main__':

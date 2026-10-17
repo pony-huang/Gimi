@@ -31,7 +31,7 @@ class PrepareVersionPrTest(unittest.TestCase):
             with self.subTest(text=text, base=base), self.assertRaises(ValueError):
                 prepare.increment_properties(text, base)
 
-    def test_commits_code_before_dispatching_ci(self):
+    def test_commits_code_without_dispatching_ci(self):
         pr = {'state': 'open', 'base': {'ref': 'main'},
               'head': {'ref': 'release-please--branches--main', 'repo': {'full_name': 'owner/Gimi'}}}
         with patch.object(prepare, 'api', side_effect=[pr, file_response('0.11.0\n'),
@@ -41,7 +41,7 @@ class PrepareVersionPrTest(unittest.TestCase):
             self.assertEqual(base64.b64decode(payload['content']).decode(), 'releaseVersionCode=55\n')
             self.assertEqual(payload['sha'], 'file-sha')
             self.assertEqual(payload['branch'], pr['head']['ref'])
-            dispatch.assert_called_once_with(['gh', 'workflow', 'run', 'ci.yml', '--ref', pr['head']['ref']], check=True)
+            dispatch.assert_not_called()
 
     def test_same_pr_rerun_does_not_create_extra_commit(self):
         pr = {'state': 'open', 'base': {'ref': 'main'},
@@ -50,7 +50,7 @@ class PrepareVersionPrTest(unittest.TestCase):
             file_response('releaseVersionCode=55\n')]) as api, patch.object(prepare.subprocess, 'run') as dispatch:
             prepare.prepare(12, 'owner/Gimi', '0.10.2', 54)
             self.assertEqual(api.call_count, 3)
-            dispatch.assert_called_once()
+            dispatch.assert_not_called()
 
     def test_failed_write_does_not_dispatch_ci(self):
         pr = {'state': 'open', 'base': {'ref': 'main'},

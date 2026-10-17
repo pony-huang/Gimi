@@ -52,6 +52,8 @@ public data class ComposerInputContentParams(
     val onAttachmentsClick: () -> Unit = { },
     val modelSelectorContent: @Composable () -> Unit = { },
     val configurationReady: Boolean = true,
+    /** 内容请求只允许文字或语音，隐藏普通聊天的附件入口。 */
+    val attachmentsEnabled: Boolean = true,
 )
 
 /** Immutable presentation state for the composer's voice-input session. */

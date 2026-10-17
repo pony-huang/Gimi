@@ -12,8 +12,6 @@ import javax.inject.Singleton
 
 /**
  * 时钟域工具：通过系统时钟应用设置闹钟 / 计时器、查询本地时间。
- *
- * 对应 [github.ponyhuang.gimi.domain.toolauthorization.model.LocalToolCategory.CLOCK]。
  */
 @Singleton
 class ClockTool @Inject constructor(

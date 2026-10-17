@@ -1,6 +1,7 @@
 <resources>
     <string name="sandbox_screen_title">Sandbox</string>
     <string name="sandbox_e2b">E2B</string>
+    <string name="sandbox_capabilities_description">Run code and commands, read and write files, browse directories, and upload and download files in an isolated sandbox.</string>
     <string name="sandbox_disabled_description">Run code and file operations in an isolated environment</string>
     <string name="sandbox_pending_description">Not configured · Enter an API Key and save</string>
     <string name="sandbox_configured_description">Configured · Separate sandbox for each conversation</string>

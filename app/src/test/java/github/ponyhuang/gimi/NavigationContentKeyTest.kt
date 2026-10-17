@@ -1,6 +1,6 @@
 package github.ponyhuang.gimi
 
-import github.ponyhuang.gimi.feature.chat.ChatDestination
+import github.ponyhuang.gimi.feature.modelsettings.ModelSettingsDestination
 import github.ponyhuang.gimi.feature.memory.MemoryDestination
 import github.ponyhuang.gimi.feature.permissions.PermissionDestination
 import github.ponyhuang.gimi.navigation.navigationContentKey
@@ -20,9 +20,8 @@ class NavigationContentKeyTest {
 
     @Test
     fun destinationParametersDistinguishKeysAndEquivalentDestinationsStayStable() {
-        val destination = ChatDestination.SearchResults("session-a", "response-a")
+        val destination = ModelSettingsDestination.ServiceDetail("service-a")
         assertEquals(destination.navigationContentKey(), destination.copy().navigationContentKey())
-        assertNotEquals(destination.navigationContentKey(), destination.copy(sessionId = "session-b").navigationContentKey())
-        assertNotEquals(destination.navigationContentKey(), destination.copy(responseId = "response-b").navigationContentKey())
+        assertNotEquals(destination.navigationContentKey(), destination.copy(serviceId = "service-b").navigationContentKey())
     }
 }

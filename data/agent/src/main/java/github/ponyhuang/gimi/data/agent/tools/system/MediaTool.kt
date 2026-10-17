@@ -20,7 +20,6 @@ import javax.inject.Singleton
 /**
  * 媒体域工具：直接播放 URL、控制其它应用的活跃媒体会话（播放/暂停/切歌等）。
  *
- * 对应 [github.ponyhuang.gimi.domain.toolauthorization.model.LocalToolCategory.MEDIA]。
  *
  * [MediaNotificationListenerService] 与本类同居，仅作为 [MediaSessionManager.getActiveSessions]
  * 所需的 [ComponentName] 占位 —— 它不消费任何通知。

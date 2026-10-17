@@ -276,4 +276,4 @@ private fun List<Message>.selectToolResponses(): Map<ToolCallKey, FunctionRespon
 private fun Message.hasAnswerContent(): Boolean =
     error != null ||
         textParts.any { !it.thought && it.text.isNotBlank() } ||
-        fileAttachments.isNotEmpty()
+        fileAttachments.isNotEmpty() || functionResponses.any { it.a2uiDocument != null || it.a2uiFailed }

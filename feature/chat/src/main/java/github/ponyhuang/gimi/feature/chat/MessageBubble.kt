@@ -17,6 +17,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,7 +73,8 @@ fun MessageBubble(
     onToggleSpeechPlayback: (messageId: String, text: String) -> Unit = { _, _ -> },
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit =
         {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    a2uiContent: @Composable () -> Unit = {},
 ) {
     val role = message.role
     val fillsBubbleWidth = role != MessageRole.User
@@ -81,7 +83,7 @@ fun MessageBubble(
     // 空白/零宽文本段（重试、还原或 runner 回显可能残留）不算可见文本，
     // 避免纯图片消息被撑成空气泡或图片下方多出一个小灰块。
     val visibleTextParts = message.textParts.filterNot { it.thought }.filter { it.hasVisibleContent }
-    val hasBubbleBody = visibleTextParts.isNotEmpty() || otherAttachments.isNotEmpty()
+    val hasBubbleBody = visibleTextParts.isNotEmpty() || otherAttachments.isNotEmpty() || message.a2uiInteraction != null
 
     if (role == MessageRole.User) {
         if (images.isEmpty() && !hasBubbleBody) {
@@ -109,6 +111,7 @@ fun MessageBubble(
 
     ChatMessageBubble(role = role.toChatBubbleRole(), modifier = modifier) {
         Column(modifier = if (fillsBubbleWidth) Modifier.fillMaxWidth() else Modifier) {
+            if (message.a2uiInteraction != null) Text(stringResource(R.string.chat_a2ui_submitted))
             visibleTextParts.forEach { part ->
                 RenderTextPart(
                     part = part,
@@ -122,6 +125,8 @@ fun MessageBubble(
                 attachments = message.fileAttachments,
                 onOpenDocument = onOpenDocument,
             )
+
+            a2uiContent()
 
             assistantReplyTextForCopy(message)?.let { text ->
                 AssistantMessageActions(
@@ -167,6 +172,7 @@ private fun UserBubbleBody(
         modifier = Modifier.padding(top = 4.dp),
     ) {
         Column {
+            if (message.a2uiInteraction != null) Text(stringResource(R.string.chat_a2ui_submitted))
             visibleTextParts.forEach { part ->
                 RenderTextPart(
                     part = part,

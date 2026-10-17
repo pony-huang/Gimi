@@ -509,6 +509,7 @@ fun ChatScaffold(
                             ) {
                                 MessageRow(
                                     message = listItem.message,
+                                    a2uiSurfaces = state.a2uiSurfaces.filterKeys { state.a2uiOwners[it] == listItem.message.id }.values.toList(),
                                     partChannelProvider = partChannelProvider,
                                     speechPlaybackState = speechPlaybackState,
                                     onToggleSpeechPlayback = onToggleSpeechPlayback,
@@ -552,6 +553,7 @@ fun ChatScaffold(
                                             ) {
                                                 MessageRow(
                                                     message = message,
+                                                    a2uiSurfaces = state.a2uiSurfaces.filterKeys { state.a2uiOwners[it] == message.id }.values.toList(),
                                                     partChannelProvider = partChannelProvider,
                                                     speechPlaybackState = speechPlaybackState,
                                                     onToggleSpeechPlayback = onToggleSpeechPlayback,
@@ -767,12 +769,16 @@ private fun FailedTurnActions(
 @Composable
 private fun MessageRow(
     message: Message,
+    a2uiSurfaces: List<androidx.a2ui.model.processor.A2uiSurfaceModel> = emptyList(),
     partChannelProvider: (partId: String) -> ReceiveChannel<String>?,
     speechPlaybackState: github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState,
     onToggleSpeechPlayback: (messageId: String, text: String) -> Unit,
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (message.role == MessageRole.Assistant && message.textParts.none { !it.thought && it.text.isNotBlank() } &&
+        message.fileAttachments.isEmpty() && message.functionResponses.any { it.a2uiDocument != null } &&
+        a2uiSurfaces.isEmpty() && message.functionResponses.none { it.a2uiFailed }) return
     if (message.error != null) {
         ErrorBubble(message = message, modifier = modifier)
     } else {
@@ -782,7 +788,20 @@ private fun MessageRow(
             speechPlaybackState = speechPlaybackState,
             onToggleSpeechPlayback = onToggleSpeechPlayback,
             onOpenDocument = onOpenDocument,
-            modifier = modifier
+            modifier = modifier,
+            a2uiContent = {
+                if (a2uiSurfaces.isNotEmpty()) {
+                    github.ponyhuang.gimi.feature.chat.a2ui.ChatA2uiContent(
+                        surfaces = a2uiSurfaces,
+                        failed = false,
+                    )
+                } else if (message.functionResponses.any { it.a2uiFailed }) {
+                    github.ponyhuang.gimi.feature.chat.a2ui.ChatA2uiContent(
+                        surfaces = emptyList(),
+                        failed = true,
+                    )
+                }
+            },
         )
     }
 }

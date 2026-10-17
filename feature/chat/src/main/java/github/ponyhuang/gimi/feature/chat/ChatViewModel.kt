@@ -92,6 +92,7 @@ class ChatViewModel @Inject constructor(
     private val memoryRuntimeStatus: MemoryRuntimeStatus,
     private val appNotificationManager: AppNotificationManager,
     private val appUpdateRepository: AppUpdateRepository,
+    private val a2uiProtocol: github.ponyhuang.gimi.domain.a2ui.A2uiProtocol,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -106,6 +107,30 @@ class ChatViewModel @Inject constructor(
     private val sessionRuntimes = linkedMapOf<String, ChatSessionRuntime>()
 
     private val _effects = MutableSharedFlow<ChatEffect>(extraBufferCapacity = 8)
+
+    private val a2ui by lazy {
+        github.ponyhuang.gimi.feature.chat.a2ui.ChatA2uiCoordinator(
+            scope = viewModelScope,
+            protocol = a2uiProtocol,
+            canSubmit = { sessionId ->
+                _uiState.value.sessionId == sessionId && !_uiState.value.isInitializing &&
+                    !_uiState.value.isAgentRunning
+            },
+            submit = { sessionId, interaction -> submitA2uiInteraction(sessionId, interaction) },
+            openUrl = { url -> _effects.tryEmit(ChatEffect.OpenA2uiUrl(url)) },
+            onChanged = { sessionId, surfaces, owners ->
+                _uiState.update { state -> if (state.sessionId == sessionId) {
+                    state.copy(a2uiSurfaces = surfaces, a2uiOwners = owners)
+                } else state }
+            },
+        )
+    }
+
+    private fun submitA2uiInteraction(sessionId: String, interaction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction) {
+        if (_uiState.value.sessionId != sessionId) return
+        val selection = _uiState.value.currentModelSelection ?: return
+        startSend(sessionId, selection, "", emptyList(), a2uiInteraction = interaction)
+    }
 
     private val toolConfigurationCoordinator = ChatToolConfigurationCoordinator(
         uiState = _uiState,
@@ -403,6 +428,7 @@ class ChatViewModel @Inject constructor(
             }
         }
         toolConfigurationCoordinator.expandPendingMarkers()
+        a2ui.sync(runtime.sessionId, runtime.messages)
     }
 
 
@@ -411,6 +437,8 @@ class ChatViewModel @Inject constructor(
         _uiState.update { state ->
             state.copy(
                 sessionId = sessionId,
+                a2uiSurfaces = emptyMap(),
+                a2uiOwners = emptyMap(),
                 messages = runtime.messages,
                 listItems = runtime.toChatListItems(),
                 isAgentRunning = runtime.isAgentRunning,
@@ -560,6 +588,7 @@ class ChatViewModel @Inject constructor(
         retry: ChatTurn? = null,
         submission: ChatSubmission = ChatSubmission {},
         showAfterAcceptance: Boolean = false,
+        a2uiInteraction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction? = null,
     ) {
         val runtime = runtimeFor(sessionId)
         if (runtime.isActive || sessionNavigationCoordinator.loadingSessionId != null ||
@@ -598,6 +627,8 @@ class ChatViewModel @Inject constructor(
                         }
                     },
                     retry = retry,
+                    a2uiCapabilities = a2ui.capabilities,
+                    a2uiInteraction = a2uiInteraction,
                 )
                 val turn = prepared.turn
                 val execution = prepared.execution
@@ -616,11 +647,13 @@ class ChatViewModel @Inject constructor(
                 runtime.failed = false
                 submission.complete(ChatSubmissionResult.ACCEPTED)
                 if (showAfterAcceptance) showRuntime(sessionId) else publishRuntime(runtime)
-                execution.send(
+                (turn.userMessage.a2uiInteraction?.let {
+                    execution.sendInteraction(it, retry = retry != null)
+                } ?: execution.send(
                     text = turn.userMessage.textParts.joinToString("") { it.text },
                     fileAttachments = turn.userMessage.fileAttachments,
                     retry = retry != null,
-                ).collect { event ->
+                )).collect { event ->
                     event.functionCalls
                         .firstOrNull { it.confirmationRequest == null }
                         ?.let {
@@ -719,6 +752,7 @@ class ChatViewModel @Inject constructor(
                     try {
                         repository.deleteConversation(id)
                         deleted += id
+                        a2ui.release(id)
                         sessionRuntimes.remove(id)?.closePartChannels()
                         attachments.deleteSession(id)
                     } catch (cancelled: CancellationException) {
@@ -767,6 +801,7 @@ class ChatViewModel @Inject constructor(
             try {
                 repository.deleteConversation(sessionId)
                 attachments.deleteSession(sessionId)
+                a2ui.release(sessionId)
                 sessionRuntimes.remove(sessionId)?.closePartChannels()
             } catch (cancelled: CancellationException) {
                 throw cancelled

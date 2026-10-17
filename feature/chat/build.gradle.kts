@@ -17,6 +17,12 @@ android {
 }
 
 dependencies {
+    implementation(project(":domain:a2ui"))
+    implementation(libs.androidx.a2ui.compose.runtime)
+    implementation(libs.androidx.a2ui.compose.ui)
+    implementation(libs.androidx.a2ui.model)
+    implementation(libs.androidx.material3.a2ui)
+    implementation(libs.kotlinx.serialization.json)
     implementation(project(":core:audio"))
     implementation(project(":core:common"))
     implementation(project(":core:designsystem"))
@@ -55,6 +61,8 @@ dependencies {
     implementation(libs.multiplatform.markdown.renderer.code)
 
     testImplementation(project(":core:testing"))
+    // 仅测试：验证实际聊天目录导出的 schema 可以由独立协议模块校验。
+    testImplementation(project(":data:a2ui"))
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)

@@ -4,6 +4,7 @@ plugins {
 }
 
 dependencies {
+    api(project(":domain:a2ui"))
     api(project(":domain:modelcatalog"))
     implementation(libs.javax.inject)
     api(libs.kotlinx.coroutines.core)

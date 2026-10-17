@@ -116,6 +116,7 @@ class AgentChatRunner(
         selection: ModelSelection? = null,
         allowConfirmationRequiredTools: Boolean = true,
         toolConfiguration: ConversationToolConfiguration? = null,
+        a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities? = null,
     ): AgentChatExecution {
         val toolAccessMode = toolAccessRepository.defaultToolAccessMode.value
         val reasoningEffort = toolConfiguration?.reasoningEffort ?: ReasoningEffort.MEDIUM
@@ -144,7 +145,11 @@ class AgentChatRunner(
                 allowConfirmationRequiredTools = allowConfirmationRequiredTools,
                 mobileUseOwner = UUID.randomUUID().toString(),
             )
-            AgentChatExecution(userId, sessionId, runtime.runner, metadata, mobileUseRepository)
+            AgentChatExecution(userId, sessionId, runtime.runner, metadata + buildMap {
+                a2uiCapabilities?.let {
+                    put(github.ponyhuang.gimi.data.agent.a2ui.GenerateA2uiTool.CAPABILITIES_KEY, kotlinx.serialization.json.Json.encodeToString(it))
+                }
+            }, mobileUseRepository)
         }
     }
 

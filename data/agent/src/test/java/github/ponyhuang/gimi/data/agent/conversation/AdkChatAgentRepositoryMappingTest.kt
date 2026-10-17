@@ -34,12 +34,35 @@ import org.junit.rules.TemporaryFolder
  */
 class AdkChatAgentRepositoryMappingTest {
 
+    @Test
+    fun a2uiCapabilityAndSubmittedEventUseTheCurrentExecution() = runTest {
+        val capabilities = github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities("catalog", "{}")
+        val document = github.ponyhuang.gimi.domain.a2ui.A2uiDocument("surface", emptyList())
+        val interaction = github.ponyhuang.gimi.domain.a2ui.A2uiInteraction(
+            "surface", "button", "submit", 1, kotlinx.serialization.json.JsonObject(emptyMap()),
+            kotlinx.serialization.json.JsonObject(emptyMap()),
+        )
+        coEvery { execution.send(any(), any(), any()) } returns flowOf(adkEvent(responses = listOf(
+            FunctionResponse(id = "ui", name = "generate_a2ui", response = mapOf(
+                "a2ui_document" to github.ponyhuang.gimi.domain.a2ui.A2uiToolResult.encode(document),
+            )),
+        )))
+        val result = repository.createExecution("session-1", selection, a2uiCapabilities = capabilities)
+            .sendInteraction(interaction).toList().single()
+        assertEquals(document, result.functionResponses.single().a2uiDocument)
+        coVerify {
+            runner.createExecution(userId = AgentSessionIdentity.DEFAULT_USER_ID, sessionId = "session-1",
+                selection = selection, a2uiCapabilities = capabilities)
+            execution.send(github.ponyhuang.gimi.domain.a2ui.A2uiInteractionCodec.encode(interaction), retry = false)
+        }
+    }
+
     @get:Rule
     val temporaryFolder = TemporaryFolder()
 
     private val execution = mockk<AgentChatExecution>()
     private val runner = mockk<AgentChatRunner> {
-        coEvery { createExecution(any(), any(), any(), any(), any()) } returns execution
+        coEvery { createExecution(any(), any(), any(), any(), any(), any()) } returns execution
     }
     private val repository = AdkChatAgentRepository(runner)
     private val selection = ModelSelection(serviceId = "svc", groupId = "grp", modelId = "mdl")

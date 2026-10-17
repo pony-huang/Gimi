@@ -92,6 +92,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":data:a2ui"))
     implementation(project(":feature:sandbox"))
     implementation(project(":data:sandbox"))
     // Provider 由主 App Manifest 注册，依赖归属 composition root，确保 lint 能解析该组件。

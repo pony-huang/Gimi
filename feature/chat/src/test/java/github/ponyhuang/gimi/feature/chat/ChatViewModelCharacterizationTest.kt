@@ -170,7 +170,7 @@ class ChatViewModelCharacterizationTest {
         assertEquals(1, gate.acquisitions.size)
         assertEquals(1, gate.releaseCount)
         assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
-        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
     }
 
     @Test
@@ -223,7 +223,7 @@ class ChatViewModelCharacterizationTest {
             cancelAndIgnoreRemainingEvents()
         }
         coVerify(exactly = 0) { fixture.attachments.read(any(), any()) }
-        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
     }
 
     @Test
@@ -239,7 +239,7 @@ class ChatViewModelCharacterizationTest {
             assertEquals(ChatEffect.ShowNotice(ChatNotice.MixedAttachmentCategories), awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
-        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
     }
 
     private fun fixtureWithExecutedToolFailure(): Fixture {
@@ -325,7 +325,13 @@ class ChatViewModelCharacterizationTest {
                 sessionId: String,
                 selection: ModelSelection,
                 toolConfiguration: ConversationToolConfiguration?,
+            a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities?,
             ): ChatAgentExecution = object : ChatAgentExecution {
+            override suspend fun sendInteraction(
+                interaction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction,
+                retry: Boolean,
+            ): Flow<ChatRunEvent> = send("interaction", emptyList(), retry)
+
                 override suspend fun send(
                     text: String,
                     fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
@@ -374,7 +380,13 @@ class ChatViewModelCharacterizationTest {
                 sessionId: String,
                 selection: ModelSelection,
                 toolConfiguration: ConversationToolConfiguration?,
+            a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities?,
             ): ChatAgentExecution = object : ChatAgentExecution {
+            override suspend fun sendInteraction(
+                interaction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction,
+                retry: Boolean,
+            ): Flow<ChatRunEvent> = send("interaction", emptyList(), retry)
+
                 override suspend fun send(
                     text: String,
                     fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
@@ -429,7 +441,13 @@ class ChatViewModelCharacterizationTest {
                 sessionId: String,
                 selection: ModelSelection,
                 toolConfiguration: ConversationToolConfiguration?,
+            a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities?,
             ): ChatAgentExecution = object : ChatAgentExecution {
+            override suspend fun sendInteraction(
+                interaction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction,
+                retry: Boolean,
+            ): Flow<ChatRunEvent> = send("interaction", emptyList(), retry)
+
                 override suspend fun send(
                     text: String,
                     fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
@@ -517,7 +535,7 @@ class ChatViewModelCharacterizationTest {
         advanceUntilIdle()
 
         assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
-        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
     }
 
     @Test
@@ -610,7 +628,7 @@ class ChatViewModelCharacterizationTest {
                 awaitItem(),
             )
             assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
-            coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
+            coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -724,6 +742,7 @@ class ChatViewModelCharacterizationTest {
                 match {
                     it.enabledMcpServerIds == afterImport.enabledMcpServerIds
                 },
+                any(),
             )
             fixture.execution.send("use the new tools", any(), any())
         }
@@ -1625,7 +1644,7 @@ class ChatViewModelCharacterizationTest {
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
         val ready = CompletableDeferred<Unit>()
-        coEvery { fixture.agent.createExecution(any(), any(), any()) } coAnswers {
+        coEvery { fixture.agent.createExecution(any(), any(), any(), any()) } coAnswers {
             ready.await()
             fixture.execution
         }
@@ -1675,7 +1694,7 @@ class ChatViewModelCharacterizationTest {
         advanceUntilIdle()
         assertEquals(listOf(ChatSubmissionResult.REJECTED), results)
         assertFalse(fixture.viewModel.uiState.value.messages.any { it.role == MessageRole.User })
-        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
     }
 
     @Test
@@ -1688,7 +1707,7 @@ class ChatViewModelCharacterizationTest {
         fixture.viewModel.send("请求", onResult = results::add)
         advanceUntilIdle()
         assertEquals(listOf(ChatSubmissionResult.REJECTED), results)
-        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any()) }
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
     }
 
     @Test
@@ -1698,7 +1717,7 @@ class ChatViewModelCharacterizationTest {
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
         val ready = CompletableDeferred<Unit>()
-        coEvery { fixture.agent.createExecution(any(), any(), any()) } coAnswers {
+        coEvery { fixture.agent.createExecution(any(), any(), any(), any()) } coAnswers {
             withContext(NonCancellable) { ready.await() }
             fixture.execution
         }
@@ -1721,7 +1740,7 @@ class ChatViewModelCharacterizationTest {
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
         advanceUntilIdle()
         val ready = CompletableDeferred<Unit>()
-        coEvery { fixture.agent.createExecution(any(), any(), any()) } coAnswers {
+        coEvery { fixture.agent.createExecution(any(), any(), any(), any()) } coAnswers {
             ready.await()
             fixture.execution
         }
@@ -1758,7 +1777,13 @@ class ChatViewModelCharacterizationTest {
             sessionId: String,
             selection: ModelSelection,
             toolConfiguration: ConversationToolConfiguration?,
+            a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities?,
         ): ChatAgentExecution = object : ChatAgentExecution {
+            override suspend fun sendInteraction(
+                interaction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction,
+                retry: Boolean,
+            ): Flow<ChatRunEvent> = send("interaction", emptyList(), retry)
+
             override suspend fun send(
                 text: String,
                 fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
@@ -1956,7 +1981,7 @@ class ChatViewModelCharacterizationTest {
             coEvery { send(any(), any(), any()) } returns flowOf(*events.toTypedArray())
         }
         val agent = agentOverride ?: mockk<ChatAgentRepository> {
-            coEvery { createExecution(any(), any(), any()) } returns execution
+            coEvery { createExecution(any(), any(), any(), any()) } returns execution
         }
         val appearance = mockk<AppearanceRepository> {
             every { themeMode } returns MutableStateFlow(ThemeMode.SYSTEM)
@@ -2085,6 +2110,7 @@ class ChatViewModelCharacterizationTest {
                 },
                 appNotificationManager = appNotificationManager,
                 appUpdateRepository = appUpdateRepository,
+                a2uiProtocol = mockk(relaxed = true),
             ),
             conversations = conversations,
             sessionResolver = sessionResolver,
@@ -2124,7 +2150,13 @@ class ChatViewModelCharacterizationTest {
             sessionId: String,
             selection: ModelSelection,
             toolConfiguration: ConversationToolConfiguration?,
+            a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities?,
         ): ChatAgentExecution = object : ChatAgentExecution {
+            override suspend fun sendInteraction(
+                interaction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction,
+                retry: Boolean,
+            ): Flow<ChatRunEvent> = send("interaction", emptyList(), retry)
+
             override suspend fun send(
                 text: String,
                 fileAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,

@@ -93,3 +93,6 @@ include(":plugins:spotify")
 include(":plugins:xiaohongshu")
 include(":plugins:v2ex")
 include(":plugins:weibo")
+
+include(":domain:a2ui")
+include(":data:a2ui")

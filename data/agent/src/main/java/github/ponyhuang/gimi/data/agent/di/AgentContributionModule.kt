@@ -25,6 +25,10 @@ import github.ponyhuang.gimi.data.agent.contribution.SandboxToolContribution
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class AgentContributionModule {
+    @Binds
+    @IntoSet
+    abstract fun bindA2uiContribution(implementation: github.ponyhuang.gimi.data.agent.a2ui.A2uiToolContribution): AgentContribution
+
 
     @Binds
     @IntoSet

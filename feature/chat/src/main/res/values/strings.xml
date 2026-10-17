@@ -210,4 +210,7 @@
     <string name="chat_official_tool_deepseek_web_fetch">DeepSeek 网页抓取</string>
     <string name="chat_official_tool_deepseek_web_search_description">搜索网页，返回链接、摘要和可选正文。</string>
     <string name="chat_official_tool_deepseek_web_fetch_description">抓取指定网页，返回标题和 Markdown 正文。</string>
+    <string name="chat_a2ui_failed">界面暂时无法显示，请让助手重试。</string>
+    <string name="chat_a2ui_submitted">已操作卡片</string>
+    <string name="chat_a2ui_link_failed">无法打开链接</string>
 </resources>

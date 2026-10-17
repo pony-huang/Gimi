@@ -42,6 +42,11 @@ shizuku = "13.1.5"
 mlkitTextRecognition = "16.0.1"
 
 [libraries]
+androidx-a2ui-engine = { module = "androidx.a2ui:a2ui-engine", version = "1.0.0-alpha01" }
+androidx-a2ui-model = { module = "androidx.a2ui:a2ui-model", version = "1.0.0-alpha01" }
+androidx-a2ui-compose-runtime = { module = "androidx.a2ui.compose:compose-runtime", version = "1.0.0-alpha01" }
+androidx-a2ui-compose-ui = { module = "androidx.a2ui.compose:compose-ui", version = "1.0.0-alpha01" }
+androidx-material3-a2ui = { module = "androidx.compose.material3:material3-a2ui", version = "1.0.0-alpha01" }
 e2b-sdk = { module = "dev.e2b.community:e2b-sdk", version = "0.1.0-SNAPSHOT" }
 mlkit-text-recognition-chinese = { module = "com.google.mlkit:text-recognition-chinese", version.ref = "mlkitTextRecognition" }
 shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }

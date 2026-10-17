@@ -105,6 +105,8 @@ sealed interface ChatAction {
  * 不经过 ViewModel，因此不引入多余的 effect 成员。
  */
 sealed interface ChatEffect {
+    /** 目录中的 openUrl 交给 Route 执行平台副作用。 */
+    data class OpenA2uiUrl(val url: String) : ChatEffect
     /** 向用户展示一条一次性提示；文案由 Route 侧解析（`ChatNotice` → stringResource / 动态文本）。 */
     data class ShowNotice(val notice: ChatNotice) : ChatEffect
 }

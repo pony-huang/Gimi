@@ -70,6 +70,10 @@ data class ChatFunctionResponse(
     val name: String,
     val localFileSearchResult: LocalFileSearchResult? = null,
     val confirmationApproved: Boolean? = null,
+    /** Validated native UI revision returned by the UI generation tool. */
+    val a2uiDocument: github.ponyhuang.gimi.domain.a2ui.A2uiDocument? = null,
+    /** The generation tool exhausted its format correction; diagnostic details remain in the tool result. */
+    val a2uiFailed: Boolean = false,
 )
 
 /**

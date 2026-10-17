@@ -10,11 +10,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
-/**
- * 聊天相关的 ViewModel 统一挂在 Activity 作用域：Chat 主界面与“查看全部”等子目的地
- * 是不同的导航条目，若各自 `hiltViewModel()` 会拿到独立实例，子目的地读不到会话状态
- * （本地文件搜索结果回查会永远落空）。
- */
+/** 聊天 ViewModel 随宿主 Activity 保持，避免导航条目重建时丢失会话状态。 */
 @Composable
 internal fun activityScopedChatViewModel(): ChatViewModel {
     val activity = checkNotNull(LocalContext.current.findComponentActivity()) {
@@ -36,17 +32,6 @@ sealed interface ChatDestination : NavKey {
     @Serializable
     data object Chat : ChatDestination
 
-    /**
-     * Structured local-file search results for one conversation response.
-     *
-     * @property sessionId Owning conversation identifier.
-     * @property responseId Tool response identifier to restore.
-     */
-    @Serializable
-    data class SearchResults(
-        val sessionId: String,
-        val responseId: String,
-    ) : ChatDestination
 }
 
 /** Cross-capability callbacks and activity inputs supplied by the app composition root. */
@@ -54,8 +39,6 @@ class ChatNavigationCallbacks(
     val onReturnToChat: () -> Unit,
     val onOpenSettings: () -> Unit,
     val onConfigureModels: () -> Unit,
-    val onOpenSearchResults: (sessionId: String, responseId: String) -> Unit,
-    val onBack: () -> Unit,
     val sharedMediaUris: List<Uri>,
     val onSharedMediaConsumed: () -> Unit,
 )
@@ -71,18 +54,8 @@ fun ChatEntryProvider(
             onReturnToChat = callbacks.onReturnToChat,
             onOpenSettings = callbacks.onOpenSettings,
             onConfigureModels = callbacks.onConfigureModels,
-            onShowAllLocalFiles = callbacks.onOpenSearchResults,
             sharedMediaUris = callbacks.sharedMediaUris,
             onSharedMediaConsumed = callbacks.onSharedMediaConsumed,
-        )
-        true
-    }
-
-    is ChatDestination.SearchResults -> {
-        ChatSearchResultsRoute(
-            sessionId = destination.sessionId,
-            responseId = destination.responseId,
-            onBack = callbacks.onBack,
         )
         true
     }

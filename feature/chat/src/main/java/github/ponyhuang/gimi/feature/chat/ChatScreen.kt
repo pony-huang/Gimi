@@ -125,8 +125,6 @@ fun ChatScaffold(
     onToggleSpeechPlayback: (String, String) -> Unit,
     onToggleAutoSpeak: () -> Unit,
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit,
-    onOpenLocalFile: (github.ponyhuang.gimi.domain.conversation.model.LocalFileReference) -> Unit,
-    onShowAllLocalFiles: (responseId: String) -> Unit,
     onToggleTimeline: (groupId: String) -> Unit = {},
     onToolConfirmation: (Boolean) -> Unit,
     onToolConfirmationAlwaysAllow: () -> Unit,
@@ -572,8 +570,6 @@ fun ChatScaffold(
                                                     (timeline.isRunning &&
                                                         segment === timeline.segments.last()),
                                                 onToggle = { onToggleTimeline(segment.id) },
-                                                onOpenLocalFile = onOpenLocalFile,
-                                                onShowAllLocalFiles = onShowAllLocalFiles,
                                             )
                                         }
                                     }
@@ -822,8 +818,6 @@ private fun ChatScaffoldEmptyPreview() {
             onToggleSpeechPlayback = { _, _ -> },
             onToggleAutoSpeak = {},
             onOpenDocument = {},
-            onOpenLocalFile = {},
-            onShowAllLocalFiles = {},
             onToolConfirmation = {},
             onToolConfirmationAlwaysAllow = {},
             onFullAccessChange = {},
@@ -868,8 +862,6 @@ private fun ChatScaffoldWithMessagesPreview() {
             onToggleSpeechPlayback = { _, _ -> },
             onToggleAutoSpeak = {},
             onOpenDocument = {},
-            onOpenLocalFile = {},
-            onShowAllLocalFiles = {},
             onToolConfirmation = {},
             onToolConfirmationAlwaysAllow = {},
             onFullAccessChange = {},
@@ -988,8 +980,6 @@ private fun ChatScaffoldFailedTurnPreview() {
             onToggleSpeechPlayback = { _, _ -> },
             onToggleAutoSpeak = {},
             onOpenDocument = {},
-            onOpenLocalFile = {},
-            onShowAllLocalFiles = {},
             onToolConfirmation = {},
             onToolConfirmationAlwaysAllow = {},
             onFullAccessChange = {},

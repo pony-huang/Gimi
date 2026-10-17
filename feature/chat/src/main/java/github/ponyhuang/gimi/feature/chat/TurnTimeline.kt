@@ -51,7 +51,7 @@ sealed interface TurnSegment {
      * 两段正文之间聚合的连续工具活动，折叠为一行「执行工具 N 次」。
      *
      * @property id 组内稳定 id（turnId + 组序号），作为展开态 key。
-     * @property entries 组内按事件顺序排列的思考、工具调用和文件结果。
+     * @property entries 组内按事件顺序排列的思考和工具调用。
      */
     data class Activity(
         val id: String,
@@ -89,14 +89,6 @@ sealed interface TimelineEntry {
         val status: ToolCallStatus,
     ) : TimelineEntry
 
-    /**
-     * 工具返回的结构化本地文件结果。
-     *
-     * @property response 携带非空文件列表的工具响应。
-     */
-    data class FileResults(
-        val response: FunctionResponseView,
-    ) : TimelineEntry
 }
 
 /** 工具调用在时间线中可展示的状态。 */
@@ -189,7 +181,6 @@ private fun List<Message>.toTurnTimeline(
     val segments = mutableListOf<TurnSegment>()
     val activityEntries = mutableListOf<TimelineEntry>()
     val seenToolEntries = mutableSetOf<ToolCallKey>()
-    val seenFileResults = mutableSetOf<ToolCallKey>()
     var activityGroupCount = 0
 
     // 思考与工具活动都发生在其后的正文之前，因此正文段出现前无条件 flush 缓冲，
@@ -240,10 +231,6 @@ private fun List<Message>.toTurnTimeline(
                     status = ToolCallStatus.Completed,
                 )
             }
-            val selected = selectedResponses[key]
-            if (selected?.hasStructuredResult() == true && seenFileResults.add(key)) {
-                activityEntries += TimelineEntry.FileResults(selected)
-            }
         }
     }
     flushActivity()
@@ -278,16 +265,13 @@ private fun List<Message>.selectToolResponses(): Map<ToolCallKey, FunctionRespon
         message.visibleFunctionResponses().forEach { response ->
             val key = ToolCallKey(response.id, response.name)
             val previous = selected[key]
-            if (previous == null || (!previous.hasStructuredResult() && response.hasStructuredResult())) {
+            if (previous == null) {
                 selected[key] = response
             }
         }
     }
     return selected
 }
-
-private fun FunctionResponseView.hasStructuredResult(): Boolean =
-    localFileSearchResult?.files?.isNotEmpty() == true
 
 private fun Message.hasAnswerContent(): Boolean =
     error != null ||

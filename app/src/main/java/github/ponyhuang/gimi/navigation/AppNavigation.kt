@@ -152,10 +152,6 @@ fun MainScreen(
                         onReturnToChat = returnToChat,
                         onOpenSettings = { navigate(SettingsDestination.Settings) },
                         onConfigureModels = { navigate(ModelSettingsDestination.ServiceList) },
-                        onOpenSearchResults = { sessionId, responseId ->
-                            navigate(ChatDestination.SearchResults(sessionId, responseId))
-                        },
-                        onBack = goBack,
                         sharedMediaUris = currentSharedMediaUris,
                         onSharedMediaConsumed = consumeSharedMedia,
                     ),

@@ -167,12 +167,6 @@
     <string name="chat_attachment_sent_image_preview">已发送图片预览</string>
     <string name="chat_attachment_close_preview">关闭图片预览</string>
     <string name="chat_attachment_file_missing">文件已丢失</string>
-    <string name="chat_local_file_show_all">查看全部（%1$d）</string>
-    <string name="chat_local_file_results_title">搜索结果</string>
-    <string name="chat_local_file_results_back">返回聊天</string>
-    <string name="chat_local_file_results_unavailable">搜索结果已不可用</string>
-    <string name="chat_local_file_image">图片：%1$s</string>
-    <string name="chat_local_file_image_preview">图片预览：%1$s</string>
     <string name="chat_remote_image">远程图片 %1$d</string>
     <string name="chat_remote_image_swipe_hint">左右滑动查看图片</string>
     <string name="chat_recommendations_title">为你推荐</string>
@@ -190,7 +184,6 @@
     <string name="chat_turn_working">思考中…</string>
     <string name="chat_timeline_expand">展开工作过程</string>
     <string name="chat_timeline_collapse">收起工作过程</string>
-    <string name="chat_timeline_file_count">找到 %1$d 个文件</string>
     <string name="chat_timeline_tool_running">执行中</string>
     <string name="chat_timeline_tool_completed">已完成</string>
     <string name="chat_timeline_tool_rejected">已拒绝</string>

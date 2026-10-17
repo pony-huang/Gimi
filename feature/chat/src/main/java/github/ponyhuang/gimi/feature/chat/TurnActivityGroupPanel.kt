@@ -15,7 +15,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.QuestionMark
 import androidx.compose.material.icons.filled.Shield
@@ -32,24 +31,19 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.domain.conversation.model.FunctionResponseView
-import github.ponyhuang.gimi.domain.conversation.model.LocalFileReference
-import github.ponyhuang.gimi.domain.conversation.model.LocalFileSearchResult
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /**
  * assistant 轮次内单个工具活动组的折叠行。
  *
  * 头部显示「执行工具 N 次」（N 为组内工具调用数；纯思考组退化为「思考」），
- * 展开后按事件顺序显示思考文本、工具调用与文件结果。运行中的组由调用方保持展开。
+ * 展开后按事件顺序显示思考文本与工具调用。运行中的组由调用方保持展开。
  */
 @Composable
 internal fun TurnActivityGroupPanel(
     segment: TurnSegment.Activity,
     expanded: Boolean,
     onToggle: () -> Unit,
-    onOpenLocalFile: (LocalFileReference) -> Unit,
-    onShowAllLocalFiles: (responseId: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val toolCount = segment.entries.count { it is TimelineEntry.ToolCall }
@@ -98,8 +92,6 @@ internal fun TurnActivityGroupPanel(
                         segment.entries.forEach { entry ->
                             TimelineEntryRow(
                                 entry = entry,
-                                onOpenLocalFile = onOpenLocalFile,
-                                onShowAllLocalFiles = onShowAllLocalFiles,
                             )
                         }
                     }
@@ -112,8 +104,6 @@ internal fun TurnActivityGroupPanel(
 @Composable
 private fun TimelineEntryRow(
     entry: TimelineEntry,
-    onOpenLocalFile: (LocalFileReference) -> Unit,
-    onShowAllLocalFiles: (responseId: String) -> Unit,
 ) {
     when (entry) {
         is TimelineEntry.Thought -> TimelineTextRow(
@@ -125,21 +115,6 @@ private fun TimelineEntryRow(
             title = "${toolDisplayName(entry.name)}${entry.argsSummary}",
             detail = toolStatusLabel(entry.status),
         )
-        is TimelineEntry.FileResults -> {
-            val result = entry.response.localFileSearchResult ?: return
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                TimelineTextRow(
-                    icon = { Icon(Icons.Default.FolderOpen, contentDescription = null) },
-                    title = stringResource(R.string.chat_timeline_file_count, result.files.size),
-                )
-                LocalFileSearchCarousel(
-                    responseId = entry.response.id,
-                    result = result,
-                    onOpenFile = onOpenLocalFile,
-                    onShowAll = onShowAllLocalFiles,
-                )
-            }
-        }
     }
 }
 
@@ -202,25 +177,6 @@ private val previewActivityGroup = TurnSegment.Activity(
     entries = listOf(
         TimelineEntry.Thought("thought", "先检索工作区内的项目计划"),
         TimelineEntry.ToolCall("call", "search_workspace", "(query=项目计划)", ToolCallStatus.Completed),
-        TimelineEntry.FileResults(
-            FunctionResponseView(
-                id = "call",
-                name = "search_workspace",
-                localFileSearchResult = LocalFileSearchResult(
-                    query = "项目计划",
-                    files = listOf(
-                        LocalFileReference(
-                            displayName = "项目计划.md",
-                            mimeType = "text/markdown",
-                            sizeBytes = 1L,
-                            modifiedTimeMillis = 1L,
-                            category = "document",
-                            contentUri = "content://preview/project-plan",
-                        ),
-                    ),
-                ),
-            ),
-        ),
         TimelineEntry.ToolCall("read", "read_document", "(风险清单.pdf)", ToolCallStatus.Rejected),
     ),
 )
@@ -229,7 +185,7 @@ private val previewActivityGroup = TurnSegment.Activity(
 @Composable
 private fun TurnActivityGroupCollapsedPreview() {
     AsssistantaiTheme(darkTheme = false) {
-        TurnActivityGroupPanel(previewActivityGroup, false, {}, {}, {})
+        TurnActivityGroupPanel(previewActivityGroup, false, {})
     }
 }
 
@@ -237,7 +193,7 @@ private fun TurnActivityGroupCollapsedPreview() {
 @Composable
 private fun TurnActivityGroupExpandedPreview() {
     AsssistantaiTheme(darkTheme = false) {
-        TurnActivityGroupPanel(previewActivityGroup, true, {}, {}, {})
+        TurnActivityGroupPanel(previewActivityGroup, true, {})
     }
 }
 
@@ -245,6 +201,6 @@ private fun TurnActivityGroupExpandedPreview() {
 @Composable
 private fun TurnActivityGroupExpandedDarkPreview() {
     AsssistantaiTheme(darkTheme = true) {
-        TurnActivityGroupPanel(previewActivityGroup, true, {}, {}, {})
+        TurnActivityGroupPanel(previewActivityGroup, true, {})
     }
 }

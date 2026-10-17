@@ -5,7 +5,9 @@ import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.types.Blob
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FileData
+import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.FunctionDeclaration
+import com.google.adk.kt.types.FunctionResponse
 import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
@@ -56,6 +58,45 @@ class ClaudeRequestPayloadTest {
     @After
     fun tearDown() {
         server.shutdown()
+    }
+
+    @Test
+    fun interruptedToolCallsHaveErrorResultsBeforeTheNextUserInput() {
+        val calls = listOf("open", "check").map { id ->
+            FunctionCall(id = id, name = id, args = emptyMap())
+        }
+        // 包括整批取消、部分完成、正常完成，以及末尾尚无新输入的历史。
+        for (completedCalls in listOf(emptyList(), calls.take(1), calls.takeLast(1), calls)) {
+            for (nextInput in listOf("男的女的", null)) {
+                val completed = completedCalls.map { call ->
+                    Part(functionResponse = FunctionResponse(
+                        id = call.id, name = call.name, response = mapOf("result" to "done"),
+                    ))
+                }
+                val history = buildList {
+                    add(userContent())
+                    add(Content(role = Role.MODEL, parts = calls.map { Part(functionCall = it) }))
+                    val parts = listOfNotNull(nextInput?.let { Part(text = it) }) + completed
+                    if (parts.isNotEmpty()) add(Content(role = Role.USER, parts = parts))
+                }
+
+                val body = capture("deepseek-flash", LlmRequest(contents = history))
+
+                val messages = body["messages"]!!.jsonArray
+                assertEquals("Every tool_use needs an immediately following user result: $body", 3, messages.size)
+                val blocks = messages[2].jsonObject["content"]!!.jsonArray.map { it.jsonObject }
+                assertEquals(setOf("open", "check"), blocks.take(2).map { it["tool_use_id"].text() }.toSet())
+                blocks.take(2).forEach { result ->
+                    val completed = completedCalls.any { it.id == result["tool_use_id"].text() }
+                    assertEquals("tool_result", result["type"].text())
+                    assertEquals((!completed).toString(), result["is_error"].text())
+                    if (completed) assertEquals("\"done\"", result["content"].text())
+                }
+                assertEquals(nextInput, blocks.drop(2).singleOrNull()?.get("text").text())
+                // 请求规范化只修复本次发送的副本，不能把占位错误持久化成真实执行结果。
+                assertEquals(completedCalls.size, history.flatMap { it.parts }.count { it.functionResponse != null })
+            }
+        }
     }
 
     @Test

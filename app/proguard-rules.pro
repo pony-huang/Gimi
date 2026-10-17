@@ -111,6 +111,13 @@
 -keep,allowobfuscation class com.fasterxml.jackson.databind.JsonDeserializer { *; }
 -keep,allowobfuscation class com.fasterxml.jackson.databind.deser.** { *; }
 
+# OpenAI/Anthropic 的 JsonNull 通过 @JsonSerialize 反射创建 NullSerializer。
+# 取消工具后重发时，历史工具结果的 error 可能包含该 JSON 空值。R8 会把
+# NullSerializer 合并到 RawSerializer 并将无参构造改为带分派参数的构造，
+# 导致 Map["error"] 编码时报 "has no default (no arg) constructor"。
+# 保留这个反射入口，防止类合并与构造裁剪；不扩大到整个 serializer 包。
+-keep class com.fasterxml.jackson.databind.ser.std.NullSerializer { *; }
+
 # Victools jsonschema-generator (transitive via google-genai / anthropic-java)
 # references these on types that don't exist on Android. Suppress the warning
 # so R8 doesn't treat them as missing classes.

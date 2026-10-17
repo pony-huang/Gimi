@@ -36,6 +36,7 @@ import com.google.adk.kt.tools.toJsonSchema
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.FunctionDeclaration
+import com.google.adk.kt.types.FunctionResponse
 import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.Schema
@@ -248,7 +249,7 @@ internal class ClaudeRequestConverter(private val name: String, private val defa
                 ToolResultBlockParam.builder()
                     .toolUseId(fr.id.toString())
                     .content(result)
-                    .isError(false)
+                    .isError(response["error"] != null)
                     .build()
             )
         }
@@ -436,6 +437,12 @@ internal fun FunctionCall.toAnthropicToolUseInput(): ToolUseBlockParam.Input =
         )
         .build()
 
+/**
+ * 合并消息并闭合工具调用，满足 Anthropic 的相邻 tool_use / tool_result 约束。
+ *
+ * 取消会保留已提交的调用、但不一定留下结果；只在请求副本中补充“结果未知”的错误，
+ * 不重跑工具，也不修改会话日志，避免影响 ADK 按 invocationId 恢复原执行。
+ */
 internal fun List<Content>.normalizeForAnthropic(): List<Content> {
     val merged = mutableListOf<Content>()
     for (content in this) {
@@ -449,10 +456,33 @@ internal fun List<Content>.normalizeForAnthropic(): List<Content> {
         }
     }
 
-    return merged.map { content ->
-        if (content.role != Role.USER) return@map content
+    val normalized = merged.mapIndexed { index, content ->
+        if (content.role != Role.USER) return@mapIndexed content
         val (toolResults, otherParts) = content.parts.partition { it.functionResponse != null }
-        content.copy(parts = toolResults + otherParts)
+        val calls = merged.getOrNull(index - 1)?.parts.orEmpty().mapNotNull { it.functionCall }
+        content.copy(parts = toolResults + calls.interruptedToolResults(toolResults) + otherParts)
+    }.toMutableList()
+    // 历史可能直接结束在工具调用上；错误结果仍须独占紧接着的 user 消息。
+    val trailingCalls = merged.lastOrNull()?.takeIf { it.role == Role.MODEL }
+        ?.parts.orEmpty().mapNotNull { it.functionCall }
+    val trailingResults = trailingCalls.interruptedToolResults(emptyList())
+    if (trailingResults.isNotEmpty()) {
+        normalized += Content(role = Role.USER, parts = trailingResults)
+    }
+    return normalized
+}
+
+/** 已有真实结果保持原样，只为本轮未配对的调用提供错误占位。 */
+private fun List<FunctionCall>.interruptedToolResults(results: List<Part>): List<Part> {
+    val answeredIds = results.mapNotNull { it.functionResponse?.id }.toSet()
+    return filter { it.id !in answeredIds }.map { call ->
+        Part(functionResponse = FunctionResponse(
+            id = call.id,
+            name = call.name,
+            response = mapOf(
+                "error" to "Tool execution was interrupted before a result was available. The outcome is unknown.",
+            ),
+        ))
     }
 }
 

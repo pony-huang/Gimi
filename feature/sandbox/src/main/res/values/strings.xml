@@ -1,6 +1,7 @@
 <resources>
     <string name="sandbox_screen_title">沙盒</string>
     <string name="sandbox_e2b">E2B</string>
+    <string name="sandbox_capabilities_description">支持在隔离沙盒中执行代码和命令、读写文件、浏览目录及上传下载文件。</string>
     <string name="sandbox_disabled_description">未启用 · 在隔离环境中执行代码与文件操作</string>
     <string name="sandbox_pending_description">待配置 · 请填写 API Key 并保存</string>
     <string name="sandbox_configured_description">已配置 · 按聊天独立使用沙盒</string>

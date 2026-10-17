@@ -78,6 +78,15 @@ fun SandboxSettingsScreen(
         LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
             item {
                 PreferenceSectionTitle(stringResource(R.string.sandbox_execution_section))
+                TextButton(
+                    onClick = onOpenDocumentation,
+                    modifier = Modifier.padding(start = 24.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text(stringResource(R.string.sandbox_documentation), style = MaterialTheme.typography.bodySmall)
+                    Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null,
+                        modifier = Modifier.padding(start = 4.dp).size(14.dp))
+                }
                 PreferenceGroupCard {
                     PreferenceListItem(
                         icon = Icons.Default.Code,
@@ -109,15 +118,12 @@ fun SandboxSettingsScreen(
                 }
             }
             item {
-                TextButton(
-                    onClick = onOpenDocumentation,
-                    modifier = Modifier.padding(start = 24.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                ) {
-                    Text(stringResource(R.string.sandbox_documentation), style = MaterialTheme.typography.bodySmall)
-                    Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null,
-                        modifier = Modifier.padding(start = 4.dp).size(14.dp))
-                }
+                Text(
+                    text = stringResource(R.string.sandbox_capabilities_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
+                )
             }
             item {
                 SandboxExpansion(state.configurationExpanded) {
@@ -181,7 +187,11 @@ fun SandboxSettingsScreen(
                                 state.environment.forEach { entry ->
                                     key(entry.id) { SandboxEnvironmentGroup(entry, !state.busy, onAction) }
                                 }
-                                TextButton(onClick = { onAction(SandboxSettingsAction.AddEnvironment) }, enabled = !state.busy) {
+                                TextButton(
+                                    onClick = { onAction(SandboxSettingsAction.AddEnvironment) },
+                                    enabled = !state.busy,
+                                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                                ) {
                                     Icon(Icons.Default.Add, contentDescription = null)
                                     Text(stringResource(R.string.sandbox_add_environment), modifier = Modifier.padding(start = 8.dp))
                                 }

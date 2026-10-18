@@ -51,11 +51,73 @@ class A2uiGenerationTest {
         }
     }
 
+    @Test
+    fun weatherCapabilityAddsHardRoutingAndSharedPayloadExample() = runTest {
+        val model = FakeModel()
+        val schema = """{"components":{"WeatherToday":{},"WeatherForecast":{}}}"""
+
+        A2uiGeneration(model, acceptingProtocol()).generate(
+            surfaceId = "surface",
+            capabilities = A2uiCapabilities("catalog", schema),
+            instruction = "Show the Guangzhou weather forecast for the next four days",
+        )
+
+        val prompt = model.requests.single().config.systemInstruction!!.parts.single().text!!
+        assertTrue(prompt.contains("WEATHER COMPONENT ROUTING"))
+        assertTrue(prompt.contains("WeatherForecast"))
+        assertTrue(prompt.contains("\"weather\":{\"path\":\"/weather\"}"))
+        assertTrue(prompt.contains("four-day"))
+    }
+
+    @Test
+    fun promptWithoutWeatherComponentsKeepsGenericCatalogBehavior() = runTest {
+        val model = FakeModel()
+        val schema = """{"components":{"Text":{}}}"""
+
+        A2uiGeneration(model, acceptingProtocol()).generate(
+            surfaceId = "surface",
+            capabilities = A2uiCapabilities("catalog", schema),
+            instruction = "Show a simple card",
+        )
+
+        val prompt = model.requests.single().config.systemInstruction!!.parts.single().text!!
+        assertFalse(prompt.contains("WEATHER COMPONENT ROUTING"))
+    }
+
+    @Test
+    fun weatherRequestRejectsGenericCardAndRetriesWithNativeComponent() = runTest {
+        val model = ScriptedModel(
+            listOf(
+                """[{"id":"root","component":"Card","child":"body"},
+                    {"id":"body","component":"Text","text":"Weather"}]""",
+                """[{"id":"root","component":"WeatherForecast","weather":{"path":"/weather"}}]""",
+            ),
+        )
+        val schema = """{"components":{"WeatherToday":{},"WeatherForecast":{}}}"""
+
+        A2uiGeneration(model, acceptingProtocol()).generate(
+            surfaceId = "surface",
+            capabilities = A2uiCapabilities("catalog", schema),
+            instruction = "Show the weather forecast",
+            requireWeatherComponent = true,
+        )
+
+        assertEquals(2, model.requests.size)
+        val correction = model.requests[1].contents.single().parts.single().text!!
+        assertTrue(correction.contains("Weather UI requests must use WeatherToday or WeatherForecast"))
+    }
+
     private fun rejectingProtocol() = object : A2uiProtocol {
         override suspend fun validate(document: A2uiDocument, capabilities: A2uiCapabilities) {
             throw IllegalArgumentException("Rejected")
         }
         override fun replay(records: List<A2uiRecord>) = records.filterIsInstance<A2uiRecord.Revision>().map { it.document }
+    }
+
+    private fun acceptingProtocol() = object : A2uiProtocol {
+        override suspend fun validate(document: A2uiDocument, capabilities: A2uiCapabilities) = Unit
+        override fun replay(records: List<A2uiRecord>) =
+            records.filterIsInstance<A2uiRecord.Revision>().map { it.document }
     }
 
     private class FakeModel(private val failure: RuntimeException? = null) : Model {
@@ -67,6 +129,30 @@ class A2uiGenerationTest {
             emit(LlmResponse(content = Content(parts = listOf(Part(functionCall = FunctionCall(
                 name = "render_a2ui", args = mapOf("components" to "[]", "data" to "{}"),
             ))))))
+        }
+    }
+
+    private class ScriptedModel(private val components: List<String>) : Model {
+        override val name = "scripted-model"
+        val requests = mutableListOf<LlmRequest>()
+
+        override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {
+            val index = requests.size.coerceAtMost(components.lastIndex)
+            requests += request
+            emit(
+                LlmResponse(
+                    content = Content(
+                        parts = listOf(
+                            Part(
+                                functionCall = FunctionCall(
+                                    name = "render_a2ui",
+                                    args = mapOf("components" to components[index], "data" to "{}"),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            )
         }
     }
 }

@@ -31,6 +31,9 @@ object AgentPrompts {
         </accuracy>
 
         <response_format>
+        - For information queries, if a purpose-built native A2UI component directly matches the requested data,
+          prefer the native A2UI result. Otherwise use the normal Markdown response. Do not use A2UI merely to
+          restyle prose with generic layout components.
         - Use Markdown when it improves readability.
         - When a tool returns a direct HTTP(S) image URL or a local image content:// URI, embed it as
           `![short description](exact-image-uri)` so the image renders inline. Local images also support

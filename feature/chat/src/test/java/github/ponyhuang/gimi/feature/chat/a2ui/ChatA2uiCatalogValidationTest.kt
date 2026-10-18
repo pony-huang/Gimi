@@ -41,4 +41,33 @@ class ChatA2uiCatalogValidationTest {
 
         AndroidxA2uiProtocol().validate(document, capabilities)
     }
+
+    @Test
+    fun exportedCatalogValidatesSharedWeatherComponentPayloads() = runTest {
+        val catalog = chatA2uiCatalog(openUrl = {})
+        val capabilities = A2uiCapabilities(catalog.id, catalog.toJsonSchemaString())
+        val document = A2uiDocument(
+            surfaceId = "weather-surface",
+            messages = listOf(
+                """{"version":"v0.9.1","createSurface":{"surfaceId":"weather-surface","catalogId":"${catalog.id}","sendDataModel":true}}""",
+                """{"version":"v0.9.1","updateDataModel":{"surfaceId":"weather-surface","path":"/","value":{
+                  "weather":{
+                    "location":"上海",
+                    "updatedAt":"14:20",
+                    "current":{"conditionCode":"clear","temperatureC":28,"humidityPercent":68},
+                    "hourly":[{"timeLabel":"15:00","conditionCode":"clear","temperatureC":29}],
+                    "daily":[{"date":"2026-10-18","conditionCode":"clear","highC":31,"lowC":24,
+                              "sunrise":"05:58","sunset":"17:24"}]
+                  }
+                }}}""",
+                """{"version":"v0.9.1","updateComponents":{"surfaceId":"weather-surface","components":[
+                  {"id":"root","component":"Column","children":["today","forecast"]},
+                  {"id":"today","component":"WeatherToday","weather":{"path":"/weather"}},
+                  {"id":"forecast","component":"WeatherForecast","weather":{"path":"/weather"}}
+                ]}}""",
+            ),
+        )
+
+        AndroidxA2uiProtocol().validate(document, capabilities)
+    }
 }

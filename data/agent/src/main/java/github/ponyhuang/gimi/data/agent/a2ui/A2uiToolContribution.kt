@@ -110,23 +110,33 @@ internal class GenerateA2uiTool(
     }
 }
 
-/** 主 Agent 的 UI 意图只要指向天气，就要求生成器使用宿主提供的原生天气组件。 */
-private fun requestedWeatherComponent(changes: Any?): Boolean {
+/**
+ * 只有“请求本身”是天气界面时才强制天气组件。
+ *
+ * 新闻摘要可能包含降雨、气温等词，不能因此把 NewsList 误判成天气请求；
+ * 显式选择其他原生组件时，天气关键词只作为内容事实处理。
+ */
+internal fun requestedWeatherComponent(changes: Any?): Boolean {
     val text = changes as? String ?: return false
-    return listOf(
-        "天气",
-        "预报",
-        "气温",
-        "温度",
-        "降水",
-        "降雨",
-        "紫外线",
-        "weather",
-        "forecast",
-        "temperature",
-        "precipitation",
-    )
-        .any { text.contains(it, ignoreCase = true) }
+    if (listOf("NewsList", "SpotifyPlayer").any { text.contains(it, ignoreCase = true) }) {
+        return false
+    }
+    val lead = text.take(600)
+    val explicitWeatherUi = listOf(
+        "WeatherToday",
+        "WeatherForecast",
+        "天气卡片",
+        "天气预报",
+        "weather card",
+        "weather forecast",
+        "current weather",
+    ).any { lead.contains(it, ignoreCase = true) }
+    if (explicitWeatherUi) return true
+    val weatherSubject = listOf("天气", "weather").any { lead.contains(it, ignoreCase = true) }
+    val anotherDigest = listOf("新闻", "资讯", "news", "digest").any {
+        lead.contains(it, ignoreCase = true)
+    }
+    return weatherSubject && !anotherDigest
 }
 
 /**

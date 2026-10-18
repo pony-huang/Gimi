@@ -18,6 +18,7 @@ internal class A2uiGeneration(private val model: Model, private val protocol: A2
         var correction = ""
         val weatherRouting = weatherRoutingInstructions(capabilities)
         val spotifyRouting = spotifyRoutingInstructions(capabilities)
+        val newsRouting = newsRoutingInstructions(capabilities)
         repeat(2) { attempt ->
             val request = LlmRequest(
                 model = model,
@@ -75,6 +76,7 @@ internal class A2uiGeneration(private val model: Model, private val protocol: A2
                         Before calling render_a2ui, review the tree for narrow-screen readability and remove redundant elements.
                         $weatherRouting
                         $spotifyRouting
+                        $newsRouting
                         Catalog: ${capabilities.schemaJson}
                     """.trimIndent()))),
                     tools = listOf(Tool(functionDeclarations = listOf(renderDeclaration))),
@@ -146,9 +148,11 @@ private fun weatherRoutingInstructions(capabilities: A2uiCapabilities): String {
     if (!weatherComponentsAvailable(capabilities)) return ""
     return """
         WEATHER COMPONENT ROUTING (HIGHEST PRIORITY):
-        When the requested UI or supplied facts concern current weather, temperature, precipitation,
-        hourly conditions, or a weather forecast, do NOT build the layout from Card, Text, List, Row,
-        or Button. Use exactly one native weather component as the root:
+        Apply this only when the requested UI itself is a weather card, current-conditions view, or
+        forecast. Do NOT choose a weather component merely because a news article, digest, or another
+        requested UI happens to mention weather, rain, or temperature.
+        For an actual weather UI request, do NOT build the layout from Card, Text, List, Row, or Button.
+        Use exactly one native weather component as the root:
         - WeatherForecast for any multi-day forecast, including when only 2-15 days are available.
         - WeatherToday for a detailed current-day view when the user explicitly asks for today.
         Both components share the same required property named `weather`.
@@ -218,6 +222,42 @@ private fun spotifyRoutingInstructions(capabilities: A2uiCapabilities): String {
           fetchedAtEpochMs may be omitted, playbackContext = track_result.
         - Never invent progress, duration, device, artwork, title, or track URI.
         - Do not add generic play/pause buttons; SpotifyPlayer emits native Spotify actions.
+    """.trimIndent()
+}
+
+/**
+ * 目录包含 NewsList 时，要求新闻/资讯摘要使用原生列表组件。
+ *
+ * 组件固定显示 5 条并在卡片内滚动，因此模型只需提供完整的编辑顺序和原文链接，
+ * 不要再用多个 Card/Text 组件重复搭建列表。
+ */
+private fun newsRoutingInstructions(capabilities: A2uiCapabilities): String {
+    val available = runCatching {
+        Json.parseToJsonElement(capabilities.schemaJson)
+            .jsonObject["components"]
+            ?.jsonObject
+            ?.containsKey("NewsList") == true
+    }.getOrDefault(false)
+    if (!available) return ""
+    return """
+        NEWS LIST ROUTING (HIGHEST PRIORITY):
+        When the requested UI concerns news, latest headlines, current events, or an information
+        digest, do NOT build the layout from Card, Text, List, Row, or Button.
+        Use exactly one native NewsList component as the root.
+        It has one required property named `news`. Prefer a data binding:
+        {"id":"root","component":"NewsList","news":{"path":"/news"}}
+        Put the digest under data.news:
+        {"news":{"heading":"今日要闻","updatedAt":"12:11","icon":"newspaper","items":[
+        {"title":"Headline from the source","source":"Reuters","timeLabel":"12:08",
+        "category":"Technology","imageUrl":"https://...","url":"https://..."}]}}
+        Requirements:
+        - Use only articles and URLs returned by tools; never invent headlines, sources, or links.
+        - Preserve editorial order; include at most 20 items.
+        - Each item requires a title. source, timeLabel, category, imageUrl, and url are optional.
+        - icon is optional and accepts newspaper, article, globe, trending, campaign, or bolt.
+        - The component shows five items and scrolls internally for the rest.
+        - NewsList takes precedence over weather keywords contained inside the articles.
+        - Do not duplicate the news list in Markdown after rendering the component.
     """.trimIndent()
 }
 

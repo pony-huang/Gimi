@@ -44,4 +44,22 @@ class A2uiToolContributionTest {
         assertTrue(instruction.contains("No purpose-built native components"))
         assertTrue(instruction.contains("prefer the normal Markdown response"))
     }
+
+    @Test
+    fun newsDigestMentioningRainAndTemperatureDoesNotRequireWeatherCard() {
+        val changes = """
+            Render native NewsList component for today's news digest.
+            Article: 12 provinces will see heavy rain and temperatures dropping by 8°C.
+            Another article covers the weather forecast for northern China.
+        """.trimIndent()
+
+        assertFalse(requestedWeatherComponent(changes))
+    }
+
+    @Test
+    fun explicitWeatherUiStillRequiresNativeWeatherComponent() {
+        assertTrue(requestedWeatherComponent("Show a WeatherForecast card for Shanghai"))
+        assertTrue(requestedWeatherComponent("展示上海明天的天气"))
+        assertFalse(requestedWeatherComponent("Show a weather story inside a NewsList digest"))
+    }
 }

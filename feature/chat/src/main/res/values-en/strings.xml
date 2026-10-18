@@ -259,4 +259,11 @@
     <string name="chat_spotify_artwork">Spotify album artwork</string>
     <string name="chat_spotify_connect_default">Spotify Connect</string>
     <string name="chat_spotify_artist_album">%1$s · %2$s</string>
+
+    <!-- A2UI news list -->
+    <string name="chat_news_default_heading">Today\'s briefing</string>
+    <string name="chat_news_updated_at">Updated %1$s</string>
+    <string name="chat_news_count">%1$d items</string>
+    <string name="chat_news_open_article">Open article: %1$s</string>
+    <string name="chat_news_thumbnail">News thumbnail</string>
 </resources>

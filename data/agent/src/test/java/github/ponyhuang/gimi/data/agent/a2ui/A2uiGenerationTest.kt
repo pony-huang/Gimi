@@ -103,6 +103,26 @@ class A2uiGenerationTest {
     }
 
     @Test
+    fun newsCapabilityAddsDigestRoutingAndScrollRequirement() = runTest {
+        val model = FakeModel()
+        val schema = """{"components":{"NewsList":{}}}"""
+
+        A2uiGeneration(model, acceptingProtocol()).generate(
+            surfaceId = "surface",
+            capabilities = A2uiCapabilities("catalog", schema),
+            instruction = "Show today's top news headlines",
+        )
+
+        val prompt = model.requests.single().config.systemInstruction!!.parts.single().text!!
+        assertTrue(prompt.contains("NEWS LIST ROUTING"))
+        assertTrue(prompt.contains("\"component\":\"NewsList\""))
+        assertTrue(prompt.contains("shows five items and scrolls internally"))
+        assertTrue(prompt.contains("never invent headlines"))
+        assertTrue(prompt.contains("takes precedence over weather keywords"))
+        assertTrue(prompt.contains("icon is optional"))
+    }
+
+    @Test
     fun weatherRequestRejectsGenericCardAndRetriesWithNativeComponent() = runTest {
         val model = ScriptedModel(
             listOf(

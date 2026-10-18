@@ -269,4 +269,11 @@
     <string name="chat_spotify_artwork">Spotify 专辑封面</string>
     <string name="chat_spotify_connect_default">Spotify Connect</string>
     <string name="chat_spotify_artist_album">%1$s · %2$s</string>
+
+    <!-- A2UI 新闻列表 -->
+    <string name="chat_news_default_heading">今日资讯</string>
+    <string name="chat_news_updated_at">更新于 %1$s</string>
+    <string name="chat_news_count">%1$d 条</string>
+    <string name="chat_news_open_article">打开新闻：%1$s</string>
+    <string name="chat_news_thumbnail">新闻缩略图</string>
 </resources>

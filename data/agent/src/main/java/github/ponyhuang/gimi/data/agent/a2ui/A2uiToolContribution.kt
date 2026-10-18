@@ -44,7 +44,10 @@ internal class GenerateA2uiTool(
             "Use generate_a2ui when an interactive card or form helps the user. Plain answers stay text. " +
                 "Generated cards are displayed separately; do not repeat their JSON as text. " +
                 "UI actions arrive as a2ui_interaction JSON user messages; use their submitted data as user input, " +
-                "and update the referenced surface when appropriate. Business actions still require normal tools and authorization.",
+                "and update the referenced surface when appropriate. " +
+                "When requesting a date/time form, ask for the catalog DateTimeInput picker, not hour/minute TextFields " +
+                "or formatted date/time text entry, unless the user explicitly requests manual text entry. " +
+                "Business actions still require normal tools and authorization.",
         ))))
     }
 

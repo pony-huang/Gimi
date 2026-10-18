@@ -20,16 +20,18 @@ import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 /** 无状态 surface 宿主；模型和交互生命周期由聊天 ViewModel 管理。 */
 @Composable
 internal fun ChatA2uiContent(surfaces: List<A2uiSurfaceModel>, failed: Boolean) {
-    Column(Modifier.fillMaxWidth()) {
-        surfaces.forEach { surface ->
-            A2uiSurface(
-                surfaceModel = surface,
-                modifier = Modifier.fillMaxWidth(),
-                loadingContent = { CircularProgressIndicator() },
-                errorContent = { A2uiError() },
-            )
+    ChatA2uiTheme {
+        Column(Modifier.fillMaxWidth()) {
+            surfaces.forEach { surface ->
+                A2uiSurface(
+                    surfaceModel = surface,
+                    modifier = Modifier.fillMaxWidth(),
+                    loadingContent = { CircularProgressIndicator() },
+                    errorContent = { A2uiError() },
+                )
+            }
+            if (failed) A2uiError()
         }
-        if (failed) A2uiError()
     }
 }
 

@@ -13,8 +13,8 @@ internal fun chatA2uiCatalog(openUrl: (String) -> Unit): A2uiCatalog {
     return A2uiCatalog(
         catalogId = "https://gimi.app/a2ui/catalogs/chat/v1",
         components = listOf(
-            defaults.text, defaults.icon, defaults.row, defaults.column, defaults.card, ChatA2uiList,
-            defaults.divider, defaults.button, defaults.textField, defaults.checkBox, defaults.choicePicker,
+            ChatA2uiText, defaults.icon, defaults.row, defaults.column, ChatA2uiCard, ChatA2uiList,
+            defaults.divider, ChatA2uiButton, defaults.textField, defaults.checkBox, defaults.choicePicker,
             defaults.slider, defaults.dateTimeInput,
             defaults.image { url, description, scale, modifier, onError ->
                 AsyncImage(model = url, contentDescription = description, contentScale = scale,

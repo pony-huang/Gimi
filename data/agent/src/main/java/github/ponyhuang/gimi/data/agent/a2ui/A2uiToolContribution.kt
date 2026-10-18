@@ -31,6 +31,7 @@ internal class GenerateA2uiTool(
 ) : BaseTool(
     A2uiToolResult.TOOL_NAME,
     "Generate, update or delete an interactive native UI card or form. " +
+        "Required for device or setting updates, on/off or yes/no controls, and confirmation of such changes. " +
         "Prefer a matching purpose-built native component for information queries; otherwise use the " +
         "normal Markdown response. " +
         "For weather results, request the native WeatherToday or WeatherForecast component " +
@@ -41,7 +42,11 @@ internal class GenerateA2uiTool(
         properties = mapOf(
             "intent" to Schema(type = Type.STRING, description = "create, update or delete"),
             "target_surface_id" to Schema(type = Type.STRING, description = "Existing surface id for update/delete"),
-            "changes" to Schema(type = Type.STRING, description = "Complete intent and facts to display; requested changes on update"),
+            "changes" to Schema(
+                type = Type.STRING,
+                description = "Complete intent and facts to display; requested changes on update. For controls, " +
+                    "include the affected item, tool-confirmed current state, and enable/disable/apply actions",
+            ),
         ), required = listOf("intent", "changes"),
     ))
 
@@ -53,10 +58,16 @@ internal class GenerateA2uiTool(
         }.getOrNull() ?: return llmRequest
         return super.processLlmRequest(toolContext, llmRequest).appendInstructions(Content(parts = listOf(Part(text =
             "Use generate_a2ui when an interactive card or form helps the user, or when a purpose-built " +
-                "native component directly matches an information query. Otherwise answer in Markdown. " +
+                "native component directly matches an information query. For any device or setting update, " +
+                "on/off or yes/no control, or confirmation of such a change, you MUST also call generate_a2ui " +
+                "to show the affected control with its current state and enable/disable/apply/cancel actions. " +
+                "Otherwise answer in Markdown. " +
                 "Generated cards are displayed separately; do not repeat their JSON as text. " +
-                "UI actions arrive as a2ui_interaction JSON user messages; use their submitted data as user input, " +
-                "and update the referenced surface when appropriate. " +
+                "UI actions arrive as a2ui_interaction JSON user messages; use their submitted data as user input. " +
+                "After executing a submitted control action, update the referenced surface with the tool-confirmed " +
+                "state so the user can reverse or adjust it. " +
+                "A CheckBox or DateTimeInput only edits local data; include a primary Button event action that " +
+                "applies the displayed choice. " +
                 "When requesting a date/time form, ask for the catalog DateTimeInput picker, not hour/minute TextFields " +
                 "or formatted date/time text entry, unless the user explicitly requests manual text entry. " +
                 "When rendering weather, explicitly request the catalog WeatherToday or WeatherForecast native " +
@@ -161,9 +172,32 @@ internal fun a2uiResponseRoutingInstructions(capabilities: A2uiCapabilities): St
         call generate_a2ui and prefer the native A2UI result over a Markdown-only answer.
         If no purpose-built component matches, use the normal Markdown response.
         Do not call generate_a2ui merely to restyle prose. Generic Text, Card, Row, Column, List, Button,
-        TextField, CheckBox, ChoicePicker, Slider, and similar layout/input primitives are not a match.
+        TextField, CheckBox, ChoicePicker, Slider, and similar layout/input primitives are not a match for an
+        information query.
         Once an A2UI component is shown, do not duplicate its content in Markdown.
         $componentBlock
+
+        A2UI CONTROL ROUTING (MANDATORY):
+        For every request to change a device or app setting, controllable state, alarm, reminder, timer, or
+        schedule - including enable, disable, on/off, toggle, set, change, schedule, create, edit, or delete -
+        call generate_a2ui in the same turn in addition to the business action. If the change requires
+        confirmation, use the A2UI control as the confirmation instead of asking in plain text, then perform
+        the action after the user submits it.
+        This includes flashlight on/off, mobile data on/off, Wi-Fi or Bluetooth state, alarms, reminders,
+        and timers. A short Markdown summary may accompany the card, but a Markdown-only answer is not
+        sufficient; if the business action has already completed, still render the resulting control
+        instead of replying with text only. A yes/no question or confirmation about such a controllable
+        state must be presented with A2UI actions (confirm/cancel or enable/disable), not plain text.
+        The control surface must include the affected item, its tool-confirmed state, and an editable control:
+        - initialize CheckBox from the current boolean state and add a primary Button event action that applies
+          the displayed choice; the CheckBox alone only changes local data and must not be treated as executed;
+        - for an alarm, reminder, timer, or schedule, show the concrete date/time with DateTimeInput, the
+          current enabled state, and enable/disable/apply actions;
+        - keep the control available after the action so the user can reverse it, and update the same surface
+          after a submitted action using the new tool result.
+        Never invent state that a tool did not confirm. If the current state is unknown, label it as unknown and
+        offer an action to check or refresh it; if the required business capability is unavailable, state that
+        limitation instead of displaying a control that cannot work.
     """.trimIndent()
 }
 

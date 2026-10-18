@@ -66,6 +66,15 @@ internal class A2uiGeneration(private val model: Model, private val protocol: A2
                         Use a TextField for a calendar date/clock time only if the user explicitly requests manual text entry,
                         or DateTimeInput is absent from the supplied catalog. A previous text-based layout is not an exception.
                         For a finite set of choices, prefer ChoicePicker; for boolean settings, prefer CheckBox.
+                        For a boolean setting or on/off control, when the catalog provides CheckBox, bind it to the supplied
+                        current state and add a primary Button with an event action that applies the displayed choice
+                        (for example enable or disable). A CheckBox only edits local data, so the action Button is mandatory;
+                        never imply the toggle already changed the device. Label the checkbox with the setting name and
+                        the primary action with its concrete effect, such as enable, disable, or apply.
+                        For an alarm, reminder, timer, or schedule control, show the concrete date/time with DateTimeInput,
+                        bind a CheckBox to the enabled state when available, and provide enable/disable/apply event actions.
+                        When the current state is unknown, say so explicitly and offer a check/refresh action instead of
+                        guessing. Keep the control available for the reverse action after an update.
                         For bounded numeric adjustments, prefer Slider when appropriate; use TextField when precise entry is necessary.
                         Use supported initial values from the supplied context to reduce repeated input, without guessing missing facts.
                         Bind selections to writable data paths and use only components and settings present in the supplied catalog.

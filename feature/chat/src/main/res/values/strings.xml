@@ -179,11 +179,21 @@
     <string name="chat_recommendation_category_general">建议</string>
     <!-- 失败消息的编辑/重试 -->
     <string name="chat_failed_turn_retry">重试</string>
-    <string name="chat_timeline_tool_group_count">执行工具 %1$d 次</string>
-    <string name="chat_timeline_thought_group">思考</string>
-    <string name="chat_turn_working">思考中…</string>
-    <string name="chat_timeline_expand">展开工作过程</string>
-    <string name="chat_timeline_collapse">收起工作过程</string>
+    <string name="chat_process_status_thinking">正在思考</string>
+    <string name="chat_process_status_preparing">正在整理回复</string>
+    <string name="chat_process_status_tool">正在%1$s</string>
+    <string name="chat_process_tool_now_playing">获取播放状态</string>
+    <string name="chat_process_tool_change_track">切换歌曲</string>
+    <string name="chat_process_tool_play">播放媒体</string>
+    <string name="chat_process_tool_pause">暂停媒体</string>
+    <string name="chat_process_tool_search">搜索内容</string>
+    <string name="chat_process_tool_read">读取内容</string>
+    <string name="chat_process_tool_calendar">查看日程</string>
+    <string name="chat_process_tool_generic">执行工具</string>
+    <string name="chat_timeline_completed_steps">已完成 %1$d 个步骤</string>
+    <string name="chat_timeline_step_understand">理解你的请求</string>
+    <string name="chat_timeline_expand">展开步骤详情</string>
+    <string name="chat_timeline_collapse">收起步骤详情</string>
     <string name="chat_timeline_tool_running">执行中</string>
     <string name="chat_timeline_tool_completed">已完成</string>
     <string name="chat_timeline_tool_rejected">已拒绝</string>

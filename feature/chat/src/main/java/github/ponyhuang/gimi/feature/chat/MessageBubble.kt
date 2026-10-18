@@ -58,8 +58,8 @@ internal fun MessageRole.toChatBubbleRole(): ChatBubbleRole = when (this) {
 /**
  * 消息气泡 — 把 [Message] 渲染到 [ChatMessageBubble] 的 content slot 里。
  *
- * 这里只渲染最终回答文本、附件、错误与回答操作。thought 和工具活动统一由
- * [TurnActivityGroupPanel] 呈现，避免同一过程信息在正文气泡里重复出现。
+ * 这里只渲染最终回答文本、附件、错误与回答操作。运行状态由输入框上方统一呈现，
+ * 完成后的工具步骤由 [TurnActivityGroupPanel] 以折叠摘要展示，避免过程信息占用正文空间。
  *
  * @param partChannelProvider reducer 暴露的"按 TextPart.id 取 chunk channel"函数。
  *        Composable 拿到 channel 后用 `for (chunk in channel) streamingState.append(chunk)`

@@ -48,7 +48,8 @@ sealed interface TurnSegment {
     data class Answer(val message: Message) : TurnSegment
 
     /**
-     * 两段正文之间聚合的连续工具活动，折叠为一行「执行工具 N 次」。
+     * 两段正文之间聚合的连续工具活动。
+     * 完成后折叠为一行步骤摘要；展开只显示通用理解阶段与工具动作，不暴露原始思考文本。
      *
      * @property id 组内稳定 id（turnId + 组序号），作为展开态 key。
      * @property entries 组内按事件顺序排列的思考和工具调用。

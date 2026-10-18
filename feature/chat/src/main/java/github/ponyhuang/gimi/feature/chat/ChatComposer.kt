@@ -98,6 +98,7 @@ import kotlinx.coroutines.launch
  * @param headerContent Optional request prompt displayed above both text and recording states.
  * @param onExpandedChange Callback reporting whether the capsule is currently in its enlarged
  * state, so surrounding content can align with it.
+ * @param generatingStatus Optional single-line run status rendered above the composer.
  */
 @Composable
 public fun ChatComposer(
@@ -133,6 +134,7 @@ public fun ChatComposer(
     onSharedMediaConsumed: () -> Unit = {},
     attachmentsEnabled: Boolean = true,
     headerContent: @Composable () -> Unit = {},
+    generatingStatus: (@Composable () -> Unit)? = null,
 ) {
     val currentMessageData by rememberUpdatedState(messageData)
     val onDraftChange by rememberUpdatedState(onMessageDataChange)
@@ -394,10 +396,15 @@ public fun ChatComposer(
             .fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        AnimatedVisibility(visible = isGenerating) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                AITypingIndicator()
-                Spacer(Modifier.height(12.dp))
+        generatingStatus?.let { status ->
+            AnimatedVisibility(visible = isGenerating) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.Start,
+                ) {
+                    status()
+                    Spacer(Modifier.height(6.dp))
+                }
             }
         }
         Surface(
@@ -640,6 +647,9 @@ internal fun ChatComposerGenerating() {
         onSendClick = { _, reply -> reply(ChatSubmissionResult.ACCEPTED) },
         onStopClick = {},
         isGenerating = true,
+        generatingStatus = {
+            ChatRunStatusRow(ChatRunStatus.Thinking)
+        },
     )
 }
 

@@ -169,11 +169,21 @@
     <string name="chat_recommendation_category_general">Idea</string>
     <!-- Failed message retry -->
     <string name="chat_failed_turn_retry">Retry</string>
-    <string name="chat_timeline_tool_group_count">Ran %1$d tool(s)</string>
-    <string name="chat_timeline_thought_group">Thinking</string>
-    <string name="chat_turn_working">Thinking…</string>
-    <string name="chat_timeline_expand">Expand work details</string>
-    <string name="chat_timeline_collapse">Collapse work details</string>
+    <string name="chat_process_status_thinking">Thinking</string>
+    <string name="chat_process_status_preparing">Preparing reply</string>
+    <string name="chat_process_status_tool">Running: %1$s</string>
+    <string name="chat_process_tool_now_playing">fetching playback status</string>
+    <string name="chat_process_tool_change_track">changing track</string>
+    <string name="chat_process_tool_play">playing media</string>
+    <string name="chat_process_tool_pause">pausing media</string>
+    <string name="chat_process_tool_search">searching</string>
+    <string name="chat_process_tool_read">reading content</string>
+    <string name="chat_process_tool_calendar">checking calendar</string>
+    <string name="chat_process_tool_generic">using a tool</string>
+    <string name="chat_timeline_completed_steps">Completed %1$d step(s)</string>
+    <string name="chat_timeline_step_understand">Understanding request</string>
+    <string name="chat_timeline_expand">Expand step details</string>
+    <string name="chat_timeline_collapse">Collapse step details</string>
     <string name="chat_timeline_tool_running">Running</string>
     <string name="chat_timeline_tool_completed">Completed</string>
     <string name="chat_timeline_tool_rejected">Rejected</string>

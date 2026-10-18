@@ -24,7 +24,11 @@ fun ErrorBubble(
     message: Message,
     modifier: Modifier = Modifier,
 ) {
-    ChatMessageBubble(role = message.role.toChatBubbleRole(), modifier = modifier) {
+    ChatMessageBubble(
+        role = message.role.toChatBubbleRole(),
+        modifier = modifier,
+        assistantHorizontalInset = 4.dp,
+    ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.errorContainer,

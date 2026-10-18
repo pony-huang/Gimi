@@ -109,7 +109,11 @@ fun MessageBubble(
         }
     }
 
-    ChatMessageBubble(role = role.toChatBubbleRole(), modifier = modifier) {
+    ChatMessageBubble(
+        role = role.toChatBubbleRole(),
+        modifier = modifier,
+        assistantHorizontalInset = 4.dp,
+    ) {
         Column(modifier = if (fillsBubbleWidth) Modifier.fillMaxWidth() else Modifier) {
             visibleTextParts.forEach { part ->
                 RenderTextPart(

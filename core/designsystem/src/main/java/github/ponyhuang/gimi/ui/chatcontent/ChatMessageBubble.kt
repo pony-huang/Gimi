@@ -44,7 +44,7 @@ fun ChatMessageBubble(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = if (isUser) 12.dp else 0.dp),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
     ) {
         if (isUser) {
@@ -69,7 +69,8 @@ fun ChatMessageBubble(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 6.dp),
+                        // 助手正文沿用外层容器的边距，避免多层内缩压窄长文本。
+                        .padding(vertical = 6.dp),
                 ) {
                     content()
                 }
@@ -88,12 +89,34 @@ private fun ChatMessageBubbleUserPreview() {
     }
 }
 
-@Preview(showBackground = true)
+@Preview(name = "助手长回复 · 浅色", showBackground = true, widthDp = 360)
 @Composable
 private fun ChatMessageBubbleAssistantPreview() {
-    AsssistantaiTheme {
-        ChatMessageBubble(role = ChatBubbleRole.ASSISTANT) {
-            Text(text = "助手回复示例")
+    ChatMessageBubbleAssistantPreviewContent(darkTheme = false)
+}
+
+@Preview(name = "助手长回复 · 深色", showBackground = true, widthDp = 360)
+@Composable
+private fun ChatMessageBubbleAssistantDarkPreview() {
+    ChatMessageBubbleAssistantPreviewContent(darkTheme = true)
+}
+
+@Composable
+private fun ChatMessageBubbleAssistantPreviewContent(darkTheme: Boolean) {
+    AsssistantaiTheme(darkTheme = darkTheme) {
+        Surface(color = MaterialTheme.colorScheme.background) {
+            ChatMessageBubble(
+                role = ChatBubbleRole.ASSISTANT,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            ) {
+                Text(
+                    text = "已经为你生成「自定义闹钟」卡片 👇\n\n" +
+                        "• 闹钟时间：日期时间选择器（默认 07:30，可改成任意日期时间）\n\n" +
+                        "• 标签：可填「起床 / 喝水 / 开会」等\n\n" +
+                        "• 重复：周一到周日多选，不选就是一次性闹钟",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            }
         }
     }
 }

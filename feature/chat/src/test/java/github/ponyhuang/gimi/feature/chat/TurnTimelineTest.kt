@@ -15,6 +15,46 @@ import org.junit.Test
 class TurnTimelineTest {
 
     @Test
+    fun `card submission hides user item while preserving response and running turn`() {
+        val submission = userMessage(id = "card-action", timestamp = 300L).copy(
+            textParts = emptyList(),
+            a2uiInteraction = github.ponyhuang.gimi.domain.a2ui.A2uiInteraction(
+                "surface", "play", "play-video", 300L,
+                kotlinx.serialization.json.JsonObject(emptyMap()),
+                kotlinx.serialization.json.JsonObject(emptyMap()),
+            ),
+        )
+        val messages = listOf(
+            userMessage(id = "original", timestamp = 100L),
+            assistantMessage(id = "card-reply", timestamp = 200L, text = "视频卡片"),
+            submission,
+            assistantMessage(id = "action-reply", timestamp = 400L, text = "正在打开视频"),
+        )
+
+        val items = messages.toChatListItems(TimelineActivityState())
+        assertEquals(listOf("original"), items.filterIsInstance<ChatListItem.UserMessage>().map { it.message.id })
+        val turns = items.filterIsInstance<ChatListItem.AssistantTurn>().map { it.timeline }
+        assertEquals(listOf("original", "card-action"), turns.map { it.turnId })
+        assertEquals(listOf("action-reply"), turns.last().answerMessages.map { it.id })
+        assertTrue(messages[2] === submission)
+
+        val running = listOf(submission).toChatListItems(TimelineActivityState(isAgentRunning = true))
+        assertEquals(1, running.size)
+        val runningTurn = (running.single() as ChatListItem.AssistantTurn).timeline
+        assertTrue(runningTurn.isRunning)
+        assertEquals("card-action", runningTurn.turnId)
+        assertTrue(listOf(submission).toChatListItems(TimelineActivityState()).isEmpty())
+
+        // 隐藏协议占位不能吞掉用户正文或失败提示。
+        listOf(
+            submission.copy(textParts = listOf(TextPart(text = "补充说明"))),
+            submission.copy(error = "提交失败"),
+        ).forEach { message ->
+            assertEquals(message, (listOf(message).toChatListItems(TimelineActivityState()).single() as ChatListItem.UserMessage).message)
+        }
+    }
+
+    @Test
     fun `messages are grouped into stable user and assistant turn items`() {
         val messages = listOf(
             userMessage(id = "user-a", timestamp = 100L),

@@ -158,7 +158,13 @@ internal fun List<Message>.toChatListItems(
                 flushTurn()
                 currentUser = message
                 currentUserIndex = index
-                result += ChatListItem.UserMessage(message)
+                // 卡片提交仍作为轮次边界和重放记录，只省略没有正文的操作占位气泡。
+                if (message.a2uiInteraction == null || message.error != null ||
+                    message.fileAttachments.isNotEmpty() ||
+                    message.textParts.any { !it.thought && it.text.isNotBlank() }
+                ) {
+                    result += ChatListItem.UserMessage(message)
+                }
             }
             MessageRole.Assistant -> if (currentUser != null) {
                 assistantMessages += message

@@ -83,7 +83,7 @@ fun MessageBubble(
     // 空白/零宽文本段（重试、还原或 runner 回显可能残留）不算可见文本，
     // 避免纯图片消息被撑成空气泡或图片下方多出一个小灰块。
     val visibleTextParts = message.textParts.filterNot { it.thought }.filter { it.hasVisibleContent }
-    val hasBubbleBody = visibleTextParts.isNotEmpty() || otherAttachments.isNotEmpty() || message.a2uiInteraction != null
+    val hasBubbleBody = visibleTextParts.isNotEmpty() || otherAttachments.isNotEmpty()
 
     if (role == MessageRole.User) {
         if (images.isEmpty() && !hasBubbleBody) {
@@ -111,7 +111,6 @@ fun MessageBubble(
 
     ChatMessageBubble(role = role.toChatBubbleRole(), modifier = modifier) {
         Column(modifier = if (fillsBubbleWidth) Modifier.fillMaxWidth() else Modifier) {
-            if (message.a2uiInteraction != null) Text(stringResource(R.string.chat_a2ui_submitted))
             visibleTextParts.forEach { part ->
                 RenderTextPart(
                     part = part,
@@ -172,7 +171,6 @@ private fun UserBubbleBody(
         modifier = Modifier.padding(top = 4.dp),
     ) {
         Column {
-            if (message.a2uiInteraction != null) Text(stringResource(R.string.chat_a2ui_submitted))
             visibleTextParts.forEach { part ->
                 RenderTextPart(
                     part = part,

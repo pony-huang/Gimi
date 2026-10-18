@@ -201,7 +201,6 @@
     <string name="chat_official_tool_deepseek_web_search_description">Search the web for links, summaries, and optional page content.</string>
     <string name="chat_official_tool_deepseek_web_fetch_description">Fetch a web page and return its title and Markdown content.</string>
     <string name="chat_a2ui_failed">Unable to display this card. Ask the assistant to try again.</string>
-    <string name="chat_a2ui_submitted">Card action sent</string>
     <string name="chat_a2ui_link_failed">Unable to open link</string>
     <string name="chat_a2ui_audio">Audio</string>
 </resources>

@@ -250,4 +250,13 @@
     <string name="chat_weather_condition_fog">雾</string>
     <string name="chat_weather_condition_wind">大风</string>
     <string name="chat_weather_condition_unknown">未知天气</string>
+
+    <!-- A2UI Spotify 播放器 -->
+    <string name="chat_spotify_open">打开 Spotify</string>
+    <string name="chat_spotify_next">下一首</string>
+    <string name="chat_spotify_play">播放</string>
+    <string name="chat_spotify_pause">暂停</string>
+    <string name="chat_spotify_artwork">Spotify 专辑封面</string>
+    <string name="chat_spotify_connect_default">Spotify Connect</string>
+    <string name="chat_spotify_artist_album">%1$s · %2$s</string>
 </resources>

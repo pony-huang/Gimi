@@ -70,4 +70,36 @@ class ChatA2uiCatalogValidationTest {
 
         AndroidxA2uiProtocol().validate(document, capabilities)
     }
+
+    @Test
+    fun exportedCatalogValidatesSpotifyPlayerPayload() = runTest {
+        val catalog = chatA2uiCatalog(openUrl = {})
+        val capabilities = A2uiCapabilities(catalog.id, catalog.toJsonSchemaString())
+        val document = A2uiDocument(
+            surfaceId = "spotify-surface",
+            messages = listOf(
+                """{"version":"v0.9.1","createSurface":{"surfaceId":"spotify-surface","catalogId":"${catalog.id}","sendDataModel":true}}""",
+                """{"version":"v0.9.1","updateDataModel":{"surfaceId":"spotify-surface","path":"/","value":{
+                  "spotify":{
+                    "trackUri":"spotify:track:one",
+                    "title":"Night Flight",
+                    "artist":"Artist",
+                    "album":"Album",
+                    "durationMs":258000,
+                    "progressMs":72000,
+                    "isPlaying":true,
+                    "fetchedAtEpochMs":1760000000000,
+                    "deviceId":"device",
+                    "deviceName":"Living room",
+                    "playbackContext":"now_playing"
+                  }
+                }}}""",
+                """{"version":"v0.9.1","updateComponents":{"surfaceId":"spotify-surface","components":[
+                  {"id":"root","component":"SpotifyPlayer","spotify":{"path":"/spotify"}}
+                ]}}""",
+            ),
+        )
+
+        AndroidxA2uiProtocol().validate(document, capabilities)
+    }
 }

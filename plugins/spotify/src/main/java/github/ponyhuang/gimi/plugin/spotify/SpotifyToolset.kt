@@ -37,6 +37,12 @@ private val SPOTIFY_INSTRUCTIONS: String = """
       editing playlists. Do not fabricate IDs, URIs, devices, or successful results.
     - Playback controls require Spotify Premium and an available Spotify Connect device. Use `spotify_get_devices`
       when the target is ambiguous or playback reports that no device is available.
+    - A2UI SpotifyPlayer interactions arrive as `spotify_toggle_playback` and `spotify_next`.
+      Use their context values exactly: `deviceId` targets the same Connect device,
+      and `playbackContext=now_playing` means pause when `isPlaying=true`
+      or resume the current item otherwise. `playbackContext=track_result` starts the provided `trackUri`.
+      After any playback control succeeds, call `spotify_now_playing` and update the same A2UI surface with the
+      fresh snapshot, including its `fetched_at_ms` timestamp.
     - Treat create, update, reorder, add, remove, playback, queue, and volume calls as mutations. Report success only
       after the corresponding tool succeeds, and surface its error or prerequisite when it fails.
     - Library save/remove use the unified `/me/library` endpoint and accept mixed Spotify URI types

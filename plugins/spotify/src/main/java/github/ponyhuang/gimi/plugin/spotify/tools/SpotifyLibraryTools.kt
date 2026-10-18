@@ -19,7 +19,14 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
         if (json == null) {
             mapOf(SpotifyTool.RESULT_KEY to "Nothing is currently playing")
         } else {
-            mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json))
+            val native = PluginJson.toNative(json)
+            val snapshot = if (native is Map<*, *>) {
+                native.entries.associate { it.key.toString() to it.value } +
+                    ("fetched_at_ms" to System.currentTimeMillis())
+            } else {
+                native
+            }
+            mapOf(SpotifyTool.RESULT_KEY to snapshot)
         }
     },
     spotifyTool(

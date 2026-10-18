@@ -85,9 +85,17 @@ internal class ChatA2uiCoordinator(
             session.documents.remove(id)
         }
         active.forEach { (id, document) ->
-            if (session.documents[id] != document) {
-                if (id in session.documents) session.processor.processInput(parser, deleteMessage(id))
-                document.messages.forEach { session.processor.processInput(parser, it) }
+            val previous = session.documents[id]
+            if (previous != document) {
+                // 提交重放只替换根数据；删除 surface 会清空仍被 Compose 读取的必填绑定，导致闪退。
+                val dataOnly = previous != null && previous.messages.size == 3 && document.messages.size == 3 &&
+                    previous.messages[0] == document.messages[0] && previous.messages[2] == document.messages[2]
+                if (dataOnly) {
+                    session.processor.processInput(parser, document.messages[1])
+                } else {
+                    if (previous != null) session.processor.processInput(parser, deleteMessage(id))
+                    document.messages.forEach { session.processor.processInput(parser, it) }
+                }
                 session.documents[id] = document
             }
         }

@@ -35,7 +35,9 @@ internal class A2uiGeneration(private val model: Model, private val protocol: A2
                         Avoid h1/h2-sized headings in chat cards. Keep source, format and duration on one concise metadata line.
                         Follow the host theme; do not invent colors, fonts, spacing or sizing properties absent from the catalog.
                         Give each card one primary action. Use secondary actions sparingly and label them with short, clear verbs.
-                        Put the primary action on its own row. Use at most two short text buttons in any other Row.
+                        Put one or two short footer actions in a Row with justify="center" and align="center".
+                        Keep the containing Column aligned with align="stretch" so the footer Row can center across the card width.
+                        Center the action group as a whole; keep headings, descriptions and other body content start-aligned.
                         Stack longer actions vertically; never squeeze three or more text buttons across the card.
                         Keep button labels at normal reading size; never insert line breaks or split words to make them fit.
                         Use the user's language consistently, including action labels, status text and field descriptions.

@@ -214,7 +214,4 @@
     <string name="chat_a2ui_submitted">已操作卡片</string>
     <string name="chat_a2ui_link_failed">无法打开链接</string>
     <string name="chat_a2ui_audio">音频</string>
-    <string name="chat_a2ui_play">播放</string>
-    <string name="chat_a2ui_pause">暂停</string>
-    <string name="chat_a2ui_seek">播放进度</string>
 </resources>

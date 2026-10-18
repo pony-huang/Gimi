@@ -13,7 +13,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
-/** A2UI 媒体渲染器的离线预览；样本 URL 来自 Media3 官方测试媒体桶。 */
+/** Media3 官方视频与音频控件的浅色、深色离线预览；预览不加载样本媒体。 */
 @Preview(showBackground = true, heightDp = 640)
 @Preview(
     showBackground = true,

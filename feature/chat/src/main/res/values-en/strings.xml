@@ -204,7 +204,4 @@
     <string name="chat_a2ui_submitted">Card action sent</string>
     <string name="chat_a2ui_link_failed">Unable to open link</string>
     <string name="chat_a2ui_audio">Audio</string>
-    <string name="chat_a2ui_play">Play</string>
-    <string name="chat_a2ui_pause">Pause</string>
-    <string name="chat_a2ui_seek">Playback position</string>
 </resources>

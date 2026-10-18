@@ -1,5 +1,5 @@
 [versions]
-agp = "9.5.0-alpha04"
+agp = "9.4.0"
 anthropicJava = "2.65.0"
 coreKtx = "1.19.0"
 googleAdk = "1.4.0"
@@ -40,6 +40,7 @@ opentelemetrySdk = "1.56.0"
 dataStore = "1.2.1"
 shizuku = "13.1.5"
 mlkitTextRecognition = "16.0.1"
+media3 = "1.11.1"
 
 [libraries]
 androidx-a2ui-engine = { module = "androidx.a2ui:a2ui-engine", version = "1.0.0-alpha01" }
@@ -88,6 +89,8 @@ androidx-lifecycle-viewmodel-navigation3 = { group = "androidx.lifecycle", name 
 androidx-navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "navigation3" }
 androidx-navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "navigation3" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+androidx-media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
+androidx-media3-ui-compose = { module = "androidx.media3:media3-ui-compose", version.ref = "media3" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 androidx-compose-animation-core = { group = "androidx.compose.animation", name = "animation-core" }
 androidx-compose-animation = { group = "androidx.compose.animation", name = "animation" }

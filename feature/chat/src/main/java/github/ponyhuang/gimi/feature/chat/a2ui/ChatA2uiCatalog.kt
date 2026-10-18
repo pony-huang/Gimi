@@ -20,6 +20,8 @@ internal fun chatA2uiCatalog(openUrl: (String) -> Unit): A2uiCatalog {
                 AsyncImage(model = url, contentDescription = description, contentScale = scale,
                     modifier = modifier, onError = { onError(it.result.throwable) })
             },
+            defaults.video(ChatA2uiVideoRenderer),
+            defaults.audioPlayer(ChatA2uiAudioPlayerRenderer),
         ),
         functions = createBasicCatalogFunctions(
             urlOpener = { openUrl(it) },

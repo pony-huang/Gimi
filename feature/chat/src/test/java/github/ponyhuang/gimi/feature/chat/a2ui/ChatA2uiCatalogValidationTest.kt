@@ -23,7 +23,7 @@ class ChatA2uiCatalogValidationTest {
                 """{"version":"v0.9.1","updateDataModel":{"surfaceId":"surface","path":"/","value":{"destination":"上海"}}}""",
                 """{"version":"v0.9.1","updateComponents":{"surfaceId":"surface","components":[
                   {"id":"root","component":"Card","child":"body"},
-                  {"id":"body","component":"Column","children":["title","description","destination","list","submit"]},
+                  {"id":"body","component":"Column","children":["title","description","destination","list","video","audio","submit"]},
                   {"id":"title","component":"Text","text":"周末行程"},
                   {"id":"description","component":"Text","text":"修改目的地后提交。"},
                   {"id":"destination","component":"TextField","label":"目的地","value":{"path":"/destination"},
@@ -31,6 +31,8 @@ class ChatA2uiCatalogValidationTest {
                               "message":"目的地不能为空"}]},
                   {"id":"list","component":"List","children":["note"]},
                   {"id":"note","component":"Text","text":"列表项"},
+                  {"id":"video","component":"Video","url":"https://example.com/video.mp4"},
+                  {"id":"audio","component":"AudioPlayer","url":"https://example.com/audio.mp3","description":"测试音频"},
                   {"id":"submit","component":"Button","child":"submit-label","action":{"event":{"name":"submit","context":{}}}},
                   {"id":"submit-label","component":"Text","text":"提交"}
                 ]}}""",

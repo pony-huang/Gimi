@@ -5,6 +5,9 @@ import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import github.ponyhuang.gimi.pluginapi.PluginConfig
 import github.ponyhuang.gimi.pluginapi.PluginConfigField
+import github.ponyhuang.gimi.pluginapi.PluginConfigAction
+import github.ponyhuang.gimi.pluginapi.PluginConfigActionExecution
+import github.ponyhuang.gimi.pluginapi.PluginActionCallbackRequest
 
 /**
  * V2EX 插件 — 接入 V2EX API 2.0（Beta），全部工具经 Personal Access Token 认证。
@@ -34,7 +37,20 @@ class V2exPlugin(
                 defaultValue = V2exApi.DEFAULT_BASE_URL,
             ),
         ),
+        actions = listOf(
+            PluginConfigAction(id = ACTION_TOKEN_SETTINGS, label = "前往 V2EX 令牌设置 ↗"),
+        ),
     )
+
+    override suspend fun runConfigAction(actionId: String): PluginConfigActionExecution = when (actionId) {
+        ACTION_TOKEN_SETTINGS -> PluginConfigActionExecution.AwaitingCallback(
+            PluginActionCallbackRequest(
+                handlerId = "external_url",
+                parameters = mapOf("url" to "https://www.v2ex.com/settings/tokens"),
+            ),
+        )
+        else -> super.runConfigAction(actionId)
+    }
 
     private val api = V2exApi()
 
@@ -72,5 +88,6 @@ class V2exPlugin(
     companion object {
         const val KEY_TOKEN: String = "token"
         const val KEY_BASE_URL: String = "base_url"
+        const val ACTION_TOKEN_SETTINGS: String = "link:token_settings"
     }
 }

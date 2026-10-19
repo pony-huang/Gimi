@@ -106,7 +106,7 @@ domain/data/core -X-> feature or app
 
 ### Compose A2UI (agentic UI) reference
 
-- Canonical upstream page: <https://developer.android.com/develop/ui/compose/agentic.md.txt> (retrieved 2026-10-19; the page and its protocol versions evolve, so re-fetch it before adopting or upgrading). Protocol spec: <https://a2ui.org/specification/v0.9.1-a2ui/>; catalogs: <https://a2ui.org/concepts/catalogs/>.
+- Canonical references: Compose renderer page <https://developer.android.com/develop/ui/compose/agentic.md.txt> (retrieved 2026-10-19; the page and its protocol versions evolve, so re-fetch it before adopting or upgrading); A2UI protocol home <https://a2ui.org/>; protocol spec <https://a2ui.org/specification/v0.9.1-a2ui/>; catalogs <https://a2ui.org/concepts/catalogs/>.
 - Purpose: the Jetpack Compose A2UI renderer implements the A2UI protocol so agents can produce rich, interactive UI as native Compose components by emitting JSON. Agents never generate or execute arbitrary UI code; the component catalog is the contract that declares which components, properties, and functions they may use.
 - Artifacts and responsibilities:
     - `androidx.a2ui.compose:compose-runtime` — fine-grained updates for streaming agent payloads through Compose Snapshot state; only affected components recompose.

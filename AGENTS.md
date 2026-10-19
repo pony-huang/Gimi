@@ -118,6 +118,10 @@ domain/data/core -X-> feature or app
 - Protocol compatibility: the renderer supports A2UI 0.9.1. Catalog schemas are tied to protocol versions, and clients can declare multiple supported catalog versions for capability negotiation with the agent. AndroidX binary compatibility rules apply: non-breaking additions enter core interfaces with default implementations, while incompatible changes deprecate old interfaces (for example `A2uiComponent`) and add new ones (`A2uiComponentV2`) alongside them.
 - Adoption guardrails: keep A2UI inside a dedicated feature or business-agnostic presentation/core slice; domain and data modules never depend on Compose or A2UI types. Treat agent JSON as untrusted input: validate it with `a2ui-engine` before it reaches UI state, surface component error states, and keep permission and credential decisions in their owning tested layers. Register only catalog components that follow the design-system, i18n, accessibility, and preview-first rules above. Before upgrading, verify the current protocol version and catalog negotiation behavior instead of assuming 0.9.1 is still current.
 
+## Integration References
+
+- Spotify: Before adding or changing Web API endpoints, OAuth, tool schemas, playback behavior, or Spotify content handling, read [Spotify integration reference](spec/en/spotify-building-with-ai.md). Re-fetch the linked official OpenAPI schema and relevant endpoint/policy pages for the capability being changed; the dated reference is not a frozen API contract.
+
 ## Build and Verification
 
 ### Build commands

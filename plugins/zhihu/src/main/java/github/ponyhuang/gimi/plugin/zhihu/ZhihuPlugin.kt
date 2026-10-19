@@ -5,6 +5,9 @@ import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import github.ponyhuang.gimi.pluginapi.PluginConfig
 import github.ponyhuang.gimi.pluginapi.PluginConfigField
+import github.ponyhuang.gimi.pluginapi.PluginConfigAction
+import github.ponyhuang.gimi.pluginapi.PluginConfigActionExecution
+import github.ponyhuang.gimi.pluginapi.PluginActionCallbackRequest
 
 /**
  * 知乎插件 — 接入知乎开放平台（developer.zhihu.com），向 Agent 注入内容工具：
@@ -24,7 +27,20 @@ class ZhihuPlugin(
         fields = listOf(
             PluginConfigField.Text(key = KEY_ACCESS_SECRET, label = "access_secret", secret = true),
         ),
+        actions = listOf(
+            PluginConfigAction(id = ACTION_DEVELOPER_PROFILE, label = "前往知乎开发者平台 ↗"),
+        ),
     )
+
+    override suspend fun runConfigAction(actionId: String): PluginConfigActionExecution = when (actionId) {
+        ACTION_DEVELOPER_PROFILE -> PluginConfigActionExecution.AwaitingCallback(
+            PluginActionCallbackRequest(
+                handlerId = "external_url",
+                parameters = mapOf("url" to "https://developer.zhihu.com/profile"),
+            ),
+        )
+        else -> super.runConfigAction(actionId)
+    }
 
     @Volatile private var accessSecret: String = ""
 
@@ -58,5 +74,6 @@ class ZhihuPlugin(
 
     companion object {
         const val KEY_ACCESS_SECRET: String = "access_secret"
+        const val ACTION_DEVELOPER_PROFILE: String = "link:developer_profile"
     }
 }

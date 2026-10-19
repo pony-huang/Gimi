@@ -6,6 +6,9 @@ import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import github.ponyhuang.gimi.pluginapi.PluginApi
 import github.ponyhuang.gimi.pluginapi.PluginConfig
 import github.ponyhuang.gimi.pluginapi.PluginConfigField
+import github.ponyhuang.gimi.pluginapi.PluginConfigAction
+import github.ponyhuang.gimi.pluginapi.PluginConfigActionExecution
+import github.ponyhuang.gimi.pluginapi.PluginActionCallbackRequest
 
 /**
  * 微博插件入口；实现 host 侧 [AgentPlugin] SPI。
@@ -54,7 +57,20 @@ class WeiboPlugin : AgentPlugin {
                 secret = true,
             ),
         ),
+        actions = listOf(
+            PluginConfigAction(id = ACTION_SETUP_GUIDE, label = "查看微博插件接入说明 ↗"),
+        ),
     )
+
+    override suspend fun runConfigAction(actionId: String): PluginConfigActionExecution = when (actionId) {
+        ACTION_SETUP_GUIDE -> PluginConfigActionExecution.AwaitingCallback(
+            PluginActionCallbackRequest(
+                handlerId = "external_url",
+                parameters = mapOf("url" to "https://github.com/wecode-ai/openclaw-weibo"),
+            ),
+        )
+        else -> super.runConfigAction(actionId)
+    }
 
     override fun toolSets(): List<Toolset> = listOf(WeiboToolset(api))
 
@@ -83,5 +99,6 @@ class WeiboPlugin : AgentPlugin {
         const val KEY_BASE_URL: String = "base_url"
         const val KEY_APP_ID: String = "app_id"
         const val KEY_APP_SECRET: String = "app_secret"
+        const val ACTION_SETUP_GUIDE: String = "link:setup_guide"
     }
 }

@@ -104,6 +104,20 @@ domain/data/core -X-> feature or app
 - Add concise Chinese comments to complex logic, explaining business invariants, lifecycle/call timing, and why the implementation is necessary rather than restating individual lines.
 - Every Kotlin `data class` and `data object` must have KDoc describing its responsibility and the meaning of its data. Document non-obvious properties with `@property` entries or focused property comments.
 
+### Compose A2UI (agentic UI) reference
+
+- Canonical upstream page: <https://developer.android.com/develop/ui/compose/agentic.md.txt> (retrieved 2026-10-19; the page and its protocol versions evolve, so re-fetch it before adopting or upgrading). Protocol spec: <https://a2ui.org/specification/v0.9.1-a2ui/>; catalogs: <https://a2ui.org/concepts/catalogs/>.
+- Purpose: the Jetpack Compose A2UI renderer implements the A2UI protocol so agents can produce rich, interactive UI as native Compose components by emitting JSON. Agents never generate or execute arbitrary UI code; the component catalog is the contract that declares which components, properties, and functions they may use.
+- Artifacts and responsibilities:
+    - `androidx.a2ui.compose:compose-runtime` — fine-grained updates for streaming agent payloads through Compose Snapshot state; only affected components recompose.
+    - `androidx.a2ui.compose:compose-ui` — catalog and component implementation APIs, including progressive rendering, per-subcomponent loading states, animated transitions, and two-way data binding back to the agent.
+    - `androidx.a2ui:a2ui-model` and `androidx.a2ui:a2ui-engine` — protocol parsing and message processing, schema validation before payloads reach state models, component error states, and automatic error reporting so the agent can self-correct.
+    - `androidx.compose.material3:material3-a2ui` — optional ready-made Basic Catalog based on Material 3, with progressive rendering and Material theming.
+    - `androidx.a2ui.compose:compose-ui-testing` — dedicated testing APIs.
+- Architecture: the runtime and UI layers are design-system agnostic. Build a custom catalog for this project's design system or adopt the provided Basic Catalog.
+- Protocol compatibility: the renderer supports A2UI 0.9.1. Catalog schemas are tied to protocol versions, and clients can declare multiple supported catalog versions for capability negotiation with the agent. AndroidX binary compatibility rules apply: non-breaking additions enter core interfaces with default implementations, while incompatible changes deprecate old interfaces (for example `A2uiComponent`) and add new ones (`A2uiComponentV2`) alongside them.
+- Adoption guardrails: keep A2UI inside a dedicated feature or business-agnostic presentation/core slice; domain and data modules never depend on Compose or A2UI types. Treat agent JSON as untrusted input: validate it with `a2ui-engine` before it reaches UI state, surface component error states, and keep permission and credential decisions in their owning tested layers. Register only catalog components that follow the design-system, i18n, accessibility, and preview-first rules above. Before upgrading, verify the current protocol version and catalog negotiation behavior instead of assuming 0.9.1 is still current.
+
 ## Build and Verification
 
 ### Build commands

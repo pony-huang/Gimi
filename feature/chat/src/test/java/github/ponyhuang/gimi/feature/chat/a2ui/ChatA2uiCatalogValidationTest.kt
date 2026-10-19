@@ -72,16 +72,17 @@ class ChatA2uiCatalogValidationTest {
     }
 
     @Test
-    fun exportedCatalogValidatesSpotifyPlayerPayload() = runTest {
+    fun exportedCatalogValidatesMusicPlayerPayload() = runTest {
         val catalog = chatA2uiCatalog(openUrl = {})
         val capabilities = A2uiCapabilities(catalog.id, catalog.toJsonSchemaString())
         val document = A2uiDocument(
-            surfaceId = "spotify-surface",
+            surfaceId = "player-surface",
             messages = listOf(
-                """{"version":"v0.9.1","createSurface":{"surfaceId":"spotify-surface","catalogId":"${catalog.id}","sendDataModel":true}}""",
-                """{"version":"v0.9.1","updateDataModel":{"surfaceId":"spotify-surface","path":"/","value":{
-                  "spotify":{
-                    "trackUri":"spotify:track:one",
+                """{"version":"v0.9.1","createSurface":{"surfaceId":"player-surface","catalogId":"${catalog.id}","sendDataModel":true}}""",
+                """{"version":"v0.9.1","updateDataModel":{"surfaceId":"player-surface","path":"/","value":{
+                  "player":{
+                    "provider":"网易云音乐",
+                    "trackUri":"netease:track:one",
                     "title":"Night Flight",
                     "artist":"Artist",
                     "album":"Album",
@@ -94,8 +95,8 @@ class ChatA2uiCatalogValidationTest {
                     "playbackContext":"now_playing"
                   }
                 }}}""",
-                """{"version":"v0.9.1","updateComponents":{"surfaceId":"spotify-surface","components":[
-                  {"id":"root","component":"SpotifyPlayer","spotify":{"path":"/spotify"}}
+                """{"version":"v0.9.1","updateComponents":{"surfaceId":"player-surface","components":[
+                  {"id":"root","component":"MusicPlayer","player":{"path":"/player"}}
                 ]}}""",
             ),
         )

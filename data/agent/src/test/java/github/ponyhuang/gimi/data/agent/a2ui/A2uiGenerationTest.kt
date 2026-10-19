@@ -85,9 +85,9 @@ class A2uiGenerationTest {
     }
 
     @Test
-    fun spotifyCapabilityAddsPlayerRoutingAndSnapshotTiming() = runTest {
+    fun musicPlayerCapabilityAddsRoutingAndSnapshotTiming() = runTest {
         val model = FakeModel()
-        val schema = """{"components":{"SpotifyPlayer":{}}}"""
+        val schema = """{"components":{"MusicPlayer":{}}}"""
 
         A2uiGeneration(model, acceptingProtocol()).generate(
             surfaceId = "surface",
@@ -96,7 +96,8 @@ class A2uiGenerationTest {
         )
 
         val prompt = model.requests.single().config.systemInstruction!!.parts.single().text!!
-        assertTrue(prompt.contains("SPOTIFY PLAYER ROUTING"))
+        assertTrue(prompt.contains("MUSIC PLAYER ROUTING"))
+        assertTrue(prompt.contains("provider"))
         assertTrue(prompt.contains("fetched_at_ms"))
         assertTrue(prompt.contains("playbackContext"))
         assertTrue(prompt.contains("Never invent progress"))

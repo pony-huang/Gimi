@@ -129,7 +129,7 @@ internal class GenerateA2uiTool(
  */
 internal fun requestedWeatherComponent(changes: Any?): Boolean {
     val text = changes as? String ?: return false
-    if (listOf("NewsList", "SpotifyPlayer").any { text.contains(it, ignoreCase = true) }) {
+    if (listOf("NewsList", "MusicPlayer").any { text.contains(it, ignoreCase = true) }) {
         return false
     }
     val lead = text.take(600)

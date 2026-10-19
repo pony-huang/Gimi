@@ -17,7 +17,7 @@ internal class A2uiGeneration(private val model: Model, private val protocol: A2
     ): A2uiDocument {
         var correction = ""
         val weatherRouting = weatherRoutingInstructions(capabilities)
-        val spotifyRouting = spotifyRoutingInstructions(capabilities)
+        val musicPlayerRouting = musicPlayerRoutingInstructions(capabilities)
         val newsRouting = newsRoutingInstructions(capabilities)
         repeat(2) { attempt ->
             val request = LlmRequest(
@@ -84,7 +84,7 @@ internal class A2uiGeneration(private val model: Model, private val protocol: A2
                         verify enableDate/enableTime, and verify each value binding has an initialized data entry.
                         Before calling render_a2ui, review the tree for narrow-screen readability and remove redundant elements.
                         $weatherRouting
-                        $spotifyRouting
+                        $musicPlayerRouting
                         $newsRouting
                         Catalog: ${capabilities.schemaJson}
                     """.trimIndent()))),
@@ -194,43 +194,54 @@ private fun weatherComponentsAvailable(capabilities: A2uiCapabilities): Boolean 
 }.getOrDefault(false)
 
 /**
- * 目录包含 SpotifyPlayer 时，强制当前播放/Spotify 曲目卡使用原生组件。
+ * 目录包含 MusicPlayer 时，强制任意播放器的当前播放/曲目卡使用原生组件。
  *
  * 进度必须在 UI 侧根据进度快照和设备时间外推，因此这里要求模型原样传递
  * `progress_ms`、`is_playing` 与 `fetched_at_ms`，不能自行计算或编造。
  */
-private fun spotifyRoutingInstructions(capabilities: A2uiCapabilities): String {
+private fun musicPlayerRoutingInstructions(capabilities: A2uiCapabilities): String {
     val available = runCatching {
         Json.parseToJsonElement(capabilities.schemaJson)
             .jsonObject["components"]
             ?.jsonObject
-            ?.containsKey("SpotifyPlayer") == true
+            ?.containsKey("MusicPlayer") == true
     }.getOrDefault(false)
     if (!available) return ""
     return """
-        SPOTIFY PLAYER ROUTING (HIGHEST PRIORITY):
-        When the requested UI concerns Spotify now-playing information, Spotify playback control, or a
-        concrete Spotify track result, do NOT build the layout from Card, Text, List, Row, or Button.
-        Use exactly one native SpotifyPlayer component as the root.
-        It has one required property named `spotify`. Prefer a data binding:
-        {"id":"root","component":"SpotifyPlayer","spotify":{"path":"/spotify"}}
-        Put the snapshot under data.spotify:
-        {"spotify":{"trackUri":"spotify:track:...","title":"Track title",
+        MUSIC PLAYER ROUTING (HIGHEST PRIORITY):
+        When the requested UI concerns now-playing information, playback control, or a concrete
+        track result for ANY music provider (Spotify, NetEase Cloud Music, QQ Music, Apple Music,
+        or another player), do NOT build the layout from Card, Text, List, Row, or Button.
+        Use exactly one native MusicPlayer component as the root.
+        It has one required property named `player`. Prefer a data binding:
+        {"id":"root","component":"MusicPlayer","player":{"path":"/player"}}
+        Put the snapshot under data.player:
+        {"player":{"provider":"Spotify","providerIconUrl":"https://example.com/icon.png",
+        "trackUri":"spotify:track:...","title":"Track title",
         "artist":"Artist one, Artist two","album":"Album name","artworkUrl":"https://i.scdn.co/...",
         "durationMs":258000,"progressMs":72000,"isPlaying":true,
-        "fetchedAtEpochMs":1760000000000,"deviceId":"spotify-device-id",
+        "fetchedAtEpochMs":1760000000000,"deviceId":"device-id",
         "deviceName":"Living room speaker","trackUrl":"https://open.spotify.com/track/...",
         "playbackContext":"now_playing"}}
         Mapping requirements:
-        - trackUri = item.uri; title = item.name; artist = item.artists[].name joined with commas.
-        - album = item.album.name; artworkUrl = the preferred item.album.images[] URL.
-        - durationMs = item.duration_ms; trackUrl = item.external_urls.spotify.
+        - provider = the service's human-readable display name, such as Spotify, 网易云音乐,
+          QQ音乐, or Apple Music.
+        - trackUri and trackUrl are optional; include whichever identifier and web URL the
+          provider or supplied tool returns.
+        - title = track name; artist = joined artist names; album and artworkUrl when available.
+        - durationMs, progressMs, fetchedAtEpochMs, deviceId, and deviceName are optional.
+        - For Spotify: trackUri = item.uri; artist = item.artists[].name joined with commas;
+          album = item.album.name; artworkUrl = the preferred item.album.images[] URL;
+          durationMs = item.duration_ms; trackUrl = item.external_urls.spotify.
         - For spotify_now_playing: progressMs = progress_ms, isPlaying = is_playing,
           fetchedAtEpochMs = fetched_at_ms, deviceId/deviceName from device, playbackContext = now_playing.
         - For a Spotify search/get-track result: progressMs = 0, isPlaying = false,
           fetchedAtEpochMs may be omitted, playbackContext = track_result.
-        - Never invent progress, duration, device, artwork, title, or track URI.
-        - Do not add generic play/pause buttons; SpotifyPlayer emits native Spotify actions.
+        - For other providers, map the equivalent fields from the supplied tool result and omit
+          unknown values.
+        - Never invent progress, duration, device, artwork, title, track identity, or provider.
+        - Do not add generic play/pause buttons; MusicPlayer emits player_toggle_playback and
+          player_next actions.
     """.trimIndent()
 }
 

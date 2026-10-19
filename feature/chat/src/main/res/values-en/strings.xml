@@ -251,14 +251,14 @@
     <string name="chat_weather_condition_wind">Windy</string>
     <string name="chat_weather_condition_unknown">Unknown weather</string>
 
-    <!-- A2UI Spotify player -->
-    <string name="chat_spotify_open">Open Spotify</string>
-    <string name="chat_spotify_next">Next track</string>
-    <string name="chat_spotify_play">Play</string>
-    <string name="chat_spotify_pause">Pause</string>
-    <string name="chat_spotify_artwork">Spotify album artwork</string>
-    <string name="chat_spotify_connect_default">Spotify Connect</string>
-    <string name="chat_spotify_artist_album">%1$s · %2$s</string>
+    <!-- A2UI generic music player -->
+    <string name="chat_player_open">Open player</string>
+    <string name="chat_player_open_named">Open in %1$s</string>
+    <string name="chat_player_next">Next track</string>
+    <string name="chat_player_play">Play</string>
+    <string name="chat_player_pause">Pause</string>
+    <string name="chat_player_artwork">Album artwork</string>
+    <string name="chat_player_generic_name">Music</string>
 
     <!-- A2UI news list -->
     <string name="chat_news_default_heading">Today\'s briefing</string>

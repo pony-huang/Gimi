@@ -5,12 +5,13 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class SpotifyPlayerDataTest {
+class MusicPlayerDataTest {
     @Test
     fun playingSnapshotAdvancesFromFetchedTime() {
         val data = requireNotNull(
-            SpotifyPlayerData.fromA2ui(
+            MusicPlayerData.fromA2ui(
                 mapOf(
+                    "provider" to "Spotify",
                     "trackUri" to "spotify:track:one",
                     "title" to "Night Flight",
                     "artist" to "Artist",
@@ -29,9 +30,10 @@ class SpotifyPlayerDataTest {
     @Test
     fun pausedSnapshotStaysAtKnownPosition() {
         val data = requireNotNull(
-            SpotifyPlayerData.fromA2ui(
+            MusicPlayerData.fromA2ui(
                 mapOf(
-                    "trackUri" to "spotify:track:one",
+                    "provider" to "网易云音乐",
+                    "trackUri" to "netease:track:one",
                     "title" to "Night Flight",
                     "durationMs" to 258_000L,
                     "progressMs" to 42_000L,
@@ -47,15 +49,16 @@ class SpotifyPlayerDataTest {
     @Test
     fun missingSnapshotTimestampKeepsStablePositionAcrossRebinds() {
         val payload = mapOf(
-            "trackUri" to "spotify:track:one",
+            "provider" to "QQ音乐",
+            "trackUri" to "qqmusic:track:one",
             "title" to "Night Flight",
             "durationMs" to 258_000L,
             "progressMs" to 42_000L,
             "isPlaying" to true,
         )
 
-        val first = requireNotNull(SpotifyPlayerData.fromA2ui(payload))
-        val second = requireNotNull(SpotifyPlayerData.fromA2ui(payload))
+        val first = requireNotNull(MusicPlayerData.fromA2ui(payload))
+        val second = requireNotNull(MusicPlayerData.fromA2ui(payload))
 
         assertEquals(0L, first.fetchedAtEpochMs)
         assertEquals(0L, second.fetchedAtEpochMs)
@@ -64,24 +67,35 @@ class SpotifyPlayerDataTest {
     }
 
     @Test
-    fun rejectsPayloadWithoutPlayableIdentityOrDuration() {
-        assertNull(
-            SpotifyPlayerData.fromA2ui(
-                mapOf("title" to "Missing URI", "durationMs" to 1_000L),
+    fun acceptsProviderWithoutPlaybackIdentityOrDuration() {
+        val data = requireNotNull(
+            MusicPlayerData.fromA2ui(
+                mapOf(
+                    "provider" to "Apple Music",
+                    "title" to "Night Flight",
+                    "artist" to "Artist",
+                    "trackUrl" to "https://music.apple.com/us/song/one",
+                ),
             ),
         )
-        assertNull(
-            SpotifyPlayerData.fromA2ui(
-                mapOf("trackUri" to "spotify:track:one", "title" to "Missing duration"),
-            ),
-        )
+
+        assertEquals("Apple Music", data.provider)
+        assertNull(data.trackUri)
+        assertNull(data.durationMs)
+        assertNull(data.positionAt(999_000L))
     }
 
     @Test
-    fun actionPayloadDropsNullContextForMiniPlayerCommand() {
-        val action = spotifyPlayerAction(
-            name = "spotify_next",
+    fun rejectsPayloadWithoutTitle() {
+        assertNull(MusicPlayerData.fromA2ui(mapOf("provider" to "Spotify")))
+    }
+
+    @Test
+    fun actionPayloadDropsNullContextForPlayerCommand() {
+        val action = musicPlayerAction(
+            name = "player_next",
             context = mapOf(
+                "provider" to "Spotify",
                 "trackUri" to "spotify:track:one",
                 "deviceId" to null,
             ),
@@ -89,7 +103,8 @@ class SpotifyPlayerDataTest {
         val event = action.getValue("event") as Map<*, *>
         val context = event["context"] as Map<*, *>
 
-        assertEquals("spotify_next", event["name"])
+        assertEquals("player_next", event["name"])
+        assertEquals("Spotify", context["provider"])
         assertEquals("spotify:track:one", context["trackUri"])
         assertTrue("deviceId" !in context)
     }

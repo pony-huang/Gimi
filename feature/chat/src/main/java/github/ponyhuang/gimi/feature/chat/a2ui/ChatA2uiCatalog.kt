@@ -10,7 +10,7 @@ import coil3.compose.AsyncImage
 /** 聊天宿主的实际目录；导出的 schema 同时作为子 Agent 的能力描述。 */
 internal fun chatA2uiCatalog(openUrl: (String) -> Unit): A2uiCatalog {
     val defaults = MaterialA2uiBasicCatalogV1Defaults
-    val spotifyPlayer = ChatA2uiSpotifyPlayer(openUrl)
+    val musicPlayer = ChatA2uiMusicPlayer(openUrl)
     val newsList = ChatA2uiNewsList(openUrl)
     return A2uiCatalog(
         catalogId = "https://gimi.app/a2ui/catalogs/chat/v1",
@@ -19,7 +19,7 @@ internal fun chatA2uiCatalog(openUrl: (String) -> Unit): A2uiCatalog {
             defaults.divider, ChatA2uiButton, defaults.textField, defaults.checkBox, defaults.choicePicker,
             defaults.slider, defaults.dateTimeInput,
             ChatA2uiWeatherToday, ChatA2uiWeatherForecast,
-            spotifyPlayer,
+            musicPlayer,
             newsList,
             defaults.image { url, description, scale, modifier, onError ->
                 AsyncImage(model = url, contentDescription = description, contentScale = scale,

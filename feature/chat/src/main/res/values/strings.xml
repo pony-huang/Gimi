@@ -261,14 +261,14 @@
     <string name="chat_weather_condition_wind">大风</string>
     <string name="chat_weather_condition_unknown">未知天气</string>
 
-    <!-- A2UI Spotify 播放器 -->
-    <string name="chat_spotify_open">打开 Spotify</string>
-    <string name="chat_spotify_next">下一首</string>
-    <string name="chat_spotify_play">播放</string>
-    <string name="chat_spotify_pause">暂停</string>
-    <string name="chat_spotify_artwork">Spotify 专辑封面</string>
-    <string name="chat_spotify_connect_default">Spotify Connect</string>
-    <string name="chat_spotify_artist_album">%1$s · %2$s</string>
+    <!-- A2UI 通用音乐播放器 -->
+    <string name="chat_player_open">打开播放器</string>
+    <string name="chat_player_open_named">在%1$s中打开</string>
+    <string name="chat_player_next">下一首</string>
+    <string name="chat_player_play">播放</string>
+    <string name="chat_player_pause">暂停</string>
+    <string name="chat_player_artwork">专辑封面</string>
+    <string name="chat_player_generic_name">音乐</string>
 
     <!-- A2UI 新闻列表 -->
     <string name="chat_news_default_heading">今日资讯</string>

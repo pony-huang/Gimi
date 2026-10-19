@@ -28,6 +28,18 @@ internal class SpotifyApi(
 ) {
     private val baseUrl = "https://api.spotify.com/v1"
 
+    /** 检查实际用户会话；网络错误保留为未知，不能把本地残留令牌当作登录成功。 */
+    suspend fun authorizationStatus(): Boolean {
+        if (!auth.hasAccessToken()) return false
+        return try {
+            get("/me") != null
+        } catch (error: SpotifyApiException) {
+            if (error.statusCode == 401) false else throw error
+        } catch (error: IllegalStateException) {
+            if (!auth.hasAccessToken()) false else throw error
+        }
+    }
+
     suspend fun get(path: String, query: Map<String, Any?> = emptyMap()): JSONObject? =
         request("GET", path, query, null)
 

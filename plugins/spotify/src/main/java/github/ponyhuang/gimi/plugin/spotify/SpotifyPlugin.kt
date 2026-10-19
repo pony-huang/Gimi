@@ -15,6 +15,7 @@ import github.ponyhuang.gimi.pluginapi.PluginConfig
 import github.ponyhuang.gimi.pluginapi.PluginConfigAction
 import github.ponyhuang.gimi.pluginapi.PluginConfigActionExecution
 import github.ponyhuang.gimi.pluginapi.PluginConfigField
+import github.ponyhuang.gimi.pluginapi.PluginActionCallbackRequest
 
 /**
  * Spotify plugin — connects the official Web API and injects content tools into the agent:
@@ -43,6 +44,8 @@ class SpotifyPlugin : AgentPlugin {
             ),
         ),
         actions = listOf(
+            PluginConfigAction(id = ACTION_AUTH_STATUS, label = "OAuth status"),
+            PluginConfigAction(id = ACTION_DASHBOARD, label = "Spotify Developer Dashboard ↗"),
             PluginConfigAction(id = ACTION_LOGIN, label = "Authorize Spotify"),
         ),
     )
@@ -88,6 +91,16 @@ class SpotifyPlugin : AgentPlugin {
     }
 
     override suspend fun runConfigAction(actionId: String): PluginConfigActionExecution = when (actionId) {
+        ACTION_DASHBOARD -> PluginConfigActionExecution.AwaitingCallback(
+            PluginActionCallbackRequest(
+                handlerId = "external_url",
+                parameters = mapOf("url" to "https://developer.spotify.com/dashboard"),
+            ),
+        )
+        // 配置页静默读取的状态动作；结果是稳定协议值，不作为 Toast 文案展示。
+        ACTION_AUTH_STATUS -> PluginConfigActionExecution.Completed(
+            PluginActionResult(message = if (api.authorizationStatus()) "authorized" else "unauthorized"),
+        )
         ACTION_LOGIN -> PluginConfigActionExecution.Completed(
             runCatching {
                 performLogin(auth, { clientId }, { clientSecret }, { redirectUri }) { appContext }
@@ -104,7 +117,9 @@ class SpotifyPlugin : AgentPlugin {
     }
 
     companion object {
-        const val ACTION_LOGIN: String = "login"
+        const val ACTION_LOGIN: String = "oauth_login"
+        const val ACTION_AUTH_STATUS: String = "oauth_status"
+        const val ACTION_DASHBOARD: String = "link:developer_dashboard"
         const val KEY_CLIENT_ID: String = "client_id"
         const val KEY_CLIENT_SECRET: String = "client_secret"
         const val KEY_REDIRECT_URI: String = "redirect_uri"

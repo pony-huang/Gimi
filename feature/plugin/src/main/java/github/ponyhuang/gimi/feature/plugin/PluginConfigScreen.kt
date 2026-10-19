@@ -18,6 +18,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -52,6 +53,9 @@ fun PluginConfigRoute(
     LaunchedEffect(pluginId) { viewModel.load(pluginId) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    PluginExternalLinkEffect(state.callback) {
+        viewModel.onAction(PluginConfigAction.DismissActionCallback)
+    }
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
             when (effect) {
@@ -63,8 +67,8 @@ fun PluginConfigRoute(
             }
         }
     }
-    PluginConfigScreen(
-        state = state,
+    PluginOAuthConfigRoute(
+        config = state,
         onAction = viewModel::onAction,
         onBack = onBack,
         modifier = modifier,
@@ -77,6 +81,7 @@ fun PluginConfigScreen(
     onAction: (PluginConfigAction) -> Unit,
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
+    headerContent: @Composable () -> Unit = {},
 ) {
     val callback = state.callback
     PreferenceScaffold(
@@ -113,6 +118,7 @@ fun PluginConfigScreen(
             state = state,
             onAction = onAction,
             modifier = contentModifier.then(modifier),
+            headerContent = headerContent,
         )
     }
 }
@@ -122,6 +128,7 @@ private fun PluginConfigContent(
     state: PluginConfigUiState,
     onAction: (PluginConfigAction) -> Unit,
     modifier: Modifier = Modifier,
+    headerContent: @Composable () -> Unit = {},
 ) {
     PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -140,6 +147,14 @@ private fun PluginConfigContent(
                     // 配置字段与动作整组放进一张卡片，行间靠组件自身间距分隔。
                     PreferenceGroupCard {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            headerContent()
+                            state.actions.filter { it.id.startsWith(CONFIG_LINK_ACTION_PREFIX) }.forEach { action ->
+                                TextButton(
+                                    onClick = { onAction(PluginConfigAction.RunAction(action.id)) },
+                                    enabled = !state.isAnyActionRunning,
+                                    modifier = Modifier.padding(horizontal = 8.dp),
+                                ) { Text(action.label) }
+                            }
                             state.fields.forEach { field ->
                                 when (field.kind) {
                                     PluginConfigFieldDescriptor.Kind.TEXT -> PluginTextField(
@@ -156,7 +171,7 @@ private fun PluginConfigContent(
                                     )
                                 }
                             }
-                            state.actions.forEach { action ->
+                            state.actions.filterNot { it.id.startsWith(CONFIG_LINK_ACTION_PREFIX) }.forEach { action ->
                                 Button(
                                     onClick = { onAction(PluginConfigAction.RunAction(action.id)) },
                                     enabled = !action.running,

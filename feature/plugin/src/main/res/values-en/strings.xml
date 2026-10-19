@@ -17,4 +17,15 @@
     <string name="plugin_uninstall_confirm">Uninstall</string>
     <string name="plugin_uninstall_cancel">Cancel</string>
     <string name="plugin_uninstalled_notice">Plugin uninstalled</string>
+    <string name="plugin_authorization_status">Login status: %1$s</string>
+    <string name="plugin_authorized">Signed in</string>
+    <string name="plugin_unauthorized">Not signed in</string>
+    <string name="plugin_authorization_checking">Checking…</string>
+    <string name="plugin_authorization_failed">Check failed</string>
+    <string name="plugin_authorization_retry">Retry</string>
+    <string name="plugin_oauth_credentials_help">Create an app in the provider’s developer console, then enter the required credentials and redirect URI.</string>
+    <string name="plugin_oauth_reauthorize">Reauthorize</string>
+    <string name="plugin_browser_unavailable">No browser available</string>
+    <string name="plugin_link_invalid">Invalid link address</string>
+    <string name="plugin_opening_link">Opening link…</string>
 </resources>

@@ -17,4 +17,15 @@
     <string name="plugin_uninstall_confirm">卸载</string>
     <string name="plugin_uninstall_cancel">取消</string>
     <string name="plugin_uninstalled_notice">插件已卸载</string>
+    <string name="plugin_authorization_status">登录状态：%1$s</string>
+    <string name="plugin_authorized">已登录</string>
+    <string name="plugin_unauthorized">未登录</string>
+    <string name="plugin_authorization_checking">正在检查…</string>
+    <string name="plugin_authorization_failed">检查失败</string>
+    <string name="plugin_authorization_retry">重试</string>
+    <string name="plugin_oauth_credentials_help">在服务商开发者控制台创建应用，填写所需凭据及回调地址。</string>
+    <string name="plugin_oauth_reauthorize">重新授权</string>
+    <string name="plugin_browser_unavailable">没有可用的浏览器</string>
+    <string name="plugin_link_invalid">链接地址无效</string>
+    <string name="plugin_opening_link">正在打开链接…</string>
 </resources>

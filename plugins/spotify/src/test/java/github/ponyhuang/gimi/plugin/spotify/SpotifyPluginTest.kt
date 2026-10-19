@@ -19,6 +19,14 @@ import org.junit.Test
 class SpotifyPluginTest {
 
     @Test
+    fun dashboardUsesGenericExternalUrlHandler() = runTest {
+        val execution = SpotifyPlugin().runConfigAction(SpotifyPlugin.ACTION_DASHBOARD)
+            as PluginConfigActionExecution.AwaitingCallback
+        assertEquals("external_url", execution.request.handlerId)
+        assertEquals("https://developer.spotify.com/dashboard", execution.request.parameters["url"])
+    }
+
+    @Test
     fun spotifyAuthorizationCompletesWithoutHostCallbackRequest() = runTest {
         val execution = SpotifyPlugin().runConfigAction(SpotifyPlugin.ACTION_LOGIN)
             as PluginConfigActionExecution.Completed

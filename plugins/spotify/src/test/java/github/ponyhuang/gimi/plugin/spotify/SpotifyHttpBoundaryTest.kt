@@ -19,7 +19,10 @@ class SpotifyHttpBoundaryTest {
     private val auth = mockk<SpotifyAuth> {
         every { requireAccessToken() } returns "test-token"
     }
-    private val api = SpotifyApi(mockk(), auth) { url ->
+    private val tokenStore = mockk<TokenStore> {
+        every { refreshToken } returns null
+    }
+    private val api = SpotifyApi(tokenStore, auth) { url ->
         requestedUrl = url
         connection
     }
@@ -27,6 +30,31 @@ class SpotifyHttpBoundaryTest {
     private fun respond(body: String, status: Int = 200) {
         every { connection.responseCode } returns status
         every { connection.inputStream } answers { body.byteInputStream() }
+    }
+
+    @Test
+    fun authorizationWithoutCredentialsDoesNotRequestProfile() = runTest {
+        every { auth.hasAccessToken() } returns false
+        assertFalse(api.authorizationStatus())
+        assertEquals("", requestedUrl)
+    }
+
+    @Test
+    fun authorizationChecksProfileRatherThanTokenPresence() = runTest {
+        every { auth.hasAccessToken() } returns true
+        respond("{}")
+        assertTrue(api.authorizationStatus())
+        assertTrue(requestedUrl.endsWith("/me"))
+        respond("", 401)
+        every { connection.errorStream } answers { "{}".byteInputStream() }
+        assertFalse(api.authorizationStatus())
+    }
+
+    @Test(expected = java.io.IOException::class)
+    fun authorizationNetworkFailureRemainsUnknown() = runTest {
+        every { auth.hasAccessToken() } returns true
+        every { connection.responseCode } throws java.io.IOException("offline")
+        api.authorizationStatus()
     }
 
     @Test

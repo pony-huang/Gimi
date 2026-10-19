@@ -4,6 +4,11 @@ import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.plugin.spotify.SpotifyApi
+import github.ponyhuang.gimi.pluginapi.PluginJson
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import org.json.JSONException
+import java.io.IOException
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -43,7 +48,30 @@ internal fun playbackTools(api: SpotifyApi): List<BaseTool> = listOf(
             intArg(args, "position_ms", 0).takeIf { it > 0 }?.let { body.put("position_ms", it) }
         }
         api.put("/me/player/play", mapOf("device_id" to deviceId), body)
-        mapOf(SpotifyTool.RESULT_KEY to ("Playback started" + (uri?.let { ": $it" } ?: "")))
+        // 控制接口的 2xx 仅说明请求被接受；单独读取状态，不把确认失败变成播放失败。
+        delay(600)
+        val observation = try {
+            mapOf("observed_playback" to PluginJson.toNative(api.get("/me/player")))
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: IOException) {
+            mapOf("verification_error" to error.message)
+        } catch (error: github.ponyhuang.gimi.plugin.spotify.SpotifyApiException) {
+            mapOf("verification_error" to error.message)
+        } catch (error: IllegalStateException) {
+            mapOf("verification_error" to error.message)
+        } catch (error: JSONException) {
+            mapOf("verification_error" to error.message)
+        }
+        mapOf(
+            SpotifyTool.RESULT_KEY to (mapOf(
+                "message" to "Playback request accepted. Check observed_playback and spotify_now_playing; " +
+                    "Spotify state may lag. Do not assume playback started or repeat the command automatically.",
+                "requested_uri" to uri,
+                "device_id" to deviceId,
+                "fetched_at_ms" to System.currentTimeMillis(),
+            ) + observation),
+        )
     },
     spotifyTool(
         name = "spotify_pause",
@@ -122,7 +150,7 @@ internal fun playbackTools(api: SpotifyApi): List<BaseTool> = listOf(
     ) { args ->
         val position = intArg(args, "position_ms", -1)
         if (position < 0) throw IllegalStateException("position_ms must be non-negative")
-        api.post(
+        api.put(
             "/me/player/seek",
             mapOf(
                 "position_ms" to position,
@@ -148,7 +176,7 @@ internal fun playbackTools(api: SpotifyApi): List<BaseTool> = listOf(
         if (state !in listOf("off", "context", "track")) {
             throw IllegalStateException("state must be one of off/context/track")
         }
-        api.post(
+        api.put(
             "/me/player/repeat",
             mapOf("state" to state, "device_id" to (strArg(args, "device_id") ?: "")),
         )
@@ -167,7 +195,7 @@ internal fun playbackTools(api: SpotifyApi): List<BaseTool> = listOf(
         ),
     ) { args ->
         val state = boolArg(args, "state", false)
-        api.post(
+        api.put(
             "/me/player/shuffle",
             mapOf("state" to state, "device_id" to (strArg(args, "device_id") ?: "")),
         )

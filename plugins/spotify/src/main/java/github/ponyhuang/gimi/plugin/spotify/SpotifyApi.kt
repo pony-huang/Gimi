@@ -8,6 +8,7 @@ import java.net.URL
 import java.net.URLEncoder
 import kotlin.math.min
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Spotify Web API 客户端（https://api.spotify.com/v1）— HttpURLConnection + org.json，零第三方依赖。
@@ -23,11 +24,16 @@ import kotlin.random.Random
 internal class SpotifyApi(
     private val tokenStore: TokenStore,
     private val auth: SpotifyAuth,
+    private val openConnection: (String) -> HttpURLConnection = { URL(it).openConnection() as HttpURLConnection },
 ) {
     private val baseUrl = "https://api.spotify.com/v1"
 
     suspend fun get(path: String, query: Map<String, Any?> = emptyMap()): JSONObject? =
         request("GET", path, query, null)
+
+    /** 查询返回顶层数组的接口，避免把布尔数组按对象解析。 */
+    suspend fun getArray(path: String, query: Map<String, Any?> = emptyMap()): JSONArray? =
+        request("GET", path, query, null, arrayResponse = true)?.getJSONArray("items")
 
     suspend fun post(path: String, query: Map<String, Any?> = emptyMap(), body: JSONObject? = null): JSONObject? =
         request("POST", path, query, body)
@@ -58,7 +64,7 @@ internal class SpotifyApi(
                                 .put("device_ids", JSONArray().put(preferredId))
                                 .put("play", false),
                         )
-                        delay(DEVICE_TRANSFER_SETTLE_MS)
+                        delay(DEVICE_TRANSFER_SETTLE_MS.milliseconds)
                     }
                     return preferredId
                 }
@@ -76,7 +82,7 @@ internal class SpotifyApi(
                 .put("device_ids", JSONArray().put(target))
                 .put("play", false),
         )
-        delay(DEVICE_TRANSFER_SETTLE_MS)
+        delay(DEVICE_TRANSFER_SETTLE_MS.milliseconds)
         return target
     }
 
@@ -85,6 +91,7 @@ internal class SpotifyApi(
         path: String,
         query: Map<String, Any?>,
         body: JSONObject?,
+        arrayResponse: Boolean = false,
     ): JSONObject? {
         val url = buildUrl(path, query)
         // 401 重试只有一次：第一次拿到 token 用旧的，发起请求，若服务端说失效则强制刷新后重试。
@@ -102,7 +109,15 @@ internal class SpotifyApi(
             }
             val response = executeRequest(url, method, token, body)
             when (response.statusCode) {
-                in 200..299 -> return response.toResult()
+                in 200..299 -> {
+                    // 播放控制成功只看状态码，不能在操作已执行后因响应体格式而报错或诱发重复操作。
+                    if (method != "GET" && (path == "/me/player" || path.startsWith("/me/player/"))) return null
+                    return if (arrayResponse && response.text.isNotBlank()) {
+                        JSONObject().put("items", JSONArray(response.text))
+                    } else {
+                        response.toResult()
+                    }
+                }
                 401 -> if (!retriedAfterRefresh && !tokenStore.refreshToken.isNullOrBlank()) {
                     retriedAfterRefresh = true
                     attempt++
@@ -117,10 +132,17 @@ internal class SpotifyApi(
                     }
                     retriedAfterRateLimit++
                     attempt++
-                    delay(response.retryAfterMs ?: defaultBackoffMs(retriedAfterRateLimit))
+                    delay((response.retryAfterMs ?: defaultBackoffMs(retriedAfterRateLimit)).milliseconds)
                     continue
                 }
-                else -> throw SpotifyApiException(response.statusCode, response.text)
+                else -> if (response.statusCode == 404 && path.startsWith("/me/player")) {
+                    throw IllegalStateException(
+                        "Spotify playback device or session is unavailable. Open Spotify and keep it active, " +
+                            "then call spotify_get_devices and select an available device before trying again.",
+                    )
+                } else {
+                    throw SpotifyApiException(response.statusCode, response.text)
+                }
             }
         }
     }
@@ -141,10 +163,12 @@ internal class SpotifyApi(
         token: String,
         body: JSONObject?,
     ): HttpResponse {
-        val connection = URL(url).openConnection() as HttpURLConnection
+        val connection = openConnection(url)
         connection.requestMethod = method
         connection.connectTimeout = CONNECT_TIMEOUT_MS
         connection.readTimeout = READ_TIMEOUT_MS
+        connection.useCaches = false
+        connection.setRequestProperty("Cache-Control", "no-cache")
         connection.setRequestProperty("Authorization", "Bearer $token")
         if (body != null) {
             connection.doOutput = true

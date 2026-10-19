@@ -5,11 +5,11 @@ import androidx.a2ui.model.processor.A2uiSurfaceModel
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.a2ui.A2uiSurface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -23,12 +23,13 @@ internal fun ChatA2uiContent(surfaces: List<A2uiSurfaceModel>, failed: Boolean) 
     ChatA2uiTheme {
         Column(Modifier.fillMaxWidth()) {
             surfaces.forEach { surface ->
-                A2uiSurface(
-                    surfaceModel = surface,
-                    modifier = Modifier.fillMaxWidth(),
-                    loadingContent = { CircularProgressIndicator() },
-                    errorContent = { A2uiError() },
-                )
+                key(surface.id) {
+                    A2uiSurface(
+                        surfaceModel = surface,
+                        modifier = Modifier.fillMaxWidth(),
+                        errorContent = { A2uiError() },
+                    )
+                }
             }
             if (failed) A2uiError()
         }

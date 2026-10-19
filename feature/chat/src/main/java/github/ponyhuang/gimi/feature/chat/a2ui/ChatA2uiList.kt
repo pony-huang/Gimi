@@ -79,6 +79,7 @@ internal object ChatA2uiList : A2uiBasicCatalogV1.List {
         AnimatedContent(
             modifier = itemModifier,
             targetState = state,
+            transitionSpec = A2uiSurfaceDefaults.transitionSpec,
             contentKey = { value ->
                 when (value) {
                     is A2uiComponentState.Loading -> "loading"

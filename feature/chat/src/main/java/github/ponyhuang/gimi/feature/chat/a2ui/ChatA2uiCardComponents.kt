@@ -5,7 +5,9 @@ import androidx.a2ui.compose.runtime.A2uiComponentScope
 import androidx.a2ui.compose.runtime.A2uiComponentState
 import androidx.a2ui.compose.ui.A2uiComponent
 import androidx.a2ui.compose.ui.catalog.A2uiBasicCatalogV1
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,9 +24,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.a2ui.A2uiSurfaceDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
@@ -79,11 +83,22 @@ internal object ChatA2uiCard : A2uiBasicCatalogV1.Card {
     ) {
         val state = observeA2uiComponentState(childId)
         ChatA2uiCardFrame(modifier.chatAccessibility(accessibility)) {
-            when (state) {
-                is A2uiComponentState.Loading -> CircularProgressIndicator(Modifier.size(24.dp))
-                is A2uiComponentState.Error -> Text(stringResource(R.string.chat_a2ui_failed),
-                    color = MaterialTheme.colorScheme.error)
-                is A2uiComponentState.Success -> A2uiComponent(component = state.component)
+            AnimatedContent(
+                targetState = state,
+                contentKey = { value -> value.contentKey(childId) },
+                transitionSpec = A2uiSurfaceDefaults.transitionSpec,
+                label = "ChatA2uiCardState",
+                modifier = Modifier.fillMaxWidth(),
+            ) { value ->
+                when (value) {
+                    is A2uiComponentState.Loading -> Box(
+                        Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) { CircularProgressIndicator(Modifier.size(24.dp)) }
+                    is A2uiComponentState.Error -> Text(stringResource(R.string.chat_a2ui_failed),
+                        color = MaterialTheme.colorScheme.error)
+                    is A2uiComponentState.Success -> A2uiComponent(component = value.component)
+                }
             }
         }
     }
@@ -112,30 +127,37 @@ internal object ChatA2uiButton : A2uiBasicCatalogV1.Button {
                     failedCheck?.message?.takeIf { it.isNotBlank() }?.let { error(it) }
                 },
             ) {
-                when (state) {
-                    is A2uiComponentState.Loading -> CircularProgressIndicator(Modifier.size(24.dp))
-                    is A2uiComponentState.Error -> Text(stringResource(R.string.chat_a2ui_failed),
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    is A2uiComponentState.Success -> {
-                        val component = state.component
-                        if (component.type == "Text") {
-                            // 按钮标签沿用原始绑定，仅限制排版，避免窄屏时逐字换行。
-                            val label = with(component.scope) {
-                                component.properties.bind(A2uiBasicCatalogV1.Text.TextProperty)
-                            }.orEmpty()
-                            val textAccessibility = with(component.scope) {
-                                component.properties.bind(A2uiBasicCatalogV1.Text.AccessibilityProperty)
+                AnimatedContent(
+                    targetState = state,
+                    contentKey = { value -> value.contentKey(childId) },
+                    transitionSpec = A2uiSurfaceDefaults.transitionSpec,
+                    label = "ChatA2uiButtonState",
+                ) { value ->
+                    when (value) {
+                        is A2uiComponentState.Loading -> CircularProgressIndicator(Modifier.size(24.dp))
+                        is A2uiComponentState.Error -> Text(stringResource(R.string.chat_a2ui_failed),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        is A2uiComponentState.Success -> {
+                            val component = value.component
+                            if (component.type == "Text") {
+                                // 按钮标签沿用原始绑定，仅限制排版，避免窄屏时逐字换行。
+                                val label = with(component.scope) {
+                                    component.properties.bind(A2uiBasicCatalogV1.Text.TextProperty)
+                                }.orEmpty()
+                                val textAccessibility = with(component.scope) {
+                                    component.properties.bind(A2uiBasicCatalogV1.Text.AccessibilityProperty)
+                                }
+                                Text(label, style = MaterialTheme.typography.labelLarge,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.semantics {
+                                        textAccessibility?.let {
+                                            contentDescription = listOfNotNull(label, it.label, it.description)
+                                                .filter { part -> part.isNotBlank() }.joinToString(" - ")
+                                        }
+                                    })
+                            } else {
+                                A2uiComponent(component = component)
                             }
-                            Text(label, style = MaterialTheme.typography.labelLarge,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.semantics {
-                                    textAccessibility?.let {
-                                        contentDescription = listOfNotNull(label, it.label, it.description)
-                                            .filter { part -> part.isNotBlank() }.joinToString(" - ")
-                                    }
-                                })
-                        } else {
-                            A2uiComponent(component = component)
                         }
                     }
                 }
@@ -146,6 +168,12 @@ internal object ChatA2uiButton : A2uiBasicCatalogV1.Button {
             }
         }
     }
+}
+
+private fun A2uiComponentState.contentKey(childId: String): Any = when (this) {
+    is A2uiComponentState.Loading -> "loading"
+    is A2uiComponentState.Error -> "error"
+    is A2uiComponentState.Success -> "$childId:${component.type}"
 }
 
 @Composable

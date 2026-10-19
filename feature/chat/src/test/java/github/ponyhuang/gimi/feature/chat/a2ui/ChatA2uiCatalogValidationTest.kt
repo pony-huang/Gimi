@@ -13,6 +13,26 @@ import org.junit.Test
  */
 class ChatA2uiCatalogValidationTest {
     @Test
+    fun exportedCatalogValidatesInlineAndBoundDataTablesIncludingEmptyRows() = runTest {
+        val catalog = chatA2uiCatalog(openUrl = {})
+        val capabilities = A2uiCapabilities(catalog.id, catalog.toJsonSchemaString())
+        val table = """{"heading":"用量","columns":[{"label":"模型"},{"label":"费用","align":"end"}],"rows":[["A","¥ 1.20"]]}"""
+        for (property in listOf(table, """{"path":"/table"}""", table.replace("[[\"A\",\"¥ 1.20\"]]", "[]"))) {
+            AndroidxA2uiProtocol().validate(
+                A2uiDocument(
+                    surfaceId = "table-surface",
+                    messages = listOf(
+                        """{"version":"v0.9.1","createSurface":{"surfaceId":"table-surface","catalogId":"${catalog.id}"}}""",
+                        """{"version":"v0.9.1","updateDataModel":{"surfaceId":"table-surface","path":"/","value":{"table":$table}}}""",
+                        """{"version":"v0.9.1","updateComponents":{"surfaceId":"table-surface","components":[{"id":"root","component":"DataTable","table":$property}]}}""",
+                    ),
+                ),
+                capabilities,
+            )
+        }
+    }
+
+    @Test
     fun exportedInteractiveCardCatalogValidatesRepresentativeForm() = runTest {
         val catalog = chatA2uiCatalog(openUrl = {})
         val capabilities = A2uiCapabilities(catalog.id, catalog.toJsonSchemaString())

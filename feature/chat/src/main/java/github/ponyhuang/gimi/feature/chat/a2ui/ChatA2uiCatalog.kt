@@ -21,6 +21,7 @@ internal fun chatA2uiCatalog(openUrl: (String) -> Unit): A2uiCatalog {
             ChatA2uiWeatherToday, ChatA2uiWeatherForecast,
             musicPlayer,
             newsList,
+            ChatA2uiDataTable,
             defaults.image { url, description, scale, modifier, onError ->
                 AsyncImage(model = url, contentDescription = description, contentScale = scale,
                     modifier = modifier, onError = { onError(it.result.throwable) })

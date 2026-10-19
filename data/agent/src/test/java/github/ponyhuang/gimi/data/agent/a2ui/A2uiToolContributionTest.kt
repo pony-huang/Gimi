@@ -61,5 +61,6 @@ class A2uiToolContributionTest {
         assertTrue(requestedWeatherComponent("Show a WeatherForecast card for Shanghai"))
         assertTrue(requestedWeatherComponent("展示上海明天的天气"))
         assertFalse(requestedWeatherComponent("Show a weather story inside a NewsList digest"))
+        assertFalse(requestedWeatherComponent("Show a DataTable comparing historical weather observations"))
     }
 }

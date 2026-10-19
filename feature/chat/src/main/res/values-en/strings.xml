@@ -266,4 +266,11 @@
     <string name="chat_news_count">%1$d items</string>
     <string name="chat_news_open_article">Open article: %1$s</string>
     <string name="chat_news_thumbnail">News thumbnail</string>
+    <!-- A2UI read-only data table -->
+    <string name="chat_table_default_heading">Data table</string>
+    <string name="chat_table_row_count">%1$d rows</string>
+    <string name="chat_table_empty">No data</string>
+    <string name="chat_table_scroll_horizontal">Scroll horizontally to see all columns</string>
+    <string name="chat_table_scroll_vertical">Scroll vertically to see all rows</string>
+    <string name="chat_table_scroll_both">Scroll horizontally for columns, vertically for rows</string>
 </resources>

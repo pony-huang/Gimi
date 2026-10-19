@@ -86,6 +86,16 @@ internal class A2uiGeneration(private val model: Model, private val protocol: A2
                         $weatherRouting
                         $musicPlayerRouting
                         $newsRouting
+                        When the catalog provides DataTable and the request is a comparison, metrics table, or structured
+                        query result, prefer DataTable over manually aligning Text/Row/List components. Keep specialized
+                        weather, news and music requests on their matching native components. DataTable is read-only:
+                        do not use it for editable forms or controls. Use one required table property, preferably
+                        {"id":"root","component":"DataTable","table":{"path":"/table"}}.
+                        Example data: {"table":{"heading":"用量","columns":[{"label":"模型"},
+                        {"label":"请求数","align":"end"}],"rows":[["Model A","128"],["Model B","64"]]}}.
+                        Supply exactly one formatted string per column in every row. Localize labels, numbers, units,
+                        dates and missing-value labels. Use rows:[] for empty results. Do not invent values or truncate
+                        silently: at most 8 columns and 100 rows; narrow the query explicitly for larger results.
                         Catalog: ${capabilities.schemaJson}
                     """.trimIndent()))),
                     tools = listOf(Tool(functionDeclarations = listOf(renderDeclaration))),

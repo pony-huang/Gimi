@@ -4,6 +4,13 @@
 - 分支/worktree：`feature/a2ui` @ `async-foraging-barto`
 - 状态：实现完成，单元测试、Debug 打包、架构检查、真机验证均通过
 
+> 发布生成方案已更新：唯一人工目录为 `data/plugin/src/main/assets/plugin_catalog.json`。
+> `.github/scripts/release_tools.py package` 在验证正式 APK 后生成 Release 附件
+> `plugin-subscription.json`，填充固定版本 `apkUrl`、SHA-256 与字节数，并纳入
+> `SHA256SUMS` 和 Draft 资产完整性检查。根目录重复 JSON 已删除。
+> `pluginVersion` 保留 `AgentPlugin.version` 的接口/行为版本含义，不使用 APK 发布版本覆盖。
+> 下方真机验证记录属于原实现的历史结果；发布方案见 `spec/en/releasing.md`。
+
 ## 1. 背景与需求演进
 
 最初目标是“MCP 商店”。经过多轮确认，最终落地为**插件列表 + 多订阅源**，不再有独立商店页面。关键决策：
@@ -93,7 +100,10 @@ interface PluginSubscriptionStore {
 - 首次启动：仅官方默认源
 - key 存在但为空：表示用户主动清空，保持空列表
 - 默认地址：
-  `https://raw.githubusercontent.com/pony-huang/Gimi/main/plugin-subscription.json`
+  `https://github.com/pony-huang/Gimi/releases/latest/download/plugin-subscription.json`
+
+已有用户保存的订阅列表保持原样；点击“恢复默认源”使用新地址。首个包含该附件的正式版本
+发布前，新地址不可用时使用内置目录。
 
 ### 4.2 目录读取与合并
 
@@ -146,7 +156,8 @@ interface PluginSubscriptionStore {
 
 ## 5. 订阅源文件格式
 
-默认文件：仓库根目录 `plugin-subscription.json`。
+人工目录：`data/plugin/src/main/assets/plugin_catalog.json`；发布输出：
+`temp/release/dist/plugin-subscription.json`（自动生成，不提交）。
 
 ```json
 {
@@ -180,7 +191,7 @@ interface PluginSubscriptionStore {
 说明：
 
 - `name`、`signingCertificateSha256` 当前解析器会忽略；保留未知字段是为了兼容未来扩展。
-- 官方源使用 `releaseAssetPrefix`，从 GitHub 最新 Release 解析 APK。
+- 内置目录使用 `releaseAssetPrefix`，从 GitHub 最新 Release 解析 APK；发布订阅文件优先使用生成的固定版本 APK 直链。
 - 自定义源可直接提供：
   - `apkUrl`：HTTPS APK 直链
   - `sha256`：64 位十六进制
@@ -238,7 +249,7 @@ interface PluginSubscriptionStore {
 - `feature/plugin/.../PluginSubscriptionViewModel.kt`
 - `feature/plugin/src/main/res/drawable/ic_plugin_*.xml`
 - `feature/plugin/src/main/res/drawable-night/ic_plugin_v2ex.xml`
-- `plugin-subscription.json`（默认官方订阅源）
+- Release 附件 `plugin-subscription.json`（从唯一内置目录和已验证 APK 自动生成）
 
 修改：
 
@@ -307,8 +318,8 @@ interface PluginSubscriptionStore {
 
 ## 10. 后续建议
 
-1. **提交并推送 `plugin-subscription.json`**：默认订阅 URL 指向 `main` 分支，未推送前手机端只能使用内置回退目录。
-2. **发布自动化**：如果希望订阅源在每次 Release 自动带上 APK 直链与 SHA-256，可在 `release_tools.py`/`release.yml` 中生成订阅文件并作为 Release 资产上传，默认 URL 改为 `releases/latest/download/plugin-subscription.json`。
+1. **首次发布检查**：发布包含新生成器的正式版本后，验证 latest 订阅附件和固定版本 APK 下载。
+2. **发布自动化已接入**：由 `release_tools.py package` 生成，现有 `release.yml` 的 package/publish 步骤自动上传；默认 URL 使用 `releases/latest/download/plugin-subscription.json`。
 3. **镜像/代理**：国内网络访问 `raw.githubusercontent.com` 可能不稳定，可提供镜像地址或在订阅页添加可达源。
 4. **可选签名固定**：当前按需求移除了签名校验；若后续允许第三方订阅源，建议重新引入“源级证书指纹”或“发布者证书固定”。
 5. **插件更新检测**：当前已安装插件只显示启用开关，不做版本更新提示；后续可基于订阅目录的 `pluginVersion` 增加“可更新”状态。

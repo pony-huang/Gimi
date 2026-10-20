@@ -146,7 +146,7 @@ needed. Plugins bring their own tools and can run an in-app authorization flow.
 
 The project provides these plugin APKs as separate GitHub Release downloads. You can also open
 *Settings → Plugins* to browse the plugin subscription and install them in the app. The default
-subscription is the official `plugin-subscription.json` in this repository; change it from the
+subscription is the release-generated `plugin-subscription.json` attached to the latest stable GitHub Release; change it from the
 subscription icon on the plugin page. Installation downloads the matching APK, verifies its SHA-256,
 and hands it to the system installer. Custom subscription sources are trusted at your own risk.
 

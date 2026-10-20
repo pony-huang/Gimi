@@ -96,10 +96,33 @@ previous published release.
 
 Once every artifact passes, they are uploaded to the Draft Release, attachment names and sizes are
 reviewed, and the release is published. Attachments include the arm64-v8a / universal app APKs, the
-five plugin APKs, `SHA256SUMS`, and `release-metadata.json` carrying the commit, version, and
+five plugin APKs, `plugin-subscription.json`, `SHA256SUMS`, and `release-metadata.json` carrying the commit, version, and
 certificate fingerprint. The main app file name keeps its ABI suffix so the in-app update selection
 works. R8 mapping is kept as an internal Actions Artifact for 90 days and should be archived elsewhere
 before it expires when it is needed long term.
+
+### Plugin subscription generation
+
+Maintain plugin descriptions only in `data/plugin/src/main/assets/plugin_catalog.json`.
+The same file is the app's bundled fallback and the release generator's input; do not maintain a
+second catalog at the repository root. `release_tools.py check` validates the catalog in CI.
+`pluginVersion` describes the plugin interface/behavior version (`AgentPlugin.version`), not the
+APK's shared versionName/versionCode; update it deliberately with the plugin implementation.
+
+The `package` command validates APK package names, versions and signing certificates before
+generating `temp/release/dist/plugin-subscription.json`. It preserves editorial fields and fills
+`apkUrl`, `sha256`, and `sizeBytes` from the validated APKs. URLs point to the exact release tag,
+including RC tags. Missing/empty/oversized APKs, incomplete or duplicate catalog entries, package
+mismatches and invalid metadata stop publication. The generated catalog is included in
+`SHA256SUMS` and the existing draft upload completeness gate. Build retries remove stale dist files.
+
+The app's default subscription is
+`https://github.com/pony-huang/Gimi/releases/latest/download/plugin-subscription.json`.
+Stable releases update this channel; RCs include their own catalog without becoming latest.
+Until the first stable release containing this asset, clients fall back to the bundled catalog.
+Existing saved subscription lists remain user-owned; use “Restore default source” to adopt the new
+URL. Preview local generation using fixture APKs only through the release-tool tests; production
+catalogs are generated from signed artifacts by CI, never committed or manually uploaded.
 
 Stable releases become latest; RCs are marked prerelease and do not affect the app's
 `/releases/latest` update channel. After publishing, check download, in-place install, and core

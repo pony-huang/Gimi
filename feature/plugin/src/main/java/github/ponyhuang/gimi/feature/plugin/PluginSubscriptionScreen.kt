@@ -218,10 +218,10 @@ private fun PluginSubscriptionScreenPreview() {
         PluginSubscriptionScreen(
             state = PluginSubscriptionUiState(
                 urls = listOf(
-                    "https://raw.githubusercontent.com/pony-huang/Gimi/main/plugin-subscription.json",
+                    "https://github.com/pony-huang/Gimi/releases/latest/download/plugin-subscription.json",
                     "https://example.com/team-plugins.json",
                 ),
-                defaultUrl = "https://raw.githubusercontent.com/pony-huang/Gimi/main/plugin-subscription.json",
+                defaultUrl = "https://github.com/pony-huang/Gimi/releases/latest/download/plugin-subscription.json",
             ),
             onAction = {},
         )

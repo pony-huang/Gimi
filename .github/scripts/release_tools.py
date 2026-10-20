@@ -11,6 +11,75 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[2]
 VERSION = re.compile(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc\.([1-9]\d*))?')
 PLUGINS = ('spotify', 'zhihu', 'xiaohongshu', 'v2ex', 'weibo')
+PLUGIN_CATALOG = Path('data/plugin/src/main/assets/plugin_catalog.json')
+
+
+def plugin_catalog(root):
+    catalog = json.loads((root / PLUGIN_CATALOG).read_text(encoding='utf-8'))
+    if not isinstance(catalog, dict) or type(catalog.get('schemaVersion')) is not int or \
+            catalog['schemaVersion'] != 1 or not isinstance(catalog.get('entries'), list):
+        raise ValueError('Unsupported plugin catalog schema')
+    keys = []
+    for entry in catalog['entries']:
+        if not isinstance(entry, dict):
+            raise ValueError('Plugin catalog entry must be an object')
+        key = entry.get('key')
+        if key not in PLUGINS or key in keys:
+            raise ValueError(f'Unknown or duplicate plugin: {key}')
+        keys.append(key)
+        if entry.get('packageName') != f'github.ponyhuang.gimi.plugin.{key}':
+            raise ValueError(f'Unexpected plugin package: {key}')
+        if type(entry.get('pluginVersion')) is not int or entry['pluginVersion'] <= 0:
+            raise ValueError(f'Invalid plugin interface version: {key}')
+        for field in ('title', 'iconKey', 'repoUrl', 'releaseAssetPrefix'):
+            if not isinstance(entry.get(field), str) or not entry[field].strip():
+                raise ValueError(f'Missing plugin {field}: {key}')
+        for field in ('summary', 'description'):
+            localized_text(entry.get(field), key)
+        if not isinstance(entry.get('highlights'), list):
+            raise ValueError(f'Invalid plugin highlights: {key}')
+        for highlight in entry['highlights']:
+            localized_text(highlight, key)
+        if type(entry.get('sortOrder')) is not int or not isinstance(entry.get('tags'), list):
+            raise ValueError(f'Invalid plugin ordering or tags: {key}')
+        if any(not isinstance(tag, str) or not tag.strip() for tag in entry['tags']):
+            raise ValueError(f'Invalid plugin tag: {key}')
+        # 安装信息只能来自本次验证后的产物，避免人工目录残留旧版地址或摘要。
+        if any(entry.get(field) is not None for field in ('apkUrl', 'sha256', 'sizeBytes')):
+            raise ValueError(f'Generated installation fields in source catalog: {key}')
+    if set(keys) != set(PLUGINS):
+        raise ValueError('Catalog must describe every released plugin')
+    return catalog
+
+
+def localized_text(value, key):
+    if not isinstance(value, dict) or any(
+        not isinstance(value.get(locale), str) or not value[locale].strip() for locale in ('zh', 'en')
+    ):
+        raise ValueError(f'Missing localized plugin text: {key}')
+
+
+def write_plugin_subscription(root, destination, repository, version):
+    version_key(version)
+    if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository):
+        raise ValueError('Invalid release repository')
+    catalog = plugin_catalog(root)
+    repo = repository.split('/')[-1]
+    for entry in catalog['entries']:
+        name = f'{repo}-plugin-{entry["key"]}-v{version}.apk'
+        apk = destination / name
+        if not apk.is_file() or not 0 < apk.stat().st_size <= 50 * 1024 * 1024:
+            raise ValueError(f'Missing, empty or oversized plugin APK: {name}')
+        if not name.startswith(entry['releaseAssetPrefix']):
+            raise ValueError(f'Plugin asset prefix does not match release: {entry["key"]}')
+        entry.update(
+            apkUrl=f'https://github.com/{repository}/releases/download/v{version}/{name}',
+            sha256=hashlib.sha256(apk.read_bytes()).hexdigest(),
+            sizeBytes=apk.stat().st_size,
+        )
+    (destination / 'plugin-subscription.json').write_text(
+        json.dumps(catalog, ensure_ascii=False, indent=2) + '\n', encoding='utf-8',
+    )
 
 
 def run(*args):
@@ -103,6 +172,9 @@ def package(aapt, apksigner):
                  f'{repo}-plugin-{name}-v{version}.apk', f'github.ponyhuang.gimi.plugin.{name}') for name in PLUGINS]
     destination = ROOT / 'temp/release/dist'
     destination.mkdir(parents=True, exist_ok=True)
+    # 重试只能发布本轮产物，旧附件不能混进完整性检查与上传列表。
+    for path in destination.iterdir():
+        path.unlink()
     for source, name, application_id in entries:
         if apk_metadata(aapt, source) != (application_id, code, version):
             raise ValueError(f'Unexpected APK metadata: {source}')
@@ -130,6 +202,7 @@ def package(aapt, apksigner):
         'versionName': version, 'versionCode': code, 'commit': run('git', 'rev-parse', 'HEAD'),
         'certificateSha256': fingerprint,
     }, indent=2) + '\n')
+    write_plugin_subscription(ROOT, destination, os.environ['GITHUB_REPOSITORY'], version)
     (destination / 'SHA256SUMS').write_text(''.join(
         f'{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n'
         for path in sorted(destination.iterdir()) if path.name != 'SHA256SUMS'))
@@ -173,6 +246,7 @@ if __name__ == '__main__':
     parser.add_argument('--apksigner')
     args = parser.parse_args()
     if args.command == 'check':
+        plugin_catalog(ROOT)
         version, _ = config()
         notes((ROOT / 'CHANGELOG.md').read_text(), version)
         if args.base_ref and subprocess.run(

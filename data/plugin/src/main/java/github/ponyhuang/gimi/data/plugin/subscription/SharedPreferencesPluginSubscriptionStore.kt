@@ -72,7 +72,7 @@ class SharedPreferencesPluginSubscriptionStore @Inject constructor(
 
     companion object {
         const val DEFAULT_URL: String =
-            "https://raw.githubusercontent.com/pony-huang/Gimi/main/plugin-subscription.json"
+            "https://github.com/pony-huang/Gimi/releases/latest/download/plugin-subscription.json"
 
         private const val PREFS_NAME = "plugin_subscription"
         private const val URLS_KEY = "urls_v1"

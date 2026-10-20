@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -63,6 +62,7 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
@@ -85,7 +85,9 @@ import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
-private const val COMPACT_SHEET_ITEM_LIMIT: Int = 3
+/** 列表上限与模型选择抽屉一致，内容较少时不强制撑高。 */
+private val ToolSheetListMaxHeight = 380.dp
+private const val ToolSheetListHeightFraction = 0.55f
 
 private enum class AddToChatPage {
     HOME,
@@ -120,6 +122,8 @@ internal fun ChatAddToChatSheet(
         GimiBottomSheet(onDismissRequest = onDismiss) {
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                 val maximumPageHeight = maxHeight * 0.92f
+                val toolListMaxHeight = (maxHeight * ToolSheetListHeightFraction)
+                    .coerceAtMost(ToolSheetListMaxHeight)
                 AnimatedContent(
                     targetState = page,
                     transitionSpec = {
@@ -151,19 +155,8 @@ internal fun ChatAddToChatSheet(
                         modifier = Modifier.fillMaxWidth(),
                         contentAlignment = Alignment.TopCenter,
                     ) {
-                        val isFullHeightPage = when (currentPage) {
-                            AddToChatPage.MCP -> state.mcpServers.size > COMPACT_SHEET_ITEM_LIMIT
-                            AddToChatPage.OFFICIAL_TOOL -> state.officialTools.sumOf { it.functions.size } >
-                                COMPACT_SHEET_ITEM_LIMIT
-                            else -> false
-                        }
-                        val pageHeightModifier = if (isFullHeightPage) {
-                            Modifier.height(maximumPageHeight)
-                        } else {
-                            Modifier.wrapContentHeight()
-                        }
                         Column(
-                            modifier = pageHeightModifier
+                            modifier = Modifier.wrapContentHeight()
                                 .widthIn(max = 640.dp),
                         ) {
                             GimiBottomSheetHeader(
@@ -230,11 +223,13 @@ internal fun ChatAddToChatSheet(
                                 AddToChatPage.MCP -> McpServersPage(
                                     state = state,
                                     onEnabledChange = onMcpServerEnabledChange,
+                                    listMaxHeight = toolListMaxHeight,
                                 )
                                 AddToChatPage.OFFICIAL_TOOL -> OfficialToolsDetailPage(
                                     state = state,
                                     onFunctionEnabledChange = onOfficialToolFunctionEnabledChange,
                                     onRetry = onOfficialToolFunctionsRetry,
+                                    listMaxHeight = toolListMaxHeight,
                                 )
                             }
                         }
@@ -524,11 +519,11 @@ private fun OfficialToolsDetailPage(
     state: ChatAddToChatState,
     onFunctionEnabledChange: (String, String, Boolean) -> Unit,
     onRetry: (String) -> Unit,
+    listMaxHeight: Dp = ToolSheetListMaxHeight,
 ) {
     val totalFunctions = state.officialTools.sumOf { it.functions.size }
-    val isScrollable = totalFunctions > COMPACT_SHEET_ITEM_LIMIT
     Column(
-        modifier = (if (isScrollable) Modifier.fillMaxSize() else Modifier.wrapContentHeight())
+        modifier = Modifier.fillMaxWidth().wrapContentHeight()
             .testTag("official-tools-detail"),
     ) {
         PageStatus(state)
@@ -562,7 +557,9 @@ private fun OfficialToolsDetailPage(
                     state = listState,
                     contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
                     modifier = Modifier
-                        .then(if (isScrollable) Modifier.fillMaxSize() else Modifier.wrapContentHeight())
+                        .fillMaxWidth()
+                        .heightIn(max = listMaxHeight)
+                        .wrapContentHeight()
                         .nestedScroll(rememberLowerBoundaryNestedScrollConnection(listState)),
                 ) {
                     state.officialTools.groupBy { it.sourceServiceId }.values
@@ -660,8 +657,8 @@ private fun ErrorState(message: String, onRetry: () -> Unit, compact: Boolean = 
 private fun EmptyCenteredMessage(message: String) {
     Column(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 36.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 36.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -696,19 +693,19 @@ private fun OfficialToolFunctionRow(
 private fun McpServersPage(
     state: ChatAddToChatState,
     onEnabledChange: (String, Boolean) -> Unit,
+    listMaxHeight: Dp = ToolSheetListMaxHeight,
 ) {
     val listState = rememberLazyListState()
-    val isScrollable = state.mcpServers.size > COMPACT_SHEET_ITEM_LIMIT
     Column(
-        modifier = (if (isScrollable) Modifier.fillMaxSize() else Modifier.wrapContentHeight())
+        modifier = Modifier.fillMaxWidth().wrapContentHeight()
             .testTag("session-mcp-page"),
     ) {
         PageStatus(state)
         if (state.mcpServers.isEmpty()) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 36.dp),
+                    .fillMaxWidth()
+                    .padding(horizontal = 36.dp, vertical = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
@@ -735,7 +732,9 @@ private fun McpServersPage(
                 state = listState,
                 contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
                 modifier = Modifier
-                    .then(if (isScrollable) Modifier.fillMaxSize() else Modifier.wrapContentHeight())
+                    .fillMaxWidth()
+                    .heightIn(max = listMaxHeight)
+                    .wrapContentHeight()
                     .nestedScroll(rememberLowerBoundaryNestedScrollConnection(listState)),
             ) {
                 itemsIndexed(state.mcpServers, key = { _, server -> server.id }) { index, server ->

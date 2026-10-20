@@ -1,5 +1,11 @@
 # Repository Guidelines
 
+## No Desktop Control
+
+- Work through source files, command-line tools, and non-UI APIs. Do not use Computer Use, desktop screenshots or accessibility inspection, window activation, mouse/keyboard injection, or equivalent scripts to inspect or control the user's computer.
+- IDE MCP calls that read project information or run builds without desktop interaction remain allowed. Android device/emulator CLI workflows follow the Android tooling rules below; they do not authorize desktop control.
+- When a step requires desktop interaction, explain the specific action for the user to perform manually, and continue independent work. Use command-line or headless rendering for Compose previews; if unavailable, report the blocker and agree on an alternative without automating the IDE UI.
+
 ## Structure, Ownership, and Architecture
 
 ### Module map
@@ -144,7 +150,7 @@ Android Studio may run the `app` debug configuration on a device or emulator.
 - Inspect the run output and, when returned, `fullOutputPath` until compilation reaches a terminal result. A successful MCP invocation or `Jugg compile started` only confirms startup. Report incremental compilation, Jugg's automatic Gradle fallback, deployment, and device verification separately; `No file changes` followed by Gradle fallback is not an incremental compile success.
 - If the IDE MCP route or required Jugg configuration is unavailable, try the Jugg CLI; if Jugg is unavailable, use conventional Gradle/Android CLI commands. For Jugg failures, inspect and report the cause before falling back under the rules below. Inspect Jugg's resolved command: it may run `:app:assembleDebug` with the configuration cache disabled rather than a narrow compile.
 - For JVM tests and required Gradle checks that Jugg's incremental path cannot establish, choose the smallest targets satisfying the testing rules below and combine compatible targets in one `gradlew.bat` invocation when practical. Existing Gradle commands remain the fallback and required-check reference. When a change requires both JVM tests and APK assembly, finish the focused tests and resolve their failures before starting assembly; combine compatible compile/test targets within that stage.
-- If Jugg produces no new output or progress for 30–60 seconds, inspect Android Studio's window and owned dialogs, the output file, and the actual running build before retrying. A `Build Files Changed Confirm` dialog can block compilation; a missing device alone does not establish the cause. Resolve the observed prompt using the current diff and baseline, and resume the existing task rather than launching another waiting compile. Open or foreground Android Studio when needed; record the concrete blocker before taking a documented fallback.
+- If Jugg produces no new output or progress for 30–60 seconds, inspect the output file and running build through command-line or non-UI APIs before retrying. A `Build Files Changed Confirm` dialog can block compilation; a missing device alone does not establish the cause. If available evidence indicates an IDE prompt, ask the user to inspect and resolve it manually using the current diff and baseline. Resume the existing task rather than launching another waiting compile; record the blocker before taking a documented fallback.
 - If Jugg's embedded Kotlin compiler reports `INTERNAL_ERROR` with `Could not find installation home path` / missing `product-info.json`, classify it as an IDE/Jugg compiler-environment failure, not a Kotlin source error. Retry the incremental compiler at most once; if it repeats, validate with the required Gradle targets and report the Jugg failure separately.
 - If Jugg reports `READY_FULL_COMPILE (build.gradle.kts changed)`, inspect both `git diff` for build scripts and Jugg's `getLastBuildFile ... exists: false` entries. Missing Jugg history can trigger this verdict even when this task changed no build script. Accept one full build to re-establish the baseline, or use direct Gradle for compile-only validation; do not repeatedly retry incremental compile against the same state or delete build artifacts to force it.
 - Changes to Hilt/Room annotations, generated code, or bytecode transforms need the Gradle build required by the testing rules; Jugg's source-to-dex incremental path does not rerun every processor or transform. Keep one build running at a time.
@@ -182,7 +188,7 @@ Android Studio may run the `app` debug configuration on a device or emulator.
 ### Refactoring
 
 - Refactor one closed capability at a time; preserve behavior and keep logical commits independently compilable and revertible.
-- Use IDE Refactor Move or `git mv`. Move-only commits change only paths, packages, imports, and necessary visibility. Inspect `git diff --find-renames --summary`, compile affected modules, and remove empty legacy package directories.
+- Use `git mv` for moves. Move-only commits change only paths, packages, imports, and necessary visibility. Inspect `git diff --find-renames --summary`, compile affected modules, and remove empty legacy package directories.
 - This project is in the development and exploration stage. Do not preserve old databases, serialized payloads, configuration fields, APIs, or compatibility adapters unless the user explicitly requests it; choose the cleanest current design, allow destructive local-data recreation, and do not add historical migrations.
 - Do not leave forwarding wrappers, duplicate implementations, or legacy adapters without an explicit current requirement.
 - Avoid drive-by package moves or broad unrelated cleanup.

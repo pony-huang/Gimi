@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.data.agent
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
+import com.google.adk.kt.logging.LoggerFactory
 import com.google.adk.kt.tools.Toolset
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -53,6 +54,13 @@ class McpToolsetRegistry @Inject constructor(
                         isGloballyEnabled = server.isEnabled,
                         toolset = server.toMcpToolset(),
                     )
+                }.onFailure { failure ->
+                    // 官方 MCP 在创建阶段反射检查 SDK/引擎；Release 缺类不能静默变成空工具集。
+                    // 仅记录异常类型，避免端点或认证信息通过原始异常正文进入日志。
+                    logger.warn {
+                        "Unable to create MCP toolset for server ${server.id}: " +
+                            "${failure.javaClass.simpleName}, cause=${failure.cause?.javaClass?.simpleName}"
+                    }
                 }.getOrNull()
             }
 
@@ -92,6 +100,7 @@ class McpToolsetRegistry @Inject constructor(
 
     private companion object {
         const val MAX_CACHED_SELECTIONS: Int = 4
+        val logger = LoggerFactory.getLogger(McpToolsetRegistry::class)
     }
 }
 

@@ -164,6 +164,15 @@
 # DefaultConstructorMarker 的合成默认参构造函数；host 自身可能不调用同一变体，R8 会把它
 # 剥掉，插件加载即抛 NoSuchMethodError。这里显式保留所有 <init>，补齐插件 ABI。
 -keepclassmembers class com.google.adk.kt.** { <init>(...); }
+
+# Official Android MCP checks these compileOnly runtime dependencies with
+# Class.forName through a loader lambda before creating its Toolset. The ADK
+# tools keep rule above does not make the external SDK/engine classes keep
+# roots. Keep these two lookup targets against removal and class merging;
+# -dontobfuscate alone only preserves names of classes that survive shrinking.
+-keep class io.modelcontextprotocol.kotlin.sdk.client.Client { *; }
+-keep class io.ktor.client.engine.okhttp.OkHttp { *; }
+
 # plugin-api ABI classes must be full shrink roots in the host APK: plugins
 # compile against the original names and resolve them parent-first via the host
 # classloader. (Previously this was implicit via the whole-app `{ *; }` keep.)

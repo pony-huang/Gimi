@@ -2,6 +2,46 @@
 
 版本 PR 根据 Conventional Commits 自动生成后续版本记录；合并前请整理用户可见的变化与升级注意事项。
 
+## [0.13.0](https://github.com/pony-huang/Gimi/compare/v0.12.2...v0.13.0) (2026-10-20)
+
+
+### Features
+
+* **a2ui:** add native news list component ([2396cff](https://github.com/pony-huang/Gimi/commit/2396cff79ed922c3224731a1bbf5db0015710f98))
+* **a2ui:** add native read-only data table ([2412cee](https://github.com/pony-huang/Gimi/commit/2412ceeaab767b92e0cd59a83da7e1ae1a8e02c3))
+* **a2ui:** add native weather cards and routing ([46abe03](https://github.com/pony-huang/Gimi/commit/46abe03f0c0f0d2851bc6174c98ed20adaae3e40))
+* **a2ui:** add Spotify mini player ([90ee2be](https://github.com/pony-huang/Gimi/commit/90ee2bec78b476f4adfcfb66163ab951c475b0ae))
+* **a2ui:** animate surface child state transitions ([5887aae](https://github.com/pony-huang/Gimi/commit/5887aae170ab4ac2177018e883ec901470055f74))
+* **a2ui:** generalize player card to any music provider ([ba14fb5](https://github.com/pony-huang/Gimi/commit/ba14fb5dac56926761a6c69cc9954e5f381a0412))
+* **a2ui:** refine card styling and input generation guidance ([bc8da6b](https://github.com/pony-huang/Gimi/commit/bc8da6b3e917d554819e3eb404e6a3dcb11d7fb4))
+* **a2ui:** require controls for state-changing requests ([0dfb174](https://github.com/pony-huang/Gimi/commit/0dfb174d1c16c0ee1a998a8316855bc67636125c))
+* **chat:** integrate A2UI native agent surfaces ([766329a](https://github.com/pony-huang/Gimi/commit/766329af2491ae9d369f0fe4a103572813033738))
+* **chat:** move run progress into tool timeline with elapsed time ([6b41c88](https://github.com/pony-huang/Gimi/commit/6b41c88077756cbd38ad541cc451278ba4714848))
+* **chat:** streamline run status and activity summary ([0d89a4f](https://github.com/pony-huang/Gimi/commit/0d89a4f6157acd3d4b3adf4604afac53defe8233))
+* **chat:** support A2UI media components ([77951fe](https://github.com/pony-huang/Gimi/commit/77951fe625f31ec887fd4603b574a5f9656fc7ec))
+* **plugin:** add reusable OAuth status and external links ([cd423d3](https://github.com/pony-huang/Gimi/commit/cd423d37c1bebf9537d39210f5d469aff5cba0ab))
+* **plugin:** add subscription-based plugin list and details ([8f34da1](https://github.com/pony-huang/Gimi/commit/8f34da10ac8895e076ca0e2b9874fedc733a660c))
+* **plugin:** generate subscription catalog from release APKs ([31655c3](https://github.com/pony-huang/Gimi/commit/31655c3e574bc4d15f2dbec72aed21163f1ac962))
+* **plugin:** merge subscription-based plugin catalog ([a1994ed](https://github.com/pony-huang/Gimi/commit/a1994ed22a5ce01e55ad3b29f609bf0a310c9170))
+* **plugins:** add Weibo and Zhihu setup links ([3d181dd](https://github.com/pony-huang/Gimi/commit/3d181ddc08c2148996ca9e7ea352cdefdc607c0f))
+* **v2ex:** add token settings link ([95c53c3](https://github.com/pony-huang/Gimi/commit/95c53c3f9aacba530f807691c71fab42a752689c))
+
+
+### Bug Fixes
+
+* **a2ui:** preserve surface bindings on form submission ([b447297](https://github.com/pony-huang/Gimi/commit/b4472975b3cfc65174ba75008b84c64bf1779aec))
+* **a2ui:** use official media controls and center footer actions ([6d4d1b2](https://github.com/pony-huang/Gimi/commit/6d4d1b2d69ff2db918471c1eec8d07810412db6f))
+* **agent:** handle tool history after cancellation ([491aefb](https://github.com/pony-huang/Gimi/commit/491aefbb864282abf41bdea2161eac41f938ad6a))
+* **chat:** blend collapsed activity panel into background ([2a8fcca](https://github.com/pony-huang/Gimi/commit/2a8fcca4bab2f50a3af71533ef2635275e87ef3a))
+* **chat:** constrain tool sheet list heights ([e9be027](https://github.com/pony-huang/Gimi/commit/e9be027482b3cc056cf7e88b0ad5f6ec5528dcea))
+* **chat:** hide card action placeholder bubbles ([cd27b6a](https://github.com/pony-huang/Gimi/commit/cd27b6a84d70cebd775c3008b287c0e3d95a4f8d))
+* **chat:** inset assistant text from composer ([a9944b9](https://github.com/pony-huang/Gimi/commit/a9944b905ae37fb58e68af097fc403bac6d7e3c0))
+* **chat:** unify progress panel and align expansion arrow ([6af35cb](https://github.com/pony-huang/Gimi/commit/6af35cb783c3568177dc98be0376418bd451b46b))
+* **chat:** widen assistant message text ([fe7c38a](https://github.com/pony-huang/Gimi/commit/fe7c38adbb08827ac0c1db87ba008ac84d4b8369))
+* **spotify:** correct API requests and playback reporting ([6dded32](https://github.com/pony-huang/Gimi/commit/6dded3284a90b79695bbbd562fa26b9e7b1ebd6e))
+* use typed dropdown anchors to prevent settings crashes ([3b7239e](https://github.com/pony-huang/Gimi/commit/3b7239e5c482d95be124b4e60e38fed30cd203c2))
+* **workspace:** align cache page terminology ([e178959](https://github.com/pony-huang/Gimi/commit/e178959419b4338c3c89ce4068375c9f370ed922))
+
 ## [0.12.2](https://github.com/pony-huang/Gimi/compare/v0.12.1...v0.12.2) (2026-10-17)
 
 

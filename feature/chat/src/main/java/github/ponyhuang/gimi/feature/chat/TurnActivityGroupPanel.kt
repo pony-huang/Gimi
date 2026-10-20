@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,12 +83,17 @@ internal fun TurnActivityGroupPanel(
         steps.size,
     )
 
-    // 状态行与详情共用一个 Surface，展开时只改变外轮廓，不再叠放两个边框。
+    // 收起时融入聊天背景，展开后由同一个 Surface 包含状态与详情。
     Surface(
         modifier = if (expanded && steps.isNotEmpty()) modifier.fillMaxWidth() else modifier,
         shape = RoundedCornerShape(if (expanded && steps.isNotEmpty()) 16.dp else 50.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+        color = if (expanded) MaterialTheme.colorScheme.surfaceContainerLow else Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = if (expanded) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
+        } else {
+            null
+        },
     ) {
         Column {
             Row(

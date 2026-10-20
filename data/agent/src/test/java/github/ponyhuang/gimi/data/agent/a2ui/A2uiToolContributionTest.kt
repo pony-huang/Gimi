@@ -48,9 +48,9 @@ class A2uiToolContributionTest {
     @Test
     fun newsDigestMentioningRainAndTemperatureDoesNotRequireWeatherCard() {
         val changes = """
-            Render native NewsList component for today's news digest.
+            Render today's news digest.
             Article: 12 provinces will see heavy rain and temperatures dropping by 8°C.
-            Another article covers the weather forecast for northern China.
+            Another article covers weather conditions in northern China.
         """.trimIndent()
 
         assertFalse(requestedWeatherComponent(changes))
@@ -60,7 +60,7 @@ class A2uiToolContributionTest {
     fun explicitWeatherUiStillRequiresNativeWeatherComponent() {
         assertTrue(requestedWeatherComponent("Show a WeatherForecast card for Shanghai"))
         assertTrue(requestedWeatherComponent("展示上海明天的天气"))
-        assertFalse(requestedWeatherComponent("Show a weather story inside a NewsList digest"))
+        assertFalse(requestedWeatherComponent("Show a weather story inside a news digest"))
         assertFalse(requestedWeatherComponent("Show a DataTable comparing historical weather observations"))
     }
 }

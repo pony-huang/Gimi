@@ -123,34 +123,4 @@ class ChatA2uiCatalogValidationTest {
 
         AndroidxA2uiProtocol().validate(document, capabilities)
     }
-
-    @Test
-    fun exportedCatalogValidatesNewsListPayload() = runTest {
-        val catalog = chatA2uiCatalog(openUrl = {})
-        val capabilities = A2uiCapabilities(catalog.id, catalog.toJsonSchemaString())
-        val document = A2uiDocument(
-            surfaceId = "news-surface",
-            messages = listOf(
-                """{"version":"v0.9.1","createSurface":{"surfaceId":"news-surface","catalogId":"${catalog.id}","sendDataModel":true}}""",
-                """{"version":"v0.9.1","updateDataModel":{"surfaceId":"news-surface","path":"/","value":{
-                  "news":{
-                    "heading":"今日要闻",
-                    "updatedAt":"12:11",
-                    "icon":"globe",
-                    "items":[
-                      {"title":"Headline one","source":"Reuters","timeLabel":"12:08",
-                       "category":"Technology","url":"https://example.com/1"},
-                      {"title":"Headline two","source":"Xinhua","timeLabel":"11:42",
-                       "category":"City","url":"https://example.com/2"}
-                    ]
-                  }
-                }}}""",
-                """{"version":"v0.9.1","updateComponents":{"surfaceId":"news-surface","components":[
-                  {"id":"root","component":"NewsList","news":{"path":"/news"}}
-                ]}}""",
-            ),
-        )
-
-        AndroidxA2uiProtocol().validate(document, capabilities)
-    }
 }

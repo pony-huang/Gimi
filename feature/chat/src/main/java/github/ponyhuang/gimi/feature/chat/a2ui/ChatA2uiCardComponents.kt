@@ -7,7 +7,6 @@ import androidx.a2ui.compose.ui.A2uiComponent
 import androidx.a2ui.compose.ui.catalog.A2uiBasicCatalogV1
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -28,9 +26,7 @@ import androidx.compose.material3.a2ui.A2uiSurfaceDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
@@ -70,37 +66,6 @@ internal object ChatA2uiText : A2uiBasicCatalogV1.Text {
                 }
             },
         )
-    }
-}
-
-/** 仅替换目录中的卡片外观，子组件仍由官方运行时解析和绑定。 */
-internal object ChatA2uiCard : A2uiBasicCatalogV1.Card {
-    @Composable
-    override fun A2uiComponentScope.TypedContent(
-        childId: String,
-        accessibility: A2uiBasicCatalogV1.AccessibilityAttributes?,
-        modifier: Modifier,
-    ) {
-        val state = observeA2uiComponentState(childId)
-        ChatA2uiCardFrame(modifier.chatAccessibility(accessibility)) {
-            AnimatedContent(
-                targetState = state,
-                contentKey = { value -> value.contentKey(childId) },
-                transitionSpec = A2uiSurfaceDefaults.transitionSpec,
-                label = "ChatA2uiCardState",
-                modifier = Modifier.fillMaxWidth(),
-            ) { value ->
-                when (value) {
-                    is A2uiComponentState.Loading -> Box(
-                        Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center,
-                    ) { CircularProgressIndicator(Modifier.size(24.dp)) }
-                    is A2uiComponentState.Error -> Text(stringResource(R.string.chat_a2ui_failed),
-                        color = MaterialTheme.colorScheme.error)
-                    is A2uiComponentState.Success -> A2uiComponent(component = value.component)
-                }
-            }
-        }
     }
 }
 
@@ -177,20 +142,6 @@ private fun A2uiComponentState.contentKey(childId: String): Any = when (this) {
 }
 
 @Composable
-private fun ChatA2uiCardFrame(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = if (MaterialTheme.colorScheme.surface.luminance() < 0.5f) 1.dp else 2.dp,
-        ),
-    ) {
-        Column(Modifier.padding(14.dp)) { content() }
-    }
-}
-
-@Composable
 private fun ChatA2uiActionButton(
     variant: A2uiBasicCatalogV1.Button.Variant,
     enabled: Boolean,
@@ -225,11 +176,11 @@ private fun Modifier.chatAccessibility(
 @Preview(showBackground = true, widthDp = 360, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Preview(showBackground = true, widthDp = 280, fontScale = 1.3f)
 @Composable
-private fun ChatA2uiCardStylePreview() {
+private fun ChatA2uiControlsPreview() {
     AsssistantaiTheme {
         ChatA2uiTheme {
             Column(Modifier.padding(16.dp)) {
-                ChatA2uiCardFrame {
+                Card {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("自定义闹钟", style = MaterialTheme.typography.titleMedium)
                         Text("选择时间，确认后设定闹钟。", style = MaterialTheme.typography.bodyLarge)

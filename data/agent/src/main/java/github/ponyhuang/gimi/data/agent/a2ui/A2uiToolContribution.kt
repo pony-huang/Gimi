@@ -124,12 +124,12 @@ internal class GenerateA2uiTool(
 /**
  * 只有“请求本身”是天气界面时才强制天气组件。
  *
- * 新闻摘要可能包含降雨、气温等词，不能因此把 NewsList 误判成天气请求；
+ * 新闻摘要可能包含降雨、气温等词，不能因此把新闻摘要误判成天气请求；
  * 显式选择其他原生组件时，天气关键词只作为内容事实处理。
  */
 internal fun requestedWeatherComponent(changes: Any?): Boolean {
     val text = changes as? String ?: return false
-    if (listOf("NewsList", "MusicPlayer", "DataTable").any { text.contains(it, ignoreCase = true) }) {
+    if (listOf("MusicPlayer", "DataTable").any { text.contains(it, ignoreCase = true) }) {
         return false
     }
     val lead = text.take(600)

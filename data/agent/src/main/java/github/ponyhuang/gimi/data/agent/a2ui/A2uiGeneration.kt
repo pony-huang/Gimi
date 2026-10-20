@@ -18,7 +18,6 @@ internal class A2uiGeneration(private val model: Model, private val protocol: A2
         var correction = ""
         val weatherRouting = weatherRoutingInstructions(capabilities)
         val musicPlayerRouting = musicPlayerRoutingInstructions(capabilities)
-        val newsRouting = newsRoutingInstructions(capabilities)
         repeat(2) { attempt ->
             val request = LlmRequest(
                 model = model,
@@ -85,10 +84,9 @@ internal class A2uiGeneration(private val model: Model, private val protocol: A2
                         Before calling render_a2ui, review the tree for narrow-screen readability and remove redundant elements.
                         $weatherRouting
                         $musicPlayerRouting
-                        $newsRouting
                         When the catalog provides DataTable and the request is a comparison, metrics table, or structured
                         query result, prefer DataTable over manually aligning Text/Row/List components. Keep specialized
-                        weather, news and music requests on their matching native components. DataTable is read-only:
+                        weather and music requests on their matching native components. DataTable is read-only:
                         do not use it for editable forms or controls. Use one required table property, preferably
                         {"id":"root","component":"DataTable","table":{"path":"/table"}}.
                         Example data: {"table":{"heading":"用量","columns":[{"label":"模型"},
@@ -252,42 +250,6 @@ private fun musicPlayerRoutingInstructions(capabilities: A2uiCapabilities): Stri
         - Never invent progress, duration, device, artwork, title, track identity, or provider.
         - Do not add generic play/pause buttons; MusicPlayer emits player_toggle_playback and
           player_next actions.
-    """.trimIndent()
-}
-
-/**
- * 目录包含 NewsList 时，要求新闻/资讯摘要使用原生列表组件。
- *
- * 组件固定显示 5 条并在卡片内滚动，因此模型只需提供完整的编辑顺序和原文链接，
- * 不要再用多个 Card/Text 组件重复搭建列表。
- */
-private fun newsRoutingInstructions(capabilities: A2uiCapabilities): String {
-    val available = runCatching {
-        Json.parseToJsonElement(capabilities.schemaJson)
-            .jsonObject["components"]
-            ?.jsonObject
-            ?.containsKey("NewsList") == true
-    }.getOrDefault(false)
-    if (!available) return ""
-    return """
-        NEWS LIST ROUTING (HIGHEST PRIORITY):
-        When the requested UI concerns news, latest headlines, current events, or an information
-        digest, do NOT build the layout from Card, Text, List, Row, or Button.
-        Use exactly one native NewsList component as the root.
-        It has one required property named `news`. Prefer a data binding:
-        {"id":"root","component":"NewsList","news":{"path":"/news"}}
-        Put the digest under data.news:
-        {"news":{"heading":"今日要闻","updatedAt":"12:11","icon":"newspaper","items":[
-        {"title":"Headline from the source","source":"Reuters","timeLabel":"12:08",
-        "category":"Technology","imageUrl":"https://...","url":"https://..."}]}}
-        Requirements:
-        - Use only articles and URLs returned by tools; never invent headlines, sources, or links.
-        - Preserve editorial order; include at most 20 items.
-        - Each item requires a title. source, timeLabel, category, imageUrl, and url are optional.
-        - icon is optional and accepts newspaper, article, globe, trending, campaign, or bolt.
-        - The component shows five items and scrolls internally for the rest.
-        - NewsList takes precedence over weather keywords contained inside the articles.
-        - Do not duplicate the news list in Markdown after rendering the component.
     """.trimIndent()
 }
 

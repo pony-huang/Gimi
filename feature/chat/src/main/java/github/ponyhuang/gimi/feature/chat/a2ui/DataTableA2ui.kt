@@ -41,7 +41,7 @@ internal object ChatA2uiDataTable : A2uiComponent {
     override val name = "DataTable"
     override val description = "Native read-only data table for comparisons, metrics and structured query results. " +
         "Use for tabular information instead of recreating aligned rows with Text/Row/List. " +
-        "Use specialized weather, news and music components when they match the request. " +
+        "Use specialized weather and music components when they match the request. " +
         "Supports a fixed header, horizontal scrolling for wide tables and internal vertical scrolling."
     override val properties = listOf(DataTableA2uiProperty)
 

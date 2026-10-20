@@ -1,23 +1,77 @@
 package github.ponyhuang.gimi.feature.plugin
 
+import github.ponyhuang.gimi.domain.plugin.model.PluginCatalogEntry
+import github.ponyhuang.gimi.domain.plugin.model.PluginCatalogSource
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigFieldDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
+import github.ponyhuang.gimi.domain.plugin.model.PluginInstallFailure
+
+/** 单个条目的安装阶段；失败状态保留原因供卡片展示。 */
+sealed interface PluginInstallUiState {
+    data object Idle : PluginInstallUiState
+
+    data object Resolving : PluginInstallUiState
+
+    data class Downloading(val progress: Float) : PluginInstallUiState
+
+    data class Failed(val failure: PluginInstallFailure) : PluginInstallUiState
+
+    /** 是否正在占用下载/安装通道。 */
+    val isInProgress: Boolean
+        get() = this is Resolving || this is Downloading
+}
+
+/**
+ * 插件列表项：已安装插件与订阅目录条目的合并投影。
+ *
+ * @property catalog 订阅目录元数据；已安装但不在目录中的插件为 null。
+ * @property installed 已安装插件描述；未安装为 null。
+ * @property installState 安装进度/失败状态。
+ */
+data class PluginListItemUi(
+    val catalog: PluginCatalogEntry?,
+    val installed: PluginDescriptor?,
+    val installState: PluginInstallUiState,
+) {
+    val key: String
+        get() = catalog?.key ?: requireNotNull(installed).id
+
+    val isInstalled: Boolean
+        get() = installed != null
+
+    val title: String
+        get() = installed?.name?.takeIf(String::isNotBlank) ?: catalog?.title.orEmpty()
+}
 
 /** 插件列表页状态。 */
 data class PluginSettingsUiState(
-    val plugins: List<PluginDescriptor> = emptyList(),
-    /** 是否正在重新发现插件，驱动下拉刷新指示器。 */
+    val items: List<PluginListItemUi> = emptyList(),
+    val query: String = "",
+    /** 是否正在重新发现插件/刷新订阅，驱动下拉刷新指示器。 */
     val isRefreshing: Boolean = false,
+    val isLoadingCatalog: Boolean = true,
+    val catalogSource: PluginCatalogSource = PluginCatalogSource.BUNDLED,
+    /** 至少一个远端订阅源失败。 */
+    val catalogError: Boolean = false,
+    val canRequestPackageInstalls: Boolean = true,
+    /** 当前占用下载/安装通道的条目。 */
+    val installingEntryKey: String? = null,
     /** 等待用户确认卸载的插件 id；非空时显示卸载确认框。 */
     val pendingUninstallPluginId: String? = null,
 )
 
 sealed interface PluginSettingsAction {
+    /** 搜索已安装或可安装插件。 */
+    data class QueryChanged(val value: String) : PluginSettingsAction
+
     /** 切换插件启用状态。 */
     data class SetEnabled(val pluginId: String, val enabled: Boolean) : PluginSettingsAction
 
-    /** 重新发现已安装插件（无需重启）。 */
+    /** 重新发现插件并强制刷新订阅目录。 */
     data object Refresh : PluginSettingsAction
+
+    /** 安装订阅目录中的插件。 */
+    data class Install(val entryKey: String) : PluginSettingsAction
 
     /** 请求卸载插件；仅弹出确认框，不直接执行。 */
     data class RequestUninstall(val pluginId: String) : PluginSettingsAction
@@ -39,6 +93,46 @@ sealed interface PluginSettingsEffect {
      * @property packageName 待卸载的插件 APK 包名。
      */
     data class RequestSystemUninstall(val packageName: String) : PluginSettingsEffect
+
+    /** APK 已下载并校验，调起系统安装器。 */
+    data class LaunchInstaller(val contentUri: String) : PluginSettingsEffect
+
+    /** 未授予未知来源安装权限，打开系统设置。 */
+    data object OpenUnknownSourcesSettings : PluginSettingsEffect
+}
+
+/** 插件订阅源编辑页状态。 */
+data class PluginSubscriptionUiState(
+    val urls: List<String> = emptyList(),
+    val defaultUrl: String = "",
+    val isAddDialogVisible: Boolean = false,
+    val draftUrl: String = "",
+    val error: PluginSubscriptionError? = null,
+)
+
+/** 订阅 URL 的本地校验失败原因。 */
+enum class PluginSubscriptionError {
+    INVALID_URL,
+    DUPLICATE,
+}
+
+sealed interface PluginSubscriptionAction {
+    /** 打开追加订阅源对话框。 */
+    data object AddClicked : PluginSubscriptionAction
+
+    /** 关闭追加订阅源对话框。 */
+    data object DismissAdd : PluginSubscriptionAction
+
+    data class DraftChanged(val value: String) : PluginSubscriptionAction
+
+    /** 校验并追加当前草稿地址。 */
+    data object ConfirmAdd : PluginSubscriptionAction
+
+    /** 移除指定订阅源。 */
+    data class Remove(val url: String) : PluginSubscriptionAction
+
+    /** 恢复为仅包含官方默认源。 */
+    data object Reset : PluginSubscriptionAction
 }
 
 /** 插件配置页状态。 */
@@ -77,7 +171,7 @@ data class PluginActionUiState(
     val id: String,
     val label: String,
     val running: Boolean = false,
-    val params: Map<String, Any> = emptyMap()
+    val params: Map<String, Any> = emptyMap(),
 )
 
 /**

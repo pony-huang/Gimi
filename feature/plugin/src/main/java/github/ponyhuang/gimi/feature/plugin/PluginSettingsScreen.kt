@@ -4,36 +4,38 @@ import android.app.Activity
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Extension
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.RssFeed
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,10 +48,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -58,27 +58,33 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import github.ponyhuang.gimi.domain.plugin.model.LocalizedText
+import github.ponyhuang.gimi.domain.plugin.model.PluginCatalogEntry
+import github.ponyhuang.gimi.domain.plugin.model.PluginCatalogSource
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
-import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.preference.PreferenceTextField
+import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @Composable
 fun PluginSettingsRoute(
     onBack: () -> Unit,
+    onOpenSubscription: () -> Unit,
     onNavigateToConfig: (String) -> Unit,
+    onNavigateToDetail: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: PluginSettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    // 进入页面自动重新发现插件，装完新插件 APK 后无需重启即可出现。
-    LaunchedEffect(Unit) { viewModel.onAction(PluginSettingsAction.Refresh) }
-    // 卸载走系统卸载页；无论结果如何返回后都重新发现插件，保证列表与设备状态一致。
+    val installLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { viewModel.onAction(PluginSettingsAction.Refresh) }
     val uninstallLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
@@ -87,6 +93,12 @@ fun PluginSettingsRoute(
         }
         viewModel.onAction(PluginSettingsAction.Refresh)
     }
+    val unknownSourcesLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { viewModel.onAction(PluginSettingsAction.Refresh) }
+
+    // 进入页面自动重新发现插件并刷新订阅目录。
+    LaunchedEffect(Unit) { viewModel.onAction(PluginSettingsAction.Refresh) }
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
             when (effect) {
@@ -95,33 +107,68 @@ fun PluginSettingsRoute(
                     context.getString(R.string.plugin_added_notice, effect.pluginIds.joinToString()),
                     Toast.LENGTH_SHORT,
                 ).show()
+
                 is PluginSettingsEffect.RequestSystemUninstall -> uninstallLauncher.launch(
                     Intent(Intent.ACTION_DELETE, Uri.parse("package:${effect.packageName}")),
+                )
+
+                is PluginSettingsEffect.LaunchInstaller -> installLauncher.launch(
+                    installerIntent(effect.contentUri),
+                )
+
+                PluginSettingsEffect.OpenUnknownSourcesSettings -> unknownSourcesLauncher.launch(
+                    Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:${context.packageName}"),
+                    ),
                 )
             }
         }
     }
-    // 读取每个插件 APK 的应用图标；插件自带图标，宿主无需硬编码品牌资源。
-    val icons = remember(state.plugins) {
-        state.plugins.associate { plugin ->
-            plugin.id to loadPluginIcon(context, plugin.packageName)?.toBitmap()?.asImageBitmap()
-        }
-    }
+
+    val icons = rememberPluginIcons(state.items)
+
     PreferenceScaffold(
         style = PreferenceStyle.Compact,
         title = stringResource(R.string.plugin_screen_title),
         onBack = onBack,
+        actions = {
+            IconButton(onClick = onOpenSubscription) {
+                Icon(
+                    imageVector = Icons.Outlined.RssFeed,
+                    contentDescription = stringResource(R.string.plugin_subscription_entry),
+                )
+            }
+        },
     ) { scaffoldModifier ->
         PluginSettingsScreen(
             state = state,
             icons = icons,
             onAction = viewModel::onAction,
             onNavigateToConfig = onNavigateToConfig,
-            modifier = scaffoldModifier,
+            onNavigateToDetail = onNavigateToDetail,
+            modifier = scaffoldModifier.then(modifier),
         )
     }
 }
 
+/** 已安装插件优先使用 APK 自带图标；未安装条目使用内置矢量图。 */
+@Composable
+internal fun rememberPluginIcons(items: List<PluginListItemUi>): Map<String, ImageBitmap?> {
+    val context = LocalContext.current
+    val installedPackages = items.mapNotNull { item ->
+        item.installed?.let { it.id to it.packageName }
+    }
+    return remember(installedPackages) {
+        installedPackages.associate { (id, packageName) ->
+            id to loadPluginIcon(context, packageName)?.toBitmap()?.asImageBitmap()
+        }
+    }
+}
+
+/**
+ * 插件列表：搜索、订阅目录与已安装插件合并后的单列列表。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PluginSettingsScreen(
@@ -129,17 +176,10 @@ fun PluginSettingsScreen(
     icons: Map<String, ImageBitmap?>,
     onAction: (PluginSettingsAction) -> Unit,
     onNavigateToConfig: (String) -> Unit,
+    onNavigateToDetail: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
-        if (state.plugins.isEmpty()) {
-            PreferenceBanner(
-                text = stringResource(R.string.plugin_empty),
-                tone = PreferenceBannerTone.Info,
-                modifier = Modifier.padding(top = 12.dp),
-            )
-        }
-        // 下拉刷新替代列表顶部的按钮刷新；isRefreshing 由 ViewModel 在 refresh() 期间置位。
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
             onRefresh = { onAction(PluginSettingsAction.Refresh) },
@@ -147,33 +187,94 @@ fun PluginSettingsScreen(
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(vertical = 8.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 item {
-                    // 插件数量有限，整组渲染进同一张 One UI 卡片。
-                    PreferenceGroupCard {
-                        state.plugins.forEachIndexed { index, plugin ->
-                            PluginRow(
-                                plugin = plugin,
-                                icon = icons[plugin.id],
-                                showDivider = index < state.plugins.lastIndex,
-                                onToggle = { enabled ->
-                                    onAction(PluginSettingsAction.SetEnabled(plugin.id, enabled))
+                    PluginListSearchField(
+                        query = state.query,
+                        onQueryChange = { onAction(PluginSettingsAction.QueryChanged(it)) },
+                    )
+                }
+                if (state.catalogError) {
+                    item {
+                        PreferenceBanner(
+                            text = stringResource(
+                                if (state.catalogSource == PluginCatalogSource.BUNDLED) {
+                                    R.string.plugin_list_catalog_error
+                                } else {
+                                    R.string.plugin_list_catalog_partial_error
                                 },
-                                onClick = { onNavigateToConfig(plugin.id) },
-                                onUninstallClick = {
-                                    onAction(PluginSettingsAction.RequestUninstall(plugin.id))
-                                },
+                            ),
+                            tone = PreferenceBannerTone.Info,
+                        )
+                    }
+                }
+                if (!state.canRequestPackageInstalls) {
+                    item {
+                        PreferenceBanner(
+                            text = stringResource(R.string.plugin_list_unknown_sources),
+                            tone = PreferenceBannerTone.Info,
+                        )
+                    }
+                }
+                when {
+                    state.isLoadingCatalog && state.items.isEmpty() -> item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 48.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+
+                    state.items.isEmpty() -> item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 48.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = stringResource(
+                                    if (state.query.isBlank()) R.string.plugin_empty
+                                    else R.string.plugin_list_empty,
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+                    }
+
+                    else -> items(state.items, key = { it.key }) { item ->
+                        PluginRowCard(
+                            item = item,
+                            installedIcon = icons[item.key],
+                            mutationEnabled = !state.isRefreshing,
+                            installEnabled = state.installingEntryKey == null,
+                            onToggleEnabled = { enabled ->
+                                item.installed?.let {
+                                    onAction(PluginSettingsAction.SetEnabled(it.id, enabled))
+                                }
+                            },
+                            onOpenDetail = { onNavigateToDetail(item.key) },
+                            onConfigure = { onNavigateToConfig(item.key) },
+                            onUninstall = {
+                                item.installed?.let {
+                                    onAction(PluginSettingsAction.RequestUninstall(it.id))
+                                }
+                            },
+                            onInstall = { onAction(PluginSettingsAction.Install(item.key)) },
+                        )
                     }
                 }
             }
         }
     }
-    // 卸载确认框浮在整个列表上层；pendingUninstallPluginId 由 ViewModel 管理，旋转重建不丢失。
     state.pendingUninstallPluginId
-        ?.let { id -> state.plugins.firstOrNull { it.id == id } }
+        ?.let { id -> state.items.firstOrNull { it.installed?.id == id }?.installed }
         ?.let { plugin ->
             UninstallConfirmDialog(
                 plugin = plugin,
@@ -184,111 +285,160 @@ fun PluginSettingsScreen(
 }
 
 @Composable
-private fun PluginRow(
-    plugin: PluginDescriptor,
-    icon: ImageBitmap?,
-    onToggle: (Boolean) -> Unit,
-    onClick: () -> Unit,
-    onUninstallClick: () -> Unit,
-    showDivider: Boolean = false,
+private fun PluginListSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 68.dp)
-                .clickable(onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    PreferenceTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(stringResource(R.string.plugin_list_search_label)) },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(
+                        imageVector = Icons.Default.Clear,
+                        contentDescription = stringResource(R.string.plugin_list_search_clear),
+                    )
+                }
+            }
+        },
+        singleLine = true,
+    )
+}
+
+@Composable
+private fun PluginRowCard(
+    item: PluginListItemUi,
+    installedIcon: ImageBitmap?,
+    mutationEnabled: Boolean,
+    installEnabled: Boolean,
+    onToggleEnabled: (Boolean) -> Unit,
+    onOpenDetail: () -> Unit,
+    onConfigure: () -> Unit,
+    onUninstall: () -> Unit,
+    onInstall: () -> Unit,
+) {
+    Surface(
+        onClick = if (item.isInstalled) onConfigure else onOpenDetail,
+        shape = RoundedCornerShape(20.dp),
+        color = preferenceGroupCardColor(),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // 统一「应用图标」样式：白底圆角方片 + 居中 logo，宽版 wordmark（如知乎）等比缩放不拉伸。
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (icon != null) {
-                    Image(
-                        bitmap = icon,
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(0.66f),
-                        contentScale = ContentScale.Fit,
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Extension,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-            }
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 16.dp, end = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(1.dp),
-            ) {
-                Text(
-                    text = plugin.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                PluginIcon(
+                    iconKey = item.catalog?.iconKey ?: item.key,
+                    size = 44.dp,
+                    installedIcon = installedIcon.takeIf { item.isInstalled },
                 )
-                Text(
-                    text = stringResource(R.string.plugin_row_tools_summary, plugin.version, plugin.toolCount),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    val summary = item.catalog?.let { localized(it.summary) }
+                    if (summary != null) {
+                        Text(
+                            text = summary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                PluginRowMenu(
+                    installed = item.isInstalled,
+                    enabled = mutationEnabled,
+                    onOpenDetail = onOpenDetail,
+                    onUninstall = onUninstall,
                 )
             }
-            Box {
-                IconButton(onClick = { menuExpanded = true }) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = stringResource(R.string.plugin_row_more),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false },
+            if (item.isInstalled) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 36.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = stringResource(R.string.plugin_uninstall_menu),
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Outlined.Delete,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
-                            )
-                        },
-                        onClick = {
-                            menuExpanded = false
-                            onUninstallClick()
-                        },
+                    Text(
+                        text = stringResource(R.string.plugin_list_installed),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Switch(
+                        checked = item.installed?.isEnabled == true,
+                        onCheckedChange = onToggleEnabled,
+                        enabled = mutationEnabled,
                     )
                 }
+            } else {
+                PluginInstallAction(
+                    entry = item,
+                    enabled = installEnabled,
+                    onInstall = onInstall,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
-            Switch(
-                checked = plugin.isEnabled,
-                onCheckedChange = onToggle,
+        }
+    }
+}
+
+@Composable
+private fun PluginRowMenu(
+    installed: Boolean,
+    enabled: Boolean,
+    onOpenDetail: () -> Unit,
+    onUninstall: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }, enabled = enabled) {
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = stringResource(R.string.plugin_row_more),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (showDivider) {
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.plugin_detail_menu)) },
+                onClick = {
+                    expanded = false
+                    onOpenDetail()
+                },
             )
+            if (installed) {
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = stringResource(R.string.plugin_uninstall_menu),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onUninstall()
+                    },
+                )
+            }
         }
     }
 }
@@ -303,7 +453,7 @@ private fun UninstallConfirmDialog(
         onDismissRequest = onDismiss,
         title = { Text(text = stringResource(R.string.plugin_uninstall_title, plugin.name)) },
         text = {
-            Text(text = stringResource(R.string.plugin_uninstall_message, plugin.toolCount))
+            Text(text = stringResource(R.string.plugin_uninstall_message))
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
@@ -322,49 +472,104 @@ private fun UninstallConfirmDialog(
     )
 }
 
-@Preview(showBackground = true)
-@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+internal fun installerIntent(contentUri: String): Intent = Intent(Intent.ACTION_VIEW)
+    .setDataAndType(Uri.parse(contentUri), "application/vnd.android.package-archive")
+    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+
+// ---------------------------------------------------------------------------
+// Preview fixtures
+// ---------------------------------------------------------------------------
+
+private fun previewCatalogEntry(
+    key: String,
+    title: String,
+    summaryZh: String,
+    summaryEn: String,
+) = PluginCatalogEntry(
+    key = key,
+    packageName = "github.ponyhuang.gimi.plugin.$key",
+    title = title,
+    summary = LocalizedText(summaryZh, summaryEn),
+    description = LocalizedText(summaryZh, summaryEn),
+    highlights = emptyList(),
+    sortOrder = 0,
+    pluginVersion = 1,
+    releaseAssetPrefix = "Gimi-plugin-$key-v",
+    repoUrl = "https://github.com/pony-huang/Gimi",
+    iconKey = key,
+    tags = emptyList(),
+)
+
+private fun previewItem(
+    key: String,
+    title: String,
+    summaryZh: String,
+    summaryEn: String,
+    installed: Boolean = false,
+    installState: PluginInstallUiState = PluginInstallUiState.Idle,
+) = PluginListItemUi(
+    catalog = previewCatalogEntry(key, title, summaryZh, summaryEn),
+    installed = if (installed) {
+        PluginDescriptor(
+            id = key,
+            name = title,
+            packageName = "github.ponyhuang.gimi.plugin.$key",
+            version = 1,
+            toolCount = 3,
+            isEnabled = true,
+        )
+    } else {
+        null
+    },
+    installState = installState,
+)
+
+private fun previewState(
+    items: List<PluginListItemUi> = listOf(
+        previewItem("zhihu", "知乎", "站内搜索、热榜、直答与知识库", "Search, hot lists, answers, and knowledge bases", installed = true),
+        previewItem("xiaohongshu", "小红书", "登录后浏览推荐、搜索、互动与发布", "Browse, search, interact, and publish", installed = true),
+        previewItem("spotify", "Spotify", "搜索、播放、歌单和音乐库", "Search, playback, playlists, and your library"),
+        previewItem("v2ex", "V2EX", "节点、主题、回复、通知与账号信息", "Nodes, topics, replies, notifications, and account info"),
+        previewItem("weibo", "微博", "热搜、智搜、超话与账号微博", "Trending, AI search, Super Topics, and posts"),
+    ),
+) = PluginSettingsUiState(
+    items = items,
+    isLoadingCatalog = false,
+    catalogSource = PluginCatalogSource.REMOTE,
+)
+
+@Preview(name = "插件列表 · 浅色", showBackground = true, widthDp = 390, heightDp = 900, locale = "zh")
+@Preview(name = "插件列表 · 深色", showBackground = true, widthDp = 390, heightDp = 900, locale = "zh", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun PluginSettingsScreenEmptyPreview() {
+private fun PluginSettingsScreenPreview() {
     AsssistantaiTheme {
         PluginSettingsScreen(
-            state = PluginSettingsUiState(),
+            state = previewState(),
             icons = emptyMap(),
             onAction = {},
             onNavigateToConfig = {},
+            onNavigateToDetail = {},
         )
     }
 }
 
-@Preview(showBackground = true)
-@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "插件列表 · 安装中", showBackground = true, widthDp = 390, heightDp = 900, locale = "zh")
 @Composable
-private fun PluginSettingsScreenWithPluginsPreview() {
+private fun PluginSettingsScreenInstallingPreview() {
     AsssistantaiTheme {
+        val items = previewState().items.map { item ->
+            if (item.key == "v2ex") {
+                item.copy(installState = PluginInstallUiState.Downloading(0.42f))
+            } else {
+                item
+            }
+        }
         PluginSettingsScreen(
-            state = PluginSettingsUiState(
-                plugins = listOf(
-                    PluginDescriptor(
-                        id = "zhihu",
-                        name = "知乎",
-                        packageName = "github.ponyhuang.gimi.plugin.zhihu",
-                        version = 1,
-                        toolCount = 3,
-                        isEnabled = true,
-                    ),
-                    PluginDescriptor(
-                        id = "spotify",
-                        name = "Spotify",
-                        packageName = "github.ponyhuang.gimi.plugin.spotify",
-                        version = 2,
-                        toolCount = 5,
-                        isEnabled = false,
-                    ),
-                ),
-            ),
+            state = previewState(items = items).copy(installingEntryKey = "v2ex"),
             icons = emptyMap(),
             onAction = {},
             onNavigateToConfig = {},
+            onNavigateToDetail = {},
         )
     }
 }

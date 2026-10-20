@@ -144,7 +144,13 @@ See the [E2B documentation](https://e2b.dev/docs).
 Install APK plugins to add capabilities. Refresh the list to apply them immediately — no restart
 needed. Plugins bring their own tools and can run an in-app authorization flow.
 
-The project provides these plugin APKs as separate GitHub Release downloads; install them separately:
+The project provides these plugin APKs as separate GitHub Release downloads. You can also open
+*Settings → Plugins* to browse the plugin subscription and install them in the app. The default
+subscription is the official `plugin-subscription.json` in this repository; change it from the
+subscription icon on the plugin page. Installation downloads the matching APK, verifies its SHA-256,
+and hands it to the system installer. Custom subscription sources are trusted at your own risk.
+
+The default subscription contains:
 
 - **Spotify**: search, playback, playlists, and your library
 - **知乎 Zhihu**: search, hot lists, and Q&A

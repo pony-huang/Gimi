@@ -13,7 +13,17 @@ import github.ponyhuang.gimi.data.plugin.PluginConfigStore
 import github.ponyhuang.gimi.data.plugin.PluginLoadNoticeQueue
 import github.ponyhuang.gimi.data.plugin.PluginLoader
 import github.ponyhuang.gimi.data.plugin.PluginManager
+import github.ponyhuang.gimi.data.plugin.catalog.SubscribedPluginCatalogRepository
+import github.ponyhuang.gimi.data.plugin.install.AndroidPluginPackageInstaller
+import github.ponyhuang.gimi.data.plugin.install.DefaultPluginInstallEnvironment
+import github.ponyhuang.gimi.data.plugin.remote.GitHubPluginReleaseRepository
+import github.ponyhuang.gimi.data.plugin.subscription.SharedPreferencesPluginSubscriptionStore
+import github.ponyhuang.gimi.domain.plugin.repository.PluginCatalogRepository
+import github.ponyhuang.gimi.domain.plugin.repository.PluginInstallEnvironment
+import github.ponyhuang.gimi.domain.plugin.repository.PluginPackageInstaller
+import github.ponyhuang.gimi.domain.plugin.repository.PluginReleaseRepository
 import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
+import github.ponyhuang.gimi.domain.plugin.repository.PluginSubscriptionStore
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginLoadNotices
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
@@ -51,4 +61,40 @@ abstract class PluginRepositoryModule {
     abstract fun bindPluginRuntimeProvider(
         implementation: PluginManager,
     ): PluginRuntimeProvider<AgentPlugin>
+}
+
+/** 插件订阅目录、发布信息与安装链路绑定。 */
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class PluginCatalogModule {
+
+    @Binds
+    @Singleton
+    abstract fun bindPluginCatalogRepository(
+        implementation: SubscribedPluginCatalogRepository,
+    ): PluginCatalogRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindPluginSubscriptionStore(
+        implementation: SharedPreferencesPluginSubscriptionStore,
+    ): PluginSubscriptionStore
+
+    @Binds
+    @Singleton
+    abstract fun bindPluginReleaseRepository(
+        implementation: GitHubPluginReleaseRepository,
+    ): PluginReleaseRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindPluginPackageInstaller(
+        implementation: AndroidPluginPackageInstaller,
+    ): PluginPackageInstaller
+
+    @Binds
+    @Singleton
+    abstract fun bindPluginInstallEnvironment(
+        implementation: DefaultPluginInstallEnvironment,
+    ): PluginInstallEnvironment
 }

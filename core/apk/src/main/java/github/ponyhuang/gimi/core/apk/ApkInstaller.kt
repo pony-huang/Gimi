@@ -1,4 +1,4 @@
-package github.ponyhuang.gimi.data.appupdate.apk
+package github.ponyhuang.gimi.core.apk
 
 import android.content.Context
 import android.content.Intent
@@ -49,6 +49,7 @@ class ApkInstaller @Inject constructor(
             ?: return false
         return current.contentEquals(incoming)
     }
+
 
     private fun signatureDigest(packageName: String, sourceDir: String?): ByteArray? {
         val info = if (sourceDir == null) {

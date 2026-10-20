@@ -7,7 +7,7 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
-import github.ponyhuang.gimi.data.appupdate.apk.ApkInstaller
+import github.ponyhuang.gimi.core.apk.ApkInstaller
 import github.ponyhuang.gimi.domain.appupdate.repository.AppUpdateRepository
 import java.io.File
 

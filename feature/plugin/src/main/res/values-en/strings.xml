@@ -1,6 +1,6 @@
 <resources>
     <string name="plugin_screen_title">Plugins</string>
-    <string name="plugin_empty">No plugins installed. Install a plugin APK and restart the app to manage it here.</string>
+    <string name="plugin_empty">No plugins yet. Refresh the subscription or install a plugin APK manually.</string>
     <string name="plugin_config_title">Plugin configuration</string>
     <string name="plugin_config_save">Save</string>
     <string name="plugin_config_saved">Configuration saved</string>
@@ -9,12 +9,59 @@
     <string name="plugin_action_callback_title">Authorization</string>
     <string name="plugin_action_callback_unsupported">Unsupported callback handler: %1$s</string>
     <string name="plugin_config_no_fields">This plugin has no configurable fields.</string>
-    <string name="plugin_row_tools_summary">Version %1$d · %2$d tools</string>
     <string name="plugin_row_more">More options</string>
     <string name="plugin_uninstall_menu">Uninstall plugin</string>
     <string name="plugin_uninstall_title">Uninstall "%1$s"?</string>
-    <string name="plugin_uninstall_message">Uninstalling removes the %1$d tools this plugin provides and deletes the plugin package installed on this device.</string>
+    <string name="plugin_uninstall_message">Uninstalling removes the tools this plugin provides and deletes the plugin package from the device.</string>
     <string name="plugin_uninstall_confirm">Uninstall</string>
     <string name="plugin_uninstall_cancel">Cancel</string>
     <string name="plugin_uninstalled_notice">Plugin uninstalled</string>
+
+    <!-- Plugin list and subscription -->
+    <string name="plugin_list_search_label">Search plugins</string>
+    <string name="plugin_list_search_clear">Clear search</string>
+    <string name="plugin_list_empty">No matching plugins</string>
+    <string name="plugin_list_catalog_partial_error">Some subscription sources failed to load.</string>
+    <string name="plugin_list_install">Install</string>
+    <string name="plugin_list_retry">Retry</string>
+    <string name="plugin_list_installed">Installed</string>
+    <string name="plugin_list_installing">Installing</string>
+    <string name="plugin_list_downloading">Downloading %1$d%%</string>
+    <string name="plugin_list_unknown_sources">Allow installing unknown apps to install plugins</string>
+    <string name="plugin_list_catalog_error">Could not load any subscription source; using the built-in catalog.</string>
+    <string name="plugin_list_install_network">Network request failed. Try again later.</string>
+    <string name="plugin_list_install_checksum">Downloaded file failed verification. Try again.</string>
+    <string name="plugin_list_install_no_asset">The subscription does not provide a package for this plugin.</string>
+    <string name="plugin_list_install_too_large">The plugin package exceeds the size limit.</string>
+    <string name="plugin_list_install_storage">Could not save the plugin package. Check storage.</string>
+    <string name="plugin_list_install_unknown">Installation failed. Try again.</string>
+
+    <string name="plugin_subscription_entry">Plugin subscriptions</string>
+    <string name="plugin_subscription_title">Plugin subscriptions</string>
+    <string name="plugin_subscription_section_sources">Sources</string>
+    <string name="plugin_subscription_official">Official source</string>
+    <string name="plugin_subscription_empty">No subscription sources</string>
+    <string name="plugin_subscription_empty_subtitle">Add one below</string>
+    <string name="plugin_subscription_add">Add subscription</string>
+    <string name="plugin_subscription_add_subtitle">Append multiple HTTPS URLs</string>
+    <string name="plugin_subscription_remove">Remove subscription</string>
+    <string name="plugin_subscription_add_dialog_title">Add subscription</string>
+    <string name="plugin_subscription_add_action">Add</string>
+    <string name="plugin_subscription_cancel">Cancel</string>
+    <string name="plugin_subscription_url_label">Subscription URL</string>
+    <string name="plugin_subscription_note">You can append multiple HTTPS subscriptions. Entries are merged by key; earlier sources take precedence.</string>
+    <string name="plugin_subscription_reset">Restore default source</string>
+    <string name="plugin_subscription_reset_subtitle">Keep only the official source</string>
+    <string name="plugin_subscription_invalid_url">Enter a subscription URL starting with https://</string>
+    <string name="plugin_subscription_duplicate">This subscription URL is already added.</string>
+
+    <!-- Plugin details -->
+    <string name="plugin_detail_title">Plugin details</string>
+    <string name="plugin_detail_menu">Details</string>
+    <string name="plugin_detail_description">About this plugin</string>
+    <string name="plugin_detail_highlights">Capabilities</string>
+    <string name="plugin_detail_repo">View on GitHub</string>
+    <string name="plugin_detail_manage">Manage plugin</string>
+    <string name="plugin_detail_no_info">This plugin is not described in the subscription source.</string>
+    <string name="plugin_detail_not_found">Plugin not found</string>
 </resources>

@@ -15,6 +15,7 @@ import java.io.File
 /** plugin capability 的受管目录声明。 */
 object PluginStorage {
     const val OPTIMIZED_ROOT_ID = "plugin.optimized-root"
+    const val PACKAGES_ID = "plugin.packages"
 
     val OptimizedRoot = ManagedDirectorySpec(
         id = OPTIMIZED_ROOT_ID,
@@ -24,6 +25,17 @@ object PluginStorage {
         lifecycle = StorageLifecycle.CACHE,
         backupPolicy = BackupPolicy.EXCLUDED,
         sharingPolicy = SharingPolicy.PRIVATE,
+    )
+
+    /** 商店下载的插件 APK；位于 FileProvider 的 `shareable/` 路径下，安装后由下次安装清理。 */
+    val Packages = ManagedDirectorySpec(
+        id = PACKAGES_ID,
+        owner = "plugin",
+        area = StorageArea.CACHE,
+        relativePath = "shareable/plugin/packages",
+        lifecycle = StorageLifecycle.TEMPORARY,
+        backupPolicy = BackupPolicy.EXCLUDED,
+        sharingPolicy = SharingPolicy.FILE_PROVIDER,
     )
 }
 
@@ -43,4 +55,7 @@ object PluginStorageModule {
     @IntoSet
     fun provideOptimizedRootDirectorySpec(): ManagedDirectorySpec = PluginStorage.OptimizedRoot
 
+    @Provides
+    @IntoSet
+    fun providePackagesDirectorySpec(): ManagedDirectorySpec = PluginStorage.Packages
 }

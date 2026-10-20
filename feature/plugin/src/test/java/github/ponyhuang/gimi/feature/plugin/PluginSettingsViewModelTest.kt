@@ -2,12 +2,27 @@ package github.ponyhuang.gimi.feature.plugin
 
 import app.cash.turbine.test
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
+import github.ponyhuang.gimi.domain.plugin.model.LocalizedText
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionCallback
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionExecution
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionOutcome
+import github.ponyhuang.gimi.domain.plugin.model.PluginCatalogEntry
+import github.ponyhuang.gimi.domain.plugin.model.PluginCatalogLoad
+import github.ponyhuang.gimi.domain.plugin.model.PluginCatalogSource
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
+import github.ponyhuang.gimi.domain.plugin.model.PluginInstallFailure
+import github.ponyhuang.gimi.domain.plugin.model.PluginPackageInstallException
+import github.ponyhuang.gimi.domain.plugin.model.PluginRelease
+import github.ponyhuang.gimi.domain.plugin.model.PluginReleaseAsset
+import github.ponyhuang.gimi.domain.plugin.repository.PluginCatalogRepository
+import github.ponyhuang.gimi.domain.plugin.repository.PluginInstallEnvironment
+import github.ponyhuang.gimi.domain.plugin.repository.PluginPackageInstaller
+import github.ponyhuang.gimi.domain.plugin.repository.PluginReleaseRepository
 import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
+import github.ponyhuang.gimi.domain.plugin.repository.PluginSubscriptionStore
+import github.ponyhuang.gimi.domain.plugin.usecase.InstallPluginUseCase
+import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +35,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -29,7 +45,7 @@ class PluginSettingsViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private val UNINSTALLED_PLUGIN = PluginDescriptor(
+    private val installedZhihu = PluginDescriptor(
         id = "zhihu",
         name = "知乎",
         packageName = "com.example.zhihu",
@@ -38,13 +54,25 @@ class PluginSettingsViewModelTest {
         isEnabled = true,
     )
 
+    private val defaultCatalog = PluginCatalogLoad(
+        entries = listOf(
+            catalogEntry("zhihu", "知乎", tags = listOf("问答", "热榜")),
+            catalogEntry("spotify", "Spotify", tags = listOf("音乐")),
+        ),
+        source = PluginCatalogSource.REMOTE,
+    )
+
     @Test
     fun refreshDelegatesAndEmitsAddedEffect() = runTest {
-        val repository = FakePluginRepository().apply { refreshResult = listOf("spotify") }
-        val viewModel = PluginSettingsViewModel(repository)
+        val harness = harness(
+            pluginRepository = FakePluginRepository().apply { refreshResult = listOf("spotify") },
+        )
+        collectUiState(harness.viewModel)
+        advanceUntilIdle()
 
-        viewModel.effects.test {
-            viewModel.onAction(PluginSettingsAction.Refresh)
+        harness.viewModel.effects.test {
+            harness.viewModel.onAction(PluginSettingsAction.Refresh)
+            advanceUntilIdle()
 
             assertEquals(
                 PluginSettingsEffect.ShowPluginAdded(listOf("spotify")),
@@ -52,100 +80,358 @@ class PluginSettingsViewModelTest {
             )
             cancelAndIgnoreRemainingEvents()
         }
-        assertEquals(1, repository.refreshCalls)
+        assertEquals(1, harness.pluginRepository.refreshCalls)
     }
 
     @Test
     fun refreshWithNoAdditionsEmitsNothing() = runTest {
-        val repository = FakePluginRepository() // refreshResult 为空
-        val viewModel = PluginSettingsViewModel(repository)
+        val harness = harness()
+        collectUiState(harness.viewModel)
+        advanceUntilIdle()
 
-        viewModel.effects.test {
-            viewModel.onAction(PluginSettingsAction.Refresh)
+        harness.viewModel.effects.test {
+            harness.viewModel.onAction(PluginSettingsAction.Refresh)
             advanceUntilIdle()
             expectNoEvents()
         }
-        assertEquals(1, repository.refreshCalls)
+        assertEquals(1, harness.pluginRepository.refreshCalls)
     }
 
     @Test
     fun refreshTogglesRefreshingIndicator() = runTest {
         val gate = CompletableDeferred<Unit>()
-        val repository = FakePluginRepository().apply { refreshGate = gate }
-        val viewModel = PluginSettingsViewModel(repository)
+        val harness = harness(
+            pluginRepository = FakePluginRepository().apply { refreshGate = gate },
+        )
+        collectUiState(harness.viewModel)
+        advanceUntilIdle()
 
-        // uiState 是 WhileSubscribed 的 stateIn，需要订阅才会上游收集并 emit。
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.uiState.collect { }
-        }
-
-        viewModel.onAction(PluginSettingsAction.Refresh)
+        harness.viewModel.onAction(PluginSettingsAction.Refresh)
         runCurrent()
 
-        assertTrue("刷新进行中应显示下拉刷新指示器", viewModel.uiState.value.isRefreshing)
+        assertTrue(harness.viewModel.uiState.value.isRefreshing)
 
         gate.complete(Unit)
         advanceUntilIdle()
 
-        assertFalse("刷新结束后应关闭刷新指示器", viewModel.uiState.value.isRefreshing)
+        assertFalse(harness.viewModel.uiState.value.isRefreshing)
     }
 
-    /** uiState 是 WhileSubscribed 的 stateIn，读取前需要先订阅驱动上游收集。 */
-    private fun TestScope.collectUiState(viewModel: PluginSettingsViewModel) =
-        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.uiState.collect { }
-        }
-
     @Test
-    fun requestUninstallForUnknownPluginIsIgnored() = runTest {
-        val repository = FakePluginRepository()
-        val viewModel = PluginSettingsViewModel(repository)
-        collectUiState(viewModel)
-
-        viewModel.onAction(PluginSettingsAction.RequestUninstall("missing"))
+    fun loadsCatalogAndMergesInstalledPlugins() = runTest {
+        val harness = harness(
+            pluginRepository = FakePluginRepository().apply {
+                pluginsFlow.value = listOf(installedZhihu)
+            },
+        )
+        collectUiState(harness.viewModel)
         advanceUntilIdle()
 
-        assertEquals(null, viewModel.uiState.value.pendingUninstallPluginId)
+        val state = harness.viewModel.uiState.value
+        assertEquals(listOf("zhihu", "spotify"), state.items.map { it.key })
+        assertTrue(state.items.first { it.key == "zhihu" }.isInstalled)
+        assertFalse(state.items.first { it.key == "spotify" }.isInstalled)
+        assertEquals(PluginCatalogSource.REMOTE, state.catalogSource)
+        assertFalse(state.catalogError)
+    }
+
+    @Test
+    fun installedPluginOutsideCatalogIsStillListed() = runTest {
+        val custom = installedZhihu.copy(id = "custom", name = "Custom")
+        val harness = harness(
+            pluginRepository = FakePluginRepository().apply {
+                pluginsFlow.value = listOf(custom)
+            },
+        )
+        collectUiState(harness.viewModel)
+        advanceUntilIdle()
+
+        val item = harness.viewModel.uiState.value.items.first { it.key == "custom" }
+        assertNull(item.catalog)
+        assertTrue(item.isInstalled)
+        assertEquals("Custom", item.title)
+    }
+
+    @Test
+    fun queryFiltersByTitleAndTags() = runTest {
+        val harness = harness()
+        collectUiState(harness.viewModel)
+        advanceUntilIdle()
+
+        harness.viewModel.onAction(PluginSettingsAction.QueryChanged("热榜"))
+        advanceUntilIdle()
+        assertEquals(listOf("zhihu"), harness.viewModel.uiState.value.items.map { it.key })
+
+        harness.viewModel.onAction(PluginSettingsAction.QueryChanged("音乐"))
+        advanceUntilIdle()
+        assertEquals(listOf("spotify"), harness.viewModel.uiState.value.items.map { it.key })
+    }
+
+    @Test
+    fun installSuccessEmitsInstallerEffectAndResetsState() = runTest {
+        val harness = harness()
+        collectUiState(harness.viewModel)
+        advanceUntilIdle()
+
+        harness.viewModel.effects.test {
+            harness.viewModel.onAction(PluginSettingsAction.Install("spotify"))
+            advanceUntilIdle()
+
+            assertEquals(
+                PluginSettingsEffect.LaunchInstaller("content://plugins/apk/spotify"),
+                awaitItem(),
+            )
+        }
+        val spotify = harness.viewModel.uiState.value.items.first { it.key == "spotify" }
+        assertEquals(PluginInstallUiState.Idle, spotify.installState)
+    }
+
+    @Test
+    fun installFailureSetsFailedState() = runTest {
+        val harness = harness(
+            installer = FakePackageInstaller(failure = PluginInstallFailure.CHECKSUM_MISMATCH),
+        )
+        collectUiState(harness.viewModel)
+        advanceUntilIdle()
+
+        harness.viewModel.onAction(PluginSettingsAction.Install("spotify"))
+        advanceUntilIdle()
+
+        val spotify = harness.viewModel.uiState.value.items.first { it.key == "spotify" }
+        assertEquals(
+            PluginInstallUiState.Failed(PluginInstallFailure.CHECKSUM_MISMATCH),
+            spotify.installState,
+        )
+        assertNull(harness.viewModel.uiState.value.installingEntryKey)
+    }
+
+    @Test
+    fun installWithoutPermissionRequestsSystemSettings() = runTest {
+        val harness = harness(environment = FakeInstallEnvironment(canInstall = false))
+        collectUiState(harness.viewModel)
+        advanceUntilIdle()
+
+        harness.viewModel.effects.test {
+            harness.viewModel.onAction(PluginSettingsAction.Install("spotify"))
+            advanceUntilIdle()
+            assertEquals(PluginSettingsEffect.OpenUnknownSourcesSettings, awaitItem())
+        }
+        assertFalse(harness.viewModel.uiState.value.canRequestPackageInstalls)
+        assertEquals(0, harness.installer.calls)
+    }
+
+    @Test
+    fun subscriptionUrlChangeForcesCatalogReload() = runTest {
+        val harness = harness()
+        collectUiState(harness.viewModel)
+        advanceUntilIdle()
+        val initialLoads = harness.catalogRepository.loadCalls
+
+        harness.subscriptionStore.add("https://example.com/other-feed.json")
+        advanceUntilIdle()
+
+        assertTrue(harness.catalogRepository.loadCalls > initialLoads)
+        assertTrue(harness.catalogRepository.forcedLoads >= 1)
+    }
+
+    @Test
+    fun catalogErrorIsExposedForFallbackBanner() = runTest {
+        val harness = harness(
+            catalogLoad = PluginCatalogLoad(
+                entries = emptyList(),
+                source = PluginCatalogSource.BUNDLED,
+                error = true,
+            ),
+        )
+        collectUiState(harness.viewModel)
+        advanceUntilIdle()
+
+        assertTrue(harness.viewModel.uiState.value.catalogError)
+        assertEquals(PluginCatalogSource.BUNDLED, harness.viewModel.uiState.value.catalogSource)
     }
 
     @Test
     fun confirmUninstallEmitsSystemUninstallAndClearsPending() = runTest {
-        val repository = FakePluginRepository()
-        repository.pluginsFlow.value = listOf(UNINSTALLED_PLUGIN)
-        val viewModel = PluginSettingsViewModel(repository)
-        collectUiState(viewModel)
+        val harness = harness(
+            pluginRepository = FakePluginRepository().apply {
+                pluginsFlow.value = listOf(installedZhihu)
+            },
+        )
+        collectUiState(harness.viewModel)
+        advanceUntilIdle()
 
-        viewModel.effects.test {
-            viewModel.onAction(PluginSettingsAction.RequestUninstall("zhihu"))
-            viewModel.onAction(PluginSettingsAction.ConfirmUninstall("zhihu"))
+        harness.viewModel.effects.test {
+            harness.viewModel.onAction(PluginSettingsAction.RequestUninstall("zhihu"))
+            harness.viewModel.onAction(PluginSettingsAction.ConfirmUninstall("zhihu"))
+            advanceUntilIdle()
 
             assertEquals(
                 PluginSettingsEffect.RequestSystemUninstall("com.example.zhihu"),
                 awaitItem(),
             )
-            cancelAndIgnoreRemainingEvents()
         }
+        assertNull(harness.viewModel.uiState.value.pendingUninstallPluginId)
+    }
+
+    @Test
+    fun requestUninstallForUnknownPluginIsIgnored() = runTest {
+        val harness = harness()
+        collectUiState(harness.viewModel)
         advanceUntilIdle()
-        assertEquals(null, viewModel.uiState.value.pendingUninstallPluginId)
+
+        harness.viewModel.onAction(PluginSettingsAction.RequestUninstall("missing"))
+        advanceUntilIdle()
+
+        assertNull(harness.viewModel.uiState.value.pendingUninstallPluginId)
+    }
+
+    // ------------------------------------------------------------------
+    // Harness
+    // ------------------------------------------------------------------
+
+    private class Harness(
+        val viewModel: PluginSettingsViewModel,
+        val pluginRepository: FakePluginRepository,
+        val catalogRepository: FakeCatalogRepository,
+        val subscriptionStore: FakeSubscriptionStore,
+        val environment: FakeInstallEnvironment,
+        val installer: FakePackageInstaller,
+    )
+
+    private fun TestScope.collectUiState(viewModel: PluginSettingsViewModel) {
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect { }
+        }
+    }
+
+    private fun harness(
+        pluginRepository: FakePluginRepository = FakePluginRepository(),
+        catalogLoad: PluginCatalogLoad = defaultCatalog,
+        environment: FakeInstallEnvironment = FakeInstallEnvironment(),
+        installer: FakePackageInstaller = FakePackageInstaller(),
+    ): Harness {
+        val catalogRepository = FakeCatalogRepository(catalogLoad)
+        val subscriptionStore = FakeSubscriptionStore()
+        val viewModel = PluginSettingsViewModel(
+            repository = pluginRepository,
+            catalogRepository = catalogRepository,
+            subscriptionStore = subscriptionStore,
+            installPlugin = InstallPluginUseCase(FakeReleaseRepository(), installer),
+            installEnvironment = environment,
+        )
+        return Harness(
+            viewModel = viewModel,
+            pluginRepository = pluginRepository,
+            catalogRepository = catalogRepository,
+            subscriptionStore = subscriptionStore,
+            environment = environment,
+            installer = installer,
+        )
+    }
+
+    private fun catalogEntry(
+        key: String,
+        title: String,
+        tags: List<String> = emptyList(),
+    ) = PluginCatalogEntry(
+        key = key,
+        packageName = "github.ponyhuang.gimi.plugin.$key",
+        title = title,
+        summary = LocalizedText("摘要 $title", "Summary $title"),
+        description = LocalizedText("描述 $title", "Description $title"),
+        highlights = emptyList(),
+        sortOrder = 0,
+        pluginVersion = 1,
+        releaseAssetPrefix = "Gimi-plugin-$key-v",
+        repoUrl = "",
+        iconKey = key,
+        tags = tags,
+        apkUrl = "https://example.com/$key.apk",
+    )
+
+    private class FakeCatalogRepository(
+        private val load: PluginCatalogLoad,
+    ) : PluginCatalogRepository {
+        var loadCalls: Int = 0
+        var forcedLoads: Int = 0
+
+        override suspend fun load(force: Boolean): PluginCatalogLoad {
+            loadCalls += 1
+            if (force) forcedLoads += 1
+            return load
+        }
+    }
+
+    private class FakeSubscriptionStore : PluginSubscriptionStore {
+        override val defaultUrl: String = DEFAULT_URL
+        private val mutableUrls = MutableStateFlow(listOf(DEFAULT_URL))
+        override val urls: StateFlow<List<String>> = mutableUrls
+
+        override fun add(url: String) {
+            if (url !in mutableUrls.value) mutableUrls.value = mutableUrls.value + url
+        }
+
+        override fun remove(url: String) {
+            mutableUrls.value = mutableUrls.value - url
+        }
+
+        override fun reset() {
+            mutableUrls.value = listOf(DEFAULT_URL)
+        }
+
+        private companion object {
+            const val DEFAULT_URL = "https://example.com/feed.json"
+        }
+    }
+
+    private class FakeReleaseRepository : PluginReleaseRepository {
+        override suspend fun latestRelease(): PluginRelease =
+            throw IOException("direct url should bypass release resolution")
+    }
+
+    private class FakePackageInstaller(
+        private val failure: PluginInstallFailure? = null,
+    ) : PluginPackageInstaller {
+        var calls: Int = 0
+
+        override suspend fun downloadAndVerify(
+            asset: PluginReleaseAsset,
+            onProgress: (Float) -> Unit,
+        ): String {
+            calls += 1
+            onProgress(0.8f)
+            failure?.let { throw PluginPackageInstallException(it) }
+            return "apk/${asset.name.substringBefore('.')}"
+        }
+    }
+
+    private class FakeInstallEnvironment(
+        private val canInstall: Boolean = true,
+    ) : PluginInstallEnvironment {
+        override fun canRequestPackageInstalls(): Boolean = canInstall
+        override fun apkContentUri(apkPath: String): String = "content://plugins/$apkPath"
     }
 
     private class FakePluginRepository : PluginRepository {
         val pluginsFlow = MutableStateFlow<List<PluginDescriptor>>(emptyList())
         override val plugins: StateFlow<List<PluginDescriptor>> = pluginsFlow
         override val revision: StateFlow<Long> = MutableStateFlow(0L)
-        val enabledCalls = mutableListOf<Pair<String, Boolean>>()
-        var refreshResult: List<String> = emptyList()
         var refreshCalls: Int = 0
+        var refreshResult: List<String> = emptyList()
         var refreshGate: CompletableDeferred<Unit>? = null
 
-        override fun setEnabled(pluginId: String, enabled: Boolean) {
-            enabledCalls += pluginId to enabled
-        }
+        override fun setEnabled(pluginId: String, enabled: Boolean) = Unit
 
         override fun configDescriptor(pluginId: String): PluginConfigDescriptor? = null
+
         override fun configValues(pluginId: String): Map<String, String> = emptyMap()
+
         override fun updateConfig(pluginId: String, values: Map<String, String>) = Unit
-        override suspend fun runAction(pluginId: String, actionId: String): PluginActionExecution? = null
+
+        override suspend fun runAction(
+            pluginId: String,
+            actionId: String,
+        ): PluginActionExecution? = null
 
         override suspend fun refresh(): List<String> {
             refreshCalls += 1

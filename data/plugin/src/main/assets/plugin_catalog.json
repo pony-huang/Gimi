@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "key": "zhihu",
+      "packageName": "github.ponyhuang.gimi.plugin.zhihu",
+      "title": "知乎",
+      "summary": {
+        "zh": "站内搜索、热榜、直答与知识库",
+        "en": "Search, hot lists, answers, and knowledge bases"
+      },
+      "description": {
+        "zh": "接入知乎开放平台，支持站内与全网搜索、热榜、直答，以及知识库检索、PDF 解析和 PPT 生成等异步任务。需要在插件配置中填写 access_secret。",
+        "en": "Connects to the Zhihu Open Platform for on-site and web search, hot lists, synthesized answers, knowledge-base retrieval, PDF parsing, and PPT generation. Requires an access_secret in the plugin settings."
+      },
+      "highlights": [
+        { "zh": "站内与全网搜索", "en": "On-site and web search" },
+        { "zh": "热榜与直答", "en": "Hot lists and synthesized answers" },
+        { "zh": "知识库检索与文档任务", "en": "Knowledge bases and document tasks" }
+      ],
+      "sortOrder": 10,
+      "pluginVersion": 2,
+      "releaseAssetPrefix": "Gimi-plugin-zhihu-v",
+      "repoUrl": "https://github.com/pony-huang/Gimi",
+      "iconKey": "zhihu",
+      "tags": ["知乎", "问答", "热榜", "知识库", "搜索"]
+    },
+    {
+      "key": "xiaohongshu",
+      "packageName": "github.ponyhuang.gimi.plugin.xiaohongshu",
+      "title": "小红书",
+      "summary": {
+        "zh": "登录后浏览推荐、搜索、互动与发布",
+        "en": "Browse, search, interact, and publish"
+      },
+      "description": {
+        "zh": "通过应用内 WebView 登录小红书，浏览推荐流与搜索、查看主页和笔记、评论互动、查看通知，并发布图文或视频。无需 MCP 服务器或中转地址。",
+        "en": "Signs in through an in-app WebView to browse feeds and search, view profiles and notes, comment and interact, read notifications, and publish image or video posts. No MCP server or relay required."
+      },
+      "highlights": [
+        { "zh": "应用内登录与推荐流", "en": "In-app sign-in and feeds" },
+        { "zh": "搜索、主页与笔记详情", "en": "Search, profiles, and notes" },
+        { "zh": "评论互动与图文/视频发布", "en": "Comments and publishing" }
+      ],
+      "sortOrder": 20,
+      "pluginVersion": 1,
+      "releaseAssetPrefix": "Gimi-plugin-xiaohongshu-v",
+      "repoUrl": "https://github.com/pony-huang/Gimi",
+      "iconKey": "xiaohongshu",
+      "tags": ["小红书", "社交", "图文", "视频", "发布"]
+    },
+    {
+      "key": "spotify",
+      "packageName": "github.ponyhuang.gimi.plugin.spotify",
+      "title": "Spotify",
+      "summary": {
+        "zh": "搜索、播放、歌单和音乐库",
+        "en": "Search, playback, playlists, and your library"
+      },
+      "description": {
+        "zh": "搜索歌曲、艺人、专辑和歌单，控制播放与音量，管理音乐库和播放队列。需要在插件配置中填写 Spotify Client ID 与 Client Secret，并在应用内完成授权。",
+        "en": "Search tracks, artists, albums, and playlists; control playback and volume; manage your library and queue. Requires a Spotify Client ID and Client Secret plus in-app authorization."
+      },
+      "highlights": [
+        { "zh": "搜索与播放控制", "en": "Search and playback control" },
+        { "zh": "歌单与音乐库管理", "en": "Playlists and library management" },
+        { "zh": "应用内 OAuth 授权", "en": "In-app OAuth authorization" }
+      ],
+      "sortOrder": 30,
+      "pluginVersion": 2,
+      "releaseAssetPrefix": "Gimi-plugin-spotify-v",
+      "repoUrl": "https://github.com/pony-huang/Gimi",
+      "iconKey": "spotify",
+      "tags": ["Spotify", "音乐", "播放", "歌单", "音乐库"]
+    },
+    {
+      "key": "v2ex",
+      "packageName": "github.ponyhuang.gimi.plugin.v2ex",
+      "title": "V2EX",
+      "summary": {
+        "zh": "节点、主题、回复、通知与账号信息",
+        "en": "Nodes, topics, replies, notifications, and account info"
+      },
+      "description": {
+        "zh": "浏览 V2EX 节点、主题与回复，查看通知和账号信息。需要在插件配置中填写 Personal Access Token。",
+        "en": "Browses V2EX nodes, topics, and replies, and shows notifications and account information. Requires a Personal Access Token in the plugin settings."
+      },
+      "highlights": [
+        { "zh": "节点与主题浏览", "en": "Nodes and topics" },
+        { "zh": "回复与通知", "en": "Replies and notifications" },
+        { "zh": "账号信息", "en": "Account information" }
+      ],
+      "sortOrder": 40,
+      "pluginVersion": 1,
+      "releaseAssetPrefix": "Gimi-plugin-v2ex-v",
+      "repoUrl": "https://github.com/pony-huang/Gimi",
+      "iconKey": "v2ex",
+      "tags": ["V2EX", "社区", "节点", "主题"]
+    },
+    {
+      "key": "weibo",
+      "packageName": "github.ponyhuang.gimi.plugin.weibo",
+      "title": "微博",
+      "summary": {
+        "zh": "热搜、智搜、超话与账号微博",
+        "en": "Trending, AI search, Super Topics, and posts"
+      },
+      "description": {
+        "zh": "查看微博热搜与智搜摘要，浏览超话，读取授权账号的微博，并支持发帖、评论与回复。需要配置 App ID 与 App Secret。",
+        "en": "Shows Weibo trending searches and AI summaries, browses Super Topics, reads the authorized account's posts, and supports posting, comments, and replies. Requires an App ID and App Secret."
+      },
+      "highlights": [
+        { "zh": "热搜与智搜摘要", "en": "Trending and AI summaries" },
+        { "zh": "超话浏览与账号微博", "en": "Super Topics and account posts" },
+        { "zh": "发帖、评论与回复", "en": "Posting, comments, and replies" }
+      ],
+      "sortOrder": 50,
+      "pluginVersion": 1,
+      "releaseAssetPrefix": "Gimi-plugin-weibo-v",
+      "repoUrl": "https://github.com/pony-huang/Gimi",
+      "iconKey": "weibo",
+      "tags": ["微博", "热搜", "超话", "社交"]
+    }
+  ]
+}

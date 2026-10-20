@@ -9,6 +9,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:apk"))
     implementation(project(":core:common"))
     implementation(project(":core:network"))
     implementation(project(":core:storage"))

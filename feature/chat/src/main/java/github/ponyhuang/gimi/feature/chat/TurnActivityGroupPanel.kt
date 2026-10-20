@@ -35,7 +35,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -83,21 +82,20 @@ internal fun TurnActivityGroupPanel(
         steps.size,
     )
 
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(0.dp),
+    // 状态行与详情共用一个 Surface，展开时只改变外轮廓，不再叠放两个边框。
+    Surface(
+        modifier = if (expanded && steps.isNotEmpty()) modifier.fillMaxWidth() else modifier,
+        shape = RoundedCornerShape(if (expanded && steps.isNotEmpty()) 16.dp else 50.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
     ) {
-        Surface(
-            shape = RoundedCornerShape(50),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
-        ) {
+        Column {
             Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(50))
+                    .fillMaxWidth()
                     .clickable(onClick = onToggle)
                     .heightIn(min = 30.dp)
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
@@ -111,20 +109,26 @@ internal fun TurnActivityGroupPanel(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text(
-                    text = label,
-                    modifier = Modifier.weight(1f, fill = false),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (showElapsed) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     Text(
-                        text = stringResource(R.string.chat_timeline_elapsed, elapsed / 1000.0),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = label,
+                        modifier = Modifier.weight(1f, fill = false),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
+                    if (showElapsed) {
+                        Text(
+                            text = stringResource(R.string.chat_timeline_elapsed, elapsed / 1000.0),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 Icon(
                     imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
@@ -135,18 +139,7 @@ internal fun TurnActivityGroupPanel(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
-        AnimatedVisibility(visible = expanded && steps.isNotEmpty()) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f),
-                ),
-            ) {
+            AnimatedVisibility(visible = expanded && steps.isNotEmpty()) {
                 Column(
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),

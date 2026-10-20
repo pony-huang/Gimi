@@ -845,6 +845,7 @@ private fun ChatSessionRuntime.toChatListItems(): List<ChatListItem> =
         TimelineActivityState(
             isAgentRunning = isAgentRunning,
             toolStatuses = toolStatuses,
+            completedAtMillis = completedAtMillis.toMap(),
         ),
     )
 

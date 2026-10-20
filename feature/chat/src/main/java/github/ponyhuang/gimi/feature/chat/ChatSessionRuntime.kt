@@ -30,7 +30,19 @@ internal class ChatSessionRuntime(
     var loadedContentRevision: Long = -1L
     /** 重试标记跨工具确认和用户输入恢复保留，最终成功时重新读取 SDK 保存的历史。 */
     var retryingInvocation: Boolean = false
+    /** 每个轮次的实际结束时刻，取消和失败也在相同入口冻结计时。 */
+    val completedAtMillis = mutableMapOf<String, Long>()
     var isAgentRunning: Boolean = false
+        set(value) {
+            val turnId = messages.lastOrNull {
+                it.role == github.ponyhuang.gimi.domain.conversation.model.MessageRole.User
+            }?.id
+            if (turnId != null) {
+                if (value) completedAtMillis.remove(turnId)
+                else if (field) completedAtMillis[turnId] = System.currentTimeMillis()
+            }
+            field = value
+        }
     var phase: AgentTaskPhase = AgentTaskPhase.GENERATING
     var pendingToolConfirmations: List<PendingToolConfirmation> = emptyList()
 

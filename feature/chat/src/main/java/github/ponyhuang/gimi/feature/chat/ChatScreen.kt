@@ -88,20 +88,6 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * 计算一个轮次实际写入消息列表的分段。
- *
- * 运行中的过程由输入框上方状态行统一呈现；完成后只保留正文与含工具调用的步骤摘要。
- * 纯思考组不进入列表，避免把内部推理文本暴露给用户。
- */
-private fun TurnTimeline.displaySegments(): List<TurnSegment> = segments.filter { segment ->
-    when (segment) {
-        is TurnSegment.Answer -> true
-        is TurnSegment.Activity ->
-            !isRunning && segment.entries.any { it is TimelineEntry.ToolCall }
-    }
-}
-
-/**
  * 聊天界面 Scaffold：
  * - 顶部浮动操作：抽屉按钮（[onOpenDrawer]）+ 新建对话（[onNewConversation]）+ 设置
  * - 底部输入卡片：文本、附件、模型选择与语音/发送操作。
@@ -201,11 +187,11 @@ fun ChatScaffold(
         mutableStateOf(state.scrollToLatestRequest)
     }
     var isModelPickerVisible by remember { mutableStateOf(false) }
-    val renderedItemCount = remember(listItems) {
+    val renderedItemCount = remember(listItems, runStatus) {
         listItems.sumOf { item ->
             when (item) {
                 is ChatListItem.UserMessage -> 1
-                is ChatListItem.AssistantTurn -> item.timeline.displaySegments().size
+                is ChatListItem.AssistantTurn -> item.timeline.displaySegments(runStatus.takeIf { item.timeline.isRunning }).size
             }
         }
     }
@@ -416,9 +402,6 @@ fun ChatScaffold(
                                 onOfficialToolFunctionsRetry = onOfficialToolFunctionsRetry,
                                 sharedMediaUris = sharedMediaUris,
                                 onSharedMediaConsumed = onSharedMediaConsumed,
-                                generatingStatus = runStatus?.let { status ->
-                                    { ChatRunStatusRow(status) }
-                                },
                                 retainExpanded = isModelPickerVisible,
                                 modelSelectorContent = {
                                     ModelTitleAndPicker(
@@ -531,7 +514,11 @@ fun ChatScaffold(
                             }
                             is ChatListItem.AssistantTurn -> {
                                 val timeline = listItem.timeline
-                                timeline.displaySegments().forEach { segment ->
+                                val turnStatus = runStatus.takeIf { timeline.isRunning }
+                                val segments = timeline.displaySegments(turnStatus)
+                                val latestActivityId = (segments.lastOrNull() as? TurnSegment.Activity)?.id
+                                val lastActivityId = segments.filterIsInstance<TurnSegment.Activity>().lastOrNull()?.id
+                                segments.forEach { segment ->
                                     when (segment) {
                                         is TurnSegment.Answer -> {
                                             val message = segment.message
@@ -563,6 +550,11 @@ fun ChatScaffold(
                                                 segment = segment,
                                                 expanded = segment.id in state.expandedActivityGroupIds,
                                                 onToggle = { onToggleTimeline(segment.id) },
+                                                runStatus = turnStatus.takeIf { segment.id == latestActivityId },
+                                                isRunning = timeline.isRunning,
+                                                startedAtMillis = timeline.startedAtMillis,
+                                                endedAtMillis = timeline.endedAtMillis,
+                                                showElapsed = segment.id == lastActivityId,
                                             )
                                         }
                                     }

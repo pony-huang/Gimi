@@ -273,4 +273,6 @@
     <string name="chat_table_scroll_horizontal">Scroll horizontally to see all columns</string>
     <string name="chat_table_scroll_vertical">Scroll vertically to see all rows</string>
     <string name="chat_table_scroll_both">Scroll horizontally for columns, vertically for rows</string>
+    <string name="chat_timeline_steps">%1$d steps</string>
+    <string name="chat_timeline_elapsed">%1$.1f s total</string>
 </resources>

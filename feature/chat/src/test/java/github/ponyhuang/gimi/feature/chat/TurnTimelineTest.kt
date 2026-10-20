@@ -403,6 +403,77 @@ class TurnTimelineTest {
         )
     }
 
+    @Test
+    fun `live placeholder keeps group identity when tools arrive and stops after answer starts`() {
+        val empty = TurnTimeline("turn", true, emptyList())
+        val placeholder = empty.displaySegments(ChatRunStatus.Thinking).single() as TurnSegment.Activity
+        assertEquals("turn:a0", placeholder.id)
+        val group = placeholder.copy(entries = listOf(TimelineEntry.ToolCall(
+            "call", "web_search", "", ToolCallStatus.Running,
+        )))
+        val running = empty.copy(segments = listOf(group))
+        assertEquals(listOf(group), running.displaySegments(ChatRunStatus.UsingTool("web_search")))
+        val answer = TurnSegment.Answer(assistantMessage(timestamp = 500L, text = "reply").copy(partial = true))
+        assertEquals(listOf(group, answer), running.copy(segments = listOf(group, answer)).displaySegments())
+        assertTrue(empty.copy(isRunning = false).displaySegments().isEmpty())
+    }
+
+    @Test
+    fun `historical thought stays hidden and interrupted tools remain visible`() {
+        val thought = TurnSegment.Activity("turn:a0", listOf(TimelineEntry.Thought("thought", "secret")))
+        assertTrue(TurnTimeline("turn", false, listOf(thought)).displaySegments().isEmpty())
+        val group = thought.copy(entries = listOf(TimelineEntry.ToolCall(
+            "call", "web_search", "", ToolCallStatus.Unknown,
+        )))
+        assertEquals(listOf(group), TurnTimeline("turn", false, listOf(group)).displaySegments())
+    }
+
+    @Test
+    fun `duration uses actual completion evidence and history falls back to last event`() {
+        val messages = listOf(userMessage(timestamp = 100L), assistantMessage(timestamp = 400L, text = "reply"))
+        val history = (messages.toChatListItems(TimelineActivityState()).last() as ChatListItem.AssistantTurn).timeline
+        assertEquals(100L, history.startedAtMillis)
+        assertEquals(400L, history.endedAtMillis)
+        val completed = (messages.toChatListItems(TimelineActivityState(
+            completedAtMillis = mapOf("user" to 600L),
+        )).last() as ChatListItem.AssistantTurn).timeline
+        assertEquals(600L, completed.endedAtMillis)
+    }
+
+    @Test
+    fun `streaming answer suppresses stale tool status and completed tools prepare answer`() {
+        val group = TurnSegment.Activity("turn:a0", listOf(TimelineEntry.ToolCall(
+            "call", "web_search", "", ToolCallStatus.Running,
+        )))
+        val timeline = TurnTimeline("turn", true, listOf(group))
+        val state = ChatUiState(isAgentRunning = true, listItems = listOf(ChatListItem.AssistantTurn(timeline)))
+        assertEquals(ChatRunStatus.UsingTool("web_search"), state.currentRunStatus())
+        val answer = TurnSegment.Answer(assistantMessage(timestamp = 500L, text = "reply").copy(partial = true))
+        assertEquals(null, state.copy(listItems = listOf(ChatListItem.AssistantTurn(
+            timeline.copy(segments = listOf(group, answer)),
+        ))).currentRunStatus())
+        val completedGroup = group.copy(entries = listOf(TimelineEntry.ToolCall(
+            "call", "web_search", "", ToolCallStatus.Completed,
+        )))
+        assertEquals(ChatRunStatus.PreparingAnswer, state.copy(listItems = listOf(ChatListItem.AssistantTurn(
+            timeline.copy(segments = listOf(completedGroup)),
+        ))).currentRunStatus())
+    }
+
+    @Test
+    fun `runtime freezes completion once and clears it when the same turn resumes`() {
+        val runtime = ChatSessionRuntime("session")
+        runtime.messages = listOf(userMessage(timestamp = 100L))
+        runtime.isAgentRunning = true
+        runtime.isAgentRunning = false
+        val completed = runtime.completedAtMillis["user"]
+        assertTrue(completed != null)
+        runtime.isAgentRunning = false
+        assertEquals(completed, runtime.completedAtMillis["user"])
+        runtime.isAgentRunning = true
+        assertFalse(runtime.completedAtMillis.containsKey("user"))
+    }
+
     private fun userMessage(
         id: String = "user",
         timestamp: Long,

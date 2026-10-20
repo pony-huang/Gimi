@@ -28,6 +28,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,9 +42,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import kotlinx.coroutines.delay
 
 /**
- * 已完成轮次的步骤摘要。
+ * 当前轮次的紧凑运行胶囊与可展开工具步骤。
  *
  * 默认只占一行；展开后展示用户可理解的步骤名称与工具状态，不展示原始思考文本或参数。
  */
@@ -49,6 +55,11 @@ internal fun TurnActivityGroupPanel(
     expanded: Boolean,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
+    runStatus: ChatRunStatus? = null,
+    isRunning: Boolean = false,
+    startedAtMillis: Long = 0L,
+    endedAtMillis: Long = startedAtMillis,
+    showElapsed: Boolean = false,
 ) {
     val hasThought = segment.entries.any { it is TimelineEntry.Thought }
     val toolCalls = segment.entries.filterIsInstance<TimelineEntry.ToolCall>()
@@ -56,45 +67,76 @@ internal fun TurnActivityGroupPanel(
         if (hasThought) add(ActivityStep.Thought)
         toolCalls.forEach { add(ActivityStep.Tool(it)) }
     }
-    if (steps.isEmpty()) return
+    if (steps.isEmpty() && runStatus == null) return
+    var now by remember(startedAtMillis) { mutableLongStateOf(System.currentTimeMillis()) }
+    // 仅活跃轮次需要刷新时钟；切换会话或结束运行时自动取消刷新。
+    LaunchedEffect(isRunning, startedAtMillis, showElapsed) {
+        while (isRunning && showElapsed) {
+            now = System.currentTimeMillis()
+            delay(100L)
+        }
+    }
+    val elapsed = ((if (isRunning) now else endedAtMillis) - startedAtMillis).coerceAtLeast(0L)
+    val completed = !isRunning && toolCalls.all { it.status == ToolCallStatus.Completed }
+    val label = if (runStatus != null) runStatusLabel(runStatus) else stringResource(
+        if (completed) R.string.chat_timeline_completed_steps else R.string.chat_timeline_steps,
+        steps.size,
+    )
 
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .clickable(onClick = onToggle)
-                .heightIn(min = 36.dp)
-                .padding(horizontal = 2.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
         ) {
-            Icon(
-                imageVector = Icons.Default.CheckCircle,
-                contentDescription = null,
-                modifier = Modifier.size(17.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = stringResource(R.string.chat_timeline_completed_steps, steps.size),
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Icon(
-                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = stringResource(
-                    if (expanded) R.string.chat_timeline_collapse else R.string.chat_timeline_expand,
-                ),
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .clickable(onClick = onToggle)
+                    .heightIn(min = 30.dp)
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (runStatus != null) {
+                    CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp)
+                } else {
+                    Icon(
+                        imageVector = if (completed) Icons.Default.CheckCircle else Icons.Default.Psychology,
+                        contentDescription = null,
+                        modifier = Modifier.size(13.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    text = label,
+                    modifier = Modifier.weight(1f, fill = false),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (showElapsed) {
+                    Text(
+                        text = stringResource(R.string.chat_timeline_elapsed, elapsed / 1000.0),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = stringResource(
+                        if (expanded) R.string.chat_timeline_collapse else R.string.chat_timeline_expand,
+                    ),
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
-        AnimatedVisibility(visible = expanded) {
+        AnimatedVisibility(visible = expanded && steps.isNotEmpty()) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -110,7 +152,7 @@ internal fun TurnActivityGroupPanel(
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     steps.forEach { step ->
-                        ActivityStepRow(step)
+                        ActivityStepRow(step, animateRunning = runStatus != null)
                     }
                 }
             }
@@ -132,7 +174,7 @@ private sealed interface ActivityStep {
 }
 
 @Composable
-private fun ActivityStepRow(step: ActivityStep) {
+private fun ActivityStepRow(step: ActivityStep, animateRunning: Boolean) {
     when (step) {
         ActivityStep.Thought -> ActivityStepContent(
             icon = {
@@ -146,9 +188,16 @@ private fun ActivityStepRow(step: ActivityStep) {
             detail = stringResource(R.string.chat_timeline_tool_completed),
         )
         is ActivityStep.Tool -> ActivityStepContent(
-            icon = { ToolStatusIcon(step.call.status) },
-            title = toolActionTitle(step.call.name),
-            detail = toolStatusLabel(step.call.status),
+            icon = {
+                if (step.call.status == ToolCallStatus.Running && !animateRunning) {
+                    Icon(Icons.Default.QuestionMark, null, Modifier.size(17.dp))
+                } else ToolStatusIcon(step.call.status)
+            },
+            title = step.call.name,
+            detail = toolStatusLabel(
+                if (step.call.status == ToolCallStatus.Running && !animateRunning) ToolCallStatus.Unknown
+                else step.call.status,
+            ),
         )
     }
 }
@@ -272,5 +321,39 @@ private fun TurnActivityExpandedPreview() {
 private fun TurnActivityExpandedDarkPreview() {
     AsssistantaiTheme(darkTheme = true) {
         TurnActivityGroupPanel(previewActivityGroup, true, {})
+    }
+}
+
+@Preview(name = "运行胶囊 · 收起", showBackground = true)
+@Composable
+private fun TurnActivityRunningPreview() {
+    AsssistantaiTheme {
+        TurnActivityGroupPanel(
+            segment = previewActivityGroup,
+            expanded = false,
+            onToggle = {},
+            runStatus = ChatRunStatus.UsingTool("web_search"),
+            startedAtMillis = 1000L,
+            endedAtMillis = 4200L,
+            showElapsed = true,
+        )
+    }
+}
+
+@Preview(name = "运行胶囊 · 展开深色", showBackground = true)
+@Composable
+private fun TurnActivityRunningDarkPreview() {
+    AsssistantaiTheme(darkTheme = true) {
+        TurnActivityGroupPanel(
+            segment = previewActivityGroup.copy(entries = previewActivityGroup.entries + TimelineEntry.ToolCall(
+                callId = "search", name = "web_search", argsSummary = "", status = ToolCallStatus.Running,
+            )),
+            expanded = true,
+            onToggle = {},
+            runStatus = ChatRunStatus.UsingTool("web_search"),
+            startedAtMillis = 1000L,
+            endedAtMillis = 4200L,
+            showElapsed = true,
+        )
     }
 }

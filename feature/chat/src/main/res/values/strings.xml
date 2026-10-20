@@ -283,4 +283,6 @@
     <string name="chat_table_scroll_horizontal">左右滑动查看全部列</string>
     <string name="chat_table_scroll_vertical">上下滑动查看全部行</string>
     <string name="chat_table_scroll_both">左右滑动查看列，上下滑动查看行</string>
+    <string name="chat_timeline_steps">%1$d 个步骤</string>
+    <string name="chat_timeline_elapsed">共 %1$.1f 秒</string>
 </resources>

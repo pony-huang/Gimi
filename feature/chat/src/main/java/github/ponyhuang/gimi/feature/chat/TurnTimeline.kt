@@ -29,11 +29,15 @@ sealed interface ChatListItem {
  * @property turnId 所属用户消息 id，同时作为列表稳定 key。
  * @property isRunning 当前轮次是否仍在运行。
  * @property segments 按事件顺序交替排列的正文段与工具活动组段。
+ * @property startedAtMillis 用户提交时间，用于本轮总耗时。
+ * @property endedAtMillis 本进程记录的结束时间；历史轮次回退到最后事件时间。
  */
 data class TurnTimeline(
     val turnId: String,
     val isRunning: Boolean,
     val segments: List<TurnSegment>,
+    val startedAtMillis: Long = 0L,
+    val endedAtMillis: Long = startedAtMillis,
 )
 
 /**
@@ -121,6 +125,8 @@ internal data class ToolCallKey(
 internal data class TimelineActivityState(
     val isAgentRunning: Boolean = false,
     val toolStatuses: Map<ToolCallKey, ToolCallStatus> = emptyMap(),
+    /** 当前进程观察到的轮次结束时间。 */
+    val completedAtMillis: Map<String, Long> = emptyMap(),
 )
 
 /**
@@ -148,6 +154,7 @@ internal fun List<Message>.toChatListItems(
                 user = user,
                 isRunning = isRunning,
                 toolStatuses = activityState.toolStatuses,
+                completedAtMillis = activityState.completedAtMillis[user.id],
             ),
         )
         assistantMessages.clear()
@@ -180,6 +187,7 @@ private fun List<Message>.toTurnTimeline(
     user: Message,
     isRunning: Boolean,
     toolStatuses: Map<ToolCallKey, ToolCallStatus>,
+    completedAtMillis: Long?,
 ): TurnTimeline {
     val selectedResponses = selectToolResponses()
     val historicalStatuses = historicalConfirmationStatuses()
@@ -246,6 +254,9 @@ private fun List<Message>.toTurnTimeline(
         turnId = user.id,
         isRunning = isRunning,
         segments = segments,
+        startedAtMillis = user.timestamp,
+        endedAtMillis = (completedAtMillis ?: maxOf(user.timestamp, maxOfOrNull { it.timestamp } ?: user.timestamp))
+            .coerceAtLeast(user.timestamp),
     )
 }
 
@@ -284,3 +295,17 @@ private fun Message.hasAnswerContent(): Boolean =
     error != null ||
         textParts.any { !it.thought && it.text.isNotBlank() } ||
         fileAttachments.isNotEmpty() || functionResponses.any { it.a2uiDocument != null || it.a2uiFailed }
+
+/** 活跃状态使用稳定的活动组 key，首个工具到达时不会重置用户的展开选择。 */
+internal fun TurnTimeline.displaySegments(status: ChatRunStatus? = null): List<TurnSegment> {
+    val visible = segments.filter { segment ->
+        segment is TurnSegment.Answer ||
+            (segment is TurnSegment.Activity && segment.entries.any { it is TimelineEntry.ToolCall })
+    }.toMutableList()
+    if (isRunning && status != null) {
+        val current = segments.lastOrNull() as? TurnSegment.Activity
+            ?: TurnSegment.Activity("$turnId:a${segments.count { it is TurnSegment.Activity }}", emptyList())
+        if (visible.none { it is TurnSegment.Activity && it.id == current.id }) visible += current
+    }
+    return visible
+}

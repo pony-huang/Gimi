@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- V2EX 官方 mark（Simple Icons 版）：深色 V 字 + 内凹槽。
+     单色 #1F1F1F 填充，无下划线；魅族深色滤镜下深色单色图标会被压黑，
+     但这是用户指定的官方 logo，与旧版双色 wordmark 不同。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#1F1F1F"
+        android:pathData="M.671 1.933h13.821a1.342 1.342 0 0 1 .98.425l8.166 8.725a1.342 1.342 0 0 1 0 1.834l-8.166 8.724a1.342 1.342 0 0 1-.98.426L.673 21.395A.671.671 0 0 1 0 20.725v-6.878h13.19l2.276-2.28a.336.336 0 0 0 0-.474l-2.276-2.28H0V2.604a.671.671 0 0 1 .671-.671Z" />
+</vector>

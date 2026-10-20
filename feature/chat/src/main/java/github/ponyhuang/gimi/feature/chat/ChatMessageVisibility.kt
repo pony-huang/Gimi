@@ -14,8 +14,8 @@ internal const val ConfirmationToolName = AdkRequestConfirmationToolName
 
 /**
  * 动态工具检索的内部工具名。它既是 ADK 协议信令（检索结果决定后续声明注入），
- * 也是用户看得见的 Agent 活动，因此时间线照常渲染，仅由 [toolDisplayName]
- * 换成本地化展示名。
+ * 也是 Agent 活动的一部分，因此活动数据照常保留，仅由 [toolDisplayName]
+ * 换成本地化展示名；聊天页通过步骤摘要与单行运行状态呈现，不直接展示协议原文。
  */
 internal const val ToolSearchProtocolName = "tool_search"
 

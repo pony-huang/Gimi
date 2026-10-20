@@ -51,6 +51,8 @@ class PrepareChatSendUseCase @Inject constructor(
         drafts: List<DraftAttachment>,
         cachedHistory: () -> ChatHistorySnapshot? = { null },
         retry: ChatTurn? = null,
+        a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities? = null,
+        a2uiInteraction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction? = null,
     ): PreparedChatSend {
         // 配置失败必须终止准备，不能沿用 UI 中的旧工具配置。
         val configuration = sessionResolver.resolveToolConfiguration(sessionId, selection)
@@ -62,8 +64,12 @@ class PrepareChatSendUseCase @Inject constructor(
         } else {
             repository.loadMessages(sessionId).orEmpty()
         }
-        val turn = prepareTurn(sessionId, text, drafts, history, retry)
-        val execution = agent.createExecution(sessionId, selection, configuration)
+        val initial = prepareTurn(sessionId, text, drafts, history, retry)
+        val turn = if (a2uiInteraction != null && retry == null) {
+            val userMessage = initial.userMessage.copy(a2uiInteraction = a2uiInteraction)
+            initial.copy(userMessage = userMessage, messages = history + userMessage)
+        } else initial
+        val execution = agent.createExecution(sessionId, selection, configuration, a2uiCapabilities)
         return PreparedChatSend(turn, execution, configuration, revision)
     }
 }

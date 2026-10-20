@@ -39,6 +39,8 @@ data class Message(
     val invocationId: String? = null,
     val author: String,
     val role: MessageRole,
+    /** 用户已提交的结构化 UI 事件；不把协议 JSON 当作普通正文展示。 */
+    val a2uiInteraction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction? = null,
     val textParts: List<TextPart> = emptyList(),
     val fileAttachments: List<FileAttachment> = emptyList(),
     val functionCalls: List<FunctionCallView> = emptyList(),
@@ -213,6 +215,10 @@ data class FunctionResponseView(
     val name: String,
     val localFileSearchResult: LocalFileSearchResult? = null,
     val confirmationApproved: Boolean? = null,
+    /** Validated native UI revision returned by the UI generation tool. */
+    val a2uiDocument: github.ponyhuang.gimi.domain.a2ui.A2uiDocument? = null,
+    /** The generation tool exhausted its format correction; diagnostic details remain in the tool result. */
+    val a2uiFailed: Boolean = false,
 )
 
 /**

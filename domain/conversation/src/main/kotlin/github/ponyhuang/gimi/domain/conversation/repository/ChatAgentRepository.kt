@@ -13,11 +13,18 @@ interface ChatAgentRepository {
         sessionId: String,
         selection: ModelSelection,
         toolConfiguration: ConversationToolConfiguration? = null,
+        a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities? = null,
     ): ChatAgentExecution
 }
 
 /** 一轮消息及其确认/输入恢复共用的执行上下文，由会话运行状态持有。 */
 interface ChatAgentExecution {
+    /** 提交结构化界面事件，作为新的用户轮次；retry 沿用原执行恢复规则。 */
+    suspend fun sendInteraction(
+        interaction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction,
+        retry: Boolean = false,
+    ): Flow<ChatRunEvent>
+
     /** retry=true 时恢复 SDK 保存的原执行，不追加用户消息。 */
     suspend fun send(
         text: String,

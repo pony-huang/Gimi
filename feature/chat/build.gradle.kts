@@ -17,6 +17,12 @@ android {
 }
 
 dependencies {
+    implementation(project(":domain:a2ui"))
+    implementation(libs.androidx.a2ui.compose.runtime)
+    implementation(libs.androidx.a2ui.compose.ui)
+    implementation(libs.androidx.a2ui.model)
+    implementation(libs.androidx.material3.a2ui)
+    implementation(libs.kotlinx.serialization.json)
     implementation(project(":core:audio"))
     implementation(project(":core:common"))
     implementation(project(":core:designsystem"))
@@ -46,6 +52,9 @@ dependencies {
     implementation(libs.coil.network.okhttp)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui.compose)
+    implementation(libs.androidx.media3.ui.compose.material3)
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.core)
@@ -55,6 +64,8 @@ dependencies {
     implementation(libs.multiplatform.markdown.renderer.code)
 
     testImplementation(project(":core:testing"))
+    // 仅测试：验证实际聊天目录导出的 schema 可以由独立协议模块校验。
+    testImplementation(project(":data:a2ui"))
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)

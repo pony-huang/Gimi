@@ -25,6 +25,10 @@ internal fun PluginActionCallbackScreen(
     onCallback: (Map<String, String>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (callback.handlerId == EXTERNAL_LINK_HANDLER) {
+        Text(stringResource(R.string.plugin_opening_link), modifier = modifier)
+        return
+    }
     if (callback.handlerId != HANDLER_WEB) {
         Text(
             text = stringResource(R.string.plugin_action_callback_unsupported, callback.handlerId),

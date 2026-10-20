@@ -1,5 +1,7 @@
 """Release gates must reject mismatched versions and prevent public asset replacement."""
 import json
+import copy
+import hashlib
 from pathlib import Path
 import tempfile
 import unittest
@@ -135,6 +137,95 @@ class ReleaseToolsTest(unittest.TestCase):
     def test_apk_metadata(self):
         with patch.object(release, 'run', return_value="package: name='github.ponyhuang.gimi' versionCode='1001' versionName='0.6.4' platformBuildVersionName='16'"):
             self.assertEqual(release.apk_metadata('aapt', Path('test.apk')), ('github.ponyhuang.gimi', 1001, '0.6.4'))
+
+    def test_subscription_uses_exact_apk_bytes_and_preserves_interface_version(self):
+        with tempfile.TemporaryDirectory(dir=release.ROOT / 'temp') as folder:
+            dist = Path(folder)
+            for key in release.PLUGINS:
+                (dist / f'Gimi-plugin-{key}-v0.13.0.apk').write_bytes(key.encode())
+            release.write_plugin_subscription(release.ROOT, dist, 'pony-huang/Gimi', '0.13.0')
+            catalog = json.loads((dist / 'plugin-subscription.json').read_text(encoding='utf-8'))
+            originals = {entry['key']: entry for entry in release.plugin_catalog(release.ROOT)['entries']}
+            for entry in catalog['entries']:
+                key = entry['key']
+                self.assertEqual(entry['apkUrl'],
+                                 f'https://github.com/pony-huang/Gimi/releases/download/v0.13.0/Gimi-plugin-{key}-v0.13.0.apk')
+                self.assertEqual(entry['sizeBytes'], len(key.encode()))
+                self.assertEqual(entry['sha256'], hashlib.sha256(key.encode()).hexdigest())
+                self.assertEqual({k: v for k, v in entry.items() if k not in ('apkUrl', 'sha256', 'sizeBytes')},
+                                 originals[key])
+
+    def test_subscription_rejects_missing_empty_and_oversized_apk(self):
+        for size in (None, 0, 50 * 1024 * 1024 + 1):
+            with self.subTest(size=size), tempfile.TemporaryDirectory(dir=release.ROOT / 'temp') as folder:
+                dist = Path(folder)
+                if size is not None:
+                    with (dist / 'Gimi-plugin-zhihu-v0.13.0.apk').open('wb') as apk:
+                        apk.truncate(size)
+                with self.assertRaises(ValueError):
+                    release.write_plugin_subscription(release.ROOT, dist, 'pony-huang/Gimi', '0.13.0')
+                self.assertFalse((dist / 'plugin-subscription.json').exists())
+
+    def test_catalog_rejects_invalid_metadata(self):
+        original = release.plugin_catalog(release.ROOT)
+        for field, value in (('key', 'unknown'), ('packageName', 'other.app'), ('pluginVersion', 0),
+                             ('pluginVersion', True), ('title', ''), ('summary', {'zh': '说明'}),
+                             ('tags', [1]), ('apkUrl', 'https://example.test/old.apk')):
+            with self.subTest(field=field, value=value), tempfile.TemporaryDirectory(
+                dir=release.ROOT / 'temp'
+            ) as folder:
+                root = Path(folder)
+                catalog = copy.deepcopy(original)
+                catalog['entries'][0][field] = value
+                source = root / release.PLUGIN_CATALOG
+                source.parent.mkdir(parents=True)
+                source.write_text(json.dumps(catalog), encoding='utf-8')
+                with self.assertRaises(ValueError):
+                    release.plugin_catalog(root)
+
+    def test_catalog_rejects_missing_duplicate_entries_and_unknown_schema(self):
+        original = release.plugin_catalog(release.ROOT)
+        variants = [dict(original, schemaVersion=2), dict(original, schemaVersion=True),
+                    dict(original, entries=original['entries'][:-1]),
+                    dict(original, entries=original['entries'] + [original['entries'][0]])]
+        for catalog in variants:
+            with self.subTest(catalog=catalog), tempfile.TemporaryDirectory(dir=release.ROOT / 'temp') as folder:
+                root = Path(folder)
+                source = root / release.PLUGIN_CATALOG
+                source.parent.mkdir(parents=True)
+                source.write_text(json.dumps(catalog), encoding='utf-8')
+                with self.assertRaises(ValueError):
+                    release.plugin_catalog(root)
+
+    def test_package_includes_subscription_in_checksums_and_removes_stale_assets(self):
+        with tempfile.TemporaryDirectory(dir=release.ROOT / 'temp') as folder:
+            root = Path(folder)
+            source = root / release.PLUGIN_CATALOG
+            source.parent.mkdir(parents=True)
+            source.write_bytes((release.ROOT / release.PLUGIN_CATALOG).read_bytes())
+            sources = {}
+            for abi in ('arm64-v8a', 'universal'):
+                sources[root / f'app/build/outputs/apk/release/app-{abi}-release.apk'] = 'github.ponyhuang.gimi'
+            for key in release.PLUGINS:
+                sources[root / f'plugins/{key}/build/outputs/apk/release/{key}-release.apk'] = f'github.ponyhuang.gimi.plugin.{key}'
+            for path in sources:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(path.name.encode())
+            dist = root / 'temp/release/dist'
+            dist.mkdir(parents=True)
+            (dist / 'stale.apk').write_bytes(b'old')
+            with patch.object(release, 'ROOT', root), patch.object(
+                release, 'config', return_value=('0.13.0', 1001)
+            ), patch.dict(release.os.environ, {
+                'GITHUB_REPOSITORY': 'pony-huang/Gimi', 'RELEASE_CERT_SHA256': 'a' * 64,
+            }), patch.object(release, 'apk_metadata', side_effect=lambda aapt, path: (sources[path], 1001, '0.13.0')), patch.object(
+                release, 'run', side_effect=lambda *args: 'commit' if args[0] == 'git' else f'Signer #1 certificate SHA-256 digest: {"a" * 64}'
+            ), patch.object(release, 'releases', return_value=[]):
+                release.package('aapt', 'apksigner')
+            self.assertFalse((dist / 'stale.apk').exists())
+            subscription = dist / 'plugin-subscription.json'
+            self.assertIn(f'{hashlib.sha256(subscription.read_bytes()).hexdigest()}  plugin-subscription.json',
+                          (dist / 'SHA256SUMS').read_text())
 
 
 if __name__ == '__main__':

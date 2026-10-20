@@ -1,5 +1,11 @@
 # Repository Guidelines
 
+## No Desktop Control
+
+- Work through source files, command-line tools, and non-UI APIs. Do not use Computer Use, desktop screenshots or accessibility inspection, window activation, mouse/keyboard injection, or equivalent scripts to inspect or control the user's computer.
+- IDE MCP calls that read project information or run builds without desktop interaction remain allowed. Android device/emulator CLI workflows follow the Android tooling rules below; they do not authorize desktop control.
+- When a step requires desktop interaction, explain the specific action for the user to perform manually, and continue independent work. Use command-line or headless rendering for Compose previews; if unavailable, report the blocker and agree on an alternative without automating the IDE UI.
+
 ## Structure, Ownership, and Architecture
 
 ### Module map
@@ -104,6 +110,24 @@ domain/data/core -X-> feature or app
 - Add concise Chinese comments to complex logic, explaining business invariants, lifecycle/call timing, and why the implementation is necessary rather than restating individual lines.
 - Every Kotlin `data class` and `data object` must have KDoc describing its responsibility and the meaning of its data. Document non-obvious properties with `@property` entries or focused property comments.
 
+### Compose A2UI (agentic UI) reference
+
+- Canonical references: Compose renderer page <https://developer.android.com/develop/ui/compose/agentic.md.txt> (retrieved 2026-10-19; the page and its protocol versions evolve, so re-fetch it before adopting or upgrading); A2UI protocol home <https://a2ui.org/>; protocol spec <https://a2ui.org/specification/v0.9.1-a2ui/>; catalogs <https://a2ui.org/concepts/catalogs/>.
+- Purpose: the Jetpack Compose A2UI renderer implements the A2UI protocol so agents can produce rich, interactive UI as native Compose components by emitting JSON. Agents never generate or execute arbitrary UI code; the component catalog is the contract that declares which components, properties, and functions they may use.
+- Artifacts and responsibilities:
+    - `androidx.a2ui.compose:compose-runtime` — fine-grained updates for streaming agent payloads through Compose Snapshot state; only affected components recompose.
+    - `androidx.a2ui.compose:compose-ui` — catalog and component implementation APIs, including progressive rendering, per-subcomponent loading states, animated transitions, and two-way data binding back to the agent.
+    - `androidx.a2ui:a2ui-model` and `androidx.a2ui:a2ui-engine` — protocol parsing and message processing, schema validation before payloads reach state models, component error states, and automatic error reporting so the agent can self-correct.
+    - `androidx.compose.material3:material3-a2ui` — optional ready-made Basic Catalog based on Material 3, with progressive rendering and Material theming.
+    - `androidx.a2ui.compose:compose-ui-testing` — dedicated testing APIs.
+- Architecture: the runtime and UI layers are design-system agnostic. Build a custom catalog for this project's design system or adopt the provided Basic Catalog.
+- Protocol compatibility: the renderer supports A2UI 0.9.1. Catalog schemas are tied to protocol versions, and clients can declare multiple supported catalog versions for capability negotiation with the agent. AndroidX binary compatibility rules apply: non-breaking additions enter core interfaces with default implementations, while incompatible changes deprecate old interfaces (for example `A2uiComponent`) and add new ones (`A2uiComponentV2`) alongside them.
+- Adoption guardrails: keep A2UI inside a dedicated feature or business-agnostic presentation/core slice; domain and data modules never depend on Compose or A2UI types. Treat agent JSON as untrusted input: validate it with `a2ui-engine` before it reaches UI state, surface component error states, and keep permission and credential decisions in their owning tested layers. Register only catalog components that follow the design-system, i18n, accessibility, and preview-first rules above. Before upgrading, verify the current protocol version and catalog negotiation behavior instead of assuming 0.9.1 is still current.
+
+## Integration References
+
+- Spotify: Before adding or changing Web API endpoints, OAuth, tool schemas, playback behavior, or Spotify content handling, read [Spotify integration reference](spec/en/spotify-building-with-ai.md). Re-fetch the linked official OpenAPI schema and relevant endpoint/policy pages for the capability being changed; the dated reference is not a frozen API contract.
+
 ## Build and Verification
 
 ### Build commands
@@ -126,7 +150,7 @@ Android Studio may run the `app` debug configuration on a device or emulator.
 - Inspect the run output and, when returned, `fullOutputPath` until compilation reaches a terminal result. A successful MCP invocation or `Jugg compile started` only confirms startup. Report incremental compilation, Jugg's automatic Gradle fallback, deployment, and device verification separately; `No file changes` followed by Gradle fallback is not an incremental compile success.
 - If the IDE MCP route or required Jugg configuration is unavailable, try the Jugg CLI; if Jugg is unavailable, use conventional Gradle/Android CLI commands. For Jugg failures, inspect and report the cause before falling back under the rules below. Inspect Jugg's resolved command: it may run `:app:assembleDebug` with the configuration cache disabled rather than a narrow compile.
 - For JVM tests and required Gradle checks that Jugg's incremental path cannot establish, choose the smallest targets satisfying the testing rules below and combine compatible targets in one `gradlew.bat` invocation when practical. Existing Gradle commands remain the fallback and required-check reference. When a change requires both JVM tests and APK assembly, finish the focused tests and resolve their failures before starting assembly; combine compatible compile/test targets within that stage.
-- If Jugg produces no new output or progress for 30–60 seconds, inspect Android Studio's window and owned dialogs, the output file, and the actual running build before retrying. A `Build Files Changed Confirm` dialog can block compilation; a missing device alone does not establish the cause. Resolve the observed prompt using the current diff and baseline, and resume the existing task rather than launching another waiting compile. Open or foreground Android Studio when needed; record the concrete blocker before taking a documented fallback.
+- If Jugg produces no new output or progress for 30–60 seconds, inspect the output file and running build through command-line or non-UI APIs before retrying. A `Build Files Changed Confirm` dialog can block compilation; a missing device alone does not establish the cause. If available evidence indicates an IDE prompt, ask the user to inspect and resolve it manually using the current diff and baseline. Resume the existing task rather than launching another waiting compile; record the blocker before taking a documented fallback.
 - If Jugg's embedded Kotlin compiler reports `INTERNAL_ERROR` with `Could not find installation home path` / missing `product-info.json`, classify it as an IDE/Jugg compiler-environment failure, not a Kotlin source error. Retry the incremental compiler at most once; if it repeats, validate with the required Gradle targets and report the Jugg failure separately.
 - If Jugg reports `READY_FULL_COMPILE (build.gradle.kts changed)`, inspect both `git diff` for build scripts and Jugg's `getLastBuildFile ... exists: false` entries. Missing Jugg history can trigger this verdict even when this task changed no build script. Accept one full build to re-establish the baseline, or use direct Gradle for compile-only validation; do not repeatedly retry incremental compile against the same state or delete build artifacts to force it.
 - Changes to Hilt/Room annotations, generated code, or bytecode transforms need the Gradle build required by the testing rules; Jugg's source-to-dex incremental path does not rerun every processor or transform. Keep one build running at a time.
@@ -164,7 +188,7 @@ Android Studio may run the `app` debug configuration on a device or emulator.
 ### Refactoring
 
 - Refactor one closed capability at a time; preserve behavior and keep logical commits independently compilable and revertible.
-- Use IDE Refactor Move or `git mv`. Move-only commits change only paths, packages, imports, and necessary visibility. Inspect `git diff --find-renames --summary`, compile affected modules, and remove empty legacy package directories.
+- Use `git mv` for moves. Move-only commits change only paths, packages, imports, and necessary visibility. Inspect `git diff --find-renames --summary`, compile affected modules, and remove empty legacy package directories.
 - This project is in the development and exploration stage. Do not preserve old databases, serialized payloads, configuration fields, APIs, or compatibility adapters unless the user explicitly requests it; choose the cleanest current design, allow destructive local-data recreation, and do not add historical migrations.
 - Do not leave forwarding wrappers, duplicate implementations, or legacy adapters without an explicit current requirement.
 - Avoid drive-by package moves or broad unrelated cleanup.

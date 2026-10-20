@@ -1,6 +1,6 @@
 <resources>
     <string name="plugin_screen_title">插件</string>
-    <string name="plugin_empty">未安装插件。安装插件 APK 后重启应用即可在此管理。</string>
+    <string name="plugin_empty">暂无插件。刷新订阅源或手动安装插件 APK。</string>
     <string name="plugin_config_title">插件配置</string>
     <string name="plugin_config_save">保存</string>
     <string name="plugin_config_saved">配置已保存</string>
@@ -9,12 +9,70 @@
     <string name="plugin_action_callback_title">授权</string>
     <string name="plugin_action_callback_unsupported">宿主不支持回调处理器：%1$s</string>
     <string name="plugin_config_no_fields">该插件无需配置。</string>
-    <string name="plugin_row_tools_summary">版本 %1$d · %2$d 个工具</string>
     <string name="plugin_row_more">更多操作</string>
     <string name="plugin_uninstall_menu">卸载插件</string>
     <string name="plugin_uninstall_title">卸载「%1$s」？</string>
-    <string name="plugin_uninstall_message">卸载后将移除该插件提供的 %1$d 个工具，设备上安装的插件包也会一并删除。</string>
+    <string name="plugin_uninstall_message">卸载后将移除该插件提供的工具，并从设备删除插件包。</string>
     <string name="plugin_uninstall_confirm">卸载</string>
     <string name="plugin_uninstall_cancel">取消</string>
     <string name="plugin_uninstalled_notice">插件已卸载</string>
+    <string name="plugin_authorization_status">登录状态：%1$s</string>
+    <string name="plugin_authorized">已登录</string>
+    <string name="plugin_unauthorized">未登录</string>
+    <string name="plugin_authorization_checking">正在检查…</string>
+    <string name="plugin_authorization_failed">检查失败</string>
+    <string name="plugin_authorization_retry">重试</string>
+    <string name="plugin_oauth_credentials_help">在服务商开发者控制台创建应用，填写所需凭据及回调地址。</string>
+    <string name="plugin_oauth_reauthorize">重新授权</string>
+    <string name="plugin_browser_unavailable">没有可用的浏览器</string>
+    <string name="plugin_link_invalid">链接地址无效</string>
+    <string name="plugin_opening_link">正在打开链接…</string>
+
+    <!-- 插件列表与订阅 -->
+    <string name="plugin_list_search_label">搜索插件</string>
+    <string name="plugin_list_search_clear">清除搜索</string>
+    <string name="plugin_list_empty">没有找到匹配的插件</string>
+    <string name="plugin_list_catalog_partial_error">部分订阅源加载失败</string>
+    <string name="plugin_list_install">安装</string>
+    <string name="plugin_list_retry">重试</string>
+    <string name="plugin_list_installed">已安装</string>
+    <string name="plugin_list_installing">安装中</string>
+    <string name="plugin_list_downloading">下载中 %1$d%%</string>
+    <string name="plugin_list_unknown_sources">需要允许安装未知来源应用后才能安装插件</string>
+    <string name="plugin_list_catalog_error">订阅源加载失败，已使用内置目录</string>
+    <string name="plugin_list_install_network">网络请求失败，请稍后重试</string>
+    <string name="plugin_list_install_checksum">下载文件校验失败，请重试</string>
+    <string name="plugin_list_install_no_asset">订阅源未提供该插件的安装包</string>
+    <string name="plugin_list_install_too_large">插件包超过大小限制</string>
+    <string name="plugin_list_install_storage">无法保存插件包，请检查存储空间</string>
+    <string name="plugin_list_install_unknown">安装失败，请重试</string>
+
+    <string name="plugin_subscription_entry">插件订阅源</string>
+    <string name="plugin_subscription_title">插件订阅源</string>
+    <string name="plugin_subscription_section_sources">订阅源</string>
+    <string name="plugin_subscription_official">官方订阅源</string>
+    <string name="plugin_subscription_empty">尚未添加订阅源</string>
+    <string name="plugin_subscription_empty_subtitle">点击下方添加</string>
+    <string name="plugin_subscription_add">添加订阅源</string>
+    <string name="plugin_subscription_add_subtitle">支持追加多个 HTTPS 地址</string>
+    <string name="plugin_subscription_remove">移除订阅源</string>
+    <string name="plugin_subscription_add_dialog_title">添加订阅源</string>
+    <string name="plugin_subscription_add_action">添加</string>
+    <string name="plugin_subscription_cancel">取消</string>
+    <string name="plugin_subscription_url_label">订阅地址</string>
+    <string name="plugin_subscription_note">可以追加多个 HTTPS 订阅源；条目按 key 合并，先添加的源优先。</string>
+    <string name="plugin_subscription_reset">恢复默认源</string>
+    <string name="plugin_subscription_reset_subtitle">仅保留官方订阅源</string>
+    <string name="plugin_subscription_invalid_url">请输入以 https:// 开头的订阅地址</string>
+    <string name="plugin_subscription_duplicate">该订阅地址已存在</string>
+
+    <!-- 插件详细信息 -->
+    <string name="plugin_detail_title">插件详情</string>
+    <string name="plugin_detail_menu">详细信息</string>
+    <string name="plugin_detail_description">插件介绍</string>
+    <string name="plugin_detail_highlights">能力</string>
+    <string name="plugin_detail_repo">在 GitHub 查看</string>
+    <string name="plugin_detail_manage">管理插件</string>
+    <string name="plugin_detail_no_info">该插件未在订阅源中提供详细介绍</string>
+    <string name="plugin_detail_not_found">插件不存在</string>
 </resources>

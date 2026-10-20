@@ -1,11 +1,15 @@
 package github.ponyhuang.gimi.feature.chat
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -19,25 +23,31 @@ import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.QuestionMark
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import kotlinx.coroutines.delay
 
 /**
- * assistant 轮次内单个工具活动组的折叠行。
+ * 当前轮次的紧凑运行胶囊与可展开工具步骤。
  *
- * 头部显示「执行工具 N 次」（N 为组内工具调用数；纯思考组退化为「思考」），
- * 展开后按事件顺序显示思考文本与工具调用。运行中的组由调用方保持展开。
+ * 默认只占一行；展开后展示用户可理解的步骤名称与工具状态，不展示原始思考文本或参数。
  */
 @Composable
 internal fun TurnActivityGroupPanel(
@@ -45,55 +55,103 @@ internal fun TurnActivityGroupPanel(
     expanded: Boolean,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
+    runStatus: ChatRunStatus? = null,
+    isRunning: Boolean = false,
+    startedAtMillis: Long = 0L,
+    endedAtMillis: Long = startedAtMillis,
+    showElapsed: Boolean = false,
 ) {
-    val toolCount = segment.entries.count { it is TimelineEntry.ToolCall }
+    val hasThought = segment.entries.any { it is TimelineEntry.Thought }
+    val toolCalls = segment.entries.filterIsInstance<TimelineEntry.ToolCall>()
+    val steps = buildList {
+        if (hasThought) add(ActivityStep.Thought)
+        toolCalls.forEach { add(ActivityStep.Tool(it)) }
+    }
+    if (steps.isEmpty() && runStatus == null) return
+    var now by remember(startedAtMillis) { mutableLongStateOf(System.currentTimeMillis()) }
+    // 仅活跃轮次需要刷新时钟；切换会话或结束运行时自动取消刷新。
+    LaunchedEffect(isRunning, startedAtMillis, showElapsed) {
+        while (isRunning && showElapsed) {
+            now = System.currentTimeMillis()
+            delay(100L)
+        }
+    }
+    val elapsed = ((if (isRunning) now else endedAtMillis) - startedAtMillis).coerceAtLeast(0L)
+    val completed = !isRunning && toolCalls.all { it.status == ToolCallStatus.Completed }
+    val label = if (runStatus != null) runStatusLabel(runStatus) else stringResource(
+        if (completed) R.string.chat_timeline_completed_steps else R.string.chat_timeline_steps,
+        steps.size,
+    )
+
+    // 收起时融入聊天背景，展开后由同一个 Surface 包含状态与详情。
     Surface(
-        onClick = onToggle,
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        shape = RoundedCornerShape(12.dp),
+        modifier = if (expanded && steps.isNotEmpty()) modifier.fillMaxWidth() else modifier,
+        shape = RoundedCornerShape(if (expanded && steps.isNotEmpty()) 16.dp else 50.dp),
+        color = if (expanded) MaterialTheme.colorScheme.surfaceContainerLow else Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = if (expanded) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f))
+        } else {
+            null
+        },
     ) {
         Column {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                    .clickable(onClick = onToggle)
+                    .heightIn(min = 30.dp)
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(
-                    text = if (toolCount > 0) {
-                        stringResource(R.string.chat_timeline_tool_group_count, toolCount)
-                    } else {
-                        stringResource(R.string.chat_timeline_thought_group)
-                    },
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Medium,
+                if (runStatus != null) {
+                    CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp)
+                } else {
+                    Icon(
+                        imageVector = if (completed) Icons.Default.CheckCircle else Icons.Default.Psychology,
+                        contentDescription = null,
+                        modifier = Modifier.size(13.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Row(
                     modifier = Modifier.weight(1f),
-                )
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = label,
+                        modifier = Modifier.weight(1f, fill = false),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (showElapsed) {
+                        Text(
+                            text = stringResource(R.string.chat_timeline_elapsed, elapsed / 1000.0),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 Icon(
                     imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                     contentDescription = stringResource(
                         if (expanded) R.string.chat_timeline_collapse else R.string.chat_timeline_expand,
                     ),
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            AnimatedVisibility(visible = expanded) {
-                Column {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.32f),
-                    )
-                    Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        segment.entries.forEach { entry ->
-                            TimelineEntryRow(
-                                entry = entry,
-                            )
-                        }
+            AnimatedVisibility(visible = expanded && steps.isNotEmpty()) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    steps.forEach { step ->
+                        ActivityStepRow(step, animateRunning = runStatus != null)
                     }
                 }
             }
@@ -101,45 +159,82 @@ internal fun TurnActivityGroupPanel(
     }
 }
 
+/** 展开摘要中的一项：合并后的思考阶段，或一次具体工具调用。 */
+private sealed interface ActivityStep {
+    /** 多条思考分段合并成一项通用说明。 */
+    data object Thought : ActivityStep
+
+    /**
+     * 一次工具调用。
+     *
+     * @property call 保留原始调用状态以生成动作名称和完成状态。
+     */
+    data class Tool(val call: TimelineEntry.ToolCall) : ActivityStep
+}
+
 @Composable
-private fun TimelineEntryRow(
-    entry: TimelineEntry,
-) {
-    when (entry) {
-        is TimelineEntry.Thought -> TimelineTextRow(
-            icon = { Icon(Icons.Default.Psychology, contentDescription = null) },
-            title = entry.text,
+private fun ActivityStepRow(step: ActivityStep, animateRunning: Boolean) {
+    when (step) {
+        ActivityStep.Thought -> ActivityStepContent(
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Psychology,
+                    contentDescription = null,
+                    modifier = Modifier.size(17.dp),
+                )
+            },
+            title = stringResource(R.string.chat_timeline_step_understand),
+            detail = stringResource(R.string.chat_timeline_tool_completed),
         )
-        is TimelineEntry.ToolCall -> TimelineTextRow(
-            icon = { ToolStatusIcon(entry.status) },
-            title = "${toolDisplayName(entry.name)}${entry.argsSummary}",
-            detail = toolStatusLabel(entry.status),
+        is ActivityStep.Tool -> ActivityStepContent(
+            icon = {
+                if (step.call.status == ToolCallStatus.Running && !animateRunning) {
+                    Icon(Icons.Default.QuestionMark, null, Modifier.size(17.dp))
+                } else ToolStatusIcon(step.call.status)
+            },
+            title = step.call.name,
+            detail = toolStatusLabel(
+                if (step.call.status == ToolCallStatus.Running && !animateRunning) ToolCallStatus.Unknown
+                else step.call.status,
+            ),
         )
     }
 }
 
 @Composable
-private fun TimelineTextRow(
+private fun ActivityStepContent(
     icon: @Composable () -> Unit,
     title: String,
-    detail: String? = null,
+    detail: String,
 ) {
-    Row(verticalAlignment = Alignment.Top) {
-        androidx.compose.foundation.layout.Box(
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 34.dp)
+            .padding(vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
             modifier = Modifier.size(20.dp),
             contentAlignment = Alignment.Center,
-        ) { icon() }
-        Spacer(Modifier.width(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.bodyMedium)
-            detail?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+        ) {
+            icon()
         }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = detail,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
     }
 }
 
@@ -150,14 +245,27 @@ private fun ToolStatusIcon(status: ToolCallStatus) {
             modifier = Modifier.size(16.dp),
             strokeWidth = 2.dp,
         )
-        ToolCallStatus.Completed -> Icon(Icons.Default.CheckCircle, contentDescription = null)
-        ToolCallStatus.Rejected -> Icon(
-            Icons.Default.Close,
+        ToolCallStatus.Completed -> Icon(
+            imageVector = Icons.Default.CheckCircle,
             contentDescription = null,
+            modifier = Modifier.size(17.dp),
+        )
+        ToolCallStatus.Rejected -> Icon(
+            imageVector = Icons.Default.Close,
+            contentDescription = null,
+            modifier = Modifier.size(17.dp),
             tint = MaterialTheme.colorScheme.error,
         )
-        ToolCallStatus.AwaitingConfirmation -> Icon(Icons.Default.Shield, contentDescription = null)
-        ToolCallStatus.Unknown -> Icon(Icons.Default.QuestionMark, contentDescription = null)
+        ToolCallStatus.AwaitingConfirmation -> Icon(
+            imageVector = Icons.Default.Shield,
+            contentDescription = null,
+            modifier = Modifier.size(17.dp),
+        )
+        ToolCallStatus.Unknown -> Icon(
+            imageVector = Icons.Default.QuestionMark,
+            contentDescription = null,
+            modifier = Modifier.size(17.dp),
+        )
     }
 }
 
@@ -175,32 +283,76 @@ private fun toolStatusLabel(status: ToolCallStatus): String = stringResource(
 private val previewActivityGroup = TurnSegment.Activity(
     id = "preview:a0",
     entries = listOf(
-        TimelineEntry.Thought("thought", "先检索工作区内的项目计划"),
-        TimelineEntry.ToolCall("call", "search_workspace", "(query=项目计划)", ToolCallStatus.Completed),
-        TimelineEntry.ToolCall("read", "read_document", "(风险清单.pdf)", ToolCallStatus.Rejected),
+        TimelineEntry.Thought("thought", "内部思考文本只保留在数据层，不进入摘要。"),
+        TimelineEntry.ToolCall(
+            callId = "now-playing",
+            name = "spotify_now_playing",
+            argsSummary = "(device=phone)",
+            status = ToolCallStatus.Completed,
+        ),
+        TimelineEntry.ToolCall(
+            callId = "next",
+            name = "spotify_next",
+            argsSummary = "",
+            status = ToolCallStatus.Completed,
+        ),
     ),
 )
 
-@Preview(name = "工具组折叠", showBackground = true)
+@Preview(name = "步骤摘要折叠", showBackground = true)
 @Composable
-private fun TurnActivityGroupCollapsedPreview() {
+private fun TurnActivityCollapsedPreview() {
     AsssistantaiTheme(darkTheme = false) {
         TurnActivityGroupPanel(previewActivityGroup, false, {})
     }
 }
 
-@Preview(name = "工具组展开", showBackground = true)
+@Preview(name = "步骤摘要展开", showBackground = true)
 @Composable
-private fun TurnActivityGroupExpandedPreview() {
+private fun TurnActivityExpandedPreview() {
     AsssistantaiTheme(darkTheme = false) {
         TurnActivityGroupPanel(previewActivityGroup, true, {})
     }
 }
 
-@Preview(name = "工具组展开（深色）", showBackground = true)
+@Preview(name = "步骤摘要展开（深色）", showBackground = true)
 @Composable
-private fun TurnActivityGroupExpandedDarkPreview() {
+private fun TurnActivityExpandedDarkPreview() {
     AsssistantaiTheme(darkTheme = true) {
         TurnActivityGroupPanel(previewActivityGroup, true, {})
+    }
+}
+
+@Preview(name = "运行胶囊 · 收起", showBackground = true)
+@Composable
+private fun TurnActivityRunningPreview() {
+    AsssistantaiTheme {
+        TurnActivityGroupPanel(
+            segment = previewActivityGroup,
+            expanded = false,
+            onToggle = {},
+            runStatus = ChatRunStatus.UsingTool("web_search"),
+            startedAtMillis = 1000L,
+            endedAtMillis = 4200L,
+            showElapsed = true,
+        )
+    }
+}
+
+@Preview(name = "运行胶囊 · 展开深色", showBackground = true)
+@Composable
+private fun TurnActivityRunningDarkPreview() {
+    AsssistantaiTheme(darkTheme = true) {
+        TurnActivityGroupPanel(
+            segment = previewActivityGroup.copy(entries = previewActivityGroup.entries + TimelineEntry.ToolCall(
+                callId = "search", name = "web_search", argsSummary = "", status = ToolCallStatus.Running,
+            )),
+            expanded = true,
+            onToggle = {},
+            runStatus = ChatRunStatus.UsingTool("web_search"),
+            startedAtMillis = 1000L,
+            endedAtMillis = 4200L,
+            showElapsed = true,
+        )
     }
 }

@@ -19,7 +19,14 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
         if (json == null) {
             mapOf(SpotifyTool.RESULT_KEY to "Nothing is currently playing")
         } else {
-            mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json))
+            val native = PluginJson.toNative(json)
+            val snapshot = if (native is Map<*, *>) {
+                native.entries.associate { it.key.toString() to it.value } +
+                    ("fetched_at_ms" to System.currentTimeMillis())
+            } else {
+                native
+            }
+            mapOf(SpotifyTool.RESULT_KEY to snapshot)
         }
     },
     spotifyTool(
@@ -187,7 +194,7 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
     ) { args ->
         val uris = listArg(args, "ids").take(40).map(::spotifyAnyUri)
         if (uris.isEmpty()) throw IllegalStateException("ids must not be empty")
-        api.put("/me/library", body = JSONObject().put("uris", JSONArray().apply { uris.forEach(::put) }))
+        api.put("/me/library", mapOf("uris" to uris.joinToString(",")))
         mapOf(SpotifyTool.RESULT_KEY to "Saved ${uris.size} item(s) to library")
     },
     spotifyTool(
@@ -205,7 +212,7 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
     ) { args ->
         val uris = listArg(args, "ids").take(40).map(::spotifyAnyUri)
         if (uris.isEmpty()) throw IllegalStateException("ids must not be empty")
-        api.delete("/me/library", body = JSONObject().put("uris", JSONArray().apply { uris.forEach(::put) }))
+        api.delete("/me/library", mapOf("uris" to uris.joinToString(",")))
         mapOf(SpotifyTool.RESULT_KEY to "Removed ${uris.size} item(s) from library")
     },
     spotifyTool(
@@ -223,7 +230,7 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
     ) { args ->
         val uris = listArg(args, "ids").take(40).map(::spotifyAnyUri)
         if (uris.isEmpty()) throw IllegalStateException("ids must not be empty")
-        val json = api.get("/me/library/contains", mapOf("uris" to uris.joinToString(",")))
+        val json = api.getArray("/me/library/contains", mapOf("uris" to uris.joinToString(",")))
             ?: throw IllegalStateException("Failed to check library")
         mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json))
     },

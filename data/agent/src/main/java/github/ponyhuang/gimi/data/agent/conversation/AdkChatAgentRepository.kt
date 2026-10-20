@@ -31,14 +31,23 @@ class AdkChatAgentRepository @Inject constructor(
         sessionId: String,
         selection: ModelSelection,
         toolConfiguration: ConversationToolConfiguration?,
+        a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities?,
     ): ChatAgentExecution {
         val execution = runner.createExecution(
             userId = USER_ID,
             sessionId = sessionId,
             selection = selection,
             toolConfiguration = toolConfiguration,
+            a2uiCapabilities = a2uiCapabilities,
         )
         return object : ChatAgentExecution {
+            override suspend fun sendInteraction(
+                interaction: github.ponyhuang.gimi.domain.a2ui.A2uiInteraction,
+                retry: Boolean,
+            ): Flow<ChatRunEvent> = execution.send(
+                github.ponyhuang.gimi.domain.a2ui.A2uiInteractionCodec.encode(interaction), retry = retry,
+            ).map { it.toDomain() }
+
             override suspend fun send(
                 text: String,
                 fileAttachments: List<FileAttachment>,
@@ -106,6 +115,8 @@ class AdkChatAgentRepository @Inject constructor(
             ChatFunctionResponse(
                 id = it.id,
                 name = it.name,
+                a2uiDocument = github.ponyhuang.gimi.domain.a2ui.A2uiToolResult.extract(it.name, it.response),
+                a2uiFailed = it.name == github.ponyhuang.gimi.domain.a2ui.A2uiToolResult.TOOL_NAME && it.response["success"] == false,
                 localFileSearchResult = parsed,
                 confirmationApproved = if (
                     it.name == FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME

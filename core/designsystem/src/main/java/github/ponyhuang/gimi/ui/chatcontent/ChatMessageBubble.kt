@@ -1,9 +1,12 @@
 package github.ponyhuang.gimi.ui.chatcontent
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.LocalContentColor
@@ -14,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.ui.theme.LocalUserBubbleColors
@@ -30,12 +34,15 @@ import github.ponyhuang.gimi.ui.theme.LocalUserBubbleColors
  *
  * @param role      消息角色，决定左右对齐和配色
  * @param modifier  修饰符（气泡整体容器的 Modifier）
+ * @param assistantHorizontalInset 助手正文左右额外内缩；聊天页由消息列表提供
+ *        与输入胶囊相同的 12dp 边距时传 4.dp，让正文略窄于胶囊。
  * @param content   气泡内部内容，可以是任意 Composable
  */
 @Composable
 fun ChatMessageBubble(
     role: ChatBubbleRole,
     modifier: Modifier = Modifier,
+    assistantHorizontalInset: Dp = 12.dp,
     content: @Composable () -> Unit,
 ) {
     val isUser = role == ChatBubbleRole.USER
@@ -44,7 +51,7 @@ fun ChatMessageBubble(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = if (isUser) 12.dp else assistantHorizontalInset),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
     ) {
         if (isUser) {
@@ -69,7 +76,8 @@ fun ChatMessageBubble(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 6.dp),
+                        // 助手正文沿用外层容器的边距，避免多层内缩压窄长文本。
+                        .padding(vertical = 6.dp),
                 ) {
                     content()
                 }
@@ -88,12 +96,49 @@ private fun ChatMessageBubbleUserPreview() {
     }
 }
 
-@Preview(showBackground = true)
+@Preview(name = "助手长回复 · 浅色", showBackground = true, widthDp = 360)
 @Composable
 private fun ChatMessageBubbleAssistantPreview() {
-    AsssistantaiTheme {
-        ChatMessageBubble(role = ChatBubbleRole.ASSISTANT) {
-            Text(text = "助手回复示例")
+    ChatMessageBubbleAssistantPreviewContent(darkTheme = false)
+}
+
+@Preview(name = "助手长回复 · 深色", showBackground = true, widthDp = 360)
+@Composable
+private fun ChatMessageBubbleAssistantDarkPreview() {
+    ChatMessageBubbleAssistantPreviewContent(darkTheme = true)
+}
+
+@Composable
+private fun ChatMessageBubbleAssistantPreviewContent(darkTheme: Boolean) {
+    AsssistantaiTheme(darkTheme = darkTheme) {
+        Surface(color = MaterialTheme.colorScheme.background) {
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                ChatMessageBubble(
+                    role = ChatBubbleRole.ASSISTANT,
+                    assistantHorizontalInset = 4.dp,
+                ) {
+                    Text(
+                        text = "已经为你生成「自定义闹钟」卡片 👇\n\n" +
+                            "• 闹钟时间：日期时间选择器（默认 07:30，可改成任意日期时间）\n\n" +
+                            "• 标签：可填「起床 / 喝水 / 开会」等\n\n" +
+                            "• 重复：周一到周日多选，不选就是一次性闹钟",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+                // 仅用于预览核对：回复正文左右各比输入胶囊窄 4dp。
+                Surface(
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = BorderStroke(
+                        1.dp,
+                        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    ),
+                ) {}
+            }
         }
     }
 }

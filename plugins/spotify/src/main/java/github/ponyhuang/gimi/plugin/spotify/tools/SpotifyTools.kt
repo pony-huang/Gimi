@@ -6,6 +6,7 @@ import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 
 /**
@@ -83,7 +84,10 @@ internal fun intParam(
 internal suspend fun spotifyCall(block: suspend () -> Map<String, Any?>): Map<String, Any?> =
     withContext(Dispatchers.IO) {
         runCatching { block() }
-            .getOrElse { mapOf(SpotifyTool.ERROR_KEY to (it.message ?: "Spotify API call failed")) }
+            .getOrElse {
+                if (it is CancellationException) throw it
+                mapOf(SpotifyTool.ERROR_KEY to (it.message ?: "Spotify API call failed"))
+            }
     }
 
 internal fun strArg(args: Map<String, Any?>, key: String): String? =

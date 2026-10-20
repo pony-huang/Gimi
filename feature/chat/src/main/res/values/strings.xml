@@ -179,11 +179,21 @@
     <string name="chat_recommendation_category_general">建议</string>
     <!-- 失败消息的编辑/重试 -->
     <string name="chat_failed_turn_retry">重试</string>
-    <string name="chat_timeline_tool_group_count">执行工具 %1$d 次</string>
-    <string name="chat_timeline_thought_group">思考</string>
-    <string name="chat_turn_working">思考中…</string>
-    <string name="chat_timeline_expand">展开工作过程</string>
-    <string name="chat_timeline_collapse">收起工作过程</string>
+    <string name="chat_process_status_thinking">正在思考</string>
+    <string name="chat_process_status_preparing">正在整理回复</string>
+    <string name="chat_process_status_tool">正在%1$s</string>
+    <string name="chat_process_tool_now_playing">获取播放状态</string>
+    <string name="chat_process_tool_change_track">切换歌曲</string>
+    <string name="chat_process_tool_play">播放媒体</string>
+    <string name="chat_process_tool_pause">暂停媒体</string>
+    <string name="chat_process_tool_search">搜索内容</string>
+    <string name="chat_process_tool_read">读取内容</string>
+    <string name="chat_process_tool_calendar">查看日程</string>
+    <string name="chat_process_tool_generic">执行工具</string>
+    <string name="chat_timeline_completed_steps">已完成 %1$d 个步骤</string>
+    <string name="chat_timeline_step_understand">理解你的请求</string>
+    <string name="chat_timeline_expand">展开步骤详情</string>
+    <string name="chat_timeline_collapse">收起步骤详情</string>
     <string name="chat_timeline_tool_running">执行中</string>
     <string name="chat_timeline_tool_completed">已完成</string>
     <string name="chat_timeline_tool_rejected">已拒绝</string>
@@ -210,4 +220,64 @@
     <string name="chat_official_tool_deepseek_web_fetch">DeepSeek 网页抓取</string>
     <string name="chat_official_tool_deepseek_web_search_description">搜索网页，返回链接、摘要和可选正文。</string>
     <string name="chat_official_tool_deepseek_web_fetch_description">抓取指定网页，返回标题和 Markdown 正文。</string>
+    <string name="chat_a2ui_failed">界面暂时无法显示，请让助手重试。</string>
+    <string name="chat_a2ui_link_failed">无法打开链接</string>
+    <string name="chat_a2ui_audio">音频</string>
+
+    <!-- A2UI 天气卡片 -->
+    <string name="chat_weather_today">今天</string>
+    <string name="chat_weather_tomorrow">明天</string>
+    <string name="chat_weather_day_index">第 %1$d 天</string>
+    <string name="chat_weather_updated_at">更新于 %1$s</string>
+    <string name="chat_weather_temperature_value">%1$d°</string>
+    <string name="chat_weather_percent_value">%1$d%%</string>
+    <string name="chat_weather_not_available">—</string>
+    <string name="chat_weather_feels_high_low">体感 %1$d° · 最高 %2$d° / 最低 %3$d°</string>
+    <string name="chat_weather_metric_feels_like">体感</string>
+    <string name="chat_weather_metric_humidity">湿度</string>
+    <string name="chat_weather_metric_wind">风</string>
+    <string name="chat_weather_metric_precipitation">降水</string>
+    <string name="chat_weather_metric_uv">紫外线</string>
+    <string name="chat_weather_metric_air_quality">空气</string>
+    <string name="chat_weather_next_hours">接下来</string>
+    <string name="chat_weather_daily">逐日</string>
+    <string name="chat_weather_forecast_range">未来 %1$d 天</string>
+    <string name="chat_weather_low_temperature">/ %1$d°</string>
+    <string name="chat_weather_rainy_days">降雨 %1$d 天</string>
+    <string name="chat_weather_average_high">平均高温</string>
+    <string name="chat_weather_lowest">最低温度</string>
+    <string name="chat_weather_temperature_spread">温差</string>
+    <string name="chat_weather_sunrise">日出 %1$s</string>
+    <string name="chat_weather_sunset">日落 %1$s</string>
+    <string name="chat_weather_wind_direction_speed">%1$s %2$d km/h</string>
+    <string name="chat_weather_wind_speed">%1$d km/h</string>
+    <string name="chat_weather_condition_clear">晴</string>
+    <string name="chat_weather_condition_partly_cloudy">晴间多云</string>
+    <string name="chat_weather_condition_cloudy">多云</string>
+    <string name="chat_weather_condition_rain">阵雨</string>
+    <string name="chat_weather_condition_thunderstorm">雷阵雨</string>
+    <string name="chat_weather_condition_snow">小雪</string>
+    <string name="chat_weather_condition_fog">雾</string>
+    <string name="chat_weather_condition_wind">大风</string>
+    <string name="chat_weather_condition_unknown">未知天气</string>
+
+    <!-- A2UI 通用音乐播放器 -->
+    <string name="chat_player_open">打开播放器</string>
+    <string name="chat_player_open_named">在%1$s中打开</string>
+    <string name="chat_player_next">下一首</string>
+    <string name="chat_player_play">播放</string>
+    <string name="chat_player_pause">暂停</string>
+    <string name="chat_player_artwork">专辑封面</string>
+    <string name="chat_player_generic_name">音乐</string>
+
+    <!-- A2UI 新闻列表 -->
+    <!-- A2UI 只读数据表格 -->
+    <string name="chat_table_default_heading">数据表格</string>
+    <string name="chat_table_row_count">%1$d 行</string>
+    <string name="chat_table_empty">暂无数据</string>
+    <string name="chat_table_scroll_horizontal">左右滑动查看全部列</string>
+    <string name="chat_table_scroll_vertical">上下滑动查看全部行</string>
+    <string name="chat_table_scroll_both">左右滑动查看列，上下滑动查看行</string>
+    <string name="chat_timeline_steps">%1$d 个步骤</string>
+    <string name="chat_timeline_elapsed">共 %1$.1f 秒</string>
 </resources>

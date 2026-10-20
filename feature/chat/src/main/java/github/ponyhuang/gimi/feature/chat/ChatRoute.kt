@@ -84,7 +84,18 @@ fun ChatRoute(
 
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
+            if (effect is ChatEffect.OpenA2uiUrl) {
+                val uri = Uri.parse(effect.url)
+                if (uri.scheme in setOf("http", "https")) {
+                    try { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+                    catch (_: android.content.ActivityNotFoundException) {
+                        Toast.makeText(context, context.getString(R.string.chat_a2ui_link_failed), Toast.LENGTH_SHORT).show()
+                    }
+                }
+                return@collect
+            }
             val message = when (effect) {
+                is ChatEffect.OpenA2uiUrl -> error("URL effect already handled")
                 is ChatEffect.ShowNotice -> when (val notice = effect.notice) {
                     ChatNotice.ConfigureChatModel -> chatNoticeConfigureChatModel
                     ChatNotice.ModelSwitchBlocked -> chatNoticeModelSwitchBlocked

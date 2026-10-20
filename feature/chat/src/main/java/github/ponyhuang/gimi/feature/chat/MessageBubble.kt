@@ -17,6 +17,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,8 +58,8 @@ internal fun MessageRole.toChatBubbleRole(): ChatBubbleRole = when (this) {
 /**
  * 消息气泡 — 把 [Message] 渲染到 [ChatMessageBubble] 的 content slot 里。
  *
- * 这里只渲染最终回答文本、附件、错误与回答操作。thought 和工具活动统一由
- * [TurnActivityGroupPanel] 呈现，避免同一过程信息在正文气泡里重复出现。
+ * 这里只渲染最终回答文本、附件、错误与回答操作。运行状态由输入框上方统一呈现，
+ * 完成后的工具步骤由 [TurnActivityGroupPanel] 以折叠摘要展示，避免过程信息占用正文空间。
  *
  * @param partChannelProvider reducer 暴露的"按 TextPart.id 取 chunk channel"函数。
  *        Composable 拿到 channel 后用 `for (chunk in channel) streamingState.append(chunk)`
@@ -72,7 +73,8 @@ fun MessageBubble(
     onToggleSpeechPlayback: (messageId: String, text: String) -> Unit = { _, _ -> },
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit =
         {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    a2uiContent: @Composable () -> Unit = {},
 ) {
     val role = message.role
     val fillsBubbleWidth = role != MessageRole.User
@@ -107,7 +109,11 @@ fun MessageBubble(
         }
     }
 
-    ChatMessageBubble(role = role.toChatBubbleRole(), modifier = modifier) {
+    ChatMessageBubble(
+        role = role.toChatBubbleRole(),
+        modifier = modifier,
+        assistantHorizontalInset = 4.dp,
+    ) {
         Column(modifier = if (fillsBubbleWidth) Modifier.fillMaxWidth() else Modifier) {
             visibleTextParts.forEach { part ->
                 RenderTextPart(
@@ -122,6 +128,8 @@ fun MessageBubble(
                 attachments = message.fileAttachments,
                 onOpenDocument = onOpenDocument,
             )
+
+            a2uiContent()
 
             assistantReplyTextForCopy(message)?.let { text ->
                 AssistantMessageActions(

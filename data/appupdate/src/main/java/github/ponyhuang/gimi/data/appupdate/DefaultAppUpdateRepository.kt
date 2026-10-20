@@ -10,7 +10,7 @@ import github.ponyhuang.gimi.core.storage.ShareableFileUriFactory
 import github.ponyhuang.gimi.data.appupdate.apk.ApkAssetSelector
 import github.ponyhuang.gimi.data.appupdate.apk.ApkDownloadException
 import github.ponyhuang.gimi.data.appupdate.apk.ApkDownloader
-import github.ponyhuang.gimi.data.appupdate.apk.ApkInstaller
+import github.ponyhuang.gimi.core.apk.ApkInstaller
 import github.ponyhuang.gimi.data.appupdate.notification.UpdateNotifier
 import github.ponyhuang.gimi.data.appupdate.remote.GitHubReleaseGateway
 import github.ponyhuang.gimi.data.appupdate.remote.RateLimitException

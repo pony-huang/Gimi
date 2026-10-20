@@ -157,6 +157,7 @@ fun ChatScaffold(
     val listItems = state.listItems
     val isSpeechRecognitionAvailable = state.isSpeechRecognitionAvailable
     val isAgentRunning = state.isAgentRunning
+    val runStatus = state.currentRunStatus()
     val speechPlaybackState = state.speechPlaybackState
     val pendingToolConfirmation = state.pendingToolConfirmation
     val pendingInputRequest = state.pendingInputRequest
@@ -186,16 +187,11 @@ fun ChatScaffold(
         mutableStateOf(state.scrollToLatestRequest)
     }
     var isModelPickerVisible by remember { mutableStateOf(false) }
-    val renderedItemCount = remember(listItems) {
+    val renderedItemCount = remember(listItems, runStatus) {
         listItems.sumOf { item ->
             when (item) {
                 is ChatListItem.UserMessage -> 1
-                is ChatListItem.AssistantTurn ->
-                    if (item.timeline.segments.isEmpty()) {
-                        if (item.timeline.isRunning) 1 else 0
-                    } else {
-                        item.timeline.segments.size
-                    }
+                is ChatListItem.AssistantTurn -> item.timeline.displaySegments(runStatus.takeIf { item.timeline.isRunning }).size
             }
         }
     }
@@ -509,6 +505,7 @@ fun ChatScaffold(
                             ) {
                                 MessageRow(
                                     message = listItem.message,
+                                    a2uiSurfaces = state.a2uiSurfaces.filterKeys { state.a2uiOwners[it] == listItem.message.id }.values.toList(),
                                     partChannelProvider = partChannelProvider,
                                     speechPlaybackState = speechPlaybackState,
                                     onToggleSpeechPlayback = onToggleSpeechPlayback,
@@ -517,26 +514,11 @@ fun ChatScaffold(
                             }
                             is ChatListItem.AssistantTurn -> {
                                 val timeline = listItem.timeline
-                                if (timeline.segments.isEmpty() && timeline.isRunning) {
-                                    item(
-                                        key = "turn_working:${state.sessionId}:${timeline.turnId}",
-                                        contentType = "turn_working",
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(16.dp),
-                                                strokeWidth = 2.dp,
-                                            )
-                                            Spacer(Modifier.width(10.dp))
-                                            Text(
-                                                text = stringResource(R.string.chat_turn_working),
-                                                style = MaterialTheme.typography.labelLarge,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        }
-                                    }
-                                }
-                                timeline.segments.forEach { segment ->
+                                val turnStatus = runStatus.takeIf { timeline.isRunning }
+                                val segments = timeline.displaySegments(turnStatus)
+                                val latestActivityId = (segments.lastOrNull() as? TurnSegment.Activity)?.id
+                                val lastActivityId = segments.filterIsInstance<TurnSegment.Activity>().lastOrNull()?.id
+                                segments.forEach { segment ->
                                     when (segment) {
                                         is TurnSegment.Answer -> {
                                             val message = segment.message
@@ -552,6 +534,7 @@ fun ChatScaffold(
                                             ) {
                                                 MessageRow(
                                                     message = message,
+                                                    a2uiSurfaces = state.a2uiSurfaces.filterKeys { state.a2uiOwners[it] == message.id }.values.toList(),
                                                     partChannelProvider = partChannelProvider,
                                                     speechPlaybackState = speechPlaybackState,
                                                     onToggleSpeechPlayback = onToggleSpeechPlayback,
@@ -565,11 +548,13 @@ fun ChatScaffold(
                                         ) {
                                             TurnActivityGroupPanel(
                                                 segment = segment,
-                                                expanded = segment.id in
-                                                    state.expandedActivityGroupIds ||
-                                                    (timeline.isRunning &&
-                                                        segment === timeline.segments.last()),
+                                                expanded = segment.id in state.expandedActivityGroupIds,
                                                 onToggle = { onToggleTimeline(segment.id) },
+                                                runStatus = turnStatus.takeIf { segment.id == latestActivityId },
+                                                isRunning = timeline.isRunning,
+                                                startedAtMillis = timeline.startedAtMillis,
+                                                endedAtMillis = timeline.endedAtMillis,
+                                                showElapsed = segment.id == lastActivityId,
                                             )
                                         }
                                     }
@@ -767,12 +752,16 @@ private fun FailedTurnActions(
 @Composable
 private fun MessageRow(
     message: Message,
+    a2uiSurfaces: List<androidx.a2ui.model.processor.A2uiSurfaceModel> = emptyList(),
     partChannelProvider: (partId: String) -> ReceiveChannel<String>?,
     speechPlaybackState: github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState,
     onToggleSpeechPlayback: (messageId: String, text: String) -> Unit,
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    if (message.role == MessageRole.Assistant && message.textParts.none { !it.thought && it.text.isNotBlank() } &&
+        message.fileAttachments.isEmpty() && message.functionResponses.any { it.a2uiDocument != null } &&
+        a2uiSurfaces.isEmpty() && message.functionResponses.none { it.a2uiFailed }) return
     if (message.error != null) {
         ErrorBubble(message = message, modifier = modifier)
     } else {
@@ -782,7 +771,20 @@ private fun MessageRow(
             speechPlaybackState = speechPlaybackState,
             onToggleSpeechPlayback = onToggleSpeechPlayback,
             onOpenDocument = onOpenDocument,
-            modifier = modifier
+            modifier = modifier,
+            a2uiContent = {
+                if (a2uiSurfaces.isNotEmpty()) {
+                    github.ponyhuang.gimi.feature.chat.a2ui.ChatA2uiContent(
+                        surfaces = a2uiSurfaces,
+                        failed = false,
+                    )
+                } else if (message.functionResponses.any { it.a2uiFailed }) {
+                    github.ponyhuang.gimi.feature.chat.a2ui.ChatA2uiContent(
+                        surfaces = emptyList(),
+                        failed = true,
+                    )
+                }
+            },
         )
     }
 }

@@ -8,6 +8,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":domain:a2ui"))
     implementation(project(":core:storage"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:mcp"))

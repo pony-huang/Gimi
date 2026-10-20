@@ -52,12 +52,14 @@ object ChatRunEventMapper {
         }
         if (event.author == "user") {
             val text = event.parts.firstNotNullOfOrNull { it.text?.takeIf(String::isNotEmpty) }.orEmpty()
+            val interaction = github.ponyhuang.gimi.domain.a2ui.A2uiInteractionCodec.decode(text)
             return Message(
                 id = event.id,
                 invocationId = event.invocationId,
                 author = event.author,
                 role = MessageRole.User,
-                textParts = text.takeIf(String::isNotEmpty)?.let {
+                a2uiInteraction = interaction,
+                textParts = text.takeIf { it.isNotEmpty() && interaction == null }?.let {
                     listOf(TextPart(id = "${event.id}:0", text = it))
                 }.orEmpty(),
                 fileAttachments = event.parts.mapNotNull { it.attachment },
@@ -111,6 +113,8 @@ fun ChatFunctionResponse.toView(): FunctionResponseView =
         name = name,
         localFileSearchResult = localFileSearchResult,
         confirmationApproved = confirmationApproved,
+        a2uiDocument = a2uiDocument,
+        a2uiFailed = a2uiFailed,
     )
 
 fun summarizeValue(value: Any?): String = when (value) {

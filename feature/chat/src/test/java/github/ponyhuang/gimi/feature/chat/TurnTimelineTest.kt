@@ -15,6 +15,46 @@ import org.junit.Test
 class TurnTimelineTest {
 
     @Test
+    fun `card submission hides user item while preserving response and running turn`() {
+        val submission = userMessage(id = "card-action", timestamp = 300L).copy(
+            textParts = emptyList(),
+            a2uiInteraction = github.ponyhuang.gimi.domain.a2ui.A2uiInteraction(
+                "surface", "play", "play-video", 300L,
+                kotlinx.serialization.json.JsonObject(emptyMap()),
+                kotlinx.serialization.json.JsonObject(emptyMap()),
+            ),
+        )
+        val messages = listOf(
+            userMessage(id = "original", timestamp = 100L),
+            assistantMessage(id = "card-reply", timestamp = 200L, text = "视频卡片"),
+            submission,
+            assistantMessage(id = "action-reply", timestamp = 400L, text = "正在打开视频"),
+        )
+
+        val items = messages.toChatListItems(TimelineActivityState())
+        assertEquals(listOf("original"), items.filterIsInstance<ChatListItem.UserMessage>().map { it.message.id })
+        val turns = items.filterIsInstance<ChatListItem.AssistantTurn>().map { it.timeline }
+        assertEquals(listOf("original", "card-action"), turns.map { it.turnId })
+        assertEquals(listOf("action-reply"), turns.last().answerMessages.map { it.id })
+        assertTrue(messages[2] === submission)
+
+        val running = listOf(submission).toChatListItems(TimelineActivityState(isAgentRunning = true))
+        assertEquals(1, running.size)
+        val runningTurn = (running.single() as ChatListItem.AssistantTurn).timeline
+        assertTrue(runningTurn.isRunning)
+        assertEquals("card-action", runningTurn.turnId)
+        assertTrue(listOf(submission).toChatListItems(TimelineActivityState()).isEmpty())
+
+        // 隐藏协议占位不能吞掉用户正文或失败提示。
+        listOf(
+            submission.copy(textParts = listOf(TextPart(text = "补充说明"))),
+            submission.copy(error = "提交失败"),
+        ).forEach { message ->
+            assertEquals(message, (listOf(message).toChatListItems(TimelineActivityState()).single() as ChatListItem.UserMessage).message)
+        }
+    }
+
+    @Test
     fun `messages are grouped into stable user and assistant turn items`() {
         val messages = listOf(
             userMessage(id = "user-a", timestamp = 100L),
@@ -361,6 +401,77 @@ class TurnTimelineTest {
             ToolCallStatus.Unknown,
             timeline.entries.filterIsInstance<TimelineEntry.ToolCall>().single().status,
         )
+    }
+
+    @Test
+    fun `live placeholder keeps group identity when tools arrive and stops after answer starts`() {
+        val empty = TurnTimeline("turn", true, emptyList())
+        val placeholder = empty.displaySegments(ChatRunStatus.Thinking).single() as TurnSegment.Activity
+        assertEquals("turn:a0", placeholder.id)
+        val group = placeholder.copy(entries = listOf(TimelineEntry.ToolCall(
+            "call", "web_search", "", ToolCallStatus.Running,
+        )))
+        val running = empty.copy(segments = listOf(group))
+        assertEquals(listOf(group), running.displaySegments(ChatRunStatus.UsingTool("web_search")))
+        val answer = TurnSegment.Answer(assistantMessage(timestamp = 500L, text = "reply").copy(partial = true))
+        assertEquals(listOf(group, answer), running.copy(segments = listOf(group, answer)).displaySegments())
+        assertTrue(empty.copy(isRunning = false).displaySegments().isEmpty())
+    }
+
+    @Test
+    fun `historical thought stays hidden and interrupted tools remain visible`() {
+        val thought = TurnSegment.Activity("turn:a0", listOf(TimelineEntry.Thought("thought", "secret")))
+        assertTrue(TurnTimeline("turn", false, listOf(thought)).displaySegments().isEmpty())
+        val group = thought.copy(entries = listOf(TimelineEntry.ToolCall(
+            "call", "web_search", "", ToolCallStatus.Unknown,
+        )))
+        assertEquals(listOf(group), TurnTimeline("turn", false, listOf(group)).displaySegments())
+    }
+
+    @Test
+    fun `duration uses actual completion evidence and history falls back to last event`() {
+        val messages = listOf(userMessage(timestamp = 100L), assistantMessage(timestamp = 400L, text = "reply"))
+        val history = (messages.toChatListItems(TimelineActivityState()).last() as ChatListItem.AssistantTurn).timeline
+        assertEquals(100L, history.startedAtMillis)
+        assertEquals(400L, history.endedAtMillis)
+        val completed = (messages.toChatListItems(TimelineActivityState(
+            completedAtMillis = mapOf("user" to 600L),
+        )).last() as ChatListItem.AssistantTurn).timeline
+        assertEquals(600L, completed.endedAtMillis)
+    }
+
+    @Test
+    fun `streaming answer suppresses stale tool status and completed tools prepare answer`() {
+        val group = TurnSegment.Activity("turn:a0", listOf(TimelineEntry.ToolCall(
+            "call", "web_search", "", ToolCallStatus.Running,
+        )))
+        val timeline = TurnTimeline("turn", true, listOf(group))
+        val state = ChatUiState(isAgentRunning = true, listItems = listOf(ChatListItem.AssistantTurn(timeline)))
+        assertEquals(ChatRunStatus.UsingTool("web_search"), state.currentRunStatus())
+        val answer = TurnSegment.Answer(assistantMessage(timestamp = 500L, text = "reply").copy(partial = true))
+        assertEquals(null, state.copy(listItems = listOf(ChatListItem.AssistantTurn(
+            timeline.copy(segments = listOf(group, answer)),
+        ))).currentRunStatus())
+        val completedGroup = group.copy(entries = listOf(TimelineEntry.ToolCall(
+            "call", "web_search", "", ToolCallStatus.Completed,
+        )))
+        assertEquals(ChatRunStatus.PreparingAnswer, state.copy(listItems = listOf(ChatListItem.AssistantTurn(
+            timeline.copy(segments = listOf(completedGroup)),
+        ))).currentRunStatus())
+    }
+
+    @Test
+    fun `runtime freezes completion once and clears it when the same turn resumes`() {
+        val runtime = ChatSessionRuntime("session")
+        runtime.messages = listOf(userMessage(timestamp = 100L))
+        runtime.isAgentRunning = true
+        runtime.isAgentRunning = false
+        val completed = runtime.completedAtMillis["user"]
+        assertTrue(completed != null)
+        runtime.isAgentRunning = false
+        assertEquals(completed, runtime.completedAtMillis["user"])
+        runtime.isAgentRunning = true
+        assertFalse(runtime.completedAtMillis.containsKey("user"))
     }
 
     private fun userMessage(

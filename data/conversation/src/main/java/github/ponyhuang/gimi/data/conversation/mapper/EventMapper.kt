@@ -130,8 +130,9 @@ object EventMapper {
             id = event.id,
             invocationId = event.invocationId,
             author = "user",
+            a2uiInteraction = github.ponyhuang.gimi.domain.a2ui.A2uiInteractionCodec.decode(firstText),
             role = MessageRole.User,
-            textParts = if (firstText.isEmpty()) emptyList() else listOf(textPartFor(event, 0, firstText, thought = false)),
+            textParts = if (firstText.isEmpty() || github.ponyhuang.gimi.domain.a2ui.A2uiInteractionCodec.decode(firstText) != null) emptyList() else listOf(textPartFor(event, 0, firstText, thought = false)),
             fileAttachments = parts.mapNotNull { part ->
                 part.toFileAttachment()
             },
@@ -276,6 +277,8 @@ object EventMapper {
             diagnoseLocalSearchResponse(name, response)
         }
         return FunctionResponseView(
+            a2uiDocument = github.ponyhuang.gimi.domain.a2ui.A2uiToolResult.extract(name, response),
+            a2uiFailed = name == github.ponyhuang.gimi.domain.a2ui.A2uiToolResult.TOOL_NAME && response["success"] == false,
             id = id.orEmpty(),
             name = name,
             localFileSearchResult = parsed,

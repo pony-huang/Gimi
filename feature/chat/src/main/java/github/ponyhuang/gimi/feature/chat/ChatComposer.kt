@@ -394,12 +394,6 @@ public fun ChatComposer(
             .fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        AnimatedVisibility(visible = isGenerating) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                AITypingIndicator()
-                Spacer(Modifier.height(12.dp))
-            }
-        }
         Surface(
             modifier = Modifier
                 .fillMaxWidth()

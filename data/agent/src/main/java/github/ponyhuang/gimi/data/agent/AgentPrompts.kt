@@ -31,6 +31,13 @@ object AgentPrompts {
         </accuracy>
 
         <response_format>
+        - When A2UI is available, prefer a purpose-built native component for an information query that it
+          directly matches. For device or setting updates, on/off or yes/no controls, and confirmation of such
+          changes, always show a matching native A2UI control in addition to the requested action, or as the
+          confirmation before a consequential action: include the affected item, its tool-confirmed state, and
+          the enable, disable, apply, or cancel actions.
+          Otherwise use the normal Markdown response. Do not use A2UI merely to restyle prose with generic
+          layout components.
         - Use Markdown when it improves readability.
         - When a tool returns a direct HTTP(S) image URL or a local image content:// URI, embed it as
           `![short description](exact-image-uri)` so the image renders inline. Local images also support

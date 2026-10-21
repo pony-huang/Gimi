@@ -266,7 +266,12 @@ fun PluginSettingsScreen(
                                     onAction(PluginSettingsAction.RequestUninstall(it.id))
                                 }
                             },
-                            onInstall = { onAction(PluginSettingsAction.Install(item.key)) },
+                            onInstall = {
+                                onAction(
+                                    if (item.isInstalled) PluginSettingsAction.Update(item.key)
+                                    else PluginSettingsAction.Install(item.key),
+                                )
+                            },
                         )
                     }
                 }
@@ -379,7 +384,7 @@ private fun PluginRowCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text(
-                        text = stringResource(R.string.plugin_list_installed),
+                        text = stringResource(if (item.isUpdateAvailable) R.string.plugin_list_update_available else R.string.plugin_list_installed),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -389,7 +394,8 @@ private fun PluginRowCard(
                         enabled = mutationEnabled,
                     )
                 }
-            } else {
+            }
+            if (!item.isInstalled || item.isUpdateAvailable) {
                 PluginInstallAction(
                     entry = item,
                     enabled = installEnabled,
@@ -571,5 +577,34 @@ private fun PluginSettingsScreenInstallingPreview() {
             onNavigateToConfig = {},
             onNavigateToDetail = {},
         )
+    }
+}
+
+@Preview(name = "更新状态 · 浅色", widthDp = 390, heightDp = 1100, locale = "zh")
+@Preview(name = "更新状态 · 深色", widthDp = 390, heightDp = 1100, locale = "zh", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PluginUpdateStatesPreview() {
+    val catalog = previewCatalogEntry("zhihu", "知乎", "站内搜索、热榜、直答与知识库", "Search and knowledge bases").copy(versionCode = 61L, versionName = "1.1.0")
+    val installed = PluginDescriptor("zhihu", "知乎", catalog.packageName, 1, 4, true, 60L, "1.0.0")
+    AsssistantaiTheme {
+        LazyColumn(
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items(listOf(
+                PluginInstallUiState.Idle,
+                PluginInstallUiState.Resolving,
+                PluginInstallUiState.Downloading(0.42f),
+                PluginInstallUiState.Failed(github.ponyhuang.gimi.domain.plugin.model.PluginInstallFailure.NETWORK),
+            )) { state ->
+                PluginRowCard(
+                    item = PluginListItemUi(catalog, installed, state),
+                    installedIcon = null,
+                    mutationEnabled = true,
+                    installEnabled = !state.isInProgress,
+                    onToggleEnabled = {}, onOpenDetail = {}, onConfigure = {}, onUninstall = {}, onInstall = {},
+                )
+            }
+        }
     }
 }

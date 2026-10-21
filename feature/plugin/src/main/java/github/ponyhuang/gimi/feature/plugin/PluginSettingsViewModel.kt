@@ -8,6 +8,7 @@ import github.ponyhuang.gimi.domain.plugin.model.PluginCatalogSource
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginInstallFailure
 import github.ponyhuang.gimi.domain.plugin.model.PluginInstallResult
+import github.ponyhuang.gimi.domain.plugin.model.isUpdateFor
 import github.ponyhuang.gimi.domain.plugin.repository.PluginCatalogRepository
 import github.ponyhuang.gimi.domain.plugin.repository.PluginInstallEnvironment
 import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
@@ -88,7 +89,9 @@ class PluginSettingsViewModel @Inject constructor(
 
             PluginSettingsAction.Refresh -> refresh()
 
-            is PluginSettingsAction.Install -> install(action.entryKey)
+            is PluginSettingsAction.Install -> install(action.entryKey, update = false)
+
+            is PluginSettingsAction.Update -> install(action.entryKey, update = true)
 
             is PluginSettingsAction.RequestUninstall -> requestUninstall(action.pluginId)
 
@@ -123,7 +126,9 @@ class PluginSettingsViewModel @Inject constructor(
             local.update { it.copy(isRefreshing = true) }
             refreshInstallPermission()
             try {
-                val added = repository.refresh()
+                val knownIds = repository.plugins.value.mapTo(mutableSetOf()) { it.id }
+                // 同包覆盖更新也会返回变化 id，不能误报为发现新插件。
+                val added = repository.refresh().filterNot { it in knownIds }
                 if (added.isNotEmpty()) {
                     mutableEffects.emit(PluginSettingsEffect.ShowPluginAdded(added))
                 }
@@ -146,12 +151,14 @@ class PluginSettingsViewModel @Inject constructor(
         local.update { it.copy(canInstallPackages = canInstall) }
     }
 
-    private fun install(entryKey: String) {
+    private fun install(entryKey: String, update: Boolean) {
         if (installJob?.isActive == true) return
-        val entry = uiState.value.items
-            .firstOrNull { it.key == entryKey && !it.isInstalled }
-            ?.catalog
-            ?: return
+        val entry = (catalog.value as? CatalogState.Ready)?.load?.entries
+            ?.firstOrNull { it.key == entryKey } ?: return
+        val installed = repository.plugins.value.firstOrNull { it.id == entryKey }
+        if (update) {
+            if (installed == null || !entry.isUpdateFor(installed)) return
+        } else if (installed != null) return
         if (!installEnvironment.canRequestPackageInstalls()) {
             local.update { it.copy(canInstallPackages = false) }
             viewModelScope.launch { mutableEffects.emit(PluginSettingsEffect.OpenUnknownSourcesSettings) }
@@ -159,7 +166,7 @@ class PluginSettingsViewModel @Inject constructor(
         }
         installJob = viewModelScope.launch {
             setInstallState(entryKey, PluginInstallUiState.Resolving)
-            val result = installPlugin(entry) { progress ->
+            val result = installPlugin(entry, installed) { progress ->
                 setInstallState(
                     entryKey,
                     PluginInstallUiState.Downloading(progress.coerceIn(0f, 1f)),

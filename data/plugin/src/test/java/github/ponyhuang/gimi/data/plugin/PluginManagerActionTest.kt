@@ -83,6 +83,38 @@ class PluginManagerActionTest {
         assertEquals("Done", outcome?.message)
     }
 
+    @Test
+    fun replacementPublishesApkMetadataAndKeepsConfigurationAndEnablement() = runTest {
+        val old = fakePlugin()
+        val replacement = fakePlugin()
+        var current = listOf(LoadedPlugin("test.package", old, 1L, 60L, "1.0.0"))
+        val loader = object : PluginLoader {
+            override fun load(): List<LoadedPlugin> = current
+            override fun refresh(): List<LoadedPlugin> {
+                current = listOf(LoadedPlugin("test.package", replacement, 2L, 61L, "1.1.0"))
+                return current
+            }
+        }
+        val preferences = mockk<SharedPreferences>(relaxed = true)
+        every { preferences.getStringSet(any(), any()) } returns setOf("test")
+        val context = mockk<Context>(relaxed = true)
+        every { context.getSharedPreferences(any(), any()) } returns preferences
+        val configStore = mockk<PluginConfigStore>()
+        every { configStore.valuesFor("test") } returns mapOf("endpoint" to "saved")
+        val manager = PluginManager(loader, context, configStore)
+        assertEquals(60L, manager.plugins.value.single().versionCode)
+        assertEquals(listOf("test"), manager.refresh())
+        val descriptor = manager.plugins.value.single()
+        assertEquals(61L, descriptor.versionCode)
+        assertEquals("1.1.0", descriptor.versionName)
+        assertEquals(1, descriptor.version)
+        assertEquals(false, descriptor.isEnabled)
+        assertEquals(mapOf("endpoint" to "saved"), manager.configValues("test"))
+        assertEquals(1L, manager.revision.value)
+        manager.setEnabled("test", true)
+        org.junit.Assert.assertTrue(manager.enabledPlugins().single() === replacement)
+    }
+
     private fun manager(plugin: AgentPlugin): PluginManager {
         val preferences = mockk<SharedPreferences>(relaxed = true)
         every { preferences.getStringSet(any(), any()) } returns emptySet()

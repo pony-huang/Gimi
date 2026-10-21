@@ -171,6 +171,8 @@ class InstallPluginUseCaseTest {
 
         override suspend fun downloadAndVerify(
             asset: PluginReleaseAsset,
+            packageName: String,
+            versionCode: Long?,
             onProgress: (Float) -> Unit,
         ): String {
             calls += 1

@@ -96,6 +96,29 @@ class PluginRuntimeStateTest {
         assertEquals(listOf("spotify", "zhihu"), state.runtime.value.enabledPlugins)
     }
 
+    @Test
+    fun sameIdNewInstanceReplacesAgentToolsAndIncrementsRevision() {
+        val old = Any()
+        val replacement = Any()
+        val state = PluginRuntimeState(listOf(old), emptySet()) { "same-plugin" }
+        assertTrue(state.replacePlugins(listOf(replacement)))
+        assertEquals(1L, state.runtime.value.revision)
+        assertTrue(state.runtime.value.enabledPlugins.single() === replacement)
+        assertFalse(state.replacePlugins(listOf(replacement)))
+        assertEquals(1L, state.runtime.value.revision)
+    }
+
+    @Test
+    fun sameIdReplacementPreservesDisabledStateUntilUserEnablesIt() {
+        val replacement = Any()
+        val state = PluginRuntimeState(listOf(Any()), setOf("same-plugin")) { "same-plugin" }
+        assertTrue(state.replacePlugins(listOf(replacement)))
+        assertTrue(state.runtime.value.enabledPlugins.isEmpty())
+        assertEquals(setOf("same-plugin"), state.disabledPluginIds())
+        assertTrue(state.setEnabled("same-plugin", true))
+        assertTrue(state.runtime.value.enabledPlugins.single() === replacement)
+    }
+
     private fun state(disabledIds: Set<String> = emptySet()): PluginRuntimeState<String> =
         PluginRuntimeState(
             initialPlugins = listOf("spotify", "zhihu"),

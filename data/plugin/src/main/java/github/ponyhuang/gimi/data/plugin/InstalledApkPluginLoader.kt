@@ -39,7 +39,7 @@ class InstalledApkPluginLoader @Inject constructor(
     private val optimizedRoot = storageRegistry.resolve(PluginStorage.OPTIMIZED_ROOT_ID, create = true)
 
     /**
-     * 加载并缓存结果。缓存为「包名 → 插件」映射，[refresh] 只增删不改实例：
+     * 加载并缓存结果。缓存为「包名 → 插件」映射，[refresh] 仅替换更新过的包：
      * 已加载插件保持同一实例（避免重复实例化与类加载器冲突）。
      */
     override fun load(): List<LoadedPlugin> = synchronized(lock) {
@@ -60,7 +60,7 @@ class InstalledApkPluginLoader @Inject constructor(
         val current = cache.orEmpty()
         val fresh = discovered.filter { candidate ->
             val old = current[candidate.packageName]
-            old == null || candidate.lastUpdateTime != old.lastUpdateTime
+            old == null || candidate.lastUpdateTime != old.lastUpdateTime || candidate.versionCode != old.versionCode
         }
         cache = discovered.associateBy { it.packageName }
         fresh
@@ -116,6 +116,11 @@ class InstalledApkPluginLoader @Inject constructor(
                 notices.report(packageName, updateTime, displayName)
                 return null
             }
+            val packageInfo = context.packageManager.getPackageInfo(packageName, 0)
+            // 同一安装快照复用原实例；只有 APK 替换后才创建新类加载器和插件实例。
+            cache?.get(packageName)?.takeIf {
+                it.lastUpdateTime == updateTime && it.versionCode == packageInfo.longVersionCode
+            }?.let { return it }
             val className = appInfo.metaData?.getString(PluginApi.CLASS_META_DATA_KEY)
                 ?: error("Missing ${PluginApi.CLASS_META_DATA_KEY} in $packageName")
             val sourceDir = appInfo.sourceDir
@@ -141,7 +146,11 @@ class InstalledApkPluginLoader @Inject constructor(
             plugin.configure(configStore.valuesFor(plugin.pluginId))
 
             Log.i(TAG, "Loaded plugin '${plugin.pluginId}' from $packageName")
-            LoadedPlugin(packageName, plugin, lastUpdateTime = updateTime)
+            LoadedPlugin(
+                packageName, plugin, lastUpdateTime = updateTime,
+                versionCode = packageInfo.longVersionCode,
+                versionName = packageInfo.versionName,
+            )
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: LinkageError) {

@@ -111,10 +111,18 @@ APK's shared versionName/versionCode; update it deliberately with the plugin imp
 
 The `package` command validates APK package names, versions and signing certificates before
 generating `temp/release/dist/plugin-subscription.json`. It preserves editorial fields and fills
-`apkUrl`, `sha256`, and `sizeBytes` from the validated APKs. URLs point to the exact release tag,
+`apkUrl`, `sha256`, `sizeBytes`, `versionCode`, and `versionName` from the validated APK release. URLs point to the exact release tag,
 including RC tags. Missing/empty/oversized APKs, incomplete or duplicate catalog entries, package
 mismatches and invalid metadata stop publication. The generated catalog is included in
 `SHA256SUMS` and the existing draft upload completeness gate. Build retries remove stale dist files.
+
+Clients compare the subscription's `versionCode` with the installed package's Android
+`longVersionCode`, requiring the same package name and a strictly higher code. `pluginVersion`
+and version-name strings do not determine update availability. Missing APK version metadata
+keeps installation available without advertising an update. Downloads must match the catalog's
+package name and, when provided, exact `versionCode` before opening Android's installer;
+Android enforces signing compatibility and handles the in-place replacement. Plugin enablement
+and saved configuration survive replacement through the existing package refresh flow.
 
 The app's default subscription is
 `https://github.com/pony-huang/Gimi/releases/latest/download/plugin-subscription.json`.

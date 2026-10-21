@@ -201,6 +201,8 @@ class PluginManager @Inject constructor(
             name = plugin.displayName,
             packageName = loadedPlugin.packageName,
             version = plugin.version,
+            versionCode = loadedPlugin.versionCode,
+            versionName = loadedPlugin.versionName,
             toolCount = plugin.toolCount,
             isEnabled = runtimeState.isEnabled(plugin.pluginId),
         )

@@ -75,4 +75,16 @@
     <string name="plugin_detail_manage">Manage plugin</string>
     <string name="plugin_detail_no_info">This plugin is not described in the subscription source.</string>
     <string name="plugin_detail_not_found">Plugin not found</string>
+    <string name="plugin_list_update">Update</string>
+    <string name="plugin_list_update_available">Update available</string>
+    <string name="plugin_list_update_resolving">Preparing update…</string>
+    <string name="plugin_list_update_downloading">Downloading update %1$d%%</string>
+    <string name="plugin_list_update_retry">Retry update</string>
+    <string name="plugin_list_update_network">Update download failed. Check your connection and try again.</string>
+    <string name="plugin_list_install_invalid_package">The APK does not match the plugin or release version. Refresh and try again.</string>
+    <string name="plugin_list_not_an_update">This plugin no longer needs an update. Refresh the list.</string>
+    <string name="plugin_detail_version">Version</string>
+    <string name="plugin_detail_current_version">Current version</string>
+    <string name="plugin_detail_latest_version">Latest version</string>
+    <string name="plugin_detail_version_unknown">Unknown</string>
 </resources>

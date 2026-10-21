@@ -82,9 +82,9 @@ internal fun PluginIcon(
 }
 
 /**
- * 未安装条目的安装操作区。
+ * 未安装条目的安装操作区，以及已安装条目的更新操作区。
  *
- * 未安装显示安装按钮；下载/解析中显示进度；失败显示可重试的错误。
+ * 按条目状态显示安装/更新按钮；下载/解析中显示进度；失败显示可重试的错误。
  */
 @Composable
 internal fun PluginInstallAction(
@@ -100,20 +100,20 @@ internal fun PluginInstallAction(
                 enabled = enabled,
                 modifier = modifier.heightIn(min = 36.dp),
             ) {
-                Text(stringResource(R.string.plugin_list_install))
+                Text(stringResource(if (entry.isInstalled) R.string.plugin_list_update else R.string.plugin_list_install))
             }
         }
 
         PluginInstallUiState.Resolving -> InstallProgress(
             progress = null,
-            label = stringResource(R.string.plugin_list_installing),
+            label = stringResource(if (entry.isInstalled) R.string.plugin_list_update_resolving else R.string.plugin_list_installing),
             modifier = modifier,
         )
 
         is PluginInstallUiState.Downloading -> InstallProgress(
             progress = state.progress,
             label = stringResource(
-                R.string.plugin_list_downloading,
+                if (entry.isInstalled) R.string.plugin_list_update_downloading else R.string.plugin_list_downloading,
                 (state.progress * 100).toInt().coerceIn(0, 100),
             ),
             modifier = modifier,
@@ -124,13 +124,17 @@ internal fun PluginInstallAction(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                text = stringResource(pluginInstallFailureMessage(state.failure)),
+                text = stringResource(
+                    if (entry.isInstalled && state.failure == PluginInstallFailure.NETWORK)
+                        R.string.plugin_list_update_network
+                    else pluginInstallFailureMessage(state.failure),
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
                 maxLines = 2,
             )
             TextButton(onClick = onInstall, enabled = enabled) {
-                Text(stringResource(R.string.plugin_list_retry))
+                Text(stringResource(if (entry.isInstalled) R.string.plugin_list_update_retry else R.string.plugin_list_retry))
             }
         }
     }
@@ -171,5 +175,7 @@ internal fun pluginInstallFailureMessage(failure: PluginInstallFailure): Int = w
     PluginInstallFailure.NO_RELEASE_ASSET -> R.string.plugin_list_install_no_asset
     PluginInstallFailure.PACKAGE_TOO_LARGE -> R.string.plugin_list_install_too_large
     PluginInstallFailure.STORAGE -> R.string.plugin_list_install_storage
+    PluginInstallFailure.INVALID_PACKAGE -> R.string.plugin_list_install_invalid_package
+    PluginInstallFailure.NOT_AN_UPDATE -> R.string.plugin_list_not_an_update
     PluginInstallFailure.UNKNOWN -> R.string.plugin_list_install_unknown
 }

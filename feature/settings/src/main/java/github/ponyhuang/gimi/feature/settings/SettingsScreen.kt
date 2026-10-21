@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Extension
@@ -79,6 +80,12 @@ fun SettingsScreen(
                                 title = stringResource(R.string.settings_mcp_title),
                                 subtitle = stringResource(R.string.settings_mcp_subtitle),
                                 action = SettingsAction.OpenMcpServers,
+                            ),
+                            SettingsNavigationItem(
+                                icon = Icons.Default.Apps,
+                                title = stringResource(R.string.settings_appfunction_title),
+                                subtitle = stringResource(R.string.settings_appfunction_subtitle),
+                                action = SettingsAction.OpenAppFunctions,
                             ),
                             SettingsNavigationItem(
                                 icon = Icons.Default.Code,

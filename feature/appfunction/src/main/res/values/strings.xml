@@ -1,0 +1,30 @@
+<resources>
+    <string name="appfunction_title">AppFunciton</string>
+    <string name="appfunction_info_title">应用功能信息</string>
+    <string name="appfunction_loading">正在发现应用…</string>
+    <string name="appfunction_save_failed">保存失败，请重新操作开关。</string>
+    <string name="appfunction_unsupported">当前设备或用户配置不支持 AppFunction。</string>
+    <string name="appfunction_permission_required">尚未获得跨应用 AppFunction 执行权限。请在系统允许的授权方式中为 Gimi 授权后重试；部分设备不向普通应用开放此权限。</string>
+    <string name="appfunction_load_failed">无法读取 AppFunction 应用，请重试。</string>
+    <string name="appfunction_retry">重试</string>
+    <string name="appfunction_refresh">刷新</string>
+    <string name="appfunction_empty">未发现支持 AppFunction 的应用。新安装或更新的应用可能需要等待系统完成索引。</string>
+    <string name="appfunction_missing">此应用已卸载或当前不可见，请返回应用列表刷新。</string>
+    <string name="appfunction_description_empty">未提供说明</string>
+    <string name="appfunction_callability">这里展示应用声明的信息，实际可调用功能取决于系统状态、目标应用授权及 SDK 支持。</string>
+    <string name="appfunction_count">%1$d 个功能</string>
+    <string name="appfunction_view_info">查看信息</string>
+    <string name="appfunction_expand">展开功能详情</string>
+    <string name="appfunction_collapse">收起功能详情</string>
+    <string name="appfunction_system_state">系统状态：%1$s</string>
+    <string name="appfunction_enabled">已启用</string>
+    <string name="appfunction_disabled">已停用</string>
+    <string name="appfunction_unknown">未知</string>
+    <string name="appfunction_parameters">参数</string>
+    <string name="appfunction_no_parameters">无参数</string>
+    <string name="appfunction_required">必填</string>
+    <string name="appfunction_optional">可选</string>
+    <string name="appfunction_return_type">返回类型：%1$s</string>
+    <string name="appfunction_enable_app">允许使用 %1$s 的功能</string>
+    <string name="appfunction_parameter_summary">%1$s · %2$s · %3$s</string>
+</resources>

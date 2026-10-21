@@ -97,3 +97,7 @@ include(":plugins:weibo")
 
 include(":domain:a2ui")
 include(":data:a2ui")
+
+include(":domain:appfunction")
+include(":data:appfunction")
+include(":feature:appfunction")

@@ -87,4 +87,6 @@
     <string name="settings_group_assistant">Assistant preferences</string>
     <string name="settings_group_permissions">Permissions and device</string>
     <string name="settings_group_about">About</string>
+    <string name="settings_appfunction_title">AppFunciton</string>
+    <string name="settings_appfunction_subtitle">Discover and use functions from apps</string>
 </resources>

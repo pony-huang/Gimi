@@ -40,6 +40,8 @@ dependencies {
     implementation(project(":core:storage"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:mcp"))
+    implementation(project(":domain:appfunction"))
+    implementation(libs.androidx.appfunctions)
     implementation(project(":domain:modelcatalog"))
     implementation(project(":domain:toolauthorization"))
     implementation(project(":domain:plugin"))

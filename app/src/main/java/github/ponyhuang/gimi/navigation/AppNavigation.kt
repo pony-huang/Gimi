@@ -38,6 +38,8 @@ import github.ponyhuang.gimi.feature.chat.ChatNavigationCallbacks
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
 import github.ponyhuang.gimi.feature.assistant.AssistantSurface
 import github.ponyhuang.gimi.feature.assistant.AssistantSurfaceMode
+import github.ponyhuang.gimi.feature.appfunction.AppFunctionDestination
+import github.ponyhuang.gimi.feature.appfunction.AppFunctionEntryProvider
 import github.ponyhuang.gimi.feature.mcp.McpDestination
 import github.ponyhuang.gimi.feature.mcp.McpEntryProvider
 import github.ponyhuang.gimi.feature.memory.MemoryDestination
@@ -167,6 +169,7 @@ fun MainScreen(
                             navigate(ModelSettingsDestination.Defaults)
                         },
                         onNavigateToMcpServers = { navigate(McpDestination.ServerList) },
+                        onNavigateToAppFunctions = { navigate(AppFunctionDestination.Apps) },
                         onNavigateToSandbox = { navigate(SandboxDestination.Settings) },
                         onNavigateToPlugins = { navigate(PluginDestination.Settings) },
                         onNavigateToSkills = { navigate(SkillsDestination.Settings) },
@@ -188,6 +191,7 @@ fun MainScreen(
                 ) || ModelSettingsEntryProvider(destination, goBack, navigate) ||
                     SandboxEntryProvider(destination, goBack) ||
                     McpEntryProvider(destination, goBack, navigate, replaceCurrent) ||
+                    AppFunctionEntryProvider(destination, goBack, navigate) ||
                     PluginEntryProvider(destination, goBack, navigate) ||
                     ToolAuthorizationEntryProvider(destination, goBack, navigate) ||
                     MobileUseEntryProvider(destination, goBack) ||

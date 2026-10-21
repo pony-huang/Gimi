@@ -27,6 +27,10 @@ import github.ponyhuang.gimi.data.agent.contribution.SandboxToolContribution
 abstract class AgentContributionModule {
     @Binds
     @IntoSet
+    abstract fun bindAppFunctionContribution(implementation: github.ponyhuang.gimi.data.agent.contribution.AppFunctionToolContribution): AgentContribution
+
+    @Binds
+    @IntoSet
     abstract fun bindA2uiContribution(implementation: github.ponyhuang.gimi.data.agent.a2ui.A2uiToolContribution): AgentContribution
 
 

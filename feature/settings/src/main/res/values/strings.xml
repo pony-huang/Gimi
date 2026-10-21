@@ -87,4 +87,6 @@
     <string name="settings_group_assistant">助手偏好</string>
     <string name="settings_group_permissions">权限与设备</string>
     <string name="settings_group_about">关于</string>
+    <string name="settings_appfunction_title">AppFunciton</string>
+    <string name="settings_appfunction_subtitle">发现并使用应用提供的功能</string>
 </resources>

@@ -43,6 +43,7 @@ mlkitTextRecognition = "16.0.1"
 media3 = "1.11.1"
 
 [libraries]
+androidx-appfunctions = { module = "androidx.appfunctions:appfunctions", version = "1.0.0-alpha11" }
 androidx-a2ui-engine = { module = "androidx.a2ui:a2ui-engine", version = "1.0.0-alpha01" }
 androidx-a2ui-model = { module = "androidx.a2ui:a2ui-model", version = "1.0.0-alpha01" }
 androidx-a2ui-compose-runtime = { module = "androidx.a2ui.compose:compose-runtime", version = "1.0.0-alpha01" }

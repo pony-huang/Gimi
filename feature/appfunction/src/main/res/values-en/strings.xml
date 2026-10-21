@@ -1,0 +1,30 @@
+<resources>
+    <string name="appfunction_title">AppFunciton</string>
+    <string name="appfunction_info_title">App function information</string>
+    <string name="appfunction_loading">Discovering apps…</string>
+    <string name="appfunction_save_failed">Could not save. Please try the switch again.</string>
+    <string name="appfunction_unsupported">AppFunction is unavailable on this device or user profile.</string>
+    <string name="appfunction_permission_required">Gimi does not have permission to execute other apps’ functions. Grant access through a supported system authorization method, then retry. Some devices do not grant this permission to regular apps.</string>
+    <string name="appfunction_load_failed">Could not read AppFunction apps. Please retry.</string>
+    <string name="appfunction_retry">Retry</string>
+    <string name="appfunction_refresh">Refresh</string>
+    <string name="appfunction_empty">No apps with AppFunction were found. Newly installed or updated apps may need time to be indexed by the system.</string>
+    <string name="appfunction_missing">This app was uninstalled or is no longer visible. Return to the app list and refresh.</string>
+    <string name="appfunction_description_empty">No description provided</string>
+    <string name="appfunction_callability">These are the app’s declarations. Callable functions depend on system state, authorization by the app, and SDK support.</string>
+    <string name="appfunction_count">%1$d functions</string>
+    <string name="appfunction_view_info">View information</string>
+    <string name="appfunction_expand">Expand function details</string>
+    <string name="appfunction_collapse">Collapse function details</string>
+    <string name="appfunction_system_state">System state: %1$s</string>
+    <string name="appfunction_enabled">Enabled</string>
+    <string name="appfunction_disabled">Disabled</string>
+    <string name="appfunction_unknown">Unknown</string>
+    <string name="appfunction_parameters">Parameters</string>
+    <string name="appfunction_no_parameters">No parameters</string>
+    <string name="appfunction_required">Required</string>
+    <string name="appfunction_optional">Optional</string>
+    <string name="appfunction_return_type">Return type: %1$s</string>
+    <string name="appfunction_enable_app">Allow functions from %1$s</string>
+    <string name="appfunction_parameter_summary">%1$s · %2$s · %3$s</string>
+</resources>

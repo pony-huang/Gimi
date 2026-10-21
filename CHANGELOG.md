@@ -2,6 +2,14 @@
 
 版本 PR 根据 Conventional Commits 自动生成后续版本记录；合并前请整理用户可见的变化与升级注意事项。
 
+## [0.13.1](https://github.com/pony-huang/Gimi/compare/v0.13.0...v0.13.1) (2026-10-21)
+
+
+### Bug Fixes
+
+* **mcp:** preserve official runtime lookup targets in release ([e9a2d3b](https://github.com/pony-huang/Gimi/commit/e9a2d3b52ff1713766350ea37167fbe930e29963))
+* **mcp:** preserve official runtime lookup targets in release ([11d34dc](https://github.com/pony-huang/Gimi/commit/11d34dcc12333521722e77e02e2a7f7d9355b764))
+
 ## [0.13.0](https://github.com/pony-huang/Gimi/compare/v0.12.2...v0.13.0) (2026-10-20)
 
 

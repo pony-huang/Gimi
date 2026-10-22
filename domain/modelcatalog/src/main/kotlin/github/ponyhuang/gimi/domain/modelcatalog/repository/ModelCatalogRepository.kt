@@ -1,8 +1,8 @@
 package github.ponyhuang.gimi.domain.modelcatalog.repository
 
-import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import kotlinx.coroutines.flow.Flow
@@ -41,21 +41,17 @@ interface ModelCatalogRepository {
     /** Process-local selection used by the active agent; this is not a persisted default. */
     fun setRuntimeSelection(selection: ModelSelection?)
 
-    fun updateApiKey(serviceId: String, value: String)
+    /** 仅读取候选目录，不改变已选择的模型或运行时配置。 */
+    suspend fun modelCandidates(serviceId: String): List<ModelGroup>
 
-    fun updateEnabled(serviceId: String, enabled: Boolean): Boolean
+    /** 一次提交连接、模型和工具偏好；失败时保持原配置。 */
+    suspend fun saveService(service: LLMModelSetting): Boolean
 
-    fun updateOfficialToolsEnabled(serviceId: String, enabled: Boolean)
+    /** 暂停保留连接、模型和工具偏好。 */
+    suspend fun setServiceEnabled(serviceId: String, enabled: Boolean): Boolean
 
-    fun updateApiProtocol(serviceId: String, protocol: ApiProtocol)
-
-    fun updateBaseUrl(serviceId: String, value: String)
-
-    suspend fun addModel(serviceId: String, model: Model)
-
-    suspend fun removeCatalogModel(serviceId: String, groupId: String, modelId: String)
-
-    suspend fun replaceRemoteModels(serviceId: String, models: List<Model>)
+    /** 清除用户配置和凭据，保留厂商目录。 */
+    suspend fun deleteService(serviceId: String): Boolean
 
     fun selectAssistantModel(selection: ModelSelection)
 

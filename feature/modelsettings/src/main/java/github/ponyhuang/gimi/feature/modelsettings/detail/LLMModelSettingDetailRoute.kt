@@ -1,10 +1,10 @@
 package github.ponyhuang.gimi.feature.modelsettings.detail
 
-import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -15,11 +15,7 @@ import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.feature.modelsettings.R
-import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
-import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 
-// ModelsSynchronized 的 count 为运行时参数，文案只能在 effect 消费时解析，豁免该 lint。
-@SuppressLint("LocalContextGetResourceValueCall")
 @Composable
 fun LLMModelSettingDetailRoute(
     serviceId: String,
@@ -29,67 +25,38 @@ fun LLMModelSettingDetailRoute(
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-
-    val noBrowserMessage = stringResource(R.string.modelsettings_no_browser)
-    val serviceNotFoundMessage = stringResource(R.string.modelsettings_notice_service_not_found)
-    val connectionSucceededMessage = stringResource(R.string.modelsettings_notice_connection_succeeded)
-    val connectionFailedMessage = stringResource(R.string.modelsettings_notice_connection_failed)
-    val modelsSyncFailedMessage = stringResource(R.string.modelsettings_notice_models_sync_failed)
-    val agentBlockedMessage = stringResource(R.string.modelsettings_agent_mutation_blocked)
-
-    LaunchedEffect(serviceId) {
-        viewModel.onAction(LLMModelSettingDetailAction.Load(serviceId))
-    }
-
-    LaunchedEffect(Unit) {
+    val noBrowser = stringResource(R.string.modelsettings_no_browser)
+    val notFound = stringResource(R.string.modelsettings_notice_service_not_found)
+    val saved = stringResource(R.string.modelsettings_saved)
+    val deleted = stringResource(R.string.modelsettings_deleted)
+    val blocked = stringResource(R.string.modelsettings_agent_mutation_blocked)
+    BackHandler { viewModel.onAction(LLMModelSettingDetailAction.Back) }
+    LaunchedEffect(serviceId) { viewModel.onAction(LLMModelSettingDetailAction.Load(serviceId)) }
+    LaunchedEffect(viewModel, onBack, notFound, saved, deleted, blocked) {
         viewModel.effects.collect { effect ->
             when (effect) {
-                is LLMModelSettingDetailEffect.ShowToast -> {
-                    val message = when (val notice = effect.notice) {
-                        LLMModelSettingDetailNotice.SettingNotFoundLLM -> serviceNotFoundMessage
-                        LLMModelSettingDetailNotice.ConnectionSucceeded -> connectionSucceededMessage
-                        LLMModelSettingDetailNotice.ConnectionFailed -> connectionFailedMessage
-                        is LLMModelSettingDetailNotice.ModelsSynchronized -> context.getString(
-                            R.string.modelsettings_notice_models_synchronized,
-                            notice.count,
-                        )
-                        LLMModelSettingDetailNotice.LLMModelSynchronizationFailed ->
-                            modelsSyncFailedMessage
-                        LLMModelSettingDetailNotice.AgentMutationBlocked -> agentBlockedMessage
-                    }
-                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                }
+                is LLMModelSettingDetailEffect.ShowToast -> Toast.makeText(context, when (effect.notice) {
+                    LLMModelSettingDetailNotice.SettingNotFoundLLM -> notFound
+                    LLMModelSettingDetailNotice.Saved -> saved
+                    LLMModelSettingDetailNotice.Deleted -> deleted
+                    LLMModelSettingDetailNotice.AgentMutationBlocked -> blocked
+                }, Toast.LENGTH_SHORT).show()
                 LLMModelSettingDetailEffect.Close -> onBack()
             }
         }
     }
-
-    PreferenceScaffold(
-
-        style = PreferenceStyle.Compact,
-        title = stringResource(R.string.modelsettings_detail_title),
-        onBack = onBack,
-    ) { scaffoldModifier ->
-        LLMModelSettingDetailScreen(
-            state = state,
-            onAction = viewModel::onAction,
-            onOpenUrl = { url, missingMessage -> context.openUrl(url, missingMessage, noBrowserMessage) },
-            modifier = scaffoldModifier,
-        )
-    }
+    LLMModelSettingDetailScreen(state, viewModel::onAction,
+        onOpenUrl = { url, missing -> context.openUrl(url, missing, noBrowser) }, modifier = modifier)
 }
 
-private fun Context.openUrl(url: String, missingMessage: String, noBrowserMessage: String) {
+private fun Context.openUrl(url: String, missing: String, noBrowser: String) {
     if (url.isBlank()) {
-        Toast.makeText(this, missingMessage, Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, missing, Toast.LENGTH_SHORT).show()
         return
     }
     try {
-        startActivity(
-            Intent(Intent.ACTION_VIEW, url.toUri())
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
+        startActivity(Intent(Intent.ACTION_VIEW, url.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (_: ActivityNotFoundException) {
-        Toast.makeText(this, noBrowserMessage, Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, noBrowser, Toast.LENGTH_SHORT).show()
     }
 }

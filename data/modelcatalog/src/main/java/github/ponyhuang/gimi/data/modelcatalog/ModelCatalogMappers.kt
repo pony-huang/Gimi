@@ -9,6 +9,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.withDefaultAttachmentCapa
 fun LLMModelProvider.toDomain(): LLMModelSetting = LLMModelSetting(
     id = serviceId,
     name = serviceName,
+    isAdded = isAdded,
     isEnabled = isEnabled,
     isOfficialToolsEnabled = isOfficialToolsEnabled,
     apiKey = apiKey,

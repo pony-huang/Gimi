@@ -1,8 +1,8 @@
 <resources>
     <!-- ApiKeySection -->
     <string name="modelsettings_api_key_label">API 密钥</string>
-    <string name="modelsettings_api_key_test">检测</string>
-    <string name="modelsettings_api_key_get_key">点击这里获取密钥</string>
+    <string name="modelsettings_api_key_test">测试连接</string>
+    <string name="modelsettings_api_key_get_key">获取 API 密钥 ↗</string>
     <string name="modelsettings_api_key_hide">隐藏密钥</string>
     <string name="modelsettings_api_key_show">显示密钥</string>
 
@@ -30,19 +30,19 @@
     <!-- LLMModelServiceDetailScreen / Route -->
     <string name="modelsettings_section_connection">连接配置</string>
     <string name="modelsettings_section_official_tools">官方工具</string>
-    <string name="modelsettings_official_tools_enabled">启用官方工具</string>
-    <string name="modelsettings_official_tools_enabled_summary">开启后，可在聊天中使用此服务提供的独立 API 工具。</string>
+    <string name="modelsettings_official_tools_enabled">在聊天中显示厂商工具</string>
+    <string name="modelsettings_official_tools_enabled_summary">开启后，可在聊天的工具面板中选择 %1$s 支持的工具；不会自动调用。</string>
     <string name="modelsettings_official_tools_deepseek_summary">开启后，可使用网页搜索查找实时信息，或通过网页抓取读取指定页面正文，也可供其他模型调用。</string>
     <string name="modelsettings_key_url_missing">未配置密钥获取链接</string>
     <string name="modelsettings_no_browser">未找到可用的浏览器</string>
     <string name="modelsettings_notice_service_not_found">未找到该服务</string>
-    <string name="modelsettings_notice_connection_succeeded">检测成功</string>
-    <string name="modelsettings_notice_connection_failed">检测失败</string>
+    <string name="modelsettings_notice_connection_succeeded">连接成功</string>
+    <string name="modelsettings_notice_connection_failed">连接失败，请检查密钥、接口地址或网络后重试。</string>
     <string name="modelsettings_notice_models_synchronized">已同步远端：%1$d 条</string>
     <string name="modelsettings_notice_models_sync_failed">同步远端模型失败</string>
 
     <!-- LLMModelServiceListScreen -->
-    <string name="modelsettings_list_section_configured">已配置服务</string>
+    <string name="modelsettings_list_section_configured">已添加服务</string>
     <string name="modelsettings_list_load_failed">模型目录加载失败</string>
 
     <!-- DefaultModelSettingsScreen -->
@@ -84,4 +84,62 @@
     <string name="modelsettings_service_configured_count">已配置 · %1$d 个模型</string>
     <string name="modelsettings_service_open">打开 %1$s 配置</string>
     <string name="modelsettings_key_testing">正在测试…</string>
+
+    <!-- Service configuration workflow -->
+    <string name="modelsettings_add_service">添加服务</string>
+    <string name="modelsettings_provider_added">已添加 · 点击编辑</string>
+    <string name="modelsettings_service_paused_count">已暂停 · %1$d 个模型</string>
+    <string name="modelsettings_empty_title">接入你的第一个服务</string>
+    <string name="modelsettings_empty_summary">添加服务商的 API 密钥，选择模型后即可在聊天中使用。</string>
+    <string name="modelsettings_search_provider">搜索服务商</string>
+    <string name="modelsettings_choose_provider">选择服务商</string>
+    <string name="modelsettings_no_matches">暂无匹配项</string>
+    <string name="modelsettings_list_hint">点击服务编辑连接、模型和扩展能力。</string>
+    <string name="modelsettings_select_models">选择模型</string>
+    <string name="modelsettings_extensions">扩展能力</string>
+    <string name="modelsettings_extensions_summary">配置厂商工具在聊天中的使用入口</string>
+    <string name="modelsettings_advanced_connection">高级连接设置</string>
+    <string name="modelsettings_api_protocol_anthropic_label">Anthropic Messages</string>
+    <string name="modelsettings_saving">正在保存…</string>
+    <string name="modelsettings_confirm_models">确认选择 · %1$d 个模型</string>
+    <string name="modelsettings_save_changes">保存修改</string>
+    <string name="modelsettings_new_service_hint">配置将在添加服务后生效</string>
+    <string name="modelsettings_paused_hint">已暂停 · 连接、模型和工具偏好已保留</string>
+    <string name="modelsettings_saved_hint">已配置 · 修改将在保存后生效</string>
+    <string name="modelsettings_manage_models">管理模型</string>
+    <string name="modelsettings_no_selected_models">尚未添加模型</string>
+    <string name="modelsettings_selected_model_count">共 %1$d 个模型</string>
+    <string name="modelsettings_manage_service">管理服务</string>
+    <string name="modelsettings_pause_service">暂停服务</string>
+    <string name="modelsettings_resume_service">恢复服务</string>
+    <string name="modelsettings_save_before_manage">请先保存或放弃修改，再暂停或恢复服务。</string>
+    <string name="modelsettings_delete_service">删除服务</string>
+    <string name="modelsettings_delete_summary">删除此服务的密钥、连接配置和模型选择。未保存的修改也会丢弃，可稍后重新添加。</string>
+    <string name="modelsettings_unsaved_title">保存修改？</string>
+    <string name="modelsettings_unsaved_summary">当前修改尚未保存，是否保存后退出？</string>
+    <string name="modelsettings_discard">放弃修改</string>
+    <string name="modelsettings_continue_editing">继续编辑</string>
+    <string name="modelsettings_saved">服务配置已保存</string>
+    <string name="modelsettings_deleted">服务已删除</string>
+    <string name="modelsettings_invalid_connection">请填写 API 密钥和有效的 HTTP 或 HTTPS 接口地址。</string>
+    <string name="modelsettings_write_failed">操作失败，原配置未改变。请重试。</string>
+    <string name="modelsettings_no_remote_models">未获取到模型，可保留已有选择或手动添加。</string>
+    <string name="modelsettings_model_selection_hint">勾选需要使用的模型，保存服务后生效。返回会取消本次模型勾选。</string>
+    <string name="modelsettings_fetch_models">获取模型</string>
+    <string name="modelsettings_manual_model">＋ 手动添加</string>
+    <string name="modelsettings_search_model">搜索模型</string>
+    <string name="modelsettings_fetch_hint">获取模型不会清除已选项，也不会立即修改服务。</string>
+    <string name="modelsettings_provider_tools">厂商工具</string>
+    <string name="modelsettings_tools_limits">可用工具取决于接口协议和模型。独立 API 工具可能产生厂商费用。</string>
+    <string name="modelsettings_supported_capabilities">支持的能力</string>
+    <string name="modelsettings_tool_search">联网搜索</string>
+    <string name="modelsettings_tool_fetch">网页抓取</string>
+    <string name="modelsettings_tool_image">图像生成</string>
+    <string name="modelsettings_tool_url">网页上下文</string>
+    <string name="modelsettings_tool_maps">Google 地图</string>
+    <string name="modelsettings_tool_glm">联网搜索与网页阅读</string>
+    <string name="modelsettings_tool_formulas">Kimi 公式工具</string>
+    <string name="modelsettings_tool_cross_model">可供其他聊天模型调用。</string>
+    <string name="modelsettings_tool_native">可用性受当前协议及模型支持范围限制。</string>
+    <string name="modelsettings_tools_save_hint">返回服务详情后，点击“保存修改”使设置生效。暂停服务会保留此偏好。</string>
 </resources>

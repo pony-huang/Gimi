@@ -94,10 +94,14 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
         fixture.load()
         fixture.viewModel.onAction(LLMModelSettingDetailAction.ApiKeyChanged("new"))
         fixture.viewModel.onAction(LLMModelSettingDetailAction.OfficialToolsEnabledChanged(false))
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.FileUploadEnabledChanged(true))
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.FileUploadRetentionChanged(30))
         advanceUntilIdle()
         assertEquals("new", fixture.viewModel.uiState.value.service?.apiKey)
         assertFalse(fixture.viewModel.uiState.value.service!!.isOfficialToolsEnabled)
         assertEquals("key", fixture.services.value?.apiKey)
+        assertFalse(fixture.services.value!!.isFileUploadEnabled)
+        assertEquals(7, fixture.services.value!!.fileUploadRetentionDays)
         assertTrue(fixture.services.value!!.isOfficialToolsEnabled)
         coVerify(exactly = 0) { fixture.repository.saveService(any()) }
     }
@@ -199,12 +203,14 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
         fixture.load()
         fixture.viewModel.onAction(LLMModelSettingDetailAction.ApiKeyChanged("new"))
         fixture.viewModel.onAction(LLMModelSettingDetailAction.OfficialToolsEnabledChanged(false))
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.FileUploadEnabledChanged(true))
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.FileUploadRetentionChanged(30))
         fixture.viewModel.effects.test {
             fixture.viewModel.onAction(LLMModelSettingDetailAction.Save)
             assertEquals(LLMModelSettingDetailEffect.ShowToast(LLMModelSettingDetailNotice.Saved), awaitItem())
             assertEquals(LLMModelSettingDetailEffect.Close, awaitItem())
         }
-        coVerify(exactly = 1) { fixture.repository.saveService(match { it.apiKey == "new" && !it.isOfficialToolsEnabled }) }
+        coVerify(exactly = 1) { fixture.repository.saveService(match { it.apiKey == "new" && !it.isOfficialToolsEnabled && it.isFileUploadEnabled && it.fileUploadRetentionDays == 30 }) }
     }
 
     @Test

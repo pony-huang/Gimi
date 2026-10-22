@@ -133,4 +133,10 @@
     <string name="modelsettings_tool_cross_model">Can be used by other chat models.</string>
     <string name="modelsettings_tool_native">Availability is limited by the current protocol and model.</string>
     <string name="modelsettings_tools_save_hint">Return to the service and save to apply changes. Pausing preserves this preference.</string>
+    <string name="modelsettings_file_upload">File upload</string>
+    <string name="modelsettings_file_upload_summary">Upload attachments to %1$s and reference them in supported models. Uploaded files can be reused in other chats.</string>
+    <string name="modelsettings_file_retention">Cloud file retention</string>
+    <string name="modelsettings_file_retention_days">%1$d days</string>
+    <string name="modelsettings_file_retention_note">Starts with each upload and applies only to new files. Expired files can be uploaded again if their local sources remain available.</string>
+    <string name="modelsettings_file_upload_pending">Sending uploaded files is pending verification. You can save this preference; attachment sending is currently blocked when enabled. Turn it off to use the existing method. The chat protocol stays unchanged.</string>
 </resources>

@@ -75,9 +75,11 @@ data class FileAttachment(
     val category: AttachmentCategory = requireNotNull(
         AttachmentCategory.from(mimeType, displayName),
     ) { "Unsupported attachment type: $mimeType ($displayName)" },
+    /** 远端引用与本地预览载荷分离；不能把文件 ID 作为本地路径读入。 */
+    val cloudReference: CloudAttachmentReference? = null,
 ) {
     init {
-        require(payloadReference != null || inlineData != null) {
+        require(payloadReference != null || inlineData != null || cloudReference != null) {
             "Attachment $displayName has neither a payload reference nor inline data"
         }
     }
@@ -95,6 +97,7 @@ data class FileAttachment(
         if (payloadReference != other.payloadReference) return false
         if (isMissing != other.isMissing) return false
         if (category != other.category) return false
+        if (cloudReference != other.cloudReference) return false
         // Usually null, so the full-payload comparison is skipped outright.
         if (!inlineData.contentEquals(other.inlineData)) return false
 
@@ -110,6 +113,7 @@ data class FileAttachment(
         result = 31 * result + isMissing.hashCode()
         result = 31 * result + category.hashCode()
         result = 31 * result + (inlineData?.contentHashCode() ?: 0)
+        result = 31 * result + (cloudReference?.hashCode() ?: 0)
         return result
     }
 

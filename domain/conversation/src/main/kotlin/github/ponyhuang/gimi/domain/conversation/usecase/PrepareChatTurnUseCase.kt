@@ -20,9 +20,11 @@ class PrepareChatTurnUseCase @Inject constructor(
         drafts: List<DraftAttachment>,
         history: List<Message>,
         retry: ChatTurn? = null,
+        preparedAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>? = null,
     ): ChatTurn {
         if (retry != null) return retry.copy(status = ChatTurnStatus.RUNNING)
-        val userMessage = Messages.fromUser(text, attachments.read(sessionId, drafts))
+        require(preparedAttachments == null || preparedAttachments.size == drafts.size) { "Prepared attachment count differs from the send snapshot" }
+        val userMessage = Messages.fromUser(text, preparedAttachments ?: attachments.read(sessionId, drafts))
         return ChatTurn(
             id = UUID.randomUUID().toString(),
             sessionId = sessionId,

@@ -43,6 +43,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
+import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -95,6 +98,7 @@ private enum class AddToChatPage {
     REASONING_EFFORT,
     MCP,
     OFFICIAL_TOOL,
+    CLOUD_FILES,
 }
 
 @Composable
@@ -112,14 +116,22 @@ internal fun ChatAddToChatSheet(
     onOfficialToolOpened: (String) -> Unit,
     onOfficialToolFunctionEnabledChange: (String, String, Boolean) -> Unit,
     onOfficialToolFunctionsRetry: (String) -> Unit,
+    onCloudFileAction: (CloudFilePickerAction) -> Unit = {},
+    onCloudFilesConfirmed: (List<DraftAttachment>) -> Unit = {},
 ) {
     var page by rememberSaveable { mutableStateOf(AddToChatPage.HOME) }
-    BackHandler(enabled = page != AddToChatPage.HOME) {
+    fun backToHome() {
+        if (page == AddToChatPage.CLOUD_FILES) onCloudFileAction(CloudFilePickerAction.Close)
         page = AddToChatPage.HOME
     }
+    LaunchedEffect(state.cloudFiles.isOpen) {
+        if (!state.cloudFiles.isOpen && page == AddToChatPage.CLOUD_FILES) page = AddToChatPage.HOME
+    }
+    BackHandler(enabled = page != AddToChatPage.HOME) { backToHome() }
+
 
     PreferenceStyleScope(PreferenceStyle.Compact) {
-        GimiBottomSheet(onDismissRequest = onDismiss) {
+        GimiBottomSheet(onDismissRequest = { onCloudFileAction(CloudFilePickerAction.Close); onDismiss() }) {
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                 val maximumPageHeight = maxHeight * 0.92f
                 val toolListMaxHeight = (maxHeight * ToolSheetListHeightFraction)
@@ -161,6 +173,7 @@ internal fun ChatAddToChatSheet(
                         ) {
                             GimiBottomSheetHeader(
                                 title = when (currentPage) {
+                                    AddToChatPage.CLOUD_FILES -> stringResource(R.string.chat_cloud_title)
                                     AddToChatPage.HOME -> stringResource(R.string.chat_add_to_chat_title)
                                     AddToChatPage.PERMISSION_MODE ->
                                         stringResource(R.string.chat_permission_mode_title)
@@ -184,7 +197,7 @@ internal fun ChatAddToChatSheet(
                                 ),
                                 onNavigationClick = {
                                     if (currentPage == AddToChatPage.HOME) onDismiss()
-                                    else page = AddToChatPage.HOME
+                                    else backToHome()
                                 },
                                 navigationModifier = Modifier.testTag(
                                     if (currentPage == AddToChatPage.HOME) {
@@ -202,6 +215,10 @@ internal fun ChatAddToChatSheet(
                                     onChooseFiles = onChooseFiles,
                                     imagesEnabled = imagesEnabled,
                                     filesEnabled = filesEnabled,
+                                    onOpenCloudFiles = {
+                                        onCloudFileAction(CloudFilePickerAction.Open)
+                                        page = AddToChatPage.CLOUD_FILES
+                                    },
                                     onOpenReasoningEffort = { page = AddToChatPage.REASONING_EFFORT },
                                     onOpenMcp = { page = AddToChatPage.MCP },
                                     onOpenPermissionMode = { page = AddToChatPage.PERMISSION_MODE },
@@ -211,6 +228,10 @@ internal fun ChatAddToChatSheet(
                                         }
                                         page = AddToChatPage.OFFICIAL_TOOL
                                     },
+                                )
+                                AddToChatPage.CLOUD_FILES -> CloudFilePickerPage(
+                                    state = state.cloudFiles, onAction = onCloudFileAction,
+                                    onConfirm = onCloudFilesConfirmed, listMaxHeight = toolListMaxHeight,
                                 )
                                 AddToChatPage.PERMISSION_MODE -> PermissionModePage(
                                     fullAccess = state.fullAccess,
@@ -241,7 +262,7 @@ internal fun ChatAddToChatSheet(
 }
 
 @Composable
-private fun AddToChatHome(
+internal fun AddToChatHome(
     state: ChatAddToChatState,
     onTakePhoto: () -> Unit,
     onChoosePhotos: () -> Unit,
@@ -252,6 +273,7 @@ private fun AddToChatHome(
     onOpenMcp: () -> Unit,
     onOpenOfficialTools: () -> Unit,
     onOpenPermissionMode: () -> Unit,
+    onOpenCloudFiles: () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     LazyColumn(
@@ -289,6 +311,12 @@ private fun AddToChatHome(
                     enabled = filesEnabled,
                     modifier = Modifier.weight(1f),
                 )
+            }
+        }
+        if (state.cloudFilesEnabled) item {
+            GroupedCard {
+                NavigationRow(Icons.Default.CloudQueue, stringResource(R.string.chat_cloud_title),
+                    stringResource(R.string.chat_cloud_entry_summary), onOpenCloudFiles, "cloud-files-nav")
             }
         }
         if (state.officialTools.isNotEmpty()) {
@@ -776,7 +804,7 @@ private fun McpServerRow(
 }
 
 @Composable
-private fun rememberLowerBoundaryNestedScrollConnection(
+internal fun rememberLowerBoundaryNestedScrollConnection(
     listState: LazyListState,
 ): NestedScrollConnection =
     remember(listState) {
@@ -995,7 +1023,7 @@ private fun previewAddToChatState(
 private fun ChatAddToChatHomePreview() {
     ChatSheetPreviewTheme {
         AddToChatHome(
-            state = previewAddToChatState(),
+            state = previewAddToChatState().copy(cloudFilesEnabled = true),
             onTakePhoto = {},
             onChoosePhotos = {},
             onChooseFiles = {},

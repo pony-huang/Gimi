@@ -146,6 +146,9 @@ fun ChatScaffold(
     recommendations: List<AgentRecommendation> = emptyList(),
     onRecommendationClick: (String) -> Unit = {},
     onRetryFailedTurn: () -> Unit = {},
+    onCloudFileAction: (CloudFilePickerAction) -> Unit = {},
+    onCloudControl: (String, Int, Boolean) -> Unit = { _, _, _ -> },
+    onLoadCloudLocalFiles: (Set<github.ponyhuang.gimi.domain.conversation.model.CloudAttachmentReference>) -> Unit = {},
 ) {
 
     val listState = rememberLazyListState()
@@ -153,8 +156,18 @@ fun ChatScaffold(
     var composerDraft by rememberSaveable(stateSaver = MessageData.Saver) {
         mutableStateOf(MessageData())
     }
+    val requestedCloudFiles = (composerDraft.attachments.mapNotNull { it.cloudReference } +
+        state.messages.flatMap { message -> message.fileAttachments.mapNotNull { it.cloudReference } } +
+        state.cloudAttachments.mapNotNull { it.draft.cloudReference }).toSet()
+    LaunchedEffect(requestedCloudFiles, state.availableLLMModelSettings, state.sessionId, state.cloudLocalRevision) {
+        onLoadCloudLocalFiles(requestedCloudFiles)
+    }
     val scope = rememberCoroutineScope()
-    val listItems = state.listItems
+    val requestStatus = remember(state.failedTurn, state.isAgentRunning, state.isRetryingFailedTurn, state.listItems) { state.requestStatus() }
+    val listItems = remember(state.listItems, requestStatus, state.cloudLocalFiles) {
+        val items = if (requestStatus == null) state.listItems else state.listItems.withoutCurrentRequestErrors()
+        items.map { it.withCloudLocal(state.cloudLocalFiles) }
+    }
     val isSpeechRecognitionAvailable = state.isSpeechRecognitionAvailable
     val isAgentRunning = state.isAgentRunning
     val runStatus = state.currentRunStatus()
@@ -363,6 +376,9 @@ fun ChatScaffold(
 
                             null -> ChatComposer(
                                 modifier = Modifier,
+                                statusContent = {
+                                    requestStatus?.let { ChatRequestStatusCard(it, onRetryFailedTurn, onStop) }
+                                },
                                 messageData = composerDraft,
                                 onMessageDataChange = { composerDraft = it },
                                 onSendClick = { data, onResult ->
@@ -382,6 +398,11 @@ fun ChatScaffold(
                                 onCancelVoiceTranscription = onCancelVoiceTranscription,
                                 voiceInputContextKey = state.sessionId,
                                 addToChatState = ChatAddToChatState(
+                                    cloudFilesEnabled = state.cloudFilePickerContext() != null,
+                                    cloudFiles = state.cloudFiles.copy(localRevision = state.cloudLocalRevision, choices = state.cloudFiles.choices.map { choice ->
+                                        val reference = github.ponyhuang.gimi.domain.conversation.model.CloudAttachmentReference(choice.file.id, choice.file.scope)
+                                        choice.copy(file = choice.file.copy(localReference = state.cloudLocalFiles[reference]))
+                                    }),
                                     configuration = state.toolConfiguration,
                                     mcpServers = state.availableMcpServers,
                                     officialTools = state.officialToolDescriptors,
@@ -400,6 +421,11 @@ fun ChatScaffold(
                                 onOfficialToolOpened = onOfficialToolOpened,
                                 onOfficialToolFunctionEnabledChange = onOfficialToolFunctionEnabledChange,
                                 onOfficialToolFunctionsRetry = onOfficialToolFunctionsRetry,
+                                onCloudFileAction = onCloudFileAction,
+                                cloudLocalFiles = state.cloudLocalFiles,
+                                cloudItems = state.cloudAttachments,
+                                cloudBatchId = state.cloudBatchId,
+                                onCloudControl = onCloudControl,
                                 sharedMediaUris = sharedMediaUris,
                                 onSharedMediaConsumed = onSharedMediaConsumed,
                                 retainExpanded = isModelPickerVisible,
@@ -562,18 +588,6 @@ fun ChatScaffold(
                             }
                         }
                     }
-                    state.failedTurn?.let { failedTurn ->
-                        if (!state.isAgentRunning) {
-                            item(
-                                key = "failed-turn-actions:${state.sessionId}",
-                                contentType = "failed_turn_actions",
-                            ) {
-                                FailedTurnActions(
-                                    onRetry = onRetryFailedTurn,
-                                )
-                            }
-                        }
-                    }
                     item(
                         key = "chat-bottom-anchor:${state.sessionId}",
                         contentType = "bottom_anchor",
@@ -692,50 +706,6 @@ internal fun ChatHeaderActions(
                                 .background(MaterialTheme.colorScheme.error, CircleShape),
                         )
                     }
-                }
-            }
-        }
-    }
-}
-
-/**
- * 失败轮次的重试入口，使用居右的胶囊按钮。
- */
-@Composable
-private fun FailedTurnActions(
-    onRetry: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.End,
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Row(
-                    modifier = Modifier
-                        .testTag("failed_turn_retry")
-                        .clickable(onClick = onRetry)
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(
-                        stringResource(R.string.chat_failed_turn_retry),
-                        modifier = Modifier.padding(start = 6.dp),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
                 }
             }
         }
@@ -920,16 +890,6 @@ private fun previewFailedTurn(): ChatTurn = ChatTurn(
     messages = listOf(Messages.fromUser("帮我查一下今天上海的天气")),
     status = ChatTurnStatus.FAILED,
 )
-
-@Preview(showBackground = true)
-@Composable
-private fun FailedTurnActionsPreview() {
-    AsssistantaiTheme {
-        FailedTurnActions(
-            onRetry = {},
-        )
-    }
-}
 
 @Preview(showBackground = true)
 @Composable

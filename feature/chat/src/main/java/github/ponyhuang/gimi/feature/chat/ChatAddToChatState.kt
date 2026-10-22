@@ -24,7 +24,10 @@ internal fun consumeAtLowerScrollBoundary(
     canScrollForward: Boolean,
 ): Float = if (canScrollForward) 0f else availableY.coerceAtMost(0f)
 
+/** 聊天抽屉的工具配置与当前连接云文件状态。 */
 data class ChatAddToChatState(
+    val cloudFilesEnabled: Boolean = false,
+    val cloudFiles: CloudFilePickerState = CloudFilePickerState(),
     val configuration: ConversationToolConfiguration? = null,
     val mcpServers: List<McpServer> = emptyList(),
     val officialTools: List<OfficialToolDescriptor> = emptyList(),

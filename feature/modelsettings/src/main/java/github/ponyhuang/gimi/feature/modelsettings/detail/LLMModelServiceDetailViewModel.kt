@@ -81,6 +81,15 @@ class ModelServiceDetailViewModel @Inject constructor(
             is LLMModelSettingDetailAction.OfficialToolsEnabledChanged -> edit {
                 it.copy(isOfficialToolsEnabled = action.value)
             }
+            is LLMModelSettingDetailAction.FileUploadEnabledChanged -> edit {
+                if (it.id in setOf("openai", "deepseek") &&
+                    (!action.value || it.apiProtocol == ApiProtocol.OpenaiChatcompletions)) {
+                    it.copy(isFileUploadEnabled = action.value)
+                } else it
+            }
+            is LLMModelSettingDetailAction.FileUploadRetentionChanged -> if (action.days in setOf(1, 7, 30)) edit {
+                it.copy(fileUploadRetentionDays = action.days)
+            }
             is LLMModelSettingDetailAction.EnabledChanged -> changeEnabled(action.value)
             is LLMModelSettingDetailAction.OpenPage -> openPage(action.page)
             is LLMModelSettingDetailAction.ToggleModel -> if (state.canEdit) _uiState.update {

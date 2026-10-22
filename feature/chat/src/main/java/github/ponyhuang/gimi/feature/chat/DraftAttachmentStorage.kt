@@ -59,7 +59,7 @@ internal fun importDraftAttachment(context: Context, uri: Uri): DraftAttachment 
 
 internal fun deleteManagedDrafts(context: Context, attachments: Iterable<DraftAttachment>) {
     val root = AndroidAppDirectoryResolver(context).resolve(chatComposerDraftDirectorySpec).canonicalFile
-    attachments.forEach { attachment ->
+    attachments.filter { it.cloudReference == null }.forEach { attachment ->
         val file = runCatching { File(attachment.reference).canonicalFile }.getOrNull()
             ?: return@forEach
         if (file.parentFile == root) file.delete()

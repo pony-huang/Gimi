@@ -15,6 +15,12 @@ import github.ponyhuang.gimi.domain.appearance.ThemeMode
  * - `partChannelFor(partId)`：渲染期同步查询流式文本增量 channel。
  */
 sealed interface ChatAction {
+    /** 当前显示的云附件需要本地原文件；业务加载由 ViewModel 管理。 */
+    data class LoadCloudLocalFiles(val references: Set<github.ponyhuang.gimi.domain.conversation.model.CloudAttachmentReference>) : ChatAction
+    /** 批次身份防止旧卡片的迟到操作取消新发送。 */
+    data class ControlCloudFile(val batchId: String, val index: Int, val retry: Boolean) : ChatAction
+    /** 云文件在同一个抽屉内加载和暂选。 */
+    data class CloudFiles(val action: CloudFilePickerAction) : ChatAction
     /** 输入栏卸载或切换上下文时取消听写，禁止迟到结果回写或自动发送。 */
     data object CancelVoiceTranscription : ChatAction
 
@@ -116,6 +122,8 @@ sealed interface ChatEffect {
  * [Message] 携带上游（语音播放、附件校验等）给出的动态文本。
  */
 sealed interface ChatNotice {
+    /** 文件上传发送尚未开放，保留原草稿并阻止静默回退。 */
+    data object CloudFileSendingUnavailable : ChatNotice
     data object ConfigureChatModel : ChatNotice
     data object ModelSwitchBlocked : ChatNotice
     data object ParallelTaskLimitReached : ChatNotice

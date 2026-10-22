@@ -57,6 +57,7 @@ class ModelServiceConfigurationPersistenceTest {
         val revision = repository.configurationRevision.value
         preferences.failWrites = true
         val draft = original.copy(apiKey = "fake-key", isEnabled = true, isAdded = true,
+            isFileUploadEnabled = true, fileUploadRetentionDays = 30,
             groups = listOf(ModelGroup("custom", "Custom", listOf(Model("new", "New")))))
         assertFalse(repository.saveService(draft))
         assertEquals(original, repository.currentService("deepseek"))
@@ -67,7 +68,8 @@ class ModelServiceConfigurationPersistenceTest {
     fun selectedModelsAndToolPreferencesSurviveRestartPauseAndResume() = runBlocking {
         val repository = readyRepository()
         val service = repository.currentService("minimax")!!.copy(apiKey = "fake-key", isEnabled = true,
-            isOfficialToolsEnabled = false, groups = listOf(ModelGroup("custom", "Custom",
+            isOfficialToolsEnabled = false, isFileUploadEnabled = true, fileUploadRetentionDays = 30,
+            groups = listOf(ModelGroup("custom", "Custom",
                 listOf(Model("voice", "Voice", isTts = true)))))
         assertTrue(repository.saveService(service))
         assertTrue(repository.setServiceEnabled("minimax", false))
@@ -76,6 +78,8 @@ class ModelServiceConfigurationPersistenceTest {
         assertTrue(restored.isAdded)
         assertTrue(restored.isEnabled)
         assertFalse(restored.isOfficialToolsEnabled)
+        assertTrue(restored.isFileUploadEnabled)
+        assertEquals(30, restored.fileUploadRetentionDays)
         assertEquals(listOf("voice"), restored.groups.flatMap { it.models }.map { it.id })
         assertTrue(restored.groups.single().models.single().isTts)
         assertTrue(repository.modelCandidates("minimax").flatMap { it.models }.any { it.id != "voice" })
@@ -85,7 +89,7 @@ class ModelServiceConfigurationPersistenceTest {
     fun zeroSelectedModelsStayEmptyAfterRestartAndDeletionRemovesCredentials() = runBlocking {
         val repository = readyRepository()
         val service = repository.currentService("deepseek")!!.copy(apiKey = "fake-key", isEnabled = true,
-            isOfficialToolsEnabled = true, groups = emptyList())
+            isOfficialToolsEnabled = true, isFileUploadEnabled = true, fileUploadRetentionDays = 1, groups = emptyList())
         assertTrue(repository.saveService(service))
         assertTrue(readyRepository().currentService("deepseek")!!.groups.isEmpty())
         assertTrue(repository.deleteService("deepseek"))
@@ -93,8 +97,20 @@ class ModelServiceConfigurationPersistenceTest {
         assertFalse(restored.isAdded)
         assertFalse(restored.isEnabled)
         assertFalse(restored.isOfficialToolsEnabled)
+        assertFalse(restored.isFileUploadEnabled)
+        assertEquals(7, restored.fileUploadRetentionDays)
         assertEquals("", restored.apiKey)
         assertFalse(repository.setServiceEnabled("deepseek", true))
+    }
+
+    @Test
+    fun invalidUploadRetentionDoesNotCommitOrChangeTheDefaultProtocol() = runBlocking {
+        val repository = readyRepository()
+        val original = repository.currentService("deepseek")!!
+        assertFalse(original.isFileUploadEnabled)
+        assertEquals(7, original.fileUploadRetentionDays)
+        assertFalse(repository.saveService(original.copy(apiKey = "fake-key", fileUploadRetentionDays = 2)))
+        assertEquals(original, repository.currentService("deepseek"))
     }
 
     private suspend fun readyRepository(): ModelServiceRepository = ModelServiceRepository(context, database).also {

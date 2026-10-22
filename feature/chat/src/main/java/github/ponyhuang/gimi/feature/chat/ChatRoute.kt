@@ -97,6 +97,7 @@ fun ChatRoute(
             val message = when (effect) {
                 is ChatEffect.OpenA2uiUrl -> error("URL effect already handled")
                 is ChatEffect.ShowNotice -> when (val notice = effect.notice) {
+                    ChatNotice.CloudFileSendingUnavailable -> context.getString(R.string.chat_cloud_sending_unavailable)
                     ChatNotice.ConfigureChatModel -> chatNoticeConfigureChatModel
                     ChatNotice.ModelSwitchBlocked -> chatNoticeModelSwitchBlocked
                     ChatNotice.ParallelTaskLimitReached -> chatNoticeParallelLimit
@@ -238,6 +239,9 @@ fun ChatRoute(
             onOfficialToolFunctionsRetry = { toolId ->
                 viewModel.onAction(ChatAction.LoadOfficialToolFunctions(toolId))
             },
+            onCloudFileAction = { viewModel.onAction(ChatAction.CloudFiles(it)) },
+            onLoadCloudLocalFiles = { viewModel.onAction(ChatAction.LoadCloudLocalFiles(it)) },
+            onCloudControl = { batch, index, retry -> viewModel.onAction(ChatAction.ControlCloudFile(batch, index, retry)) },
             sharedMediaUris = sharedMediaUris.takeIf {
                 currentSessionId.isNotBlank() && !uiState.isInitializing
             }.orEmpty(),

@@ -121,8 +121,11 @@ fun LLMModelSettingDetailScreen(
                 if (service != null) when (state.page) {
                     ServiceEditorPage.Detail -> ServiceConnectionOverview(state, onAction, onOpenUrl)
                     ServiceEditorPage.Models -> LLMModelManagementSection(state, onAction)
-                    ServiceEditorPage.Extensions -> OfficialToolsSection(service, state.supportedTools, state.canEdit) {
-                        onAction(LLMModelSettingDetailAction.OfficialToolsEnabledChanged(it))
+                    ServiceEditorPage.Extensions -> {
+                        FileUploadSection(service, state.canEdit, onAction)
+                        OfficialToolsSection(service, state.supportedTools, state.canEdit) {
+                            onAction(LLMModelSettingDetailAction.OfficialToolsEnabledChanged(it))
+                        }
                     }
                     ServiceEditorPage.Advanced -> PreferenceGroupCard {
                         ApiBaseUrlSection(

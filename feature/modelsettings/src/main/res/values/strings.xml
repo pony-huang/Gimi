@@ -142,4 +142,10 @@
     <string name="modelsettings_tool_cross_model">可供其他聊天模型调用。</string>
     <string name="modelsettings_tool_native">可用性受当前协议及模型支持范围限制。</string>
     <string name="modelsettings_tools_save_hint">返回服务详情后，点击“保存修改”使设置生效。暂停服务会保留此偏好。</string>
+    <string name="modelsettings_file_upload">文件上传</string>
+    <string name="modelsettings_file_upload_summary">发送附件时上传至 %1$s，并在支持的模型中引用。已上传文件可在其他会话中再次选择。</string>
+    <string name="modelsettings_file_retention">云文件有效期</string>
+    <string name="modelsettings_file_retention_days">%1$d 天</string>
+    <string name="modelsettings_file_retention_note">从每次上传开始计时，仅影响新上传文件。到期后本地来源仍在时可重新上传。</string>
+    <string name="modelsettings_file_upload_pending">文件上传发送尚未开放验证。可先保存偏好；开启后暂不能发送附件，关闭可使用原有发送方式。聊天协议保持不变。</string>
 </resources>

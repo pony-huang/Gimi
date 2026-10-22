@@ -27,6 +27,10 @@ data class LLMModelProvider(
     val isEnabled: Boolean,
     /** 是否允许本服务的独立官方 API 工具参与跨模型会话。 */
     val isOfficialToolsEnabled: Boolean = isEnabled,
+    /** 文件上传偏好独立于官方工具，只有已验证的聊天引用能力才可使用。 */
+    val isFileUploadEnabled: Boolean = false,
+    /** 仅影响新上传文件的有效期，支持 1 / 7 / 30 天。 */
+    val fileUploadRetentionDays: Int = 7,
     val apiKey: String,
     val apiBaseUrl: String,
     val baseType: ApiBaseType = ApiBaseType.OpenaiChatcompletions,

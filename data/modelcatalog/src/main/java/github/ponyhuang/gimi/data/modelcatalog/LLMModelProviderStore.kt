@@ -45,6 +45,10 @@ internal data class ModelServiceSettings(
     // 补默认值容忍旧版本稀疏 blob（Gson 静默留 null / 缺字段，kotlinx 默认抛异常）。
     val isEnabled: Boolean = false,
     val isOfficialToolsEnabled: Boolean = isEnabled,
+    /** 文件上传偏好独立于官方工具，只有已验证的聊天引用能力才可使用。 */
+    val isFileUploadEnabled: Boolean = false,
+    /** 仅影响新上传文件的有效期，支持 1 / 7 / 30 天。 */
+    val fileUploadRetentionDays: Int = 7,
     val apiKey: String = "",
     val apiBaseUrl: String = "",
     val baseType: ApiBaseType = ApiBaseType.OpenaiChatcompletions,
@@ -211,6 +215,8 @@ class ModelServiceRepository @Inject constructor(
                 isAdded = true,
                 isEnabled = service.isEnabled,
                 isOfficialToolsEnabled = service.isOfficialToolsEnabled,
+                isFileUploadEnabled = service.isFileUploadEnabled,
+                fileUploadRetentionDays = service.fileUploadRetentionDays,
                 apiKey = service.apiKey.trim(),
                 apiBaseUrl = service.apiBaseUrl.trim().trimEnd('/'),
                 anthropicBaseUrl = service.anthropicBaseUrl.trim().trimEnd('/'),
@@ -252,6 +258,7 @@ class ModelServiceRepository @Inject constructor(
             val defaults = defaultSettings[serviceId] ?: return@synchronized false
             commitSettings(serviceId, defaults.copy(
                 isAdded = false, isEnabled = false, isOfficialToolsEnabled = false,
+                isFileUploadEnabled = false, fileUploadRetentionDays = 7,
                 apiKey = "", selectedGroups = null,
             ))
         }
@@ -419,6 +426,8 @@ class ModelServiceRepository @Inject constructor(
             isAdded = providerSettings.isAdded || providerSettings.apiKey.isNotBlank(),
             isEnabled = providerSettings.isEnabled,
             isOfficialToolsEnabled = providerSettings.isOfficialToolsEnabled,
+            isFileUploadEnabled = providerSettings.isFileUploadEnabled,
+            fileUploadRetentionDays = providerSettings.fileUploadRetentionDays,
             apiKey = providerSettings.apiKey,
             apiBaseUrl = providerSettings.apiBaseUrl,
             baseType = baseType,
@@ -456,6 +465,8 @@ class ModelServiceRepository @Inject constructor(
     private fun LLMModelProvider.toSettings(): ModelServiceSettings = ModelServiceSettings(
         isEnabled = isEnabled,
         isOfficialToolsEnabled = isOfficialToolsEnabled,
+        isFileUploadEnabled = isFileUploadEnabled,
+        fileUploadRetentionDays = fileUploadRetentionDays,
         apiKey = apiKey,
         apiBaseUrl = apiBaseUrl,
         baseType = baseType,

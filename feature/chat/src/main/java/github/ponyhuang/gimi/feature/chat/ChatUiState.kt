@@ -45,6 +45,13 @@ import github.ponyhuang.gimi.domain.appearance.ThemeMode
  */
 data class ChatUiState(
     val messages: List<Message> = emptyList(),
+    /** 页面恢复或连接改变后重新检查原文件，避免一直复用已被清理的旧路径。 */
+    val cloudLocalRevision: Long = 0,
+    /** null 表示本次恢复失败；只保存本地路径，不保存临时下载 URL 或密钥。 */
+    val cloudLocalFiles: Map<github.ponyhuang.gimi.domain.conversation.model.CloudAttachmentReference, String?> = emptyMap(),
+    val cloudFiles: CloudFilePickerState = CloudFilePickerState(),
+    val cloudBatchId: String? = null,
+    val cloudAttachments: List<github.ponyhuang.gimi.domain.conversation.cloud.CloudAttachmentItem> = emptyList(),
     /** 当前会话的渲染模型及首次出现位置，surface 更新不会追加重复卡片。 */
     val a2uiSurfaces: Map<String, androidx.a2ui.model.processor.A2uiSurfaceModel> = emptyMap(),
     val a2uiOwners: Map<String, String> = emptyMap(),
@@ -59,6 +66,8 @@ data class ChatUiState(
      * 一旦用户成功发送新消息或完成当前轮，该字段被清空。
      */
     val failedTurn: ChatTurn? = null,
+    /** 正在恢复原失败请求；新草稿独立，状态卡可取消该执行。 */
+    val isRetryingFailedTurn: Boolean = false,
     val conversations: List<Conversation> = emptyList(),
     /** 最近会话搜索、多选及删除状态，由 ViewModel 维护。 */
     val recentConversations: RecentConversationsState = RecentConversationsState(),

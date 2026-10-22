@@ -1,6 +1,11 @@
 package github.ponyhuang.gimi.feature.chat
 
 import android.util.Log
+import github.ponyhuang.gimi.domain.conversation.cloud.CloudAttachmentBatchFactory
+import kotlinx.coroutines.coroutineScope
+import github.ponyhuang.gimi.domain.conversation.cloud.LoadCloudFileChoicesUseCase
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -92,11 +97,38 @@ class ChatViewModel @Inject constructor(
     private val memoryRuntimeStatus: MemoryRuntimeStatus,
     private val appNotificationManager: AppNotificationManager,
     private val appUpdateRepository: AppUpdateRepository,
+    private val cloudBatchFactory: CloudAttachmentBatchFactory,
+    private val loadCloudFileChoices: LoadCloudFileChoicesUseCase,
+    private val resolveCloudFileLocal: github.ponyhuang.gimi.domain.conversation.cloud.ResolveCloudFileLocalUseCase,
     private val a2uiProtocol: github.ponyhuang.gimi.domain.a2ui.A2uiProtocol,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
+
+    private val cloudLocalFiles = CloudFileLocalCoordinator(viewModelScope, resolveCloudFileLocal,
+        services = { _uiState.value.availableLLMModelSettings },
+        update = { paths -> _uiState.update { it.copy(cloudLocalFiles = paths,
+            cloudLocalRevision = if (paths.isEmpty()) it.cloudLocalRevision + 1 else it.cloudLocalRevision) } },
+    )
+
+    private val cloudFiles = ChatCloudFilesCoordinator(viewModelScope, loadCloudFileChoices,
+        context = { _uiState.value.cloudFilePickerContext() },
+        state = { _uiState.value.cloudFiles },
+        update = { next -> _uiState.update { it.copy(cloudFiles = next) } },
+    )
+
+    init {
+        viewModelScope.launch {
+            uiState.map { it.availableLLMModelSettings }.distinctUntilChanged().collect {
+                cloudLocalFiles.reset()
+            }
+        }
+        viewModelScope.launch {
+            uiState.map { it.cloudFilePickerContext() }.distinctUntilChanged().collect { cloudFiles.contextChanged() }
+        }
+    }
+
 
     private val voiceDictation = VoiceDictationCoordinator(
         scope = viewModelScope,
@@ -190,9 +222,28 @@ class ChatViewModel @Inject constructor(
             voiceDictation.cancel()
         }
         when (action) {
+            is ChatAction.ControlCloudFile -> {
+                val batch = sessionRuntimes[_uiState.value.sessionId]?.cloudBatch
+                if (batch?.id == action.batchId) {
+                    if (action.retry) batch.retry(action.index) else batch.cancel(action.index)
+                }
+            }
+            is ChatAction.LoadCloudLocalFiles -> cloudLocalFiles.request(action.references)
+            is ChatAction.CloudFiles -> {
+                when (val intent = action.action) {
+                    is CloudFilePickerAction.LoadLocal -> cloudLocalFiles.request(setOf(intent.reference))
+                    else -> {
+                        if (intent == CloudFilePickerAction.Open) cloudLocalFiles.reset()
+                        cloudFiles.onAction(intent)
+                    }
+                }
+            }
             ChatAction.CancelVoiceTranscription -> voiceDictation.cancel()
             ChatAction.RetryFailedTurn -> turnRecoveryCoordinator.retry()
-            ChatAction.ResumeChat -> resumeChat()
+            ChatAction.ResumeChat -> {
+                cloudLocalFiles.reset()
+                resumeChat()
+            }
             ChatAction.StopStreaming -> runLifecycleCoordinator.stopStreaming()
             is ChatAction.ToggleSpeechPlayback ->
                 toggleSpeechPlayback(action.messageId, action.markdown)
@@ -412,7 +463,10 @@ class ChatViewModel @Inject constructor(
                     messages = runtime.messages,
                     listItems = runtime.toChatListItems(),
                     isAgentRunning = runtime.isAgentRunning,
+                    cloudBatchId = runtime.cloudBatch?.id,
+                    cloudAttachments = runtime.cloudItems,
                     failedTurn = runtime.failedRecoverableTurn(),
+                    isRetryingFailedTurn = runtime.retryingInvocation && runtime.isAgentRunning,
                     currentModelSelection = runtime.modelSelection,
                     toolConfiguration = runtime.toolConfiguration,
                     officialToolDescriptors = toolConfigurationCoordinator.buildDescriptors(
@@ -442,7 +496,10 @@ class ChatViewModel @Inject constructor(
                 messages = runtime.messages,
                 listItems = runtime.toChatListItems(),
                 isAgentRunning = runtime.isAgentRunning,
+                cloudBatchId = runtime.cloudBatch?.id,
+                cloudAttachments = runtime.cloudItems,
                 failedTurn = runtime.failedRecoverableTurn(),
+                isRetryingFailedTurn = runtime.retryingInvocation && runtime.isAgentRunning,
                 currentModelSelection = runtime.modelSelection,
                 toolConfiguration = runtime.toolConfiguration,
                 officialToolDescriptors = toolConfigurationCoordinator.buildDescriptors(
@@ -600,7 +657,14 @@ class ChatViewModel @Inject constructor(
             submission.complete(ChatSubmissionResult.REJECTED)
             return
         }
-        validateChatAttachments(selection, _uiState.value.availableLLMModelSettings, draftAttachments)?.let {
+        val service = _uiState.value.availableLLMModelSettings.firstOrNull { it.id == selection.serviceId }
+        val prepareCloud = retry == null && draftAttachments.isNotEmpty() &&
+            (service?.isFileUploadEnabled == true || draftAttachments.any { it.cloudReference != null })
+        runtime.cloudBatch = null
+        runtime.cloudItems = emptyList()
+        publishRuntime(runtime)
+        validateChatAttachments(selection, _uiState.value.availableLLMModelSettings, draftAttachments,
+            prepareCloudFiles = prepareCloud)?.let {
             emitNotice(it.toChatNotice())
             submission.complete(ChatSubmissionResult.REJECTED)
             return
@@ -609,18 +673,45 @@ class ChatViewModel @Inject constructor(
         runtime.modelSelection = selection
         runtime.failed = false
         runtime.attention = SessionResultAttention.NONE
+        runtime.retryingInvocation = retry != null
         val navigationAtSend = sessionNavigationCoordinator.navigationVersion
         var preparedTurn: ChatTurn? = null
         val job = runLifecycleCoordinator.launchRun(runtime, onFailure = { failure ->
             preparedTurn?.let { turnRecoveryCoordinator.recordFailure(sessionId, it) }
         }) { runToken ->
             try {
+                val cloudPrepared = if (prepareCloud && service != null) {
+                    val batch = cloudBatchFactory.create(sessionId, service, selection.modelId, draftAttachments)
+                    runtime.cloudBatch = batch
+                    runtime.cloudItems = batch.items.value
+                    publishRuntime(runtime)
+                    try {
+                        coroutineScope {
+                            val observer = launch {
+                                batch.items.collect { items ->
+                                    if (runtime.cloudBatch === batch) {
+                                        runtime.cloudItems = items
+                                        publishRuntime(runtime)
+                                    }
+                                }
+                            }
+                            try { batch.awaitReady() } finally { observer.cancel() }
+                        }
+                    } finally {
+                        if (runtime.cloudBatch === batch) {
+                            runtime.cloudItems = batch.items.value
+                            runtime.cloudBatch = null
+                            publishRuntime(runtime)
+                        }
+                    } ?: return@launchRun
+                } else null
                 // 准备流程不持有运行所有权；接管前仍由本类核对 token 与导航版本。
                 val prepared = prepareChatSend(
                     sessionId = sessionId,
                     selection = selection,
                     text = text,
                     drafts = draftAttachments,
+                    preparedAttachments = cloudPrepared,
                     cachedHistory = {
                         runtime.takeIf { it.isLoaded }?.let {
                             ChatHistorySnapshot(it.messages, it.loadedContentRevision)
@@ -641,7 +732,6 @@ class ChatViewModel @Inject constructor(
                 preparedTurn = turn
                 runtime.lastTurn = turn
                 runtime.messages = turn.messages
-                runtime.retryingInvocation = retry != null
                 runtime.loadedContentRevision = prepared.contentRevision
                 runtime.isLoaded = true
                 runtime.failed = false

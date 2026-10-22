@@ -66,6 +66,21 @@ class ValidateChatAttachmentsUseCaseTest {
         assertNull(validate(selection, emptyList(), emptyList()))
     }
 
+    @Test
+    fun uploadPreferenceRejectsNewAttachmentsBeforeTheyCanFallBackToInline() {
+        assertEquals(ChatAttachmentValidationFailure.CloudFileSendingUnavailable,
+            validate(selection, listOf(service.copy(isFileUploadEnabled = true)), listOf(draft("a.pdf", 10))))
+        assertNull(validate(selection, listOf(service.copy(isFileUploadEnabled = true)), emptyList()))
+    }
+
+    @Test
+    fun restoredCloudReferenceIsNeverReadAsALocalFileEvenAfterUploadIsDisabled() {
+        val file = draft("a.pdf", 10).copy(cloudReference =
+            github.ponyhuang.gimi.domain.conversation.model.CloudAttachmentReference("foreign", "old-scope"))
+        assertEquals(ChatAttachmentValidationFailure.CloudFileSendingUnavailable,
+            validate(selection, listOf(service), listOf(file)))
+    }
+
     private fun draft(name: String, sizeBytes: Long) = DraftAttachment(
         reference = "/drafts/$name", displayName = name, mimeType = "application/pdf",
         sizeBytes = sizeBytes, category = AttachmentCategory.DOCUMENT,

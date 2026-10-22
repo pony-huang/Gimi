@@ -96,6 +96,7 @@ import kotlinx.coroutines.launch
  * @param retainExpanded Whether an active child surface requires the composer to stay expanded.
  * @param attachmentsEnabled Whether attachment selection is available for this input.
  * @param headerContent Optional request prompt displayed above both text and recording states.
+ * @param statusContent Request status rendered outside the text input capsule.
  * @param onExpandedChange Callback reporting whether the capsule is currently in its enlarged
  * state, so surrounding content can align with it.
  */
@@ -128,10 +129,16 @@ public fun ChatComposer(
     onOfficialToolOpened: (String) -> Unit = { _ -> },
     onOfficialToolFunctionEnabledChange: (String, String, Boolean) -> Unit = { _, _, _ -> },
     onOfficialToolFunctionsRetry: (String) -> Unit = { _ -> },
+    onCloudFileAction: (CloudFilePickerAction) -> Unit = {},
     attachmentCapabilities: MultimodalCapabilities = MultimodalCapabilities(),
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
     attachmentsEnabled: Boolean = true,
+    cloudItems: List<github.ponyhuang.gimi.domain.conversation.cloud.CloudAttachmentItem> = emptyList(),
+    cloudLocalFiles: Map<github.ponyhuang.gimi.domain.conversation.model.CloudAttachmentReference, String?> = emptyMap(),
+    cloudBatchId: String? = null,
+    onCloudControl: (String, Int, Boolean) -> Unit = { _, _, _ -> },
+    statusContent: @Composable () -> Unit = {},
     headerContent: @Composable () -> Unit = {},
 ) {
     val currentMessageData by rememberUpdatedState(messageData)
@@ -158,6 +165,7 @@ public fun ChatComposer(
     val voiceRecordingFailedMessage = stringResource(R.string.chat_voice_recording_failed)
     val voiceNoTextMessage = stringResource(R.string.chat_voice_no_text_recognized)
     val mixedAttachmentMessage = stringResource(R.string.chat_attachment_mixed_types)
+    val cloudDraftLimitMessage = stringResource(R.string.chat_cloud_draft_limit)
     val attachmentReadFailedMessage = stringResource(R.string.chat_attachment_read_failed)
     val attachmentUnsupportedMessage = stringResource(R.string.chat_attachment_unsupported)
 
@@ -394,6 +402,28 @@ public fun ChatComposer(
             .fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        statusContent()
+        val visibleCloudItems = cloudItems.filter { cloudBatchId != null || it.draft in messageData.attachments }
+        val displayAttachments = visibleCloudItems.map { it.draft } + messageData.attachments.filter { draft -> visibleCloudItems.none { it.draft == draft } }
+        if (attachmentsEnabled && displayAttachments.isNotEmpty()) {
+            AttachmentList(
+                attachments = displayAttachments,
+                cloudLocalFiles = cloudLocalFiles,
+                cloudItems = visibleCloudItems,
+                cloudActive = cloudBatchId != null,
+                onCloudControl = { draft, retry ->
+                    cloudBatchId?.let { onCloudControl(it, cloudItems.indexOfFirst { item -> item.draft == draft }, retry) }
+                },
+                enabled = !isSubmitting,
+                onRemoveAttachment = { attachment ->
+                    if (!isSubmitting) {
+                        onDraftChange(currentMessageData.copy(attachments = currentMessageData.attachments - attachment))
+                        deleteManagedDrafts(context, listOf(attachment))
+                    }
+                },
+                modifier = Modifier.weight(1f, fill = false).padding(bottom = 8.dp),
+            )
+        }
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -491,6 +521,22 @@ public fun ChatComposer(
             onOfficialToolOpened = onOfficialToolOpened,
             onOfficialToolFunctionEnabledChange = onOfficialToolFunctionEnabledChange,
             onOfficialToolFunctionsRetry = onOfficialToolFunctionsRetry,
+            onCloudFileAction = onCloudFileAction,
+            onCloudFilesConfirmed = { selected ->
+                if (!isSubmitting && currentTranscriptionMode == null) {
+                    when (val result = addCloudFilesToDraft(currentMessageData.attachments, selected)) {
+                        is CloudDraftAddition.Accepted -> {
+                            onDraftChange(currentMessageData.copy(attachments = result.attachments))
+                            onCloudFileAction(CloudFilePickerAction.Close)
+                            showAttachmentOptions = false
+                        }
+                        CloudDraftAddition.MixedCategories ->
+                            Toast.makeText(context, mixedAttachmentMessage, Toast.LENGTH_SHORT).show()
+                        CloudDraftAddition.LimitExceeded ->
+                            Toast.makeText(context, cloudDraftLimitMessage, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
         )
     }
 }
@@ -555,6 +601,8 @@ public data class MessageData(
                         attachment.mimeType,
                         attachment.sizeBytes.toString(),
                         attachment.category.name,
+                        attachment.cloudReference?.fileId.orEmpty(),
+                        attachment.cloudReference?.scope.orEmpty(),
                     )
                 }
             },
@@ -562,20 +610,23 @@ public data class MessageData(
                 val text = saved.firstOrNull() as? String ?: ""
                 val attachments = saved.drop(1)
                     .mapNotNull { it as? String }
-                    .chunked(5)
+                    .chunked(7)
                     .mapNotNull { values ->
-                        if (values.size != 5) return@mapNotNull null
+                        if (values.size != 7) return@mapNotNull null
                         val category = runCatching {
                             AttachmentCategory.valueOf(values[4])
                         }.getOrNull() ?: return@mapNotNull null
                         // 草稿文件可能已被发送归档或存储清理；恢复时不再展示已失效的附件。
-                        if (!File(values[0]).exists()) return@mapNotNull null
+                        val cloud = if (values[5].isNotBlank() && values[6].isNotBlank())
+                            github.ponyhuang.gimi.domain.conversation.model.CloudAttachmentReference(values[5], values[6]) else null
+                        if (cloud == null && !File(values[0]).isFile) return@mapNotNull null
                         DraftAttachment(
                             reference = values[0],
                             displayName = values[1],
                             mimeType = values[2],
                             sizeBytes = values[3].toLongOrNull() ?: return@mapNotNull null,
                             category = category,
+                            cloudReference = cloud,
                         )
                     }
                 MessageData(text = text, attachments = attachments)

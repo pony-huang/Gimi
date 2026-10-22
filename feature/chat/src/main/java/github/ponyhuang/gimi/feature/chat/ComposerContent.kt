@@ -138,10 +138,6 @@ internal fun DefaultComposerInputContent(
         if (isTranscribing) {
             TranscribingContent(transcribing.mode)
         } else {
-            AttachmentList(
-                attachments = params.messageData.attachments,
-                onRemoveAttachment = params.onRemoveAttachment,
-            )
             Box(modifier = Modifier.fillMaxWidth()) {
                 BasicTextField(
                     modifier = Modifier
@@ -171,12 +167,13 @@ internal fun DefaultComposerInputContent(
                         .testTag("chat_composer_text_field"),
                     value = params.messageData.text,
                     onValueChange = params.onTextChange,
-                    enabled = !params.isGenerating,
+                    // 生成与重试只锁定发送；新草稿仍可编辑，且不属于正在执行的请求快照。
+                    enabled = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { params.onSendClick() }),
                     textStyle = resolveTextFieldStyle(
                         interactionSource,
-                        disabled = params.isGenerating,
+                        disabled = false,
                     ),
                     cursorBrush = SolidColor(OutlinedTextFieldDefaults.colors().cursorColor),
                     interactionSource = interactionSource,

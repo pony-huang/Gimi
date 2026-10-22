@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.chat
 
+import github.ponyhuang.gimi.domain.conversation.cloud.*
 import android.util.Log
 import app.cash.turbine.test
 import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
@@ -206,6 +207,92 @@ class ChatViewModelCharacterizationTest {
         assertFalse(state.messages[1].partial)
         assertFalse(state.isAgentRunning)
         coVerify { fixture.conversations.refreshConversation("session-1") }
+    }
+
+    @Test
+    fun unverifiedCloudUploadRejectsBeforeArchivingOrStartingTheModel() = runTest {
+        val fixture = fixture(configured = true, fileUploadEnabled = true)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        val results = mutableListOf<ChatSubmissionResult>()
+        fixture.viewModel.send("保留草稿", listOf(documentDraft("a.pdf", 10)), results::add)
+        advanceUntilIdle()
+        assertEquals(listOf(ChatSubmissionResult.REJECTED), results)
+        assertEquals(CloudAttachmentState.Failed(CloudFileFailure.UnverifiedChatReference),
+            fixture.viewModel.uiState.value.cloudAttachments.single().state)
+        assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
+        coVerify(exactly = 0) { fixture.attachments.read(any(), any()) }
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun cloudSendWaitsForAllFilesAndAcceptsOnlyTheOriginalSnapshot() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val factory = cloudFactoryForTest(gate)
+        val fixture = fixture(configured = true, fileUploadEnabled = true, cloudFactoryOverride = factory)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        val original = MessageData("原请求", listOf(documentDraft("one.pdf", 10), documentDraft("two.pdf", 10)))
+        var editing = original
+        val results = mutableListOf<ChatSubmissionResult>()
+        fixture.viewModel.send(original.text, original.attachments) { result ->
+            results += result
+            if (result == ChatSubmissionResult.ACCEPTED) editing = consumeAcceptedDraft(editing, original)
+        }
+        runCurrent()
+        assertTrue(fixture.viewModel.uiState.value.cloudAttachments.all { it.state == CloudAttachmentState.Uploading })
+        assertTrue(results.isEmpty())
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
+        editing = MessageData("后来输入的新草稿", listOf(documentDraft("next.pdf", 10)))
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(listOf(ChatSubmissionResult.ACCEPTED), results)
+        assertEquals("后来输入的新草稿", editing.text)
+        assertEquals("next.pdf", editing.attachments.single().displayName)
+        coVerify(exactly = 0) { fixture.attachments.read(any(), any()) }
+        coVerify(exactly = 1) { fixture.execution.send("原请求", match {
+            it.map { file -> file.cloudReference!!.fileId } == listOf("one.pdf", "two.pdf")
+        }, false) }
+    }
+
+    @Test
+    fun stoppingACloudBatchRejectsTheSendAndRetainsEveryOriginalDraft() = runTest {
+        val fixture = fixture(configured = true, fileUploadEnabled = true,
+            cloudFactoryOverride = cloudFactoryForTest(CompletableDeferred()))
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        val results = mutableListOf<ChatSubmissionResult>()
+        fixture.viewModel.send("原草稿", listOf(documentDraft("one.pdf", 10)), results::add)
+        runCurrent()
+        fixture.viewModel.onAction(ChatAction.StopStreaming)
+        advanceUntilIdle()
+        assertEquals(listOf(ChatSubmissionResult.REJECTED), results)
+        assertEquals(CloudAttachmentState.Cancelled, fixture.viewModel.uiState.value.cloudAttachments.single().state)
+        assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
+        assertTrue(fixture.viewModel.uiState.value.messages.isEmpty())
+        coVerify(exactly = 0) { fixture.attachments.deleteDrafts(any()) }
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
+    }
+
+    private fun cloudFactoryForTest(gate: CompletableDeferred<Unit>): CloudAttachmentBatchFactory {
+        val support = mockk<CloudFileChatSupport> { every { supports(any(), any(), any()) } returns true }
+        val cloud = mockk<CloudFileRepository>()
+        every { cloud.prepare(any(), any()) } answers {
+            val draft = secondArg<github.ponyhuang.gimi.domain.conversation.model.DraftAttachment>()
+            flow {
+                emit(CloudFilePreparation.Uploading)
+                gate.await()
+                emit(CloudFilePreparation.Ready(CloudFile(draft.displayName, "scope", draft.displayName,
+                    draft.mimeType, draft.sizeBytes, "hash", 1, Long.MAX_VALUE, null, draft.reference)))
+            }
+        }
+        val source = mockk<CloudFileLocalSource>()
+        coEvery { source.archive(any(), any()) } answers {
+            val draft = secondArg<github.ponyhuang.gimi.domain.conversation.model.DraftAttachment>()
+            github.ponyhuang.gimi.domain.conversation.model.FileAttachment(draft.mimeType, draft.displayName,
+                draft.sizeBytes, draft.displayName, "/archive/${draft.displayName}")
+        }
+        return CloudAttachmentBatchFactory(source, PrepareCloudFileUseCase(cloud, support), support)
     }
 
     @Test
@@ -1958,9 +2045,11 @@ class ChatViewModelCharacterizationTest {
         attachmentReadFailure: Exception? = null,
         sessionResolverOverride: ConversationSessionResolver? = null,
         recognitionOverride: SpeechRecognitionRepository? = null,
+        fileUploadEnabled: Boolean = false,
+        cloudFactoryOverride: CloudAttachmentBatchFactory? = null,
     ): Fixture {
         val selection = ModelSelection("service", "chat", "model")
-        val services = if (configured) listOf(service()) else emptyList()
+        val services = if (configured) listOf(service().copy(isFileUploadEnabled = fileUploadEnabled)) else emptyList()
         val catalog = mockk<ModelCatalogRepository>(relaxed = true) {
             every { observeServices() } returns MutableStateFlow(services)
             every { observeLoadState() } returns MutableStateFlow(CatalogLoadState.Ready)
@@ -2082,6 +2171,9 @@ class ChatViewModelCharacterizationTest {
         val appUpdateRepository = mockk<github.ponyhuang.gimi.domain.appupdate.repository.AppUpdateRepository>(relaxed = true)
         every { appUpdateRepository.hasUnseenUpdate } returns MutableStateFlow(false)
         val toolApproval = FakeToolApprovalRepository()
+        val cloudSupport = mockk<CloudFileChatSupport> { every { supports(any(), any(), any()) } returns false }
+        val cloudFactory = cloudFactoryOverride ?: CloudAttachmentBatchFactory(mockk(relaxed = true),
+            PrepareCloudFileUseCase(mockk(relaxed = true), cloudSupport), cloudSupport)
         val prepareChatTurn = PrepareChatTurnUseCase(
             attachments = attachments,
         )
@@ -2110,6 +2202,9 @@ class ChatViewModelCharacterizationTest {
                 },
                 appNotificationManager = appNotificationManager,
                 appUpdateRepository = appUpdateRepository,
+                cloudBatchFactory = cloudFactory,
+                loadCloudFileChoices = mockk(relaxed = true),
+                resolveCloudFileLocal = mockk(relaxed = true),
                 a2uiProtocol = mockk(relaxed = true),
             ),
             conversations = conversations,

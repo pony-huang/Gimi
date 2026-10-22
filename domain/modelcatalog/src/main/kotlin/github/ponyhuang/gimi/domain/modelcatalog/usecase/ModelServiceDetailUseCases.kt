@@ -50,7 +50,8 @@ class DeleteModelServiceUseCase @Inject constructor(private val repository: Mode
 
 /** 本地格式校验与连接测试分离；网络暂时不可用时仍允许保存合法配置。 */
 fun LLMModelSetting.hasValidConnectionConfiguration(): Boolean {
-    if (apiKey.isBlank() || apiProtocol !in supportedProtocols) return false
+    if (apiKey.isBlank() || apiProtocol !in supportedProtocols ||
+        fileUploadRetentionDays !in setOf(1, 7, 30)) return false
     val uri = try {
         URI(activeApiBaseUrl.trim())
     } catch (_: java.net.URISyntaxException) {

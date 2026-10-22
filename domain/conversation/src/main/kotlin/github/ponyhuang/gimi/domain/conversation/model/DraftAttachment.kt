@@ -14,4 +14,10 @@ data class DraftAttachment(
     val mimeType: String,
     val sizeBytes: Long,
     val category: AttachmentCategory,
+    /** 云文件只持有共享记录的引用；移除草稿不能删除该来源或远端文件。 */
+    val cloudReference: CloudAttachmentReference? = null,
 )
+
+/** 文件 ID 必须与连接摘要一起校验，禁止跨服务或凭据复用。 */
+@Serializable
+data class CloudAttachmentReference(val fileId: String, val scope: String)

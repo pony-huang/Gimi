@@ -61,6 +61,10 @@ sealed interface LLMModelSettingDetailAction {
     data class EnabledChanged(val value: Boolean) : LLMModelSettingDetailAction
     /** 修改聊天工具入口的草稿偏好。 */
     data class OfficialToolsEnabledChanged(val value: Boolean) : LLMModelSettingDetailAction
+    /** 修改独立的文件上传草稿偏好。 */
+    data class FileUploadEnabledChanged(val value: Boolean) : LLMModelSettingDetailAction
+    /** 只修改未来上传的有效期。 */
+    data class FileUploadRetentionChanged(val days: Int) : LLMModelSettingDetailAction
     /** 打开共享草稿的子页面。 */
     data class OpenPage(val page: ServiceEditorPage) : LLMModelSettingDetailAction
     /** 勾选或取消候选模型。 */

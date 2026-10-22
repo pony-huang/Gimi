@@ -62,6 +62,8 @@ internal class ChatSessionRuntime(
 
     /** 当前进程可证明的工具状态，按调用 id 与工具名隔离。 */
     val toolStatuses: MutableMap<ToolCallKey, ToolCallStatus> = mutableMapOf()
+    var cloudBatch: github.ponyhuang.gimi.domain.conversation.cloud.CloudAttachmentBatch? = null
+    var cloudItems: List<github.ponyhuang.gimi.domain.conversation.cloud.CloudAttachmentItem> = emptyList()
     var job: Job? = null
     /** 新发送创建，挂起期间保留，终止时释放引用；不跟随全局设置变化。 */
     var execution: ChatAgentExecution? = null

@@ -49,6 +49,7 @@ class AndroidChatAttachmentRepository @Inject constructor(
         attachments: List<DraftAttachment>,
     ): List<FileAttachment> =
         withContext(Dispatchers.IO) {
+            require(attachments.none { it.cloudReference != null }) { "Cloud references require a verified file adapter" }
             // 归档目的地是全局共享工作区，与会话无关；sessionId 仅为接口兼容保留。
             attachments.map { attachment ->
                 when (attachment.category) {
@@ -67,7 +68,7 @@ class AndroidChatAttachmentRepository @Inject constructor(
 
     override suspend fun deleteDrafts(attachments: List<DraftAttachment>) {
         withContext(Dispatchers.IO) {
-            attachments.forEach { attachment ->
+            attachments.filter { it.cloudReference == null }.forEach { attachment ->
                 val file = File(attachment.reference)
                 val candidate = runCatching { file.canonicalFile }.getOrNull() ?: return@forEach
                 if (draftRoots.any { candidate.parentFile == it.canonicalFile }) candidate.delete()

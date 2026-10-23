@@ -11,6 +11,8 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import java.io.IOException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
@@ -106,6 +108,64 @@ class CloudAttachmentBatchTest {
         assertFalse(task.isCompleted)
         batch.retry(1)
         assertEquals(2, task.await()!!.size)
+    }
+
+    @Test fun removedCancelledFileNoLongerBlocksTheReadyFileAndCannotBeRetried() = runTest {
+        allow()
+        every { repository.prepare(service, any()) } answers {
+            val name = secondArg<DraftAttachment>().displayName
+            flow {
+                if (name == "two.pdf") CompletableDeferred<Unit>().await()
+                emit(CloudFilePreparation.Ready(record(name)))
+            }
+        }
+        val batch = factory.create("session", service, "model", drafts)
+        val task = async { batch.awaitReady() }
+        runCurrent()
+        batch.cancel(1)
+        runCurrent()
+        assertFalse(task.isCompleted)
+        batch.remove(1)
+        batch.retry(1)
+        assertEquals(listOf("one.pdf"), task.await()!!.map { it.cloudReference!!.fileId })
+        assertEquals(CloudAttachmentState.Removed, batch.items.value[1].state)
+    }
+
+    @Test fun removingEveryFileEndsTheBatchWithoutSendingAnEmptyInput() = runTest {
+        allow()
+        every { repository.prepare(service, any()) } returns flow {
+            emit(CloudFilePreparation.Uploading)
+            CompletableDeferred<Unit>().await()
+        }
+        val batch = factory.create("session", service, "model", drafts)
+        val task = async { batch.awaitReady() }
+        runCurrent()
+        batch.remove(0)
+        batch.remove(1)
+        assertNull(task.await())
+        assertTrue(batch.items.value.all { it.state == CloudAttachmentState.Removed })
+    }
+
+    @Test fun removalWaitsForArchiveToExitAndLateCompletionCannotRestoreTheFile() = runTest {
+        allow()
+        val finishArchive = CompletableDeferred<Unit>()
+        coEvery { source.archive(any(), any()) } coAnswers {
+            withContext(NonCancellable) {
+                finishArchive.await()
+                FileAttachment("application/pdf", "one", 10, "one.pdf", "/archive/one.pdf")
+            }
+        }
+        val batch = factory.create("session", service, "model", drafts.take(1))
+        val task = async { batch.awaitReady() }
+        runCurrent()
+        batch.remove(0)
+        runCurrent()
+        assertEquals(CloudAttachmentState.Removed, batch.items.value.single().state)
+        assertFalse(task.isCompleted)
+        finishArchive.complete(Unit)
+        assertNull(task.await())
+        assertEquals(CloudAttachmentState.Removed, batch.items.value.single().state)
+        coVerify(exactly = 0) { repository.prepare(any(), any()) }
     }
 
     @Test fun cancellationOfTheBatchCancelsPendingWorkAndNeverReturnsAPartialInput() = runTest {

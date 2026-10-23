@@ -36,6 +36,7 @@ fun LLMModelSettingDetailRoute(
         viewModel.effects.collect { effect ->
             when (effect) {
                 is LLMModelSettingDetailEffect.ShowToast -> Toast.makeText(context, when (effect.notice) {
+                    is LLMModelSettingDetailNotice.ModelsRefreshed -> context.getString(R.string.modelsettings_notice_models_synchronized, effect.notice.count)
                     LLMModelSettingDetailNotice.SettingNotFoundLLM -> notFound
                     LLMModelSettingDetailNotice.Saved -> saved
                     LLMModelSettingDetailNotice.Deleted -> deleted

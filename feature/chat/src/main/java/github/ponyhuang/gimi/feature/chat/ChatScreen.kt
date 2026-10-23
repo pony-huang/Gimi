@@ -191,7 +191,6 @@ fun ChatScaffold(
             ?: MultimodalCapabilities()
         val service = state.availableLLMModelSettings.firstOrNull { it.id == selection?.serviceId }
         if (service?.usesCloudFileUpload() == true) capabilities.copy(
-            vision = null, audioInput = null,
             documentInput = if (state.cloudPdfInputSupported) github.ponyhuang.gimi.domain.modelcatalog.model.DocumentInputCapability(
                 supportedMimeTypes = listOf("application/pdf"), ingestMode = github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode.FILE_REFERENCE,
             ) else null,

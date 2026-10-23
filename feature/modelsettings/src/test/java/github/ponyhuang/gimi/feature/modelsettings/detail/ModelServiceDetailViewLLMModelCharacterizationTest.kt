@@ -369,6 +369,42 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
         assertTrue(fixture.viewModel.uiState.value.pendingModelKeys.isEmpty())
     }
 
+    @Test
+    fun refreshReportsValidDistinctRemoteCountWithoutChangingSelections() = runTest {
+        val fixture = fixture(service())
+        fixture.load()
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.OpenPage(ServiceEditorPage.Models))
+        val selected = fixture.viewModel.uiState.value.pendingModelKeys
+        coEvery { fixture.remote.fetchModels(any()) } returns listOf(Model("new", "New"), Model("new", "Duplicate"), Model("", "Invalid"))
+        fixture.viewModel.effects.test {
+            fixture.viewModel.onAction(LLMModelSettingDetailAction.RefreshModels)
+            assertEquals(LLMModelSettingDetailEffect.ShowToast(LLMModelSettingDetailNotice.ModelsRefreshed(1)), awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals(selected, fixture.viewModel.uiState.value.pendingModelKeys)
+        assertEquals(2, fixture.viewModel.uiState.value.candidates.size)
+        coVerify(exactly = 0) { fixture.repository.saveService(any()) }
+    }
+
+    @Test
+    fun emptyRefreshReportsZeroAndCancelledRefreshDoesNotReportSuccess() = runTest {
+        val fixture = fixture(service())
+        fixture.load()
+        coEvery { fixture.remote.fetchModels(any()) } returns emptyList()
+        fixture.viewModel.effects.test {
+            fixture.viewModel.onAction(LLMModelSettingDetailAction.RefreshModels)
+            assertEquals(LLMModelSettingDetailEffect.ShowToast(LLMModelSettingDetailNotice.ModelsRefreshed(0)), awaitItem())
+            assertEquals(R.string.modelsettings_no_remote_models, fixture.viewModel.uiState.value.errorRes)
+            coEvery { fixture.remote.fetchModels(any()) } coAnswers { suspendCancellableCoroutine { } }
+            fixture.viewModel.onAction(LLMModelSettingDetailAction.RefreshModels)
+            runCurrent()
+            fixture.viewModel.onAction(LLMModelSettingDetailAction.ApiKeyChanged("changed"))
+            runCurrent()
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
     private fun fixture(service: LLMModelSetting?, gate: FakeAgentRuntimeGate = FakeAgentRuntimeGate()): Fixture {
         val services = MutableStateFlow(service)
         val repository = mockk<ModelCatalogRepository>(relaxed = true) {

@@ -12,6 +12,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
@@ -37,6 +39,8 @@ sealed interface CloudAttachmentState {
     data class Failed(val reason: CloudFileFailure) : CloudAttachmentState
     /** 单文件取消不移除本次发送快照，批次继续等待显式重试或整体取消。 */
     data object Cancelled : CloudAttachmentState
+    /** 用户明确移除该文件，不再等待、重试或带入本次请求。 */
+    data object Removed : CloudAttachmentState
 }
 
 /** 索引关联原发送快照；UI 保留原名称、缩略图，与后来编辑的草稿分离。 */
@@ -66,12 +70,13 @@ class CloudAttachmentBatch internal constructor(
     private val _items = MutableStateFlow(drafts.map(::CloudAttachmentItem))
     val items = _items.asStateFlow()
     private val started = AtomicBoolean()
-    private val commands = Channel<Pair<Int, Boolean>>(Channel.UNLIMITED)
+    private val commands = Channel<Pair<Int, CloudFileCommand>>(Channel.UNLIMITED)
 
-    fun retry(index: Int) { commands.trySend(index to true) }
-    fun cancel(index: Int) { commands.trySend(index to false) }
+    fun retry(index: Int) { commands.trySend(index to CloudFileCommand.Retry) }
+    fun cancel(index: Int) { commands.trySend(index to CloudFileCommand.Cancel) }
+    fun remove(index: Int) { commands.trySend(index to CloudFileCommand.Remove) }
 
-    /** null 表示副作用前的能力拒绝；其它失败保留批次等待，全部 Ready 才返回模型输入。 */
+    /** 能力拒绝或全部移除时返回 null；未移除文件全部 Ready 后返回，其他失败继续等待重试。 */
     suspend fun awaitReady(): List<FileAttachment>? = coroutineScope {
         check(started.compareAndSet(false, true)) { "A cloud preparation batch can run only once" }
         val rejected = _items.value.map { item -> when {
@@ -109,6 +114,8 @@ class CloudAttachmentBatch internal constructor(
                         val source = archived[index] ?: localSource.archive(sessionId, draft).also { archived[index] = it }
                         prepareFile(service, modelId, draft.copy(reference = requireNotNull(source.payloadReference), sizeBytes = source.sizeBytes, mimeType = source.mimeType))
                     }
+                    // 归档实现可能在不可取消的 IO 区间收尾；取消后不得再启动远端上传。
+                    currentCoroutineContext().ensureActive()
                     flow.collect { result -> set(index, token, when (result) {
                         CloudFilePreparation.Uploading -> CloudAttachmentState.Uploading
                         is CloudFilePreparation.Failed -> CloudAttachmentState.Failed(result.reason)
@@ -139,32 +146,36 @@ class CloudAttachmentBatch internal constructor(
         }
         _items.value.indices.forEach(::start)
         val controls = launch {
-            for ((index, retry) in commands) {
+            for ((index, command) in commands) {
                 val current = _items.value.getOrNull(index)?.state ?: continue
-                if (current is CloudAttachmentState.Ready) continue
-                if (retry) {
-                    if (current is CloudAttachmentState.Failed || current == CloudAttachmentState.Cancelled) start(index)
-                } else {
-                    tokens[index] = Any() // 已取消 Job 的迟到结果不能覆盖新的状态或重试结果。
-                    jobs[index]?.cancel()
-                    _items.update { list -> list.mapIndexed { i, item -> if (i == index) item.copy(state = CloudAttachmentState.Cancelled) else item } }
+                if (current == CloudAttachmentState.Removed) continue
+                when (command) {
+                    CloudFileCommand.Retry -> if (current is CloudAttachmentState.Failed || current == CloudAttachmentState.Cancelled) start(index)
+                    CloudFileCommand.Cancel, CloudFileCommand.Remove -> {
+                        if (command == CloudFileCommand.Cancel && current is CloudAttachmentState.Ready) continue
+                        tokens[index] = Any() // 迟到结果不能恢复已取消或移除的附件。
+                        jobs[index]?.cancel()
+                        val next = if (command == CloudFileCommand.Remove) CloudAttachmentState.Removed else CloudAttachmentState.Cancelled
+                        _items.update { list -> list.mapIndexed { i, item -> if (i == index) item.copy(state = next) else item } }
+                    }
                 }
             }
         }
         try {
-            var ready = _items.first { list -> list.all { it.state is CloudAttachmentState.Ready } }
+            var ready = _items.first { list -> list.all { it.state is CloudAttachmentState.Ready || it.state == CloudAttachmentState.Removed } }
+            if (ready.all { it.state == CloudAttachmentState.Removed }) return@coroutineScope null
             fun expired(): List<Int> {
                 val now = nowMillis()
-                return ready.indices.filter { (ready[it].state as CloudAttachmentState.Ready).expiresAtMillis <= now }
+                return ready.indices.filter { (ready[it].state as? CloudAttachmentState.Ready)?.expiresAtMillis?.let { expiry -> expiry <= now } == true }
             }
             var expiredIndices = expired()
             while (expiredIndices.isNotEmpty()) {
                 // 某文件等待其它附件期间可能到期；只重做过期项，不能把过期 ID 发给模型。
                 expiredIndices.forEach(::start)
-                ready = _items.first { list -> list.all { it.state is CloudAttachmentState.Ready } }
+                ready = _items.first { list -> list.all { it.state is CloudAttachmentState.Ready || it.state == CloudAttachmentState.Removed } }
                 expiredIndices = expired()
             }
-            ready.map { (it.state as CloudAttachmentState.Ready).attachment }
+            ready.mapNotNull { (it.state as? CloudAttachmentState.Ready)?.attachment }.takeIf { it.isNotEmpty() }
         } finally {
             commands.close()
             controls.cancel()
@@ -177,3 +188,6 @@ class CloudAttachmentBatch internal constructor(
         }
     }
 }
+
+/** 批次内命令使用稳定索引；移除保留墓碑以避免其他文件的操作索引漂移。 */
+private enum class CloudFileCommand { Retry, Cancel, Remove }

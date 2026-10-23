@@ -15,6 +15,7 @@ dependencies {
     implementation(project(":domain:modelcatalog"))
     implementation(project(":domain:speech"))
     implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.animation)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.foundation.layout)
     implementation(libs.androidx.compose.material.icons.extended)

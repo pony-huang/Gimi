@@ -33,7 +33,7 @@
     <string name="modelsettings_notice_service_not_found">Service not found</string>
     <string name="modelsettings_notice_connection_succeeded">Connection succeeded</string>
     <string name="modelsettings_notice_connection_failed">Connection failed. Check the key, API address, or network and retry.</string>
-    <string name="modelsettings_notice_models_synchronized">Synced %1$d models from the remote catalog</string>
+    <string name="modelsettings_notice_models_synchronized">Fetched %1$d models</string>
     <string name="modelsettings_notice_models_sync_failed">Failed to sync remote models</string>
 
     <string name="modelsettings_list_section_configured">Added services</string>

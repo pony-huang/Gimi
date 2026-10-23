@@ -83,13 +83,16 @@ internal fun AttachmentList(
     cloudLocalFiles: Map<github.ponyhuang.gimi.domain.conversation.model.CloudAttachmentReference, String?> = emptyMap(),
     onCloudControl: (DraftAttachment, Boolean) -> Unit = { _, _ -> },
 ) {
-    if (attachments.isEmpty()) return
+    val visibleAttachments = attachments.filterNot { attachment ->
+        cloudItems.any { it.draft == attachment && it.state == CloudAttachmentState.Removed }
+    }
+    if (visibleAttachments.isEmpty()) return
     var preview by remember { mutableStateOf<DraftAttachment?>(null) }
     Column(
         modifier = modifier.fillMaxWidth().heightIn(max = 240.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        attachments.forEach { attachment ->
+        visibleAttachments.forEach { attachment ->
             key(attachment.cloudReference?.let { it.scope + it.fileId } ?: attachment.reference) {
                 val local = if (attachment.cloudReference == null) attachment.reference else cloudLocalFiles[attachment.cloudReference].orEmpty()
                 DraftAttachmentCard(attachment.copy(reference = local), enabled, { onRemoveAttachment(attachment) }, { preview = attachment },
@@ -98,7 +101,7 @@ internal fun AttachmentList(
             }
         }
     }
-    preview?.takeIf { it in attachments }?.let { attachment ->
+    preview?.takeIf { it in visibleAttachments }?.let { attachment ->
         ZoomableCoilImagePreviewDialog(
             model = File(if (attachment.cloudReference == null) attachment.reference else cloudLocalFiles[attachment.cloudReference].orEmpty()),
             imageKey = attachment.cloudReference?.let { it.scope + it.fileId } ?: attachment.reference,
@@ -155,8 +158,8 @@ private fun DraftAttachmentCard(attachment: DraftAttachment, enabled: Boolean, o
                     }
                     if (cloudState is CloudAttachmentState.Ready) Icon(Icons.Default.Check,
                         stringResource(R.string.chat_cloud_upload_ready), Modifier.padding(end = 12.dp).size(20.dp), tint = MaterialTheme.colorScheme.primary)
-                    else if (cloudState != CloudAttachmentState.Cancelled) IconButton(onClick = { onCloudControl(false) }, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Default.Close, stringResource(R.string.chat_cloud_cancel_file), Modifier.size(18.dp))
+                    IconButton(onClick = { onCloudControl(false) }, modifier = Modifier.size(40.dp)) {
+                        Icon(Icons.Default.Close, stringResource(R.string.chat_attachment_remove), Modifier.size(18.dp))
                     }
                 } else IconButton(onClick = onRemove, enabled = enabled, modifier = Modifier.size(48.dp).testTag("chat_composer_attachment_remove")) {
                     Icon(Icons.Default.Close, stringResource(R.string.chat_attachment_remove), Modifier.size(18.dp))

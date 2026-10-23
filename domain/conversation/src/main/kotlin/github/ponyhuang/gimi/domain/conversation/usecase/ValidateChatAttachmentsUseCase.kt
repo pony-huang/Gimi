@@ -1,6 +1,6 @@
 package github.ponyhuang.gimi.domain.conversation.usecase
 
-import github.ponyhuang.gimi.domain.conversation.cloud.usesCloudFileUpload
+import github.ponyhuang.gimi.domain.conversation.cloud.usesCloudFileUploadFor
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
@@ -37,7 +37,7 @@ class ValidateChatAttachmentsUseCase @Inject constructor() {
     ): ChatAttachmentValidationFailure? {
         if (drafts.isEmpty()) return null
         val cloudRequested = drafts.any { it.cloudReference != null } ||
-            services.firstOrNull { it.id == selection.serviceId }?.usesCloudFileUpload() == true
+            services.firstOrNull { it.id == selection.serviceId }?.usesCloudFileUploadFor(drafts) == true
         if (cloudRequested && !prepareCloudFiles) {
             return ChatAttachmentValidationFailure.CloudFileSendingUnavailable
         }

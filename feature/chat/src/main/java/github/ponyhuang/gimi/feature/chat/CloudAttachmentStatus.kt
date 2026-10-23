@@ -12,6 +12,7 @@ internal fun cloudAttachmentStatus(state: CloudAttachmentState, active: Boolean)
     CloudAttachmentState.Preparing -> R.string.chat_cloud_preparing
     CloudAttachmentState.Uploading -> R.string.chat_cloud_uploading
     is CloudAttachmentState.Ready -> R.string.chat_cloud_upload_ready
+    CloudAttachmentState.Removed -> R.string.chat_attachment_remove
     CloudAttachmentState.Cancelled -> if (active) R.string.chat_cloud_file_cancelled_waiting else R.string.chat_cloud_file_cancelled
     is CloudAttachmentState.Failed -> when (state.reason) {
         CloudFileFailure.UnverifiedChatReference -> R.string.chat_cloud_reference_unverified

@@ -103,6 +103,19 @@ class ValidateChatAttachmentsUseCaseTest {
             validate(selection, listOf(source), listOf(cloud)))
     }
 
+    @Test
+    fun cloudUploadPreferenceKeepsNativeImagesAndTheirSizeAndMimeValidation() {
+        val source = service.copy(isFileUploadEnabled = true)
+        val image = draft("photo.jpg", 100).copy(mimeType = "image/jpeg", category = AttachmentCategory.IMAGE)
+        assertNull(validate(selection, listOf(source), listOf(image)))
+        val invalid = image.copy(mimeType = "image/unsupported")
+        assertEquals(ChatAttachmentValidationFailure.UnsupportedOrTooLarge(invalid.displayName),
+            validate(selection, listOf(source), listOf(invalid)))
+        val noVision = source.copy(groups = listOf(ModelGroup("group", "Group", listOf(model.copy(capabilities = MultimodalCapabilities(vision = null))))))
+        assertEquals(ChatAttachmentValidationFailure.CategoryUnsupported,
+            validate(selection, listOf(noVision), listOf(image)))
+    }
+
     private fun draft(name: String, sizeBytes: Long) = DraftAttachment(
         reference = "/drafts/$name", displayName = name, mimeType = "application/pdf",
         sizeBytes = sizeBytes, category = AttachmentCategory.DOCUMENT,

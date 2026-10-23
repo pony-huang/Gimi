@@ -258,16 +258,18 @@ class ModelServiceDetailViewModel @Inject constructor(
                 val result = refreshCatalog(service)
                 if (revision != connectionRevision) return@launch
                 result.fold(onSuccess = { models ->
+                    val validModels = models.filter { it.id.isNotBlank() }.distinctBy { it.id }
                     _uiState.update { current ->
                         val known = current.candidates.associateBy { it.model.id }
-                        val rows = models.filter { it.id.isNotBlank() }.map { model ->
+                        val rows = validModels.map { model ->
                             // 远端 /models 常常没有语音类型和能力元数据，已有项保留本地元数据。
                             known[model.id] ?: LLMModelSettingDetailRow.LLMModelItem("${service.id}-remote", model)
                         }
                         current.copy(candidates = (current.candidates + rows).distinctBy { it.key },
                             candidateGroupNames = current.candidateGroupNames + ("${service.id}-remote" to service.name),
-                            errorRes = if (models.isEmpty()) R.string.modelsettings_no_remote_models else null)
+                            errorRes = if (validModels.isEmpty()) R.string.modelsettings_no_remote_models else null)
                     }
+                    _effects.trySend(LLMModelSettingDetailEffect.ShowToast(LLMModelSettingDetailNotice.ModelsRefreshed(validModels.size)))
                 }, onFailure = {
                     _uiState.update { it.copy(errorRes = R.string.modelsettings_notice_models_sync_failed) }
                 })

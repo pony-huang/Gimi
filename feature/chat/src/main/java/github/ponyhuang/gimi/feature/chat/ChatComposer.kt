@@ -404,7 +404,8 @@ public fun ChatComposer(
     ) {
         statusContent()
         val visibleCloudItems = cloudItems.filter { cloudBatchId != null || it.draft in messageData.attachments }
-        val displayAttachments = visibleCloudItems.map { it.draft } + messageData.attachments.filter { draft -> visibleCloudItems.none { it.draft == draft } }
+        val displayAttachments = (visibleCloudItems.map { it.draft } + messageData.attachments.filter { draft -> visibleCloudItems.none { it.draft == draft } })
+            .filterNot { draft -> cloudItems.any { it.draft == draft && it.state == github.ponyhuang.gimi.domain.conversation.cloud.CloudAttachmentState.Removed } }
         if (attachmentsEnabled && displayAttachments.isNotEmpty()) {
             AttachmentList(
                 attachments = displayAttachments,
@@ -413,6 +414,7 @@ public fun ChatComposer(
                 cloudActive = cloudBatchId != null,
                 onCloudControl = { draft, retry ->
                     cloudBatchId?.let { onCloudControl(it, cloudItems.indexOfFirst { item -> item.draft == draft }, retry) }
+                    if (!retry) onDraftChange(currentMessageData.copy(attachments = currentMessageData.attachments - draft))
                 },
                 enabled = !isSubmitting,
                 onRemoveAttachment = { attachment ->

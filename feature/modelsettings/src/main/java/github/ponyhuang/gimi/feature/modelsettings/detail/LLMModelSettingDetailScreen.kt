@@ -1,6 +1,18 @@
 package github.ponyhuang.gimi.feature.modelsettings.detail
 
 import android.content.res.Configuration
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +30,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
@@ -42,7 +53,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -75,9 +89,33 @@ fun LLMModelSettingDetailScreen(
     onOpenUrl: (String, String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val pageStateHolder = rememberSaveableStateHolder()
+    AnimatedContent(
+        targetState = state.page,
+        modifier = modifier.fillMaxSize(),
+        transitionSpec = {
+            val direction = if (targetState == ServiceEditorPage.Models) 1 else -1
+            (slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { direction * it / 5 } + fadeIn(tween(180))) togetherWith
+                (slideOutHorizontally(tween(200, easing = FastOutSlowInEasing)) { -direction * it / 8 } + fadeOut(tween(140)))
+        },
+        label = "ServiceEditorPage",
+    ) { page ->
+        // 各页面保存自己的滚动位置；返回详情时不跳回顶部。
+        pageStateHolder.SaveableStateProvider(page) {
+            ServiceEditorPageContent(state.copy(page = page), onAction, onOpenUrl)
+        }
+    }
+    ServiceEditorDialogs(state, onAction)
+}
+
+@Composable
+private fun ServiceEditorPageContent(
+    state: LLMModelSettingDetailUiState,
+    onAction: (LLMModelSettingDetailAction) -> Unit,
+    onOpenUrl: (String, String) -> Unit,
+) {
     val service = state.service
     PreferenceScaffold(
-        modifier = modifier,
         style = PreferenceStyle.Compact,
         title = when (state.page) {
             ServiceEditorPage.Detail -> service?.name ?: stringResource(R.string.modelsettings_detail_title)
@@ -137,7 +175,6 @@ fun LLMModelSettingDetailScreen(
             }
         }
     }
-    ServiceEditorDialogs(state, onAction)
 }
 
 @Composable
@@ -147,6 +184,11 @@ private fun ServiceConnectionOverview(
     onOpenUrl: (String, String) -> Unit,
 ) {
     val service = state.service ?: return
+    val connectionRotation by animateFloatAsState(
+        targetValue = if (state.isConnectionExpanded) 180f else 0f,
+        animationSpec = tween(220, easing = FastOutSlowInEasing),
+        label = "ConnectionChevron",
+    )
     Row(Modifier.padding(horizontal = 32.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Icon(Icons.Default.CheckCircle, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
@@ -182,21 +224,28 @@ private fun ServiceConnectionOverview(
         }
         PreferenceListItem(icon = Icons.Outlined.Settings,
             title = stringResource(R.string.modelsettings_connection_options),
-            subtitle = if (state.isConnectionExpanded) null else protocolLabel(service.apiProtocol),
+            subtitle = protocolLabel(service.apiProtocol),
             onClick = { onAction(LLMModelSettingDetailAction.ToggleConnection) },
             trailingContent = {
-                Icon(if (state.isConnectionExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    stringResource(if (state.isConnectionExpanded) R.string.modelsettings_collapse_connection else R.string.modelsettings_expand_connection))
+                Icon(Icons.Default.ExpandMore,
+                    stringResource(if (state.isConnectionExpanded) R.string.modelsettings_collapse_connection else R.string.modelsettings_expand_connection),
+                    modifier = Modifier.rotate(connectionRotation))
             })
-        if (state.isConnectionExpanded) ApiBaseUrlSection(
-            service = service,
-            isMenuExpanded = state.isProtocolMenuExpanded,
-            onToggleMenu = { onAction(LLMModelSettingDetailAction.ToggleProtocolMenu) },
-            onDismissMenu = { onAction(LLMModelSettingDetailAction.DismissProtocolMenu) },
-            onProtocolChange = { onAction(LLMModelSettingDetailAction.ApiProtocolChanged(it)) },
-            onBaseUrlChange = { onAction(LLMModelSettingDetailAction.ApiBaseUrlChanged(it)) },
-            enabled = state.canEdit,
-        )
+        AnimatedVisibility(
+            visible = state.isConnectionExpanded,
+            enter = expandVertically(tween(220, easing = FastOutSlowInEasing), expandFrom = Alignment.Top) + fadeIn(tween(160)),
+            exit = shrinkVertically(tween(200, easing = FastOutSlowInEasing), shrinkTowards = Alignment.Top) + fadeOut(tween(120)),
+        ) {
+            ApiBaseUrlSection(
+                service = service,
+                isMenuExpanded = state.isProtocolMenuExpanded,
+                onToggleMenu = { onAction(LLMModelSettingDetailAction.ToggleProtocolMenu) },
+                onDismissMenu = { onAction(LLMModelSettingDetailAction.DismissProtocolMenu) },
+                onProtocolChange = { onAction(LLMModelSettingDetailAction.ApiProtocolChanged(it)) },
+                onBaseUrlChange = { onAction(LLMModelSettingDetailAction.ApiBaseUrlChanged(it)) },
+                enabled = state.canEdit,
+            )
+        }
         OutlinedButton(onClick = { onAction(LLMModelSettingDetailAction.TestConnection) },
             enabled = state.canEdit && !state.isTestingKey && service.apiKey.isNotBlank(),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {

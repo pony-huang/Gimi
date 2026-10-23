@@ -17,7 +17,7 @@ import github.ponyhuang.gimi.domain.appearance.ThemeMode
 sealed interface ChatAction {
     /** 当前显示的云附件需要本地原文件；业务加载由 ViewModel 管理。 */
     data class LoadCloudLocalFiles(val references: Set<github.ponyhuang.gimi.domain.conversation.model.CloudAttachmentReference>) : ChatAction
-    /** 批次身份防止旧卡片的迟到操作取消新发送。 */
+    /** 批次身份防止旧卡片影响新发送；retry 为 false 时明确移除文件。 */
     data class ControlCloudFile(val batchId: String, val index: Int, val retry: Boolean) : ChatAction
     /** 云文件在同一个抽屉内加载和暂选。 */
     data class CloudFiles(val action: CloudFilePickerAction) : ChatAction

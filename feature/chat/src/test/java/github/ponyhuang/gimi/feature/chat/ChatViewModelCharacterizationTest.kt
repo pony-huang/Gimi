@@ -1,5 +1,7 @@
 package github.ponyhuang.gimi.feature.chat
 
+import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
+
 import github.ponyhuang.gimi.domain.conversation.cloud.*
 import android.util.Log
 import app.cash.turbine.test
@@ -310,6 +312,61 @@ class ChatViewModelCharacterizationTest {
         assertTrue(fixture.viewModel.uiState.value.messages.isEmpty())
         coVerify(exactly = 0) { fixture.attachments.deleteDrafts(any()) }
         coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun nativeImageBypassesCloudPreparationWhenUploadPreferenceIsEnabled() = runTest {
+        val fixture = fixture(configured = true, fileUploadEnabled = true)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        val draft = documentDraft("photo.jpg", 10).copy(mimeType = "image/jpeg", category = AttachmentCategory.IMAGE)
+        val file = github.ponyhuang.gimi.domain.conversation.model.FileAttachment("image/jpeg", "image", 10,
+            "photo.jpg", payloadReference = "/archive/photo.jpg")
+        coEvery { fixture.attachments.read(any(), listOf(draft)) } returns listOf(file)
+        val results = mutableListOf<ChatSubmissionResult>()
+        fixture.viewModel.send("image", listOf(draft), results::add)
+        advanceUntilIdle()
+        assertEquals(listOf(ChatSubmissionResult.ACCEPTED), results)
+        assertTrue(fixture.viewModel.uiState.value.cloudAttachments.isEmpty())
+        coVerify(exactly = 1) { fixture.attachments.read(any(), listOf(draft)) }
+        coVerify(exactly = 1) { fixture.execution.send("image", listOf(file), false) }
+    }
+
+    @Test
+    fun removingOnePendingCloudFileSendsOnlyTheRemainingSnapshot() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val fixture = fixture(configured = true, fileUploadEnabled = true, cloudFactoryOverride = cloudFactoryForTest(gate))
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        val results = mutableListOf<ChatSubmissionResult>()
+        fixture.viewModel.send("remaining", listOf(documentDraft("one.pdf", 10), documentDraft("two.pdf", 10)), results::add)
+        runCurrent()
+        val batchId = requireNotNull(fixture.viewModel.uiState.value.cloudBatchId)
+        fixture.viewModel.onAction(ChatAction.ControlCloudFile(batchId, 1, false))
+        runCurrent()
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(listOf(ChatSubmissionResult.ACCEPTED), results)
+        coVerify(exactly = 1) { fixture.execution.send("remaining", match { it.map { file -> file.cloudReference?.fileId } == listOf("one.pdf") }, false) }
+    }
+
+    @Test
+    fun removingLastPendingCloudFileStopsWithoutStartingTheModel() = runTest {
+        val fixture = fixture(configured = true, fileUploadEnabled = true, cloudFactoryOverride = cloudFactoryForTest(CompletableDeferred()))
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        val draft = documentDraft("one.pdf", 10)
+        val results = mutableListOf<ChatSubmissionResult>()
+        fixture.viewModel.send("keep text", listOf(draft), results::add)
+        runCurrent()
+        fixture.viewModel.onAction(ChatAction.ControlCloudFile(requireNotNull(fixture.viewModel.uiState.value.cloudBatchId), 0, false))
+        advanceUntilIdle()
+        assertEquals(listOf(ChatSubmissionResult.REJECTED), results)
+        assertFalse(fixture.viewModel.uiState.value.isAgentRunning)
+        assertNull(fixture.viewModel.uiState.value.cloudBatchId)
+        assertTrue(fixture.viewModel.uiState.value.messages.isEmpty())
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
+        coVerify(exactly = 1) { fixture.attachments.deleteDrafts(listOf(draft)) }
     }
 
     private fun cloudFactoryForTest(gate: CompletableDeferred<Unit>): CloudAttachmentBatchFactory {

@@ -1,7 +1,9 @@
 package github.ponyhuang.gimi.feature.chat
 
 import github.ponyhuang.gimi.domain.conversation.cloud.usesCloudFileUpload
+import github.ponyhuang.gimi.domain.conversation.cloud.usesCloudFileUploadFor
 import android.util.Log
+import github.ponyhuang.gimi.domain.conversation.cloud.CloudAttachmentState
 import github.ponyhuang.gimi.domain.conversation.cloud.CloudAttachmentBatchFactory
 import kotlinx.coroutines.coroutineScope
 import github.ponyhuang.gimi.domain.conversation.cloud.LoadCloudFileChoicesUseCase
@@ -234,7 +236,7 @@ class ChatViewModel @Inject constructor(
             is ChatAction.ControlCloudFile -> {
                 val batch = sessionRuntimes[_uiState.value.sessionId]?.cloudBatch
                 if (batch?.id == action.batchId) {
-                    if (action.retry) batch.retry(action.index) else batch.cancel(action.index)
+                    if (action.retry) batch.retry(action.index) else batch.remove(action.index)
                 }
             }
             is ChatAction.LoadCloudLocalFiles -> cloudLocalFiles.request(action.references)
@@ -668,7 +670,7 @@ class ChatViewModel @Inject constructor(
         }
         val service = _uiState.value.availableLLMModelSettings.firstOrNull { it.id == selection.serviceId }
         val prepareCloud = retry == null && draftAttachments.isNotEmpty() &&
-            service?.usesCloudFileUpload() == true
+            service?.usesCloudFileUploadFor(draftAttachments) == true
         runtime.cloudBatch = null
         runtime.cloudItems = emptyList()
         publishRuntime(runtime)
@@ -689,6 +691,7 @@ class ChatViewModel @Inject constructor(
             preparedTurn?.let { turnRecoveryCoordinator.recordFailure(sessionId, it) }
         }) { runToken ->
             try {
+                var sendDrafts = draftAttachments
                 val cloudPrepared = if (prepareCloud && service != null) {
                     val batch = cloudBatchFactory.create(sessionId, service, selection.modelId, draftAttachments)
                     runtime.cloudBatch = batch
@@ -704,7 +707,11 @@ class ChatViewModel @Inject constructor(
                                     }
                                 }
                             }
-                            try { batch.awaitReady() } finally { observer.cancel() }
+                            try {
+                                batch.awaitReady().also {
+                                    sendDrafts = batch.items.value.filterNot { item -> item.state == CloudAttachmentState.Removed }.map { item -> item.draft }
+                                }
+                            } finally { observer.cancel() }
                         }
                     } finally {
                         if (runtime.cloudBatch === batch) {
@@ -719,7 +726,7 @@ class ChatViewModel @Inject constructor(
                     sessionId = sessionId,
                     selection = selection,
                     text = text,
-                    drafts = draftAttachments,
+                    drafts = sendDrafts,
                     preparedAttachments = cloudPrepared,
                     cachedHistory = {
                         runtime.takeIf { it.isLoaded }?.let {
@@ -765,9 +772,11 @@ class ChatViewModel @Inject constructor(
                 }
             } finally {
                 submission.complete(ChatSubmissionResult.REJECTED)
-                if (submission.result == ChatSubmissionResult.ACCEPTED) {
-                    // 输入已归档，网络失败和取消也可清理原草稿；重试使用归档副本。
-                    withContext(NonCancellable) { attachments.deleteDrafts(draftAttachments) }
+                val cleanup = if (submission.result == ChatSubmissionResult.ACCEPTED) draftAttachments
+                    else runtime.cloudItems.filter { it.state == CloudAttachmentState.Removed }.map { it.draft }
+                if (cleanup.isNotEmpty()) {
+                    // 上传任务退出后才能清理被移除的草稿；共享归档与仍在编辑的其他文件不受影响。
+                    withContext(NonCancellable) { attachments.deleteDrafts(cleanup) }
                 }
             }
         }

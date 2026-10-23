@@ -118,6 +118,8 @@ sealed interface LLMModelSettingDetailAction {
 }
 
 sealed interface LLMModelSettingDetailNotice {
+    /** 本次请求实际返回的有效、去重模型数量，不是累计候选数。 */
+    data class ModelsRefreshed(val count: Int) : LLMModelSettingDetailNotice
     /** 厂商目录中不存在该项。 */
     data object SettingNotFoundLLM : LLMModelSettingDetailNotice
     /** 配置成功保存。 */

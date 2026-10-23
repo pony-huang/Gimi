@@ -5,6 +5,7 @@ import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import io.mockk.every
+import io.mockk.coVerify
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.mockk.verify
@@ -29,6 +30,17 @@ class PrepareCloudFileUseCaseTest {
             useCase(service, "model", attachment).toList())
         verify(exactly = 0) { repository.prepare(any(), any()) }
         verify(exactly = 0) { support.supports(any(), any(), any()) }
+    }
+
+    @Test fun nonChatCompletionsProtocolCannotUploadOrReadCloudChoicesEvenWithPreferenceOn() = runBlocking {
+        val enabled = service.copy(isFileUploadEnabled = true, apiProtocol = ApiProtocol.Anthropic)
+        assertEquals(listOf(CloudFilePreparation.Failed(CloudFileFailure.InvalidConfiguration)),
+            useCase(enabled, "model", attachment).toList())
+        assertEquals(listOf(CloudFilePreparation.Failed(CloudFileFailure.InvalidConfiguration)),
+            useCase.existing(enabled, "model", "old-id").toList())
+        verify(exactly = 0) { support.supports(any(), any(), any()) }
+        verify(exactly = 0) { repository.prepare(any(), any()) }
+        coVerify(exactly = 0) { repository.list(any()) }
     }
 
     @Test fun unverifiedReferenceMakesNoUploadAndDoesNotChangeProtocol() = runBlocking {

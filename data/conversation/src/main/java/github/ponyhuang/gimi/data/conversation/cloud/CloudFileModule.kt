@@ -9,13 +9,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.gimi.domain.conversation.cloud.CloudFileChatSupport
 import github.ponyhuang.gimi.domain.conversation.cloud.CloudFileRepository
-import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import javax.inject.Singleton
-
-/** 未完成服务实测与当前 ADK 文件引用映射前，不向聊天流程开放上传。 */
-internal class UnverifiedCloudFileChatSupport : CloudFileChatSupport {
-    override fun supports(service: LLMModelSetting, modelId: String, mimeType: String): Boolean = false
-}
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -31,5 +25,5 @@ internal object CloudFileModule {
 
     @Provides
     @Singleton
-    fun chatSupport(): CloudFileChatSupport = UnverifiedCloudFileChatSupport()
+    fun chatSupport(): CloudFileChatSupport = OpenAiCompatibleCloudFileChatSupport()
 }

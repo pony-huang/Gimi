@@ -65,6 +65,8 @@ internal fun ModelConfig.toRuntimeMetadata(): ModelRuntimeMetadata = ModelRuntim
 @Singleton
 class AgentLLMModelFactory @Inject constructor(
     private val modelServices: AgentModelConfigurationSource,
+    private val cloudFiles: github.ponyhuang.gimi.domain.conversation.cloud.CloudFileRepository,
+    private val cloudFileSupport: github.ponyhuang.gimi.domain.conversation.cloud.CloudFileChatSupport,
 ) {
     /**
      * 从 [AgentModelConfigurationSource] 选当前模型配置。
@@ -100,8 +102,11 @@ class AgentLLMModelFactory @Inject constructor(
 
 
     fun createModel(cfg: ModelConfig): Model = AttachmentResolvingModel(
-        delegate = when (cfg.baseType) {
-            // OpenaiChatcompletions 完全采用官方后端的能力边界，不补思考流、非图片媒体或厂商原生工具。
+        delegate = github.ponyhuang.gimi.data.agent.model.files.CloudFileReferenceModel(
+            cfg, modelServices, cloudFiles, cloudFileSupport,
+            fileDelegate = github.ponyhuang.gimi.data.agent.model.files.FileChatCompletions(cfg.modelId, cfg.apiKey, cfg.fullBaseUrl),
+            delegate = when (cfg.baseType) {
+            // 普通请求沿用 ADK；含云文件的请求由外层适配器转交官方 Chat Completions SDK。
             ApiProtocol.OpenaiChatcompletions -> ChatCompletions(
                 name = cfg.modelId,
                 apiKey = cfg.apiKey,
@@ -122,6 +127,7 @@ class AgentLLMModelFactory @Inject constructor(
                 apiKey = cfg.apiKey,
             )
         },
+        ),
     )
 
     fun selectFastModelConfig(): ModelConfig? {

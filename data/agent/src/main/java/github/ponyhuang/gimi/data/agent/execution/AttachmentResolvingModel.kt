@@ -38,6 +38,7 @@ private fun LlmRequest.resolveAttachmentParts(): LlmRequest = copy(
 private fun Part.resolveAttachment(): Part {
     val reference = fileData ?: return this
     val uri = reference.fileUri ?: return attachmentUnavailable(reference, "附件引用缺少 URI")
+    if (github.ponyhuang.gimi.domain.conversation.cloud.CloudFileAttachmentCodec.isCloudReference(uri)) return this
     if (uri.isHttpReference()) return this
 
     val file = if (uri.startsWith(FILE_URI_SCHEME, ignoreCase = true)) {

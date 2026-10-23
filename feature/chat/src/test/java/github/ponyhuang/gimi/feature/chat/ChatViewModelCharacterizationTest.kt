@@ -210,6 +210,44 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun uploadPreferenceOnAnotherProtocolUsesNativeAttachmentsAndHidesCloudEntry() = runTest {
+        val fixture = fixture(configured = true, fileUploadEnabled = true, attachmentProtocol = ApiProtocol.Anthropic)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        val draft = documentDraft("a.pdf", 10)
+        val file = github.ponyhuang.gimi.domain.conversation.model.FileAttachment("application/pdf", "local", 10,
+            "a.pdf", payloadReference = "/archive/a.pdf")
+        coEvery { fixture.attachments.read(any(), listOf(draft)) } returns listOf(file)
+        val results = mutableListOf<ChatSubmissionResult>()
+        fixture.viewModel.send("native", listOf(draft), results::add)
+        advanceUntilIdle()
+        assertEquals(listOf(ChatSubmissionResult.ACCEPTED), results)
+        assertNull(fixture.viewModel.uiState.value.cloudFilePickerContext())
+        assertTrue(fixture.viewModel.uiState.value.cloudAttachments.isEmpty())
+        coVerify(exactly = 1) { fixture.attachments.read(any(), listOf(draft)) }
+        coVerify(exactly = 1) { fixture.execution.send("native", listOf(file), false) }
+    }
+
+    @Test
+    fun cloudDraftCannotStartCloudPreparationWhenTheSelectedProtocolIsNotChatCompletions() = runTest {
+        val fixture = fixture(configured = true, fileUploadEnabled = true, attachmentProtocol = ApiProtocol.Anthropic)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        val cloudDraft = documentDraft("a.pdf", 10).copy(cloudReference =
+            github.ponyhuang.gimi.domain.conversation.model.CloudAttachmentReference("id", "scope"))
+        fixture.viewModel.effects.test {
+            val results = mutableListOf<ChatSubmissionResult>()
+            fixture.viewModel.send("cloud", listOf(cloudDraft), results::add)
+            assertEquals(listOf(ChatSubmissionResult.REJECTED), results)
+            assertEquals(ChatEffect.ShowNotice(ChatNotice.CloudFileSendingUnavailable), awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertTrue(fixture.viewModel.uiState.value.cloudAttachments.isEmpty())
+        coVerify(exactly = 0) { fixture.attachments.read(any(), any()) }
+        coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
+    }
+
+    @Test
     fun unverifiedCloudUploadRejectsBeforeArchivingOrStartingTheModel() = runTest {
         val fixture = fixture(configured = true, fileUploadEnabled = true)
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
@@ -2046,10 +2084,11 @@ class ChatViewModelCharacterizationTest {
         sessionResolverOverride: ConversationSessionResolver? = null,
         recognitionOverride: SpeechRecognitionRepository? = null,
         fileUploadEnabled: Boolean = false,
+        attachmentProtocol: ApiProtocol = ApiProtocol.OpenaiChatcompletions,
         cloudFactoryOverride: CloudAttachmentBatchFactory? = null,
     ): Fixture {
         val selection = ModelSelection("service", "chat", "model")
-        val services = if (configured) listOf(service().copy(isFileUploadEnabled = fileUploadEnabled)) else emptyList()
+        val services = if (configured) listOf(service().copy(isFileUploadEnabled = fileUploadEnabled, apiProtocol = attachmentProtocol)) else emptyList()
         val catalog = mockk<ModelCatalogRepository>(relaxed = true) {
             every { observeServices() } returns MutableStateFlow(services)
             every { observeLoadState() } returns MutableStateFlow(CatalogLoadState.Ready)
@@ -2204,6 +2243,7 @@ class ChatViewModelCharacterizationTest {
                 appUpdateRepository = appUpdateRepository,
                 cloudBatchFactory = cloudFactory,
                 loadCloudFileChoices = mockk(relaxed = true),
+                cloudFileSupport = mockk(relaxed = true),
                 resolveCloudFileLocal = mockk(relaxed = true),
                 a2uiProtocol = mockk(relaxed = true),
             ),

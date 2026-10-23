@@ -36,7 +36,7 @@ sealed interface CloudFilePreparation {
 
 enum class CloudFileFailure {
     Disabled, UnverifiedChatReference, UnsupportedProvider, InvalidConfiguration,
-    LocalFileUnavailable, UploadRejected, InvalidResponse, StorageUnavailable,
+    LocalFileUnavailable, UploadRejected, InvalidResponse, StorageUnavailable, FileTooLarge,
 }
 
 /** 不把包含服务响应、文件路径或凭据的底层异常传到展示层。 */

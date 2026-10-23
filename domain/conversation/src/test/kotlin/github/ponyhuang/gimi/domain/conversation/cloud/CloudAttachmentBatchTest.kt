@@ -131,6 +131,15 @@ class CloudAttachmentBatchTest {
         coVerify(exactly = 0) { source.archive(any(), any()) }
     }
 
+    @Test fun fileRequestLimitRejectsBeforeArchivingOrUploadingAnyFile() = runTest {
+        allow()
+        val oversized = drafts.map { it.copy(sizeBytes = CloudFileRequestLimits.MAX_BYTES) }
+        val batch = factory.create("session", service, "model", oversized)
+        assertNull(batch.awaitReady())
+        assertTrue(batch.items.value.all { it.state == CloudAttachmentState.Failed(CloudFileFailure.FileTooLarge) })
+        coVerify(exactly = 0) { source.archive(any(), any()) }
+    }
+
     @Test fun existingCloudIdIsRevalidatedWithoutArchivingAndCannotCrossItsOriginalScope() = runTest {
         allow()
         val cloud = drafts.first().copy(reference = "", cloudReference = CloudAttachmentReference("id", "original-scope"))

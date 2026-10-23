@@ -138,5 +138,5 @@
     <string name="modelsettings_file_retention">Cloud file retention</string>
     <string name="modelsettings_file_retention_days">%1$d days</string>
     <string name="modelsettings_file_retention_note">Starts with each upload and applies only to new files. Expired files can be uploaded again if their local sources remain available.</string>
-    <string name="modelsettings_file_upload_pending">Sending uploaded files is pending verification. You can save this preference; attachment sending is currently blocked when enabled. Turn it off to use the existing method. The chat protocol stays unchanged.</string>
+    <string name="modelsettings_file_upload_pending">PDF files are supported, up to 50 MB per request. Compatible services may reject uploads or file references; failures never omit attachments. Turn this off to send images, audio, or other files.</string>
 </resources>

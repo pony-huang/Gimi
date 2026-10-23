@@ -54,7 +54,7 @@ class ChatCompletionsIntegrationTest {
 
     private lateinit var server: MockWebServer
     private val factory = AgentLLMModelFactory(
-        mockk<AgentModelConfigurationSource>(),
+        mockk<AgentModelConfigurationSource>(), mockk(relaxed = true), mockk(relaxed = true),
     )
 
     @Before

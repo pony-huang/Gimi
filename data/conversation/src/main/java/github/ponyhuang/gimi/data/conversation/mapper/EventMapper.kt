@@ -170,6 +170,11 @@ object EventMapper {
                 Log.w(TAG, "Dropping file attachment without mime/reference: ${file.displayName.orEmpty()}")
                 return null
             }
+            if (github.ponyhuang.gimi.domain.conversation.cloud.CloudFileAttachmentCodec.isCloudReference(reference)) {
+                return runCatching {
+                    github.ponyhuang.gimi.domain.conversation.cloud.CloudFileAttachmentCodec.decode(reference, mimeType, file.displayName.orEmpty())
+                }.getOrNull()
+            }
             val payload = File(reference.removePrefix("file://"))
             val attachment = runCatching {
                 FileAttachment.fromFile(

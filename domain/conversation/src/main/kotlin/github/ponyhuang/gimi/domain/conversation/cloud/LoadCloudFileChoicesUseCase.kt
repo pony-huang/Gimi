@@ -27,7 +27,7 @@ class LoadCloudFileChoicesUseCase @Inject constructor(
     private val support: CloudFileChatSupport,
 ) {
     suspend operator fun invoke(service: LLMModelSetting, modelId: String, nowMillis: Long): List<CloudFileChoice> {
-        if (!service.isEnabled || !service.isFileUploadEnabled || service.apiKey.isBlank()) return emptyList()
+        if (!service.isEnabled || !service.usesCloudFileUpload() || service.apiKey.isBlank()) return emptyList()
         return repository.list(service).map { file ->
             val availability = when {
                 !support.supports(service, modelId, file.mimeType) ||

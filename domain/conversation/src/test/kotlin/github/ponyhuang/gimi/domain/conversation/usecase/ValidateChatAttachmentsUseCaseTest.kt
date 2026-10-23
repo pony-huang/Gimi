@@ -81,6 +81,28 @@ class ValidateChatAttachmentsUseCaseTest {
             validate(selection, listOf(service), listOf(file)))
     }
 
+    @Test
+    fun cloudFileQuotaIsIndependentOfInlineCapabilitiesAndRejectsOverflow() {
+        val cloudService = service.copy(isFileUploadEnabled = true, groups = listOf(ModelGroup("group", "Group",
+            listOf(model.copy(capabilities = MultimodalCapabilities(documentInput = null))))))
+        val limit = github.ponyhuang.gimi.domain.conversation.cloud.CloudFileRequestLimits.MAX_BYTES
+        assertNull(validate(selection, listOf(cloudService), listOf(draft("a.pdf", limit)), prepareCloudFiles = true))
+        assertEquals(ChatAttachmentValidationFailure.DocumentTotalSizeLimitExceeded,
+            validate(selection, listOf(cloudService), listOf(draft("a.pdf", limit), draft("b.pdf", 1)), prepareCloudFiles = true))
+        assertEquals(ChatAttachmentValidationFailure.DocumentTotalSizeLimitExceeded,
+            validate(selection, listOf(cloudService), listOf(draft("a.pdf", Long.MAX_VALUE)), prepareCloudFiles = true))
+    }
+
+    @Test
+    fun storedUploadPreferenceDoesNotDivertOtherProtocolsFromNativeAttachmentValidation() {
+        val source = service.copy(isFileUploadEnabled = true,
+            apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Anthropic)
+        assertNull(validate(selection, listOf(source), listOf(draft("a.pdf", 100))))
+        val cloud = draft("a.pdf", 100).copy(cloudReference = github.ponyhuang.gimi.domain.conversation.model.CloudAttachmentReference("id", "scope"))
+        assertEquals(ChatAttachmentValidationFailure.CloudFileSendingUnavailable,
+            validate(selection, listOf(source), listOf(cloud)))
+    }
+
     private fun draft(name: String, sizeBytes: Long) = DraftAttachment(
         reference = "/drafts/$name", displayName = name, mimeType = "application/pdf",
         sizeBytes = sizeBytes, category = AttachmentCategory.DOCUMENT,

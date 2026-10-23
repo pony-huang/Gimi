@@ -79,6 +79,7 @@ class CloudAttachmentBatch internal constructor(
             !service.isEnabled || !service.hasValidConnectionConfiguration() ||
                 service.apiProtocol != github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.OpenaiChatcompletions -> CloudFileFailure.InvalidConfiguration
             !support.supports(service, modelId, item.draft.mimeType) -> CloudFileFailure.UnverifiedChatReference
+            !CloudFileRequestLimits.allows(_items.value.map { it.draft.sizeBytes }) -> CloudFileFailure.FileTooLarge
             else -> null
         } }
         if (rejected.any { it != null }) {

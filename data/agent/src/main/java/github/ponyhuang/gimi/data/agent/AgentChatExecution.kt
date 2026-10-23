@@ -41,7 +41,6 @@ class AgentChatExecution internal constructor(
         fileAttachments: List<FileAttachment> = emptyList(),
         retry: Boolean = false,
     ): Flow<Event> {
-        require(fileAttachments.none { it.cloudReference != null }) { "Cloud file references require the Chat Completions file adapter" }
         val resumeInvocationId = if (retry) {
             // 用户事件先于模型输出落盘；即使首个输出前报错，也从 SDK 日志取回原执行。
             runner.sessionService.getSession(
@@ -56,7 +55,9 @@ class AgentChatExecution internal constructor(
                         fileData = FileData(
                             mimeType = attachment.mimeType,
                             displayName = attachment.displayName,
-                            fileUri = requireNotNull(attachment.payloadReference) {
+                            fileUri = if (attachment.cloudReference != null)
+                                github.ponyhuang.gimi.domain.conversation.cloud.CloudFileAttachmentCodec.encode(attachment)
+                            else requireNotNull(attachment.payloadReference) {
                                 "Managed attachment reference is missing"
                             },
                         ),

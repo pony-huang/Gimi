@@ -309,7 +309,7 @@
     <string name="chat_cloud_source_unavailable">已过期 · 本地来源不可用</string>
     <string name="chat_cloud_reference_unverified">当前连接尚未验证此类文件引用</string>
     <string name="chat_cloud_attachment">云文件 · 发送前校验有效期</string>
-    <string name="chat_cloud_sending_unavailable">文件上传发送尚未开放。请关闭服务的文件上传开关以使用原有方式；云文件暂不能发送。</string>
+    <string name="chat_cloud_sending_unavailable">云文件需在原服务的 Chat Completions 模式下开启文件上传后发送。</string>
     <string name="chat_cloud_expires_days">%1$d 天后到期</string>
     <string name="chat_cloud_expires_hours">%1$d 小时内到期</string>
     <string name="chat_cloud_draft_limit">草稿最多保留 3 个附件，请减少选择后再添加</string>
@@ -328,4 +328,5 @@
     <string name="chat_cloud_upload_storage">上传记录保存失败，请重试</string>
     <string name="chat_cloud_upload_response">上传响应无效，请重试</string>
     <string name="chat_cloud_upload_failed">文件上传失败，请重试</string>
+    <string name="chat_cloud_file_too_large">本次文件总大小不能超过 50 MB</string>
 </resources>

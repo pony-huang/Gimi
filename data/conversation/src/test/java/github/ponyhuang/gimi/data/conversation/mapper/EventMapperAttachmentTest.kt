@@ -40,6 +40,15 @@ class EventMapperAttachmentTest {
     }
 
     @Test
+    fun `cloud reference survives ADK event history restoration without a local file`() {
+        val original = github.ponyhuang.gimi.domain.conversation.model.FileAttachment("application/pdf", "original-id", 100,
+            "report.pdf", cloudReference = github.ponyhuang.gimi.domain.conversation.model.CloudAttachmentReference("file-remote", "scope"))
+        val uri = github.ponyhuang.gimi.domain.conversation.cloud.CloudFileAttachmentCodec.encode(original)
+        val event = userEvent(Part(fileData = FileData(mimeType = original.mimeType, displayName = original.displayName, fileUri = uri)))
+        assertEquals(original, EventMapper.fromEvent(event)!!.fileAttachments.single())
+    }
+
+    @Test
     fun `restores a file backed attachment without loading its bytes`() {
         val id = "c".repeat(64)
         val payload = temporaryFolder.newFile("$id.jpg")

@@ -26,6 +26,13 @@ class LoadCloudFileChoicesUseCaseTest {
         coVerify(exactly = 0) { repository.list(any()) }
     }
 
+    @Test fun otherProtocolsKeepTheStoredPreferenceButDoNotReadTheCloudLibrary() = runBlocking {
+        for (protocol in listOf(ApiProtocol.Anthropic, ApiProtocol.Gemini)) {
+            assertTrue(load(service.copy(apiProtocol = protocol), "model", 1000).isEmpty())
+        }
+        coVerify(exactly = 0) { repository.list(any()) }
+    }
+
     @Test fun unverifiedReferencesCannotBeSelectedEvenWhenTheRemoteFileIsValid() = runBlocking {
         coEvery { repository.list(service) } returns listOf(file)
         every { support.supports(service, "model", file.mimeType) } returns false

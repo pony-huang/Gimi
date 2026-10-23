@@ -50,6 +50,7 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.anthropic.java)
+    implementation(libs.openai.java)
     implementation(libs.google.adk.kotlin.core) {
         exclude(group = "io.modelcontextprotocol.sdk")
     }

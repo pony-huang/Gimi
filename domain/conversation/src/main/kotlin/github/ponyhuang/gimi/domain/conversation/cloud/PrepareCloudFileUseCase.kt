@@ -19,6 +19,7 @@ class PrepareCloudFileUseCase @Inject constructor(
     ): Flow<CloudFilePreparation> = flow {
         when {
             !service.isFileUploadEnabled -> emit(CloudFilePreparation.Failed(CloudFileFailure.Disabled))
+            !service.usesCloudFileUpload() -> emit(CloudFilePreparation.Failed(CloudFileFailure.InvalidConfiguration))
             !chatSupport.supports(service, modelId, attachment.mimeType) ->
                 emit(CloudFilePreparation.Failed(CloudFileFailure.UnverifiedChatReference))
             else -> emitAll(repository.prepare(service, attachment))
@@ -29,6 +30,10 @@ class PrepareCloudFileUseCase @Inject constructor(
     fun existing(service: LLMModelSetting, modelId: String, fileId: String, expectedScope: String? = null): Flow<CloudFilePreparation> = flow {
         if (!service.isFileUploadEnabled) {
             emit(CloudFilePreparation.Failed(CloudFileFailure.Disabled))
+            return@flow
+        }
+        if (!service.usesCloudFileUpload()) {
+            emit(CloudFilePreparation.Failed(CloudFileFailure.InvalidConfiguration))
             return@flow
         }
         val record = try {

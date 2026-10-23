@@ -315,6 +315,16 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
         assertTrue(group.models.single().isTts)
     }
 
+    @Test
+    fun anyChatCompletionsServiceCanEnableFileUploadWithoutAProviderAllowlist() = runTest {
+        val fixture = fixture(service().copy(id = "custom", apiProtocol = ApiProtocol.OpenaiChatcompletions))
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.Load("custom"))
+        advanceUntilIdle()
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.FileUploadEnabledChanged(true))
+        assertTrue(fixture.viewModel.uiState.value.service!!.isFileUploadEnabled)
+        assertFalse(fixture.services.value!!.isFileUploadEnabled)
+    }
+
     private fun fixture(service: LLMModelSetting?, gate: FakeAgentRuntimeGate = FakeAgentRuntimeGate()): Fixture {
         val services = MutableStateFlow(service)
         val repository = mockk<ModelCatalogRepository>(relaxed = true) {

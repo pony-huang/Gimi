@@ -13,17 +13,17 @@ import org.junit.Test
 
 class AgentExecutionTest {
     @Test
-    fun cloudReferencesCannotSilentlyEnterTheInlineOnlyAdapter() = runTest {
+    fun cloudReferencesPersistAsStructuredAppUrisWithoutRequiringALocalSource() = runTest {
+        val messages = mutableListOf<Content>()
         val runner = mockk<InMemoryRunner>()
+        coEvery { runner.runAsync(userId = "user", sessionId = "session", invocationId = null,
+            newMessage = capture(messages), stateDelta = null, runConfig = any()) } returns emptyFlow()
         val execution = AgentChatExecution("user", "session", runner, emptyMap())
         val file = github.ponyhuang.gimi.domain.conversation.model.FileAttachment("application/pdf", "file", 10,
             "report.pdf", cloudReference = github.ponyhuang.gimi.domain.conversation.model.CloudAttachmentReference("remote", "scope"))
-        try {
-            execution.send("read", listOf(file))
-            throw AssertionError("Unmapped file reference must not be omitted or read as a local file")
-        } catch (_: IllegalArgumentException) {
-            io.mockk.verify { runner wasNot io.mockk.Called }
-        }
+        execution.send("read", listOf(file))
+        val part = messages.single().parts.last().fileData!!
+        assertEquals(file, github.ponyhuang.gimi.domain.conversation.cloud.CloudFileAttachmentCodec.decode(part.fileUri!!, part.mimeType!!, part.displayName!!))
     }
 
     @Test

@@ -12,7 +12,7 @@ import org.junit.Test
 
 class RecommendationModelConfigTest {
     private val modelServices = mockk<AgentModelConfigurationSource>()
-    private val factory = AgentLLMModelFactory(modelServices)
+    private val factory = AgentLLMModelFactory(modelServices, mockk(relaxed = true), mockk(relaxed = true))
 
     @Test
     fun deepSeekAnthropicRecommendationUsesItsConfiguredChatCompletionsEndpoint() {

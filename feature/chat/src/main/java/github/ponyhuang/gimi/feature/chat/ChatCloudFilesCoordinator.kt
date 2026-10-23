@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.chat
 
+import github.ponyhuang.gimi.domain.conversation.cloud.usesCloudFileUpload
 import github.ponyhuang.gimi.domain.conversation.cloud.LoadCloudFileChoicesUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
@@ -14,7 +15,7 @@ internal data class CloudFilePickerContext(val sessionId: String, val selection:
 internal fun ChatUiState.cloudFilePickerContext(): CloudFilePickerContext? {
     val selection = currentModelSelection ?: return null
     val service = availableLLMModelSettings.firstOrNull { it.id == selection.serviceId } ?: return null
-    if (!service.isEnabled || !service.isFileUploadEnabled || service.apiKey.isBlank()) return null
+    if (!service.isEnabled || !service.usesCloudFileUpload() || service.apiKey.isBlank()) return null
     return CloudFilePickerContext(sessionId, selection, service)
 }
 

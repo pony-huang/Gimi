@@ -82,8 +82,7 @@ class ModelServiceDetailViewModel @Inject constructor(
                 it.copy(isOfficialToolsEnabled = action.value)
             }
             is LLMModelSettingDetailAction.FileUploadEnabledChanged -> edit {
-                if (it.id in setOf("openai", "deepseek") &&
-                    (!action.value || it.apiProtocol == ApiProtocol.OpenaiChatcompletions)) {
+                if (!action.value || it.apiProtocol == ApiProtocol.OpenaiChatcompletions) {
                     it.copy(isFileUploadEnabled = action.value)
                 } else it
             }

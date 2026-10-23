@@ -45,6 +45,7 @@ import github.ponyhuang.gimi.domain.appearance.ThemeMode
  */
 data class ChatUiState(
     val messages: List<Message> = emptyList(),
+    val cloudPdfInputSupported: Boolean = false,
     /** 页面恢复或连接改变后重新检查原文件，避免一直复用已被清理的旧路径。 */
     val cloudLocalRevision: Long = 0,
     /** null 表示本次恢复失败；只保存本地路径，不保存临时下载 URL 或密钥。 */

@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.chat
 
+import github.ponyhuang.gimi.domain.conversation.cloud.usesCloudFileUpload
 import android.annotation.SuppressLint
 import android.net.Uri
 import androidx.compose.animation.AnimatedContent
@@ -177,9 +178,10 @@ fun ChatScaffold(
     val attachmentCapabilities = remember(
         state.availableLLMModelSettings,
         state.currentModelSelection,
+        state.cloudPdfInputSupported,
     ) {
         val selection = state.currentModelSelection
-        state.availableLLMModelSettings
+        val capabilities = state.availableLLMModelSettings
             .firstOrNull { it.id == selection?.serviceId }
             ?.groups
             ?.firstOrNull { it.id == selection?.groupId }
@@ -187,6 +189,13 @@ fun ChatScaffold(
             ?.firstOrNull { it.id == selection?.modelId }
             ?.capabilities
             ?: MultimodalCapabilities()
+        val service = state.availableLLMModelSettings.firstOrNull { it.id == selection?.serviceId }
+        if (service?.usesCloudFileUpload() == true) capabilities.copy(
+            vision = null, audioInput = null,
+            documentInput = if (state.cloudPdfInputSupported) github.ponyhuang.gimi.domain.modelcatalog.model.DocumentInputCapability(
+                supportedMimeTypes = listOf("application/pdf"), ingestMode = github.ponyhuang.gimi.domain.modelcatalog.model.FileIngestMode.FILE_REFERENCE,
+            ) else null,
+        ) else capabilities
     }
     // 只要用户仍停留在底部，就让流式内容增长持续跟随；用户向上浏览历史时则停止抢占滚动。
     var shouldFollowLatest by rememberSaveable(state.sessionId) { mutableStateOf(true) }

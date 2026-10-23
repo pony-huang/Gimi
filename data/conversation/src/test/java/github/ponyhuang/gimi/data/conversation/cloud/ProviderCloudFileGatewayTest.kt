@@ -58,6 +58,16 @@ class ProviderCloudFileGatewayTest {
         assertEquals(1_700_604_800_000L, result.remoteExpiresAtMillis)
     }
 
+    @Test fun customChatCompletionsProviderUsesStandardFilesApiByDefault() = runBlocking {
+        server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody(
+            """{"id":"file-custom","object":"file","bytes":14,"created_at":1700000000,"filename":"report.txt","purpose":"user_data","status":"processed"}"""))
+        val uploaded = gateway.upload(cloudService("custom", server.url("/v1").toString()), attachment, source)
+        val request = server.takeRequest()
+        assertEquals("/v1/files", request.path)
+        assertEquals("Bearer fake-test-key", request.getHeader("Authorization"))
+        assertEquals("file-custom", uploaded.id)
+    }
+
     @Test fun deepSeekUsesOfficialFilesDialectWithoutChangingChatProtocol() = runBlocking {
         server.enqueue(MockResponse().setBody("""{"id":"file-deepseek","type":"file","size_bytes":14,
             "created_at":"2026-10-22T00:00:00Z","filename":"report.txt","mime_type":"text/plain"}"""))
@@ -103,11 +113,11 @@ class ProviderCloudFileGatewayTest {
         assertFalse(error.toString().contains("sensitive-response"))
     }
 
-    @Test fun unsupportedProviderMakesNoRequest() = runBlocking {
+    @Test fun unsupportedProtocolMakesNoRequest() = runBlocking {
         val error = failure {
-            gateway.upload(cloudService("claude", server.url("/v1").toString()), attachment, source)
+            gateway.upload(cloudService("claude", server.url("/v1").toString()).copy(apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Anthropic), attachment, source)
         }
-        assertEquals(CloudFileFailure.UnsupportedProvider, error.reason)
+        assertEquals(CloudFileFailure.InvalidConfiguration, error.reason)
         assertEquals(0, server.requestCount)
     }
 

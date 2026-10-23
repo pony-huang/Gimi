@@ -93,6 +93,11 @@ class AdkChatAgentRepository @Inject constructor(
                 } ?: part.fileData?.let { file ->
                     val mimeType = file.mimeType ?: return@let null
                     val reference = file.fileUri ?: return@let null
+                    if (github.ponyhuang.gimi.domain.conversation.cloud.CloudFileAttachmentCodec.isCloudReference(reference)) {
+                        return@let runCatching {
+                            github.ponyhuang.gimi.domain.conversation.cloud.CloudFileAttachmentCodec.decode(reference, mimeType, file.displayName.orEmpty())
+                        }.getOrNull()
+                    }
                     val payload = File(reference.removePrefix("file://"))
                     // per-part 降级：workspace 文件可能被用户删除，映射为 isMissing 占位而不是抛错，
                     // 否则一个丢失的载荷文件会让该会话之后的每一轮流式事件全部失败。

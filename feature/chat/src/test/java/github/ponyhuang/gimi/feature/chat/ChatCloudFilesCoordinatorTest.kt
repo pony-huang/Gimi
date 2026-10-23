@@ -85,6 +85,17 @@ class ChatCloudFilesCoordinatorTest {
         assertEquals(listOf("new"), state.choices.map { it.file.id })
     }
 
+    @Test fun cloudDrawerContextRequiresChatCompletionsAndTheUploadPreferenceTogether() {
+        val original = context!!
+        for (protocol in listOf(ApiProtocol.OpenaiChatcompletions, ApiProtocol.Anthropic, ApiProtocol.Gemini)) {
+            for (enabled in listOf(false, true)) {
+                val state = ChatUiState(sessionId = original.sessionId, currentModelSelection = original.selection,
+                    availableLLMModelSettings = listOf(original.service.copy(apiProtocol = protocol, isFileUploadEnabled = enabled)))
+                assertEquals(protocol == ApiProtocol.OpenaiChatcompletions && enabled, state.cloudFilePickerContext() != null)
+            }
+        }
+    }
+
     private fun choice(id: String) = CloudFileChoice(CloudFile(id, "scope", "$id.pdf", "application/pdf", 10,
         "hash", 1, Long.MAX_VALUE, null, null), CloudFileAvailability.Ready)
 }

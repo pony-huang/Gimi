@@ -42,7 +42,7 @@ internal class ProviderCloudFileGateway @Inject constructor() : CloudFileRemoteG
         .callTimeout(Duration.ofSeconds(120)).build()
 
     override suspend fun download(service: LLMModelSetting, file: CloudFile, target: File) {
-        if (service.id != "openai") throw CloudFileException(CloudFileFailure.LocalFileUnavailable)
+        if (service.id == "deepseek") throw CloudFileException(CloudFileFailure.LocalFileUnavailable)
         if (service.apiProtocol != ApiProtocol.OpenaiChatcompletions) {
             throw CloudFileException(CloudFileFailure.InvalidConfiguration)
         }
@@ -74,7 +74,7 @@ internal class ProviderCloudFileGateway @Inject constructor() : CloudFileRemoteG
         return when (service.id) {
             "openai" -> uploadOpenAi(service, attachment, source)
             "deepseek" -> uploadDeepSeek(service, attachment, source)
-            else -> throw CloudFileException(CloudFileFailure.UnsupportedProvider)
+            else -> uploadOpenAi(service, attachment, source)
         }
     }
 

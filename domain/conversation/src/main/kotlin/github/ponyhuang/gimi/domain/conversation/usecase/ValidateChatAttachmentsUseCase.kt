@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.domain.conversation.usecase
 
+import github.ponyhuang.gimi.domain.conversation.cloud.usesCloudFileUpload
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
@@ -8,7 +9,7 @@ import javax.inject.Inject
 
 /** 附件不能进入当前发送请求的原因，不持有界面文案。 */
 sealed interface ChatAttachmentValidationFailure {
-    /** 正式文件引用转换接入前阻止发送，不允许退回内联或把远端引用读成本地附件。 */
+    /** 当前模式未启用云文件准备时拒绝远端引用，不允许退回本地附件读取。 */
     data object CloudFileSendingUnavailable : ChatAttachmentValidationFailure
     /** 一次请求不能混合不同附件类别。 */
     data object MixedCategories : ChatAttachmentValidationFailure
@@ -36,7 +37,7 @@ class ValidateChatAttachmentsUseCase @Inject constructor() {
     ): ChatAttachmentValidationFailure? {
         if (drafts.isEmpty()) return null
         val cloudRequested = drafts.any { it.cloudReference != null } ||
-            services.firstOrNull { it.id == selection.serviceId }?.isFileUploadEnabled == true
+            services.firstOrNull { it.id == selection.serviceId }?.usesCloudFileUpload() == true
         if (cloudRequested && !prepareCloudFiles) {
             return ChatAttachmentValidationFailure.CloudFileSendingUnavailable
         }
@@ -47,7 +48,10 @@ class ValidateChatAttachmentsUseCase @Inject constructor() {
             ?.groups?.firstOrNull { it.id == selection.groupId }
             ?.models?.firstOrNull { it.id == selection.modelId }
             ?: return ChatAttachmentValidationFailure.ModelUnavailable
-        if (cloudRequested) return null // 上传引用的格式由批次按模型能力检查，不能套用内联额度。
+        if (cloudRequested) {
+            return if (github.ponyhuang.gimi.domain.conversation.cloud.CloudFileRequestLimits.allows(drafts.map { it.sizeBytes })) null
+            else ChatAttachmentValidationFailure.DocumentTotalSizeLimitExceeded
+        }
         val (supportedMimeTypes, maxInlineBytes) = when (drafts.first().category) {
             AttachmentCategory.IMAGE -> model.capabilities.vision?.let {
                 it.supportedMimeTypes to it.maxInlineBytes

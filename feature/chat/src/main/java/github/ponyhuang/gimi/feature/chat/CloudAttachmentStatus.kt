@@ -21,6 +21,7 @@ internal fun cloudAttachmentStatus(state: CloudAttachmentState, active: Boolean)
         CloudFileFailure.LocalFileUnavailable -> R.string.chat_cloud_upload_local_missing
         CloudFileFailure.StorageUnavailable -> R.string.chat_cloud_upload_storage
         CloudFileFailure.InvalidResponse -> R.string.chat_cloud_upload_response
+        CloudFileFailure.FileTooLarge -> R.string.chat_cloud_file_too_large
         CloudFileFailure.UploadRejected -> R.string.chat_cloud_upload_failed
     }
 })

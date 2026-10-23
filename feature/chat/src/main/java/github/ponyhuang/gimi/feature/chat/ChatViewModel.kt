@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.chat
 
+import github.ponyhuang.gimi.domain.conversation.cloud.usesCloudFileUpload
 import android.util.Log
 import github.ponyhuang.gimi.domain.conversation.cloud.CloudAttachmentBatchFactory
 import kotlinx.coroutines.coroutineScope
@@ -99,6 +100,7 @@ class ChatViewModel @Inject constructor(
     private val appUpdateRepository: AppUpdateRepository,
     private val cloudBatchFactory: CloudAttachmentBatchFactory,
     private val loadCloudFileChoices: LoadCloudFileChoicesUseCase,
+    private val cloudFileSupport: github.ponyhuang.gimi.domain.conversation.cloud.CloudFileChatSupport,
     private val resolveCloudFileLocal: github.ponyhuang.gimi.domain.conversation.cloud.ResolveCloudFileLocalUseCase,
     private val a2uiProtocol: github.ponyhuang.gimi.domain.a2ui.A2uiProtocol,
 ) : ViewModel() {
@@ -119,6 +121,13 @@ class ChatViewModel @Inject constructor(
     )
 
     init {
+        viewModelScope.launch {
+            uiState.map { it.currentModelSelection to it.availableLLMModelSettings }.distinctUntilChanged().collect { (selection, services) ->
+                val service = services.firstOrNull { it.id == selection?.serviceId }
+                val supported = service != null && service.usesCloudFileUpload() && cloudFileSupport.supports(service, selection?.modelId.orEmpty(), "application/pdf")
+                _uiState.update { it.copy(cloudPdfInputSupported = supported) }
+            }
+        }
         viewModelScope.launch {
             uiState.map { it.availableLLMModelSettings }.distinctUntilChanged().collect {
                 cloudLocalFiles.reset()
@@ -659,7 +668,7 @@ class ChatViewModel @Inject constructor(
         }
         val service = _uiState.value.availableLLMModelSettings.firstOrNull { it.id == selection.serviceId }
         val prepareCloud = retry == null && draftAttachments.isNotEmpty() &&
-            (service?.isFileUploadEnabled == true || draftAttachments.any { it.cloudReference != null })
+            service?.usesCloudFileUpload() == true
         runtime.cloudBatch = null
         runtime.cloudItems = emptyList()
         publishRuntime(runtime)

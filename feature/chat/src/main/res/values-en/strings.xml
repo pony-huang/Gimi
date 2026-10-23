@@ -299,7 +299,7 @@
     <string name="chat_cloud_source_unavailable">Expired · local source unavailable</string>
     <string name="chat_cloud_reference_unverified">File references of this type are unverified for this connection</string>
     <string name="chat_cloud_attachment">Cloud file · availability checked before sending</string>
-    <string name="chat_cloud_sending_unavailable">Sending uploaded files is not available yet. Turn off file upload for this service to use the existing method. Cloud references cannot be sent yet.</string>
+    <string name="chat_cloud_sending_unavailable">To send cloud files, use their original service with Chat Completions and file upload enabled.</string>
     <string name="chat_cloud_expires_days">Expires in %1$d days</string>
     <string name="chat_cloud_expires_hours">Expires within %1$d hours</string>
     <string name="chat_cloud_draft_limit">A draft can hold up to 3 attachments. Select fewer files and try again.</string>
@@ -318,4 +318,5 @@
     <string name="chat_cloud_upload_storage">Could not save the upload record. Retry.</string>
     <string name="chat_cloud_upload_response">Invalid upload response. Retry.</string>
     <string name="chat_cloud_upload_failed">File upload failed. Retry.</string>
+    <string name="chat_cloud_file_too_large">Files in this request must total no more than 50 MB</string>
 </resources>

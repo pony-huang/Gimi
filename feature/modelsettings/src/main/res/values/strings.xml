@@ -147,5 +147,5 @@
     <string name="modelsettings_file_retention">云文件有效期</string>
     <string name="modelsettings_file_retention_days">%1$d 天</string>
     <string name="modelsettings_file_retention_note">从每次上传开始计时，仅影响新上传文件。到期后本地来源仍在时可重新上传。</string>
-    <string name="modelsettings_file_upload_pending">文件上传发送尚未开放验证。可先保存偏好；开启后暂不能发送附件，关闭可使用原有发送方式。聊天协议保持不变。</string>
+    <string name="modelsettings_file_upload_pending">当前支持 PDF，文件总大小最多 50 MB。兼容服务是否接受上传与文件引用，以实际接口结果为准；失败时不会省略附件。图片、音频及其他文件请关闭此开关后发送。</string>
 </resources>

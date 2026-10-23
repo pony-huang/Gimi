@@ -29,10 +29,10 @@ import github.ponyhuang.gimi.ui.preference.PreferenceSectionNote
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
-/** 独立上传偏好沿用编辑器草稿；未开放发送时明确显示限制，不宣称引用已经可用。 */
+/** 所有 Chat Completions 服务共享上传偏好与格式说明，编辑器保存后才影响发送。 */
 @Composable
 internal fun FileUploadSection(service: LLMModelSetting, editable: Boolean, onAction: (LLMModelSettingDetailAction) -> Unit) {
-    if (service.id !in setOf("openai", "deepseek")) return
+    if (service.apiProtocol != ApiProtocol.OpenaiChatcompletions && !service.isFileUploadEnabled) return
     PreferenceSectionTitle(stringResource(R.string.modelsettings_file_upload))
     PreferenceGroupCard {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -6,19 +6,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.CloudQueue
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +27,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.feature.modelsettings.detail.modelServicePreviewFixture
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
+import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionNote
@@ -43,7 +40,6 @@ fun LLMModelServiceListScreen(
     state: ModelServiceListUiState,
     onAction: (ModelServiceListAction) -> Unit,
     onNavigateToDetail: (String) -> Unit,
-    onAddService: () -> Unit,
     providerPicker: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
@@ -65,12 +61,14 @@ fun LLMModelServiceListScreen(
                         Text(stringResource(R.string.modelsettings_empty_title), style = MaterialTheme.typography.titleLarge)
                         Text(stringResource(R.string.modelsettings_empty_summary), style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Button(onClick = onAddService) { Text(stringResource(R.string.modelsettings_add_service)) }
                     }
                 } else LazyColumn(Modifier.fillMaxSize().padding(top = 8.dp)) {
                     if (state.isMutationBlocked) item {
                         PreferenceBanner(stringResource(R.string.modelsettings_agent_mutation_blocked))
                     }
+                    state.errorRes?.let { error -> item {
+                        PreferenceBanner(stringResource(error), tone = PreferenceBannerTone.Error)
+                    } }
                     if (providerPicker) item {
                         OutlinedTextField(state.query, { onAction(ModelServiceListAction.QueryChanged(it)) },
                             placeholder = { Text(stringResource(R.string.modelsettings_search_provider)) },
@@ -85,16 +83,10 @@ fun LLMModelServiceListScreen(
                         } else PreferenceGroupCard {
                             services.forEachIndexed { index, service ->
                                 ModelServiceCard(service, onNavigateToDetail,
-                                    showDivider = index < services.lastIndex, providerPicker = providerPicker)
+                                    showDivider = index < services.lastIndex, providerPicker = providerPicker,
+                                    onEnabledChange = { id, enabled -> onAction(ModelServiceListAction.EnabledChanged(id, enabled)) },
+                                    isSwitchEnabled = !state.isMutationBlocked && service.id !in state.pendingServiceIds)
                             }
-                        }
-                    }
-                    if (!providerPicker) item {
-                        PreferenceSectionNote(stringResource(R.string.modelsettings_list_hint))
-                        OutlinedButton(onClick = onAddService,
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).height(48.dp)) {
-                            Icon(Icons.Default.Add, null, Modifier.size(18.dp))
-                            Text(stringResource(R.string.modelsettings_add_service), Modifier.padding(start = 8.dp))
                         }
                     }
                 }
@@ -109,7 +101,8 @@ fun LLMModelServiceListScreen(
 private fun ServiceListPreview() {
     AsssistantaiTheme {
         LLMModelServiceListScreen(ModelServiceListUiState(loadState = CatalogLoadState.Ready,
-            items = listOf(modelServicePreviewFixture())), {}, {}, {})
+            items = listOf(modelServicePreviewFixture().copy(id = "deepseek", name = "DeepSeek"),
+                modelServicePreviewFixture().copy(isEnabled = false))), {}, {})
     }
 }
 
@@ -117,7 +110,7 @@ private fun ServiceListPreview() {
 @Preview(name = "空列表 · 深色", showBackground = true, widthDp = 390, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun EmptyServiceListPreview() {
-    AsssistantaiTheme { LLMModelServiceListScreen(ModelServiceListUiState(loadState = CatalogLoadState.Ready), {}, {}, {}) }
+    AsssistantaiTheme { LLMModelServiceListScreen(ModelServiceListUiState(loadState = CatalogLoadState.Ready), {}, {}) }
 }
 
 @Preview(name = "厂商选择", showBackground = true, widthDp = 390)
@@ -126,6 +119,6 @@ private fun EmptyServiceListPreview() {
 private fun ProviderPickerPreview() {
     AsssistantaiTheme {
         LLMModelServiceListScreen(ModelServiceListUiState(loadState = CatalogLoadState.Ready,
-            items = listOf(modelServicePreviewFixture())), {}, {}, {}, providerPicker = true)
+            items = listOf(modelServicePreviewFixture())), {}, {}, providerPicker = true)
     }
 }

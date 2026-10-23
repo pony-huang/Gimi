@@ -325,6 +325,50 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
         assertFalse(fixture.services.value!!.isFileUploadEnabled)
     }
 
+    @Test
+    fun bulkSelectionKeepsSpeechMetadataAndOnlyPersistsAfterSave() = runTest {
+        val configured = service().copy(groups = listOf(
+            ModelGroup("chat", "Chat", listOf(Model("chat", "Chat"))),
+            ModelGroup("speech", "Speech", listOf(Model("stt", "STT", isStt = true), Model("tts", "TTS", isTts = true))),
+        ))
+        val fixture = fixture(configured)
+        fixture.load()
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.OpenPage(ServiceEditorPage.Models))
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.ClearModels)
+        assertTrue(fixture.viewModel.uiState.value.pendingModelKeys.isEmpty())
+        assertEquals(3, fixture.viewModel.uiState.value.rows.size)
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.SelectAllModels)
+        assertEquals(3, fixture.viewModel.uiState.value.pendingModelKeys.size)
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.ConfirmModels)
+        assertEquals(configured.groups, fixture.viewModel.uiState.value.service!!.groups)
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.OpenPage(ServiceEditorPage.Models))
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.ClearModels)
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.ConfirmModels)
+        assertTrue(fixture.viewModel.uiState.value.service!!.groups.isEmpty())
+        assertEquals(configured.groups, fixture.services.value!!.groups)
+        coVerify(exactly = 0) { fixture.repository.saveService(any()) }
+    }
+
+    @Test
+    fun busyAgentBlocksBothBulkSelectionActions() = runTest {
+        val gate = FakeAgentRuntimeGate()
+        val fixture = fixture(service(), gate)
+        fixture.load()
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.OpenPage(ServiceEditorPage.Models))
+        val selected = fixture.viewModel.uiState.value.pendingModelKeys
+        gate.state.value = FakeAgentRuntimeGate.busy().state.value
+        runCurrent()
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.ClearModels)
+        assertEquals(selected, fixture.viewModel.uiState.value.pendingModelKeys)
+        gate.state.value = FakeAgentRuntimeGate().state.value
+        runCurrent()
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.ClearModels)
+        gate.state.value = FakeAgentRuntimeGate.busy().state.value
+        runCurrent()
+        fixture.viewModel.onAction(LLMModelSettingDetailAction.SelectAllModels)
+        assertTrue(fixture.viewModel.uiState.value.pendingModelKeys.isEmpty())
+    }
+
     private fun fixture(service: LLMModelSetting?, gate: FakeAgentRuntimeGate = FakeAgentRuntimeGate()): Fixture {
         val services = MutableStateFlow(service)
         val repository = mockk<ModelCatalogRepository>(relaxed = true) {

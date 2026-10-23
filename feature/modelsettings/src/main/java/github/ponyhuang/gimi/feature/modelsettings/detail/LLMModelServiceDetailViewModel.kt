@@ -25,9 +25,9 @@ import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -95,7 +95,13 @@ class ModelServiceDetailViewModel @Inject constructor(
                 it.copy(pendingModelKeys = if (action.key in it.pendingModelKeys) it.pendingModelKeys - action.key
                     else it.pendingModelKeys + action.key)
             }
-            is LLMModelSettingDetailAction.ModelQueryChanged -> _uiState.update { it.copy(modelQuery = action.value) }
+            LLMModelSettingDetailAction.SelectAllModels -> if (state.canEdit) _uiState.update {
+                it.copy(pendingModelKeys = it.candidates.mapTo(mutableSetOf()) { row -> row.key })
+            }
+            LLMModelSettingDetailAction.ClearModels -> if (state.canEdit) _uiState.update { it.copy(pendingModelKeys = emptySet()) }
+            LLMModelSettingDetailAction.ToggleConnection -> _uiState.update {
+                it.copy(isConnectionExpanded = !it.isConnectionExpanded, isProtocolMenuExpanded = false)
+            }
             is LLMModelSettingDetailAction.NewLLMModelIdChanged -> _uiState.update { it.copy(newModelId = action.value) }
             is LLMModelSettingDetailAction.NewLLMModelKindChanged -> _uiState.update { it.copy(newModelKind = action.value) }
             LLMModelSettingDetailAction.ToggleApiKeyVisibility -> _uiState.update { it.copy(isApiKeyVisible = !it.isApiKeyVisible) }
@@ -190,7 +196,7 @@ class ModelServiceDetailViewModel @Inject constructor(
     private fun openPage(page: ServiceEditorPage) {
         if (_uiState.value.isSaving) return
         _uiState.update { state ->
-            state.copy(page = page, errorRes = null, modelQuery = "",
+            state.copy(page = page, errorRes = null,
                 pendingModelKeys = if (page == ServiceEditorPage.Models) state.rows.mapTo(mutableSetOf()) { it.key }
                     else state.pendingModelKeys)
         }

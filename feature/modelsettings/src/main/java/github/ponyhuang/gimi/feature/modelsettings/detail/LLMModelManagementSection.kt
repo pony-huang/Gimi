@@ -1,7 +1,6 @@
 package github.ponyhuang.gimi.feature.modelsettings.detail
 
 import android.content.res.Configuration
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,13 +8,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -27,7 +23,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewParameter
+import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.modelcatalog.model.Model
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionNote
@@ -37,33 +37,30 @@ import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 /** 获取候选与勾选分离；确认只更新草稿，保存服务后才进入聊天模型目录。 */
 @Composable
 fun LLMModelManagementSection(state: LLMModelSettingDetailUiState, onAction: (LLMModelSettingDetailAction) -> Unit) {
-    PreferenceSectionNote(stringResource(R.string.modelsettings_model_selection_hint))
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        OutlinedButton(onClick = { onAction(LLMModelSettingDetailAction.RefreshModels) },
-            enabled = state.canEdit && !state.isRefreshing && !state.service?.apiKey.isNullOrBlank()) {
-            Text(stringResource(if (state.isRefreshing) R.string.modelsettings_sync_refreshing else R.string.modelsettings_fetch_models))
+    val keys = state.candidates.mapTo(mutableSetOf()) { it.key }
+    Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(stringResource(R.string.modelsettings_model_selection_count, keys.size, state.pendingModelKeys.intersect(keys).size),
+            style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+        TextButton(onClick = { onAction(LLMModelSettingDetailAction.SelectAllModels) },
+            enabled = state.canEdit && keys.any { it !in state.pendingModelKeys }) {
+            Text(stringResource(R.string.modelsettings_select_all))
         }
-        TextButton(onClick = { onAction(LLMModelSettingDetailAction.ShowAddDialog) }, enabled = state.canEdit) {
-            Text(stringResource(R.string.modelsettings_manual_model))
+        TextButton(onClick = { onAction(LLMModelSettingDetailAction.ClearModels) },
+            enabled = state.canEdit && state.pendingModelKeys.isNotEmpty()) {
+            Text(stringResource(R.string.modelsettings_clear_selection))
         }
     }
-    OutlinedTextField(state.modelQuery, { onAction(LLMModelSettingDetailAction.ModelQueryChanged(it)) },
-        placeholder = { Text(stringResource(R.string.modelsettings_search_model)) },
-        leadingIcon = { Icon(Icons.Default.Search, null) }, singleLine = true,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp))
-    val query = state.modelQuery.trim()
-    val visible = state.candidates.filter { query.isBlank() || it.model.id.contains(query, true) || it.model.name.contains(query, true) }
-    if (visible.isEmpty()) PreferenceSectionNote(stringResource(R.string.modelsettings_no_matches))
+    if (state.candidates.isEmpty()) PreferenceSectionNote(stringResource(R.string.modelsettings_no_model_candidates))
     NewModelKind.entries.forEach { kind ->
-        val models = visible.filter { row -> when (kind) {
+        val models = state.candidates.filter { row -> when (kind) {
             NewModelKind.Chat -> !row.model.isStt && !row.model.isTts
             NewModelKind.Stt -> row.model.isStt
             NewModelKind.Tts -> row.model.isTts
         } }
         if (models.isNotEmpty()) {
-            PreferenceSectionTitle(stringResource(kind.labelRes))
+            PreferenceSectionTitle(stringResource(R.string.modelsettings_model_type_count, stringResource(kind.labelRes), models.size))
             PreferenceGroupCard {
-                models.forEach { row ->
+                models.forEachIndexed { index, row ->
                     Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).toggleable(
                         value = row.key in state.pendingModelKeys,
                         enabled = state.canEdit,
@@ -71,15 +68,16 @@ fun LLMModelManagementSection(state: LLMModelSettingDetailUiState, onAction: (LL
                         onValueChange = { onAction(LLMModelSettingDetailAction.ToggleModel(row.key)) },
                     ).padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
                         verticalAlignment = Alignment.CenterVertically) {
-                        Text(row.model.id, style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                         Checkbox(checked = row.key in state.pendingModelKeys, enabled = state.canEdit, onCheckedChange = null)
+                        Text(row.model.id, style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f).padding(start = 8.dp), maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
+                    if (index < models.lastIndex) HorizontalDivider(Modifier.padding(start = 64.dp, end = 16.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
         }
     }
-    PreferenceSectionNote(stringResource(R.string.modelsettings_fetch_hint))
     if (state.isAddDialogVisible) AddModelDialog(state, onAction)
 }
 
@@ -119,10 +117,23 @@ private fun AddModelDialog(state: LLMModelSettingDetailUiState, onAction: (LLMMo
 @Preview(name = "模型选择", widthDp = 390, heightDp = 844, locale = "zh")
 @Preview(name = "模型选择 · 深色", widthDp = 390, heightDp = 844, locale = "zh", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun ModelSelectionPreview() {
-    val service = modelServicePreviewFixture()
+private fun ModelSelectionPreview(@PreviewParameter(ModelSelectionPreviewProvider::class) selectedCount: Int) {
+    AsssistantaiTheme { LLMModelSettingDetailScreen(modelSelectionPreviewState(selectedCount), {}, { _, _ -> }) }
+}
+
+/** 对话和两类语音模型的固定预览数据，不调用远端目录。 */
+internal fun modelSelectionPreviewState(selectedCount: Int): LLMModelSettingDetailUiState {
+    val service = modelServicePreviewFixture().copy(id = "openai", name = "OpenAI", groups = listOf(
+        ModelGroup("chat", "Chat", listOf(Model("gpt-4.1", "gpt-4.1"), Model("gpt-4.1-mini", "gpt-4.1-mini"))),
+        ModelGroup("stt", "STT", listOf(Model("gpt-4o-transcribe", "gpt-4o-transcribe", isStt = true), Model("whisper-1", "whisper-1", isStt = true))),
+        ModelGroup("tts", "TTS", listOf(Model("gpt-4o-mini-tts", "gpt-4o-mini-tts", isTts = true), Model("tts-1", "tts-1", isTts = true))),
+    ))
     val rows = service.groups.flatMap { group -> group.models.map { LLMModelSettingDetailRow.LLMModelItem(group.id, it) } }
-    AsssistantaiTheme { LLMModelSettingDetailScreen(LLMModelSettingDetailUiState(isLoading = false,
-        service = service, baseline = service, page = ServiceEditorPage.Models, candidates = rows,
-        pendingModelKeys = rows.mapTo(mutableSetOf()) { it.key }), {}, { _, _ -> }) }
+    return LLMModelSettingDetailUiState(isLoading = false, service = service, baseline = service,
+        page = ServiceEditorPage.Models, candidates = rows, pendingModelKeys = rows.take(selectedCount).mapTo(mutableSetOf()) { it.key })
+}
+
+/** 覆盖未选、部分选择、全选三种批量操作状态。 */
+class ModelSelectionPreviewProvider : PreviewParameterProvider<Int> {
+    override val values = sequenceOf(0, 2, 6)
 }

@@ -8,7 +8,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSpec
 import github.ponyhuang.gimi.feature.modelsettings.R
 
 /** 编辑器内部页面共享同一份草稿，子页返回不创建另一份配置。 */
-enum class ServiceEditorPage { Detail, Models, Extensions, Advanced }
+enum class ServiceEditorPage { Detail, Models }
 
 /** 草稿、候选目录和业务操作状态；原始快照用于判断退出时是否需要提示。 */
 data class LLMModelSettingDetailUiState(
@@ -18,7 +18,6 @@ data class LLMModelSettingDetailUiState(
     val page: ServiceEditorPage = ServiceEditorPage.Detail,
     val candidates: List<LLMModelSettingDetailRow.LLMModelItem> = emptyList(),
     val pendingModelKeys: Set<ServiceModelKey> = emptySet(),
-    val modelQuery: String = "",
     val candidateGroupNames: Map<String, String> = emptyMap(),
     val supportedTools: List<OfficialToolSpec> = emptyList(),
     val isTestingKey: Boolean = false,
@@ -27,6 +26,7 @@ data class LLMModelSettingDetailUiState(
     val isSaving: Boolean = false,
     val isClosing: Boolean = false,
     val isApiKeyVisible: Boolean = false,
+    val isConnectionExpanded: Boolean = false,
     val isProtocolMenuExpanded: Boolean = false,
     val isServiceMenuExpanded: Boolean = false,
     val isAddDialogVisible: Boolean = false,
@@ -69,8 +69,12 @@ sealed interface LLMModelSettingDetailAction {
     data class OpenPage(val page: ServiceEditorPage) : LLMModelSettingDetailAction
     /** 勾选或取消候选模型。 */
     data class ToggleModel(val key: ServiceModelKey) : LLMModelSettingDetailAction
-    /** 修改模型搜索词。 */
-    data class ModelQueryChanged(val value: String) : LLMModelSettingDetailAction
+    /** 将全部候选加入待确认选择。 */
+    data object SelectAllModels : LLMModelSettingDetailAction
+    /** 清空待确认选择，不直接修改已保存配置。 */
+    data object ClearModels : LLMModelSettingDetailAction
+    /** 页内展开或收起接口设置。 */
+    data object ToggleConnection : LLMModelSettingDetailAction
     /** 修改手动添加的 ID。 */
     data class NewLLMModelIdChanged(val value: String) : LLMModelSettingDetailAction
     /** 修改手动添加的模型类型。 */

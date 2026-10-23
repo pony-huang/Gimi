@@ -36,6 +36,6 @@ fun ModelServiceListRoute(
         },
     ) { scaffoldModifier ->
         LLMModelServiceListScreen(state, viewModel::onAction, onNavigateToDetail,
-            onAddService, providerPicker, scaffoldModifier)
+            providerPicker, scaffoldModifier)
     }
 }

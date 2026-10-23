@@ -12,12 +12,15 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -33,6 +36,8 @@ fun ModelServiceCard(
     showDivider: Boolean = false,
     providerPicker: Boolean = false,
     modifier: Modifier = Modifier,
+    onEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
+    isSwitchEnabled: Boolean = true,
 ) {
     Column(modifier.fillMaxWidth()) {
         Row(
@@ -48,14 +53,18 @@ fun ModelServiceCard(
                 val subtitle = when {
                     providerPicker && item.isAdded -> stringResource(R.string.modelsettings_provider_added)
                     providerPicker -> null
-                    !item.isEnabled -> stringResource(R.string.modelsettings_service_paused_count, item.groups.sumOf { it.models.size })
-                    else -> stringResource(R.string.modelsettings_service_configured_count, item.groups.sumOf { it.models.size })
+                    else -> stringResource(R.string.modelsettings_service_model_count, item.groups.sumOf { it.models.size })
                 }
                 if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
             }
-            Icon(Icons.Default.ChevronRight, contentDescription = null,
+            if (providerPicker) Icon(Icons.Default.ChevronRight, contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            else {
+                val switchLabel = stringResource(R.string.modelsettings_service_enabled_label, item.name)
+                Switch(item.isEnabled, onCheckedChange = { onEnabledChange(item.id, it) }, enabled = isSwitchEnabled,
+                    modifier = Modifier.semantics { contentDescription = switchLabel })
+            }
         }
         if (showDivider) HorizontalDivider(Modifier.padding(start = 70.dp, end = 16.dp),
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))

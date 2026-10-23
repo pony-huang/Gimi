@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,11 +16,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -61,6 +64,7 @@ import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /** 无状态的完整编辑器；所有草稿和弹窗状态由 ViewModel 持有。 */
@@ -77,19 +81,27 @@ fun LLMModelSettingDetailScreen(
         style = PreferenceStyle.Compact,
         title = when (state.page) {
             ServiceEditorPage.Detail -> service?.name ?: stringResource(R.string.modelsettings_detail_title)
-            ServiceEditorPage.Models -> stringResource(R.string.modelsettings_select_models)
-            ServiceEditorPage.Extensions -> stringResource(R.string.modelsettings_extensions)
-            ServiceEditorPage.Advanced -> stringResource(R.string.modelsettings_advanced_connection)
+            ServiceEditorPage.Models -> stringResource(R.string.modelsettings_manage_models)
         },
         onBack = { onAction(LLMModelSettingDetailAction.Back) },
         actions = {
+            if (state.page == ServiceEditorPage.Models) {
+                IconButton(onClick = { onAction(LLMModelSettingDetailAction.RefreshModels) },
+                    enabled = state.canEdit && !state.isRefreshing && !service?.apiKey.isNullOrBlank()) {
+                    if (state.isRefreshing) CircularProgressIndicator(Modifier.size(24.dp))
+                    else Icon(Icons.Default.Refresh, stringResource(R.string.modelsettings_fetch_models))
+                }
+                IconButton(onClick = { onAction(LLMModelSettingDetailAction.ShowAddDialog) }, enabled = state.canEdit) {
+                    Icon(Icons.Default.Add, stringResource(R.string.modelsettings_manual_model))
+                }
+            }
             if (state.page == ServiceEditorPage.Detail && service?.isAdded == true) {
                 ServiceManagementMenu(state, onAction)
             }
         },
         bottomBar = {
-            if (service != null && (state.page == ServiceEditorPage.Detail || state.page == ServiceEditorPage.Models)) {
-                Surface(color = MaterialTheme.colorScheme.background) {
+            if (service != null) {
+                Surface(color = preferenceCanvasColor()) {
                     Button(
                         onClick = { onAction(if (state.page == ServiceEditorPage.Models)
                             LLMModelSettingDetailAction.ConfirmModels else LLMModelSettingDetailAction.Save) },
@@ -121,23 +133,6 @@ fun LLMModelSettingDetailScreen(
                 if (service != null) when (state.page) {
                     ServiceEditorPage.Detail -> ServiceConnectionOverview(state, onAction, onOpenUrl)
                     ServiceEditorPage.Models -> LLMModelManagementSection(state, onAction)
-                    ServiceEditorPage.Extensions -> {
-                        FileUploadSection(service, state.canEdit, onAction)
-                        OfficialToolsSection(service, state.supportedTools, state.canEdit) {
-                            onAction(LLMModelSettingDetailAction.OfficialToolsEnabledChanged(it))
-                        }
-                    }
-                    ServiceEditorPage.Advanced -> PreferenceGroupCard {
-                        ApiBaseUrlSection(
-                            service = service,
-                            isMenuExpanded = state.isProtocolMenuExpanded,
-                            onToggleMenu = { onAction(LLMModelSettingDetailAction.ToggleProtocolMenu) },
-                            onDismissMenu = { onAction(LLMModelSettingDetailAction.DismissProtocolMenu) },
-                            onProtocolChange = { onAction(LLMModelSettingDetailAction.ApiProtocolChanged(it)) },
-                            onBaseUrlChange = { onAction(LLMModelSettingDetailAction.ApiBaseUrlChanged(it)) },
-                            enabled = state.canEdit,
-                        )
-                    }
                 }
             }
         }
@@ -186,9 +181,22 @@ private fun ServiceConnectionOverview(
             }
         }
         PreferenceListItem(icon = Icons.Outlined.Settings,
-            title = stringResource(R.string.modelsettings_advanced_connection),
-            subtitle = protocolLabel(service.apiProtocol),
-            onClick = { onAction(LLMModelSettingDetailAction.OpenPage(ServiceEditorPage.Advanced)) })
+            title = stringResource(R.string.modelsettings_connection_options),
+            subtitle = if (state.isConnectionExpanded) null else protocolLabel(service.apiProtocol),
+            onClick = { onAction(LLMModelSettingDetailAction.ToggleConnection) },
+            trailingContent = {
+                Icon(if (state.isConnectionExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    stringResource(if (state.isConnectionExpanded) R.string.modelsettings_collapse_connection else R.string.modelsettings_expand_connection))
+            })
+        if (state.isConnectionExpanded) ApiBaseUrlSection(
+            service = service,
+            isMenuExpanded = state.isProtocolMenuExpanded,
+            onToggleMenu = { onAction(LLMModelSettingDetailAction.ToggleProtocolMenu) },
+            onDismissMenu = { onAction(LLMModelSettingDetailAction.DismissProtocolMenu) },
+            onProtocolChange = { onAction(LLMModelSettingDetailAction.ApiProtocolChanged(it)) },
+            onBaseUrlChange = { onAction(LLMModelSettingDetailAction.ApiBaseUrlChanged(it)) },
+            enabled = state.canEdit,
+        )
         OutlinedButton(onClick = { onAction(LLMModelSettingDetailAction.TestConnection) },
             enabled = state.canEdit && !state.isTestingKey && service.apiKey.isNotBlank(),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -202,32 +210,16 @@ private fun ServiceConnectionOverview(
                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp))
         }
     }
-    Row(Modifier.fillMaxWidth().padding(start = 32.dp, end = 20.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(stringResource(R.string.modelsettings_section_models), style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        TextButton(onClick = { onAction(LLMModelSettingDetailAction.OpenPage(ServiceEditorPage.Models)) }) {
-            Text(stringResource(R.string.modelsettings_manage_models))
-        }
-    }
+    PreferenceSectionTitle(stringResource(R.string.modelsettings_section_models))
     PreferenceGroupCard {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (state.rows.isEmpty()) Text(stringResource(R.string.modelsettings_no_selected_models),
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            else {
-                state.rows.take(3).forEach { Text(it.model.name, style = MaterialTheme.typography.bodyMedium) }
-                Text(stringResource(R.string.modelsettings_selected_model_count, state.rows.size),
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
+        PreferenceListItem(icon = Icons.Default.ViewList,
+            title = stringResource(R.string.modelsettings_manage_models),
+            subtitle = stringResource(R.string.modelsettings_selected_model_count, state.rows.size),
+            onClick = { onAction(LLMModelSettingDetailAction.OpenPage(ServiceEditorPage.Models)) })
     }
-    if (state.supportedTools.isNotEmpty()) {
-        Spacer(Modifier.height(16.dp))
-        PreferenceGroupCard {
-            PreferenceListItem(icon = Icons.Outlined.Extension,
-                title = stringResource(R.string.modelsettings_extensions),
-                subtitle = stringResource(R.string.modelsettings_extensions_summary),
-                onClick = { onAction(LLMModelSettingDetailAction.OpenPage(ServiceEditorPage.Extensions)) })
-        }
+    FileUploadSection(service, state.canEdit, onAction)
+    OfficialToolsSection(service, state.supportedTools, state.canEdit) {
+        onAction(LLMModelSettingDetailAction.OfficialToolsEnabledChanged(it))
     }
 }
 
@@ -305,6 +297,15 @@ private fun ServiceDetailPreview() {
     val service = modelServicePreviewFixture()
     AsssistantaiTheme { LLMModelSettingDetailScreen(LLMModelSettingDetailUiState(isLoading = false,
         service = service, baseline = service, supportedTools = OfficialToolSupport().all.filter { it.serviceId == service.id && service.apiProtocol in it.protocols }), {}, { _, _ -> }) }
+}
+
+@Preview(name = "接口设置展开", widthDp = 390, heightDp = 1000, locale = "zh")
+@Preview(name = "接口设置展开 · 深色", widthDp = 390, heightDp = 1000, locale = "zh", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun ExpandedConnectionPreview() {
+    val service = modelServicePreviewFixture()
+    AsssistantaiTheme { LLMModelSettingDetailScreen(LLMModelSettingDetailUiState(isLoading = false,
+        service = service, baseline = service, isConnectionExpanded = true), {}, { _, _ -> }) }
 }
 
 @Preview(name = "连接失败", widthDp = 390, heightDp = 844, locale = "zh")

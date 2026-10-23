@@ -69,9 +69,9 @@
     <string name="modelsettings_dialog_no_models">暂无可用模型，请先在模型服务中启用至少一个模型。</string>
 
     <!-- 新增模型对话框 -->
-    <string name="modelsettings_new_model_chat">聊天模型</string>
-    <string name="modelsettings_new_model_stt">语音识别模型（STT）</string>
-    <string name="modelsettings_new_model_tts">语音合成模型（TTS）</string>
+    <string name="modelsettings_new_model_chat">对话模型</string>
+    <string name="modelsettings_new_model_stt">语音识别</string>
+    <string name="modelsettings_new_model_tts">语音合成</string>
 
     <!-- 路由标题（由 :app 注入 SettingsScaffold 使用） -->
     <string name="modelsettings_list_title">API 接入</string>
@@ -90,7 +90,7 @@
     <string name="modelsettings_provider_added">已添加 · 点击编辑</string>
     <string name="modelsettings_service_paused_count">已暂停 · %1$d 个模型</string>
     <string name="modelsettings_empty_title">接入你的第一个服务</string>
-    <string name="modelsettings_empty_summary">添加服务商的 API 密钥，选择模型后即可在聊天中使用。</string>
+    <string name="modelsettings_empty_summary">点击右上角 + 添加服务</string>
     <string name="modelsettings_search_provider">搜索服务商</string>
     <string name="modelsettings_choose_provider">选择服务商</string>
     <string name="modelsettings_no_matches">暂无匹配项</string>
@@ -98,7 +98,6 @@
     <string name="modelsettings_select_models">选择模型</string>
     <string name="modelsettings_extensions">扩展能力</string>
     <string name="modelsettings_extensions_summary">配置厂商工具在聊天中的使用入口</string>
-    <string name="modelsettings_advanced_connection">高级连接设置</string>
     <string name="modelsettings_api_protocol_anthropic_label">Anthropic Messages</string>
     <string name="modelsettings_saving">正在保存…</string>
     <string name="modelsettings_confirm_models">确认选择 · %1$d 个模型</string>
@@ -108,7 +107,7 @@
     <string name="modelsettings_saved_hint">已配置 · 修改将在保存后生效</string>
     <string name="modelsettings_manage_models">管理模型</string>
     <string name="modelsettings_no_selected_models">尚未添加模型</string>
-    <string name="modelsettings_selected_model_count">共 %1$d 个模型</string>
+    <string name="modelsettings_selected_model_count">已选择 %1$d 个模型</string>
     <string name="modelsettings_manage_service">管理服务</string>
     <string name="modelsettings_pause_service">暂停服务</string>
     <string name="modelsettings_resume_service">恢复服务</string>
@@ -142,10 +141,24 @@
     <string name="modelsettings_tool_cross_model">可供其他聊天模型调用。</string>
     <string name="modelsettings_tool_native">可用性受当前协议及模型支持范围限制。</string>
     <string name="modelsettings_tools_save_hint">返回服务详情后，点击“保存修改”使设置生效。暂停服务会保留此偏好。</string>
-    <string name="modelsettings_file_upload">文件上传</string>
-    <string name="modelsettings_file_upload_summary">发送附件时上传至 %1$s，并在支持的模型中引用。已上传文件可在其他会话中再次选择。</string>
+    <string name="modelsettings_file_upload">云文件上传</string>
+    <string name="modelsettings_file_upload_summary">上传后可在其他会话中选择</string>
     <string name="modelsettings_file_retention">云文件有效期</string>
     <string name="modelsettings_file_retention_days">%1$d 天</string>
-    <string name="modelsettings_file_retention_note">从每次上传开始计时，仅影响新上传文件。到期后本地来源仍在时可重新上传。</string>
-    <string name="modelsettings_file_upload_pending">当前支持 PDF，文件总大小最多 50 MB。兼容服务是否接受上传与文件引用，以实际接口结果为准；失败时不会省略附件。图片、音频及其他文件请关闭此开关后发送。</string>
+    <string name="modelsettings_file_retention_note">仅影响新上传文件</string>
+    <string name="modelsettings_file_upload_pending">支持 PDF，单次附件合计不超过 50 MB。</string>
+    <string name="modelsettings_connection_options">接口设置</string>
+    <string name="modelsettings_expand_connection">展开接口设置</string>
+    <string name="modelsettings_collapse_connection">收起接口设置</string>
+    <string name="modelsettings_section_features">功能</string>
+    <string name="modelsettings_section_files">文件</string>
+    <string name="modelsettings_section_tools">工具</string>
+    <string name="modelsettings_provider_tools_summary">在聊天工具面板中选择使用</string>
+    <string name="modelsettings_model_selection_count">共 %1$d 个 · 已选 %2$d 个</string>
+    <string name="modelsettings_model_type_count">%1$s · %2$d</string>
+    <string name="modelsettings_select_all">全选</string>
+    <string name="modelsettings_clear_selection">清空</string>
+    <string name="modelsettings_no_model_candidates">点击右上角刷新获取模型，或手动添加。</string>
+    <string name="modelsettings_service_model_count">%1$d 个模型</string>
+    <string name="modelsettings_service_enabled_label">启用 %1$s</string>
 </resources>

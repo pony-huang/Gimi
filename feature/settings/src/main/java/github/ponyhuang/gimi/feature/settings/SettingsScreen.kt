@@ -15,7 +15,6 @@ import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.Rule
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SmartToy
@@ -159,12 +158,6 @@ fun SettingsScreen(
                 PreferenceGroupCard {
                     SettingsNavigationItems(
                         items = listOf(
-                            SettingsNavigationItem(
-                                icon = Icons.Default.Rule,
-                                title = stringResource(R.string.settings_tool_authorization_title),
-                                subtitle = stringResource(R.string.settings_tool_authorization_subtitle),
-                                action = SettingsAction.OpenToolAuthorization,
-                            ),
                             SettingsNavigationItem(
                                 icon = Icons.Default.Security,
                                 title = stringResource(R.string.settings_permissions_title),

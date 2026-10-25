@@ -14,8 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Rule
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -38,6 +38,7 @@ import github.ponyhuang.gimi.domain.recommendation.model.RecommendationRefreshSt
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
+import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceSwitchItem
@@ -51,7 +52,7 @@ import java.time.format.FormatStyle
 fun RecommendationSettingsScreen(
     state: RecommendationSettingsUiState,
     onAction: (RecommendationSettingsAction) -> Unit,
-    onOpenPermissions: () -> Unit,
+    onOpenToolAuthorization: () -> Unit,
     onOpenFastModelSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -100,8 +101,8 @@ fun RecommendationSettingsScreen(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    .padding(horizontal = 16.dp, vertical = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 Text(
                                     text = recommendationStatusText(state),
@@ -117,8 +118,7 @@ fun RecommendationSettingsScreen(
                                         (state.refreshStatus == RecommendationRefreshStatus.Idle ||
                                             state.lastError != null),
                                     modifier = Modifier
-                                        .fillMaxWidth(0.5f)
-                                        .align(Alignment.CenterHorizontally)
+                                        .fillMaxWidth()
                                         .testTag("recommendation_refresh_action"),
                                 ) {
                                     Text(text = stringResource(R.string.recommendation_refresh_now))
@@ -128,14 +128,14 @@ fun RecommendationSettingsScreen(
                     }
                 }
             }
-            item { PreferenceSectionTitle(stringResource(R.string.recommendation_privacy_section)) }
+            item { PreferenceSectionTitle(stringResource(R.string.recommendation_tools_section)) }
             item {
                 PreferenceGroupCard {
                     PreferenceListItem(
-                        icon = Icons.Default.Apps,
-                        title = stringResource(R.string.recommendation_permissions_title),
-                        subtitle = stringResource(R.string.recommendation_permissions_subtitle),
-                        onClick = onOpenPermissions,
+                        icon = Icons.Default.Rule,
+                        title = stringResource(R.string.recommendation_toolauth_title),
+                        subtitle = stringResource(R.string.recommendation_toolauth_subtitle),
+                        onClick = onOpenToolAuthorization,
                     )
                 }
             }
@@ -242,7 +242,7 @@ private fun RecommendationSettingsScreenEnabledPreview() {
                 refreshStatus = RecommendationRefreshStatus.Scheduled,
             ),
             onAction = {},
-            onOpenPermissions = {},
+            onOpenToolAuthorization = {},
             onOpenFastModelSettings = {},
         )
     }
@@ -262,7 +262,7 @@ private fun RecommendationSettingsScreenRetryPreview() {
                 retryDelaySeconds = 30,
             ),
             onAction = {},
-            onOpenPermissions = {},
+            onOpenToolAuthorization = {},
             onOpenFastModelSettings = {},
         )
     }
@@ -279,7 +279,7 @@ private fun RecommendationSettingsScreenDisabledPreview() {
                 lastError = "权限不足，无法读取使用记录",
             ),
             onAction = {},
-            onOpenPermissions = {},
+            onOpenToolAuthorization = {},
             onOpenFastModelSettings = {},
         )
     }
@@ -297,7 +297,7 @@ private fun RecommendationSettingsScreenFastModelMissingPreview() {
                 fastModelReady = false,
             ),
             onAction = {},
-            onOpenPermissions = {},
+            onOpenToolAuthorization = {},
             onOpenFastModelSettings = {},
         )
         FastModelRequiredDialog(
@@ -305,4 +305,73 @@ private fun RecommendationSettingsScreenFastModelMissingPreview() {
             onDismiss = {},
         )
     }
+}
+
+/** 带页面外壳的固定状态预览，便于检查分组间距与系统安全区域。 */
+@Composable
+private fun RecommendationSettingsPagePreview(
+    dark: Boolean,
+    enabled: Boolean = true,
+    error: Boolean = false,
+) {
+    AsssistantaiTheme(darkTheme = dark) {
+        PreferenceScaffold(
+            title = stringResource(R.string.recommendation_settings_title),
+            onBack = {},
+        ) { modifier ->
+            RecommendationSettingsScreen(
+                state = RecommendationSettingsUiState(
+                    enabled = enabled,
+                    intervalHours = 2,
+                    refreshStatus = if (error) {
+                        RecommendationRefreshStatus.Refreshing
+                    } else {
+                        RecommendationRefreshStatus.Scheduled
+                    },
+                    lastError = if (error) "网络暂时不可用，请稍后重试" else null,
+                    retryDelaySeconds = if (error) 30 else null,
+                ),
+                onAction = {},
+                onOpenToolAuthorization = {},
+                onOpenFastModelSettings = {},
+                modifier = modifier,
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RecommendationSettingsPageLightPreview() {
+    RecommendationSettingsPagePreview(false)
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RecommendationSettingsPageDarkPreview() {
+    RecommendationSettingsPagePreview(true)
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RecommendationSettingsPageDisabledLightPreview() {
+    RecommendationSettingsPagePreview(false, enabled = false)
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RecommendationSettingsPageDisabledDarkPreview() {
+    RecommendationSettingsPagePreview(true, enabled = false)
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RecommendationSettingsPageErrorLightPreview() {
+    RecommendationSettingsPagePreview(false, error = true)
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RecommendationSettingsPageErrorDarkPreview() {
+    RecommendationSettingsPagePreview(true, error = true)
 }

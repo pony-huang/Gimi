@@ -1,5 +1,5 @@
 <resources>
-    <string name="recommendation_settings_title">Smart recommendations</string>
+    <string name="recommendation_settings_title">Personalized services</string>
     <string name="recommendation_settings_section">Recommendation updates</string>
     <string name="recommendation_enabled_title">Enable smart recommendations</string>
     <string name="recommendation_enabled_subtitle">Show Agent-generated tasks in empty conversations</string>
@@ -15,8 +15,8 @@
     <string name="recommendation_status_updated">Last updated: %1$s</string>
     <string name="recommendation_status_error">Update failed: %1$s</string>
     <string name="recommendation_status_retrying">Update failed: %1$s. Retrying in %2$d s.</string>
-    <string name="recommendation_privacy_section">Privacy</string>
-    <string name="recommendation_permissions_title">Context permissions</string>
-    <string name="recommendation_permissions_subtitle">Manage location and app usage; unavailable context is skipped</string>
+    <string name="recommendation_tools_section">Tools and permissions</string>
+    <string name="recommendation_toolauth_title">Tool authorization</string>
+    <string name="recommendation_toolauth_subtitle">Choose which local tools the assistant may use</string>
     <string name="recommendation_close">Close</string>
 </resources>

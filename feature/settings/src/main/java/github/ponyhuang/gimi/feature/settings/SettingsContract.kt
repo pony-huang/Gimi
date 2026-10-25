@@ -15,7 +15,6 @@ sealed interface SettingsAction {
     /** 打开附件工作区管理页。 */
     data object OpenWorkspace : SettingsAction
     data object OpenPermissions : SettingsAction
-    data object OpenToolAuthorization : SettingsAction
     /** 进入 Shizuku 后台操作设置页。 */
     data object OpenMobileUse : SettingsAction
     data object OpenRecommendations : SettingsAction
@@ -39,7 +38,6 @@ sealed interface SettingsEffect {
     /** 跳转附件工作区管理页。 */
     data object NavigateToWorkspace : SettingsEffect
     data object NavigateToPermissions : SettingsEffect
-    data object NavigateToToolAuthorization : SettingsEffect
     data object NavigateToMobileUse : SettingsEffect
     data object NavigateToRecommendations : SettingsEffect
     data object NavigateToMemory : SettingsEffect

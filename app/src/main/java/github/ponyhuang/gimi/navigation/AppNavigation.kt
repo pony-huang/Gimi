@@ -176,9 +176,6 @@ fun MainScreen(
                         onNavigateToSkills = { navigate(SkillsDestination.Settings) },
                         onNavigateToWorkspace = { navigate(WorkspaceDestination.Manager) },
                         onNavigateToPermissions = { navigate(PermissionDestination.Settings) },
-                        onNavigateToToolAuthorization = {
-                            navigate(ToolAuthorizationDestination.Settings)
-                        },
                         onNavigateToMobileUse = {
                             navigate(MobileUseDestination.Settings)
                         },
@@ -199,7 +196,9 @@ fun MainScreen(
                     RecommendationEntryProvider(
                         destination = destination,
                         onBack = goBack,
-                        onOpenPermissions = { navigate(PermissionDestination.Settings) },
+                        onOpenToolAuthorization = {
+                            navigate(ToolAuthorizationDestination.Settings)
+                        },
                         onOpenFastModelSettings = { navigate(ModelSettingsDestination.Defaults) },
                     ) ||
                     MemoryEntryProvider(destination, goBack, navigate) ||

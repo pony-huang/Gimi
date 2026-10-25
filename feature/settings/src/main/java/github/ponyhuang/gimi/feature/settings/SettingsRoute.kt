@@ -24,7 +24,6 @@ fun SettingsRoute(
     onNavigateToSkills: () -> Unit,
     onNavigateToWorkspace: () -> Unit,
     onNavigateToPermissions: () -> Unit,
-    onNavigateToToolAuthorization: () -> Unit,
     onNavigateToMobileUse: () -> Unit,
     onNavigateToRecommendations: () -> Unit,
     onNavigateToMemory: () -> Unit,
@@ -45,7 +44,6 @@ fun SettingsRoute(
             SettingsEffect.NavigateToSkills -> onNavigateToSkills()
             SettingsEffect.NavigateToWorkspace -> onNavigateToWorkspace()
             SettingsEffect.NavigateToPermissions -> onNavigateToPermissions()
-            SettingsEffect.NavigateToToolAuthorization -> onNavigateToToolAuthorization()
             SettingsEffect.NavigateToMobileUse -> onNavigateToMobileUse()
             SettingsEffect.NavigateToRecommendations -> onNavigateToRecommendations()
             SettingsEffect.NavigateToMemory -> onNavigateToMemory()

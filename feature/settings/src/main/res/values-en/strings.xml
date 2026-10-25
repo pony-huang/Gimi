@@ -27,8 +27,6 @@
     <string name="settings_workspace_title">Cache</string>
     <string name="settings_workspace_subtitle">Manage chat attachments</string>
 
-    <string name="settings_tool_authorization_title">Tool access</string>
-    <string name="settings_tool_authorization_subtitle">Choose which local tools the assistant may use</string>
     <string name="settings_mobile_use_title">Shizuku</string>
     <string name="settings_mobile_use_subtitle">Let the Agent use other apps in the background</string>
     <string name="settings_permissions_title">Permissions</string>
@@ -66,8 +64,8 @@
     <string name="update_open_app_details">Open app details</string>
     <string name="update_failed_title">Update failed</string>
     <string name="update_retry">Retry</string>
-    <string name="settings_recommendations_title">Smart recommendations</string>
-    <string name="settings_recommendations_subtitle">Configure suggestions and pre-generation</string>
+    <string name="settings_recommendations_title">Personalized services</string>
+    <string name="settings_recommendations_subtitle">Configure suggestions and tool authorization</string>
 
     <string name="logs_title">Logs</string>
     <string name="logs_subtitle">View and export logs from the last 24 hours</string>

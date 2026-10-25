@@ -285,6 +285,122 @@ class PluginSettingsViewModelTest {
         assertNull(harness.viewModel.uiState.value.pendingUninstallPluginId)
     }
 
+    @Test
+    fun updateUsesInstalledApkVersionAndEmitsSystemInstallerWithoutChangingEnablement() = runTest {
+        val harness = updateHarness()
+        collectUiState(harness.viewModel)
+        advanceUntilIdle()
+        assertTrue(harness.viewModel.uiState.value.items.first { it.key == "zhihu" }.isUpdateAvailable)
+
+        harness.viewModel.effects.test {
+            harness.viewModel.onAction(PluginSettingsAction.Update("zhihu"))
+            advanceUntilIdle()
+            assertEquals(PluginSettingsEffect.LaunchInstaller("content://plugins/apk/zhihu"), awaitItem())
+        }
+        assertEquals("github.ponyhuang.gimi.plugin.zhihu" to 61L, harness.installer.lastRequest)
+        assertFalse(harness.pluginRepository.plugins.value.single().isEnabled)
+        harness.pluginRepository.pluginsFlow.value = harness.pluginRepository.plugins.value.map { it.copy(versionCode = 61L) }
+        advanceUntilIdle()
+        assertFalse(harness.viewModel.uiState.value.items.first { it.key == "zhihu" }.isUpdateAvailable)
+    }
+
+    @Test
+    fun refreshedUpgradeDoesNotEmitNewPluginNotice() = runTest {
+        val harness = updateHarness()
+        harness.pluginRepository.refreshResult = listOf("zhihu")
+        collectUiState(harness.viewModel)
+        advanceUntilIdle()
+        harness.viewModel.effects.test {
+            harness.viewModel.onAction(PluginSettingsAction.Refresh)
+            advanceUntilIdle()
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun equalOlderUnknownOrDifferentPackageUpdatesAreIgnored() = runTest {
+        for (entry in listOf(
+            catalogEntry("zhihu", "知乎").copy(versionCode = 60L),
+            catalogEntry("zhihu", "知乎").copy(versionCode = 59L),
+            catalogEntry("zhihu", "知乎").copy(versionCode = null),
+            catalogEntry("zhihu", "知乎").copy(versionCode = 61L, packageName = "another.plugin"),
+        )) {
+            val harness = updateHarness(entry = entry)
+            collectUiState(harness.viewModel)
+            advanceUntilIdle()
+            assertFalse(harness.viewModel.uiState.value.items.first().isUpdateAvailable)
+            harness.viewModel.onAction(PluginSettingsAction.Update("zhihu"))
+            advanceUntilIdle()
+            assertEquals(0, harness.installer.calls)
+        }
+    }
+
+    @Test
+    fun updateWithoutPermissionOpensSettingsWithoutDownloading() = runTest {
+        val harness = updateHarness(environment = FakeInstallEnvironment(canInstall = false))
+        collectUiState(harness.viewModel)
+        advanceUntilIdle()
+        harness.viewModel.effects.test {
+            harness.viewModel.onAction(PluginSettingsAction.Update("zhihu"))
+            advanceUntilIdle()
+            assertEquals(PluginSettingsEffect.OpenUnknownSourcesSettings, awaitItem())
+        }
+        assertEquals(0, harness.installer.calls)
+    }
+
+    @Test
+    fun updateProgressBlocksDuplicateAndOtherInstallsAndFailureCanRetry() = runTest {
+        val gate = CompletableDeferred<Unit>()
+        val installer = FakePackageInstaller(failure = PluginInstallFailure.NETWORK).apply { downloadGate = gate }
+        val harness = updateHarness(installer = installer)
+        collectUiState(harness.viewModel)
+        advanceUntilIdle()
+        harness.viewModel.onAction(PluginSettingsAction.Update("zhihu"))
+        runCurrent()
+        assertEquals("zhihu", harness.viewModel.uiState.value.installingEntryKey)
+        assertEquals(PluginInstallUiState.Downloading(0.8f), harness.viewModel.uiState.value.items.first().installState)
+        harness.viewModel.onAction(PluginSettingsAction.Update("zhihu"))
+        harness.viewModel.onAction(PluginSettingsAction.Install("spotify"))
+        runCurrent()
+        assertEquals(1, installer.calls)
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(PluginInstallUiState.Failed(PluginInstallFailure.NETWORK), harness.viewModel.uiState.value.items.first().installState)
+        assertNull(harness.viewModel.uiState.value.installingEntryKey)
+        installer.failure = null
+        harness.viewModel.effects.test {
+            harness.viewModel.onAction(PluginSettingsAction.Update("zhihu"))
+            advanceUntilIdle()
+            assertEquals(PluginSettingsEffect.LaunchInstaller("content://plugins/apk/zhihu"), awaitItem())
+        }
+        assertEquals(2, installer.calls)
+    }
+
+    @Test
+    fun installActionCannotReinstallAnAlreadyInstalledPlugin() = runTest {
+        val harness = updateHarness()
+        collectUiState(harness.viewModel)
+        advanceUntilIdle()
+        harness.viewModel.onAction(PluginSettingsAction.Install("zhihu"))
+        advanceUntilIdle()
+        assertEquals(0, harness.installer.calls)
+    }
+
+    private fun updateHarness(
+        entry: PluginCatalogEntry = catalogEntry("zhihu", "知乎").copy(versionCode = 61L, versionName = "1.1.0"),
+        environment: FakeInstallEnvironment = FakeInstallEnvironment(),
+        installer: FakePackageInstaller = FakePackageInstaller(),
+    ) = harness(
+        pluginRepository = FakePluginRepository().apply {
+            pluginsFlow.value = listOf(installedZhihu.copy(
+                packageName = "github.ponyhuang.gimi.plugin.zhihu", versionCode = 60L, versionName = "1.0.0", isEnabled = false,
+            ))
+        },
+        catalogLoad = defaultCatalog.copy(entries = listOf(entry, catalogEntry("spotify", "Spotify"))),
+        environment = environment,
+        installer = installer,
+    )
+
     // ------------------------------------------------------------------
     // Harness
     // ------------------------------------------------------------------
@@ -390,16 +506,22 @@ class PluginSettingsViewModelTest {
     }
 
     private class FakePackageInstaller(
-        private val failure: PluginInstallFailure? = null,
+        var failure: PluginInstallFailure? = null,
     ) : PluginPackageInstaller {
         var calls: Int = 0
+        var lastRequest: Pair<String, Long?>? = null
+        var downloadGate: CompletableDeferred<Unit>? = null
 
         override suspend fun downloadAndVerify(
             asset: PluginReleaseAsset,
+            packageName: String,
+            versionCode: Long?,
             onProgress: (Float) -> Unit,
         ): String {
             calls += 1
+            lastRequest = packageName to versionCode
             onProgress(0.8f)
+            downloadGate?.await()
             failure?.let { throw PluginPackageInstallException(it) }
             return "apk/${asset.name.substringBefore('.')}"
         }

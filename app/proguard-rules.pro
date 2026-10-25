@@ -172,6 +172,37 @@
 # 剥掉，插件加载即抛 NoSuchMethodError。这里显式保留所有 <init>，补齐插件 ABI。
 -keepclassmembers class com.google.adk.kt.** { <init>(...); }
 
+# A2A 线协议 SDK（a2a-java，google-adk-kotlin-a2a 的底层依赖）。AgentCard 等请求/
+# 响应 record 由 Gson 反射序列化，改名或收缩都会让 JSON-RPC 载荷与字段名错位；
+# 与 com.google.adk.kt.** 的处理一致，整个包禁用改名并保留成员。
+-keep class org.a2aproject.sdk.** { *; }
+# proto-google-common-protos / protobuf 运行时会被描述符注册与 JsonFormat 反射读取：
+# a2a.proto 引用 google.api.FieldBehavior 字段注解扩展（注册时反射查枚举 valueOf），
+# A2A 消息 metadata 等 well-known 类型（Struct/Value/Any…）在解析时反射调 newBuilder。
+# 丢失即 release 运行时 IllegalStateException（首次为闪退，后被聊天失败态捕获）。
+# 本仓库 packaging 排除了 META-INF/proguard/**，protobuf 自带 consumer 规则不生效，
+# 需手工整体保留；proto-google-common-protos 生成类一并保留。
+-keep class com.google.protobuf.** { *; }
+-keep class !com.google.api.client.**,com.google.api.** { *; }
+-keep class com.google.rpc.** { *; }
+-keep class com.google.type.** { *; }
+-keep class com.google.logging.type.** { *; }
+-keep class com.google.longrunning.** { *; }
+-keep class com.google.geo.type.** { *; }
+# a2a-java 的可选 HTTP 传输实现（vertx）在 compileOnly/provided scope，运行时不存在，
+# 类路径扫描时的引用由 R8 忽略即可；spec-grpc 生成代码以 provided scope 引用
+# io.grpc/javax.annotation，JSON-RPC 路径不触达，一并忽略。
+-dontwarn org.a2aproject.sdk.client.http.vertx.**
+-dontwarn io.vertx.**
+-dontwarn io.grpc.**
+-dontwarn javax.annotation.**
+# JdkA2AHttpClient 被 keep 规则保留，其方法体引用桌面 JVM 的 java.net.http（Android
+# 无此类）：应用路径永远注入 AndroidA2AHttpClient，JdkA2AHttpClient 不会被实例化或
+# 加载，缺失类可安全忽略。org.mapstruct.* 是 spec-grpc 生成 mapper 引用的 provided
+# 注解，运行时反射不读取，同样忽略。
+-dontwarn java.net.http.**
+-dontwarn org.mapstruct.**
+
 # Official Android MCP checks these compileOnly runtime dependencies with
 # Class.forName through a loader lambda before creating its Toolset. The ADK
 # tools keep rule above does not make the external SDK/engine classes keep

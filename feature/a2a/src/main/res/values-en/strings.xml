@@ -1,0 +1,48 @@
+<resources>
+    <!-- Route titles (injected by :app into SettingsScaffold) -->
+    <string name="a2a_list_title">A2A</string>
+    <string name="a2a_add_agent">Add A2A agent</string>
+    <string name="a2a_edit_agent">Edit A2A agent</string>
+
+    <!-- RemoteAgentListScreen -->
+    <string name="a2a_empty_title">No A2A agents yet</string>
+    <string name="a2a_empty_subtitle">Add an A2A agent so the assistant can delegate tasks to it.</string>
+    <string name="a2a_empty_action_new">New A2A agent</string>
+    <string name="a2a_more_action">More actions</string>
+    <string name="a2a_edit_action">Edit</string>
+    <string name="a2a_agent_mutation_blocked">The assistant is running; change A2A agent settings later</string>
+
+    <!-- RemoteAgentEditorScreen -->
+    <string name="a2a_section_basic_info">Basics</string>
+    <string name="a2a_field_name_required">Name *</string>
+    <string name="a2a_field_name_placeholder">e.g. weather_agent</string>
+    <string name="a2a_field_endpoint_required">Agent URL *</string>
+    <string name="a2a_field_endpoint_placeholder">https://example.com/a2a/agent  or  http://192.168.1.8:8001</string>
+    <string name="a2a_field_bearer_token_optional">Bearer token (optional)</string>
+    <string name="a2a_field_enable_agent">Enable this agent</string>
+    <string name="a2a_field_enable_subtitle">When disabled, the assistant will not delegate tasks to it</string>
+    <string name="a2a_token_show">Show token</string>
+    <string name="a2a_token_hide">Hide token</string>
+    <string name="a2a_save">Save</string>
+    <string name="a2a_save_success">A2A agent saved</string>
+    <string name="a2a_connection_testing">Testing connection…</string>
+    <string name="a2a_connection_error_default">Cannot reach the A2A agent, please check the URL</string>
+    <string name="a2a_save_error_default">Failed to save the A2A agent, please retry</string>
+    <string name="a2a_cancel">Cancel</string>
+    <string name="a2a_delete_agent">Delete this A2A agent</string>
+    <string name="a2a_delete_confirm_title">Delete A2A agent</string>
+    <string name="a2a_delete_confirm_message">Delete “%1$s”? The assistant will no longer be able to delegate tasks to it.</string>
+    <string name="a2a_delete_confirm_action">Delete</string>
+
+    <!-- Agent card detail section (RemoteAgentCardDetailSection) and test connection -->
+    <string name="a2a_card_test_action">Test connection</string>
+    <string name="a2a_card_section_title">Agent card</string>
+    <string name="a2a_card_capability_streaming">Streaming</string>
+    <string name="a2a_card_capability_push">Push notifications</string>
+    <string name="a2a_card_capability_extended">Extended card</string>
+    <string name="a2a_card_skill_label">Skill</string>
+    <string name="a2a_card_input_output">Input / output</string>
+    <string name="a2a_card_provider">Provider</string>
+    <string name="a2a_card_docs">Docs</string>
+    <string name="a2a_card_protocol_value">protocol %1$s</string>
+</resources>

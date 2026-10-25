@@ -3,6 +3,9 @@
     <string name="recommendation_settings_section">Recommendation updates</string>
     <string name="recommendation_enabled_title">Enable smart recommendations</string>
     <string name="recommendation_enabled_subtitle">Show Agent-generated tasks in empty conversations</string>
+    <string name="recommendation_fast_model_required_title">Fast model required</string>
+    <string name="recommendation_fast_model_required_text">Recommendations are generated with the fast model. Select one in Settings → Model Service → Default models before enabling smart recommendations.</string>
+    <string name="recommendation_fast_model_required_configure">Configure</string>
     <string name="recommendation_interval_title">Update interval</string>
     <string name="recommendation_interval_value">About %1$d hours</string>
     <string name="recommendation_refresh_now">Update now</string>

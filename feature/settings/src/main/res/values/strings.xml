@@ -14,6 +14,8 @@
     <string name="settings_default_model_subtitle">配置各项功能的默认模型</string>
 
     <string name="settings_mcp_title">MCP</string>
+    <string name="settings_remote_agents_title">A2A</string>
+    <string name="settings_remote_agents_subtitle">接入 A2A 协议的智能体</string>
     <string name="settings_mcp_subtitle">连接远程工具服务</string>
 
     <string name="settings_plugins_title">插件</string>
@@ -22,8 +24,6 @@
     <string name="settings_skills_title">Skills</string>
     <string name="settings_skills_subtitle">安装Skills</string>
 
-    <string name="settings_work_files_title">文件夹</string>
-    <string name="settings_work_files_subtitle">授权助手访问本机文件夹</string>
     <string name="settings_workspace_title">缓存区</string>
     <string name="settings_workspace_subtitle">管理聊天附件文件</string>
 
@@ -87,4 +87,6 @@
     <string name="settings_group_assistant">助手偏好</string>
     <string name="settings_group_permissions">权限与设备</string>
     <string name="settings_group_about">关于</string>
+    <string name="settings_appfunction_title">AppFunciton</string>
+    <string name="settings_appfunction_subtitle">发现并使用应用提供的功能</string>
 </resources>

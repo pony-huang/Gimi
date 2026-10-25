@@ -13,7 +13,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.DockedSearchBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,8 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
+import github.ponyhuang.gimi.ui.components.GimiSearchField
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
-import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
@@ -75,7 +74,6 @@ fun ToolAuthorizationConfigurationScreen(
             if (state.isMutationBlocked) {
                 PreferenceBanner(
                     text = stringResource(R.string.toolauth_agent_mutation_blocked),
-                    tone = PreferenceBannerTone.Error,
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
@@ -144,15 +142,12 @@ private fun SearchAndFilterRow(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    DockedSearchBar(
-        query = state.query,
-        onQueryChange = { onAction(ToolAuthorizationConfigurationAction.Search(it)) },
+    GimiSearchField(
+        value = state.query,
+        onValueChange = { onAction(ToolAuthorizationConfigurationAction.Search(it)) },
         onSearch = { onAction(ToolAuthorizationConfigurationAction.Search(it)) },
-        active = false,
-        onActiveChange = { },
         modifier = modifier.fillMaxWidth(),
         placeholder = { Text(stringResource(R.string.toolauth_search_label)) },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
         trailingIcon = {
             Box {
                 IconButton(onClick = { expanded = true }) {
@@ -190,8 +185,7 @@ private fun SearchAndFilterRow(
                 }
             }
         },
-    ) {
-    }
+    )
 }
 
 private fun ToolAuthorizationFilter.labelRes(): Int = when (this) {

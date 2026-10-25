@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.mcp.model.McpToolParameter
 import github.ponyhuang.gimi.domain.mcp.model.McpToolSummary
 import github.ponyhuang.gimi.domain.mcp.model.parameters
+import github.ponyhuang.gimi.ui.components.FunctionIcon
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
@@ -109,7 +109,7 @@ private fun McpToolCard(tool: McpToolSummary, expanded: Boolean, onToggle: () ->
     PreferenceGroupCard {
         Column(Modifier.fillMaxWidth()) {
             PreferenceListItem(
-                icon = Icons.Default.Build,
+                leadingIcon = { FunctionIcon(it) },
                 iconSize = 24.dp,
                 title = tool.name,
                 subtitle = if (expanded) null else tool.description,

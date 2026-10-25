@@ -115,6 +115,10 @@ fun ChatRoute(
                         R.string.chat_notice_mcp_server_skipped,
                         notice.serverName,
                     )
+                    is ChatNotice.RemoteAgentSkipped -> context.getString(
+                        R.string.chat_notice_remote_agent_skipped,
+                        notice.agentName,
+                    )
                     ChatNotice.MemorySearchFailed -> chatNoticeMemorySearchFailed
                     ChatNotice.MemoryWriteFailed -> chatNoticeMemoryWriteFailed
                     is ChatNotice.Message -> notice.text

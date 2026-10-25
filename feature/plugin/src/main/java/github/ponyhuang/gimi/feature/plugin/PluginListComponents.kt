@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.feature.plugin
 
+import android.content.res.Configuration
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +14,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,13 +26,16 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.plugin.model.LocalizedText
 import github.ponyhuang.gimi.domain.plugin.model.PluginInstallFailure
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /** 目录 iconKey 到宿主内置矢量图的映射；未知 key 回退通用插件图标。 */
 internal fun pluginStoreIconResource(iconKey: String): Int = when (iconKey) {
+    "netease" -> R.drawable.ic_plugin_netease
     "spotify" -> R.drawable.ic_plugin_spotify
     "zhihu" -> R.drawable.ic_plugin_zhihu
     "v2ex" -> R.drawable.ic_plugin_v2ex
@@ -82,9 +87,9 @@ internal fun PluginIcon(
 }
 
 /**
- * 未安装条目的安装操作区。
+ * 未安装条目的安装操作区，以及已安装条目的更新操作区。
  *
- * 未安装显示安装按钮；下载/解析中显示进度；失败显示可重试的错误。
+ * 按条目状态显示安装/更新按钮；下载/解析中显示进度；失败显示可重试的错误。
  */
 @Composable
 internal fun PluginInstallAction(
@@ -100,20 +105,20 @@ internal fun PluginInstallAction(
                 enabled = enabled,
                 modifier = modifier.heightIn(min = 36.dp),
             ) {
-                Text(stringResource(R.string.plugin_list_install))
+                Text(stringResource(if (entry.isInstalled) R.string.plugin_list_update else R.string.plugin_list_install))
             }
         }
 
         PluginInstallUiState.Resolving -> InstallProgress(
             progress = null,
-            label = stringResource(R.string.plugin_list_installing),
+            label = stringResource(if (entry.isInstalled) R.string.plugin_list_update_resolving else R.string.plugin_list_installing),
             modifier = modifier,
         )
 
         is PluginInstallUiState.Downloading -> InstallProgress(
             progress = state.progress,
             label = stringResource(
-                R.string.plugin_list_downloading,
+                if (entry.isInstalled) R.string.plugin_list_update_downloading else R.string.plugin_list_downloading,
                 (state.progress * 100).toInt().coerceIn(0, 100),
             ),
             modifier = modifier,
@@ -124,13 +129,17 @@ internal fun PluginInstallAction(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                text = stringResource(pluginInstallFailureMessage(state.failure)),
+                text = stringResource(
+                    if (entry.isInstalled && state.failure == PluginInstallFailure.NETWORK)
+                        R.string.plugin_list_update_network
+                    else pluginInstallFailureMessage(state.failure),
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
                 maxLines = 2,
             )
             TextButton(onClick = onInstall, enabled = enabled) {
-                Text(stringResource(R.string.plugin_list_retry))
+                Text(stringResource(if (entry.isInstalled) R.string.plugin_list_update_retry else R.string.plugin_list_retry))
             }
         }
     }
@@ -171,5 +180,18 @@ internal fun pluginInstallFailureMessage(failure: PluginInstallFailure): Int = w
     PluginInstallFailure.NO_RELEASE_ASSET -> R.string.plugin_list_install_no_asset
     PluginInstallFailure.PACKAGE_TOO_LARGE -> R.string.plugin_list_install_too_large
     PluginInstallFailure.STORAGE -> R.string.plugin_list_install_storage
+    PluginInstallFailure.INVALID_PACKAGE -> R.string.plugin_list_install_invalid_package
+    PluginInstallFailure.NOT_AN_UPDATE -> R.string.plugin_list_not_an_update
     PluginInstallFailure.UNKNOWN -> R.string.plugin_list_install_unknown
+}
+
+@Preview(name = "网易云品牌图标 · 浅色", showBackground = true)
+@Preview(name = "网易云品牌图标 · 深色", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun NeteasePluginIconPreview() {
+    AsssistantaiTheme {
+        Surface {
+            PluginIcon(iconKey = "netease", size = 56.dp)
+        }
+    }
 }

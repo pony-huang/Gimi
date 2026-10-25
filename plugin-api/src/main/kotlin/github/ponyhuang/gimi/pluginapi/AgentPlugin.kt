@@ -29,7 +29,7 @@ interface AgentPlugin : Plugin {
     /** ADK [Plugin] 要求的唯一名称；默认取 [pluginId]，作者通常无需覆写。 */
     override val name: String get() = pluginId
 
-    /** 插件自身版本，供宿主做启用/升级判断。 */
+    /** 插件自身行为版本；APK 覆盖更新由 Android versionCode 判断。 */
     val version: Int
 
     /** 插件向 Agent 声明的工具总数；动态 Toolset 插件应覆盖此值供宿主展示。 */

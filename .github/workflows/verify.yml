@@ -41,7 +41,7 @@ jobs:
 
       - name: Unit tests
         timeout-minutes: 15
-        # 插件实例和 E2B SDK 只编译，不运行测试；宿主的插件管理与协议测试仍保留。
+        # 既有插件实例和 E2B SDK 仅编译；网易云 HTTP 边界及宿主插件管理测试保留。
         run: |
           ./gradlew testDebugUnitTest \
             :domain:sandbox:test \
@@ -59,7 +59,7 @@ jobs:
           ./gradlew :app:assembleDebug \
             :plugins:zhihu:compileDebugKotlin :plugins:spotify:compileDebugKotlin \
             :plugins:xiaohongshu:compileDebugKotlin :plugins:v2ex:compileDebugKotlin \
-            :plugins:weibo:compileDebugKotlin \
+            :plugins:weibo:compileDebugKotlin :plugins:netease:compileDebugKotlin \
             --max-workers=2 --console=plain --stacktrace
 
       - name: Lint

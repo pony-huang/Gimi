@@ -40,6 +40,7 @@ class AgentExecutionService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
     private var wakeLock: PowerManager.WakeLock? = null
+    private var latestStartId = 0
     private val notificationManager by lazy {
         getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     }
@@ -47,15 +48,6 @@ class AgentExecutionService : Service() {
     override fun onCreate() {
         super.onCreate()
         ensureNotificationChannel()
-        acquireWakeLock()
-
-        val notification = createNotification(getString(R.string.agent_execution_phase_generating))
-        ServiceCompat.startForeground(
-            this,
-            NOTIFICATION_ID,
-            notification,
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
-        )
 
         serviceScope.launch {
             runtimeGate.state.collect { state ->
@@ -66,7 +58,8 @@ class AgentExecutionService : Service() {
                         notificationManager.notify(NOTIFICATION_ID, createNotification(text))
                     }
                     AgentRuntimeState.Idle -> {
-                        stopSelf()
+                        // onCreate 可能早于启动请求送达；旧请求不能停止已排队的新请求。
+                        if (latestStartId != 0) stopSelfResult(latestStartId)
                     }
                 }
             }
@@ -74,8 +67,19 @@ class AgentExecutionService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // 每个前台启动请求都先履约，短任务结束或复用服务实例时也不能跳过。
+        val phase = (runtimeGate.state.value as? AgentRuntimeState.Busy)
+            ?.tasks?.lastOrNull()?.phase ?: AgentTaskPhase.GENERATING
+        ServiceCompat.startForeground(
+            this,
+            NOTIFICATION_ID,
+            createNotification(phaseToText(phase)),
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+        )
+        latestStartId = startId
+        acquireWakeLock()
         if (runtimeGate.state.value is AgentRuntimeState.Idle) {
-            stopSelf()
+            stopSelfResult(startId)
         }
         return START_NOT_STICKY
     }
@@ -90,6 +94,7 @@ class AgentExecutionService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
         try {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
             wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKELOCK_TAG).apply {
@@ -168,15 +173,6 @@ class AgentExecutionService : Service() {
                 ContextCompat.startForegroundService(context, intent)
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to start AgentExecutionService", e)
-            }
-        }
-
-        fun stop(context: Context) {
-            try {
-                val intent = Intent(context, AgentExecutionService::class.java)
-                context.stopService(intent)
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to stop AgentExecutionService", e)
             }
         }
     }

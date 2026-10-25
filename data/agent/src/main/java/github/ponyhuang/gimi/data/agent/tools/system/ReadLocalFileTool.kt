@@ -88,15 +88,15 @@ class ReadLocalFileTool @Inject constructor(
         if (uri == null || uri.scheme != "content" || !isAllowedUri(uri, contentUri)) {
             return error(NOT_ALLOWED_MESSAGE)
         }
-        // MediaStore URI 的直读依赖运行时媒体权限；文档目录走 SAF 授权，无需该检查。
+        // MediaStore URI 的直读依赖运行时媒体权限；共享存储 URI 在提供方内部检查所有文件访问权限。
         val mediaPermission = requiredMediaPermission(uri)
-        if (mediaPermission != null &&
+        if (mediaPermission != null && !documentSearch.hasAccess() &&
             appContext.checkSelfPermission(mediaPermission) !=
             android.content.pm.PackageManager.PERMISSION_GRANTED
         ) {
             return error(
                 "Media permission is required to read this file. Call " +
-                    "request_media_file_permissions and ask the user to grant access, then retry.",
+                    "request_file_search_access and ask the user to grant access, then retry.",
             )
         }
         val displayName = resolveDisplayName(uri)
@@ -298,8 +298,8 @@ class ReadLocalFileTool @Inject constructor(
         const val MAX_INLINE_BYTES: Int = 20 * 1024 * 1024
 
         const val NOT_ALLOWED_MESSAGE =
-            "contentUri is not an accessible media result or a file from an authorized " +
-                "document directory. Only identifiers returned by search_media_files or " +
+            "contentUri is not an accessible media result or a file in shared external " +
+                "storage. Only identifiers returned by search_media_files or " +
                 "search_documents are accepted."
         const val UNREADABLE_MESSAGE =
             "The file could not be read. It may have been moved or deleted; search again to " +

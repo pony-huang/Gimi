@@ -1,7 +1,7 @@
 <resources>
     <string name="modelsettings_api_key_label">API key</string>
-    <string name="modelsettings_api_key_test">Test</string>
-    <string name="modelsettings_api_key_get_key">Click here to get an API key</string>
+    <string name="modelsettings_api_key_test">Test connection</string>
+    <string name="modelsettings_api_key_get_key">Get an API key ↗</string>
     <string name="modelsettings_api_key_hide">Hide key</string>
     <string name="modelsettings_api_key_show">Show key</string>
 
@@ -25,23 +25,25 @@
 
     <string name="modelsettings_section_connection">Connection</string>
     <string name="modelsettings_section_official_tools">Official tools</string>
-    <string name="modelsettings_official_tools_enabled">Enable official tools</string>
-    <string name="modelsettings_official_tools_enabled_summary">Allow independent API tools provided by this service in chats.</string>
+    <string name="modelsettings_official_tools_enabled">Show provider tools in chat</string>
+    <string name="modelsettings_official_tools_enabled_summary">When enabled, tools supported by %1$s appear in the chat tools panel. They are not called automatically.</string>
     <string name="modelsettings_official_tools_deepseek_summary">Enable DeepSeek web search for current information and web fetch to read page content. These tools can also be used by other models.</string>
     <string name="modelsettings_key_url_missing">API key help URL is not configured</string>
     <string name="modelsettings_no_browser">No browser available</string>
     <string name="modelsettings_notice_service_not_found">Service not found</string>
     <string name="modelsettings_notice_connection_succeeded">Connection succeeded</string>
-    <string name="modelsettings_notice_connection_failed">Connection failed</string>
-    <string name="modelsettings_notice_models_synchronized">Synced %1$d models from the remote catalog</string>
+    <string name="modelsettings_notice_connection_failed">Connection failed. Check the key, API address, or network and retry.</string>
+    <string name="modelsettings_notice_models_synchronized">Fetched %1$d models</string>
     <string name="modelsettings_notice_models_sync_failed">Failed to sync remote models</string>
 
-    <string name="modelsettings_list_section_configured">Configured services</string>
+    <string name="modelsettings_list_section_configured">Added services</string>
     <string name="modelsettings_list_load_failed">Failed to load the model catalog</string>
 
-        <string name="modelsettings_defaults_section_chat">Chat</string>
-    <string name="modelsettings_defaults_section_stt">STT</string>
-    <string name="modelsettings_defaults_section_tts">TTS</string>
+    <!-- Model kind group names shared by default model settings, service model list and the add-model dialog -->
+    <string name="modelsettings_model_kind_chat">Chat</string>
+    <string name="modelsettings_model_kind_stt">STT</string>
+    <string name="modelsettings_model_kind_tts">TTS</string>
+
     <string name="modelsettings_defaults_online_only_note">Online API models only</string>
 <string name="modelsettings_defaults_assistant_title">Default assistant model</string>
     <string name="modelsettings_defaults_assistant_subtitle">Model used when creating a new assistant</string>
@@ -61,10 +63,6 @@
     <string name="modelsettings_dialog_no_voices">No voices available</string>
     <string name="modelsettings_dialog_no_models">No models available. Please enable at least one model in Model Services first.</string>
 
-    <string name="modelsettings_new_model_chat">Chat model</string>
-    <string name="modelsettings_new_model_stt">Speech recognition model (STT)</string>
-    <string name="modelsettings_new_model_tts">Speech synthesis model (TTS)</string>
-
     <!-- Navigation screen titles (consumed by :app SettingsScaffold) -->
     <string name="modelsettings_list_title">API access</string>
     <string name="modelsettings_defaults_screen_title">Default models</string>
@@ -75,4 +73,75 @@
     <string name="modelsettings_service_configured_count">Configured · %1$d models</string>
     <string name="modelsettings_service_open">Open %1$s settings</string>
     <string name="modelsettings_key_testing">Testing…</string>
+
+    <!-- Service configuration workflow -->
+    <string name="modelsettings_add_service">Add service</string>
+    <string name="modelsettings_provider_added">Added · Tap to edit</string>
+    <string name="modelsettings_service_paused_count">Paused · %1$d models</string>
+    <string name="modelsettings_empty_title">Connect your first service</string>
+    <string name="modelsettings_empty_summary">Tap + in the top right to add a service</string>
+    <string name="modelsettings_search_provider">Search providers</string>
+    <string name="modelsettings_choose_provider">Choose a provider</string>
+    <string name="modelsettings_no_matches">No matching items</string>
+    <string name="modelsettings_list_hint">Tap a service to edit its connection, models, and extensions.</string>
+    <string name="modelsettings_select_models">Choose models</string>
+    <string name="modelsettings_extensions">Extensions</string>
+    <string name="modelsettings_extensions_summary">Configure provider tools in chat</string>
+    <string name="modelsettings_api_protocol_anthropic_label">Anthropic Messages</string>
+    <string name="modelsettings_saving">Saving…</string>
+    <string name="modelsettings_confirm_models">Confirm · %1$d models</string>
+    <string name="modelsettings_save_changes">Save changes</string>
+    <string name="modelsettings_new_service_hint">Configuration takes effect after adding the service</string>
+    <string name="modelsettings_paused_hint">Paused · Connection, models, and tool preferences are retained</string>
+    <string name="modelsettings_saved_hint">Configured · Changes take effect after saving</string>
+    <string name="modelsettings_manage_models">Manage models</string>
+    <string name="modelsettings_no_selected_models">No models added yet</string>
+    <string name="modelsettings_selected_model_count">%1$d models selected</string>
+    <string name="modelsettings_manage_service">Manage service</string>
+    <string name="modelsettings_pause_service">Pause service</string>
+    <string name="modelsettings_resume_service">Resume service</string>
+    <string name="modelsettings_save_before_manage">Save or discard changes before pausing or resuming the service.</string>
+    <string name="modelsettings_delete_service">Delete service</string>
+    <string name="modelsettings_delete_summary">Delete the API key, connection settings, and model selection. Unsaved changes will also be discarded. You can add the service again later.</string>
+    <string name="modelsettings_unsaved_title">Save changes?</string>
+    <string name="modelsettings_unsaved_summary">These changes have not been saved. Save before leaving?</string>
+    <string name="modelsettings_discard">Discard</string>
+    <string name="modelsettings_continue_editing">Keep editing</string>
+    <string name="modelsettings_saved">Service configuration saved</string>
+    <string name="modelsettings_deleted">Service deleted</string>
+    <string name="modelsettings_invalid_connection">Enter an API key and a valid HTTP or HTTPS API address.</string>
+    <string name="modelsettings_write_failed">The operation failed. The original configuration is unchanged. Please retry.</string>
+    <string name="modelsettings_no_remote_models">No models returned. Keep the current selection or add models manually.</string>
+    <string name="modelsettings_model_selection_hint">Choose models to use after saving the service. Going back cancels this model selection.</string>
+    <string name="modelsettings_fetch_models">Fetch models</string>
+    <string name="modelsettings_manual_model">＋ Add manually</string>
+    <string name="modelsettings_search_model">Search models</string>
+    <string name="modelsettings_fetch_hint">Fetching models preserves selections and does not change the saved service.</string>
+    <string name="modelsettings_provider_tools">Provider tools</string>
+    <string name="modelsettings_tools_limits">Available tools depend on the protocol and model. Separate API tools may incur provider charges.</string>
+    <string name="modelsettings_supported_capabilities">Supported capabilities</string>
+    <string name="modelsettings_tool_search">Web search</string>
+    <string name="modelsettings_tool_fetch">Web fetch</string>
+    <string name="modelsettings_tool_image">Image generation</string>
+    <string name="modelsettings_tool_url">URL context</string>
+    <string name="modelsettings_tool_maps">Google Maps</string>
+    <string name="modelsettings_tool_glm">Web search and reader</string>
+    <string name="modelsettings_tool_formulas">Kimi formula tools</string>
+    <string name="modelsettings_tool_cross_model">Can be used by other chat models.</string>
+    <string name="modelsettings_tool_native">Availability is limited by the current protocol and model.</string>
+    <string name="modelsettings_tools_save_hint">Return to the service and save to apply changes. Pausing preserves this preference.</string>
+    <string name="modelsettings_connection_options">API settings</string>
+    <string name="modelsettings_expand_connection">Expand API settings</string>
+    <string name="modelsettings_collapse_connection">Collapse API settings</string>
+    <string name="modelsettings_section_features">Features</string>
+    <string name="modelsettings_section_files">Files</string>
+    <string name="modelsettings_section_tools">Tools</string>
+    <string name="modelsettings_provider_tools_summary">Choose tools from the chat tools panel</string>
+    <string name="modelsettings_model_selection_count">%1$d total · %2$d selected</string>
+    <string name="modelsettings_model_type_count">%1$s · %2$d</string>
+    <string name="modelsettings_select_all">Select all</string>
+    <string name="modelsettings_clear_selection">Clear</string>
+    <string name="modelsettings_no_model_candidates">Refresh models or add one manually using the buttons in the top right.</string>
+    <string name="modelsettings_service_model_count">%1$d models</string>
+    <string name="modelsettings_service_enabled_label">Enable %1$s</string>
 </resources>

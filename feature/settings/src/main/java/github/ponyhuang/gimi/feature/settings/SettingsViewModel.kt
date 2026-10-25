@@ -19,10 +19,11 @@ class SettingsViewModel @Inject constructor() : ViewModel() {
             SettingsAction.OpenModelService -> emitEffect(SettingsEffect.NavigateToModelService)
             SettingsAction.OpenDefaultModels -> emitEffect(SettingsEffect.NavigateToDefaultModels)
             SettingsAction.OpenMcpServers -> emitEffect(SettingsEffect.NavigateToMcpServers)
+            SettingsAction.OpenRemoteAgents -> emitEffect(SettingsEffect.NavigateToRemoteAgents)
+            SettingsAction.OpenAppFunctions -> emitEffect(SettingsEffect.NavigateToAppFunctions)
             SettingsAction.OpenSandbox -> emitEffect(SettingsEffect.NavigateToSandbox)
             SettingsAction.OpenPlugins -> emitEffect(SettingsEffect.NavigateToPlugins)
             SettingsAction.OpenSkills -> emitEffect(SettingsEffect.NavigateToSkills)
-            SettingsAction.OpenWorkFiles -> emitEffect(SettingsEffect.NavigateToWorkFiles)
             SettingsAction.OpenWorkspace -> emitEffect(SettingsEffect.NavigateToWorkspace)
             SettingsAction.OpenPermissions -> emitEffect(SettingsEffect.NavigateToPermissions)
             SettingsAction.OpenToolAuthorization ->

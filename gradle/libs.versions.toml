@@ -1,6 +1,8 @@
 [versions]
 agp = "9.4.0"
 anthropicJava = "2.65.0"
+a2aJavaSdk = "1.3.2.Final"
+protobufJavaUtil = "4.35.0"
 coreKtx = "1.19.0"
 googleAdk = "1.4.0"
 pluginApi = "4"
@@ -8,6 +10,7 @@ gson = "2.14.0"
 hilt = "2.60"
 androidxHilt = "1.4.0"
 junit = "4.13.2"
+robolectric = "4.16.1"
 orgJson = "20240303"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
@@ -43,6 +46,8 @@ mlkitTextRecognition = "16.0.1"
 media3 = "1.11.1"
 
 [libraries]
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+androidx-appfunctions = { module = "androidx.appfunctions:appfunctions", version = "1.0.0-alpha11" }
 androidx-a2ui-engine = { module = "androidx.a2ui:a2ui-engine", version = "1.0.0-alpha01" }
 androidx-a2ui-model = { module = "androidx.a2ui:a2ui-model", version = "1.0.0-alpha01" }
 androidx-a2ui-compose-runtime = { module = "androidx.a2ui.compose:compose-runtime", version = "1.0.0-alpha01" }
@@ -66,6 +71,10 @@ androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "
 androidx-room-testing = { module = "androidx.room:room-testing", version.ref = "room" }
 anthropic-java = { module = "com.anthropic:anthropic-java", version.ref = "anthropicJava" }
 google-adk-kotlin-core = { module = "com.google.adk:google-adk-kotlin-core", version.ref = "googleAdk" }
+google-adk-kotlin-a2a = { module = "com.google.adk:google-adk-kotlin-a2a", version.ref = "googleAdk" }
+a2a-java-sdk-client = { module = "org.a2aproject.sdk:a2a-java-sdk-client", version.ref = "a2aJavaSdk" }
+a2a-java-sdk-http-client-android = { module = "org.a2aproject.sdk:a2a-java-sdk-http-client-android", version.ref = "a2aJavaSdk" }
+protobuf-java-util = { module = "com.google.protobuf:protobuf-java-util", version.ref = "protobufJavaUtil" }
 google-adk-kotlin-integrations-openai = { module = "com.google.adk:google-adk-kotlin-integrations-openai", version.ref = "googleAdk" }
 google-adk-kotlin-processor = { module = "com.google.adk:google-adk-kotlin-processor", version.ref = "googleAdk" }
 google-adk-kotlin-webserver = { module = "com.google.adk:google-adk-kotlin-webserver", version.ref = "googleAdk" }

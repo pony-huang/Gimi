@@ -22,6 +22,7 @@ import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationGenerationInput
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationSnapshot
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationGenerator
+import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationNotConfiguredException
 import github.ponyhuang.gimi.pluginapi.PluginJson
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
@@ -177,7 +178,9 @@ class AgentRecommendationGenerator @Inject constructor(
             input.copy(systemInstruction = AgentPrompts.defaultAssistantInstruction())
         val config = modelFactory.forRecommendationJson(
             modelFactory.selectFastModelConfig()
-                ?: error("Configure an OpenAI-compatible fast model for recommendation generation."),
+                ?: throw RecommendationNotConfiguredException(
+                    "Configure an OpenAI-compatible fast model for recommendation generation.",
+                ),
         )
         val model = modelFactory.createModel(config)
         val request = LlmRequest(

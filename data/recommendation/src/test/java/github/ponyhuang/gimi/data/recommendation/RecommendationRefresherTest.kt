@@ -15,6 +15,7 @@ import github.ponyhuang.gimi.domain.recommendation.model.RecommendationContext
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationCapabilitySource
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationContextSource
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationGenerator
+import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationNotConfiguredException
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -138,6 +139,20 @@ class RecommendationRefresherTest {
             fixture.preferences.markRetrying(30L, "No enabled model service with a configured model.")
         }
         assertEquals(listOf(30_000L), fixture.delays)
+    }
+
+    @Test
+    fun notConfiguredErrorFailsImmediatelyWithoutConsumingLadder() = runTest {
+        val fixture = Fixture()
+        coEvery { fixture.generator.generate(any()) } throws
+            RecommendationNotConfiguredException("Configure an OpenAI-compatible fast model.")
+
+        val outcome = fixture.refresher.refreshSafely()
+
+        assertEquals(RecommendationRefreshOutcome.Failure, outcome)
+        verify(exactly = 0) { fixture.preferences.markRetrying(any(), any()) }
+        verify { fixture.preferences.markFailed("Configure an OpenAI-compatible fast model.") }
+        assertTrue(fixture.delays.isEmpty())
     }
 
     @Test

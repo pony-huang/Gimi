@@ -12,7 +12,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
-@Preview(name = "音乐播放器 · Spotify 浅色", showBackground = true, widthDp = 390, heightDp = 170)
+@Preview(name = "音乐播放器 · Spotify 浅色", showBackground = true, widthDp = 390, heightDp = 430)
 @Composable
 private fun MusicPlayerSpotifyPreview() {
     MusicPlayerPreviewCanvas(darkTheme = false) {
@@ -29,7 +29,7 @@ private fun MusicPlayerSpotifyPreview() {
     name = "音乐播放器 · 网易云音乐 深色",
     showBackground = true,
     widthDp = 390,
-    heightDp = 170,
+    heightDp = 430,
     uiMode = Configuration.UI_MODE_NIGHT_YES,
 )
 @Composable
@@ -53,7 +53,7 @@ private fun MusicPlayerNetEasePreview() {
     name = "音乐播放器 · QQ音乐 窄屏",
     showBackground = true,
     widthDp = 280,
-    heightDp = 200,
+    heightDp = 520,
     fontScale = 1.3f,
 )
 @Composable
@@ -75,7 +75,7 @@ private fun MusicPlayerNarrowPreview() {
     }
 }
 
-@Preview(name = "音乐播放器 · Apple Music 无设备", showBackground = true, widthDp = 390, heightDp = 150)
+@Preview(name = "音乐播放器 · Apple Music 无设备", showBackground = true, widthDp = 390, heightDp = 430)
 @Composable
 private fun MusicPlayerApplePreview() {
     MusicPlayerPreviewCanvas(darkTheme = false) {
@@ -129,5 +129,13 @@ private fun musicPlayerPreviewData(
     deviceId = "preview-device",
     deviceName = deviceName,
     trackUrl = trackUrl,
+    isSaved = true,
+    shuffleEnabled = false,
+    repeatMode = "context",
+    canSeek = true,
+    canPrevious = true,
+    canShuffle = true,
+    canRepeat = true,
+    canSave = true,
     playbackContext = MusicPlaybackContext.NOW_PLAYING,
 )

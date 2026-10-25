@@ -25,7 +25,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -40,6 +39,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.ui.components.GimiListDefaults
+import github.ponyhuang.gimi.ui.components.GimiSwitch
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import github.ponyhuang.gimi.ui.theme.PreferenceCanvasDark
 import github.ponyhuang.gimi.ui.theme.PreferenceCanvasLight
@@ -153,10 +154,11 @@ fun PreferenceGroupCard(
  * @property iconSize 图标本身的尺寸；品牌图标可使用与容器相同的尺寸以保留原始外观。
  * @property subtitleMaxLines 说明文字的最大行数；需要完整解释功能的设置项可单独放宽。
  * @property onLongClick 长按行为；提供后行改为 combinedClickable，用于进入多选等模式。
+ * @param leadingIcon 自定义图标槽位；提供时以透明背景替换默认图标，沿用列表的对齐尺寸。
  */
 @Composable
 fun PreferenceListItem(
-    icon: ImageVector,
+    icon: ImageVector? = null,
     title: String,
     subtitle: String? = null,
     modifier: Modifier = Modifier,
@@ -164,18 +166,19 @@ fun PreferenceListItem(
     onLongClick: (() -> Unit)? = null,
     iconContainer: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) Color.Transparent else MaterialTheme.colorScheme.primary,
     iconTint: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) MaterialTheme.colorScheme.onSurfaceVariant else Color.White,
-    iconSize: Dp = 20.dp,
+    iconSize: Dp = GimiListDefaults.IconSize,
     showDivider: Boolean = false,
     subtitleMaxLines: Int = 2,
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
+    leadingIcon: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val compact = LocalPreferenceStyle.current == PreferenceStyle.Compact
-    val containerSize = if (compact) maxOf(24.dp, iconSize) else 34.dp
+    val containerSize = if (compact) maxOf(GimiListDefaults.LeadingSize, iconSize) else 34.dp
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = if (compact) 64.dp else 60.dp)
+                .heightIn(min = GimiListDefaults.MinHeight)
                 .then(
                     when {
                         onClick == null -> Modifier
@@ -187,16 +190,18 @@ fun PreferenceListItem(
                         )
                     },
                 )
-                .padding(horizontal = 16.dp, vertical = if (compact) 10.dp else 8.dp),
+                .padding(horizontal = GimiListDefaults.HorizontalPadding, vertical = GimiListDefaults.VerticalPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier = Modifier
                     .size(containerSize)
-                    .background(color = iconContainer, shape = CircleShape),
+                    .background(color = if (leadingIcon == null) iconContainer else Color.Transparent, shape = CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
+                if (leadingIcon != null) {
+                    leadingIcon(Modifier.size(24.dp))
+                } else if (icon != null) Icon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = iconTint,
@@ -206,7 +211,7 @@ fun PreferenceListItem(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = 16.dp, end = if (trailingContent == null) 0.dp else 8.dp),
+                    .padding(start = GimiListDefaults.ContentSpacing, end = if (trailingContent == null) 0.dp else 8.dp),
             ) {
                 Text(
                     text = title,
@@ -231,9 +236,9 @@ fun PreferenceListItem(
             }
         }
         if (showDivider) {
-            // 内缩到文字左缘（行内边距 16 + 圆形 34 + 间距 16）。
+            // 分隔线对齐文字左缘，品牌图标与普通图标共用槽位和间距。
             HorizontalDivider(
-                modifier = Modifier.padding(start = 32.dp + containerSize, end = 16.dp),
+                modifier = Modifier.padding(start = GimiListDefaults.HorizontalPadding + containerSize + GimiListDefaults.ContentSpacing, end = GimiListDefaults.HorizontalPadding),
                 color = if (compact) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
             )
         }
@@ -256,7 +261,7 @@ fun PreferenceSwitchItem(
     switchEnabled: Boolean = true,
     iconContainer: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) Color.Transparent else MaterialTheme.colorScheme.primary,
     iconTint: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) MaterialTheme.colorScheme.onSurfaceVariant else Color.White,
-    iconSize: Dp = 20.dp,
+    iconSize: Dp = GimiListDefaults.IconSize,
     showDivider: Boolean = false,
 ) {
     PreferenceListItem(
@@ -270,7 +275,7 @@ fun PreferenceSwitchItem(
         iconSize = iconSize,
         showDivider = showDivider,
         trailingContent = {
-            Switch(
+            GimiSwitch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
                 enabled = switchEnabled,

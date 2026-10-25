@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import github.ponyhuang.gimi.domain.workfiles.model.WorkFileSearchResult
 import github.ponyhuang.gimi.domain.workfiles.repository.DocumentSearchRepository
+import io.mockk.every
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -16,7 +17,9 @@ import org.junit.Test
 class FilesToolDocumentSearchTest {
     @Test
     fun searchDocumentsDelegatesToDomainRepositoryAndPreservesStructuredOutput() = runTest {
-        val repository = mockk<DocumentSearchRepository>()
+        val repository = mockk<DocumentSearchRepository> {
+            every { hasAccess() } returns true
+        }
         coEvery { repository.search("计划", 50) } returns listOf(
             WorkFileSearchResult(
                 contentUri = "content://documents/document/plan",
@@ -45,7 +48,9 @@ class FilesToolDocumentSearchTest {
             io.mockk.every { authority } returns "documents"
         }
         io.mockk.every { Uri.parse("content://documents/document/plan") } returns parsedUri
-        val repository = mockk<DocumentSearchRepository>()
+        val repository = mockk<DocumentSearchRepository> {
+            every { hasAccess() } returns true
+        }
         coEvery { repository.isAuthorized("content://documents/document/plan") } returns false
         val tool = FilesTool(mockk<Context>(relaxed = true), mockk(relaxed = true), repository)
 

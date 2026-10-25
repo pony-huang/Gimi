@@ -72,7 +72,7 @@ include(":data:workspace")
 include(":data:mobileuse")
 include(":feature:modelsettings")
 include(":feature:mcp")
-include(":feature:workfiles")
+include(":feature:a2a")
 include(":feature:permissions")
 include(":feature:toolauthorization")
 include(":feature:settings")
@@ -97,3 +97,12 @@ include(":plugins:weibo")
 
 include(":domain:a2ui")
 include(":data:a2ui")
+
+include(":domain:a2a")
+include(":data:a2a")
+
+include(":domain:appfunction")
+include(":data:appfunction")
+include(":feature:appfunction")
+
+include(":plugins:netease")

@@ -17,11 +17,13 @@ fun RecommendationEntryProvider(
     destination: NavKey,
     onBack: () -> Unit,
     onOpenPermissions: () -> Unit,
+    onOpenFastModelSettings: () -> Unit,
 ): Boolean = when (destination) {
     RecommendationDestination.Settings -> {
         RecommendationSettingsRoute(
             onBack = onBack,
             onOpenPermissions = onOpenPermissions,
+            onOpenFastModelSettings = onOpenFastModelSettings,
         )
         true
     }

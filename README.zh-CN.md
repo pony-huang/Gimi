@@ -193,3 +193,6 @@ Gimi 不收集任何数据：无统计埋点、无遥测、无账号，开发者
 ## 开发与发布流程
 
 参见[发布指南](spec/en/releasing.md)，了解 CI 验证、自动更新日志、版本 PR、签名配置和发布重试。
+
+正式版和调试版通过 ADB 启动 AppFunction 临时权限会话的步骤，参见
+[AppFunction 执行会话指南](spec/zh/appfunctions.md)。

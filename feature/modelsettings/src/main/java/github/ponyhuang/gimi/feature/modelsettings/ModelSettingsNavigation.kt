@@ -13,6 +13,10 @@ sealed interface ModelSettingsDestination : NavKey {
     @Serializable
     data object ServiceList : ModelSettingsDestination
 
+    /** 可添加的厂商目录。 */
+    @Serializable
+    data object ServiceProviders : ModelSettingsDestination
+
     /** Default models for each application role. */
     @Serializable
     data object Defaults : ModelSettingsDestination
@@ -37,6 +41,17 @@ fun ModelSettingsEntryProvider(
         ModelServiceListRoute(
             onBack = onBack,
             onNavigateToDetail = { navigate(ModelSettingsDestination.ServiceDetail(it)) },
+            onAddService = { navigate(ModelSettingsDestination.ServiceProviders) },
+        )
+        true
+    }
+
+    ModelSettingsDestination.ServiceProviders -> {
+        ModelServiceListRoute(
+            onBack = onBack,
+            onNavigateToDetail = { navigate(ModelSettingsDestination.ServiceDetail(it)) },
+            onAddService = {},
+            providerPicker = true,
         )
         true
     }

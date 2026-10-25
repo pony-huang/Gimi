@@ -10,7 +10,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
 VERSION = re.compile(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc\.([1-9]\d*))?')
-PLUGINS = ('spotify', 'zhihu', 'xiaohongshu', 'v2ex', 'weibo')
+PLUGINS = ('spotify', 'zhihu', 'xiaohongshu', 'v2ex', 'weibo', 'netease')
 PLUGIN_CATALOG = Path('data/plugin/src/main/assets/plugin_catalog.json')
 
 
@@ -45,7 +45,7 @@ def plugin_catalog(root):
         if any(not isinstance(tag, str) or not tag.strip() for tag in entry['tags']):
             raise ValueError(f'Invalid plugin tag: {key}')
         # 安装信息只能来自本次验证后的产物，避免人工目录残留旧版地址或摘要。
-        if any(entry.get(field) is not None for field in ('apkUrl', 'sha256', 'sizeBytes')):
+        if any(entry.get(field) is not None for field in ('apkUrl', 'sha256', 'sizeBytes', 'versionCode', 'versionName')):
             raise ValueError(f'Generated installation fields in source catalog: {key}')
     if set(keys) != set(PLUGINS):
         raise ValueError('Catalog must describe every released plugin')
@@ -59,8 +59,10 @@ def localized_text(value, key):
         raise ValueError(f'Missing localized plugin text: {key}')
 
 
-def write_plugin_subscription(root, destination, repository, version):
+def write_plugin_subscription(root, destination, repository, version, version_code):
     version_key(version)
+    if type(version_code) is not int or not 0 < version_code <= 2100000000:
+        raise ValueError('Invalid plugin APK versionCode')
     if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', repository):
         raise ValueError('Invalid release repository')
     catalog = plugin_catalog(root)
@@ -76,6 +78,8 @@ def write_plugin_subscription(root, destination, repository, version):
             apkUrl=f'https://github.com/{repository}/releases/download/v{version}/{name}',
             sha256=hashlib.sha256(apk.read_bytes()).hexdigest(),
             sizeBytes=apk.stat().st_size,
+            versionCode=version_code,
+            versionName=version,
         )
     (destination / 'plugin-subscription.json').write_text(
         json.dumps(catalog, ensure_ascii=False, indent=2) + '\n', encoding='utf-8',
@@ -202,7 +206,7 @@ def package(aapt, apksigner):
         'versionName': version, 'versionCode': code, 'commit': run('git', 'rev-parse', 'HEAD'),
         'certificateSha256': fingerprint,
     }, indent=2) + '\n')
-    write_plugin_subscription(ROOT, destination, os.environ['GITHUB_REPOSITORY'], version)
+    write_plugin_subscription(ROOT, destination, os.environ['GITHUB_REPOSITORY'], version, code)
     (destination / 'SHA256SUMS').write_text(''.join(
         f'{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n'
         for path in sorted(destination.iterdir()) if path.name != 'SHA256SUMS'))

@@ -12,10 +12,11 @@ import org.json.JSONObject
 internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
     spotifyTool(
         name = "spotify_now_playing",
-        description = "Show the currently playing track with progress, device, and volume info.",
+        description = "Show playback state including current track, progress, device, shuffle, repeat, and restrictions.",
         parameters = Schema(type = Type.OBJECT),
     ) {
-        val json = api.get("/me/player/currently-playing")
+        // 完整播放状态提供设备、随机与循环模式，供遥控卡片按真实能力启用控件。
+        val json = api.get("/me/player")
         if (json == null) {
             mapOf(SpotifyTool.RESULT_KEY to "Nothing is currently playing")
         } else {

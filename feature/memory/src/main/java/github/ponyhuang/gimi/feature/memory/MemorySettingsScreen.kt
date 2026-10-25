@@ -100,7 +100,7 @@ fun MemorySettingsScreen(
                         icon = mem0Icon,
                         iconContainer = Color.Transparent,
                         iconTint = Color.Unspecified,
-                        iconSize = 34.dp,
+                        iconSize = 24.dp,
                         title = stringResource(R.string.memory_mem0_enabled_title),
                         subtitle = stringResource(R.string.memory_mem0_enabled_subtitle),
                         showDivider = state.mem0Enabled,
@@ -126,7 +126,7 @@ fun MemorySettingsScreen(
                                 icon = mem0Icon,
                                 iconContainer = Color.Transparent,
                                 iconTint = Color.Unspecified,
-                                iconSize = 34.dp,
+                                iconSize = 24.dp,
                                 title = stringResource(R.string.memory_history_title),
                                 subtitle = stringResource(R.string.memory_history_subtitle),
                                 modifier = Modifier.alpha(

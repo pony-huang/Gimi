@@ -11,6 +11,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,8 +62,6 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -84,6 +83,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.domain.conversation.model.Conversation
+import github.ponyhuang.gimi.ui.components.GimiListDefaults
+import github.ponyhuang.gimi.ui.components.GimiSearchField
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyleScope
 import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
@@ -97,7 +98,7 @@ private val DrawerGroupCornerRadius = 16.dp
 private val DrawerGroupHorizontalPadding = 16.dp
 
 /** 紧凑行最小高度：与设置页 `PreferenceListItem` 一致。 */
-private val DrawerRowMinHeight = 64.dp
+private val DrawerRowMinHeight = GimiListDefaults.MinHeight
 
 /** 底部渐隐高度：留出列表末尾滚到操作区下方淡出的空间。 */
 private val DrawerFooterHeight = 112.dp
@@ -223,6 +224,8 @@ private fun HistoryDrawerContent(
         ) {
             Text(
                 text = stringResource(R.string.chat_drawer_history_title),
+                // 抽屉打开时由标题承接初始焦点，避免自动进入搜索框并唤起输入法。
+                modifier = Modifier.focusable(),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -256,20 +259,12 @@ private fun HistoryDrawerContent(
             }
         }
         // 搜索框与分组卡片同底色，去掉描边与指示线。
-        TextField(
+        GimiSearchField(
             value = recentState.query,
             onValueChange = { onRecentAction(RecentConversationsAction.Search(it)) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             enabled = !recentState.isDeleting,
             placeholder = { Text(stringResource(R.string.chat_drawer_search)) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            },
             trailingIcon = {
                 if (recentState.query.isNotEmpty()) {
                     IconButton(onClick = { onRecentAction(RecentConversationsAction.Search("")) }) {
@@ -277,16 +272,7 @@ private fun HistoryDrawerContent(
                     }
                 }
             },
-            singleLine = true,
-            shape = RoundedCornerShape(DrawerGroupCornerRadius),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = preferenceGroupCardColor(),
-                unfocusedContainerColor = preferenceGroupCardColor(),
-                disabledContainerColor = preferenceGroupCardColor(),
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent,
-            ),
+
         )
         Box(Modifier.weight(1f).navigationBarsPadding().imePadding()) {
             LazyColumn(

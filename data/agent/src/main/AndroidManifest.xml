@@ -20,7 +20,7 @@
             android:exported="false"
             android:theme="@style/Theme.Asssistantai" />
         <activity
-            android:name="github.ponyhuang.gimi.data.agent.permission.MediaPermissionActivity"
+            android:name="github.ponyhuang.gimi.data.agent.permission.FileSearchPermissionActivity"
             android:exported="false"
             android:theme="@style/Theme.Asssistantai" />
         <!-- 透明中转 Activity：代替工具以 Activity 身份发起可返回结果的跳转。 -->

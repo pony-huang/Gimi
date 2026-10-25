@@ -26,7 +26,10 @@ internal class PluginRuntimeState<T : Any>(
     }
 
     fun replacePlugins(plugins: List<T>): Boolean {
-        if (loadedPlugins.map(pluginId) == plugins.map(pluginId)) return false
+        // 同 id 的新实例表示 APK 已替换，必须发布新快照让 Agent 丢弃旧工具。
+        if (loadedPlugins.size == plugins.size && loadedPlugins.indices.all { loadedPlugins[it] === plugins[it] }) {
+            return false
+        }
         loadedPlugins = plugins.toList()
         publishNextSnapshot()
         return true

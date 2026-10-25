@@ -53,9 +53,10 @@ class AgentFactory @Inject constructor(
     suspend fun create(spec: AgentBuildSpec): AgentRuntime {
         val modelConfig = agentLLMModelFactory.selectModelConfig(spec.selection)
         val model = agentLLMModelFactory.createModel(modelConfig)
+        val subAgents = contributions.subAgents(spec)
         val agent = when (spec.toolAccessMode) {
             ToolAccessMode.ALWAYS_AVAILABLE ->
-                baseAgent(model, spec, contributions.toolsets(spec))
+                baseAgent(model, spec, contributions.toolsets(spec), subAgents)
             ToolAccessMode.ON_DEMAND ->
                 baseAgent(
                     model = model,
@@ -64,6 +65,7 @@ class AgentFactory @Inject constructor(
                         sources = contributions.candidateSources(spec),
                         vectorSearch = toolVectorSearch,
                     ),
+                    subAgents = subAgents,
                 )
         }
         return AgentRuntime(
@@ -72,11 +74,12 @@ class AgentFactory @Inject constructor(
         )
     }
 
-    /** 机械组装：业务工具/工具集全部来自贡献方聚合结果，此处只补指令与推理配置。 */
+    /** 机械组装：业务工具/工具集与 sub-agent 全部来自贡献方聚合结果，此处只补指令与推理配置。 */
     private fun baseAgent(
         model: Model,
         spec: AgentBuildSpec,
         toolsets: List<Toolset>,
+        subAgents: List<BaseAgent>,
     ): BaseAgent = LlmAgent(
         name = "Assistant",
         model = model,
@@ -86,6 +89,7 @@ class AgentFactory @Inject constructor(
         instruction = Instruction(AgentPrompts.defaultAssistantInstruction()),
         tools = contributions.tools(spec),
         toolsets = toolsets,
+        subAgents = subAgents,
     )
 }
 

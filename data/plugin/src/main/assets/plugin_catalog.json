@@ -120,6 +120,44 @@
       "repoUrl": "https://github.com/pony-huang/Gimi",
       "iconKey": "weibo",
       "tags": ["微博", "热搜", "超话", "社交"]
+    },
+    {
+      "key": "netease",
+      "packageName": "github.ponyhuang.gimi.plugin.netease",
+      "title": "网易云音乐",
+      "summary": {
+        "zh": "扫码登录、歌单与歌曲详情",
+        "en": "QR sign-in, playlists, and song details"
+      },
+      "description": {
+        "zh": "接入网易云开放平台，支持匿名或扫码登录、歌曲/专辑/歌手/歌单搜索、逐行与逐字歌词、用户资料、歌单和歌曲详情、授权音频链接、创建歌单、加歌/删歌与红心收藏。需要 App ID、RSA PKCS#8 私钥及对应接口权限；刷新登录可选填 Client Secret。暂不提供笔记发布、云盘上传或播放控制。",
+        "en": "Connects to NetEase Cloud Music OpenAPI for anonymous or QR sign-in, song/album/artist/playlist search, line and word lyrics, profiles, playlists, song details, authorized audio URLs, playlist creation, adding/removing songs, and liked songs. Requires App ID, RSA PKCS#8 private key, and endpoint authorization; optional Client Secret for refresh. Note publishing, cloud uploads, and playback control are unavailable."
+      },
+      "highlights": [
+        {
+          "zh": "匿名与扫码登录",
+          "en": "Anonymous and QR sign-in"
+        },
+        {
+          "zh": "歌单、歌曲详情与授权音频链接",
+          "en": "Playlists, song details, and authorized audio URLs"
+        },
+        {
+          "zh": "向歌单添加歌曲",
+          "en": "Add songs to playlists"
+        }
+      ],
+      "sortOrder": 60,
+      "pluginVersion": 1,
+      "releaseAssetPrefix": "Gimi-plugin-netease-v",
+      "repoUrl": "https://github.com/pony-huang/Gimi",
+      "iconKey": "netease",
+      "tags": [
+        "网易云",
+        "音乐",
+        "歌单",
+        "扫码登录"
+      ]
     }
   ]
 }

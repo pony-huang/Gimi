@@ -13,6 +13,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 fun RecommendationSettingsRoute(
     onBack: () -> Unit,
     onOpenPermissions: () -> Unit,
+    onOpenFastModelSettings: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: RecommendationSettingsViewModel = hiltViewModel(),
 ) {
@@ -26,6 +27,7 @@ fun RecommendationSettingsRoute(
             state = state,
             onAction = viewModel::onAction,
             onOpenPermissions = onOpenPermissions,
+            onOpenFastModelSettings = onOpenFastModelSettings,
             modifier = scaffoldModifier,
         )
     }

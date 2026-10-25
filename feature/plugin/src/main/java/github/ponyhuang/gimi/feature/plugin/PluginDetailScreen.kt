@@ -115,7 +115,7 @@ fun PluginDetailRoute(
 /**
  * 插件详细信息：介绍、能力与仓库链接；已安装时进入配置，未安装时可直接安装。
  *
- * 不展示版本、工具数量和签名/校验信息。
+ * 展示 APK 当前/最新版本，更新操作与列表共用安装状态。
  */
 @Composable
 fun PluginDetailScreen(
@@ -157,12 +157,12 @@ fun PluginDetailScreen(
             ) {
                 item {
                     Surface(
-                        shape = RoundedCornerShape(24.dp),
+                        shape = RoundedCornerShape(20.dp),
                         color = preferenceGroupCardColor(),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(
-                            modifier = Modifier.padding(20.dp),
+                            modifier = Modifier.padding(14.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -186,6 +186,45 @@ fun PluginDetailScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
+                        }
+                    }
+                }
+                item {
+                    DetailSection(title = stringResource(R.string.plugin_detail_version)) {
+                        item.installed?.let { installed ->
+                            VersionRow(
+                                stringResource(R.string.plugin_detail_current_version),
+                                installed.versionName?.takeIf(String::isNotBlank)
+                                    ?: installed.versionCode.takeIf { it > 0L }?.toString()
+                                    ?: stringResource(R.string.plugin_detail_version_unknown),
+                            )
+                        }
+                        item.catalog?.let { catalog ->
+                            VersionRow(
+                                stringResource(R.string.plugin_detail_latest_version),
+                                catalog.versionName?.takeIf(String::isNotBlank)
+                                    ?: catalog.versionCode?.toString()
+                                    ?: stringResource(R.string.plugin_detail_version_unknown),
+                            )
+                        }
+                        if (!item.isInstalled || item.isUpdateAvailable) {
+                            PluginInstallAction(
+                                entry = item,
+                                enabled = installEnabled,
+                                onInstall = {
+                                    onAction(
+                                        if (item.isInstalled) PluginSettingsAction.Update(item.key)
+                                        else PluginSettingsAction.Install(item.key),
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                        if (item.isInstalled) {
+                            OutlinedButton(
+                                onClick = { onNavigateToConfig(item.key) },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text(stringResource(R.string.plugin_detail_manage)) }
                         }
                     }
                 }
@@ -223,23 +262,6 @@ fun PluginDetailScreen(
                         }
                     }
                 }
-                item {
-                    if (item.isInstalled) {
-                        OutlinedButton(
-                            onClick = { onNavigateToConfig(item.key) },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text(stringResource(R.string.plugin_detail_manage))
-                        }
-                    } else {
-                        PluginInstallAction(
-                            entry = item,
-                            enabled = installEnabled,
-                            onInstall = { onAction(PluginSettingsAction.Install(item.key)) },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
                 val repoUrl = item.catalog?.repoUrl?.takeIf(String::isNotBlank)
                 if (repoUrl != null) {
                     item {
@@ -260,6 +282,14 @@ fun PluginDetailScreen(
 }
 
 @Composable
+private fun VersionRow(label: String, version: String) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(version, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
 private fun DetailSection(
     title: String,
     content: @Composable () -> Unit,
@@ -270,7 +300,7 @@ private fun DetailSection(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(
@@ -356,6 +386,36 @@ private fun PluginDetailScreenInstalledPreview() {
             onAction = {},
             onNavigateToConfig = {},
             onOpenUrl = {},
+        )
+    }
+}
+
+@Preview(name = "详情更新 · 浅色", widthDp = 390, heightDp = 900, locale = "zh")
+@Preview(name = "详情更新 · 深色", widthDp = 390, heightDp = 900, locale = "zh", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PluginDetailUpdatePreview() {
+    PluginDetailUpdateFixture(PluginInstallUiState.Idle)
+}
+
+@Preview(name = "详情更新失败 · 浅色", widthDp = 390, heightDp = 900, locale = "zh")
+@Preview(name = "详情更新失败 · 深色", widthDp = 390, heightDp = 900, locale = "zh", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PluginDetailUpdateFailedPreview() {
+    PluginDetailUpdateFixture(PluginInstallUiState.Failed(github.ponyhuang.gimi.domain.plugin.model.PluginInstallFailure.NETWORK))
+}
+
+@Composable
+private fun PluginDetailUpdateFixture(installState: PluginInstallUiState) {
+    val fixture = previewDetailItem(installed = true)
+    AsssistantaiTheme {
+        PluginDetailScreen(
+            item = fixture.copy(
+                catalog = fixture.catalog?.copy(versionCode = 61L, versionName = "1.1.0"),
+                installed = fixture.installed?.copy(versionCode = 60L, versionName = "1.0.0"),
+                installState = installState,
+            ),
+            installedIcon = null, installEnabled = true, isLoading = false,
+            onAction = {}, onNavigateToConfig = {}, onOpenUrl = {},
         )
     }
 }

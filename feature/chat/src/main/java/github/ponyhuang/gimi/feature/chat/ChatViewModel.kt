@@ -24,6 +24,8 @@ import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.core.notifications.AppNotificationManager
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.a2a.model.SkippedRemoteAgent
+import github.ponyhuang.gimi.domain.a2a.repository.RemoteAgentSkipReporter
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
@@ -82,6 +84,7 @@ class ChatViewModel @Inject constructor(
     private val toolAuthorization: ToolAuthorizationRepository,
     private val mcpRepository: McpRepository,
     private val mcpSkipReporter: McpSkipReporter,
+    private val remoteAgentSkipReporter: RemoteAgentSkipReporter,
     private val speechRecognitionRepository: SpeechRecognitionRepository,
     private val speechPlaybackController: SpeechPlaybackRepository,
     private val speechSettings: SpeechSettingsRepository,
@@ -177,6 +180,7 @@ class ChatViewModel @Inject constructor(
         showRuntime = ::showRuntime,
         publishRuntime = ::publishRuntime,
         clearSpeechSession = speechPlaybackController::clearSession,
+        emitNotice = ::emitNotice,
     )
 
     /** 一次性 UI 反馈通道（Toast 等），由 Route 消费；见 [ChatEffect]。 */
@@ -350,6 +354,11 @@ class ChatViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            remoteAgentSkipReporter.skipped.collect { skipped ->
+                notifySkippedRemoteAgents(skipped)
+            }
+        }
+        viewModelScope.launch {
             memoryRuntimeStatus.failures.collect { failure ->
                 emitNotice(
                     when (failure.operation) {
@@ -382,6 +391,17 @@ class ChatViewModel @Inject constructor(
         skipped
             .filter { notifiedSkippedMcpServers.add("$sessionId:${it.serverId}") }
             .forEach { emitNotice(ChatNotice.McpServerSkipped(it.displayName)) }
+    }
+
+    /** 已提示过的 (sessionId, remoteAgentId)，保证每个远程 agent 每个会话只提示一次。 */
+    private val notifiedSkippedRemoteAgents = mutableSetOf<String>()
+
+    private fun notifySkippedRemoteAgents(skipped: List<SkippedRemoteAgent>) {
+        val sessionId = _uiState.value.sessionId
+        if (sessionId.isBlank() || skipped.isEmpty()) return
+        skipped
+            .filter { notifiedSkippedRemoteAgents.add("$sessionId:${it.remoteAgentId}") }
+            .forEach { emitNotice(ChatNotice.RemoteAgentSkipped(it.displayName)) }
     }
 
     /**

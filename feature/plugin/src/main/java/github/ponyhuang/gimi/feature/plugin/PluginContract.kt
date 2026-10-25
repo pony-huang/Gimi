@@ -5,15 +5,20 @@ import github.ponyhuang.gimi.domain.plugin.model.PluginCatalogSource
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigFieldDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginInstallFailure
+import github.ponyhuang.gimi.domain.plugin.model.isUpdateFor
 
 /** 单个条目的安装阶段；失败状态保留原因供卡片展示。 */
 sealed interface PluginInstallUiState {
+    /** 条目当前无下载任务。 */
     data object Idle : PluginInstallUiState
 
+    /** 正在解析下载资产。 */
     data object Resolving : PluginInstallUiState
 
+    /** 下载进度；[progress] 范围为 0 到 1。 */
     data class Downloading(val progress: Float) : PluginInstallUiState
 
+    /** 本次下载失败；[failure] 用于选择本地化错误文案。 */
     data class Failed(val failure: PluginInstallFailure) : PluginInstallUiState
 
     /** 是否正在占用下载/安装通道。 */
@@ -38,6 +43,9 @@ data class PluginListItemUi(
 
     val isInstalled: Boolean
         get() = installed != null
+
+    val isUpdateAvailable: Boolean
+        get() = installed?.let { catalog?.isUpdateFor(it) } == true
 
     val title: String
         get() = installed?.name?.takeIf(String::isNotBlank) ?: catalog?.title.orEmpty()
@@ -72,6 +80,9 @@ sealed interface PluginSettingsAction {
 
     /** 安装订阅目录中的插件。 */
     data class Install(val entryKey: String) : PluginSettingsAction
+
+    /** 更新已安装的同包名插件，复用下载和系统安装通道。 */
+    data class Update(val entryKey: String) : PluginSettingsAction
 
     /** 请求卸载插件；仅弹出确认框，不直接执行。 */
     data class RequestUninstall(val pluginId: String) : PluginSettingsAction

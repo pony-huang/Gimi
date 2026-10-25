@@ -3,15 +3,14 @@ package github.ponyhuang.gimi.data.modelcatalog
 import android.content.Context
 import android.util.Log
 import androidx.core.content.edit
-import androidx.room.withTransaction
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.core.security.KeystoreAesGcmStringCipher
 import github.ponyhuang.gimi.data.modelcatalog.toData
 import github.ponyhuang.gimi.data.modelcatalog.toDomain
-import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+import github.ponyhuang.gimi.domain.modelcatalog.usecase.hasValidConnectionConfiguration
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
-import github.ponyhuang.gimi.domain.modelcatalog.model.Model
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedAgentModel
@@ -31,8 +30,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 
 sealed interface ModelCatalogLoadState {
@@ -43,7 +41,7 @@ sealed interface ModelCatalogLoadState {
 
 /** Sensitive, user-editable provider settings stored outside the public Room catalog. */
 @Serializable
-private data class ModelServiceSettings(
+internal data class ModelServiceSettings(
     // 补默认值容忍旧版本稀疏 blob（Gson 静默留 null / 缺字段，kotlinx 默认抛异常）。
     val isEnabled: Boolean = false,
     val isOfficialToolsEnabled: Boolean = isEnabled,
@@ -52,11 +50,15 @@ private data class ModelServiceSettings(
     val baseType: ApiBaseType = ApiBaseType.OpenaiChatcompletions,
     val anthropicBaseUrl: String = "",
     val disabledOfficialTools: Set<String> = emptySet(),
+    val isAdded: Boolean = false,
+    /** null 表示沿用已有目录；空列表表示用户显式选择零个模型。 */
+    val selectedGroups: List<StoredModelGroup>? = null,
 )
 
 /**
  * Combines the Room-owned public model catalog with Keystore-encrypted connection settings.
- * Room is the only runtime source for providers, groups, and models.
+ * Room owns provider templates and model candidates; one encrypted settings commit owns
+ * each user configuration, including its selected models. Candidate refreshes never publish selections.
  */
 @Singleton
 class ModelServiceRepository @Inject constructor(
@@ -65,7 +67,7 @@ class ModelServiceRepository @Inject constructor(
 ) : ModelCatalogRepository, AgentModelConfigurationSource {
     private val dao = database.lLMModelConfigDao()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val catalogWriteMutex = Mutex()
+    @Volatile private var catalogEntities: List<LLMModelConfigEntity> = emptyList()
     private val settingsMutationLock = Any()
     private val ready = CompletableDeferred<Unit>()
     private val preferences = applicationContext.getSharedPreferences(
@@ -115,14 +117,17 @@ class ModelServiceRepository @Inject constructor(
                 settings.value = readInitialSettings()
                 seedCatalogIfEmpty()
                 dao.observeAll().collectLatest { entities ->
-                    _services.value = entities.filter { entity ->
-                        LLMModelConfigs.isSupportedService(entity.serviceId)
-                    }.mapNotNull { entity ->
-                        cancellationAwareRunCatching { entityToProvider(entity) }
-                            .onFailure { error ->
-                                Log.w(TAG, "Skipping corrupt model service ${entity.serviceId}.", error)
-                            }
-                            .getOrNull()
+                    synchronized(settingsMutationLock) {
+                        catalogEntities = entities
+                        _services.value = entities.filter { entity ->
+                            LLMModelConfigs.isSupportedService(entity.serviceId)
+                        }.mapNotNull { entity ->
+                            cancellationAwareRunCatching { entityToProvider(entity) }
+                                .onFailure { error ->
+                                    Log.w(TAG, "Skipping corrupt model service ${entity.serviceId}.", error)
+                                }
+                                .getOrNull()
+                        }
                     }
                     if (!ready.isCompleted) {
                         _loadState.value = ModelCatalogLoadState.Ready
@@ -185,42 +190,81 @@ class ModelServiceRepository @Inject constructor(
         setCurrentSelection(selection)
     }
 
-    override fun updateApiKey(serviceId: String, value: String) {
-        updateService(serviceId) { it.copy(apiKey = value) }
-    }
-
-    override fun updateEnabled(serviceId: String, enabled: Boolean): Boolean =
-        setEnabled(serviceId, enabled)
-
-    override fun updateApiProtocol(serviceId: String, protocol: ApiProtocol) {
-        updateService(serviceId) { provider ->
-            val target = protocol.toData()
-            // 单协议厂商（OpenAI / Anthropic）拒绝切换到不支持的接口标准。
-            if (target in provider.supportedBaseTypes) provider.copy(baseType = target) else provider
+    override suspend fun modelCandidates(serviceId: String): List<ModelGroup> = withContext(Dispatchers.IO) {
+        awaitReady()
+        val entity = dao.get(serviceId) ?: return@withContext emptyList()
+        val template = entityToProvider(entity, useSelection = false).toDomain()
+        val selected = currentService(serviceId)?.groups.orEmpty()
+        (template.groups + selected).groupBy { it.id }.map { (_, groups) ->
+            groups.first().copy(models = groups.flatMap { it.models }.distinctBy { it.id })
         }
     }
 
-    override fun updateBaseUrl(serviceId: String, value: String) {
-        updateService(serviceId) { provider ->
-            when (provider.baseType) {
-                ApiBaseType.OpenaiChatcompletions -> provider.copy(apiBaseUrl = value)
-                ApiBaseType.Anthropic -> provider.copy(anthropicBaseUrl = value)
-                // Gemini 不暴露地址编辑；即使写入也只影响测试 / 刷新用的兼容端点。
-                ApiBaseType.Gemini -> provider.copy(apiBaseUrl = value)
-            }
+    override suspend fun saveService(service: LLMModelSetting): Boolean = withContext(Dispatchers.IO) {
+        awaitReady()
+        if (!service.hasValidConnectionConfiguration()) return@withContext false
+        synchronized(settingsMutationLock) {
+            val current = settings.value[service.id] ?: return@synchronized false
+            val provider = getService(service.id) ?: return@synchronized false
+            if (service.apiProtocol.toData() !in provider.supportedBaseTypes) return@synchronized false
+            val updated = current.copy(
+                isAdded = true,
+                isEnabled = service.isEnabled,
+                isOfficialToolsEnabled = service.isOfficialToolsEnabled,
+                apiKey = service.apiKey.trim(),
+                apiBaseUrl = service.apiBaseUrl.trim().trimEnd('/'),
+                anthropicBaseUrl = service.anthropicBaseUrl.trim().trimEnd('/'),
+                baseType = service.apiProtocol.toData(),
+                selectedGroups = service.groups.map { group ->
+                    StoredModelGroup(
+                        groupId = group.id,
+                        groupName = group.name,
+                        models = group.models.distinctBy { it.id }.map { model ->
+                            StoredModel(
+                                modelId = model.id,
+                                modelName = model.name,
+                                isStt = model.isStt,
+                                isTts = model.isTts,
+                                capabilities = model.capabilities,
+                            )
+                        },
+                    )
+                },
+            )
+            commitSettings(service.id, updated)
         }
     }
 
-    override suspend fun addModel(serviceId: String, model: Model) {
-        appendModel(serviceId, model.toData())
+    override suspend fun setServiceEnabled(serviceId: String, enabled: Boolean): Boolean = withContext(Dispatchers.IO) {
+        awaitReady()
+        synchronized(settingsMutationLock) {
+            val current = settings.value[serviceId] ?: return@synchronized false
+            if (!(current.isAdded || current.apiKey.isNotBlank())) return@synchronized false
+            if (enabled && current.apiKey.isBlank()) return@synchronized false
+            // 暂停仅改变运行时可用性，不覆盖用户对厂商工具的选择。
+            commitSettings(serviceId, current.copy(isEnabled = enabled))
+        }
     }
 
-    override suspend fun removeCatalogModel(serviceId: String, groupId: String, modelId: String) {
-        removeModel(serviceId, groupId, modelId)
+    override suspend fun deleteService(serviceId: String): Boolean = withContext(Dispatchers.IO) {
+        awaitReady()
+        synchronized(settingsMutationLock) {
+            val defaults = defaultSettings[serviceId] ?: return@synchronized false
+            commitSettings(serviceId, defaults.copy(
+                isAdded = false, isEnabled = false, isOfficialToolsEnabled = false,
+                apiKey = "", selectedGroups = null,
+            ))
+        }
     }
 
-    override suspend fun replaceRemoteModels(serviceId: String, models: List<Model>) {
-        syncRemoteModels(serviceId, models.map(Model::toData))
+    /** 持久化成功后才一次性发布；不得把草稿或失败写入暴露给运行中的消费者。 */
+    private fun commitSettings(serviceId: String, updated: ModelServiceSettings): Boolean {
+        val nextSettings = settings.value + (serviceId to updated)
+        if (!persistSettings(nextSettings)) return false
+        settings.value = nextSettings
+        refreshMergedServices()
+        _configurationRevision.update { it + 1 }
+        return true
     }
 
     override fun selectAssistantModel(selection: ModelSelection) {
@@ -245,69 +289,6 @@ class ModelServiceRepository @Inject constructor(
 
     fun getService(serviceId: String): LLMModelProvider? =
         _services.value.firstOrNull { it.serviceId == serviceId }
-
-    /** Updates encrypted connection settings; public catalog fields are intentionally ignored. */
-    fun updateService(serviceId: String, transform: (LLMModelProvider) -> LLMModelProvider) {
-        synchronized(settingsMutationLock) {
-            val current = getService(serviceId) ?: return
-            val updated = transform(current).toSettings()
-            val nextSettings = settings.value + (serviceId to updated)
-            if (!persistSettings(nextSettings)) return
-            settings.value = nextSettings
-            refreshMergedServices()
-            _configurationRevision.update { it + 1 }
-        }
-    }
-
-    /**
-     * 切换总开关。返回是否真的发生了状态变化：
-     * - `enabled=true` 但 apiKey 为空 → 拒绝并返回 `false`（保护用户，避免无密钥启用后调用失败）。
-     * - 其他情况正常切换并返回 `true`。
-     */
-    fun setEnabled(serviceId: String, enabled: Boolean): Boolean {
-        val current = getService(serviceId) ?: return false
-        if (enabled && current.apiKey.isBlank()) {
-            Log.w(TAG, "Refusing to enable '$serviceId' — apiKey is blank.")
-            return false
-        }
-        updateService(serviceId) { it.copy(isEnabled = enabled, isOfficialToolsEnabled = enabled) }
-        return true
-    }
-
-    override fun updateOfficialToolsEnabled(serviceId: String, enabled: Boolean) {
-        updateService(serviceId) { provider ->
-            provider.copy(isOfficialToolsEnabled = enabled && provider.isEnabled)
-        }
-    }
-
-    suspend fun removeModel(serviceId: String, groupId: String, modelId: String) {
-        mutateCatalog(serviceId) { groups ->
-            removeStoredModel(groups, groupId, modelId)
-        }
-    }
-
-    suspend fun appendModel(serviceId: String, model: LLMModelItem) {
-        mutateCatalog(serviceId) { groups ->
-            appendUserModel(
-                groups = groups,
-                serviceId = serviceId,
-                serviceName = getService(serviceId)?.serviceName ?: serviceId,
-                model = model,
-            )
-        }
-    }
-
-    /** Replaces the remote catalog snapshot while preserving manually entered models. */
-    suspend fun syncRemoteModels(serviceId: String, models: List<LLMModelItem>) {
-        mutateCatalog(serviceId) { existingGroups ->
-            syncStoredRemoteModels(
-                existingGroups = existingGroups,
-                serviceId = serviceId,
-                serviceName = getService(serviceId)?.serviceName ?: serviceId,
-                models = models,
-            )
-        }
-    }
 
     /**
      * Resolves the default assistant model, falling back to the first usable model when the
@@ -411,27 +392,12 @@ class ModelServiceRepository @Inject constructor(
         upgradeDefaultModelMetadata(database)
     }
 
-    private suspend fun mutateCatalog(
-        serviceId: String,
-        transform: (List<StoredModelGroup>) -> List<StoredModelGroup>,
-    ) {
-        awaitReady()
-        catalogWriteMutex.withLock {
-            database.withTransaction {
-                val entity = dao.get(serviceId) ?: return@withTransaction
-                val groups = decodeGroups(entity.modelGroupsJson)
-                dao.upsert(entity.copy(modelGroupsJson = modelCatalogJson.encodeToString(transform(groups))))
-            }
-        }
-    }
-
     private fun refreshMergedServices() {
-        _services.value = _services.value.map { provider ->
-            provider.applySettings(settings.value[provider.serviceId] ?: provider.toSettings())
-        }
+        _services.value = catalogEntities.filter { LLMModelConfigs.isSupportedService(it.serviceId) }
+            .map { entityToProvider(it) }
     }
 
-    private fun entityToProvider(entity: LLMModelConfigEntity): LLMModelProvider {
+    private fun entityToProvider(entity: LLMModelConfigEntity, useSelection: Boolean = true): LLMModelProvider {
         val providerSettings = settings.value[entity.serviceId]
             ?: defaultSettings[entity.serviceId]
             ?: ModelServiceSettings(
@@ -450,6 +416,7 @@ class ModelServiceRepository @Inject constructor(
         return LLMModelProvider(
             serviceId = entity.serviceId,
             serviceName = entity.serviceName,
+            isAdded = providerSettings.isAdded || providerSettings.apiKey.isNotBlank(),
             isEnabled = providerSettings.isEnabled,
             isOfficialToolsEnabled = providerSettings.isOfficialToolsEnabled,
             apiKey = providerSettings.apiKey,
@@ -457,7 +424,8 @@ class ModelServiceRepository @Inject constructor(
             baseType = baseType,
             supportedBaseTypes = supportedBaseTypes,
             anthropicBaseUrl = providerSettings.anthropicBaseUrl,
-            lLMModelGroups = decodeGroups(entity.modelGroupsJson).map { group ->
+            lLMModelGroups = (providerSettings.selectedGroups.takeIf { useSelection }
+                ?: decodeGroups(entity.modelGroupsJson)).map { group ->
                 LLMModelGroup(
                     groupId = group.groupId,
                     groupName = group.groupName,
@@ -468,6 +436,7 @@ class ModelServiceRepository @Inject constructor(
                             modelName = it.modelName,
                             isStt = it.isStt,
                             isTts = it.isTts,
+                            capabilities = it.capabilities,
                         )
                     },
                 )
@@ -490,16 +459,8 @@ class ModelServiceRepository @Inject constructor(
         apiKey = apiKey,
         apiBaseUrl = apiBaseUrl,
         baseType = baseType,
-        anthropicBaseUrl = anthropicBaseUrl
-    )
-
-    private fun LLMModelProvider.applySettings(value: ModelServiceSettings): LLMModelProvider = copy(
-        isEnabled = value.isEnabled,
-        isOfficialToolsEnabled = value.isOfficialToolsEnabled,
-        apiKey = value.apiKey,
-        apiBaseUrl = value.apiBaseUrl,
-        baseType = value.baseType,
-        anthropicBaseUrl = value.anthropicBaseUrl,
+        anthropicBaseUrl = anthropicBaseUrl,
+        isAdded = apiKey.isNotBlank(),
     )
 
     private fun readSettings(): Map<String, ModelServiceSettings>? {
@@ -511,7 +472,7 @@ class ModelServiceRepository @Inject constructor(
     }
 
     private fun readInitialSettings(): Map<String, ModelServiceSettings> {
-        return readSettings() ?: defaultSettings.also {
+        return readSettings()?.let { defaultSettings + it } ?: defaultSettings.also {
             check(persistSettings(defaultSettings)) {
                 "Unable to persist initial model service settings."
             }

@@ -1,5 +1,7 @@
 package github.ponyhuang.gimi.data.plugin.install
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.core.network.HttpFileDownloadException
 import github.ponyhuang.gimi.core.network.HttpFileDownloader
 import github.ponyhuang.gimi.core.storage.StorageRegistry
@@ -9,8 +11,10 @@ import github.ponyhuang.gimi.domain.plugin.model.PluginPackageInstallException
 import github.ponyhuang.gimi.domain.plugin.model.PluginReleaseAsset
 import github.ponyhuang.gimi.domain.plugin.repository.PluginPackageInstaller
 import java.io.File
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -24,12 +28,15 @@ import kotlinx.coroutines.withContext
  */
 @Singleton
 class AndroidPluginPackageInstaller @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val fileDownloader: HttpFileDownloader,
     private val storageRegistry: StorageRegistry,
 ) : PluginPackageInstaller {
 
     override suspend fun downloadAndVerify(
         asset: PluginReleaseAsset,
+        packageName: String,
+        versionCode: Long?,
         onProgress: (Float) -> Unit,
     ): String = withContext(Dispatchers.IO) {
         if (!asset.downloadUrl.startsWith("https://", ignoreCase = true)) {
@@ -43,9 +50,14 @@ class AndroidPluginPackageInstaller @Inject constructor(
         }.getOrElse {
             throw PluginPackageInstallException(PluginInstallFailure.STORAGE)
         }
-        // 每次安装前清掉上一轮 APK，目录只保留当前待安装文件。
-        runCatching { directory.listFiles()?.forEach { it.delete() } }
-        val destination = File(directory, safeFileName(asset.name))
+        // 系统安装器可能仍在读取上一份 APK；独立文件避免列表/详情页互相覆盖或删除。
+        val expiredBefore = System.currentTimeMillis() - PACKAGE_TTL_MS
+        directory.listFiles()?.filter { it.lastModified() < expiredBefore }?.forEach { it.delete() }
+        val destination = try {
+            File.createTempFile("plugin-", ".apk", directory)
+        } catch (e: IOException) {
+            throw PluginPackageInstallException(PluginInstallFailure.STORAGE)
+        }
         try {
             fileDownloader.download(
                 url = asset.downloadUrl,
@@ -54,6 +66,9 @@ class AndroidPluginPackageInstaller @Inject constructor(
                 destination = destination,
                 onProgress = onProgress,
             )
+        } catch (e: CancellationException) {
+            destination.delete()
+            throw e
         } catch (e: HttpFileDownloadException) {
             destination.delete()
             val failure = when (e.reason) {
@@ -73,22 +88,26 @@ class AndroidPluginPackageInstaller @Inject constructor(
             destination.delete()
             throw PluginPackageInstallException(PluginInstallFailure.PACKAGE_TOO_LARGE)
         }
-        destination.absolutePath
-    }
-
-    /** 资产名来自远端，限制字符集与长度，避免路径穿越或超长文件名。 */
-    private fun safeFileName(name: String): String {
-        val sanitized = name
-            .substringAfterLast('/')
-            .replace(Regex("[^A-Za-z0-9._-]"), "_")
-            .take(MAX_FILE_NAME_LENGTH)
-        return sanitized.ifBlank { "plugin.apk" }.let { fileName ->
-            if (fileName.endsWith(".apk", ignoreCase = true)) fileName else "$fileName.apk"
+        if (asset.sizeBytes > 0L && destination.length() != asset.sizeBytes) {
+            destination.delete()
+            throw PluginPackageInstallException(PluginInstallFailure.CHECKSUM_MISMATCH)
         }
+        val archive = try {
+            context.packageManager.getPackageArchiveInfo(destination.absolutePath, 0)
+        } catch (e: RuntimeException) {
+            null
+        }
+        if (archive == null || archive.packageName != packageName ||
+            (versionCode != null && archive.longVersionCode != versionCode)
+        ) {
+            destination.delete()
+            throw PluginPackageInstallException(PluginInstallFailure.INVALID_PACKAGE)
+        }
+        destination.absolutePath
     }
 
     private companion object {
         const val MAX_APK_BYTES = 50L * 1024L * 1024L
-        const val MAX_FILE_NAME_LENGTH = 128
+        const val PACKAGE_TTL_MS = 24L * 60L * 60L * 1000L
     }
 }

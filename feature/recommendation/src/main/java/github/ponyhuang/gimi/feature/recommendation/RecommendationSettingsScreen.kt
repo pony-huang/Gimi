@@ -52,9 +52,11 @@ fun RecommendationSettingsScreen(
     state: RecommendationSettingsUiState,
     onAction: (RecommendationSettingsAction) -> Unit,
     onOpenPermissions: () -> Unit,
+    onOpenFastModelSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showIntervalDialog by remember { mutableStateOf(false) }
+    var showFastModelDialog by remember { mutableStateOf(false) }
     PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -69,8 +71,13 @@ fun RecommendationSettingsScreen(
                         subtitle = stringResource(R.string.recommendation_enabled_subtitle),
                         showDivider = state.enabled,
                         checked = state.enabled,
-                        onCheckedChange = {
-                            onAction(RecommendationSettingsAction.SetEnabled(it))
+                        onCheckedChange = { checked ->
+                            // 推荐由快速模型生成：未配置时不写入开启状态，先引导去模型设置。
+                            if (checked && !state.fastModelReady) {
+                                showFastModelDialog = true
+                            } else {
+                                onAction(RecommendationSettingsAction.SetEnabled(checked))
+                            }
                         },
                     )
                     // 更新相关配置仅在推荐开启后展开，关闭时整块隐藏。
@@ -134,6 +141,15 @@ fun RecommendationSettingsScreen(
             }
         }
     }
+    if (showFastModelDialog) {
+        FastModelRequiredDialog(
+            onConfigure = {
+                showFastModelDialog = false
+                onOpenFastModelSettings()
+            },
+            onDismiss = { showFastModelDialog = false },
+        )
+    }
     if (showIntervalDialog) {
         AlertDialog(
             onDismissRequest = { showIntervalDialog = false },
@@ -164,6 +180,29 @@ fun RecommendationSettingsScreen(
             },
         )
     }
+}
+
+/** 未配置快速模型时的开启引导：解释前置条件并提供直达模型设置的入口。 */
+@Composable
+private fun FastModelRequiredDialog(
+    onConfigure: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.recommendation_fast_model_required_title)) },
+        text = { Text(stringResource(R.string.recommendation_fast_model_required_text)) },
+        confirmButton = {
+            TextButton(onClick = onConfigure) {
+                Text(stringResource(R.string.recommendation_fast_model_required_configure))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.recommendation_close))
+            }
+        },
+    )
 }
 
 @Composable
@@ -204,6 +243,7 @@ private fun RecommendationSettingsScreenEnabledPreview() {
             ),
             onAction = {},
             onOpenPermissions = {},
+            onOpenFastModelSettings = {},
         )
     }
 }
@@ -223,6 +263,7 @@ private fun RecommendationSettingsScreenRetryPreview() {
             ),
             onAction = {},
             onOpenPermissions = {},
+            onOpenFastModelSettings = {},
         )
     }
 }
@@ -239,6 +280,29 @@ private fun RecommendationSettingsScreenDisabledPreview() {
             ),
             onAction = {},
             onOpenPermissions = {},
+            onOpenFastModelSettings = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun RecommendationSettingsScreenFastModelMissingPreview() {
+    // 门控态：未选择快速模型时开关可点但开启动作被拦截，展示引导对话框。
+    AsssistantaiTheme {
+        RecommendationSettingsScreen(
+            state = RecommendationSettingsUiState(
+                enabled = false,
+                fastModelReady = false,
+            ),
+            onAction = {},
+            onOpenPermissions = {},
+            onOpenFastModelSettings = {},
+        )
+        FastModelRequiredDialog(
+            onConfigure = {},
+            onDismiss = {},
         )
     }
 }

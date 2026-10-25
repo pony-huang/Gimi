@@ -22,7 +22,7 @@
     <string name="plugin_authorization_checking">Checking…</string>
     <string name="plugin_authorization_failed">Check failed</string>
     <string name="plugin_authorization_retry">Retry</string>
-    <string name="plugin_oauth_credentials_help">Create an app in the provider’s developer console, then enter the required credentials and redirect URI.</string>
+    <string name="plugin_oauth_credentials_help">Enter the credentials required by the provider, then sign in to authorize.</string>
     <string name="plugin_oauth_reauthorize">Reauthorize</string>
     <string name="plugin_browser_unavailable">No browser available</string>
     <string name="plugin_link_invalid">Invalid link address</string>
@@ -75,4 +75,18 @@
     <string name="plugin_detail_manage">Manage plugin</string>
     <string name="plugin_detail_no_info">This plugin is not described in the subscription source.</string>
     <string name="plugin_detail_not_found">Plugin not found</string>
+    <string name="plugin_list_update">Update</string>
+    <string name="plugin_list_update_available">Update available</string>
+    <string name="plugin_list_update_resolving">Preparing update…</string>
+    <string name="plugin_list_update_downloading">Downloading update %1$d%%</string>
+    <string name="plugin_list_update_retry">Retry update</string>
+    <string name="plugin_list_update_network">Update download failed. Check your connection and try again.</string>
+    <string name="plugin_list_install_invalid_package">The APK does not match the plugin or release version. Refresh and try again.</string>
+    <string name="plugin_list_not_an_update">This plugin no longer needs an update. Refresh the list.</string>
+    <string name="plugin_detail_version">Version</string>
+    <string name="plugin_detail_current_version">Current version</string>
+    <string name="plugin_detail_latest_version">Latest version</string>
+    <string name="plugin_detail_version_unknown">Unknown</string>
+    <string name="plugin_authorization_waiting">Waiting for confirmation. Sign-in status updates automatically.</string>
+    <string name="plugin_authorization_expired">The sign-in link expired. Please sign in again.</string>
 </resources>

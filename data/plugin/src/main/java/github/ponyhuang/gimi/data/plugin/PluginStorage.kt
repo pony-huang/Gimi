@@ -27,7 +27,7 @@ object PluginStorage {
         sharingPolicy = SharingPolicy.PRIVATE,
     )
 
-    /** 商店下载的插件 APK；位于 FileProvider 的 `shareable/` 路径下，安装后由下次安装清理。 */
+    /** 商店下载的插件 APK；位于 FileProvider 的 `shareable/` 路径下，下次下载时清理超过 24 小时的缓存。 */
     val Packages = ManagedDirectorySpec(
         id = PACKAGES_ID,
         owner = "plugin",

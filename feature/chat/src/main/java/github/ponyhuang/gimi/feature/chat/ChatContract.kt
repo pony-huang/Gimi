@@ -143,6 +143,9 @@ sealed interface ChatNotice {
     /** 会话勾选的 MCP 服务器连接失败，本轮已跳过。 */
     data class McpServerSkipped(val serverName: String) : ChatNotice
 
+    /** 已配置的远程 A2A agent 连接失败，本轮已跳过。 */
+    data class RemoteAgentSkipped(val agentName: String) : ChatNotice
+
     /** Mem0 记忆搜索失败，本轮继续但不注入云记忆。 */
     data object MemorySearchFailed : ChatNotice
 

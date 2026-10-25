@@ -29,6 +29,8 @@ internal data class PluginCatalogEntryDto(
     val apkUrl: String? = null,
     val sha256: String? = null,
     val sizeBytes: Long? = null,
+    val versionCode: Long? = null,
+    val versionName: String? = null,
 )
 
 /** 中英文案对；缺失字段使用空串，由 domain 的 LocalizedText 做回退。 */

@@ -25,7 +25,6 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,8 +41,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
+import github.ponyhuang.gimi.ui.components.GimiSwitch
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
-import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
@@ -79,10 +78,7 @@ fun McpServerEditorScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (state.isMutationBlocked) {
-                PreferenceBanner(
-                    text = stringResource(R.string.mcp_agent_mutation_blocked),
-                    tone = PreferenceBannerTone.Error,
-                )
+                PreferenceBanner(text = stringResource(R.string.mcp_agent_mutation_blocked))
             }
             // 启用开关是状态控制而非表单字段，置顶作主开关；
             // 样式与其它设置页条目的 PreferenceListItem + 尾部 Switch 保持一致。
@@ -101,7 +97,7 @@ fun McpServerEditorScreen(
                         }
                     },
                     trailingContent = {
-                        Switch(
+                        GimiSwitch(
                             checked = draft.isEnabled,
                             enabled = !state.isMutationBlocked,
                             onCheckedChange = {

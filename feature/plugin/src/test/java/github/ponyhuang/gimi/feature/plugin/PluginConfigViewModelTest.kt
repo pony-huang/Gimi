@@ -254,6 +254,26 @@ class PluginConfigViewModelTest {
         assertEquals(null, viewModel.state.value.callback)
     }
 
+    @Test
+    fun oauthLoginSavesCurrentFormBeforeStartingAuthorization() = runTest {
+        val repository = FakePluginRepository(
+            descriptor = PluginConfigDescriptor(
+                fields = listOf(PluginConfigFieldDescriptor(
+                    key = "private_key", label = "Private key", kind = PluginConfigFieldDescriptor.Kind.TEXT, secret = true,
+                )),
+                actions = listOf(PluginActionDescriptor(id = "oauth_login", label = "Sign in")),
+            ),
+            stored = mapOf("private_key" to "old-test-value"),
+        )
+        val viewModel = PluginConfigViewModel(repository)
+        viewModel.load("provider")
+        viewModel.onAction(PluginConfigAction.SetValue("private_key", "new-test-value"))
+        viewModel.onAction(PluginConfigAction.RunAction("oauth_login"))
+        advanceUntilIdle()
+        assertEquals("provider" to mapOf("private_key" to "new-test-value"), repository.updatedConfig)
+        assertEquals(listOf("config", "action"), repository.callOrder)
+    }
+
     private class FakePluginRepository(
         private val descriptor: PluginConfigDescriptor = PluginConfigDescriptor(),
         var stored: Map<String, String> = emptyMap(),
@@ -265,16 +285,19 @@ class PluginConfigViewModelTest {
         override val revision: StateFlow<Long> = MutableStateFlow(0L)
         var updatedConfig: Pair<String, Map<String, String>>? = null
         val runActionCalls = mutableListOf<Pair<String, String>>()
+        val callOrder = mutableListOf<String>()
         val actionCallbackCalls = mutableListOf<Triple<String, String, PluginActionCallback>>()
 
         override fun setEnabled(pluginId: String, enabled: Boolean) = Unit
         override fun configDescriptor(pluginId: String): PluginConfigDescriptor? = descriptor
         override fun configValues(pluginId: String): Map<String, String> = stored
         override fun updateConfig(pluginId: String, values: Map<String, String>) {
+            callOrder += "config"
             updatedConfig = pluginId to values
         }
 
         override suspend fun runAction(pluginId: String, actionId: String): PluginActionExecution? {
+            callOrder += "action"
             runActionCalls += pluginId to actionId
             return runExecution
         }

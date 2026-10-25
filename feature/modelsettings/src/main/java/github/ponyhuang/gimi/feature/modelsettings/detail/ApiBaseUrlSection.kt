@@ -10,6 +10,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -19,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.feature.modelsettings.R
-import github.ponyhuang.gimi.ui.preference.PreferenceTextField
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,7 +52,7 @@ fun ApiBaseUrlSection(
     ) {
         if (options.size == 1) {
             // 协议被厂商约束锁定时，用禁用的只读输入框展示当前唯一可用协议。
-            PreferenceTextField(
+            OutlinedTextField(
                 value = currentLabel,
                 onValueChange = {},
                 readOnly = true,
@@ -65,7 +65,7 @@ fun ApiBaseUrlSection(
                 expanded = isMenuExpanded,
                 onExpandedChange = { if (enabled) onToggleMenu() },
             ) {
-                PreferenceTextField(
+                OutlinedTextField(
                     value = currentLabel,
                     onValueChange = {},
                     readOnly = true,
@@ -94,7 +94,7 @@ fun ApiBaseUrlSection(
         }
 
         if (showsBaseUrlField) {
-            PreferenceTextField(
+            OutlinedTextField(
                 value = service.activeApiBaseUrl,
                 onValueChange = onBaseUrlChange,
                 singleLine = true,

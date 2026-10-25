@@ -25,6 +25,7 @@ import com.mikepenz.markdown.model.rememberStreamingMarkdownState
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
 import github.ponyhuang.gimi.ui.theme.markdownContentTypography
+import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.ReceiveChannel
 
@@ -191,15 +192,27 @@ private fun ChatTextContentBody(
     }
 }
 
-@Preview
+@Preview(name = "Markdown · 浅色", showBackground = true, widthDp = 390)
+@Preview(name = "Markdown · 深色", showBackground = true, widthDp = 390,
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ChatTextContentPreview() {
-    ChatTextContent("""
-        # h1
-        ## h2
-        ### h3
-        ```java
-        var a = 123
-        ```
-    """.trimIndent(), false, null, modifier = Modifier.padding(8.dp))
+    AsssistantaiTheme {
+        ChatTextContent("""
+            ## 文件分析
+
+            先确认两点：
+
+            1. **写什么主题：** 围绕这份 Excel 分析内容，还是介绍产品、活动或其他主题？
+            2. **发在哪：** 公众号 / 小红书 / 朋友圈？
+
+            > 可以重新上传文件，或直接粘贴关键内容。
+
+            查看[文件说明](https://example.com)，也可以使用 `file.name`。
+
+            ```kotlin
+            val title = "文件分析"
+            ```
+        """.trimIndent(), false, null, modifier = Modifier.padding(8.dp))
+    }
 }

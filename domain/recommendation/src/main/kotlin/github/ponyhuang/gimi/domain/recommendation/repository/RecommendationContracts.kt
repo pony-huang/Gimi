@@ -21,6 +21,14 @@ interface RecommendationGenerator {
     suspend fun generate(input: RecommendationGenerationInput): List<AgentRecommendation>
 }
 
+/**
+ * 推荐生成的前置配置缺失，例如未选择快速模型。
+ *
+ * 该错误不会随重试自愈：刷新链路应立即落为最终失败并提示配置，
+ * 而不是消耗面向瞬态故障的重试梯子。
+ */
+class RecommendationNotConfiguredException(message: String) : IllegalStateException(message)
+
 /** 汇总当前可推荐的工具能力，不执行任何工具。 */
 interface RecommendationCapabilitySource {
     suspend fun capabilities(): List<RecommendationCapability>

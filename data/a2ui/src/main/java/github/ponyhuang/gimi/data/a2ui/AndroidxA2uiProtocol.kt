@@ -43,12 +43,10 @@ class AndroidxA2uiProtocol @Inject constructor() : A2uiProtocol {
         require(components.isNotEmpty() && components.size <= 256) { "Expected 1..256 components" }
         val ids = components.map { it.id }.toSet()
         require(ids.size == components.size && "root" in ids) { "Unique component IDs and root required" }
+        val schema = Json.parseToJsonElement(capabilities.schemaJson).jsonObject
+        val references = CatalogComponentReferences(schema)
         val edges = components.associate { component ->
-            component.id to buildList {
-                (component.properties["child"] as? String)?.let(::add)
-                (component.properties["children"] as? List<*>)?.filterIsInstance<String>()?.let(::addAll)
-                (component.properties["children"] as? Map<*, *>)?.get("componentId")?.let { add(it as String) }
-            }
+            component.id to references.of(component.type, component.properties)
         }
         val visited = mutableSetOf<String>()
         fun visit(id: String, stack: Set<String>) {
@@ -56,7 +54,7 @@ class AndroidxA2uiProtocol @Inject constructor() : A2uiProtocol {
             if (visited.add(id)) edges.getValue(id).forEach { visit(it, stack + id) }
         }
         ids.forEach { visit(it, emptySet()) }
-        val catalog = CatalogSchema(capabilities.catalogId, Json.parseToJsonElement(capabilities.schemaJson).jsonObject)
+        val catalog = CatalogSchema(capabilities.catalogId, schema)
         coroutineScope {
             val errors = mutableListOf<String>()
             val complete = CompletableDeferred<List<String>>()

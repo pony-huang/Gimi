@@ -17,10 +17,11 @@ fun SettingsRoute(
     onNavigateToModelService: () -> Unit,
     onNavigateToDefaultModels: () -> Unit,
     onNavigateToMcpServers: () -> Unit,
+    onNavigateToRemoteAgents: () -> Unit,
+    onNavigateToAppFunctions: () -> Unit,
     onNavigateToSandbox: () -> Unit,
     onNavigateToPlugins: () -> Unit,
     onNavigateToSkills: () -> Unit,
-    onNavigateToWorkFiles: () -> Unit,
     onNavigateToWorkspace: () -> Unit,
     onNavigateToPermissions: () -> Unit,
     onNavigateToToolAuthorization: () -> Unit,
@@ -37,10 +38,11 @@ fun SettingsRoute(
             SettingsEffect.NavigateToModelService -> onNavigateToModelService()
             SettingsEffect.NavigateToDefaultModels -> onNavigateToDefaultModels()
             SettingsEffect.NavigateToMcpServers -> onNavigateToMcpServers()
+            SettingsEffect.NavigateToRemoteAgents -> onNavigateToRemoteAgents()
+            SettingsEffect.NavigateToAppFunctions -> onNavigateToAppFunctions()
             SettingsEffect.NavigateToSandbox -> onNavigateToSandbox()
             SettingsEffect.NavigateToPlugins -> onNavigateToPlugins()
             SettingsEffect.NavigateToSkills -> onNavigateToSkills()
-            SettingsEffect.NavigateToWorkFiles -> onNavigateToWorkFiles()
             SettingsEffect.NavigateToWorkspace -> onNavigateToWorkspace()
             SettingsEffect.NavigateToPermissions -> onNavigateToPermissions()
             SettingsEffect.NavigateToToolAuthorization -> onNavigateToToolAuthorization()

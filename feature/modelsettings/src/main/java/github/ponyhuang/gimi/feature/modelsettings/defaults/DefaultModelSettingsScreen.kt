@@ -3,7 +3,6 @@ package github.ponyhuang.gimi.feature.modelsettings.defaults
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -12,7 +11,6 @@ import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -27,6 +25,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.speech.model.TtsVoice
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.ui.components.PickerSingleChoiceDialog
+import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
@@ -47,15 +46,9 @@ fun DefaultModelSettingsScreen(
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
             if (state.isMutationBlocked) {
-                item {
-                    Text(
-                        text = stringResource(R.string.modelsettings_agent_mutation_blocked),
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                    )
-                }
+                item { PreferenceBanner(stringResource(R.string.modelsettings_agent_mutation_blocked)) }
             }
-            item { PreferenceSectionTitle(stringResource(R.string.modelsettings_defaults_section_chat)) }
+            item { PreferenceSectionTitle(stringResource(R.string.modelsettings_model_kind_chat)) }
             item {
                 PreferenceGroupCard {
                     DefaultModelOption(
@@ -81,7 +74,7 @@ fun DefaultModelSettingsScreen(
                     )
                 }
             }
-            item { PreferenceSectionTitle(stringResource(R.string.modelsettings_defaults_section_stt)) }
+            item { PreferenceSectionTitle(stringResource(R.string.modelsettings_model_kind_stt)) }
             item {
                 PreferenceSectionNote(stringResource(R.string.modelsettings_defaults_online_only_note))
             }
@@ -99,7 +92,7 @@ fun DefaultModelSettingsScreen(
                     )
                 }
             }
-            item { PreferenceSectionTitle(stringResource(R.string.modelsettings_defaults_section_tts)) }
+            item { PreferenceSectionTitle(stringResource(R.string.modelsettings_model_kind_tts)) }
             item {
                 PreferenceSectionNote(stringResource(R.string.modelsettings_defaults_online_only_note))
             }
@@ -243,43 +236,55 @@ private fun ModelChoiceDialog(
     )
 }
 
+private fun defaultModelSettingsPreviewState(isMutationBlocked: Boolean): DefaultModelSettingsUiState {
+    val service = LLMModelSetting(
+        id = "openai",
+        name = "OpenAI",
+        isEnabled = true,
+        apiKey = "sk-test",
+        apiBaseUrl = "https://api.openai.com/v1",
+        apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.OpenaiChatcompletions,
+        anthropicBaseUrl = "https://api.anthropic.com",
+        groups = listOf(
+            ModelGroup(
+                id = "gpt",
+                name = "GPT",
+                models = listOf(Model(id = "gpt-4o", name = "GPT-4o")),
+            ),
+        ),
+    )
+    val row = SelectableModelRow(
+        service = service,
+        group = service.groups.first(),
+        model = service.groups.first().models.first(),
+    )
+    return DefaultModelSettingsUiState(
+        assistantSelection = row.selection(),
+        speechSelection = row.selection(),
+        ttsSelection = row.selection(),
+        ttsVoiceId = "default",
+        chatModels = listOf(row),
+        speechModels = listOf(row),
+        ttsModels = listOf(row),
+        isMutationBlocked = isMutationBlocked,
+    )
+}
+
 @Preview(showBackground = true)
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun DefaultModelSettingsScreenPreview() {
     AsssistantaiTheme {
-        val service = LLMModelSetting(
-            id = "openai",
-            name = "OpenAI",
-            isEnabled = true,
-            apiKey = "sk-test",
-            apiBaseUrl = "https://api.openai.com/v1",
-            apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.OpenaiChatcompletions,
-            anthropicBaseUrl = "https://api.anthropic.com",
-            groups = listOf(
-                ModelGroup(
-                    id = "gpt",
-                    name = "GPT",
-                    models = listOf(Model(id = "gpt-4o", name = "GPT-4o")),
-                ),
-            ),
-        )
-        val row = SelectableModelRow(
-            service = service,
-            group = service.groups.first(),
-            model = service.groups.first().models.first(),
-        )
-        DefaultModelSettingsScreen(
-            state = DefaultModelSettingsUiState(
-                assistantSelection = row.selection(),
-                speechSelection = row.selection(),
-                ttsSelection = row.selection(),
-                ttsVoiceId = "default",
-                chatModels = listOf(row),
-                speechModels = listOf(row),
-                ttsModels = listOf(row),
-            ),
-            onAction = {},
-        )
+        DefaultModelSettingsScreen(state = defaultModelSettingsPreviewState(isMutationBlocked = false), onAction = {})
+    }
+}
+
+@Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun DefaultModelSettingsScreenBlockedPreview() {
+    // 阻塞态：Agent 运行中禁改配置，顶部改为统一的信息横幅。
+    AsssistantaiTheme {
+        DefaultModelSettingsScreen(state = defaultModelSettingsPreviewState(isMutationBlocked = true), onAction = {})
     }
 }

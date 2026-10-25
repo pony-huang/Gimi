@@ -634,6 +634,22 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun newConversationWithoutConfiguredModelEmitsNoticeWithoutCrashing() = runTest {
+        val fixture = fixture(configured = false)
+
+        fixture.viewModel.effects.test {
+            fixture.viewModel.onAction(ChatAction.NewConversation)
+            advanceUntilIdle()
+
+            assertEquals(ChatEffect.ShowNotice(ChatNotice.ConfigureChatModel), awaitItem())
+            assertTrue(fixture.viewModel.uiState.value.sessionId.isBlank())
+            assertFalse(fixture.viewModel.uiState.value.isInitializing)
+            coVerify(exactly = 0) { fixture.conversations.createConversation(any(), any(), any()) }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun sendWithUnexpectedResolutionFailureSurfacesRealCauseNotModelNotice() = runTest {
         val failingResolver = mockk<ConversationSessionResolver>(relaxed = true) {
             coEvery { resolveCurrentOrCreate() } throws java.io.IOException("disk boom")
@@ -2102,6 +2118,9 @@ class ChatViewModelCharacterizationTest {
                 toolAuthorization = toolAuthorization,
                 mcpRepository = mcpRepository,
                 mcpSkipReporter = mockk {
+                    every { skipped } returns MutableStateFlow(emptyList())
+                },
+                remoteAgentSkipReporter = mockk {
                     every { skipped } returns MutableStateFlow(emptyList())
                 },
                 officialFunctionCatalog = officialFunctionCatalog,

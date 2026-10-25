@@ -32,9 +32,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.ui.components.GimiListDefaults
 import github.ponyhuang.gimi.ui.settings.llmmodel.LLMModelServiceIcon
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
@@ -114,11 +115,12 @@ private fun ChatModelPickerContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .selectable(selected = selected, role = Role.RadioButton, onClick = { onPick(row) })
-                                .padding(14.dp),
+                                .heightIn(min = GimiListDefaults.MinHeight)
+                                .padding(horizontal = 16.dp, vertical = GimiListDefaults.VerticalPadding),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            LLMModelServiceIcon(serviceId = row.service.id, modifier = Modifier.size(36.dp))
-                            Spacer(Modifier.width(12.dp))
+                            LLMModelServiceIcon(serviceId = row.service.id, modifier = Modifier.size(28.dp), contentPadding = 3.dp)
+                            Spacer(Modifier.width(14.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(
                                     text = row.model.name,
@@ -135,7 +137,7 @@ private fun ChatModelPickerContent(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            Spacer(Modifier.width(12.dp))
+                            Spacer(Modifier.width(14.dp))
                             RadioButton(selected = selected, onClick = null)
                         }
                     }

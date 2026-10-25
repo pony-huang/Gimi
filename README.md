@@ -260,3 +260,6 @@ please describe the use case it addresses; discuss substantial feature or interf
 ## Development and release workflow
 
 [See the release guide](spec/en/releasing.md) for CI checks, automated changelogs, version PRs, signing setup, and release retries.
+
+For ADB-launched AppFunction testing on release and debug APKs, see the
+[AppFunction execution session guide](spec/en/appfunctions.md).

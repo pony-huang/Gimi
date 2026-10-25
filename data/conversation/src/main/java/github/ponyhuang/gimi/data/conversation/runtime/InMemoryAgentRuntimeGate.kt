@@ -85,9 +85,7 @@ class InMemoryAgentRuntimeGate @Inject constructor(
             synchronized(tasks) {
                 if (tasks.remove(token) != null) {
                     publishState()
-                    if (tasks.isEmpty()) {
-                        AgentExecutionService.stop(context)
-                    }
+                    // 服务必须先确认前台启动请求，再根据 Idle 自行停止；不能撤销尚未送达的启动。
                 }
             }
         }

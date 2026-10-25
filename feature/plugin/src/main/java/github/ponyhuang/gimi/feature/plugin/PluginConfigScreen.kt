@@ -16,7 +16,6 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.domain.plugin.model.PluginConfigFieldDescriptor
+import github.ponyhuang.gimi.ui.components.GimiSwitch
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
@@ -82,6 +82,7 @@ fun PluginConfigScreen(
     onBack: () -> Unit = {},
     modifier: Modifier = Modifier,
     headerContent: @Composable () -> Unit = {},
+    showSaveAction: Boolean = true,
 ) {
     val callback = state.callback
     PreferenceScaffold(
@@ -95,7 +96,7 @@ fun PluginConfigScreen(
             { onAction(PluginConfigAction.DismissActionCallback) }
         },
         bottomBar = {
-            if (callback == null && state.hasFields) {
+            if (callback == null && state.hasFields && showSaveAction) {
                 PreferenceSaveBar(
                     label = stringResource(R.string.plugin_config_save),
                     onSave = { onAction(PluginConfigAction.Save) },
@@ -129,6 +130,7 @@ private fun PluginConfigContent(
     onAction: (PluginConfigAction) -> Unit,
     modifier: Modifier = Modifier,
     headerContent: @Composable () -> Unit = {},
+    showSaveAction: Boolean = true,
 ) {
     PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -227,7 +229,7 @@ private fun PluginToggleField(
         icon = Icons.Default.Tune,
         title = field.label,
         trailingContent = {
-            Switch(
+            GimiSwitch(
                 checked = field.value.toBoolean(),
                 onCheckedChange = onCheckedChange,
             )
@@ -315,4 +317,61 @@ private fun PluginConfigScreenWithFieldsPreview() {
             onAction = {},
         )
     }
+}
+
+@Preview(name = "网易云登录 · 未登录", showBackground = true)
+@Preview(name = "网易云登录 · 未登录深色", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun NeteaseLoginPreview() {
+    NeteaseLoginPreviewContent("未登录；点击登录后打开链接，扫码状态将自动更新。")
+}
+
+@Preview(name = "网易云登录 · 已授权", showBackground = true)
+@Preview(name = "网易云登录 · 已授权深色", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun NeteaseLoginAuthorizedPreview() {
+    NeteaseLoginPreviewContent("已登录网易云音乐", authorized = true)
+}
+
+@Preview(name = "网易云登录 · 过期", showBackground = true)
+@Composable
+private fun NeteaseLoginExpiredPreview() {
+    NeteaseLoginPreviewContent("登录链接已过期，请重新登录。")
+}
+
+@Composable
+private fun NeteaseLoginPreviewContent(message: String, authorized: Boolean = false) {
+    AsssistantaiTheme {
+        PluginConfigScreen(
+            state = PluginConfigUiState(
+                pluginId = "netease",
+                fields = listOf(
+                    PluginConfigFieldUiState(
+                        key = "app_id", label = "App ID",
+                        kind = PluginConfigFieldDescriptor.Kind.TEXT,
+                    ),
+                    PluginConfigFieldUiState(
+                        key = "private_key", label = "Private Key",
+                        kind = PluginConfigFieldDescriptor.Kind.TEXT, secret = true,
+                    ),
+                ),
+                actions = listOf(
+                    PluginActionUiState("link:official", "网易云音乐 CLI 官网 ↗"),
+                    PluginActionUiState("oauth_login", if (authorized) "重新登录网易云" else "登录网易云"),
+                ),
+            ),
+            onAction = {},
+            showSaveAction = false,
+            headerContent = {
+                Text(message, Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
+            },
+        )
+    }
+}
+
+@Preview(name = "网易云登录 · 等待确认", showBackground = true)
+@Preview(name = "网易云登录 · 等待确认深色", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun NeteaseLoginWaitingPreview() {
+    NeteaseLoginPreviewContent("等待网易云客户端确认，登录状态将自动更新。")
 }

@@ -1,0 +1,19 @@
+<resources>
+    <string name="netease_app_name">Gimi NetEase Cloud Music Plugin</string>
+    <string name="netease_app_id">App ID</string>
+    <string name="netease_private_key">Private Key</string>
+    <string name="netease_network_error">NetEase request failed. Check network or credentials, or sign in again.</string>
+    <string name="netease_config_error">Check App ID and PKCS#8 private key (PEM or Base64)</string>
+    <string name="netease_login_error">Sign-in unavailable. Please sign in to NetEase Cloud Music again.</string>
+    <string name="netease_response_error">Invalid NetEase response</string>
+    <string name="netease_login_status">Sign-in status</string>
+    <string name="netease_login">Sign in to NetEase Cloud Music</string>
+    <string name="netease_public_ip_error">Could not obtain the public IP required for sign-in. Check your network and retry.</string>
+    <string name="netease_dns_error">Could not resolve the NetEase server. Check your network or DNS.</string>
+    <string name="netease_tls_error">Could not establish a secure connection. Check device time and network.</string>
+    <string name="netease_timeout_error">NetEase request timed out. Please retry.</string>
+    <string name="netease_http_error">NetEase HTTP request failed (%1$d)</string>
+    <string name="netease_api_error">NetEase rejected the request (code %1$d)</string>
+    <string name="netease_account_mismatch">This account cannot use the App ID. Sign in with the account that created the Open Platform app (%1$d).</string>
+    <string name="netease_official_site">NetEase Cloud Music CLI ↗</string>
+</resources>

@@ -81,6 +81,11 @@ class PluginConfigViewModel @Inject constructor(
     private fun runAction(actionId: String) {
         if (_state.value.isAnyActionRunning) return
         viewModelScope.launch {
+            if (actionId == OAUTH_LOGIN_ACTION) {
+                val current = _state.value
+                // 授权必须使用当前表单值，避免用户多点一次保存或误用旧凭证。
+                repository.updateConfig(current.pluginId, current.fields.associate { it.key to it.value })
+            }
             _state.update { state ->
                 state.copy(
                     actions = state.actions.map { action ->

@@ -1,5 +1,7 @@
 package github.ponyhuang.gimi.feature.chat
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -57,6 +59,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import github.ponyhuang.gimi.feature.chat.R
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
@@ -379,6 +382,16 @@ public fun ChatComposer(
             }
     }
 
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            launchCamera()
+        } else {
+            Toast.makeText(context, cameraErrorMessage, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     val componentFactory = LocalChatAiComponentFactory.current
     val recordingState = voiceInputState as? VoiceInputUiState.Recording
 
@@ -463,7 +476,14 @@ public fun ChatComposer(
             onDismiss = { showAttachmentOptions = false },
             onTakePhoto = {
                 showAttachmentOptions = false
-                launchCamera()
+                // 应用声明 CAMERA 后，系统拍照 Intent 也要求先获得运行时授权。
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED
+                ) {
+                    launchCamera()
+                } else {
+                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                }
             },
             onChoosePhotos = {
                 showAttachmentOptions = false

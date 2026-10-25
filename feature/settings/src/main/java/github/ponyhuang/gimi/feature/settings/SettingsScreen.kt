@@ -6,11 +6,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Extension
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.Psychology
@@ -81,6 +82,18 @@ fun SettingsScreen(
                                 action = SettingsAction.OpenMcpServers,
                             ),
                             SettingsNavigationItem(
+                                icon = Icons.Default.Hub,
+                                title = stringResource(R.string.settings_remote_agents_title),
+                                subtitle = stringResource(R.string.settings_remote_agents_subtitle),
+                                action = SettingsAction.OpenRemoteAgents,
+                            ),
+                            SettingsNavigationItem(
+                                icon = Icons.Default.Apps,
+                                title = stringResource(R.string.settings_appfunction_title),
+                                subtitle = stringResource(R.string.settings_appfunction_subtitle),
+                                action = SettingsAction.OpenAppFunctions,
+                            ),
+                            SettingsNavigationItem(
                                 icon = Icons.Default.Code,
                                 title = stringResource(R.string.settings_sandbox_title),
                                 subtitle = stringResource(R.string.settings_sandbox_subtitle),
@@ -108,12 +121,6 @@ fun SettingsScreen(
                 PreferenceGroupCard {
                     SettingsNavigationItems(
                         items = listOf(
-                            SettingsNavigationItem(
-                                icon = Icons.Default.Folder,
-                                title = stringResource(R.string.settings_work_files_title),
-                                subtitle = stringResource(R.string.settings_work_files_subtitle),
-                                action = SettingsAction.OpenWorkFiles,
-                            ),
                             SettingsNavigationItem(
                                 icon = Icons.Default.FolderOpen,
                                 title = stringResource(R.string.settings_workspace_title),

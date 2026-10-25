@@ -3,14 +3,14 @@ package github.ponyhuang.gimi.feature.chat
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -31,11 +31,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.Handyman
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -52,29 +51,30 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.domain.mcp.model.McpServer
+import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
+import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
+import github.ponyhuang.gimi.ui.components.FunctionIcon
 import github.ponyhuang.gimi.ui.components.GimiBottomSheet
 import github.ponyhuang.gimi.ui.components.GimiBottomSheetHeader
 import github.ponyhuang.gimi.ui.components.GimiBottomSheetOptionRow
 import github.ponyhuang.gimi.ui.components.GimiBottomSheetSwitchRow
-import androidx.compose.ui.tooling.preview.Preview
-import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
@@ -413,14 +413,16 @@ private fun SheetDivider(withIcon: Boolean = true) {
 
 @Composable
 private fun NavigationRow(
-    icon: ImageVector,
+    icon: ImageVector? = null,
     title: String,
     subtitle: String,
     onClick: () -> Unit,
     testTag: String,
+    leadingIcon: (@Composable (Modifier) -> Unit)? = null,
 ) {
     PreferenceListItem(
         icon = icon,
+        leadingIcon = leadingIcon,
         title = title,
         subtitle = subtitle,
         onClick = onClick,
@@ -506,7 +508,7 @@ private fun OfficialToolsNavigationRow(
     onClick: () -> Unit,
 ) {
     NavigationRow(
-        icon = Icons.Outlined.Handyman,
+        leadingIcon = { FunctionIcon(it) },
         title = stringResource(R.string.chat_official_tools_title),
         subtitle = enabledCountText(enabledCount, isMcp = false),
         onClick = onClick,
@@ -679,7 +681,7 @@ private fun OfficialToolFunctionRow(
     onEnabledChange: (Boolean) -> Unit,
 ) {
     GimiBottomSheetSwitchRow(
-        icon = Icons.Outlined.Handyman,
+        leadingIcon = { FunctionIcon(it) },
         label = officialFunctionLabel(toolId, function.id),
         description = officialFunctionDescription(toolId, function.id, function.description),
         checked = enabled,
@@ -1141,7 +1143,6 @@ private fun ChatSheetPreviewTheme(
         }
     }
 }
-
 
 @Preview(name = "权限 · 浅色", widthDp = 390, locale = "zh")
 @Preview(name = "权限 · 深色", widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)

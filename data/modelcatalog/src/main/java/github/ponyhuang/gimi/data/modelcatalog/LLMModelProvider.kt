@@ -36,6 +36,7 @@ data class LLMModelProvider(
     val iconRes: Int? = null,
     val homepageUrl: String = "",
     val keyHelpUrl: String = "",
+    val isAdded: Boolean = apiKey.isNotBlank(),
 ) {
     /** 当前 [baseType] 对应的实际请求地址。两种协议的地址分别保存，切换时互不覆盖。 */
     val activeApiBaseUrl: String

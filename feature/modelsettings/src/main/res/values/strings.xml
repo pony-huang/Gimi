@@ -10,7 +10,7 @@
     <string name="modelsettings_api_url_label">API 地址</string>
     <string name="modelsettings_api_protocol_label">接口标准</string>
     <string name="modelsettings_api_protocol_standard">OpenAI Chat Completions</string>
-    <string name="modelsettings_api_protocol_anthropic">Anthropic API 地址</string>
+    <string name="modelsettings_api_protocol_anthropic">Anthropic API</string>
     <string name="modelsettings_api_protocol_gemini">Gemini API</string>
 
     <!-- HeaderSection -->
@@ -46,12 +46,11 @@
     <string name="modelsettings_list_load_failed">模型目录加载失败</string>
 
     <!-- 模型种类分组名：默认模型页、服务详情模型列表与添加自定义模型共用，命名以默认模型页为准 -->
-    <string name="modelsettings_model_kind_chat">聊天</string>
+    <string name="modelsettings_model_kind_chat">LLM</string>
     <string name="modelsettings_model_kind_stt">STT</string>
     <string name="modelsettings_model_kind_tts">TTS</string>
 
     <!-- DefaultModelSettingsScreen -->
-    <string name="modelsettings_defaults_online_only_note">仅支持线上 API 模型</string>
 <string name="modelsettings_defaults_assistant_title">默认模型</string>
     <string name="modelsettings_defaults_assistant_subtitle">创建新助手时使用的模型</string>
     <string name="modelsettings_defaults_quick_title">快速模型</string>
@@ -152,4 +151,6 @@
     <string name="modelsettings_no_model_candidates">点击右上角刷新获取模型，或手动添加。</string>
     <string name="modelsettings_service_model_count">%1$d 个模型</string>
     <string name="modelsettings_service_enabled_label">启用 %1$s</string>
+    <string name="modelsettings_search_model_or_service">搜索模型或服务</string>
+    <string name="modelsettings_search_voice">搜索音色</string>
 </resources>

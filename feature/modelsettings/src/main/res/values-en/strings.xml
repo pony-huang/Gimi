@@ -8,7 +8,7 @@
     <string name="modelsettings_api_url_label">API endpoint</string>
     <string name="modelsettings_api_protocol_label">API standard</string>
     <string name="modelsettings_api_protocol_standard">OpenAI Chat Completions</string>
-    <string name="modelsettings_api_protocol_anthropic">Anthropic API endpoint</string>
+    <string name="modelsettings_api_protocol_anthropic">Anthropic API</string>
     <string name="modelsettings_api_protocol_gemini">Gemini API</string>
 
 
@@ -40,11 +40,10 @@
     <string name="modelsettings_list_load_failed">Failed to load the model catalog</string>
 
     <!-- Model kind group names shared by default model settings, service model list and the add-model dialog -->
-    <string name="modelsettings_model_kind_chat">Chat</string>
+    <string name="modelsettings_model_kind_chat">LLM</string>
     <string name="modelsettings_model_kind_stt">STT</string>
     <string name="modelsettings_model_kind_tts">TTS</string>
 
-    <string name="modelsettings_defaults_online_only_note">Online API models only</string>
 <string name="modelsettings_defaults_assistant_title">Default assistant model</string>
     <string name="modelsettings_defaults_assistant_subtitle">Model used when creating a new assistant</string>
     <string name="modelsettings_defaults_quick_title">Quick model</string>
@@ -144,4 +143,6 @@
     <string name="modelsettings_no_model_candidates">Refresh models or add one manually using the buttons in the top right.</string>
     <string name="modelsettings_service_model_count">%1$d models</string>
     <string name="modelsettings_service_enabled_label">Enable %1$s</string>
+    <string name="modelsettings_search_model_or_service">Search models or services</string>
+    <string name="modelsettings_search_voice">Search voices</string>
 </resources>

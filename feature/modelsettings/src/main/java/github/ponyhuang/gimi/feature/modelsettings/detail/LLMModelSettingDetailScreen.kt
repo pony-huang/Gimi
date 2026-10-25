@@ -95,8 +95,9 @@ fun LLMModelSettingDetailScreen(
         modifier = modifier.fillMaxSize(),
         transitionSpec = {
             val direction = if (targetState == ServiceEditorPage.Models) 1 else -1
-            (slideInHorizontally(tween(240, easing = FastOutSlowInEasing)) { direction * it / 5 } + fadeIn(tween(180))) togetherWith
-                (slideOutHorizontally(tween(200, easing = FastOutSlowInEasing)) { -direction * it / 8 } + fadeOut(tween(140)))
+            // 与应用导航使用相同的整页位移，避免两层页面同时淡出造成画布闪烁。
+            slideInHorizontally(initialOffsetX = { direction * it }) togetherWith
+                slideOutHorizontally(targetOffsetX = { -direction * it })
         },
         label = "ServiceEditorPage",
     ) { page ->

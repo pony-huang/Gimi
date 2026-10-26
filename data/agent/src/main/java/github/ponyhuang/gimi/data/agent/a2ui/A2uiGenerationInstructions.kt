@@ -12,13 +12,6 @@ internal fun catalogHas(capabilities: A2uiCapabilities, vararg names: String): B
 
 /** 容器只描述布局，业务内容仍由普通组件与标准 children 模板表达。 */
 internal fun containerRoutingInstructions(capabilities: A2uiCapabilities): String = buildString {
-    if (catalogHas(capabilities, "Panel")) appendLine("""
-        Prefer Panel for composed chat cards. header/footer are optional component IDs; children is a list
-        of component IDs or {"componentId":"item-template","path":"/items"}. Never nest components inline.
-        mode: static for natural flow, horizontal for a scrolling rail, vertical for a bounded feed,
-        pages for a gallery, grid for adaptive tiles. Keep repeated item layouts in one template.
-        Use basic Image/Text/Button/Row/Column/input components inside the panel; do not invent domain fields.
-    """.trimIndent())
     if (catalogHas(capabilities, "Disclosure")) appendLine(
         "Disclosure: summary is a component ID; children uses the standard child list/template. " +
             "initiallyExpanded is optional. Use for details/sources; expand/collapse is local.",

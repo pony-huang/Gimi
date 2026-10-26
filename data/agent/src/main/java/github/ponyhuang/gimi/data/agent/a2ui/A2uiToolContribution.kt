@@ -182,7 +182,7 @@ internal fun a2uiResponseRoutingInstructions(capabilities: A2uiCapabilities): St
     val nativeComponents = nativeA2uiComponentSummaries(capabilities.schemaJson)
     val containers = runCatching {
         Json.parseToJsonElement(capabilities.schemaJson).jsonObject["components"]?.jsonObject?.keys.orEmpty()
-            .intersect(setOf("Panel", "Disclosure", "Tabs", "DetailSheet"))
+            .intersect(setOf("Disclosure", "Tabs", "DetailSheet"))
     }.getOrDefault(emptySet())
     val componentBlock = if (nativeComponents.isEmpty()) {
         if (containers.isEmpty()) "No purpose-built native components are currently available, so prefer the normal Markdown response."
@@ -196,7 +196,7 @@ internal fun a2uiResponseRoutingInstructions(capabilities: A2uiCapabilities): St
     val composition = if (containers.isEmpty()) "" else """
         COMPOSABLE UI:
         Available containers: ${containers.joinToString()}.
-        Use Panel for structured results and forms; its mode supports static/horizontal/vertical/pages/grid.
+        Use basic Column/Row/List components for structured results and forms.
         Use Disclosure for expandable details, Tabs for local groups, and DetailSheet for local detail overlays,
         only when that type is listed above. Compose existing components inside them; reuse one children template
         with a data array for repeated items. Expand/switch/open/close are local and require no business tools.
@@ -216,7 +216,7 @@ internal fun a2uiResponseRoutingInstructions(capabilities: A2uiCapabilities): St
         Also provide acceptLabel and rejectLabel that fit the domain, such as Want to go / Try another,
         Agree / Disagree, Like / Dislike, Save / Skip, or Want to visit / Not this place.
         Each item link needs its own contextual label, such as View note, Open map, View menu or Open design.
-        Do not rebuild this browsing experience with Panel, repeated Cards, or a Markdown-only list.
+        Do not rebuild this browsing experience with repeated Cards, or a Markdown-only list.
         Use normal Markdown or a simpler native component for one final recommendation, a non-comparative fact
         list, detailed prose, or when the request does not involve reviewing alternatives.
     """.trimIndent() else ""
@@ -293,7 +293,6 @@ private val GenericA2uiComponents = setOf(
     "DateTimeInput",
     "Modal",
     "Tabs",
-    "Panel",
     "Disclosure",
     "DetailSheet",
 )

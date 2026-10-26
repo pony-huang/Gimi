@@ -9,12 +9,12 @@ class A2uiToolContributionTest {
     @Test
     fun composableContainersEnableStructuredResultsWithoutTreatingThemAsDomainCards() {
         val instruction = a2uiResponseRoutingInstructions(A2uiCapabilities(
-            "catalog", """{"components":{"Panel":{},"Disclosure":{},"Tabs":{},"DetailSheet":{},"Text":{}}}""",
+            "catalog", """{"components":{"Column":{},"Disclosure":{},"Tabs":{},"DetailSheet":{},"Text":{}}}""",
         ))
         assertTrue(instruction.contains("COMPOSABLE UI"))
         assertTrue(instruction.contains("component_names"))
         assertTrue(instruction.contains("structured collections"))
-        assertFalse(instruction.contains("- Panel"))
+        assertFalse(instruction.contains("- Column"))
     }
 
     @Test
@@ -63,7 +63,7 @@ class A2uiToolContributionTest {
               "components": {
                 "Text": {},
                 "Card": {},
-                "Panel": {},
+                "Column": {},
                 "OptionDeck": {
                   "description": "Compare plans, social posts, nearby stores or places one at a time"
                 }
@@ -94,7 +94,7 @@ class A2uiToolContributionTest {
             Another article covers weather conditions in northern China.
         """.trimIndent()
 
-        assertFalse(requestedWeatherComponent(changes, setOf("Panel")))
+        assertFalse(requestedWeatherComponent(changes, setOf("Column")))
     }
 
     @Test
@@ -105,6 +105,6 @@ class A2uiToolContributionTest {
         assertFalse(requestedWeatherComponent("展示上海未来七天天气", weather))
         assertFalse(requestedWeatherComponent("Show a weather story inside a news digest", weather))
         assertFalse(requestedWeatherComponent("Show a DataTable comparing historical weather observations", setOf("DataTable")))
-        assertFalse(requestedWeatherComponent("Show an album of photos about today's weather", setOf("Panel", "Image")))
+        assertFalse(requestedWeatherComponent("Show an album of photos about today's weather", setOf("Column", "Image")))
     }
 }

@@ -14,7 +14,7 @@ class A2uiGenerationCatalogTest {
         val capabilities = A2uiCapabilities("catalog", """{
           "catalogId":"catalog",
           "components":{
-            "Panel":{"properties":{"body":{"${'$'}ref":"#/${'$'}defs/body"}}},
+            "Column":{"properties":{"body":{"${'$'}ref":"#/${'$'}defs/body"}}},
             "Text":{},"Unused":{"description":"unused-native-schema"}
           },
           "functions":{"format":{"properties":{"args":{"${'$'}ref":"#/${'$'}defs/args"}}}},
@@ -25,10 +25,10 @@ class A2uiGenerationCatalogTest {
             "unused":{"description":"unneeded-definition"}
           }
         }""")
-        val scoped = generationCatalog(capabilities, setOf("Panel"))
+        val scoped = generationCatalog(capabilities, setOf("Column"))
         val schema = Json.parseToJsonElement(scoped.schemaJson).jsonObject
         assertEquals("catalog", scoped.catalogId)
-        assertEquals(setOf("Panel", "Text"), schema.getValue("components").jsonObject.keys)
+        assertEquals(setOf("Column", "Text"), schema.getValue("components").jsonObject.keys)
         assertEquals(setOf("body", "args", "anyFunction"), schema.getValue("\$defs").jsonObject.keys)
         assertTrue(schema.getValue("functions").jsonObject.containsKey("format"))
         assertFalse(scoped.schemaJson.contains("unused-native-schema"))
@@ -46,9 +46,9 @@ class A2uiGenerationCatalogTest {
           "updateComponents":{"components":[{"id":"time","component":"DateTimeInput"}]}
         }"""))
         val capabilities = A2uiCapabilities("catalog", """{
-          "components":{"Text":{},"Panel":{},"DateTimeInput":{},"WeatherToday":{}}
+          "components":{"Text":{},"Column":{},"DateTimeInput":{},"WeatherToday":{}}
         }""")
-        val scoped = generationCatalog(capabilities, setOf("Panel") + previousComponentNames(previous))
+        val scoped = generationCatalog(capabilities, setOf("Column") + previousComponentNames(previous))
         val names = Json.parseToJsonElement(scoped.schemaJson).jsonObject.getValue("components").jsonObject.keys
         assertTrue("DateTimeInput" in names)
         assertFalse("WeatherToday" in names)

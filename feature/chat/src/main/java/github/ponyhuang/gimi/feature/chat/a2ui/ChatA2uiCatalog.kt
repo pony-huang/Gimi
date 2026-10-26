@@ -18,7 +18,7 @@ internal fun chatA2uiCatalog(openUrl: (String) -> Unit): A2uiCatalog {
             ChatA2uiText, defaults.icon, defaults.row, defaults.column, defaults.card, defaults.list,
             defaults.divider, ChatA2uiButton, defaults.textField, defaults.checkBox, defaults.choicePicker,
             defaults.slider, defaults.dateTimeInput,
-            ChatA2uiPanel, ChatA2uiDisclosure, ChatA2uiTabs, ChatA2uiDetailSheet,
+            ChatA2uiDisclosure, ChatA2uiTabs, ChatA2uiDetailSheet,
             ChatA2uiWeatherToday,
             musicPlayer,
             ChatA2uiDataTable,

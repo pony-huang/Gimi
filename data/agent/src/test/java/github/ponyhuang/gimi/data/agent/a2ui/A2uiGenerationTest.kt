@@ -153,7 +153,7 @@ class A2uiGenerationTest {
 
     @Test
     fun rejectsAnUnselectedNativeComponentAndValidatesCorrectionAgainstTheFullClientCatalog() = runTest {
-        val schema = """{"components":{"Text":{},"Panel":{},"WeatherToday":{"description":"unused-weather-schema"}}}"""
+        val schema = """{"components":{"Text":{},"Column":{},"WeatherToday":{"description":"unused-weather-schema"}}}"""
         val full = A2uiCapabilities("catalog", schema)
         val model = ScriptedModel(listOf(
             """[{"id":"root","component":"WeatherToday"}]""",
@@ -167,11 +167,11 @@ class A2uiGenerationTest {
             }
             override fun replay(records: List<A2uiRecord>) = emptyList<A2uiDocument>()
         }
-        A2uiGeneration(model, protocol).generate("surface", full, "Show a collection", requestedComponents = setOf("Panel"))
+        A2uiGeneration(model, protocol).generate("surface", full, "Show a collection", requestedComponents = setOf("Column"))
         assertEquals(2, model.requests.size)
         assertEquals(1, validated)
         val prompt = model.requests.first().config.systemInstruction!!.parts.single().text!!
-        assertTrue(prompt.contains("mode: static"))
+        assertFalse(prompt.contains("mode: static"))
         assertFalse(prompt.contains("unused-weather-schema"))
         assertFalse(prompt.contains("WEATHER COMPONENT ROUTING"))
         assertFalse(prompt.contains("REQUIRED INPUT SELECTION"))

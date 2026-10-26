@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CollectionInfo
 import androidx.compose.ui.semantics.CollectionItemInfo
@@ -36,13 +37,23 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.feature.chat.R
 
+/** 表体视口最多展示的行数，超出的行通过表体纵向滚动查看。 */
+private const val MAX_VISIBLE_ROWS = 10
+
+/** 单元格垂直内边距，需与 [DataTableRow] 的 padding 保持一致。 */
+private val CellVerticalPadding = 12.dp
+
+/** 行分隔线厚度，需与 [HorizontalDivider] 的默认厚度保持一致。 */
+private val DividerThickness = 1.dp
+
 /** 聊天目录的原生只读表格，不包含业务操作或编辑入口。 */
 internal object ChatA2uiDataTable : A2uiComponent {
     override val name = "DataTable"
     override val description = "Native read-only data table for comparisons, metrics and structured query results. " +
         "Use for tabular information instead of recreating aligned rows with Text/Row/List. " +
         "Use specialized weather and music components when they match the request. " +
-        "Supports a fixed header, horizontal scrolling for wide tables and internal vertical scrolling."
+        "Supports a fixed header, horizontal scrolling for wide tables and internal vertical scrolling. " +
+        "The body viewport shows at most ten rows at a time; longer tables scroll vertically inside the card."
     override val properties = listOf(DataTableA2uiProperty)
 
     @Composable
@@ -60,6 +71,11 @@ internal object ChatA2uiDataTable : A2uiComponent {
 internal fun DataTableCard(data: DataTableData, modifier: Modifier = Modifier) {
     val horizontalScroll = rememberScrollState()
     val verticalScroll = rememberScrollState()
+    // 表体视口最多显示十行，其余行在表体内纵向滚动；行高随字体缩放，大字号下不会被过早截断。
+    val rowHeight = with(LocalDensity.current) {
+        MaterialTheme.typography.bodyMedium.lineHeight.toDp()
+    } + CellVerticalPadding * 2
+    val bodyMaxHeight = (rowHeight + DividerThickness) * MAX_VISIBLE_ROWS
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
@@ -95,7 +111,7 @@ internal fun DataTableCard(data: DataTableData, modifier: Modifier = Modifier) {
                 },
             ) {
                 DataTableRow(data.columns.map { it.label }, data.columns, widths, 0, header = true)
-                Column(Modifier.heightIn(max = 192.dp).verticalScroll(verticalScroll)) {
+                Column(Modifier.heightIn(max = bodyMaxHeight).verticalScroll(verticalScroll)) {
                     data.rows.forEachIndexed { index, cells ->
                         DataTableRow(cells, data.columns, widths, index + 1, header = false)
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))

@@ -8,7 +8,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 
-/** 通用容器组合预览：折叠、网格、分组切换和详情浮层，全部使用真实基础组件。 */
+/** 通用容器组合预览：折叠、列表、分组切换和详情浮层，全部使用真实基础组件。 */
 @Preview(name = "容器合集 · 浅色", widthDp = 400, heightDp = 2200)
 @Composable
 fun ChatA2uiContainersLightPreview() = ChatA2uiContainerShowcase(dark = false)
@@ -21,11 +21,11 @@ fun ChatA2uiContainersDarkPreview() = ChatA2uiContainerShowcase(dark = true)
 @Composable
 fun ChatA2uiContainersExpandedPreview() = ChatA2uiContainerShowcase(dark = false, expanded = true)
 
-@Preview(name = "网格 · 窄屏大字", widthDp = 280, heightDp = 2700, fontScale = 1.3f)
+@Preview(name = "列表 · 窄屏大字", widthDp = 280, heightDp = 2700, fontScale = 1.3f)
 @Composable
 fun ChatA2uiContainersNarrowPreview() = ChatA2uiContainerShowcase(dark = false)
 
-@Preview(name = "网格 · 宽屏", widthDp = 840, heightDp = 1800)
+@Preview(name = "列表 · 宽屏", widthDp = 840, heightDp = 1800)
 @Composable
 fun ChatA2uiContainersWidePreview() = ChatA2uiContainerShowcase(dark = false)
 
@@ -87,11 +87,11 @@ internal fun containerPreviewMessages(
         {"id":"note","component":"TextField","label":"补充备注","value":{"path":"/note"}}
     ]""", """{"note":"","sources":[{"title":"产品说明"},{"title":"使用记录"},{"title":"补充资料"}]}""")
     addSurface("grid", """[
-        {"id":"root","component":"Panel","mode":"grid","header":"grid-header",
-         "children":{"componentId":"file-item","path":"/files"},"footer":"grid-footer"},
+        {"id":"root","component":"Column","children":["grid-header","file-list","grid-footer"],"align":"stretch"},
+        {"id":"file-list","component":"Column","children":{"componentId":"file-item","path":"/files"},"align":"stretch"},
         {"id":"grid-header","component":"Column","children":["grid-title","grid-caption"],"align":"stretch"},
         {"id":"grid-title","component":"Text","text":"最近的工作文件","variant":"h4"},
-        {"id":"grid-caption","component":"Text","text":"${if (emptyGrid) "暂无文件" else "4 个文件 · 可滑动浏览"}","variant":"caption"},
+        {"id":"grid-caption","component":"Text","text":"${if (emptyGrid) "暂无文件" else "4 个文件"}","variant":"caption"},
         {"id":"file-item","component":"Column","children":["file-cover","file-title","file-type","file-select"],"align":"stretch"},
         {"id":"file-cover","component":"Image","url":{"path":"cover"},"description":{"path":"title"},"variant":"mediumFeature"},
         {"id":"file-title","component":"Text","text":{"path":"title"},"variant":"h4"},
@@ -107,7 +107,7 @@ internal fun containerPreviewMessages(
         {"cover":"fixture://files/3","title":"交互说明","info":"PDF · 1.1 MB","selected":false}
     ]}""")
     addSurface("tabs", """[
-        {"id":"root","component":"Panel","header":"task-title","children":["task-tabs"],"footer":"task-note"},
+        {"id":"root","component":"Column","children":["task-title","task-tabs","task-note"],"align":"stretch"},
         {"id":"task-title","component":"Text","text":"手边的安排","variant":"h4"},
         {"id":"task-tabs","component":"Tabs","tabs":[{"title":"待处理","child":"pending"},{"title":"已完成","child":"completed"}]},
         {"id":"pending","component":"Column","children":["pending-list","task-name"],"align":"stretch"},
@@ -120,7 +120,7 @@ internal fun containerPreviewMessages(
         {"id":"task-note","component":"Text","text":"切换分组后，已填写的内容仍然保留。勾选仅修改示例数据。","variant":"caption"}
     ]""", """{"nextTask":"","pending":[{"title":"查看设计草案","checked":false},{"title":"整理本周想法","checked":true}]}""")
     addSurface("sheet", """[
-        {"id":"root","component":"Panel","header":"preview-title","children":["preview-summary","${if (detailBody) "detail-content" else "detail-sheet"}"]},
+        {"id":"root","component":"Column","align":"stretch","children":["preview-title","preview-summary","${if (detailBody) "detail-content" else "detail-sheet"}"]},
         {"id":"preview-title","component":"Text","text":"项目概览","variant":"h4"},
         {"id":"preview-summary","component":"Text","text":"PDF · 2.4 MB · 查看详情后可回到原来的浏览位置。","variant":"caption"},
         {"id":"detail-sheet","component":"DetailSheet","trigger":"open-detail","content":"detail-content"},

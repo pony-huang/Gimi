@@ -49,6 +49,9 @@ fun ChatRoute(
     // 保持聊天状态与宿主 Activity 生命周期一致。
     val viewModel: ChatViewModel = activityScopedChatViewModel()
     val recommendationViewModel: ChatRecommendationsViewModel = hiltViewModel()
+    val exportViewModel: SessionExportViewModel = hiltViewModel()
+    val exportState by exportViewModel.uiState.collectAsStateWithLifecycle()
+    SessionExportEffects(exportViewModel)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val recommendations by recommendationViewModel.recommendations.collectAsStateWithLifecycle()
     val currentSessionId = uiState.sessionId
@@ -60,6 +63,7 @@ fun ChatRoute(
         stringResource(R.string.chat_notice_current_conversation_busy)
     val chatNoticeDeleteFailed = stringResource(R.string.chat_notice_delete_failed)
     val chatNoticeActiveDeleteBlocked = stringResource(R.string.chat_notice_active_delete_blocked)
+    val chatNoticeCurrentDeleteProtected = stringResource(R.string.chat_drawer_current_session_protected)
     val chatNoticeMixedAttachmentCategories =
         stringResource(R.string.chat_notice_mixed_attachment_categories)
     val chatNoticeChatModelUnavailable = stringResource(R.string.chat_notice_chat_model_unavailable)
@@ -102,6 +106,7 @@ fun ChatRoute(
                     ChatNotice.ParallelTaskLimitReached -> chatNoticeParallelLimit
                     ChatNotice.CurrentConversationBusy -> chatNoticeCurrentConversationBusy
                     ChatNotice.ActiveConversationDeleteBlocked -> chatNoticeActiveDeleteBlocked
+                    ChatNotice.CurrentConversationDeleteProtected -> chatNoticeCurrentDeleteProtected
                     ChatNotice.ConversationDeleteFailed -> chatNoticeDeleteFailed
                     ChatNotice.MixedAttachmentCategories -> chatNoticeMixedAttachmentCategories
                     ChatNotice.ChatModelUnavailable -> chatNoticeChatModelUnavailable
@@ -159,6 +164,9 @@ fun ChatRoute(
             viewModel.onAction(ChatAction.SetThemeMode(mode))
         },
         showUpdateBadge = uiState.hasUpdateBadge,
+        exportState = exportState,
+        onExportConversation = exportViewModel::requestExport,
+        onDeleteConversation = { viewModel.onAction(ChatAction.DeleteConversation(it)) },
     ) {
         ChatScaffold(
             state = uiState,

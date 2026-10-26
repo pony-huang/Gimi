@@ -6,14 +6,17 @@ import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeState
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskSource
 import io.mockk.mockk
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.fail
 import org.junit.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class InMemoryAgentRuntimeGateTest {
     private val context = mockk<Context>(relaxed = true)
     private fun createGate() = InMemoryAgentRuntimeGate(context)
@@ -110,5 +113,46 @@ class InMemoryAgentRuntimeGateTest {
         val lease = acquire.await()
         assertEquals(1, (gate.state.value as AgentRuntimeState.Busy).tasks.size)
         lease.release()
+    }
+
+    @Test
+    fun snapshotBlocksItsActiveSessionButAllowsOtherIdleSessions() = runTest {
+        val gate = createGate()
+        val lease = gate.acquire(AgentTaskSource.CHAT, "active", AgentTaskPhase.WAITING_FOR_INPUT)
+        assertSame(AgentMutationResult.BlockedByActiveAgent, gate.readSessionSnapshot("active") { error("must not read") })
+        assertSame(AgentMutationResult.BlockedByActiveAgent, gate.readSessionSnapshot(null) { error("must not read") })
+        assertEquals(AgentMutationResult.Applied(42), gate.readSessionSnapshot("idle") { 42 })
+        lease.release()
+    }
+
+    @Test
+    fun newTasksWaitForSnapshotAndCancellationReleasesItsLock() = runTest {
+        val gate = createGate()
+        val started = CompletableDeferred<Unit>()
+        val snapshot = async {
+            gate.readSessionSnapshot("session") {
+                started.complete(Unit)
+                CompletableDeferred<Unit>().await()
+            }
+        }
+        started.await()
+        val task = async { gate.acquire(AgentTaskSource.CHAT, "session") }
+        runCurrent()
+        assertEquals(false, task.isCompleted)
+        snapshot.cancel()
+        snapshot.join()
+        task.await().release()
+        assertEquals(AgentMutationResult.Applied(Unit), gate.readSessionSnapshot("session") {})
+    }
+
+    @Test
+    fun failedSnapshotReleasesItsLock() = runTest {
+        val gate = createGate()
+        try {
+            gate.readSessionSnapshot("session") { throw java.io.IOException("read failed") }
+            fail("Expected read failure")
+        } catch (_: java.io.IOException) {
+            gate.acquire(AgentTaskSource.CHAT, "session").release()
+        }
     }
 }

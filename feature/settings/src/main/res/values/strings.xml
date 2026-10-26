@@ -87,4 +87,11 @@
     <string name="settings_group_about">关于</string>
     <string name="settings_appfunction_title">AppFunciton</string>
     <string name="settings_appfunction_subtitle">发现并使用应用提供的功能</string>
+    <string name="session_export_all">导出全部会话</string>
+    <string name="session_export_subtitle">一个会话保存为 JSONL，多个会话打包为 ZIP</string>
+    <string name="session_export_working">正在导出，请稍候…</string>
+    <string name="session_export_empty">暂无会话可导出</string>
+    <string name="session_export_blocked">任务进行中，结束后可导出</string>
+    <string name="session_export_succeeded">会话已导出</string>
+    <string name="session_export_failed">导出失败，请重试</string>
 </resources>

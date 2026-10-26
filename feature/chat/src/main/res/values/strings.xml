@@ -291,4 +291,11 @@
     <string name="chat_a2ui_collapsed">已收起</string>
     <string name="chat_a2ui_expand">展开内容</string>
     <string name="chat_a2ui_collapse">收起内容</string>
+    <string name="session_export_single">导出会话</string>
+    <string name="session_export_actions">会话操作</string>
+    <string name="session_delete_single">删除会话</string>
+    <string name="session_export_empty">暂无会话可导出</string>
+    <string name="session_export_blocked">任务进行中，结束后可导出</string>
+    <string name="session_export_succeeded">会话已导出</string>
+    <string name="session_export_failed">导出失败，请重试</string>
 </resources>

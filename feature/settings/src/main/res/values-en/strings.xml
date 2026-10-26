@@ -87,4 +87,11 @@
     <string name="settings_group_about">About</string>
     <string name="settings_appfunction_title">AppFunciton</string>
     <string name="settings_appfunction_subtitle">Discover and use functions from apps</string>
+    <string name="session_export_all">Export all conversations</string>
+    <string name="session_export_subtitle">Save one conversation as JSONL or multiple conversations as a ZIP</string>
+    <string name="session_export_working">Exporting…</string>
+    <string name="session_export_empty">No conversations to export</string>
+    <string name="session_export_blocked">A task is in progress. Export when it finishes.</string>
+    <string name="session_export_succeeded">Conversations exported</string>
+    <string name="session_export_failed">Export failed. Please try again.</string>
 </resources>

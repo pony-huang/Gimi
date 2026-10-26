@@ -281,4 +281,11 @@
     <string name="chat_a2ui_collapsed">Collapsed</string>
     <string name="chat_a2ui_expand">Expand content</string>
     <string name="chat_a2ui_collapse">Collapse content</string>
+    <string name="session_export_single">Export conversation</string>
+    <string name="session_export_actions">Conversation actions</string>
+    <string name="session_delete_single">Delete conversation</string>
+    <string name="session_export_empty">No conversations to export</string>
+    <string name="session_export_blocked">A task is in progress. Export when it finishes.</string>
+    <string name="session_export_succeeded">Conversations exported</string>
+    <string name="session_export_failed">Export failed. Please try again.</string>
 </resources>

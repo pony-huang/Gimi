@@ -1471,6 +1471,34 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun deletingANonCurrentConversationRemovesItWithItsAttachments() = runTest {
+        val fixture = fixture(configured = true, sessionIds = listOf("session-1"))
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        fixture.viewModel.onAction(ChatAction.DeleteConversation("other-session"))
+        advanceUntilIdle()
+        coVerify(exactly = 1) { fixture.conversations.deleteConversation("other-session") }
+        coVerify(exactly = 1) { fixture.attachments.deleteSession("other-session") }
+    }
+
+    @Test
+    fun deletingTheCurrentConversationIsRefusedWithNotice() = runTest {
+        val fixture = fixture(configured = true, sessionIds = listOf("session-1"))
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        assertEquals("session-1", fixture.viewModel.uiState.value.sessionId)
+        fixture.viewModel.effects.test {
+            fixture.viewModel.onAction(ChatAction.DeleteConversation("session-1"))
+            assertEquals(
+                ChatEffect.ShowNotice(ChatNotice.CurrentConversationDeleteProtected),
+                awaitItem(),
+            )
+            coVerify(exactly = 0) { fixture.conversations.deleteConversation("session-1") }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun officialFunctionsExpandTheMarkerAndReuseLoadedDescriptors() = runTest {
         val catalog = toolFunctionCatalog()
         val fixture = fixture(configured = true, officialCatalogOverride = catalog)

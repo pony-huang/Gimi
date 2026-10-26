@@ -122,6 +122,9 @@ sealed interface ChatNotice {
     data object CurrentConversationBusy : ChatNotice
     data object ActiveConversationDeleteBlocked : ChatNotice
 
+    /** 目标会话正是当前正在使用的会话，不能删除。 */
+    data object CurrentConversationDeleteProtected : ChatNotice
+
     /** 有会话删除失败，保留选择以便重试。 */
     data object ConversationDeleteFailed : ChatNotice
 

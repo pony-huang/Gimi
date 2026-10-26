@@ -3,27 +3,29 @@ package github.ponyhuang.gimi.data.conversation.di
 import android.content.Context
 import androidx.room.Room
 import com.google.adk.kt.sessions.SessionService
-import dagger.Module
-import dagger.Provides
-import dagger.multibindings.IntoSet
-import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import dagger.hilt.InstallIn
+import dagger.Module
+import dagger.multibindings.IntoSet
+import dagger.Provides
 import github.ponyhuang.gimi.core.storage.ManagedDirectorySpec
-import github.ponyhuang.gimi.data.conversation.ToolAccessPreferences
-import github.ponyhuang.gimi.data.conversation.ToolApprovalPreferences
+import github.ponyhuang.gimi.data.conversation.attachment.AndroidChatAttachmentRepository
 import github.ponyhuang.gimi.data.conversation.conversationAttachmentDirectorySpec
 import github.ponyhuang.gimi.data.conversation.conversationDraftDirectorySpec
-import github.ponyhuang.gimi.data.conversation.attachment.AndroidChatAttachmentRepository
+import github.ponyhuang.gimi.data.conversation.export.AndroidConversationExportRepository
+import github.ponyhuang.gimi.data.conversation.local.ConversationMetadataDatabase
 import github.ponyhuang.gimi.data.conversation.repository.AdkConversationRepository
 import github.ponyhuang.gimi.data.conversation.repository.DefaultConversationSessionResolver
 import github.ponyhuang.gimi.data.conversation.runtime.InMemoryAgentRuntimeGate
-import github.ponyhuang.gimi.data.conversation.local.ConversationMetadataDatabase
+import github.ponyhuang.gimi.data.conversation.ToolAccessPreferences
+import github.ponyhuang.gimi.data.conversation.ToolApprovalPreferences
+import github.ponyhuang.gimi.domain.conversation.export.ConversationExportRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
-import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
+import github.ponyhuang.gimi.domain.conversation.repository.ToolApprovalRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import javax.inject.Singleton
@@ -31,6 +33,12 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object ConversationModule {
+
+    @Provides
+    @Singleton
+    fun provideConversationExportRepository(
+        implementation: AndroidConversationExportRepository,
+    ): ConversationExportRepository = implementation
 
     @Provides
     @IntoSet

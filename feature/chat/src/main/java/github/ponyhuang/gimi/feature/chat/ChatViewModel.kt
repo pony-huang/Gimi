@@ -802,7 +802,7 @@ class ChatViewModel @Inject constructor(
     /**
      * 删除指定 session，并刷新会话列表。
      *
-     * 守卫：若 [sessionId] 等于当前 `_uiState.value.sessionId`（即用户正在用的会话），直接 no-op —
+     * 守卫：若 [sessionId] 等于当前 `_uiState.value.sessionId`（即用户正在用的会话），拒绝并提示 —
      * 删掉当前会话会把 `sessionId` 留在一个已删除的 id 上，后续 `send()` 会因找不到 session 而失败。
      *
      * 副作用：删除成功后同步移除 RoomDatabase 中对应的会话元数据。
@@ -815,6 +815,7 @@ class ChatViewModel @Inject constructor(
         }
         if (sessionId == _uiState.value.sessionId) {
             Log.w(TAG, "deleteConversation($sessionId) refused: this is the active session.")
+            emitNotice(ChatNotice.CurrentConversationDeleteProtected)
             return
         }
         viewModelScope.launch {

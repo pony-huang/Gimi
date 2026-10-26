@@ -243,6 +243,9 @@ class RecommendationRefresherTest {
 
         override suspend fun <T> runMutation(block: suspend () -> T): AgentMutationResult<T> =
             AgentMutationResult.Applied(block())
+
+        override suspend fun <T> readSessionSnapshot(sessionId: String?, block: suspend () -> T): AgentMutationResult<T> =
+            AgentMutationResult.Applied(block())
     }
 
     private class BusyGate : AgentRuntimeGate {
@@ -255,6 +258,9 @@ class RecommendationRefresherTest {
         ): AgentRunLease = error("Not used")
 
         override suspend fun <T> runMutation(block: suspend () -> T): AgentMutationResult<T> =
+            AgentMutationResult.BlockedByActiveAgent
+
+        override suspend fun <T> readSessionSnapshot(sessionId: String?, block: suspend () -> T): AgentMutationResult<T> =
             AgentMutationResult.BlockedByActiveAgent
     }
 }

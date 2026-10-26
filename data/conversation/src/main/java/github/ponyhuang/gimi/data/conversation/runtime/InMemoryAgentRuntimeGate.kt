@@ -10,6 +10,7 @@ import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeState
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskSource
+import github.ponyhuang.gimi.domain.conversation.runtime.blocksSessionRead
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,6 +67,17 @@ class InMemoryAgentRuntimeGate @Inject constructor(
             AgentRuntimeState.Idle
         } else {
             AgentRuntimeState.Busy(tasks.values.toList())
+        }
+    }
+
+    override suspend fun <T> readSessionSnapshot(
+        sessionId: String?,
+        block: suspend () -> T,
+    ): AgentMutationResult<T> = mutationMutex.withLock {
+        if (state.value.blocksSessionRead(sessionId)) {
+            AgentMutationResult.BlockedByActiveAgent
+        } else {
+            AgentMutationResult.Applied(block())
         }
     }
 

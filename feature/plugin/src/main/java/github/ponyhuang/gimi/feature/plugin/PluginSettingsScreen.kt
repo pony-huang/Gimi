@@ -352,19 +352,22 @@ private fun PluginRowCard(
                         )
                     }
                 }
-                if (item.isInstalled) {
-                    GimiSwitch(
-                        checked = item.installed?.isEnabled == true,
-                        onCheckedChange = onToggleEnabled,
-                        enabled = mutationEnabled,
-                    )
-                }
+                // 尾部顺序与 MCP 服务列表、A2A 远程 Agent 列表保持一致：溢出菜单在前，开关贴行尾。
                 PluginRowMenu(
                     installed = item.isInstalled,
                     enabled = mutationEnabled,
                     onOpenDetail = onOpenDetail,
                     onUninstall = onUninstall,
                 )
+                if (item.isInstalled) {
+                    // 菜单与开关都是 48dp 触控盒，留一点间距避免两者紧贴糊在一起。
+                    Spacer(Modifier.width(4.dp))
+                    GimiSwitch(
+                        checked = item.installed?.isEnabled == true,
+                        onCheckedChange = onToggleEnabled,
+                        enabled = mutationEnabled,
+                    )
+                }
             }
             if (!item.isInstalled || item.isUpdateAvailable) {
                 PluginInstallAction(

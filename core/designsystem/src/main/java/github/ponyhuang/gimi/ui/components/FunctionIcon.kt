@@ -17,7 +17,7 @@ fun FunctionIcon(modifier: Modifier = Modifier) {
     Icon(
         painter = painterResource(R.drawable.ic_function_24),
         contentDescription = null,
-        tint = MaterialTheme.colorScheme.onSurface,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = modifier,
     )
 }

@@ -3,7 +3,7 @@
     <string name="stream_ai_compose_speech_to_text_idle_button">语音输入</string>
     <string name="stream_ai_compose_composer_mic_permission_message">录制音频需要麦克风权限</string>
     <string name="stream_ai_compose_composer_mic_permission_action">设置</string>
-    <string name="stream_ai_compose_composer_input_placeholder">问问助手</string>
+    <string name="stream_ai_compose_composer_input_placeholder">Ask</string>
     <string name="stream_ai_compose_composer_stop_button">停止</string>
     <string name="stream_ai_compose_composer_send_button">发送</string>
     <string name="stream_ai_compose_composer_add_attachments_button">添加上下文</string>

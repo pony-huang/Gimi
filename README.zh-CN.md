@@ -90,7 +90,7 @@ AppFunciton”并启用应用后，其 AppFunction 会提供给 Agent 使用；�
 | **Anthropic** | 联网搜索 |
 | **MiniMax** | 联网搜索、文生图、参考图生成 |
 | **智谱 GLM** | 联网搜索、网页读取 |
-| **Kimi** | Kimi 工具集（formulas） |
+| **Kimi** | Kimi 联网搜索 Basic / Pro、网页抓取 |
 
 厂商原生执行的联网搜索（Anthropic、MiniMax）由厂商远端完成检索，在对应服务的 Anthropic 协议下提供。MiniMax 图像生成可与其他服务的对话模型混用，使用 MiniMax 服务的凭据。
 

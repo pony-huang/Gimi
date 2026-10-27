@@ -124,7 +124,7 @@ capabilities in the conversation's *Official tools* panel.
 | **Anthropic** | Web search |
 | **MiniMax** | Web search, text-to-image, reference-image generation |
 | **GLM (Zhipu)** | Web search, webpage reading |
-| **Kimi** | Kimi tool collection (formulas) |
+| **Kimi** | Kimi Search Basic, Search Pro, and web fetch |
 
 Provider-executed web search (Anthropic, MiniMax) runs on the provider's side and is offered under
 the service's Anthropic protocol. MiniMax image generation can be used with chat models from other

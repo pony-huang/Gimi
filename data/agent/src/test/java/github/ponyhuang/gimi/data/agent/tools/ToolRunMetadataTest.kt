@@ -22,7 +22,7 @@ class ToolRunMetadataTest {
         val configuration = ConversationToolConfiguration(
             enabledMcpServerIds = setOf("github"),
             enabledOfficialFunctionIds = mapOf(
-                "kimi_formulas" to setOf("translate", "code"),
+                "kimi_web_tools" to setOf("translate", "code"),
             ),
         )
 
@@ -87,7 +87,7 @@ class ToolRunMetadataTest {
             toolConfiguration = ConversationToolConfiguration(
                 enabledMcpServerIds = setOf("github"),
                 enabledOfficialFunctionIds = mapOf(
-                    "kimi_formulas" to setOf("translate"),
+                    "kimi_web_tools" to setOf("translate"),
                 ),
             ),
             allowConfirmationRequiredTools = false,

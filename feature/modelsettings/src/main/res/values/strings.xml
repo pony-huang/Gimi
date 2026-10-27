@@ -133,7 +133,7 @@
     <string name="modelsettings_tool_url">网页上下文</string>
     <string name="modelsettings_tool_maps">Google 地图</string>
     <string name="modelsettings_tool_glm">联网搜索与网页阅读</string>
-    <string name="modelsettings_tool_formulas">Kimi 公式工具</string>
+    <string name="modelsettings_tool_kimi_web_tools">Kimi 联网工具</string>
     <string name="modelsettings_tool_cross_model">可供其他聊天模型调用。</string>
     <string name="modelsettings_tool_native">可用性受当前协议及模型支持范围限制。</string>
     <string name="modelsettings_tools_save_hint">返回服务详情后，点击“保存修改”使设置生效。暂停服务会保留此偏好。</string>

@@ -288,19 +288,19 @@ class AgentFactoryToolAccessTest {
     )
 
     /**
-     * 目录 mock:暴露一个检索候选声明(Kimi formulas 形态),驱动 ON_DEMAND
+     * 目录 mock:暴露一个检索候选声明(Kimi web tools 形态),驱动 ON_DEMAND
      * 模式的候选源装配路径。
      */
     private fun officialCatalog(): OfficialToolFunctionCatalog = mockk {
         every { enabledSearchCandidateSpecs() } returns emptyList()
         every { all } returns listOf(
             OfficialToolSpec(
-                toolId = "kimi_formulas",
+                toolId = "kimi_web_tools",
                 serviceId = "kimi",
                 protocols = setOf(ApiProtocol.OpenaiChatcompletions),
-                displayName = "Kimi formulas",
+                displayName = "Kimi web tools",
                 searchCandidate = true,
-                binding = OfficialToolBinding.ProviderDeclaration("formula_tool"),
+                binding = OfficialToolBinding.ProviderDeclaration("kimi_search_pro"),
             ),
         )
     }

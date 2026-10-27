@@ -36,13 +36,13 @@ class ChatAddToChatStateTest {
         val state = ChatAddToChatState(
             configuration = ConversationToolConfiguration(
                 enabledOfficialFunctionIds = mapOf(
-                    KIMI_FORMULAS_TOOL_ID to
+                    KIMI_WEB_TOOLS_TOOL_ID to
                         setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
                 ),
             ),
             officialTools = listOf(
                 OfficialToolDescriptor(
-                    id = KIMI_FORMULAS_TOOL_ID,
+                    id = KIMI_WEB_TOOLS_TOOL_ID,
                     functions = listOf(
                         OfficialToolFunction("convert", "convert", "convert formula"),
                         OfficialToolFunction("rethink", "rethink", "rethink formula"),
@@ -51,8 +51,8 @@ class ChatAddToChatStateTest {
             ),
         )
 
-        assertEquals(2, state.enabledOfficialFunctionCount(KIMI_FORMULAS_TOOL_ID))
+        assertEquals(2, state.enabledOfficialFunctionCount(KIMI_WEB_TOOLS_TOOL_ID))
     }
 }
 
-private const val KIMI_FORMULAS_TOOL_ID: String = "kimi_formulas"
+private const val KIMI_WEB_TOOLS_TOOL_ID: String = "kimi_web_tools"

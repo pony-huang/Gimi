@@ -125,7 +125,7 @@
     <string name="modelsettings_tool_url">URL context</string>
     <string name="modelsettings_tool_maps">Google Maps</string>
     <string name="modelsettings_tool_glm">Web search and reader</string>
-    <string name="modelsettings_tool_formulas">Kimi formula tools</string>
+    <string name="modelsettings_tool_kimi_web_tools">Kimi web tools</string>
     <string name="modelsettings_tool_cross_model">Can be used by other chat models.</string>
     <string name="modelsettings_tool_native">Availability is limited by the current protocol and model.</string>
     <string name="modelsettings_tools_save_hint">Return to the service and save to apply changes. Pausing preserves this preference.</string>

@@ -26,7 +26,7 @@ class OfficialToolSupportTest {
             listOf(service("anthropic"), service("openai"), service("minimax"), service("kimi")),
         )
         assertEquals(
-            listOf(OfficialToolIds.ANTHROPIC_WEB_SEARCH, OfficialToolIds.MINIMAX_IMAGE_GENERATION),
+            listOf(OfficialToolIds.ANTHROPIC_WEB_SEARCH, OfficialToolIds.MINIMAX_IMAGE_GENERATION, OfficialToolIds.KIMI_WEB_TOOLS),
             specs.map { it.toolId },
         )
         assertFalse(specs.any { it.toolId == OfficialToolIds.MINIMAX_WEB_SEARCH })
@@ -46,6 +46,19 @@ class OfficialToolSupportTest {
     @Test
     fun crossModelToolsRequireSupportedSourceProtocol() {
         assertTrue(available(listOf(service("minimax").copy(apiProtocol = ApiProtocol.Gemini))).isEmpty())
+    }
+
+    @Test
+    fun kimiIndependentToolsRequireEnabledCredentialedSource() {
+        assertEquals(listOf(OfficialToolIds.KIMI_WEB_TOOLS), available(listOf(service("kimi"))).map { it.toolId })
+        for (source in listOf(
+            service("kimi").copy(isEnabled = false),
+            service("kimi").copy(isOfficialToolsEnabled = false),
+            service("kimi").copy(apiKey = " "),
+            service("kimi").copy(apiProtocol = ApiProtocol.Gemini),
+        )) {
+            assertTrue(available(listOf(source)).isEmpty())
+        }
     }
 
     @Test

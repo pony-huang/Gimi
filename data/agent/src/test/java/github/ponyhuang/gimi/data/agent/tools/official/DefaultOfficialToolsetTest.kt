@@ -20,7 +20,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -48,7 +47,8 @@ class DefaultOfficialToolsetTest {
     fun deepSeekReceivesItsWebToolsAndCrossModelImageFunctions() = runTest {
         assertEquals(
             setOf("minimax_text_to_image", "minimax_image_to_image",
-                OfficialToolIds.DEEPSEEK_WEB_SEARCH, OfficialToolIds.DEEPSEEK_WEB_FETCH),
+                OfficialToolIds.DEEPSEEK_WEB_SEARCH, OfficialToolIds.DEEPSEEK_WEB_FETCH,
+                OfficialToolIds.KIMI_SEARCH, OfficialToolIds.KIMI_SEARCH_PRO, OfficialToolIds.KIMI_FETCH),
             toolset().resolveTools(config(serviceId = "deepseek"), selection = null)
                 .map { it.name }.toSet(),
         )
@@ -122,7 +122,7 @@ class DefaultOfficialToolsetTest {
     fun skipsCrossModelToolsWhenTheirServiceDisablesOfficialTools() = runTest {
         val modelServices = allServices(officialToolsEnabled = false)
         val catalog = testCatalog(modelServices)
-        val factory = OfficialToolFactory(testKimiFormulaCache(), testHttpClient(), modelServices)
+        val factory = OfficialToolFactory(testHttpClient(), modelServices)
 
         val tools = DefaultOfficialToolset(catalog, factory, FakeToolAccessRepository()).resolveTools(
             config(serviceId = "openai", baseType = ApiProtocol.OpenaiChatcompletions),
@@ -262,7 +262,7 @@ class DefaultOfficialToolsetTest {
     fun glmToolsEmptyWithoutCredentials() = runTest {
         val modelServices = emptyServices()
         val catalog = testCatalog(modelServices)
-        val factory = OfficialToolFactory(testKimiFormulaCache(), testHttpClient(), modelServices)
+        val factory = OfficialToolFactory(testHttpClient(), modelServices)
 
         assertTrue(
             DefaultOfficialToolset(catalog, factory, FakeToolAccessRepository())
@@ -274,80 +274,80 @@ class DefaultOfficialToolsetTest {
     // ---------------------------------------------------------------- Kimi
 
     @Test
-    fun kimiFormulasResolveFromRemoteManifest() = runTest {
-        val tools = toolset(manifestClient(200, MANIFEST_BODY))
+    fun kimiWebToolsResolveWithoutRemoteManifest() = runTest {
+        val tools = toolset(cannedClient(500, "{}"))
             .resolveTools(config(serviceId = "kimi", modelId = "kimi-k2.5"), selection = null)
 
-        assertTrue(tools.any { it.name == "translate" })
+        assertTrue(tools.any { it.name == OfficialToolIds.KIMI_SEARCH })
     }
 
     @Test
-    fun kimiFormulasRequireModelFamilyMatch() = runTest {
+    fun kimiWebToolsDoNotRequireModelFamilyMatch() = runTest {
         assertTrue(
-            toolset(manifestClient(200, MANIFEST_BODY))
+            toolset(cannedClient(500, "{}"))
                 .resolveTools(config(serviceId = "kimi", modelId = "other-model"), null)
-                .none { it.name == "translate" },
+                .any { it.name == OfficialToolIds.KIMI_SEARCH },
         )
     }
 
     @Test
-    fun kimiFormulasFilteredByEnabledFunctionIds() = runTest {
+    fun kimiWebToolsFilteredByEnabledFunctionIds() = runTest {
         val selection = ConversationToolConfiguration(
-            enabledOfficialFunctionIds = mapOf("kimi_formulas" to setOf("missing_function")),
+            enabledOfficialFunctionIds = mapOf("kimi_web_tools" to setOf(OfficialToolIds.KIMI_SEARCH_PRO)),
         )
 
-        assertTrue(
-            toolset(manifestClient(200, MANIFEST_BODY))
-                .resolveTools(config(serviceId = "kimi", modelId = "kimi-k2.5"), selection)
-                .none { it.name == "translate" },
+        assertEquals(
+            listOf(OfficialToolIds.KIMI_SEARCH_PRO),
+            toolset(cannedClient(500, "{}"))
+                .resolveTools(config(serviceId = "kimi", modelId = "kimi-k2.5"), selection).map { it.name },
         )
     }
 
     @Test
-    fun kimiFormulasResolveAllWhenMarkerPresent() = runTest {
+    fun kimiWebToolsResolveAllWhenMarkerPresent() = runTest {
         val selection = ConversationToolConfiguration(
             enabledOfficialFunctionIds = mapOf(
-                "kimi_formulas" to setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
+                "kimi_web_tools" to setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
             ),
         )
 
-        val tools = toolset(manifestClient(200, MANIFEST_BODY))
+        val tools = toolset(cannedClient(500, "{}"))
             .resolveTools(config(serviceId = "kimi", modelId = "kimi-k2.5"), selection)
 
-        assertTrue(tools.any { it.name == "translate" })
+        assertTrue(tools.any { it.name == OfficialToolIds.KIMI_SEARCH })
     }
 
     @Test
-    fun kimiFormulasEmptyWhenManifestNetworkFails() = runTest {
+    fun kimiWebToolsRemainAvailableWhenNetworkFails() = runTest {
         assertTrue(
-            toolset(manifestClient(500, "{}"))
+            toolset(cannedClient(500, "{}"))
                 .resolveTools(config(serviceId = "kimi", modelId = "kimi-k2.5"), selection = null)
-                .none { it.name == "translate" },
+                .any { it.name == OfficialToolIds.KIMI_SEARCH },
         )
     }
 
     @Test
-    fun kimiFormulasResolveForAnthropicProtocol() = runTest {
-        val tools = toolset(manifestClient(200, MANIFEST_BODY))
+    fun kimiWebToolsResolveForAnthropicProtocol() = runTest {
+        val tools = toolset(cannedClient(500, "{}"))
             .resolveTools(
                 config(serviceId = "kimi", baseType = ApiProtocol.Anthropic, modelId = "kimi-k2.5"),
                 selection = null,
             )
 
-        assertTrue(tools.any { it.name == "translate" })
+        assertTrue(tools.any { it.name == OfficialToolIds.KIMI_SEARCH })
     }
 
     @Test
     fun searchCandidatesAreSkippedInOnDemandMode() = runTest {
         val selection = ConversationToolConfiguration(
             enabledOfficialFunctionIds = mapOf(
-                "kimi_formulas" to setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
+                "kimi_web_tools" to setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
             ),
         )
 
         // ON_DEMAND 模式下标记为检索候选的声明不再直接注入,由 tool_search 按需暴露。
         assertTrue(
-            toolset(manifestClient(200, MANIFEST_BODY), toolAccessMode = ToolAccessMode.ON_DEMAND)
+            toolset(cannedClient(500, "{}"), toolAccessMode = ToolAccessMode.ON_DEMAND)
                 .resolveTools(config(serviceId = "kimi", modelId = "kimi-k2.5"), selection)
                 .isEmpty(),
         )
@@ -368,32 +368,24 @@ class DefaultOfficialToolsetTest {
     }
 
     @Test
-    fun catalogAndAgentReuseTheSameCredentialScopedManifest() = runTest {
+    fun catalogAndAgentExposeFixedFunctionsWithoutNetworkRequests() = runTest {
         val requests = java.util.concurrent.atomic.AtomicInteger()
-        val client = cannedClient(200, MANIFEST_BODY) { requests.incrementAndGet() }
+        val client = cannedClient(500, "{}") { requests.incrementAndGet() }
         val services = allServices("key")
-        val formulas = testKimiFormulaCache(client)
-        val catalog = testCatalog(services, client, formulas)
-        val factory = OfficialToolFactory(formulas, client, services)
-        val functions = catalog.listFunctions("kimi_formulas")
-        val requestsAfterCatalog = requests.get()
-        val tools = DefaultOfficialToolset(catalog, factory, FakeToolAccessRepository())
-            .resolveTools(config(serviceId = "kimi", modelId = "kimi-k2.5"), selection = null)
-        assertEquals(listOf("translate"), functions.map { it.id })
-        val translated = tools.single { it.name == "translate" }.declaration()
-        assertEquals(listOf("text"), translated?.parameters?.required)
-        assertEquals("Input text", translated?.parameters?.properties?.get("text")?.description)
-        assertTrue(requestsAfterCatalog > 0)
-        assertEquals(requestsAfterCatalog, requests.get())
+        val catalog = testCatalog(services)
+        val factory = OfficialToolFactory(client, services)
+        val functions = catalog.listFunctions("kimi_web_tools")
+        val spec = catalog.all.single { it.toolId == "kimi_web_tools" }
+        assertEquals(functions.map { it.id }, factory.createTools(spec).map { it.name })
+        assertEquals(0, requests.get())
     }
 
     @Test
     fun everyDirectoryBindingHasAnAgentFactory() = runTest {
-        val client = manifestClient(200, MANIFEST_BODY)
+        val client = cannedClient(500, "{}")
         val services = allServices("key")
-        val formulas = testKimiFormulaCache(client)
-        val catalog = testCatalog(services, client, formulas)
-        val factory = OfficialToolFactory(formulas, client, services)
+        val catalog = testCatalog(services)
+        val factory = OfficialToolFactory(client, services)
         for (spec in catalog.all) {
             assertTrue("Missing factory for ${spec.toolId}", factory.createTools(spec).isNotEmpty())
         }
@@ -407,10 +399,9 @@ class DefaultOfficialToolsetTest {
         toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
     ): DefaultOfficialToolset {
         val services = allServices(credential)
-        val kimiFormulas = testKimiFormulaCache(httpClient)
         return DefaultOfficialToolset(
-            testCatalog(services, httpClient, kimiFormulas),
-            OfficialToolFactory(kimiFormulas, httpClient, services),
+            testCatalog(services),
+            OfficialToolFactory(httpClient, services),
             FakeToolAccessRepository(toolAccessMode),
         )
     }
@@ -440,9 +431,6 @@ class DefaultOfficialToolsetTest {
         }
     }
 
-    private fun manifestClient(code: Int, body: String): OkHttpClient =
-        cannedClient(code, body) { _: Request -> }
-
     private fun config(
         serviceId: String,
         baseType: ApiProtocol = ApiProtocol.OpenaiChatcompletions,
@@ -465,8 +453,4 @@ class DefaultOfficialToolsetTest {
         }
     }
 
-    private companion object {
-        const val MANIFEST_BODY =
-            """{"tools":[{"function":{"name":"translate","description":"Translate text","parameters":{"properties":{"text":{"description":"Input text"}},"required":["text"]}}}]}"""
-    }
 }

@@ -48,8 +48,8 @@
     <string name="chat_official_tool_text_to_image_description">根据文字描述生成图片</string>
     <string name="chat_official_tool_image_to_image">图生图</string>
     <string name="chat_official_tool_image_to_image_description">根据参考图片和文字描述生成图片</string>
-    <string name="chat_official_tool_kimi_formulas">Kimi 公式</string>
-    <string name="chat_official_tool_kimi_formulas_description">使用 Kimi 的公式计算能力</string>
+    <string name="chat_official_tool_kimi_web_tools">Kimi 联网工具</string>
+    <string name="chat_official_tool_kimi_web_tools_description">使用 Kimi 搜索网页或抓取正文</string>
     <string name="chat_official_tool_glm_web_search">GLM 网页搜索</string>
     <string name="chat_official_tool_glm_web_search_description">调用智谱搜索引擎获取最新的互联网信息</string>
     <string name="chat_official_tool_web_reader">网页阅读</string>
@@ -298,4 +298,10 @@
     <string name="session_export_blocked">任务进行中，结束后可导出</string>
     <string name="session_export_succeeded">会话已导出</string>
     <string name="session_export_failed">导出失败，请重试</string>
+    <string name="chat_official_tool_kimi_search_basic">Basic 搜索</string>
+    <string name="chat_official_tool_kimi_search_basic_description">返回摘要和可选网页正文</string>
+    <string name="chat_official_tool_kimi_search_pro">Pro 搜索</string>
+    <string name="chat_official_tool_kimi_search_pro_description">返回相关正文片段，支持站点与时间筛选</string>
+    <string name="chat_official_tool_kimi_fetch">网页抓取</string>
+    <string name="chat_official_tool_kimi_fetch_description">获取指定网页的 Markdown 正文</string>
 </resources>

@@ -46,8 +46,8 @@
     <string name="chat_official_tool_text_to_image_description">Generate an image from a text description</string>
     <string name="chat_official_tool_image_to_image">Image to image</string>
     <string name="chat_official_tool_image_to_image_description">Generate an image from a reference image and text</string>
-    <string name="chat_official_tool_kimi_formulas">Kimi formulas</string>
-    <string name="chat_official_tool_kimi_formulas_description">Use Kimi formula calculations</string>
+    <string name="chat_official_tool_kimi_web_tools">Kimi web tools</string>
+    <string name="chat_official_tool_kimi_web_tools_description">Search the web or fetch page content with Kimi</string>
     <string name="chat_official_tool_glm_web_search">GLM web search</string>
     <string name="chat_official_tool_glm_web_search_description">Search the web for current information with Zhipu’s search engine</string>
     <string name="chat_official_tool_web_reader">Web reader</string>
@@ -288,4 +288,10 @@
     <string name="session_export_blocked">A task is in progress. Export when it finishes.</string>
     <string name="session_export_succeeded">Conversations exported</string>
     <string name="session_export_failed">Export failed. Please try again.</string>
+    <string name="chat_official_tool_kimi_search_basic">Search Basic</string>
+    <string name="chat_official_tool_kimi_search_basic_description">Return summaries and optional full page text</string>
+    <string name="chat_official_tool_kimi_search_pro">Search Pro</string>
+    <string name="chat_official_tool_kimi_search_pro_description">Return relevant passages with site and date filters</string>
+    <string name="chat_official_tool_kimi_fetch">Web fetch</string>
+    <string name="chat_official_tool_kimi_fetch_description">Fetch a page as Markdown</string>
 </resources>

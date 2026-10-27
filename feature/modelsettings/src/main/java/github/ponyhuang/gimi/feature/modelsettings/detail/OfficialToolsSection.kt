@@ -62,7 +62,7 @@ fun OfficialToolsSection(service: LLMModelSetting, supported: List<OfficialToolS
                         OfficialToolIds.GEMINI_URL_CONTEXT -> R.string.modelsettings_tool_url
                         OfficialToolIds.GEMINI_GOOGLE_MAPS -> R.string.modelsettings_tool_maps
                         OfficialToolIds.GLM_WEB_SEARCH -> R.string.modelsettings_tool_glm
-                        else -> R.string.modelsettings_tool_formulas
+                        else -> R.string.modelsettings_tool_kimi_web_tools
                     }), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
                 }
             }

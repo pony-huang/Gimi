@@ -9,7 +9,8 @@ import github.ponyhuang.gimi.data.agent.tools.official.deepseek.DeepSeekWebToolA
 import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmReaderTool
 import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmWebSearchTool
 import github.ponyhuang.gimi.data.agent.tools.official.glm.GlmWebToolApi
-import github.ponyhuang.gimi.data.agent.tools.official.kimi.KimiFormulaTool
+import github.ponyhuang.gimi.data.agent.tools.official.kimi.KimiWebTool
+import github.ponyhuang.gimi.data.agent.tools.official.kimi.KimiWebToolApi
 import github.ponyhuang.gimi.data.agent.tools.official.minimax.MinimaxImageGenerationApi
 import github.ponyhuang.gimi.data.agent.tools.official.minimax.MinimaxImageGenerationTool
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolBinding
@@ -17,7 +18,6 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSpec
 import github.ponyhuang.gimi.domain.modelcatalog.model.canProvideOfficialTools
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
-import github.ponyhuang.gimi.domain.modelcatalog.repository.KimiFormulaSource
 import javax.inject.Inject
 import javax.inject.Singleton
 import okhttp3.OkHttpClient
@@ -25,7 +25,6 @@ import okhttp3.OkHttpClient
 /** 将纯目录声明适配为 ADK 工具；不再维护厂商支持矩阵和目录查询。 */
 @Singleton
 class OfficialToolFactory @Inject constructor(
-    private val kimiFormulas: KimiFormulaSource,
     private val httpClient: OkHttpClient,
     private val modelServices: AgentModelConfigurationSource,
 ) {
@@ -60,8 +59,9 @@ class OfficialToolFactory @Inject constructor(
                     val api = GlmWebToolApi(service.apiKey, service.activeApiBaseUrl, httpClient)
                     listOf(GlmWebSearchTool(api), GlmReaderTool(api))
                 }
-                OfficialToolIds.KIMI_FORMULAS -> kimiFormulas.fetch(service.id, service.apiKey).map {
-                    KimiFormulaTool(service.apiKey, it, httpClient)
+                OfficialToolIds.KIMI_WEB_TOOLS -> {
+                    val api = KimiWebToolApi(service.apiKey, httpClient)
+                    spec.staticFunctionIds.map { KimiWebTool(it, api) }
                 }
                 else -> error("No local tool factory for ${spec.toolId}")
             }

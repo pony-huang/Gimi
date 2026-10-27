@@ -19,7 +19,7 @@ import javax.inject.Singleton
  *
  * - 所有厂商工具由单一 [DefaultOfficialToolset] 在请求期按目录声明组装,无构建期 revision;
  * - ALWAYS_AVAILABLE 模式全部直接声明;ON_DEMAND 模式下厂商原生工具保持直接声明,
- *   标记为检索候选([OfficialToolSpec.searchCandidate],如 Kimi formulas)的声明
+ *   标记为检索候选([OfficialToolSpec.searchCandidate],如 Kimi 联网工具)的声明
  *   转为 tool_search 检索候选源;
  * - 目录展开用调用方提供的模型运行信息解析函数声明(官方函数按当前模型服务门控),
  *   解析失败只丢弃该来源。

@@ -6,7 +6,6 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolBinding
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSupport
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
-import github.ponyhuang.gimi.domain.modelcatalog.repository.KimiFormulaSource
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -123,14 +122,14 @@ class OfficialToolCatalogTest {
     @Test
     fun kimiMatchesBothFamilySpellingsAndProtocols() {
         assertEquals(
-            listOf("kimi_formulas"),
+            listOf("kimi_web_tools"),
             support.specsFor("kimi", ApiProtocol.OpenaiChatcompletions, "kimi-k2.5").map { it.toolId },
         )
         assertEquals(
-            listOf("kimi_formulas"),
+            listOf("kimi_web_tools"),
             support.specsFor("kimi", ApiProtocol.Anthropic, "moonshot-v1").map { it.toolId },
         )
-        assertFalse(support.specsFor("kimi", ApiProtocol.Gemini, "kimi-k2.5").any { it.toolId == "kimi_formulas" })
+        assertFalse(support.specsFor("kimi", ApiProtocol.Gemini, "kimi-k2.5").any { it.toolId == "kimi_web_tools" })
     }
 
     private fun catalogFor(serviceId: String? = null): DefaultOfficialToolFunctionCatalog {
@@ -144,6 +143,6 @@ class OfficialToolCatalogTest {
         val source = mockk<AgentModelConfigurationSource> {
             every { currentServices() } returns services
         }
-        return DefaultOfficialToolFunctionCatalog(support, source, mockk<KimiFormulaSource>())
+        return DefaultOfficialToolFunctionCatalog(support, source)
     }
 }

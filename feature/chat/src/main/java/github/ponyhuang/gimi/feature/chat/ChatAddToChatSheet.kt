@@ -905,7 +905,7 @@ private fun officialToolLabel(toolId: String): String = when (toolId) {
     OfficialToolIds.MINIMAX_WEB_SEARCH,
     OfficialToolIds.GEMINI_WEB_SEARCH,
     -> stringResource(R.string.chat_official_tool_web_search)
-    OfficialToolIds.KIMI_FORMULAS -> stringResource(R.string.chat_official_tool_kimi_formulas)
+    OfficialToolIds.KIMI_WEB_TOOLS -> stringResource(R.string.chat_official_tool_kimi_web_tools)
     OfficialToolIds.GLM_WEB_SEARCH -> stringResource(R.string.chat_official_tool_glm_web_search)
     OfficialToolIds.GEMINI_URL_CONTEXT -> stringResource(R.string.chat_official_tool_url_context)
     OfficialToolIds.GEMINI_GOOGLE_MAPS -> stringResource(R.string.chat_official_tool_google_maps)
@@ -922,8 +922,8 @@ private fun officialToolDescription(toolId: String): String = when (toolId) {
     OfficialToolIds.MINIMAX_WEB_SEARCH,
     OfficialToolIds.GEMINI_WEB_SEARCH,
     -> stringResource(R.string.chat_official_tool_web_search_description)
-    OfficialToolIds.KIMI_FORMULAS ->
-        stringResource(R.string.chat_official_tool_kimi_formulas_description)
+    OfficialToolIds.KIMI_WEB_TOOLS ->
+        stringResource(R.string.chat_official_tool_kimi_web_tools_description)
     OfficialToolIds.GLM_WEB_SEARCH ->
         stringResource(R.string.chat_official_tool_glm_web_search_description)
     OfficialToolIds.GEMINI_URL_CONTEXT ->
@@ -935,12 +935,18 @@ private fun officialToolDescription(toolId: String): String = when (toolId) {
 
 /**
  * 函数行展示:目录 ID 与工具相同的单函数工具复用工具文案;GLM 的两个本地函数
- * 和 MiniMax 生图函数按厂商函数名映射;Kimi 公式等动态函数展示厂商返回的信息。
+ * 和 MiniMax、Kimi 固定函数使用本地化文案。
  */
 @Composable
 private fun officialFunctionLabel(toolId: String, functionId: String): String =
     when {
         functionId == toolId -> officialToolLabel(toolId)
+        functionId == OfficialToolIds.KIMI_SEARCH ->
+            stringResource(R.string.chat_official_tool_kimi_search_basic)
+        functionId == OfficialToolIds.KIMI_SEARCH_PRO ->
+            stringResource(R.string.chat_official_tool_kimi_search_pro)
+        functionId == OfficialToolIds.KIMI_FETCH ->
+            stringResource(R.string.chat_official_tool_kimi_fetch)
         functionId == OfficialToolIds.GLM_WEB_SEARCH_FUNCTION ->
             stringResource(R.string.chat_official_tool_web_search)
         functionId == OfficialToolIds.GLM_WEB_READER_FUNCTION ->
@@ -956,6 +962,12 @@ private fun officialFunctionLabel(toolId: String, functionId: String): String =
 private fun officialFunctionDescription(toolId: String, functionId: String, fallback: String): String =
     when {
         functionId == toolId -> officialToolDescription(toolId)
+        functionId == OfficialToolIds.KIMI_SEARCH ->
+            stringResource(R.string.chat_official_tool_kimi_search_basic_description)
+        functionId == OfficialToolIds.KIMI_SEARCH_PRO ->
+            stringResource(R.string.chat_official_tool_kimi_search_pro_description)
+        functionId == OfficialToolIds.KIMI_FETCH ->
+            stringResource(R.string.chat_official_tool_kimi_fetch_description)
         functionId == OfficialToolIds.GLM_WEB_SEARCH_FUNCTION ->
             stringResource(R.string.chat_official_tool_web_search_description)
         functionId == OfficialToolIds.GLM_WEB_READER_FUNCTION ->
@@ -1126,6 +1138,35 @@ private fun ChatAddToChatOfficialToolsDetailPageDarkPreview() {
     ChatSheetPreviewTheme(darkTheme = true) {
         OfficialToolsDetailPage(
             state = previewMinimaxOfficialToolsState(),
+            onFunctionEnabledChange = { _, _, _ -> },
+            onRetry = {},
+        )
+    }
+}
+
+@Preview(name = "Kimi 联网工具-浅色", showBackground = true, widthDp = 390, locale = "zh")
+@Preview(name = "Kimi 联网工具-深色", showBackground = true, widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun KimiOfficialToolsPreview() {
+    ChatSheetPreviewTheme {
+        OfficialToolsDetailPage(
+            state = previewAddToChatState().copy(
+                configuration = ConversationToolConfiguration(
+                    enabledOfficialFunctionIds = mapOf(
+                        OfficialToolIds.KIMI_WEB_TOOLS to setOf(OfficialToolIds.KIMI_SEARCH_PRO, OfficialToolIds.KIMI_FETCH),
+                    ),
+                ),
+                officialTools = listOf(
+                    OfficialToolDescriptor(
+                        id = OfficialToolIds.KIMI_WEB_TOOLS,
+                        sourceServiceId = "kimi",
+                        sourceServiceName = "Kimi",
+                        functions = listOf(OfficialToolIds.KIMI_SEARCH, OfficialToolIds.KIMI_SEARCH_PRO, OfficialToolIds.KIMI_FETCH).map {
+                            OfficialToolFunction(id = it, name = it, description = it)
+                        },
+                    ),
+                ),
+            ),
             onFunctionEnabledChange = { _, _, _ -> },
             onRetry = {},
         )

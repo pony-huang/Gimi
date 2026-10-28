@@ -191,7 +191,6 @@ The default subscription contains:
 **About Xiaohongshu**: The plugin operates the website directly with an on-device WebView, without an
 MCP server or relay URL.
 
-See the [NetEase plugin notes](spec/zh/netease-plugin.md) (Chinese) for credential format, login
 flow, supported tools, and platform limitations.
 
 Third parties can build their own with the public plugin API.

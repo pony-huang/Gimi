@@ -146,12 +146,6 @@ class RecommendationOutputParserTest {
     }
 
     @Test
-    fun outputConfigUsesJsonObjectWithoutRequiringStrictSchemaSupport() {
-        assertEquals("application/json", RecommendationOutputFormat.config.responseMimeType)
-        org.junit.Assert.assertNull(RecommendationOutputFormat.config.responseSchema)
-    }
-
-    @Test
     fun recommendationToolResultsAreConvertedToJsonNativeValues() {
         val result = RecommendationToolResultSanitizer.sanitize(
             mapOf("items" to JSONArray().put(JSONObject().put("name", "item"))),

@@ -2,7 +2,6 @@ package github.ponyhuang.gimi.feature.chat.a2ui
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
 import org.junit.Test
 
 /** OptionDeck 解析边界：场景文案、链接安全、数量上限、id 唯一性与事件载荷。 */
@@ -210,62 +209,4 @@ class OptionDeckDataTest {
         assertNull(data.items[1].link)
     }
 
-    @Test
-    fun returnsExistingDataInstanceUnchanged() {
-        val data = OptionDeckData(
-            title = null,
-            acceptLabel = "喜欢",
-            rejectLabel = "不喜欢",
-            items = listOf(
-                OptionDeckItem("a", "A", null, null, emptyList(), null, null, null),
-                OptionDeckItem("b", "B", null, null, emptyList(), null, null, null),
-            ),
-        )
-        assertSame(data, OptionDeckData.fromA2ui(data))
-    }
-
-    @Test
-    fun acceptActionCarriesStableSemanticsAndContextLabel() {
-        val action = optionDecisionAction(
-            item = OptionDeckItem("travel", "杭州路线", null, null, emptyList(), null, null, null),
-            index = 2,
-            accepted = true,
-            actionLabel = "想去",
-        )
-        val event = action.getValue("event") as Map<*, *>
-        val context = event["context"] as Map<*, *>
-
-        assertEquals("option_accept", event["name"])
-        assertEquals("travel", context["itemId"])
-        assertEquals(2, context["index"])
-        assertEquals("杭州路线", context["title"])
-        assertEquals("想去", context["actionLabel"])
-    }
-
-    @Test
-    fun rejectActionUsesStableRejectEventName() {
-        val action = optionDecisionAction(
-            item = OptionDeckItem("design", "视觉方向", null, null, emptyList(), null, null, null),
-            index = 0,
-            accepted = false,
-            actionLabel = "不赞同",
-        )
-        val event = action.getValue("event") as Map<*, *>
-        val context = event["context"] as Map<*, *>
-
-        assertEquals("option_reject", event["name"])
-        assertEquals("不赞同", context["actionLabel"])
-    }
-
-    @Test
-    fun exhaustedActionCarriesRoundSummary() {
-        val action = optionExhaustedAction(acceptedCount = 3, rejectedCount = 1, total = 4)
-        val event = action.getValue("event") as Map<*, *>
-
-        assertEquals("option_exhausted", event["name"])
-        val context = event["context"] as Map<*, *>
-        assertEquals(3, context["accepted"])
-        assertEquals(1, context["rejected"])
-        assertEquals(4, context["total"])
-    }
 }

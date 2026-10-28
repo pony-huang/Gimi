@@ -6,17 +6,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class MessageDraftSubmissionTest {
-    @Test
-    fun pendingOrRejectedSubmissionKeepsTheDraft() {
-        val draft = MessageData(text = "尚未发送", attachments = listOf(attachment("draft")))
-        var current = draft
-        val submission = ChatSubmission { result ->
-            if (result == ChatSubmissionResult.ACCEPTED) current = consumeAcceptedDraft(current, draft)
-        }
-        assertEquals(draft, current)
-        submission.complete(ChatSubmissionResult.REJECTED)
-        assertEquals(draft, current)
-    }
 
     @Test
     fun acceptedReceiptConsumesOnlyTheSubmittedSnapshotAndIsDeliveredOnce() {

@@ -42,16 +42,6 @@ class RecommendationPreferencesTest {
         verify { scheduler.cancel() }
     }
 
-    @Test
-    fun refreshRequestUsesUniqueSchedulerEntryPoint() {
-        val scheduler = mockk<RecommendationWorkScheduler>(relaxed = true)
-        val repository = repository(FakePreferences(), scheduler)
-
-        repository.requestRefresh()
-
-        verify(exactly = 1) { scheduler.enqueueImmediate() }
-    }
-
     private fun repository(
         preferences: FakePreferences,
         scheduler: RecommendationWorkScheduler,

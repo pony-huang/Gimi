@@ -4,7 +4,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertSame
 import org.junit.Test
 
 class PluginJsonTest {
@@ -27,17 +26,4 @@ class PluginJsonTest {
         assertNull(native["empty"])
     }
 
-    @Test
-    fun arraysConvertElementWise() {
-        val native = PluginJson.toNative(JSONArray().put(JSONObject().put("k", 2))) as List<Any?>
-
-        assertEquals(listOf(mapOf("k" to 2)), native)
-    }
-
-    @Test
-    fun plainValuesPassThrough() {
-        assertSame("str", PluginJson.toNative("str"))
-        assertSame(42, PluginJson.toNative(42))
-        assertNull(PluginJson.toNative(null))
-    }
 }

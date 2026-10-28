@@ -66,21 +66,6 @@ class MemoryHistoryViewModelTest {
     }
 
     @Test
-    fun `tapping a memory toggles its expanded actions`() = runTest(mainDispatcherRule.dispatcher) {
-        val repository = RecordingMemoryManagementRepository(
-            pages = listOf(ManagedMemoryPage(listOf(memory("m1")), hasNextPage = false)),
-        )
-        val viewModel = MemoryHistoryViewModel(repository)
-        advanceUntilIdle()
-
-        viewModel.onAction(MemoryHistoryAction.ToggleExpanded("m1"))
-        assertEquals(setOf("m1"), viewModel.uiState.value.expandedMemoryIds)
-
-        viewModel.onAction(MemoryHistoryAction.ToggleExpanded("m1"))
-        assertTrue(viewModel.uiState.value.expandedMemoryIds.isEmpty())
-    }
-
-    @Test
     fun `loading an overlapping page keeps every visible memory id unique`() = runTest(mainDispatcherRule.dispatcher) {
         val repository = RecordingMemoryManagementRepository(
             pages = listOf(

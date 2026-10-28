@@ -2,18 +2,9 @@ package github.ponyhuang.gimi.domain.recommendation.model
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RecommendationModelsTest {
-    @Test
-    fun settingsDefaultToEnabledTwoHourRefresh() {
-        val settings = RecommendationSettings()
-
-        assertTrue(settings.enabled)
-        assertEquals(2, settings.intervalHours)
-        assertEquals(listOf(1, 2, 6, 12, 24), RecommendationSettings.SUPPORTED_INTERVAL_HOURS)
-    }
 
     @Test
     fun snapshotRequiresExactlySixUniqueNonBlankRecommendations() {

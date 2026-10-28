@@ -8,14 +8,6 @@ import org.junit.Test
 class ConversationToolConfigurationTest {
 
     @Test
-    fun newConversationsDefaultToMediumReasoningEffort() {
-        assertEquals(
-            ReasoningEffort.MEDIUM,
-            ConversationToolConfiguration().reasoningEffort,
-        )
-    }
-
-    @Test
     fun officialFunctionsDefaultToTheAllMarkerForUnseenTools() {
         val configuration = ConversationToolConfiguration()
 

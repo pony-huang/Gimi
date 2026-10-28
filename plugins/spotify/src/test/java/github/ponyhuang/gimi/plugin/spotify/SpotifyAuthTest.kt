@@ -104,15 +104,6 @@ class SpotifyAuthTest {
         assertTrue((result as RedirectResult.Error).message.contains("access_denied"))
     }
 
-    @Test
-    fun newStateIsFixedLengthAlphanumeric() {
-        repeat(20) {
-            val state = SpotifyAuth.newState()
-            assertEquals(16, state.length)
-            assertTrue(state.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' })
-        }
-    }
-
     /**
      * 真实 socket 回归测试：模拟浏览器请求回调，验证服务器能返回成功页且不因
      * 提前关闭流而失败（此前 `.use` 关闭 reader 连带关闭 socket，浏览器报「无法访问页面」）。

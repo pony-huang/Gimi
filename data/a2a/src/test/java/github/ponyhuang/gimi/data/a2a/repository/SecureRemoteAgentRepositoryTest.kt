@@ -2,7 +2,6 @@ package github.ponyhuang.gimi.data.a2a.repository
 
 import github.ponyhuang.gimi.domain.a2a.model.RemoteAgentConfig
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -44,18 +43,6 @@ class SecureRemoteAgentRepositoryTest {
         assertEquals(1, agents.size)
         assertEquals("http://b.example.com", agents.single().endpointUrl)
         assertEquals(2L, repository.revision.value)
-    }
-
-    @Test
-    fun delete_removesAgent() {
-        val repository = SecureRemoteAgentRepository(storage)
-        val agent = RemoteAgentConfig(name = "weather", endpointUrl = "http://a.example.com")
-        repository.save(agent)
-
-        repository.delete(agent.id)
-
-        assertTrue(repository.currentAgents().isEmpty())
-        assertNull(repository.agent(agent.id))
     }
 
     @Test

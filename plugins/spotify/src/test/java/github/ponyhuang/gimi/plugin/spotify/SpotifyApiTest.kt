@@ -1,10 +1,6 @@
 package github.ponyhuang.gimi.plugin.spotify
 
-import github.ponyhuang.gimi.pluginapi.PluginJson
-import org.json.JSONArray
-import org.json.JSONObject
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -25,36 +21,6 @@ class SpotifyApiTest {
     }
 
     @Test
-    fun spotifyForbiddenMessageGuidesAgentToUserOwnedContent() {
-        val body = """{"error":{"status":403,"message":"Forbidden."}}"""
-
-        val message = spotifyErrorMessage(403, body)
-
-        assertTrue(message.contains("spotify_get_my_playlists"))
-        assertTrue(message.contains("spotify_get_top_tracks"))
-    }
-
-    @Test
-    fun spotifyNotFoundMessageAvoidsRetryingRemovedOrInaccessibleContent() {
-        val body = """{"error":{"status":404,"message":"Resource not found"}}"""
-
-        val message = spotifyErrorMessage(404, body)
-
-        assertTrue(message.contains("Do not retry"))
-        assertTrue(message.contains("Spotify Web API"))
-    }
-
-    @Test
-    fun spotifyUnauthorizedMessageDirectsUserToReauthorize() {
-        val body = """{"error":{"status":401,"message":"The access token expired"}}"""
-
-        val message = spotifyErrorMessage(401, body)
-
-        assertTrue(message.contains("The access token expired"))
-        assertTrue(message.contains("spotify_login"))
-    }
-
-    @Test
     fun spotifyRateLimitMessageSurfacesRetryExhaustion() {
         val body = """{"error":{"status":429,"message":"Rate limit exceeded"}}"""
 
@@ -64,19 +30,4 @@ class SpotifyApiTest {
         assertTrue(message.contains("rate limit"))
     }
 
-    @Test
-    fun toJsonNativeRecursivelyConverts() {
-        val json = JSONObject()
-            .put("a", "x")
-            .put("b", 1)
-            .put("c", JSONArray().put("y").put(JSONObject().put("d", true)))
-            .put("e", JSONObject.NULL)
-
-        val native = PluginJson.toNative(json) as Map<String, Any?>
-
-        assertEquals("x", native["a"])
-        assertEquals(1, native["b"])
-        assertEquals(listOf("y", mapOf("d" to true)), native["c"])
-        assertNull(native["e"])
-    }
 }

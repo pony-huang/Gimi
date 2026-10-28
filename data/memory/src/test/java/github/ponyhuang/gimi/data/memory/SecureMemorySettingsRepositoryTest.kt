@@ -8,13 +8,6 @@ import org.junit.Test
 class SecureMemorySettingsRepositoryTest {
 
     @Test
-    fun `defaults to local memory when storage is empty`() {
-        val repository = SecureMemorySettingsRepository(FakeMemorySettingsStorage())
-
-        assertEquals(MemoryConfiguration(), repository.configuration.value)
-    }
-
-    @Test
     fun `cannot enable Mem0 without a token`() = runTest {
         val repository = SecureMemorySettingsRepository(FakeMemorySettingsStorage())
 

@@ -2,6 +2,29 @@
 
 版本 PR 根据 Conventional Commits 自动生成后续版本记录；合并前请整理用户可见的变化与升级注意事项。
 
+## [0.14.0](https://github.com/pony-huang/Gimi/compare/v0.13.1...v0.14.0) (2026-10-29)
+
+
+### Features
+
+* **agent:** upgrade ADK to 1.5.0 and add parallel subtasks ([634c92a](https://github.com/pony-huang/Gimi/commit/634c92a29927559cf57b0db15649b4aecc14744e))
+* **chat:** add copy action and compact message controls ([aeb7d85](https://github.com/pony-huang/Gimi/commit/aeb7d8570f5d7554a32de1d5e733bd9d65d5f914))
+* **conversation:** export history and delete individual sessions ([56da33d](https://github.com/pony-huang/Gimi/commit/56da33d45f98d48ae6592015fe5084f4d3af336b))
+* **kimi:** replace formula tools with web search APIs ([c9a1fb7](https://github.com/pony-huang/Gimi/commit/c9a1fb7c8f54eae0a51f1a3b31f794f1def74ba9))
+* **modelsettings:** add searchable pickers and refine settings UI ([3e1252d](https://github.com/pony-huang/Gimi/commit/3e1252dc04d2175c2e8f1b7cac8b7e35546eb616))
+* prepare v0.14.0 ([0a19c97](https://github.com/pony-huang/Gimi/commit/0a19c97f945406f91d080673d498f2522264c889))
+* **settings:** refine personalized services and permission groups ([7fbcdac](https://github.com/pony-huang/Gimi/commit/7fbcdac46dc91ad789e58e253b8e9076389e1689))
+
+
+### Bug Fixes
+
+* **a2a:** isolate remote agent failures from chat ([6cbce84](https://github.com/pony-huang/Gimi/commit/6cbce843bafbc26622631e1cf64af484e2a07232))
+* **build:** avoid resource-only tests in empty feature modules ([cb59738](https://github.com/pony-huang/Gimi/commit/cb59738b9896f66f0e6be7bb31f23b6dc0c82e68))
+* **chat:** compact composer controls and unify input hint ([1132d58](https://github.com/pony-huang/Gimi/commit/1132d5874a5fd3b0b445b41dee9ffb46b3829baa))
+* **conversation:** use managed storage for export staging ([151b229](https://github.com/pony-huang/Gimi/commit/151b22923961758ce00d640382a9e48ffe01d2e4))
+* **designsystem:** align function icon tint with other icons ([a2330c2](https://github.com/pony-huang/Gimi/commit/a2330c26dbf4e1887b700dfa5979dfd276d95a52))
+* **plugin:** put overflow menu before switch in plugin list rows ([5d7dc91](https://github.com/pony-huang/Gimi/commit/5d7dc9166449ee1f3fec28f7c6a1806dbbd6b750))
+
 ## [0.13.1](https://github.com/pony-huang/Gimi/compare/v0.13.0...v0.13.1) (2026-10-21)
 
 

@@ -6,6 +6,8 @@ plugins {
 
 android {
     namespace = "github.ponyhuang.gimi.feature.assistant"
+    // 当前模块没有单元测试，避免资源打包生成的 R 类触发 Gradle 的空测试检查。
+    testOptions.unitTests.isIncludeAndroidResources = false
 }
 
 dependencies {
@@ -27,10 +29,4 @@ dependencies {
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.core)
-
-    testImplementation(project(":core:testing"))
-    testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.mockk)
-    testImplementation(libs.turbine)
 }

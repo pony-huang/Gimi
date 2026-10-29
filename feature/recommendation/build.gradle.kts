@@ -7,6 +7,8 @@ plugins {
 
 android {
     namespace = "github.ponyhuang.gimi.feature.recommendation"
+    // 当前模块没有单元测试，避免资源打包生成的 R 类触发 Gradle 的空测试检查。
+    testOptions.unitTests.isIncludeAndroidResources = false
 }
 
 dependencies {

@@ -331,7 +331,14 @@ internal class ChatRunLifecycleCoordinator(
         }
         cancelRun(runtime)
         runtime.messages = runtime.messages.map { msg ->
-            if (msg.partial && msg.role == MessageRole.Assistant) {
+            val batch = msg.subtaskBatch
+            if (batch != null) {
+                msg.copy(subtaskBatch = batch.copy(tasks = batch.tasks.map { task ->
+                    if (task.status == github.ponyhuang.gimi.domain.conversation.model.SubtaskStatus.RUNNING ||
+                        task.status == github.ponyhuang.gimi.domain.conversation.model.SubtaskStatus.QUEUED
+                    ) task.copy(status = github.ponyhuang.gimi.domain.conversation.model.SubtaskStatus.CANCELLED) else task
+                }))
+            } else if (msg.partial && msg.role == MessageRole.Assistant) {
                 msg.copy(partial = false, turnComplete = false)
             } else {
                 msg

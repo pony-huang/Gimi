@@ -14,6 +14,12 @@ import github.ponyhuang.gimi.domain.conversation.model.TextPart
 
 object ChatRunEventMapper {
     fun fromEvent(event: ChatRunEvent): Message? {
+        event.subtaskBatch?.let { batch ->
+            return Messages.fromAssistant(
+                id = "subtasks:${batch.id}", invocationId = batch.invocationId,
+                author = "subtasks", timestamp = batch.createdAt,
+            ).copy(subtaskBatch = batch)
+        }
         val error = event.errorMessage ?: event.errorCode
         if (!error.isNullOrBlank()) {
             return Messages.fromError(

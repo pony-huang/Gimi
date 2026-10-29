@@ -1,4 +1,21 @@
 <resources>
+    <string name="chat_subtask_parent_read">Parent assistance is required for file access</string>
+    <string name="chat_subtasks_running">Analyzing · %1$d / %2$d completed</string>
+    <string name="chat_subtasks_failed">Partially completed · %1$d failed</string>
+    <string name="chat_subtasks_stopped">Stopped · %1$d / %2$d completed</string>
+    <string name="chat_subtasks_interrupted">Tasks interrupted</string>
+    <string name="chat_subtasks_completed">Completed %1$d tasks</string>
+    <string name="chat_subtasks_elapsed">%1$d s</string>
+    <string name="chat_subtask_queued">Queued</string>
+    <string name="chat_subtask_running">Analyzing</string>
+    <string name="chat_subtask_completed">Completed</string>
+    <string name="chat_subtask_failed">Failed</string>
+    <string name="chat_subtask_cancelled">Cancelled</string>
+    <string name="chat_subtask_interrupted">Interrupted</string>
+    <string name="chat_subtask_timeout">Request timed out; no automatic retry</string>
+    <string name="chat_subtask_error">Analysis failed; no automatic retry</string>
+    <string name="chat_subtask_tool_completed">Completed: %1$s</string>
+    <string name="chat_subtask_tool_started">Tool step: %1$s</string>
     <string name="stream_ai_compose_speech_to_text_idle_button">Voice input</string>
     <string name="stream_ai_compose_composer_mic_permission_message">Microphone permission is required to record audio</string>
     <string name="stream_ai_compose_composer_mic_permission_action">Settings</string>

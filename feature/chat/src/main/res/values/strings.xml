@@ -1,4 +1,21 @@
 <resources>
+    <string name="chat_subtask_parent_read">需要主助手读取文件或处理授权</string>
+    <string name="chat_subtasks_running">正在分析 · %1$d / %2$d 已完成</string>
+    <string name="chat_subtasks_failed">部分完成 · %1$d 个任务失败</string>
+    <string name="chat_subtasks_stopped">已停止 · %1$d / %2$d 已完成</string>
+    <string name="chat_subtasks_interrupted">任务已中断</string>
+    <string name="chat_subtasks_completed">已完成 %1$d 个任务</string>
+    <string name="chat_subtasks_elapsed">%1$d 秒</string>
+    <string name="chat_subtask_queued">排队中</string>
+    <string name="chat_subtask_running">分析中</string>
+    <string name="chat_subtask_completed">已完成</string>
+    <string name="chat_subtask_failed">失败</string>
+    <string name="chat_subtask_cancelled">已取消</string>
+    <string name="chat_subtask_interrupted">已中断</string>
+    <string name="chat_subtask_timeout">请求超时，未自动重试</string>
+    <string name="chat_subtask_error">未能完成分析，未自动重试</string>
+    <string name="chat_subtask_tool_completed">已完成：%1$s</string>
+    <string name="chat_subtask_tool_started">工具步骤：%1$s</string>
     <!-- 现有 ChatComposer 键 -->
     <string name="stream_ai_compose_speech_to_text_idle_button">语音输入</string>
     <string name="stream_ai_compose_composer_mic_permission_message">录制音频需要麦克风权限</string>

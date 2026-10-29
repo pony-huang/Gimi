@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.domain.conversation.model
 
+/** 一次 SDK 无关的聊天运行事件；可携带文本、工具调用或独立的子任务进度快照。 */
 data class ChatRunEvent(
     val id: String,
     val invocationId: String?,
@@ -12,6 +13,8 @@ data class ChatRunEvent(
     val errorCode: String?,
     val errorMessage: String?,
     val timestamp: Long,
+    /** SDK 无关的子任务进度，不改变主助手的运行阶段或完成标记。 */
+    val subtaskBatch: SubtaskBatch? = null,
 )
 
 data class ChatRunPart(

@@ -91,12 +91,14 @@ object ConversationModule {
         @ApplicationContext context: Context,
         sessionService: SessionService,
         database: ConversationMetadataDatabase,
+        subtasks: github.ponyhuang.gimi.domain.conversation.repository.SubtaskRunRepository,
     ): ConversationRepository = AdkConversationRepository(
         appName = AgentSessionIdentity.APP_NAME,
         userId = AgentSessionIdentity.DEFAULT_USER_ID,
         sessionService = sessionService,
         metadataDao = database.conversationMetadataDao(),
         context = context,
+        subtasks = subtasks,
     )
 
     @Provides

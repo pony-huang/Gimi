@@ -37,6 +37,7 @@ class AdkConversationRepository(
     private val sessionService: SessionService,
     private val metadataDao: ConversationMetadataDao,
     private val context: Context,
+    private val subtasks: github.ponyhuang.gimi.domain.conversation.repository.SubtaskRunRepository? = null,
 ) : ConversationRepository {
 
     private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
@@ -147,7 +148,12 @@ class AdkConversationRepository(
             return recover(t, "loadMessages($sessionId)", null)
         }
         return try {
-            EventMapper.fromSession(session)
+            (EventMapper.fromSession(session) + subtasks?.load(sessionId).orEmpty().map { batch ->
+                github.ponyhuang.gimi.domain.conversation.model.Messages.fromAssistant(
+                    id = "subtasks:${batch.id}", invocationId = batch.invocationId,
+                    author = "subtasks", timestamp = batch.createdAt,
+                ).copy(subtaskBatch = batch)
+            }).sortedBy(Message::timestamp)
         } catch (t: Throwable) {
             recover(t, "EventMapper.fromSession($sessionId)", emptyList())
         }
@@ -273,6 +279,7 @@ class AdkConversationRepository(
      * 删除一个会话，触发 [refresh]。
      */
     override suspend fun deleteConversation(sessionId: String) {
+        subtasks?.delete(sessionId)
         val key = SessionKey(appName = appName, userId = userId, id = sessionId)
         // 删除失败必须交给调用方提示和重试，不能把未删除的会话当作成功清理。
         sessionService.deleteSession(key)

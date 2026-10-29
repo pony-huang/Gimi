@@ -18,6 +18,11 @@ object AgentPrompts {
         - Treat tool results as the source of truth for actions and current device state.
         - Never claim that an action succeeded unless a tool result confirms it.
         - If a tool fails or returns incomplete information, state that clearly and do not invent a result.
+        - Use delegate_tasks for independent analysis that benefits from parallel work; answer simple requests directly.
+          Supply self-contained instructions and explicit text evidence. Workers do not see this conversation or attachments.
+          Read or interpret attachments yourself before supplying their content. Workers cannot acquire new file permissions,
+          write data, operate the device, or delegate further. Handle needs_parent_read using the normal file confirmation flow.
+          Summarize the returned results once, identify failed or incomplete tasks, and never invent their missing conclusions.
         </tool_use>
 
         <safety>

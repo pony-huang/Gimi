@@ -516,6 +516,16 @@ fun ChatScaffold(
                                 val lastActivityId = segments.filterIsInstance<TurnSegment.Activity>().lastOrNull()?.id
                                 segments.forEach { segment ->
                                     when (segment) {
+                                        is TurnSegment.Subtasks -> item(
+                                            key = "subtasks:${state.sessionId}:${segment.id}",
+                                            contentType = "subtasks",
+                                        ) {
+                                            SubtaskBatchPanel(
+                                                batch = segment.batch,
+                                                expanded = segment.id in state.expandedActivityGroupIds,
+                                                onToggle = { onToggleTimeline(segment.id) },
+                                            )
+                                        }
                                         is TurnSegment.Answer -> {
                                             val message = segment.message
                                             item(

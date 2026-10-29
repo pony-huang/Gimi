@@ -49,6 +49,8 @@ data class Message(
     val partial: Boolean = false,
     val turnComplete: Boolean = false,
     val timestamp: Long = Clock.System.now().toEpochMilliseconds(),
+    /** 子任务进度作为时间线活动，不作为另一条助手正文。 */
+    val subtaskBatch: SubtaskBatch? = null,
 )
 
 /**

@@ -57,8 +57,8 @@ internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 64.dp)
-            .padding(horizontal = 8.dp)
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 10.dp)
             .semantics { stateDescription = recordingState },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -66,7 +66,7 @@ internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
         FilledIconButton(
             onClick = params.onCancel,
             modifier = Modifier
-                .size(48.dp)
+                .size(40.dp)
                 .testTag(VOICE_CANCEL_TEST_TAG),
             colors = IconButtonDefaults.filledIconButtonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -83,7 +83,7 @@ internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
             levels = params.levels,
             modifier = Modifier
                 .weight(1f)
-                .height(36.dp)
+                .height(28.dp)
                 .testTag(VOICE_WAVEFORM_TEST_TAG)
                 .semantics {
                     contentDescription = waveformDescription
@@ -93,7 +93,7 @@ internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
         FilledIconButton(
             onClick = params.onFinish,
             modifier = Modifier
-                .size(48.dp)
+                .size(40.dp)
                 .testTag(VOICE_FINISH_TEST_TAG),
             colors = IconButtonDefaults.filledIconButtonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -109,7 +109,7 @@ internal fun DefaultVoiceRecordingContent(params: VoiceRecordingContentParams) {
 
         FilledIconButton(
             onClick = params.onSend,
-            modifier = Modifier.size(48.dp).testTag(VOICE_SEND_TEST_TAG),
+            modifier = Modifier.size(40.dp).testTag(VOICE_SEND_TEST_TAG),
             colors = IconButtonDefaults.filledIconButtonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,

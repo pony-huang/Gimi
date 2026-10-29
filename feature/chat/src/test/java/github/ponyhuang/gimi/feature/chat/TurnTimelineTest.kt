@@ -229,6 +229,7 @@ class TurnTimelineTest {
                 when (segment) {
                     is TurnSegment.Answer -> segment.message.id
                     is TurnSegment.Activity -> "activity"
+                    is TurnSegment.Subtasks -> "subtasks"
                 }
             },
         )
@@ -258,6 +259,7 @@ class TurnTimelineTest {
                 when (segment) {
                     is TurnSegment.Answer -> segment.message.id
                     is TurnSegment.Activity -> "activity"
+                    is TurnSegment.Subtasks -> "subtasks"
                 }
             },
         )

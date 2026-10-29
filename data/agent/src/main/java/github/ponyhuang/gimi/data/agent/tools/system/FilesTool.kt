@@ -11,13 +11,14 @@ import com.google.adk.kt.annotations.Tool
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.domain.workfiles.model.WorkFileSearchResult
 import github.ponyhuang.gimi.domain.workfiles.repository.DocumentSearchRepository
-import github.ponyhuang.gimi.data.agent.permission.MediaPermissionActivity
+import github.ponyhuang.gimi.data.agent.permission.FileSearchPermissionActivity
+import github.ponyhuang.gimi.data.agent.R
 import javax.inject.Inject
 import javax.inject.Singleton
 import androidx.core.net.toUri
 
 /**
- * 文件域工具：文件选择、共享媒体搜索、文档目录递归搜索、预览打开。
+ * 文件域工具：文件选择、共享媒体搜索、共享存储递归搜索、预览打开。
  */
 @Singleton
 class FilesTool @Inject constructor(
@@ -56,15 +57,24 @@ class FilesTool @Inject constructor(
     // ---------- 媒体文件搜索 ----------
 
     @Tool(
-        name = "request_media_file_permissions",
-        description = "Asks the user to grant permission to search shared images, videos, and audio files.",
+        name = "request_file_search_access",
+        description = "Opens Android settings for all-files access, waits for the user to return, and reports whether shared-storage file search is available. Request once; do not repeat if the user declines.",
         requireConfirmation = true,
     )
-    fun requestMediaFilePermissions(): Map<String, Any> = queue.request(
-        "Grant media search access",
-        "Allow access to shared images, videos, and audio for local file searches.",
-        Intent(context, MediaPermissionActivity::class.java),
-    )
+    suspend fun requestFileSearchAccess(): Map<String, Any> {
+        if (documentSearch.hasAccess()) return mapOf("success" to true, "granted" to true)
+        val outcome = queue.requestForResult(
+            context.getString(R.string.file_search_access_title),
+            context.getString(R.string.file_search_access_summary),
+            Intent(context, FileSearchPermissionActivity::class.java),
+        )
+        val granted = documentSearch.hasAccess()
+        return if (granted) {
+            mapOf("success" to true, "granted" to true)
+        } else {
+            outcome + mapOf("success" to false, "granted" to false, "error" to FILE_ACCESS_REQUIRED)
+        }
+    }
 
     @Tool(
         name = "search_media_files",
@@ -74,10 +84,10 @@ class FilesTool @Inject constructor(
             "instead of sending the full sentence. If the search returns no results, retry once or " +
             "twice with a different keyword before reporting failure. Returns up to 50 newest matches " +
             "as structured results that the chat UI renders directly. Summarize the outcome without " +
-            "repeating the complete file-name list. Requires permission to access the requested media type.",
+            "repeating the complete file-name list. Requires all-files access; when missing, opens system settings once and checks the grant on return.",
         requireConfirmation = true,
     )
-    fun searchMediaFiles(
+    suspend fun searchMediaFiles(
         @Param("A non-blank file-name query.") query: String,
         @Param("Optional media category: all, image, video, or audio. Defaults to all.") mediaType: String? = "all",
     ): Map<String, Any> {
@@ -91,9 +101,10 @@ class FilesTool @Inject constructor(
             "audio" -> listOf(MEDIA_COLLECTIONS[2])
             else -> return error("mediaType must be all, image, video, or audio.")
         }
+        if (!ensureFileSearchAccess()) return error(FILE_ACCESS_REQUIRED)
         val accessible = requested.filter { hasPermission(it.permission) }
         if (accessible.isEmpty()) return error(
-            "Media permission is required. Call request_media_file_permissions and grant access before searching.",
+            "File search access is required. Call request_file_search_access to grant access.",
         )
         val results = accessible.flatMap { collection -> queryMedia(collection, value) }
             .sortedByDescending { it["modifiedTimeMillis"] as Long }
@@ -101,11 +112,11 @@ class FilesTool @Inject constructor(
         return mediaResponse(value, results, requested.filterNot(accessible::contains).map { it.type })
     }
 
-    // ---------- 文档目录搜索 ----------
+    // ---------- 共享存储搜索 ----------
 
     @Tool(
         name = "search_documents",
-        description = "Recursively searches file names in document directories the user has authorized in Settings. " +
+        description = "Recursively searches file names across all accessible shared external storage, including documents not indexed by MediaStore. Private app directories are excluded. If all-files access is missing, opens system settings once and checks permission when the user returns. Do not retry permission requests if declined. " +
             "The query matches file NAMES only: use a short keyword most likely inside the target file name, " +
             "and if no results are returned, retry once or twice with a different keyword before reporting failure. " +
             "Returns up to 50 newest matching files as structured results that the chat UI renders directly. " +
@@ -115,6 +126,7 @@ class FilesTool @Inject constructor(
     suspend fun searchDocuments(@Param("A non-blank file-name query.") query: String): Map<String, Any> {
         val value = query.trim()
         if (value.isEmpty()) return error("query must not be blank.")
+        if (!ensureFileSearchAccess()) return error(FILE_ACCESS_REQUIRED)
         var results = documentSearch.search(value, MAX_RESULTS)
         // 精确短语零结果时按分词放宽（任一词命中），与 queryMedia 的兜底策略保持一致。
         if (results.isEmpty()) {
@@ -137,7 +149,7 @@ class FilesTool @Inject constructor(
     suspend fun openLocalFile(@Param("The file identifier returned by search_mediaFiles or searchDocuments.") contentUri: String): Map<String, Any> {
         val uri = runCatching { contentUri.toUri() }.getOrNull() ?: return error("contentUri is invalid.")
         if (uri.scheme != "content" || !isAllowedUri(uri, contentUri)) return error(
-            "contentUri is not an accessible media result or a file from an authorized document directory.",
+            "contentUri is not an accessible media result or a file in shared external storage.",
         )
         val mimeType = context.contentResolver.getType(uri) ?: "*/*"
         return queue.request(
@@ -253,7 +265,10 @@ class FilesTool @Inject constructor(
     )
 
     private fun hasPermission(permission: String): Boolean =
-        context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+        documentSearch.hasAccess() || context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+
+    private suspend fun ensureFileSearchAccess(): Boolean =
+        documentSearch.hasAccess() || requestFileSearchAccess()["granted"] == true
 
     private suspend fun isAllowedUri(uri: Uri, originalValue: String): Boolean =
         uri.authority == MediaStore.AUTHORITY || documentSearch.isAuthorized(originalValue)
@@ -295,3 +310,7 @@ internal fun relaxedQueryTokens(query: String): List<String> =
 private const val NO_RESULT_HINT =
     "No file name contains this query. Ask the user for a different or shorter keyword, " +
         "or try a keyword that likely appears in the target file name."
+
+private const val FILE_ACCESS_REQUIRED =
+    "All-files access was not granted or has been revoked. File search cannot continue. " +
+        "Tell the user they can enable all-files access in Android settings; do not repeatedly request permission."

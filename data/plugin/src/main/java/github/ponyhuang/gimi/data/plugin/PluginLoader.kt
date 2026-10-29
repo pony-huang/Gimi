@@ -7,12 +7,16 @@ import github.ponyhuang.gimi.pluginapi.AgentPlugin
  *
  * @property packageName 来源插件 APK 的包名。
  * @property plugin 经 DexClassLoader 实例化的插件。
+ * @property versionCode APK 安装版本，与插件自身行为版本分离。
+ * @property versionName APK 展示版本。
  * @property lastUpdateTime 插件 APK 的安装更新时间（毫秒），用于检测同包名插件是否更新。
  */
 data class LoadedPlugin(
     val packageName: String,
     val plugin: AgentPlugin,
     val lastUpdateTime: Long = 0L,
+    val versionCode: Long = 0L,
+    val versionName: String? = null,
 )
 
 /**
@@ -25,10 +29,10 @@ interface PluginLoader {
     fun load(): List<LoadedPlugin>
 
     /**
-     * 重新发现已安装的插件 APK，**只新增**此前未加载的包并实例化；
-     * 已加载插件保持原实例（避免重复实例化与类加载器冲突），已卸载的包从缓存移除。
+     * 重新发现已安装的插件 APK；新增/更新的包重新实例化，未更新的包复用原实例，
+     * 已卸载的包从缓存移除。
      *
-     * @return 本次新增的插件。
+     * @return 本次新增或更新的插件。
      */
     fun refresh(): List<LoadedPlugin>
 }

@@ -1,7 +1,7 @@
 package github.ponyhuang.gimi.domain.workfiles.model
 
 /**
- * 已授权工作目录中的一个文件搜索结果。
+ * 共享外部存储中的一个文件搜索结果。
  *
  * @property contentUri 可用于读取文件的 content URI。
  * @property displayName provider 返回的文件名。

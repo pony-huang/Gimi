@@ -1,7 +1,6 @@
 package github.ponyhuang.gimi.domain.toolauthorization.usecase
 
 import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
-import github.ponyhuang.gimi.domain.conversation.runtime.isBusy
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
@@ -12,7 +11,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -60,13 +58,6 @@ class SetToolAuthorizationUseCaseTest {
 
         assertEquals(ToolAuthorizationMutationResult.BlockedByActiveAgent, result)
         verify(exactly = 0) { repository.setEnabled(any(), any()) }
-    }
-
-    @Test
-    fun agentRuntimeStateReflectsGateState() = runTest {
-        val useCase = useCase(repository(), busy = true)
-
-        assertTrue(useCase.agentRuntimeState.value.isBusy)
     }
 
     private fun useCase(

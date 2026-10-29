@@ -75,7 +75,7 @@ internal fun DefaultComposerLeadingContent(params: ComposerLeadingContentParams)
         enabled = isEnabled,
         onClick = params.onAttachmentsClick,
         modifier = Modifier
-            .size(48.dp)
+            .size(40.dp)
             .testTag("chat_composer_add"),
         colors = IconButtonDefaults.iconButtonColors(
             containerColor = composerActionContainerColor(),
@@ -261,7 +261,7 @@ internal fun TranscribingContent(mode: VoiceInputMode = VoiceInputMode.TRANSCRIB
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = 52.dp)
+            .defaultMinSize(minHeight = 44.dp)
             .padding(horizontal = 16.dp)
             .testTag(VOICE_TRANSCRIBING_TEST_TAG),
         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
@@ -432,7 +432,7 @@ private fun TrailingIconButton(
     FilledIconButton(
         onClick = onClick,
         modifier = Modifier
-            .size(48.dp)
+            .size(40.dp)
             .testTag(testTag),
     ) {
         Icon(
@@ -460,7 +460,7 @@ internal fun DefaultIdleContent(onClick: () -> Unit, enabled: Boolean = true) {
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier
-            .size(48.dp)
+            .size(40.dp)
             .testTag("chat_composer_microphone"),
         colors = IconButtonDefaults.iconButtonColors(
             containerColor = composerActionContainerColor(),

@@ -72,6 +72,9 @@ android {
                 "META-INF/INDEX.LIST",
                 "META-INF/io.netty.versions.properties",
                 "META-INF/DEPENDENCIES",
+                // Jakarta CDI bean 归档标记（a2a-java 各 jar 携带），仅服务端容器使用，
+                // Android 运行时无用；三个 jar 同名文件会阻断 Java 资源合并。
+                "META-INF/beans.xml",
                 // GraalVM native-image metadata shipped by google-genai, google-auth,
                 // google-http-client, jansi, opentelemetry. Useless on Android runtime.
                 "META-INF/native-image/**",
@@ -116,6 +119,8 @@ dependencies {
     implementation(project(":data:agent"))
     implementation(project(":data:appearance"))
     implementation(project(":data:mcp"))
+    implementation(project(":data:a2a"))
+    implementation(project(":data:appfunction"))
     implementation(project(":data:workfiles"))
     implementation(project(":data:permissions"))
     implementation(project(":data:toolauthorization"))
@@ -131,7 +136,8 @@ dependencies {
     implementation(project(":core:notifications"))
     implementation(project(":feature:modelsettings"))
     implementation(project(":feature:mcp"))
-    implementation(project(":feature:workfiles"))
+    implementation(project(":feature:a2a"))
+    implementation(project(":feature:appfunction"))
     implementation(project(":feature:permissions"))
     implementation(project(":feature:toolauthorization"))
     implementation(project(":feature:settings"))

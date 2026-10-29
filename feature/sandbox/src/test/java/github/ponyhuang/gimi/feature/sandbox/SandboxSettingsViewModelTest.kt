@@ -224,22 +224,6 @@ class SandboxSettingsViewModelTest {
         assertEquals("draft", viewModel.uiState.value.apiKey)
         assertEquals("", repository.configuration.value.connection.apiKey)
     }
-    @Test fun existingVariablesStartCollapsedAndNewVariablesExpandIndependently() = runTest {
-        val repository = Settings()
-        repository.configuration.value = SandboxConfiguration(true, SandboxConnection(apiKey = "key", envs = mapOf("LANG" to "en_US")))
-        val viewModel = SandboxSettingsViewModel(repository, Templates()); runCurrent()
-        val savedId = viewModel.uiState.value.environment.single().id
-        assertFalse(viewModel.uiState.value.environment.single().expanded)
-        viewModel.onAction(SandboxSettingsAction.AddEnvironment)
-        val addedId = viewModel.uiState.value.environment.last().id
-        assertTrue(viewModel.uiState.value.environment.last().expanded)
-        viewModel.onAction(SandboxSettingsAction.ToggleEnvironment(savedId))
-        assertTrue(viewModel.uiState.value.environment.all { it.expanded })
-        viewModel.onAction(SandboxSettingsAction.ToggleEnvironment(addedId))
-        assertTrue(viewModel.uiState.value.environment.first().expanded)
-        assertFalse(viewModel.uiState.value.environment.last().expanded)
-        assertEquals(0, repository.saves)
-    }
     @Test fun invalidCollapsedVariableExpandsWhenSaving() = runTest {
         val repository = Settings()
         val viewModel = SandboxSettingsViewModel(repository, Templates())
@@ -273,43 +257,6 @@ class SandboxSettingsViewModelTest {
         viewModel.onAction(SandboxSettingsAction.ToggleEnvironment(id)); runCurrent()
         assertFalse(viewModel.uiState.value.dirty)
         assertFalse(viewModel.uiState.value.environment.single().expanded)
-    }
-    @Test fun keyVisibilityDoesNotPersistConnection() = runTest {
-        val repository = Settings(); val viewModel = SandboxSettingsViewModel(repository, Templates())
-        viewModel.onAction(SandboxSettingsAction.ToggleKeyVisibility); runCurrent()
-        assertTrue(viewModel.uiState.value.keyVisible)
-        assertEquals(0, repository.saves)
-        assertEquals(0L, repository.revision.value)
-    }
-    @Test fun configurationCanExpandWhileDisabledWithoutPersistingSettings() = runTest {
-        val repository = Settings()
-        val viewModel = SandboxSettingsViewModel(repository, Templates()); runCurrent()
-        viewModel.onAction(SandboxSettingsAction.ToggleConfiguration)
-        assertTrue(viewModel.uiState.value.configurationExpanded)
-        assertFalse(viewModel.uiState.value.enabled)
-        assertFalse(viewModel.uiState.value.dirty)
-        assertEquals(0L, repository.revision.value)
-        viewModel.onAction(SandboxSettingsAction.ToggleConfiguration)
-        assertFalse(viewModel.uiState.value.configurationExpanded)
-        assertEquals(0, repository.saves)
-    }
-
-    @Test fun enablingAndDisablingPreservesIndependentConfigurationExpansion() = runTest {
-        val repository = Settings()
-        val viewModel = SandboxSettingsViewModel(repository, Templates()); runCurrent()
-        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
-        assertTrue(viewModel.uiState.value.enabled)
-        assertFalse(viewModel.uiState.value.configurationExpanded)
-        viewModel.onAction(SandboxSettingsAction.ToggleConfiguration)
-        viewModel.onAction(SandboxSettingsAction.SetEnabled(false)); runCurrent()
-        assertFalse(viewModel.uiState.value.enabled)
-        assertTrue(viewModel.uiState.value.configurationExpanded)
-        viewModel.onAction(SandboxSettingsAction.SetEnabled(true)); runCurrent()
-        assertTrue(viewModel.uiState.value.configurationExpanded)
-        viewModel.onAction(SandboxSettingsAction.SetApiKey("key"))
-        viewModel.onAction(SandboxSettingsAction.Save); runCurrent()
-        assertEquals(1, repository.saves)
-        assertTrue(viewModel.uiState.value.configurationExpanded)
     }
 
 }

@@ -19,7 +19,10 @@ public object OfficialToolIds {
     public const val GEMINI_URL_CONTEXT: String = "gemini_url_context"
     public const val GEMINI_GOOGLE_MAPS: String = "gemini_google_maps"
     public const val GLM_WEB_SEARCH: String = "glm_web_search"
-    public const val KIMI_FORMULAS: String = "kimi_formulas"
+    public const val KIMI_WEB_TOOLS: String = "kimi_web_tools"
+    public const val KIMI_SEARCH: String = "kimi_search"
+    public const val KIMI_SEARCH_PRO: String = "kimi_search_pro"
+    public const val KIMI_FETCH: String = "kimi_fetch"
 
     /**
      * 厂商远端执行的联网搜索在本地使用的声明名。

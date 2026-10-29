@@ -30,7 +30,9 @@ import org.junit.Test
 
 class ReadLocalFileToolTest {
     private val contentResolver = mockk<ContentResolver>()
-    private val documentSearch = mockk<DocumentSearchRepository>()
+    private val documentSearch = mockk<DocumentSearchRepository> {
+        every { hasAccess() } returns false
+    }
 
     @After
     fun tearDown() {
@@ -85,7 +87,26 @@ class ReadLocalFileToolTest {
         )
 
         assertEquals(false, response["success"])
-        assertTrue((response["error"] as String).contains("request_media_file_permissions"))
+        assertTrue((response["error"] as String).contains("request_file_search_access"))
+    }
+
+    @Test
+    fun allFilesAccessAllowsMediaReadWithoutSeparateMediaPermissions() = runTest {
+        val context = mockk<Context>(relaxed = true)
+        every { context.checkSelfPermission(any()) } returns PackageManager.PERMISSION_DENIED
+        every { documentSearch.hasAccess() } returns true
+        mockkStatic(Uri::class)
+        every { Uri.parse("content://media/external/images/media/9") } returns mockUri(
+            authority = "media",
+            pathSegments = listOf("external", "images", "media", "9"),
+        )
+        val tool = tool(context)
+        every { contentResolver.getType(any()) } returns "image/jpeg"
+        every { contentResolver.openInputStream(any()) } returns ByteArrayInputStream(byteArrayOf(1, 2))
+
+        val response = responseOf(tool.execute(mockk(), args("content://media/external/images/media/9")))
+
+        assertEquals(true, response["success"])
     }
 
     // ---------- execute：文本路径 ----------
@@ -249,7 +270,7 @@ class ReadLocalFileToolTest {
         ),
     )
 
-    /** 授权文档目录 URI：authority 非 MediaStore，走 [DocumentSearchRepository.isAuthorized]。 */
+    /** 授权共享文件 URI：authority 非 MediaStore，走 [DocumentSearchRepository.isAuthorized]。 */
     private suspend fun authorizedDocumentTool(contentUri: String): ReadLocalFileTool {
         mockkStatic(Uri::class)
         every { Uri.parse(contentUri) } returns mockUri(authority = "docs", lastSegment = contentUri.substringAfterLast('/'))

@@ -97,17 +97,17 @@ fun ModelStatusDisplay(
         shape = RoundedCornerShape(24.dp),
         // 模型入口比输入栏背景抬一级，与抽屉中的选项保持中性容器层级。
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = modifier.heightIn(min = 40.dp),
+        modifier = modifier.heightIn(min = 32.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
         ) {
             if (isActive) {
                 LLMModelServiceIcon(
                     serviceId = serviceId.orEmpty(),
                     modifier = Modifier
-                        .size(26.dp)
+                        .size(22.dp)
                         .alpha(iconAlpha),
                     contentPadding = 4.dp,
                 )
@@ -115,7 +115,8 @@ fun ModelStatusDisplay(
             }
             Text(
                 text = modelName ?: emptyText,
-                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.weight(1f, fill = false),
+                style = MaterialTheme.typography.labelMedium,
                 color = when {
                     isActive -> MaterialTheme.colorScheme.onSurface
                     isLoading -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -304,6 +305,22 @@ internal fun previewModelServices(): List<LLMModelSetting> = listOf(
                     Model(id = "gpt-4o", name = "GPT-4o"),
                     Model(id = "gpt-4o-mini", name = "GPT-4o mini"),
                 ),
+            ),
+        ),
+    ),
+    LLMModelSetting(
+        id = "deepseek",
+        name = "DeepSeek",
+        isEnabled = true,
+        apiKey = "preview-only",
+        apiBaseUrl = "https://api.deepseek.com",
+        apiProtocol = ApiProtocol.OpenaiChatcompletions,
+        anthropicBaseUrl = "",
+        groups = listOf(
+            ModelGroup(
+                id = "deepseek",
+                name = "DeepSeek",
+                models = listOf(Model(id = "deepseekv4-flash", name = "deepseekv4-flash")),
             ),
         ),
     ),

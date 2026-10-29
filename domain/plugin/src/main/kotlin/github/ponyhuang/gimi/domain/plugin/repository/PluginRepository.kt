@@ -39,7 +39,7 @@ interface PluginRepository {
     /**
      * 重新发现已安装插件，无需重启即把新装插件纳入列表与 Agent 运行。
      *
-     * @return 本次新增的插件 id 列表（空表示无新增）。
+     * @return 本次新增或更新的插件 id 列表（空表示无变化）。
      */
     suspend fun refresh(): List<String>
 

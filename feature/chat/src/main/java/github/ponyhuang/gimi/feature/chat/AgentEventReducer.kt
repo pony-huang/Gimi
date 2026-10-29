@@ -55,6 +55,16 @@ internal class AgentEventReducer(
      */
     fun applyEvent(sessionId: String, event: ChatRunEvent, runToken: Any) {
         if (runtimeOrNull(sessionId)?.runToken !== runToken) return
+        if (event.subtaskBatch != null) {
+            val runtime = runtimeFor(sessionId)
+            val message = buildMessageFromParts(event) ?: return
+            val index = runtime.messages.indexOfFirst { it.id == message.id }
+            runtime.messages = if (index < 0) runtime.messages + message else runtime.messages.toMutableList().also {
+                it[index] = message
+            }
+            publishRuntime(runtime)
+            return
+        }
         // 错误优先：errorCode / errorMessage 非空 → 错误消息。
         val errMsg = event.errorMessage
         if (event.errorCode != null || !errMsg.isNullOrBlank()) {

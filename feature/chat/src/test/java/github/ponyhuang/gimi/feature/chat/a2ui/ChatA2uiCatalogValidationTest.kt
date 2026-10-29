@@ -5,6 +5,9 @@ import github.ponyhuang.gimi.data.a2ui.AndroidxA2uiProtocol
 import github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities
 import github.ponyhuang.gimi.domain.a2ui.A2uiDocument
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Test
 
 /**
@@ -12,6 +15,19 @@ import org.junit.Test
  * 尤其覆盖 Material 目录引用的公共类型，防止运行时才出现 ChildList 等缺失。
  */
 class ChatA2uiCatalogValidationTest {
+    @Test
+    fun exportedContainersValidateComposedTemplatesInputsTabsAndDetailReferences() = runTest {
+        val catalog = chatA2uiCatalog {}
+        val capabilities = A2uiCapabilities(catalog.id, catalog.toJsonSchemaString())
+        for (empty in listOf(false, true)) {
+            for (revision in containerPreviewMessages(catalog.id, !empty, false, empty).chunked(3)) {
+                val surfaceId = Json.parseToJsonElement(revision.first()).jsonObject
+                    .getValue("createSurface").jsonObject.getValue("surfaceId").jsonPrimitive.content
+                AndroidxA2uiProtocol().validate(A2uiDocument(surfaceId, revision), capabilities)
+            }
+        }
+    }
+
     @Test
     fun exportedCatalogValidatesInlineAndBoundDataTablesIncludingEmptyRows() = runTest {
         val catalog = chatA2uiCatalog(openUrl = {})
@@ -63,9 +79,10 @@ class ChatA2uiCatalogValidationTest {
     }
 
     @Test
-    fun exportedCatalogValidatesSharedWeatherComponentPayloads() = runTest {
+    fun exportedCatalogValidatesTodayOnlyWeatherPayload() = runTest {
         val catalog = chatA2uiCatalog(openUrl = {})
         val capabilities = A2uiCapabilities(catalog.id, catalog.toJsonSchemaString())
+        org.junit.Assert.assertFalse(capabilities.schemaJson.contains("WeatherForecast"))
         val document = A2uiDocument(
             surfaceId = "weather-surface",
             messages = listOf(
@@ -75,15 +92,11 @@ class ChatA2uiCatalogValidationTest {
                     "location":"上海",
                     "updatedAt":"14:20",
                     "current":{"conditionCode":"clear","temperatureC":28,"humidityPercent":68},
-                    "hourly":[{"timeLabel":"15:00","conditionCode":"clear","temperatureC":29}],
-                    "daily":[{"date":"2026-10-18","conditionCode":"clear","highC":31,"lowC":24,
-                              "sunrise":"05:58","sunset":"17:24"}]
+                    "daily":[{"date":"2026-10-25","highC":31,"lowC":24}]
                   }
                 }}}""",
                 """{"version":"v0.9.1","updateComponents":{"surfaceId":"weather-surface","components":[
-                  {"id":"root","component":"Column","children":["today","forecast"]},
-                  {"id":"today","component":"WeatherToday","weather":{"path":"/weather"}},
-                  {"id":"forecast","component":"WeatherForecast","weather":{"path":"/weather"}}
+                  {"id":"root","component":"WeatherToday","weather":{"path":"/weather"}}
                 ]}}""",
             ),
         )
@@ -122,5 +135,45 @@ class ChatA2uiCatalogValidationTest {
         )
 
         AndroidxA2uiProtocol().validate(document, capabilities)
+    }
+
+    @Test
+    fun exportedCatalogValidatesOptionDeckWithContextualActionsAndLinks() = runTest {
+        val catalog = chatA2uiCatalog(openUrl = {})
+        val capabilities = A2uiCapabilities(catalog.id, catalog.toJsonSchemaString())
+        val deck = """
+            {
+              "title":"发布会视觉方向",
+              "acceptLabel":"赞同",
+              "rejectLabel":"不赞同",
+              "items":[
+                {
+                  "id":"calm-blue",
+                  "title":"克制的深蓝视觉",
+                  "description":"适合强调技术感和可信度。",
+                  "tags":["视觉设计","发布会"],
+                  "link":{"label":"查看设计稿","url":"https://example.com/design/calm-blue"}
+                },
+                {
+                  "id":"warm-paper",
+                  "title":"纸张质感的暖色视觉",
+                  "description":"突出内容和人本身的温度。"
+                }
+              ]
+            }
+        """.trimIndent()
+        for (property in listOf(deck, """{"path":"/deck"}""")) {
+            AndroidxA2uiProtocol().validate(
+                A2uiDocument(
+                    surfaceId = "option-deck-surface",
+                    messages = listOf(
+                        """{"version":"v0.9.1","createSurface":{"surfaceId":"option-deck-surface","catalogId":"${catalog.id}","sendDataModel":true}}""",
+                        """{"version":"v0.9.1","updateDataModel":{"surfaceId":"option-deck-surface","path":"/","value":{"deck":$deck}}}""",
+                        """{"version":"v0.9.1","updateComponents":{"surfaceId":"option-deck-surface","components":[{"id":"root","component":"OptionDeck","deck":$property}]}}""",
+                    ),
+                ),
+                capabilities,
+            )
+        }
     }
 }

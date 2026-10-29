@@ -2,31 +2,37 @@ package github.ponyhuang.gimi.feature.settings
 
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Extension
-import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.Rule
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.Icons
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.conversation.runtime.blocksSessionRead
 import github.ponyhuang.gimi.feature.settings.R
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
@@ -41,6 +47,8 @@ fun SettingsScreen(
     appVersionName: String,
     onAction: (SettingsAction) -> Unit,
     modifier: Modifier = Modifier,
+    exportState: SessionExportUiState = SessionExportUiState(),
+    onExportConversations: () -> Unit = {},
 ) {
     PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         LazyColumn(
@@ -81,6 +89,18 @@ fun SettingsScreen(
                                 action = SettingsAction.OpenMcpServers,
                             ),
                             SettingsNavigationItem(
+                                icon = Icons.Default.Hub,
+                                title = stringResource(R.string.settings_remote_agents_title),
+                                subtitle = stringResource(R.string.settings_remote_agents_subtitle),
+                                action = SettingsAction.OpenRemoteAgents,
+                            ),
+                            SettingsNavigationItem(
+                                icon = Icons.Default.Apps,
+                                title = stringResource(R.string.settings_appfunction_title),
+                                subtitle = stringResource(R.string.settings_appfunction_subtitle),
+                                action = SettingsAction.OpenAppFunctions,
+                            ),
+                            SettingsNavigationItem(
                                 icon = Icons.Default.Code,
                                 title = stringResource(R.string.settings_sandbox_title),
                                 subtitle = stringResource(R.string.settings_sandbox_subtitle),
@@ -109,12 +129,6 @@ fun SettingsScreen(
                     SettingsNavigationItems(
                         items = listOf(
                             SettingsNavigationItem(
-                                icon = Icons.Default.Folder,
-                                title = stringResource(R.string.settings_work_files_title),
-                                subtitle = stringResource(R.string.settings_work_files_subtitle),
-                                action = SettingsAction.OpenWorkFiles,
-                            ),
-                            SettingsNavigationItem(
                                 icon = Icons.Default.FolderOpen,
                                 title = stringResource(R.string.settings_workspace_title),
                                 subtitle = stringResource(R.string.settings_workspace_subtitle),
@@ -122,6 +136,27 @@ fun SettingsScreen(
                             ),
                         ),
                         onAction = onAction,
+                        showLastDivider = true,
+                    )
+                    val canExport = exportState.canExport()
+                    PreferenceListItem(
+                        icon = Icons.Default.FileDownload,
+                        title = stringResource(R.string.session_export_all),
+                        subtitle = stringResource(
+                            when {
+                                exportState.isWorking -> R.string.session_export_working
+                                exportState.runtimeState.blocksSessionRead(null) -> R.string.session_export_blocked
+                                !exportState.hasConversations -> R.string.session_export_empty
+                                else -> R.string.session_export_subtitle
+                            },
+                        ),
+                        modifier = Modifier.semantics { if (!canExport) disabled() },
+                        onClick = if (canExport) onExportConversations else null,
+                        trailingContent = if (exportState.isWorking) {
+                            { CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) }
+                        } else {
+                            null
+                        },
                     )
                 }
             }
@@ -152,12 +187,6 @@ fun SettingsScreen(
                 PreferenceGroupCard {
                     SettingsNavigationItems(
                         items = listOf(
-                            SettingsNavigationItem(
-                                icon = Icons.Default.Rule,
-                                title = stringResource(R.string.settings_tool_authorization_title),
-                                subtitle = stringResource(R.string.settings_tool_authorization_subtitle),
-                                action = SettingsAction.OpenToolAuthorization,
-                            ),
                             SettingsNavigationItem(
                                 icon = Icons.Default.Security,
                                 title = stringResource(R.string.settings_permissions_title),
@@ -237,7 +266,49 @@ private fun SettingsHomePreview() {
                 appVersionName = "1.0",
                 onAction = {},
                 modifier = modifier,
+                exportState = SessionExportUiState(hasConversations = true),
             )
         }
+    }
+}
+
+@Preview(name = "导出 · 任务进行中", widthDp = 390, heightDp = 900)
+@Preview(name = "导出 · 任务进行中 · 深色", widthDp = 390, heightDp = 900, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun SettingsExportBlockedPreview() {
+    SettingsExportStatePreview(
+        SessionExportUiState(
+            hasConversations = true,
+            runtimeState = github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeState.Busy(
+                listOf(
+                    github.ponyhuang.gimi.domain.conversation.runtime.ActiveAgentTask(
+                        source = github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskSource.CHAT,
+                        sessionId = "preview",
+                        phase = github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase.GENERATING,
+                    ),
+                ),
+            ),
+        ),
+    )
+}
+
+@Preview(name = "导出 · 保存中", widthDp = 390, heightDp = 900)
+@Preview(name = "导出 · 保存中 · 深色", widthDp = 390, heightDp = 900, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun SettingsExportWorkingPreview() {
+    SettingsExportStatePreview(SessionExportUiState(isWorking = true, hasConversations = true))
+}
+
+@Preview(name = "导出 · 暂无会话", widthDp = 390, heightDp = 900)
+@Preview(name = "导出 · 暂无会话 · 深色", widthDp = 390, heightDp = 900, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun SettingsExportEmptyPreview() {
+    SettingsExportStatePreview(SessionExportUiState())
+}
+
+@Composable
+private fun SettingsExportStatePreview(state: SessionExportUiState) {
+    AsssistantaiTheme {
+        SettingsScreen(appVersionName = "1.0", onAction = {}, exportState = state)
     }
 }

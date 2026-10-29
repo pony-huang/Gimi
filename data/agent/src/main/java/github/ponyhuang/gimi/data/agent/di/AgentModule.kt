@@ -15,6 +15,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.gimi.data.agent.AdkMcpConnectionTester
 import github.ponyhuang.gimi.data.agent.AdkMcpSkipReporter
+import github.ponyhuang.gimi.data.agent.AdkRemoteAgentConnectionTester
+import github.ponyhuang.gimi.data.agent.AdkRemoteAgentSkipReporter
 import github.ponyhuang.gimi.data.agent.AgentChatRunner
 import github.ponyhuang.gimi.data.agent.AgentBuildConfigurationSnapshot
 import github.ponyhuang.gimi.data.agent.AgentStorage
@@ -36,6 +38,8 @@ import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
 import github.ponyhuang.gimi.domain.mcp.repository.McpConnectionTester
 import github.ponyhuang.gimi.domain.mcp.repository.McpSkipReporter
+import github.ponyhuang.gimi.domain.a2a.repository.RemoteAgentConnectionTester
+import github.ponyhuang.gimi.domain.a2a.repository.RemoteAgentSkipReporter
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
@@ -43,6 +47,8 @@ import github.ponyhuang.gimi.domain.toolauthorization.repository.LocalToolDefini
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
 import io.objectbox.Box
 import io.objectbox.BoxStore
+import org.a2aproject.sdk.client.http.A2AHttpClient
+import org.a2aproject.sdk.client.http.android.AndroidA2AHttpClient
 import github.ponyhuang.gimi.core.storage.ManagedDirectorySpec
 import github.ponyhuang.gimi.core.storage.StorageRegistry
 import dagger.multibindings.IntoSet
@@ -90,6 +96,22 @@ object AgentModule {
     fun provideMcpSkipReporter(
         implementation: AdkMcpSkipReporter,
     ): McpSkipReporter = implementation
+
+    @Provides
+    @Singleton
+    fun provideRemoteAgentSkipReporter(
+        implementation: AdkRemoteAgentSkipReporter,
+    ): RemoteAgentSkipReporter = implementation
+
+    @Provides
+    @Singleton
+    fun provideRemoteAgentConnectionTester(
+        implementation: AdkRemoteAgentConnectionTester,
+    ): RemoteAgentConnectionTester = implementation
+
+    @Provides
+    @Singleton
+    fun provideA2AHttpClient(): A2AHttpClient = AndroidA2AHttpClient()
 
     @Provides
     @Singleton

@@ -21,7 +21,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.Switch
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -33,9 +32,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
 import github.ponyhuang.gimi.ui.preference.LocalPreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /**
@@ -133,14 +132,14 @@ fun GimiBottomSheetOptionRow(
     androidx.compose.foundation.layout.Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = if (compact) 64.dp else 80.dp)
+            .heightIn(min = GimiListDefaults.MinHeight)
             .selectable(
                 selected = selected,
                 enabled = enabled,
                 role = Role.RadioButton,
                 onClick = onClick,
             )
-            .padding(horizontal = if (compact) 16.dp else 20.dp, vertical = 10.dp),
+            .padding(horizontal = if (compact) 16.dp else 20.dp, vertical = GimiListDefaults.VerticalPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         androidx.compose.foundation.layout.Column(modifier = Modifier.weight(1f)) {
@@ -169,39 +168,43 @@ fun GimiBottomSheetOptionRow(
  *
  * 用于本地工具、官方内置工具和 MCP 等可独立启停的配置，保持与互斥选项相同的
  * 留白、图标和文字层级。
+ * @param leadingIcon 自定义图标槽位；提供时替换默认图标及其圆形背景。
  */
 @Composable
 fun GimiBottomSheetSwitchRow(
-    icon: ImageVector,
+    icon: ImageVector? = null,
     label: String,
     description: String,
     checked: Boolean,
     enabled: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    leadingIcon: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val compact = LocalPreferenceStyle.current == PreferenceStyle.Compact
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = if (compact) 64.dp else 80.dp)
+            .heightIn(min = GimiListDefaults.MinHeight)
             .toggleable(
                 value = checked,
                 enabled = enabled,
                 role = Role.Switch,
                 onValueChange = onCheckedChange,
             )
-            .padding(horizontal = if (compact) 16.dp else 20.dp, vertical = 10.dp),
+            .padding(horizontal = if (compact) 16.dp else 20.dp, vertical = GimiListDefaults.VerticalPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (compact) {
+        if (leadingIcon != null) {
+            leadingIcon(Modifier.size(24.dp))
+        } else if (compact && icon != null) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.38f),
-                modifier = Modifier.size(24.dp).padding(2.dp),
+                modifier = Modifier.size(GimiListDefaults.LeadingSize).padding(2.dp),
             )
-        } else Surface(
+        } else if (icon != null) Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(36.dp),
@@ -218,7 +221,7 @@ fun GimiBottomSheetSwitchRow(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .padding(start = if (compact) 16.dp else 12.dp, end = 12.dp),
+                .padding(start = if (compact) GimiListDefaults.ContentSpacing else 12.dp, end = 12.dp),
         ) {
             Text(
                 text = label,
@@ -236,7 +239,7 @@ fun GimiBottomSheetSwitchRow(
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
-        Switch(
+        GimiSwitch(
             checked = checked,
             onCheckedChange = null,
             enabled = enabled,

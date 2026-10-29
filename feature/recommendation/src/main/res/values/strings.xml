@@ -1,8 +1,11 @@
 <resources>
-    <string name="recommendation_settings_title">智能推荐</string>
+    <string name="recommendation_settings_title">个性化服务</string>
     <string name="recommendation_settings_section">推荐更新</string>
     <string name="recommendation_enabled_title">开启智能推荐</string>
     <string name="recommendation_enabled_subtitle">在空会话中显示由 Agent 生成的任务建议</string>
+    <string name="recommendation_fast_model_required_title">需要先配置快速模型</string>
+    <string name="recommendation_fast_model_required_text">推荐内容由快速模型生成。请先在「设置 → 模型服务 → 默认模型」中选择快速模型，再开启智能推荐。</string>
+    <string name="recommendation_fast_model_required_configure">去配置</string>
     <string name="recommendation_interval_title">更新间隔</string>
     <string name="recommendation_interval_value">约 %1$d 小时</string>
     <string name="recommendation_refresh_now">立即更新</string>
@@ -12,8 +15,8 @@
     <string name="recommendation_status_updated">上次更新：%1$s</string>
     <string name="recommendation_status_error">更新失败：%1$s</string>
     <string name="recommendation_status_retrying">更新失败：%1$s，%2$d 秒后自动重试</string>
-    <string name="recommendation_privacy_section">隐私</string>
-    <string name="recommendation_permissions_title">上下文权限</string>
-    <string name="recommendation_permissions_subtitle">管理位置与应用使用情况；未授权的信息会被跳过</string>
+    <string name="recommendation_tools_section">工具与权限</string>
+    <string name="recommendation_toolauth_title">工具授权</string>
+    <string name="recommendation_toolauth_subtitle">选择允许助手使用的本地工具</string>
     <string name="recommendation_close">关闭</string>
 </resources>

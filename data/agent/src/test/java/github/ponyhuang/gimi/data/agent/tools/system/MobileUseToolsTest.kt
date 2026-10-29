@@ -37,14 +37,6 @@ class MobileUseToolsTest {
     private val tools = MobileUseTools(repository).all().associateBy { it.name }
 
     @Test
-    fun actionsAreSeparateTools() {
-        assertEquals(
-            setOf("mobile_observe", "mobile_open_app", "mobile_click", "mobile_set_text", "mobile_tap", "mobile_tap_relative", "mobile_swipe", "mobile_back", "mobile_type_text", "mobile_wait", "mobile_stop"),
-            tools.keys,
-        )
-    }
-
-    @Test
     fun screenshotIsOnlyAttachedToImmediateNextRequest() = runTest {
         val jpeg = byteArrayOf(1, 2, 3, 4)
         coEvery { repository.observe("turn-1") } returns

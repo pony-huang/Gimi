@@ -127,7 +127,7 @@ jobs:
         run: |
           ./gradlew :app:assembleRelease :plugins:spotify:assembleRelease \
             :plugins:zhihu:assembleRelease :plugins:xiaohongshu:assembleRelease \
-            :plugins:v2ex:assembleRelease :plugins:weibo:assembleRelease \
+            :plugins:v2ex:assembleRelease :plugins:weibo:assembleRelease :plugins:netease:assembleRelease \
             --stacktrace --no-parallel --max-workers=2
       - name: Validate and package artifacts
         run: |

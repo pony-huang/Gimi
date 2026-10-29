@@ -6,7 +6,9 @@ package github.ponyhuang.gimi.domain.plugin.model
  * @property id 插件稳定唯一 id（如 `"zhihu"`）。
  * @property name 展示给用户的名称（如 `"知乎"`）。
  * @property packageName 来源插件 APK 的包名。
- * @property version 插件自身版本。
+ * @property version 插件自身行为版本，不用于 APK 更新判断。
+ * @property versionCode 已安装 APK 的 longVersionCode；读取失败时为 0。
+ * @property versionName 已安装 APK 的展示版本。
  * @property toolCount 插件注入 Agent 的工具数量。
  * @property isEnabled 是否启用（关闭后其工具不再注入 Agent）。
  */
@@ -17,6 +19,8 @@ data class PluginDescriptor(
     val version: Int,
     val toolCount: Int,
     val isEnabled: Boolean,
+    val versionCode: Long = 0L,
+    val versionName: String? = null,
 )
 
 /**

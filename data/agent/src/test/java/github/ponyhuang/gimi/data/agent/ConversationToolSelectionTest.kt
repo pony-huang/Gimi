@@ -66,7 +66,7 @@ class ConversationToolSelectionTest {
             ),
         )
 
-        assertFalse(configuration.isOfficialToolEnabled("kimi_formulas"))
+        assertFalse(configuration.isOfficialToolEnabled("kimi_web_tools"))
     }
 
     @Test
@@ -74,6 +74,6 @@ class ConversationToolSelectionTest {
         val configuration: ConversationToolConfiguration? = null
 
         assertTrue(configuration.isOfficialToolEnabled("mimo_web_search"))
-        assertTrue(configuration.isOfficialToolEnabled("kimi_formulas"))
+        assertTrue(configuration.isOfficialToolEnabled("kimi_web_tools"))
     }
 }

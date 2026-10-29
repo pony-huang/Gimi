@@ -1,9 +1,13 @@
 package github.ponyhuang.gimi.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
@@ -16,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -47,6 +52,8 @@ fun <T> PickerSingleChoiceDialog(
     emptyText: String,
     onPick: (T) -> Unit,
     onDismiss: () -> Unit,
+    searchField: (@Composable () -> Unit)? = null,
+    compact: Boolean = false,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -54,39 +61,75 @@ fun <T> PickerSingleChoiceDialog(
         tonalElevation = 0.dp,
         title = { Text(title, style = MaterialTheme.typography.headlineSmall) },
         text = {
-            if (options.isEmpty()) {
-                Text(emptyText, style = MaterialTheme.typography.bodyMedium)
-            } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp),
-                    modifier = Modifier.heightIn(max = 440.dp),
-                ) {
-                    items(options, key = key) { option ->
-                        val isSelected = selected(option)
-                        ListItem(
-                            headlineContent = {
-                                Text(
-                                    text = optionTitle(option),
-                                    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                searchField?.invoke()
+                if (options.isEmpty()) {
+                    Text(emptyText, style = MaterialTheme.typography.bodyMedium)
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (compact) 0.dp else 2.dp),
+                        modifier = Modifier.heightIn(max = 440.dp),
+                    ) {
+                        items(options, key = key) { option ->
+                            val isSelected = selected(option)
+                            if (compact) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 60.dp)
+                                        .selectable(
+                                            isSelected,
+                                            role = Role.RadioButton,
+                                            onClick = { onPick(option) })
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    RadioButton(
+                                        isSelected,
+                                        onClick = null,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            optionTitle(option),
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
+                                        )
+                                        val detail = optionSubtitle(option)
+                                        if (detail.isNotBlank()) Text(
+                                            detail, style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            } else {
+                                ListItem(
+                                    headlineContent = {
+                                        Text(
+                                            text = optionTitle(option),
+                                            fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                                        )
+                                    },
+                                    supportingContent = {
+                                        val detail = optionSubtitle(option)
+                                        if (detail.isNotBlank()) Text(detail)
+                                    },
+                                    leadingContent = {
+                                        RadioButton(selected = isSelected, onClick = null)
+                                    },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .selectable(
+                                            selected = isSelected,
+                                            role = Role.RadioButton,
+                                            onClick = { onPick(option) },
+                                        ),
                                 )
-                            },
-                            supportingContent = {
-                                val detail = optionSubtitle(option)
-                                if (detail.isNotBlank()) Text(detail)
-                            },
-                            leadingContent = {
-                                RadioButton(selected = isSelected, onClick = null)
-                            },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .selectable(
-                                    selected = isSelected,
-                                    role = Role.RadioButton,
-                                    onClick = { onPick(option) },
-                                ),
-                        )
+                            }
+                        }
                     }
                 }
             }

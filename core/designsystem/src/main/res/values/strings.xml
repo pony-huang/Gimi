@@ -3,4 +3,6 @@
     <string name="common_back">返回</string>
     <string name="common_settings">设置</string>
     <string name="picker_cancel">取消</string>
+    <string name="picker_no_search_results">没有匹配的选项</string>
+    <string name="picker_clear_search">清除搜索</string>
 </resources>

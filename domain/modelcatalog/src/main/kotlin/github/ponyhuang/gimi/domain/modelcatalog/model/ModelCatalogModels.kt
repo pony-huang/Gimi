@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.domain.modelcatalog.model
 
 import kotlinx.serialization.Serializable
 
+/** 厂商连接配置与用户选择的模型；未添加项只作为厂商目录模板。 */
 data class LLMModelSetting(
     val id: String,
     val name: String,
@@ -18,6 +19,7 @@ data class LLMModelSetting(
     val iconRes: Int? = null,
     val homepageUrl: String = "",
     val keyHelpUrl: String = "",
+    val isAdded: Boolean = apiKey.isNotBlank(),
 ) {
     val activeApiBaseUrl: String
         get() = when (apiProtocol) {

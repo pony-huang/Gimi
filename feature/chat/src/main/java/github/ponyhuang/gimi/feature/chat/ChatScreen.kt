@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -46,7 +47,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -64,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -276,16 +277,14 @@ fun ChatScaffold(
         modifier = Modifier.fillMaxSize(),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            // 与底部 composer 的 fadeBrush 对称：消息滚到悬浮顶栏后方时渐隐，
-            // 避免文字从透明按钮之间透出（只保护状态栏不够，按钮行本身也是透明的）。
-            val topBarBackground = MaterialTheme.colorScheme.background
-            val topFadeBrush = remember(topBarBackground) {
+            // 与底部输入区对称：正文滚到悬浮顶栏后方时柔和淡出，状态栏保留额外遮罩。
+            val background = MaterialTheme.colorScheme.background
+            val fadeBrush = remember(background) {
                 Brush.verticalGradient(
-                    // 保留柔和淡出，略微降低遮罩强度，让后方正文更容易辨认。
                     colorStops = arrayOf(
-                        0.0f to topBarBackground,
-                        0.55f to topBarBackground.copy(alpha = 0.9f),
-                        0.8f to topBarBackground.copy(alpha = 0.4f),
+                        0.0f to background,
+                        0.55f to background.copy(alpha = 0.9f),
+                        0.8f to background.copy(alpha = 0.4f),
                         1.0f to Color.Transparent,
                     ),
                 )
@@ -294,7 +293,7 @@ fun ChatScaffold(
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .background(topFadeBrush),
+                        .background(fadeBrush),
                 )
                 ChatHeaderActions(
                     autoSpeakEnabled = state.autoSpeakEnabled,
@@ -314,15 +313,17 @@ fun ChatScaffold(
         },
         bottomBar = {
             val background = MaterialTheme.colorScheme.background
-            val fadeBrush = remember(background) {
+            // 渐隐只用固定高度，避免输入区变高时把正文过早淡没。
+            val fadeHeightPx = with(LocalDensity.current) { 28.dp.toPx() }
+            val fadeBrush = remember(background, fadeHeightPx) {
                 Brush.verticalGradient(
-                    // 恢复原来的渐变范围，仅小幅降低中段不透明度。
-                    colorStops = arrayOf(
-                        0.0f to Color.Transparent,
-                        0.333f to background.copy(alpha = 0.7f),
-                        0.667f to background.copy(alpha = 0.9f),
-                        1.0f to background,
+                    colors = listOf(
+                        Color.Transparent,
+                        background.copy(alpha = 0.8f),
+                        background,
                     ),
+                    startY = 0f,
+                    endY = fadeHeightPx,
                 )
             }
             Column(modifier = Modifier.background(fadeBrush)) {
@@ -429,19 +430,14 @@ fun ChatScaffold(
                 // 但空会话里没有"最新消息"可回，这时不该冒出这个按钮。
                 visible = listState.canScrollForward && !showsRecommendations,
             ) {
-                SmallFloatingActionButton(
+                ChatScrollToLatestButton(
                     onClick = {
                         shouldFollowLatest = true
                         scope.launch {
                             listState.animateScrollToItem(renderedItemCount)
                         }
                     },
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = stringResource(R.string.chat_fab_back_to_latest),
-                    )
-                }
+                )
             }
         },
     ) { innerPadding ->
@@ -520,6 +516,16 @@ fun ChatScaffold(
                                 val lastActivityId = segments.filterIsInstance<TurnSegment.Activity>().lastOrNull()?.id
                                 segments.forEach { segment ->
                                     when (segment) {
+                                        is TurnSegment.Subtasks -> item(
+                                            key = "subtasks:${state.sessionId}:${segment.id}",
+                                            contentType = "subtasks",
+                                        ) {
+                                            SubtaskBatchPanel(
+                                                batch = segment.batch,
+                                                expanded = segment.id in state.expandedActivityGroupIds,
+                                                onToggle = { onToggleTimeline(segment.id) },
+                                            )
+                                        }
                                         is TurnSegment.Answer -> {
                                             val message = segment.message
                                             item(
@@ -585,6 +591,38 @@ fun ChatScaffold(
 
         }
 
+    }
+}
+
+/** 回到底部的悬浮入口，复用聊天顶栏与输入胶囊的中性容器样式。 */
+@Composable
+private fun ChatScrollToLatestButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.size(48.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            modifier = Modifier.size(44.dp),
+            shape = CircleShape,
+            color = chatCapsuleColor(),
+            border = BorderStroke(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+            ),
+        ) {}
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier
+                .size(48.dp)
+                .testTag("chat_scroll_to_latest"),
+        ) {
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = stringResource(R.string.chat_fab_back_to_latest),
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -839,7 +877,9 @@ private fun ChatScaffoldEmptyPreview() {
     }
 }
 
-@Preview(showBackground = true)
+@Preview(name = "聊天正文 · 浅色", showBackground = true, widthDp = 390)
+@Preview(name = "聊天正文 · 深色", showBackground = true, widthDp = 390,
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ChatScaffoldWithMessagesPreview() {
     AsssistantaiTheme {
@@ -848,7 +888,14 @@ private fun ChatScaffoldWithMessagesPreview() {
             Message(
                 author = "DefaultAssistant",
                 role = MessageRole.Assistant,
-                textParts = listOf(TextPart(text = "上海今天晴，28°C，适合出门。")),
+                textParts = listOf(TextPart(text = """
+                    先确认两点：
+
+                    1. **写什么主题：** 围绕这份 Excel 来写，还是产品推广、活动通知或小红书笔记？
+                    2. **发在哪：** 公众号 / 小红书 / 朋友圈？
+
+                    你可以粘贴关键内容，或重新上传文件，我再动笔。
+                """.trimIndent())),
             ),
         )
         ChatScaffold(
@@ -879,6 +926,29 @@ private fun ChatScaffoldWithMessagesPreview() {
             onOfficialToolFunctionEnabledChange = { _, _, _ -> },
             onOfficialToolFunctionsRetry = {},
         )
+    }
+}
+
+@Preview(name = "回到底部 · 浅色", showBackground = true, widthDp = 120, heightDp = 96)
+@Preview(
+    name = "回到底部 · 深色",
+    showBackground = true,
+    widthDp = 120,
+    heightDp = 96,
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun ChatScrollToLatestButtonPreview() {
+    AsssistantaiTheme {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(16.dp),
+            contentAlignment = Alignment.BottomEnd,
+        ) {
+            ChatScrollToLatestButton(onClick = {})
+        }
     }
 }
 

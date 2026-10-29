@@ -15,6 +15,7 @@ import github.ponyhuang.gimi.domain.recommendation.model.RecommendationContext
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationCapabilitySource
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationContextSource
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationGenerator
+import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationNotConfiguredException
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -141,6 +142,20 @@ class RecommendationRefresherTest {
     }
 
     @Test
+    fun notConfiguredErrorFailsImmediatelyWithoutConsumingLadder() = runTest {
+        val fixture = Fixture()
+        coEvery { fixture.generator.generate(any()) } throws
+            RecommendationNotConfiguredException("Configure an OpenAI-compatible fast model.")
+
+        val outcome = fixture.refresher.refreshSafely()
+
+        assertEquals(RecommendationRefreshOutcome.Failure, outcome)
+        verify(exactly = 0) { fixture.preferences.markRetrying(any(), any()) }
+        verify { fixture.preferences.markFailed("Configure an OpenAI-compatible fast model.") }
+        assertTrue(fixture.delays.isEmpty())
+    }
+
+    @Test
     fun cancellationPropagatesWithoutMarkingFailure() = runTest {
         val fixture = Fixture()
         coEvery { fixture.generator.generate(any()) } throws CancellationException("cancelled")
@@ -228,6 +243,9 @@ class RecommendationRefresherTest {
 
         override suspend fun <T> runMutation(block: suspend () -> T): AgentMutationResult<T> =
             AgentMutationResult.Applied(block())
+
+        override suspend fun <T> readSessionSnapshot(sessionId: String?, block: suspend () -> T): AgentMutationResult<T> =
+            AgentMutationResult.Applied(block())
     }
 
     private class BusyGate : AgentRuntimeGate {
@@ -240,6 +258,9 @@ class RecommendationRefresherTest {
         ): AgentRunLease = error("Not used")
 
         override suspend fun <T> runMutation(block: suspend () -> T): AgentMutationResult<T> =
+            AgentMutationResult.BlockedByActiveAgent
+
+        override suspend fun <T> readSessionSnapshot(sessionId: String?, block: suspend () -> T): AgentMutationResult<T> =
             AgentMutationResult.BlockedByActiveAgent
     }
 }

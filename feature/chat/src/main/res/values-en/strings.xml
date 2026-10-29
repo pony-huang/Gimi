@@ -1,8 +1,25 @@
 <resources>
+    <string name="chat_subtask_parent_read">Parent assistance is required for file access</string>
+    <string name="chat_subtasks_running">Analyzing · %1$d / %2$d completed</string>
+    <string name="chat_subtasks_failed">Partially completed · %1$d failed</string>
+    <string name="chat_subtasks_stopped">Stopped · %1$d / %2$d completed</string>
+    <string name="chat_subtasks_interrupted">Tasks interrupted</string>
+    <string name="chat_subtasks_completed">Completed %1$d tasks</string>
+    <string name="chat_subtasks_elapsed">%1$d s</string>
+    <string name="chat_subtask_queued">Queued</string>
+    <string name="chat_subtask_running">Analyzing</string>
+    <string name="chat_subtask_completed">Completed</string>
+    <string name="chat_subtask_failed">Failed</string>
+    <string name="chat_subtask_cancelled">Cancelled</string>
+    <string name="chat_subtask_interrupted">Interrupted</string>
+    <string name="chat_subtask_timeout">Request timed out; no automatic retry</string>
+    <string name="chat_subtask_error">Analysis failed; no automatic retry</string>
+    <string name="chat_subtask_tool_completed">Completed: %1$s</string>
+    <string name="chat_subtask_tool_started">Tool step: %1$s</string>
     <string name="stream_ai_compose_speech_to_text_idle_button">Voice input</string>
     <string name="stream_ai_compose_composer_mic_permission_message">Microphone permission is required to record audio</string>
     <string name="stream_ai_compose_composer_mic_permission_action">Settings</string>
-    <string name="stream_ai_compose_composer_input_placeholder">Ask Assistant</string>
+    <string name="stream_ai_compose_composer_input_placeholder">Ask</string>
     <string name="stream_ai_compose_composer_stop_button">Stop</string>
     <string name="stream_ai_compose_composer_send_button">Send</string>
     <string name="stream_ai_compose_composer_add_attachments_button">Add context</string>
@@ -46,8 +63,8 @@
     <string name="chat_official_tool_text_to_image_description">Generate an image from a text description</string>
     <string name="chat_official_tool_image_to_image">Image to image</string>
     <string name="chat_official_tool_image_to_image_description">Generate an image from a reference image and text</string>
-    <string name="chat_official_tool_kimi_formulas">Kimi formulas</string>
-    <string name="chat_official_tool_kimi_formulas_description">Use Kimi formula calculations</string>
+    <string name="chat_official_tool_kimi_web_tools">Kimi web tools</string>
+    <string name="chat_official_tool_kimi_web_tools_description">Search the web or fetch page content with Kimi</string>
     <string name="chat_official_tool_glm_web_search">GLM web search</string>
     <string name="chat_official_tool_glm_web_search_description">Search the web for current information with Zhipu’s search engine</string>
     <string name="chat_official_tool_web_reader">Web reader</string>
@@ -146,6 +163,7 @@
     <string name="chat_notice_attachment_unsupported_or_too_large">Unsupported attachment type or file too large: %1$s</string>
     <string name="chat_notice_document_total_size_limit">Document attachments cannot exceed 50 MB in total</string>
     <string name="chat_notice_mcp_server_skipped">MCP server “%1$s” is unreachable and was skipped for this session</string>
+    <string name="chat_notice_remote_agent_skipped">A2A agent “%1$s” is unreachable and was skipped for this session</string>
     <string name="chat_notice_memory_search_failed">Mem0 search failed; cloud memory will not be used for this turn</string>
     <string name="chat_notice_memory_write_failed">Mem0 could not save this conversation; the response is unaffected</string>
 
@@ -206,8 +224,8 @@
     <string name="chat_notice_delete_failed">Some conversations could not be deleted. Please try again.</string>
     <string name="chat_choice_show_full_text">Show full option</string>
     <string name="chat_choice_close_full_text">Close</string>
-    <string name="chat_official_tool_deepseek_web_search">DeepSeek web search</string>
-    <string name="chat_official_tool_deepseek_web_fetch">DeepSeek web fetch</string>
+    <string name="chat_official_tool_deepseek_web_search">Web search</string>
+    <string name="chat_official_tool_deepseek_web_fetch">Web fetch</string>
     <string name="chat_official_tool_deepseek_web_search_description">Search the web for links, summaries, and optional page content.</string>
     <string name="chat_official_tool_deepseek_web_fetch_description">Fetch a web page and return its title and Markdown content.</string>
     <string name="chat_a2ui_failed">Unable to display this card. Ask the assistant to try again.</string>
@@ -216,30 +234,13 @@
 
     <!-- A2UI weather cards -->
     <string name="chat_weather_today">Today</string>
-    <string name="chat_weather_tomorrow">Tomorrow</string>
-    <string name="chat_weather_day_index">Day %1$d</string>
     <string name="chat_weather_updated_at">Updated %1$s</string>
     <string name="chat_weather_temperature_value">%1$d°</string>
     <string name="chat_weather_percent_value">%1$d%%</string>
     <string name="chat_weather_not_available">—</string>
-    <string name="chat_weather_feels_high_low">Feels %1$d° · High %2$d° / Low %3$d°</string>
-    <string name="chat_weather_metric_feels_like">Feels</string>
     <string name="chat_weather_metric_humidity">Humidity</string>
     <string name="chat_weather_metric_wind">Wind</string>
     <string name="chat_weather_metric_precipitation">Rain</string>
-    <string name="chat_weather_metric_uv">UV</string>
-    <string name="chat_weather_metric_air_quality">Air</string>
-    <string name="chat_weather_next_hours">Next hours</string>
-    <string name="chat_weather_daily">Daily</string>
-    <string name="chat_weather_forecast_range">Next %1$d days</string>
-    <string name="chat_weather_low_temperature">/ %1$d°</string>
-    <string name="chat_weather_rainy_days">%1$d rainy days</string>
-    <string name="chat_weather_average_high">Avg high</string>
-    <string name="chat_weather_lowest">Lowest</string>
-    <string name="chat_weather_temperature_spread">Spread</string>
-    <string name="chat_weather_sunrise">Sunrise %1$s</string>
-    <string name="chat_weather_sunset">Sunset %1$s</string>
-    <string name="chat_weather_wind_direction_speed">%1$s %2$d km/h</string>
     <string name="chat_weather_wind_speed">%1$d km/h</string>
     <string name="chat_weather_condition_clear">Clear</string>
     <string name="chat_weather_condition_partly_cloudy">Partly cloudy</string>
@@ -260,6 +261,17 @@
     <string name="chat_player_artwork">Album artwork</string>
     <string name="chat_player_generic_name">Music</string>
 
+    <!-- A2UI discovery deck -->
+    <string name="chat_option_deck_default_title">Options to compare</string>
+    <string name="chat_option_deck_position">%1$d / %2$d</string>
+    <string name="chat_option_deck_item_image">Option image</string>
+    <string name="chat_option_deck_open_image">View image</string>
+    <string name="chat_option_deck_close_image">Close image</string>
+    <string name="chat_option_deck_browse_hint">Swipe horizontally to browse. Tap a button to submit your choice.</string>
+    <string name="chat_option_deck_empty_title">You have reviewed this round</string>
+    <string name="chat_option_deck_empty_summary">%1$d accepted · %2$d skipped</string>
+    <string name="chat_option_deck_empty_restart">Review again</string>
+
     <!-- A2UI news list -->
     <!-- A2UI read-only data table -->
     <string name="chat_table_default_heading">Data table</string>
@@ -270,4 +282,33 @@
     <string name="chat_table_scroll_both">Scroll horizontally for columns, vertically for rows</string>
     <string name="chat_timeline_steps">%1$d steps</string>
     <string name="chat_timeline_elapsed">%1$.1f s total</string>
+    <string name="chat_player_playing">Now playing</string>
+    <string name="chat_player_paused">Paused</string>
+    <string name="chat_player_saved">Saved</string>
+    <string name="chat_player_save">Save</string>
+    <string name="chat_player_previous">Previous track</string>
+    <string name="chat_player_shuffle">Shuffle</string>
+    <string name="chat_player_repeat">Change repeat mode</string>
+    <string name="chat_weather_location_today">%1$s · Today</string>
+    <string name="chat_weather_high_low">High %1$d° / Low %2$d°</string>
+    <string name="chat_a2ui_collection_empty">No content</string>
+    <string name="chat_a2ui_position_vertical">%1$d / %2$d · Scroll vertically</string>
+    <string name="chat_a2ui_position_horizontal">%1$d / %2$d · Swipe horizontally</string>
+    <string name="chat_a2ui_expanded">Expanded</string>
+    <string name="chat_a2ui_collapsed">Collapsed</string>
+    <string name="chat_a2ui_expand">Expand content</string>
+    <string name="chat_a2ui_collapse">Collapse content</string>
+    <string name="session_export_single">Export conversation</string>
+    <string name="session_export_actions">Conversation actions</string>
+    <string name="session_delete_single">Delete conversation</string>
+    <string name="session_export_empty">No conversations to export</string>
+    <string name="session_export_blocked">A task is in progress. Export when it finishes.</string>
+    <string name="session_export_succeeded">Conversations exported</string>
+    <string name="session_export_failed">Export failed. Please try again.</string>
+    <string name="chat_official_tool_kimi_search_basic">Search Basic</string>
+    <string name="chat_official_tool_kimi_search_basic_description">Return summaries and optional full page text</string>
+    <string name="chat_official_tool_kimi_search_pro">Search Pro</string>
+    <string name="chat_official_tool_kimi_search_pro_description">Return relevant passages with site and date filters</string>
+    <string name="chat_official_tool_kimi_fetch">Web fetch</string>
+    <string name="chat_official_tool_kimi_fetch_description">Fetch a page as Markdown</string>
 </resources>

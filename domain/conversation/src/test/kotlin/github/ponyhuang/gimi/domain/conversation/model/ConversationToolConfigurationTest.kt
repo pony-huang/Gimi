@@ -8,19 +8,11 @@ import org.junit.Test
 class ConversationToolConfigurationTest {
 
     @Test
-    fun newConversationsDefaultToMediumReasoningEffort() {
-        assertEquals(
-            ReasoningEffort.MEDIUM,
-            ConversationToolConfiguration().reasoningEffort,
-        )
-    }
-
-    @Test
     fun officialFunctionsDefaultToTheAllMarkerForUnseenTools() {
         val configuration = ConversationToolConfiguration()
 
         val initialized = configuration.initializeOfficialFunctions(
-            supportedToolIds = setOf("mimo_web_search", "kimi_formulas"),
+            supportedToolIds = setOf("mimo_web_search", "kimi_web_tools"),
         )
 
         assertEquals(
@@ -29,14 +21,14 @@ class ConversationToolConfigurationTest {
         )
         assertEquals(
             setOf(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER),
-            initialized.enabledOfficialFunctionIds("kimi_formulas"),
+            initialized.enabledOfficialFunctionIds("kimi_web_tools"),
         )
     }
 
     @Test
     fun officialToolSelectionsRemainIndependentBetweenTools() {
         val configuration = ConversationToolConfiguration()
-            .initializeOfficialFunctions(setOf("mimo_web_search", "kimi_formulas"))
+            .initializeOfficialFunctions(setOf("mimo_web_search", "kimi_web_tools"))
             .setOfficialFunctionEnabled(
                 toolId = "mimo_web_search",
                 functionId = "mimo_web_search",
@@ -47,23 +39,23 @@ class ConversationToolConfigurationTest {
         assertFalse("mimo_web_search" in configuration.enabledOfficialFunctionIds("mimo_web_search"))
         assertTrue(
             ConversationToolConfiguration.ALL_FUNCTIONS_MARKER in
-                configuration.enabledOfficialFunctionIds("kimi_formulas"),
+                configuration.enabledOfficialFunctionIds("kimi_web_tools"),
         )
     }
 
     @Test
     fun setOfficialFunctionEnabledExpandsMarkerBeforeApplyingChange() {
         val configuration = ConversationToolConfiguration()
-            .initializeOfficialFunctions(setOf("kimi_formulas"))
+            .initializeOfficialFunctions(setOf("kimi_web_tools"))
 
         val updated = configuration.setOfficialFunctionEnabled(
-            toolId = "kimi_formulas",
+            toolId = "kimi_web_tools",
             functionId = "convert",
             supportedFunctionIds = setOf("convert", "rethink"),
             enabled = false,
         )
 
-        val enabled = updated.enabledOfficialFunctionIds("kimi_formulas")
+        val enabled = updated.enabledOfficialFunctionIds("kimi_web_tools")
         assertFalse(ConversationToolConfiguration.ALL_FUNCTIONS_MARKER in enabled)
         assertTrue("convert" !in enabled)
         assertTrue("rethink" in enabled)
@@ -72,16 +64,16 @@ class ConversationToolConfigurationTest {
     @Test
     fun expandOfficialFunctionsMarkerReplacesTheSentinelWithConcreteIds() {
         val configuration = ConversationToolConfiguration()
-            .initializeOfficialFunctions(setOf("kimi_formulas"))
+            .initializeOfficialFunctions(setOf("kimi_web_tools"))
 
         val expanded = configuration.expandOfficialFunctionsMarker(
-            toolId = "kimi_formulas",
+            toolId = "kimi_web_tools",
             supportedFunctionIds = setOf("convert", "rethink"),
         )
 
         assertEquals(
             setOf("convert", "rethink"),
-            expanded.enabledOfficialFunctionIds("kimi_formulas"),
+            expanded.enabledOfficialFunctionIds("kimi_web_tools"),
         )
     }
 
@@ -89,12 +81,12 @@ class ConversationToolConfigurationTest {
     fun expandOfficialFunctionsMarkerIsANoOpWhenMarkerAbsent() {
         val configuration = ConversationToolConfiguration(
             enabledOfficialFunctionIds = mapOf(
-                "kimi_formulas" to setOf("convert"),
+                "kimi_web_tools" to setOf("convert"),
             ),
         )
 
         val expanded = configuration.expandOfficialFunctionsMarker(
-            toolId = "kimi_formulas",
+            toolId = "kimi_web_tools",
             supportedFunctionIds = setOf("convert", "rethink"),
         )
 

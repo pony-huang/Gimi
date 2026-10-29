@@ -10,6 +10,7 @@ import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeState
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskSource
+import github.ponyhuang.gimi.domain.conversation.runtime.blocksSessionRead
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -69,6 +70,17 @@ class InMemoryAgentRuntimeGate @Inject constructor(
         }
     }
 
+    override suspend fun <T> readSessionSnapshot(
+        sessionId: String?,
+        block: suspend () -> T,
+    ): AgentMutationResult<T> = mutationMutex.withLock {
+        if (state.value.blocksSessionRead(sessionId)) {
+            AgentMutationResult.BlockedByActiveAgent
+        } else {
+            AgentMutationResult.Applied(block())
+        }
+    }
+
     private inner class Lease(
         private val token: Any,
     ) : AgentRunLease {
@@ -85,9 +97,7 @@ class InMemoryAgentRuntimeGate @Inject constructor(
             synchronized(tasks) {
                 if (tasks.remove(token) != null) {
                     publishState()
-                    if (tasks.isEmpty()) {
-                        AgentExecutionService.stop(context)
-                    }
+                    // 服务必须先确认前台启动请求，再根据 Idle 自行停止；不能撤销尚未送达的启动。
                 }
             }
         }

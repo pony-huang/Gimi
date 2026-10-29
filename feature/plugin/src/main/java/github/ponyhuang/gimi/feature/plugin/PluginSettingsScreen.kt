@@ -36,7 +36,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -62,12 +61,13 @@ import github.ponyhuang.gimi.domain.plugin.model.LocalizedText
 import github.ponyhuang.gimi.domain.plugin.model.PluginCatalogEntry
 import github.ponyhuang.gimi.domain.plugin.model.PluginCatalogSource
 import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
+import github.ponyhuang.gimi.ui.components.GimiSearchField
+import github.ponyhuang.gimi.ui.components.GimiSwitch
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
-import github.ponyhuang.gimi.ui.preference.PreferenceTextField
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
@@ -210,14 +210,6 @@ fun PluginSettingsScreen(
                         )
                     }
                 }
-                if (!state.canRequestPackageInstalls) {
-                    item {
-                        PreferenceBanner(
-                            text = stringResource(R.string.plugin_list_unknown_sources),
-                            tone = PreferenceBannerTone.Info,
-                        )
-                    }
-                }
                 when {
                     state.isLoadingCatalog && state.items.isEmpty() -> item {
                         Box(
@@ -266,7 +258,12 @@ fun PluginSettingsScreen(
                                     onAction(PluginSettingsAction.RequestUninstall(it.id))
                                 }
                             },
-                            onInstall = { onAction(PluginSettingsAction.Install(item.key)) },
+                            onInstall = {
+                                onAction(
+                                    if (item.isInstalled) PluginSettingsAction.Update(item.key)
+                                    else PluginSettingsAction.Install(item.key),
+                                )
+                            },
                         )
                     }
                 }
@@ -289,18 +286,11 @@ private fun PluginListSearchField(
     query: String,
     onQueryChange: (String) -> Unit,
 ) {
-    PreferenceTextField(
+    GimiSearchField(
         value = query,
         onValueChange = onQueryChange,
         modifier = Modifier.fillMaxWidth(),
-        label = { Text(stringResource(R.string.plugin_list_search_label)) },
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        },
+        placeholder = { Text(stringResource(R.string.plugin_list_search_label)) },
         trailingIcon = {
             if (query.isNotEmpty()) {
                 IconButton(onClick = { onQueryChange("") }) {
@@ -311,7 +301,6 @@ private fun PluginListSearchField(
                 }
             }
         },
-        singleLine = true,
     )
 }
 
@@ -363,33 +352,24 @@ private fun PluginRowCard(
                         )
                     }
                 }
+                // 尾部顺序与 MCP 服务列表、A2A 远程 Agent 列表保持一致：溢出菜单在前，开关贴行尾。
                 PluginRowMenu(
                     installed = item.isInstalled,
                     enabled = mutationEnabled,
                     onOpenDetail = onOpenDetail,
                     onUninstall = onUninstall,
                 )
-            }
-            if (item.isInstalled) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 36.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text = stringResource(R.string.plugin_list_installed),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Switch(
+                if (item.isInstalled) {
+                    // 菜单与开关都是 48dp 触控盒，留一点间距避免两者紧贴糊在一起。
+                    Spacer(Modifier.width(4.dp))
+                    GimiSwitch(
                         checked = item.installed?.isEnabled == true,
                         onCheckedChange = onToggleEnabled,
                         enabled = mutationEnabled,
                     )
                 }
-            } else {
+            }
+            if (!item.isInstalled || item.isUpdateAvailable) {
                 PluginInstallAction(
                     entry = item,
                     enabled = installEnabled,
@@ -531,6 +511,7 @@ private fun previewState(
         previewItem("spotify", "Spotify", "搜索、播放、歌单和音乐库", "Search, playback, playlists, and your library"),
         previewItem("v2ex", "V2EX", "节点、主题、回复、通知与账号信息", "Nodes, topics, replies, notifications, and account info"),
         previewItem("weibo", "微博", "热搜、智搜、超话与账号微博", "Trending, AI search, Super Topics, and posts"),
+        previewItem("netease", "网易云音乐", "扫码登录、歌单与歌曲详情", "QR sign-in, playlists, and song details"),
     ),
 ) = PluginSettingsUiState(
     items = items,
@@ -571,5 +552,34 @@ private fun PluginSettingsScreenInstallingPreview() {
             onNavigateToConfig = {},
             onNavigateToDetail = {},
         )
+    }
+}
+
+@Preview(name = "更新状态 · 浅色", widthDp = 390, heightDp = 1100, locale = "zh")
+@Preview(name = "更新状态 · 深色", widthDp = 390, heightDp = 1100, locale = "zh", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PluginUpdateStatesPreview() {
+    val catalog = previewCatalogEntry("zhihu", "知乎", "站内搜索、热榜、直答与知识库", "Search and knowledge bases").copy(versionCode = 61L, versionName = "1.1.0")
+    val installed = PluginDescriptor("zhihu", "知乎", catalog.packageName, 1, 4, true, 60L, "1.0.0")
+    AsssistantaiTheme {
+        LazyColumn(
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            items(listOf(
+                PluginInstallUiState.Idle,
+                PluginInstallUiState.Resolving,
+                PluginInstallUiState.Downloading(0.42f),
+                PluginInstallUiState.Failed(github.ponyhuang.gimi.domain.plugin.model.PluginInstallFailure.NETWORK),
+            )) { state ->
+                PluginRowCard(
+                    item = PluginListItemUi(catalog, installed, state),
+                    installedIcon = null,
+                    mutationEnabled = true,
+                    installEnabled = !state.isInProgress,
+                    onToggleEnabled = {}, onOpenDetail = {}, onConfigure = {}, onUninstall = {}, onInstall = {},
+                )
+            }
+        }
     }
 }

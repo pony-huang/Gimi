@@ -599,4 +599,7 @@ private class RecordingAgentRuntimeGate : AgentRuntimeGate {
 
     override suspend fun <T> runMutation(block: suspend () -> T): AgentMutationResult<T> =
         AgentMutationResult.Applied(block())
+
+    override suspend fun <T> readSessionSnapshot(sessionId: String?, block: suspend () -> T): AgentMutationResult<T> =
+        AgentMutationResult.Applied(block())
 }

@@ -16,10 +16,14 @@ import org.junit.Test
 
 /** 验证模型修正仅用于无副作用读取，取消与执行类工具不能被重新尝试。 */
 class AgentToolRetryPolicyTest {
+    @OptIn(com.google.adk.kt.annotations.FrameworkInternalApi::class)
     @Test
     fun retryGuidanceStopsAfterTwoFailuresAndSuccessResetsBudget() = runTest {
         val plugin = AgentToolRetryPolicy.plugin()
-        val context = mockk<ToolContext> { every { invocationId } returns "turn-a" }
+        val context = mockk<ToolContext> {
+            every { invocationId } returns "turn-a"
+            every { callbackContextData } returns mutableMapOf()
+        }
         val tool = mockk<BaseTool> { every { name } returns "load_skill" }
         val first = plugin.afterTool(context, tool, emptyMap(), mapOf("error" to "Missing skill"))
         val second = plugin.afterTool(context, tool, emptyMap(), mapOf("error" to "Missing skill"))

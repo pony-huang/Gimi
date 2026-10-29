@@ -14,6 +14,8 @@
     <string name="settings_default_model_subtitle">Choose default models for each feature</string>
 
     <string name="settings_mcp_title">MCP</string>
+    <string name="settings_remote_agents_title">A2A</string>
+    <string name="settings_remote_agents_subtitle">Connect agents over the A2A protocol</string>
     <string name="settings_mcp_subtitle">Connect remote tool services</string>
 
     <string name="settings_plugins_title">Plugins</string>
@@ -22,13 +24,9 @@
     <string name="settings_skills_title">Skills</string>
     <string name="settings_skills_subtitle">Install Skills</string>
 
-    <string name="settings_work_files_title">Folders</string>
-    <string name="settings_work_files_subtitle">Allow access to local folders</string>
     <string name="settings_workspace_title">Cache</string>
     <string name="settings_workspace_subtitle">Manage chat attachments</string>
 
-    <string name="settings_tool_authorization_title">Tool access</string>
-    <string name="settings_tool_authorization_subtitle">Choose which local tools the assistant may use</string>
     <string name="settings_mobile_use_title">Shizuku</string>
     <string name="settings_mobile_use_subtitle">Let the Agent use other apps in the background</string>
     <string name="settings_permissions_title">Permissions</string>
@@ -66,8 +64,8 @@
     <string name="update_open_app_details">Open app details</string>
     <string name="update_failed_title">Update failed</string>
     <string name="update_retry">Retry</string>
-    <string name="settings_recommendations_title">Smart recommendations</string>
-    <string name="settings_recommendations_subtitle">Configure suggestions and pre-generation</string>
+    <string name="settings_recommendations_title">Personalized services</string>
+    <string name="settings_recommendations_subtitle">Configure suggestions and tool authorization</string>
 
     <string name="logs_title">Logs</string>
     <string name="logs_subtitle">View and export logs from the last 24 hours</string>
@@ -87,4 +85,13 @@
     <string name="settings_group_assistant">Assistant preferences</string>
     <string name="settings_group_permissions">Permissions and device</string>
     <string name="settings_group_about">About</string>
+    <string name="settings_appfunction_title">AppFunciton</string>
+    <string name="settings_appfunction_subtitle">Discover and use functions from apps</string>
+    <string name="session_export_all">Export all conversations</string>
+    <string name="session_export_subtitle">Save one conversation as JSONL or multiple conversations as a ZIP</string>
+    <string name="session_export_working">Exporting…</string>
+    <string name="session_export_empty">No conversations to export</string>
+    <string name="session_export_blocked">A task is in progress. Export when it finishes.</string>
+    <string name="session_export_succeeded">Conversations exported</string>
+    <string name="session_export_failed">Export failed. Please try again.</string>
 </resources>

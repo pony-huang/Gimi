@@ -7,6 +7,17 @@ import org.junit.Test
 
 class A2uiToolContributionTest {
     @Test
+    fun composableContainersEnableStructuredResultsWithoutTreatingThemAsDomainCards() {
+        val instruction = a2uiResponseRoutingInstructions(A2uiCapabilities(
+            "catalog", """{"components":{"Column":{},"Disclosure":{},"Tabs":{},"DetailSheet":{},"Text":{}}}""",
+        ))
+        assertTrue(instruction.contains("COMPOSABLE UI"))
+        assertTrue(instruction.contains("component_names"))
+        assertTrue(instruction.contains("structured collections"))
+        assertFalse(instruction.contains("- Column"))
+    }
+
+    @Test
     fun routingPrefersPurposeBuiltComponentsAndFallsBackToMarkdown() {
         val capabilities = A2uiCapabilities(
             catalogId = "catalog",
@@ -14,7 +25,6 @@ class A2uiToolContributionTest {
               "components": {
                 "Text": {"description": "Plain text"},
                 "Card": {"description": "Container"},
-                "WeatherForecast": {"description": "Native multi-day weather card"},
                 "WeatherToday": {"description": "Native current-day weather card"},
                 "Video": {"description": "Native video player"}
               }
@@ -25,7 +35,7 @@ class A2uiToolContributionTest {
 
         assertTrue(instruction.contains("prefer the native A2UI result"))
         assertTrue(instruction.contains("normal Markdown response"))
-        assertTrue(instruction.contains("- WeatherForecast"))
+        assertFalse(instruction.contains("- WeatherForecast"))
         assertTrue(instruction.contains("- WeatherToday"))
         assertTrue(instruction.contains("- Video"))
         assertFalse(instruction.contains("- Text"))
@@ -46,6 +56,37 @@ class A2uiToolContributionTest {
     }
 
     @Test
+    fun optionDeckRoutingCoversSocialAndNearbyPlaceResults() {
+        val capabilities = A2uiCapabilities(
+            catalogId = "catalog",
+            schemaJson = """{
+              "components": {
+                "Text": {},
+                "Card": {},
+                "Column": {},
+                "OptionDeck": {
+                  "description": "Compare plans, social posts, nearby stores or places one at a time"
+                }
+              }
+            }""",
+        )
+
+        val instruction = a2uiResponseRoutingInstructions(capabilities)
+
+        assertTrue(instruction.contains("OPTION DECK ROUTING"))
+        assertTrue(instruction.contains("social notes"))
+        assertTrue(instruction.contains("nearby place-search stores and places"))
+        assertTrue(instruction.contains("Save / Skip"))
+        assertTrue(instruction.contains("Want to visit / Not this place"))
+        assertTrue(instruction.contains("\"OptionDeck\" in component_names"))
+        assertFalse(
+            a2uiResponseRoutingInstructions(
+                A2uiCapabilities("catalog", """{"components":{"Text":{},"Card":{}}}"""),
+            ).contains("OPTION DECK ROUTING"),
+        )
+    }
+
+    @Test
     fun newsDigestMentioningRainAndTemperatureDoesNotRequireWeatherCard() {
         val changes = """
             Render today's news digest.
@@ -53,14 +94,17 @@ class A2uiToolContributionTest {
             Another article covers weather conditions in northern China.
         """.trimIndent()
 
-        assertFalse(requestedWeatherComponent(changes))
+        assertFalse(requestedWeatherComponent(changes, setOf("Column")))
     }
 
     @Test
     fun explicitWeatherUiStillRequiresNativeWeatherComponent() {
-        assertTrue(requestedWeatherComponent("Show a WeatherForecast card for Shanghai"))
-        assertTrue(requestedWeatherComponent("展示上海明天的天气"))
-        assertFalse(requestedWeatherComponent("Show a weather story inside a news digest"))
-        assertFalse(requestedWeatherComponent("Show a DataTable comparing historical weather observations"))
+        val weather = setOf("WeatherToday")
+        assertTrue(requestedWeatherComponent("Show a WeatherToday card for Shanghai", weather))
+        assertFalse(requestedWeatherComponent("展示上海明天的天气", weather))
+        assertFalse(requestedWeatherComponent("展示上海未来七天天气", weather))
+        assertFalse(requestedWeatherComponent("Show a weather story inside a news digest", weather))
+        assertFalse(requestedWeatherComponent("Show a DataTable comparing historical weather observations", setOf("DataTable")))
+        assertFalse(requestedWeatherComponent("Show an album of photos about today's weather", setOf("Column", "Image")))
     }
 }

@@ -7,6 +7,7 @@ import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentRuntimeState
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskSource
+import github.ponyhuang.gimi.domain.conversation.runtime.blocksSessionRead
 import github.ponyhuang.gimi.domain.conversation.runtime.isBusy
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -66,6 +67,15 @@ class FakeAgentRuntimeGate(
         } else {
             AgentMutationResult.Applied(block())
         }
+
+    override suspend fun <T> readSessionSnapshot(
+        sessionId: String?,
+        block: suspend () -> T,
+    ): AgentMutationResult<T> = if (state.value.blocksSessionRead(sessionId)) {
+        AgentMutationResult.BlockedByActiveAgent
+    } else {
+        AgentMutationResult.Applied(block())
+    }
 
     companion object {
         fun busy(

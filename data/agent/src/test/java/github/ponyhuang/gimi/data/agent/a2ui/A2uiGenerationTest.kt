@@ -52,21 +52,23 @@ class A2uiGenerationTest {
     }
 
     @Test
-    fun weatherCapabilityAddsHardRoutingAndSharedPayloadExample() = runTest {
+    fun weatherCapabilityAddsTodayOnlyRoutingAndPayloadExample() = runTest {
         val model = FakeModel()
-        val schema = """{"components":{"WeatherToday":{},"WeatherForecast":{}}}"""
+        val schema = """{"components":{"WeatherToday":{}}}"""
 
         A2uiGeneration(model, acceptingProtocol()).generate(
             surfaceId = "surface",
             capabilities = A2uiCapabilities("catalog", schema),
-            instruction = "Show the Guangzhou weather forecast for the next four days",
+            instruction = "Show today's Guangzhou weather",
+            requestedComponents = setOf("WeatherToday"),
         )
 
         val prompt = model.requests.single().config.systemInstruction!!.parts.single().text!!
         assertTrue(prompt.contains("WEATHER COMPONENT ROUTING"))
-        assertTrue(prompt.contains("WeatherForecast"))
+        assertFalse(prompt.contains("WeatherForecast"))
+        assertTrue(prompt.contains("WeatherToday"))
         assertTrue(prompt.contains("\"weather\":{\"path\":\"/weather\"}"))
-        assertTrue(prompt.contains("four-day"))
+        assertTrue(prompt.contains("exactly one item"))
     }
 
     @Test
@@ -93,6 +95,7 @@ class A2uiGenerationTest {
             surfaceId = "surface",
             capabilities = A2uiCapabilities("catalog", schema),
             instruction = "Show what is playing on Spotify",
+            requestedComponents = setOf("MusicPlayer"),
         )
 
         val prompt = model.requests.single().config.systemInstruction!!.parts.single().text!!
@@ -104,15 +107,37 @@ class A2uiGenerationTest {
     }
 
     @Test
+    fun optionDeckCapabilityAddsContextualActionsAndEventContract() = runTest {
+        val model = FakeModel()
+        val schema = """{"components":{"OptionDeck":{}}}"""
+
+        A2uiGeneration(model, acceptingProtocol()).generate(
+            surfaceId = "surface",
+            capabilities = A2uiCapabilities("catalog", schema),
+            instruction = "推荐几家周末值得试的餐厅",
+            requestedComponents = setOf("OptionDeck"),
+        )
+
+        val prompt = model.requests.single().config.systemInstruction!!.parts.single().text!!
+        assertTrue(prompt.contains("OPTION DECK ROUTING"))
+        assertTrue(prompt.contains("\"deck\":{\"path\":\"/deck\"}"))
+        assertTrue(prompt.contains("acceptLabel"))
+        assertTrue(prompt.contains("rejectLabel"))
+        assertTrue(prompt.contains("option_accept"))
+        assertTrue(prompt.contains("option_exhausted"))
+        assertTrue(prompt.contains("at least 2 and at most 12"))
+    }
+
+    @Test
     fun weatherRequestRejectsGenericCardAndRetriesWithNativeComponent() = runTest {
         val model = ScriptedModel(
             listOf(
                 """[{"id":"root","component":"Card","child":"body"},
                     {"id":"body","component":"Text","text":"Weather"}]""",
-                """[{"id":"root","component":"WeatherForecast","weather":{"path":"/weather"}}]""",
+                """[{"id":"root","component":"WeatherToday","weather":{"path":"/weather"}}]""",
             ),
         )
-        val schema = """{"components":{"WeatherToday":{},"WeatherForecast":{}}}"""
+        val schema = """{"components":{"WeatherToday":{}}}"""
 
         A2uiGeneration(model, acceptingProtocol()).generate(
             surfaceId = "surface",
@@ -123,7 +148,33 @@ class A2uiGenerationTest {
 
         assertEquals(2, model.requests.size)
         val correction = model.requests[1].contents.single().parts.single().text!!
-        assertTrue(correction.contains("Weather UI requests must use WeatherToday or WeatherForecast"))
+        assertTrue(correction.contains("Weather UI requests must use WeatherToday"))
+    }
+
+    @Test
+    fun rejectsAnUnselectedNativeComponentAndValidatesCorrectionAgainstTheFullClientCatalog() = runTest {
+        val schema = """{"components":{"Text":{},"Column":{},"WeatherToday":{"description":"unused-weather-schema"}}}"""
+        val full = A2uiCapabilities("catalog", schema)
+        val model = ScriptedModel(listOf(
+            """[{"id":"root","component":"WeatherToday"}]""",
+            """[{"id":"root","component":"Text","text":"Result"}]""",
+        ))
+        var validated = 0
+        val protocol = object : A2uiProtocol {
+            override suspend fun validate(document: A2uiDocument, capabilities: A2uiCapabilities) {
+                validated += 1
+                assertEquals(full, capabilities)
+            }
+            override fun replay(records: List<A2uiRecord>) = emptyList<A2uiDocument>()
+        }
+        A2uiGeneration(model, protocol).generate("surface", full, "Show a collection", requestedComponents = setOf("Column"))
+        assertEquals(2, model.requests.size)
+        assertEquals(1, validated)
+        val prompt = model.requests.first().config.systemInstruction!!.parts.single().text!!
+        assertFalse(prompt.contains("mode: static"))
+        assertFalse(prompt.contains("unused-weather-schema"))
+        assertFalse(prompt.contains("WEATHER COMPONENT ROUTING"))
+        assertFalse(prompt.contains("REQUIRED INPUT SELECTION"))
     }
 
     private fun rejectingProtocol() = object : A2uiProtocol {

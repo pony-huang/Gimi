@@ -11,12 +11,10 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,32 +23,38 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.Icons
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -58,25 +62,26 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.VerticalDivider
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,10 +89,12 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.domain.conversation.model.Conversation
-import github.ponyhuang.gimi.ui.preference.PreferenceStyle
-import github.ponyhuang.gimi.ui.preference.PreferenceStyleScope
+import github.ponyhuang.gimi.ui.components.GimiListDefaults
+import github.ponyhuang.gimi.ui.components.GimiSearchField
 import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
+import github.ponyhuang.gimi.ui.preference.PreferenceStyle
+import github.ponyhuang.gimi.ui.preference.PreferenceStyleScope
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 
 /** 分组卡片圆角：与设置页分组卡片同值。 */
@@ -97,7 +104,7 @@ private val DrawerGroupCornerRadius = 16.dp
 private val DrawerGroupHorizontalPadding = 16.dp
 
 /** 紧凑行最小高度：与设置页 `PreferenceListItem` 一致。 */
-private val DrawerRowMinHeight = 64.dp
+private val DrawerRowMinHeight = GimiListDefaults.MinHeight
 
 /** 底部渐隐高度：留出列表末尾滚到操作区下方淡出的空间。 */
 private val DrawerFooterHeight = 112.dp
@@ -119,6 +126,8 @@ private val DrawerFooterHeight = 112.dp
  * @param onConversationClick 点击某个对话时回调（实现方负责关闭抽屉）
  * @param recentState         搜索、多选和删除进度状态
  * @param onRecentAction      最近会话操作，由 ViewModel 处理并再次校验删除保护
+ * @param onExportConversation 长按菜单导出会话；实现方负责弹出系统文件选择器
+ * @param onDeleteConversation 长按菜单删除单个会话；实现方负责再次校验删除保护
  * @param onSettingsClick     点击底部"设置"按钮时回调（实现方负责关闭抽屉并跳转）
  * @param themeMode           当前夜间模式偏好（跟随系统/浅色/深色）
  * @param onThemeModeChange   点击夜间模式按钮循环到下一模式时回调（实现方负责持久化并应用主题）
@@ -139,6 +148,9 @@ fun ChatDrawer(
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
     showUpdateBadge: Boolean = false,
+    exportState: SessionExportUiState = SessionExportUiState(hasConversations = true),
+    onExportConversation: (String) -> Unit = {},
+    onDeleteConversation: (String) -> Unit = {},
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
@@ -170,6 +182,9 @@ fun ChatDrawer(
                         onThemeModeChange = onThemeModeChange,
                         showUpdateBadge = showUpdateBadge,
                         listState = historyListState,
+                        exportState = exportState,
+                        onExportConversation = onExportConversation,
+                        onDeleteConversation = onDeleteConversation,
                     )
                 }
             }
@@ -196,6 +211,9 @@ private fun HistoryDrawerContent(
     onThemeModeChange: (ThemeMode) -> Unit,
     showUpdateBadge: Boolean = false,
     listState: LazyListState = rememberLazyListState(),
+    exportState: SessionExportUiState = SessionExportUiState(hasConversations = true),
+    onExportConversation: (String) -> Unit = {},
+    onDeleteConversation: (String) -> Unit = {},
 ) {
     val visible = recentState.visibleConversations(conversations)
     val eligible = deletableConversationIds(conversations, currentSessionId, conversationTaskStatuses)
@@ -223,6 +241,8 @@ private fun HistoryDrawerContent(
         ) {
             Text(
                 text = stringResource(R.string.chat_drawer_history_title),
+                // 抽屉打开时由标题承接初始焦点，避免自动进入搜索框并唤起输入法。
+                modifier = Modifier.focusable(),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -256,20 +276,12 @@ private fun HistoryDrawerContent(
             }
         }
         // 搜索框与分组卡片同底色，去掉描边与指示线。
-        TextField(
+        GimiSearchField(
             value = recentState.query,
             onValueChange = { onRecentAction(RecentConversationsAction.Search(it)) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             enabled = !recentState.isDeleting,
             placeholder = { Text(stringResource(R.string.chat_drawer_search)) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            },
             trailingIcon = {
                 if (recentState.query.isNotEmpty()) {
                     IconButton(onClick = { onRecentAction(RecentConversationsAction.Search("")) }) {
@@ -277,16 +289,7 @@ private fun HistoryDrawerContent(
                     }
                 }
             },
-            singleLine = true,
-            shape = RoundedCornerShape(DrawerGroupCornerRadius),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = preferenceGroupCardColor(),
-                unfocusedContainerColor = preferenceGroupCardColor(),
-                disabledContainerColor = preferenceGroupCardColor(),
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent,
-            ),
+
         )
         Box(Modifier.weight(1f).navigationBarsPadding().imePadding()) {
             LazyColumn(
@@ -318,7 +321,11 @@ private fun HistoryDrawerContent(
                             if (recentState.isSelecting) onRecentAction(RecentConversationsAction.ToggleSelection(conversation.id))
                             else onConversationClick(conversation)
                         },
-                        onLongClick = { onRecentAction(RecentConversationsAction.StartSelection(conversation.id)) },
+                        canExport = exportState.canExport(conversation.id),
+                        // 删除沿用批量删除的同一套保护：当前会话与任务进行中的会话不可删。
+                        canDelete = conversation.id in eligible,
+                        onExport = { onExportConversation(conversation.id) },
+                        onDelete = { onDeleteConversation(conversation.id) },
                     )
                 }
             }
@@ -497,7 +504,7 @@ private fun themeModeLabelRes(mode: ThemeMode): Int = when (mode) {
 // ── 对话列表项 ──────────────────────────────────────────────────
 
 /**
- * 分组卡片中的单个会话行：点击切换会话，长按进入多选；多选时点击整行切换勾选。
+ * 分组卡片中的单个会话行：点击切换，长按显示导出/删除操作；多选时点击整行切换勾选。
  *
  * 行内只有标题与副标题，不额外加图标——会话行靠卡片、分隔线与排版区分层次，
  * 逐行重复同一个图标只会增加视觉噪声。
@@ -516,9 +523,13 @@ private fun ConversationListItem(
     isFirst: Boolean = false,
     isLast: Boolean = false,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
+    canExport: Boolean = true,
+    canDelete: Boolean = true,
+    onExport: () -> Unit = {},
+    onDelete: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    var showActions by remember(conversation.id) { mutableStateOf(false) }
     // 选中态用品牌 primaryContainer：深/浅主题下都与白色卡片拉开明度差，
     // secondaryContainer 在深色模式 (#26262A on #1E1E23) 几乎看不出哪条是当前会话。
     val highlighted = if (isSelecting) isSelected else isCurrent
@@ -557,7 +568,12 @@ private fun ConversationListItem(
                 .heightIn(min = DrawerRowMinHeight)
                 .then(
                     if (isSelecting) Modifier.toggleable(value = isSelected, enabled = enabled, role = Role.Checkbox, onValueChange = { onClick() })
-                    else Modifier.combinedClickable(enabled = enabled, onClick = onClick, onLongClick = onLongClick),
+                    else Modifier.combinedClickable(
+                        enabled = enabled,
+                        onClick = onClick,
+                        onLongClickLabel = stringResource(R.string.session_export_actions),
+                        onLongClick = { showActions = true },
+                    ),
                 )
                 .padding(horizontal = DrawerGroupHorizontalPadding, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -625,6 +641,16 @@ private fun ConversationListItem(
                 null -> Unit
             }
         }
+        ConversationActionsMenu(
+            expanded = showActions && !isSelecting && enabled,
+            onDismiss = { showActions = false },
+            canExport = canExport && taskStatus !is ConversationTaskStatus.Running &&
+                taskStatus !is ConversationTaskStatus.WaitingForConfirmation &&
+                taskStatus != ConversationTaskStatus.WaitingForInput,
+            canDelete = canDelete,
+            onExport = onExport,
+            onDelete = onDelete,
+        )
         if (!isLast) {
             // 分隔线内缩到文字左缘：多选时让开勾选框（24 + 12），与设置页分组一致。
             HorizontalDivider(
@@ -639,6 +665,42 @@ private fun ConversationListItem(
 }
 
 // ── 副标题：相对时间 + 末条消息 ─────────────────────────────────
+
+/** 单个会话操作不复用删除勾选规则，因此当前会话也能在空闲时导出；删除则沿用同一套保护条件。 */
+@Composable
+private fun ConversationActionsMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    canExport: Boolean,
+    canDelete: Boolean,
+    onExport: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.session_export_single)) },
+            leadingIcon = { Icon(Icons.Default.FileDownload, contentDescription = null) },
+            enabled = canExport,
+            onClick = {
+                onDismiss()
+                onExport()
+            },
+        )
+        DropdownMenuItem(
+            text = {
+                Text(stringResource(R.string.session_delete_single), color = MaterialTheme.colorScheme.error)
+            },
+            leadingIcon = {
+                Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+            },
+            enabled = canDelete,
+            onClick = {
+                onDismiss()
+                onDelete()
+            },
+        )
+    }
+}
 
 /** 列表副标题：`2 小时前 · 末条消息…`；无消息时只有时间。 */
 @Composable
@@ -818,6 +880,56 @@ private fun RecentContentPreview(
                     showUpdateBadge = true,
                 )
             }
+        }
+    }
+}
+
+@Preview(name = "单个会话导出 · 浅色", widthDp = 360, heightDp = 150)
+@Preview(name = "单个会话导出 · 深色", widthDp = 360, heightDp = 150, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun ConversationExportPreview() {
+    AsssistantaiTheme {
+        ConversationListItem(
+            conversation = Conversation(id = "preview", title = "整理本周工作笔记", timestamp = System.currentTimeMillis()),
+            isCurrent = true,
+            taskStatus = null,
+            enabled = true,
+            isFirst = true,
+            isLast = true,
+            onClick = {},
+        )
+    }
+}
+
+@Preview(name = "会话操作菜单 · 可用", widthDp = 260, heightDp = 150)
+@Preview(name = "会话操作菜单 · 可用 · 深色", widthDp = 260, heightDp = 150, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun ConversationActionsMenuPreview() {
+    AsssistantaiTheme {
+        Box {
+            ConversationActionsMenu(expanded = true, onDismiss = {}, canExport = true, canDelete = true, onExport = {}, onDelete = {})
+        }
+    }
+}
+
+@Preview(name = "会话操作菜单 · 当前会话", widthDp = 260, heightDp = 150)
+@Preview(name = "会话操作菜单 · 当前会话 · 深色", widthDp = 260, heightDp = 150, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun ConversationActionsMenuBlockedPreview() {
+    AsssistantaiTheme {
+        Box {
+            ConversationActionsMenu(expanded = true, onDismiss = {}, canExport = true, canDelete = false, onExport = {}, onDelete = {})
+        }
+    }
+}
+
+@Preview(name = "会话操作菜单 · 任务进行中", widthDp = 260, heightDp = 150)
+@Preview(name = "会话操作菜单 · 任务进行中 · 深色", widthDp = 260, heightDp = 150, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun ConversationActionsMenuRunningPreview() {
+    AsssistantaiTheme {
+        Box {
+            ConversationActionsMenu(expanded = true, onDismiss = {}, canExport = false, canDelete = false, onExport = {}, onDelete = {})
         }
     }
 }

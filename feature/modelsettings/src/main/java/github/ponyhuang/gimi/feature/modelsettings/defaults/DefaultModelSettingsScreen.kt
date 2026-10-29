@@ -3,7 +3,6 @@ package github.ponyhuang.gimi.feature.modelsettings.defaults
 import android.content.res.Configuration
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -12,8 +11,11 @@ import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -26,11 +28,11 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.speech.model.TtsVoice
 import github.ponyhuang.gimi.feature.modelsettings.R
-import github.ponyhuang.gimi.ui.components.PickerSingleChoiceDialog
+import github.ponyhuang.gimi.ui.components.SearchablePickerSingleChoiceDialog
+import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
-import github.ponyhuang.gimi.ui.preference.PreferenceSectionNote
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
@@ -47,15 +49,9 @@ fun DefaultModelSettingsScreen(
             contentPadding = PaddingValues(vertical = 12.dp),
         ) {
             if (state.isMutationBlocked) {
-                item {
-                    Text(
-                        text = stringResource(R.string.modelsettings_agent_mutation_blocked),
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                    )
-                }
+                item { PreferenceBanner(stringResource(R.string.modelsettings_agent_mutation_blocked)) }
             }
-            item { PreferenceSectionTitle(stringResource(R.string.modelsettings_defaults_section_chat)) }
+            item { PreferenceSectionTitle(stringResource(R.string.modelsettings_model_kind_chat)) }
             item {
                 PreferenceGroupCard {
                     DefaultModelOption(
@@ -81,10 +77,7 @@ fun DefaultModelSettingsScreen(
                     )
                 }
             }
-            item { PreferenceSectionTitle(stringResource(R.string.modelsettings_defaults_section_stt)) }
-            item {
-                PreferenceSectionNote(stringResource(R.string.modelsettings_defaults_online_only_note))
-            }
+            item { PreferenceSectionTitle(stringResource(R.string.modelsettings_model_kind_stt)) }
             item {
                 PreferenceGroupCard {
                     DefaultModelOption(
@@ -99,10 +92,7 @@ fun DefaultModelSettingsScreen(
                     )
                 }
             }
-            item { PreferenceSectionTitle(stringResource(R.string.modelsettings_defaults_section_tts)) }
-            item {
-                PreferenceSectionNote(stringResource(R.string.modelsettings_defaults_online_only_note))
-            }
+            item { PreferenceSectionTitle(stringResource(R.string.modelsettings_model_kind_tts)) }
             item {
                 PreferenceGroupCard {
                     DefaultModelOption(
@@ -148,6 +138,7 @@ fun DefaultModelSettingsScreen(
             target = DefaultModelDialog.Assistant,
             onAction = onAction,
         )
+
         DefaultModelDialog.Fast -> ModelChoiceDialog(
             rows = state.chatModels,
             currentSelection = state.fastSelection,
@@ -155,6 +146,7 @@ fun DefaultModelSettingsScreen(
             target = DefaultModelDialog.Fast,
             onAction = onAction,
         )
+
         DefaultModelDialog.Speech -> ModelChoiceDialog(
             rows = state.speechModels,
             currentSelection = state.speechSelection,
@@ -162,6 +154,7 @@ fun DefaultModelSettingsScreen(
             target = DefaultModelDialog.Speech,
             onAction = onAction,
         )
+
         DefaultModelDialog.Tts -> ModelChoiceDialog(
             rows = state.ttsModels,
             currentSelection = state.ttsSelection,
@@ -169,21 +162,33 @@ fun DefaultModelSettingsScreen(
             target = DefaultModelDialog.Tts,
             onAction = onAction,
         )
-        DefaultModelDialog.TtsVoice -> PickerSingleChoiceDialog(
-            options = state.ttsVoiceOptions,
-            selected = { it.id == state.ttsVoiceId },
-            key = TtsVoice::id,
-            title = stringResource(R.string.modelsettings_dialog_pick_voice),
-            optionTitle = TtsVoice::name,
-            optionSubtitle = {
-                listOfNotNull(it.description, it.language, it.gender)
-                    .filter { text -> text.isNotBlank() }
-                    .joinToString(" · ")
-            },
-            emptyText = stringResource(R.string.modelsettings_dialog_no_voices),
-            onPick = { onAction(DefaultModelSettingsAction.SelectVoice(it.id)) },
-            onDismiss = { onAction(DefaultModelSettingsAction.DismissDialog) },
-        )
+
+        DefaultModelDialog.TtsVoice -> {
+            var query by rememberSaveable(state.ttsSelection) { mutableStateOf("") }
+            SearchablePickerSingleChoiceDialog(
+                query = query,
+                onQueryChange = { query = it },
+                searchText = {
+                    listOfNotNull(it.name, it.id, it.description, it.language, it.gender)
+                        .joinToString(" ")
+                },
+                searchPlaceholder = stringResource(R.string.modelsettings_search_voice),
+                options = state.ttsVoiceOptions,
+                selected = { it.id == state.ttsVoiceId },
+                key = TtsVoice::id,
+                title = stringResource(R.string.modelsettings_dialog_pick_voice),
+                optionTitle = TtsVoice::name,
+                optionSubtitle = {
+                    listOfNotNull(it.description, it.language, it.gender)
+                        .filter { text -> text.isNotBlank() }
+                        .joinToString(" · ")
+                },
+                emptyText = stringResource(R.string.modelsettings_dialog_no_voices),
+                onPick = { onAction(DefaultModelSettingsAction.SelectVoice(it.id)) },
+                onDismiss = { onAction(DefaultModelSettingsAction.DismissDialog) },
+            )
+        }
+
         null -> Unit
     }
 }
@@ -216,7 +221,12 @@ private fun ModelChoiceDialog(
     target: DefaultModelDialog,
     onAction: (DefaultModelSettingsAction) -> Unit,
 ) {
-    PickerSingleChoiceDialog(
+    var query by rememberSaveable(target) { mutableStateOf("") }
+    SearchablePickerSingleChoiceDialog(
+        query = query,
+        onQueryChange = { query = it },
+        searchText = { "${it.model.name} ${it.model.id} ${it.service.name} ${it.group.name}" },
+        searchPlaceholder = stringResource(R.string.modelsettings_search_model_or_service),
         options = rows,
         selected = { it.selection() == currentSelection },
         key = { "${it.service.id}/${it.group.id}/${it.model.id}" },
@@ -243,43 +253,59 @@ private fun ModelChoiceDialog(
     )
 }
 
+private fun defaultModelSettingsPreviewState(isMutationBlocked: Boolean): DefaultModelSettingsUiState {
+    val service = LLMModelSetting(
+        id = "openai",
+        name = "OpenAI",
+        isEnabled = true,
+        apiKey = "sk-test",
+        apiBaseUrl = "https://api.openai.com/v1",
+        apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.OpenaiChatcompletions,
+        anthropicBaseUrl = "https://api.anthropic.com",
+        groups = listOf(
+            ModelGroup(
+                id = "gpt",
+                name = "GPT",
+                models = listOf(Model(id = "gpt-4o", name = "GPT-4o")),
+            ),
+        ),
+    )
+    val row = SelectableModelRow(
+        service = service,
+        group = service.groups.first(),
+        model = service.groups.first().models.first(),
+    )
+    return DefaultModelSettingsUiState(
+        assistantSelection = row.selection(),
+        speechSelection = row.selection(),
+        ttsSelection = row.selection(),
+        ttsVoiceId = "default",
+        chatModels = listOf(row),
+        speechModels = listOf(row),
+        ttsModels = listOf(row),
+        isMutationBlocked = isMutationBlocked,
+    )
+}
+
 @Preview(showBackground = true)
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun DefaultModelSettingsScreenPreview() {
     AsssistantaiTheme {
-        val service = LLMModelSetting(
-            id = "openai",
-            name = "OpenAI",
-            isEnabled = true,
-            apiKey = "sk-test",
-            apiBaseUrl = "https://api.openai.com/v1",
-            apiProtocol = github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.OpenaiChatcompletions,
-            anthropicBaseUrl = "https://api.anthropic.com",
-            groups = listOf(
-                ModelGroup(
-                    id = "gpt",
-                    name = "GPT",
-                    models = listOf(Model(id = "gpt-4o", name = "GPT-4o")),
-                ),
-            ),
-        )
-        val row = SelectableModelRow(
-            service = service,
-            group = service.groups.first(),
-            model = service.groups.first().models.first(),
-        )
         DefaultModelSettingsScreen(
-            state = DefaultModelSettingsUiState(
-                assistantSelection = row.selection(),
-                speechSelection = row.selection(),
-                ttsSelection = row.selection(),
-                ttsVoiceId = "default",
-                chatModels = listOf(row),
-                speechModels = listOf(row),
-                ttsModels = listOf(row),
-            ),
-            onAction = {},
-        )
+            state = defaultModelSettingsPreviewState(isMutationBlocked = false),
+            onAction = {})
+    }
+}
+
+@Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun DefaultModelSettingsScreenBlockedPreview() {
+    // 阻塞态：Agent 运行中禁改配置，顶部改为统一的信息横幅。
+    AsssistantaiTheme {
+        DefaultModelSettingsScreen(
+            state = defaultModelSettingsPreviewState(isMutationBlocked = true),
+            onAction = {})
     }
 }

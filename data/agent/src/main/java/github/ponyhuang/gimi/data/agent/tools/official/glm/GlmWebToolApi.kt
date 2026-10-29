@@ -50,7 +50,7 @@ internal data class GlmReaderResult(
  * Client for the GLM Web Search and Reader APIs.
  *
  * Kept separate from [GlmWebSearchTool] so the request/response mapping can be
- * unit-tested with a canned [OkHttpClient], mirroring the Kimi formula
+ * unit-tested with a canned [OkHttpClient], mirroring the Kimi web tool
  * manifest/tool split.
  */
 internal class GlmWebToolApi(

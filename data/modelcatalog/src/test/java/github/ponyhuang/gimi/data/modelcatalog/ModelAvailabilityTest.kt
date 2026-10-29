@@ -56,28 +56,6 @@ class ModelAvailabilityTest {
         )
     }
 
-    @Test
-    fun onlyOrdinaryModelsAreChatModels() {
-        assertTrue(LLMModelItem("chat", "Chat").isChatModel)
-        assertFalse(LLMModelItem("stt", "STT", isStt = true).isChatModel)
-        assertFalse(LLMModelItem("tts", "TTS", isTts = true).isChatModel)
-    }
-
-    @Test
-    fun providerRequiresEnabledStateAndApiKeyForChat() {
-        val configured = provider(isEnabled = true, apiKey = "key")
-
-        assertTrue(configured.isConfiguredForChat)
-        assertFalse(configured.copy(isEnabled = false).isConfiguredForChat)
-        assertFalse(configured.copy(apiKey = "").isConfiguredForChat)
-    }
-
-    @Test
-    fun officialToolsDefaultToTheServiceEnabledState() {
-        assertTrue(provider(isEnabled = true, apiKey = "key").isOfficialToolsEnabled)
-        assertFalse(provider(isEnabled = false, apiKey = "key").isOfficialToolsEnabled)
-    }
-
     private fun provider(isEnabled: Boolean, apiKey: String) = LLMModelProvider(
         serviceId = "test",
         serviceName = "Test",

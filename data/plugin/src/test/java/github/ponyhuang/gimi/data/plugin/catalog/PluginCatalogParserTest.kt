@@ -71,7 +71,9 @@ class PluginCatalogParserTest {
                   "pluginVersion": 3,
                   "apkUrl": "https://example.com/custom.apk",
                   "sha256": "${"c".repeat(64)}",
-                  "sizeBytes": 12345
+                  "sizeBytes": 12345,
+                  "versionCode": 5000000000,
+                  "versionName": " 1.2.0 "
                 }
               ]
             }
@@ -82,7 +84,20 @@ class PluginCatalogParserTest {
         assertEquals("https://example.com/custom.apk", entry.apkUrl)
         assertEquals("c".repeat(64), entry.sha256)
         assertEquals(12345L, entry.sizeBytes)
+        assertEquals(5000000000L, entry.versionCode)
+        assertEquals("1.2.0", entry.versionName)
         assertTrue(entry.releaseAssetPrefix.isEmpty())
+    }
+
+    @Test
+    fun absentInstallVersionIsUnknownAndNonPositiveVersionIsDropped() {
+        val valid = """{"entries":[{"key":"test","packageName":"plugin.test","title":"Test",
+            "summary":{"zh":"测试"},"description":{"zh":"测试"},"apkUrl":"https://example.com/test.apk"}]}"""
+        assertNull(parser.parse(valid).single().versionCode)
+        assertNull(parser.parse(valid).single().versionName)
+        for (code in listOf(0, -1)) {
+            assertTrue(parser.parse(valid.replace("\"key\":", "\"versionCode\":$code,\"key\":" )).isEmpty())
+        }
     }
 
     @Test
@@ -181,7 +196,7 @@ class PluginCatalogParserTest {
 
         val entries = parser.parse(file.readText())
         assertEquals(
-            setOf("spotify", "zhihu", "v2ex", "weibo", "xiaohongshu"),
+            setOf("spotify", "zhihu", "v2ex", "weibo", "xiaohongshu", "netease"),
             entries.map { it.key }.toSet(),
         )
         assertEquals(entries.size, entries.map { it.key }.toSet().size)

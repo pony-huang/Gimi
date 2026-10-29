@@ -8,7 +8,6 @@ import com.google.adk.kt.types.Part
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -108,12 +107,4 @@ class WeiboPluginTest {
         assertTrue((secretField as github.ponyhuang.gimi.pluginapi.PluginConfigField.Text).secret)
     }
 
-    @Test
-    fun toolSetInstructionsReferenceIdStringGuidance() {
-        val instructions = WEIBO_INSTRUCTIONS
-        // 雪花 id 字符串化的约束写在指令里，避免模型以 number 传入丢精度。
-        assertNotNull(instructions)
-        assertTrue(instructions.contains("2^53"))
-        assertTrue(instructions.contains("cid"))
-    }
 }

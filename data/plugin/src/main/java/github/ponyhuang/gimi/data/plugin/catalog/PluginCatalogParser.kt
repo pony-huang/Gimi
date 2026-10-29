@@ -31,6 +31,7 @@ class PluginCatalogParser @Inject constructor() {
         if (normalizedKey.isEmpty() || normalizedTitle.isEmpty()) return null
         if (!normalizedPackage.matches(PACKAGE_NAME_PATTERN)) return null
         if (pluginVersion <= 0) return null
+        if (versionCode != null && versionCode <= 0L) return null
 
         val directUrl = apkUrl?.trim()?.takeIf(String::isNotEmpty)
         if (directUrl != null &&
@@ -66,6 +67,8 @@ class PluginCatalogParser @Inject constructor() {
             apkUrl = directUrl,
             sha256 = normalizedSha,
             sizeBytes = normalizedSize,
+            versionCode = versionCode,
+            versionName = versionName?.trim()?.takeIf(String::isNotEmpty),
         )
     }
 

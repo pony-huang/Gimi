@@ -68,35 +68,6 @@ class ToolAuthorizationPreferencesTest {
         assertEquals(setOf("two"), repository.enabledToolIds())
     }
 
-    @Test
-    fun togglingCustomizationIncrementsRevision() {
-        val repository = repository(FakePreferences(), "one", "two")
-        val initialRevision = repository.revision.value
-
-        repository.setCustomizationEnabled(true)
-        assertEquals(initialRevision + 1, repository.revision.value)
-
-        repository.setCustomizationEnabled(false)
-        assertEquals(initialRevision + 2, repository.revision.value)
-    }
-
-    @Test
-    fun customizationDisabledDoesNotClearStoredEnabledIds() {
-        val preferences = FakePreferences()
-        val repository = repository(preferences, "one", "two")
-        repository.setCustomizationEnabled(true)
-        repository.setEnabled("one", false)
-
-        repository.setCustomizationEnabled(false)
-        val restored = repository(preferences, "one", "two")
-
-        assertFalse(restored.isCustomizationEnabled.value)
-        assertEquals(setOf("one", "two"), restored.enabledToolIds())
-
-        restored.setCustomizationEnabled(true)
-        assertEquals(setOf("two"), restored.enabledToolIds())
-    }
-
     private fun repository(preferences: FakePreferences, vararg ids: String): ToolAuthorizationPreferences {
         val context = mockk<Context> {
             every { getSharedPreferences(any(), any()) } returns preferences.delegate

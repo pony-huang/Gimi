@@ -16,6 +16,8 @@ android {
 }
 
 dependencies {
+    // 业务无关的取消感知异常恢复，仅用于导出边界的错误反馈。
+    implementation(project(":core:common"))
     implementation(project(":core:designsystem"))
     implementation(project(":domain:appupdate"))
     implementation(project(":domain:logging"))

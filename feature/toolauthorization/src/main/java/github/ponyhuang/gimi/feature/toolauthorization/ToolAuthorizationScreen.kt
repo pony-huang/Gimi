@@ -13,10 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Rule
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,8 +30,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
+import github.ponyhuang.gimi.ui.components.GimiSwitch
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
-import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
@@ -78,12 +78,12 @@ fun ToolAuthorizationScreen(
             item {
                 PreferenceGroupCard {
                     PreferenceListItem(
-                        icon = Icons.Default.Tune,
+                        icon = Icons.Default.Build,
                         title = stringResource(R.string.toolauth_tool_access_label),
                         subtitle = toolAccessModeDescription(state.toolAccessMode),
                         showDivider = true,
                         trailingContent = {
-                            Switch(
+                            GimiSwitch(
                                 checked = state.toolAccessMode == ToolAccessMode.ALWAYS_AVAILABLE,
                                 onCheckedChange = { on ->
                                     onAction(
@@ -102,7 +102,7 @@ fun ToolAuthorizationScreen(
                     )
                     val configurationEnabled = state.isCustomizationEnabled && !state.isMutationBlocked
                     PreferenceListItem(
-                        icon = Icons.Default.Rule,
+                        icon = Icons.Default.Tune,
                         title = stringResource(R.string.toolauth_customize_label),
                         subtitle = stringResource(R.string.toolauth_customize_description),
                         showDivider = configurationEnabled,
@@ -112,7 +112,7 @@ fun ToolAuthorizationScreen(
                             }
                         },
                         trailingContent = {
-                            Switch(
+                            GimiSwitch(
                                 checked = state.isCustomizationEnabled,
                                 onCheckedChange = { enabled ->
                                     onAction(ToolAuthorizationAction.SetCustomizationEnabled(enabled))
@@ -128,7 +128,7 @@ fun ToolAuthorizationScreen(
                         exit = shrinkVertically() + fadeOut(),
                     ) {
                         PreferenceListItem(
-                            icon = Icons.Default.Tune,
+                            icon = Icons.Default.Checklist,
                             title = stringResource(R.string.toolauth_configure_tools),
                             subtitle = stringResource(R.string.toolauth_configure_subtitle),
                             onClick = onNavigateToConfiguration,
@@ -147,7 +147,6 @@ fun ToolAuthorizationScreen(
                 item {
                     PreferenceBanner(
                         text = stringResource(R.string.toolauth_agent_mutation_blocked),
-                        tone = PreferenceBannerTone.Error,
                         modifier = Modifier.padding(top = 4.dp),
                     )
                 }

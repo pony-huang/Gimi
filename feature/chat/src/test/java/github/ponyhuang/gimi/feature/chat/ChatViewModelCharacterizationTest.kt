@@ -21,7 +21,6 @@ import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentExecution
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ChatAttachmentRepository
 import github.ponyhuang.gimi.domain.conversation.model.ChatTurnStatus
-import github.ponyhuang.gimi.domain.conversation.model.FunctionCallView
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
@@ -240,17 +239,6 @@ class ChatViewModelCharacterizationTest {
             cancelAndIgnoreRemainingEvents()
         }
         coVerify(exactly = 0) { fixture.agent.createExecution(any(), any(), any(), any()) }
-    }
-
-    private fun fixtureWithExecutedToolFailure(): Fixture {
-        val fixture = fixture(configured = true)
-        coEvery { fixture.execution.send(any(), any(), any()) } returns flow {
-            emit(event().copy(functionCalls = listOf(
-                ChatFunctionCall(id = "executed-tool", name = "compose_message", args = emptyMap()),
-            )))
-            throw java.io.IOException("failed after executing tool")
-        }
-        return fixture
     }
 
     private fun documentDraft(name: String, sizeBytes: Long) =
@@ -634,6 +622,22 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun newConversationWithoutConfiguredModelEmitsNoticeWithoutCrashing() = runTest {
+        val fixture = fixture(configured = false)
+
+        fixture.viewModel.effects.test {
+            fixture.viewModel.onAction(ChatAction.NewConversation)
+            advanceUntilIdle()
+
+            assertEquals(ChatEffect.ShowNotice(ChatNotice.ConfigureChatModel), awaitItem())
+            assertTrue(fixture.viewModel.uiState.value.sessionId.isBlank())
+            assertFalse(fixture.viewModel.uiState.value.isInitializing)
+            coVerify(exactly = 0) { fixture.conversations.createConversation(any(), any(), any()) }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun sendWithUnexpectedResolutionFailureSurfacesRealCauseNotModelNotice() = runTest {
         val failingResolver = mockk<ConversationSessionResolver>(relaxed = true) {
             coEvery { resolveCurrentOrCreate() } throws java.io.IOException("disk boom")
@@ -750,16 +754,6 @@ class ChatViewModelCharacterizationTest {
             afterImport.enabledMcpServerIds,
             fixture.viewModel.uiState.value.toolConfiguration?.enabledMcpServerIds,
         )
-    }
-
-    @Test
-    fun setThemeModeDelegatesToAppearanceRepository() = runTest {
-        val fixture = fixture(configured = true)
-
-        fixture.viewModel.onAction(ChatAction.SetThemeMode(ThemeMode.DARK))
-        advanceUntilIdle()
-
-        verify { fixture.appearance.setThemeMode(ThemeMode.DARK) }
     }
 
     @Test
@@ -1455,6 +1449,34 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun deletingANonCurrentConversationRemovesItWithItsAttachments() = runTest {
+        val fixture = fixture(configured = true, sessionIds = listOf("session-1"))
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        fixture.viewModel.onAction(ChatAction.DeleteConversation("other-session"))
+        advanceUntilIdle()
+        coVerify(exactly = 1) { fixture.conversations.deleteConversation("other-session") }
+        coVerify(exactly = 1) { fixture.attachments.deleteSession("other-session") }
+    }
+
+    @Test
+    fun deletingTheCurrentConversationIsRefusedWithNotice() = runTest {
+        val fixture = fixture(configured = true, sessionIds = listOf("session-1"))
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        assertEquals("session-1", fixture.viewModel.uiState.value.sessionId)
+        fixture.viewModel.effects.test {
+            fixture.viewModel.onAction(ChatAction.DeleteConversation("session-1"))
+            assertEquals(
+                ChatEffect.ShowNotice(ChatNotice.CurrentConversationDeleteProtected),
+                awaitItem(),
+            )
+            coVerify(exactly = 0) { fixture.conversations.deleteConversation("session-1") }
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun officialFunctionsExpandTheMarkerAndReuseLoadedDescriptors() = runTest {
         val catalog = toolFunctionCatalog()
         val fixture = fixture(configured = true, officialCatalogOverride = catalog)
@@ -2102,6 +2124,9 @@ class ChatViewModelCharacterizationTest {
                 toolAuthorization = toolAuthorization,
                 mcpRepository = mcpRepository,
                 mcpSkipReporter = mockk {
+                    every { skipped } returns MutableStateFlow(emptyList())
+                },
+                remoteAgentSkipReporter = mockk {
                     every { skipped } returns MutableStateFlow(emptyList())
                 },
                 officialFunctionCatalog = officialFunctionCatalog,

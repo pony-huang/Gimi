@@ -1,0 +1,48 @@
+<resources>
+    <!-- 路由标题（由 :app 注入 SettingsScaffold 使用） -->
+    <string name="a2a_list_title">A2A</string>
+    <string name="a2a_add_agent">添加 A2A Agent</string>
+    <string name="a2a_edit_agent">编辑 A2A Agent</string>
+
+    <!-- RemoteAgentListScreen -->
+    <string name="a2a_empty_title">还没有 A2A Agent</string>
+    <string name="a2a_empty_subtitle">添加 A2A Agent 后，助手可以把任务委派给它执行。</string>
+    <string name="a2a_empty_action_new">新建 A2A Agent</string>
+    <string name="a2a_more_action">更多操作</string>
+    <string name="a2a_edit_action">编辑</string>
+    <string name="a2a_agent_mutation_blocked">助手正在运行，稍后再修改 A2A Agent 配置</string>
+
+    <!-- RemoteAgentEditorScreen -->
+    <string name="a2a_section_basic_info">基本信息</string>
+    <string name="a2a_field_name_required">名称 *</string>
+    <string name="a2a_field_name_placeholder">例如：weather_agent</string>
+    <string name="a2a_field_endpoint_required">Agent 地址 *</string>
+    <string name="a2a_field_endpoint_placeholder">https://example.com/a2a/agent  或  http://192.168.1.8:8001</string>
+    <string name="a2a_field_bearer_token_optional">Bearer Token（可选）</string>
+    <string name="a2a_field_enable_agent">启用此 Agent</string>
+    <string name="a2a_field_enable_subtitle">停用后，助手不会委派任务给此 Agent</string>
+    <string name="a2a_token_show">显示 Token</string>
+    <string name="a2a_token_hide">隐藏 Token</string>
+    <string name="a2a_save">保存</string>
+    <string name="a2a_save_success">A2A Agent 已保存</string>
+    <string name="a2a_connection_testing">正在测试连接…</string>
+    <string name="a2a_connection_error_default">无法连接到 A2A Agent，请检查地址</string>
+    <string name="a2a_save_error_default">A2A Agent 配置保存失败，请重试</string>
+    <string name="a2a_cancel">取消</string>
+    <string name="a2a_delete_agent">删除此 A2A Agent</string>
+    <string name="a2a_delete_confirm_title">删除 A2A Agent</string>
+    <string name="a2a_delete_confirm_message">确定删除“%1$s”吗？删除后助手将无法再委派任务给它。</string>
+    <string name="a2a_delete_confirm_action">删除</string>
+
+    <!-- Agent 卡片详情区（RemoteAgentCardDetailSection）与测试连接 -->
+    <string name="a2a_card_test_action">测试连接</string>
+    <string name="a2a_card_section_title">Agent 卡片</string>
+    <string name="a2a_card_capability_streaming">流式传输</string>
+    <string name="a2a_card_capability_push">推送通知</string>
+    <string name="a2a_card_capability_extended">扩展卡片</string>
+    <string name="a2a_card_skill_label">技能</string>
+    <string name="a2a_card_input_output">输入 / 输出</string>
+    <string name="a2a_card_provider">提供方</string>
+    <string name="a2a_card_docs">文档</string>
+    <string name="a2a_card_protocol_value">协议 %1$s</string>
+</resources>

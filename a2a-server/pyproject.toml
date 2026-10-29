@@ -1,0 +1,20 @@
+[project]
+name = "a2a-server"
+version = "0.1.0"
+description = "Sample A2A agent server for gimi client end-to-end testing"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "a2a-sdk[http-server]>=1.2.3",
+    "uvicorn",
+    "fastapi",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "httpx",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

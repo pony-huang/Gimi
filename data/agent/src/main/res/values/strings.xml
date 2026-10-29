@@ -1,0 +1,4 @@
+<resources>
+    <string name="file_search_access_title">文件搜索授权</string>
+    <string name="file_search_access_summary">允许访问共享存储中的文件，无需逐个添加文件夹。</string>
+</resources>

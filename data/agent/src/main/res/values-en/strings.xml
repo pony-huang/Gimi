@@ -1,0 +1,4 @@
+<resources>
+    <string name="file_search_access_title">File search access</string>
+    <string name="file_search_access_summary">Allow access to shared storage files without adding folders individually.</string>
+</resources>

@@ -22,6 +22,7 @@ import github.ponyhuang.gimi.domain.recommendation.model.RecommendationSnapshot
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationCapabilitySource
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationContextSource
 import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationGenerator
+import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationNotConfiguredException
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -86,6 +87,7 @@ class RecommendationRefresher(
      * 失败自动重试包装：任意异常均按 [RETRY_DELAY_SECONDS] 顺序等待后重试，
      * 梯子耗尽才记录最终失败。Agent 忙返回 [RecommendationRefreshOutcome.Retry]
      * 交给 WorkManager 原生退避，不属于失败、不消耗梯子。
+     * 配置缺失（[RecommendationNotConfiguredException]）不随重试自愈，跳过梯子直接落失败。
      */
     suspend fun refreshSafely(): RecommendationRefreshOutcome {
         var attempt = 0
@@ -94,6 +96,9 @@ class RecommendationRefresher(
                 return refresh()
             } catch (error: CancellationException) {
                 throw error
+            } catch (error: RecommendationNotConfiguredException) {
+                preferences.markFailed(error.message ?: "Recommendation update failed")
+                return RecommendationRefreshOutcome.Failure
             } catch (error: Throwable) {
                 val message = error.message ?: "Recommendation update failed"
                 // UI 只保留一句短文案，堆栈与尝试序号必须落日志，否则失败原因无法追溯。

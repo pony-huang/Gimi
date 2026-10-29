@@ -6,6 +6,7 @@ plugins {
 
 android {
     namespace = "github.ponyhuang.gimi.data.modelcatalog"
+    testOptions.unitTests.isIncludeAndroidResources = true
     defaultConfig {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -26,6 +27,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
     testImplementation(libs.mockk)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -12,6 +12,7 @@ import github.ponyhuang.gimi.data.agent.contribution.BaseToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.ModelCatalogContribution
 import github.ponyhuang.gimi.data.agent.contribution.OfficialToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.PluginToolContribution
+import github.ponyhuang.gimi.data.agent.contribution.RemoteAgentContribution
 import github.ponyhuang.gimi.data.agent.contribution.SkillToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.SandboxToolContribution
 
@@ -25,6 +26,10 @@ import github.ponyhuang.gimi.data.agent.contribution.SandboxToolContribution
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class AgentContributionModule {
+    @Binds
+    @IntoSet
+    abstract fun bindAppFunctionContribution(implementation: github.ponyhuang.gimi.data.agent.contribution.AppFunctionToolContribution): AgentContribution
+
     @Binds
     @IntoSet
     abstract fun bindA2uiContribution(implementation: github.ponyhuang.gimi.data.agent.a2ui.A2uiToolContribution): AgentContribution
@@ -61,4 +66,8 @@ abstract class AgentContributionModule {
     @Binds
     @IntoSet
     abstract fun bindModelCatalogContribution(implementation: ModelCatalogContribution): AgentContribution
+
+    @Binds
+    @IntoSet
+    abstract fun bindRemoteAgentContribution(implementation: RemoteAgentContribution): AgentContribution
 }

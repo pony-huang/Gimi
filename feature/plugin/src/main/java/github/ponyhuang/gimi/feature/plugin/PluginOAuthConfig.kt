@@ -8,6 +8,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -37,6 +38,8 @@ internal fun PluginOAuthConfigRoute(
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         if (!busy) viewModel.refresh()
     }
+    LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { viewModel.cancelCheck() }
+    DisposableEffect(config.pluginId) { onDispose { viewModel.cancelCheck() } }
     val reauthorize = stringResource(R.string.plugin_oauth_reauthorize)
     PluginConfigScreen(
         state = config.copy(actions = config.actions.filter { it.id != OAUTH_STATUS_ACTION }.map {
@@ -54,6 +57,11 @@ internal fun PluginOAuthConfigRoute(
         },
         onBack = onBack,
         modifier = modifier,
+        // 登录表单由登录动作保存；辅助链接不需要额外的保存入口。
+        showSaveAction = !supported || config.actions.any {
+            it.id != OAUTH_STATUS_ACTION && it.id != OAUTH_LOGIN_ACTION &&
+                !it.id.startsWith(CONFIG_LINK_ACTION_PREFIX)
+        },
         headerContent = {
             if (supported && state.pluginId == config.pluginId) {
                 PluginOAuthSection(state, viewModel::refresh)
@@ -69,6 +77,8 @@ internal fun PluginOAuthSection(state: PluginOAuthConfigUiState, onRetry: () -> 
         Text(
             text = stringResource(R.string.plugin_authorization_status, stringResource(when (state.authorization) {
                 PluginOAuthAuthorization.Checking -> R.string.plugin_authorization_checking
+                PluginOAuthAuthorization.Waiting -> R.string.plugin_authorization_waiting
+                PluginOAuthAuthorization.Expired -> R.string.plugin_authorization_expired
                 PluginOAuthAuthorization.Authorized -> R.string.plugin_authorized
                 PluginOAuthAuthorization.Unauthorized -> R.string.plugin_unauthorized
                 PluginOAuthAuthorization.Failed -> R.string.plugin_authorization_failed
@@ -77,6 +87,14 @@ internal fun PluginOAuthSection(state: PluginOAuthConfigUiState, onRetry: () -> 
             style = MaterialTheme.typography.bodyLarge,
         )
         if (state.authorization == PluginOAuthAuthorization.Failed) {
+            state.failureMessage?.let { message ->
+                Text(
+                    text = message,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             TextButton(onClick = onRetry, modifier = Modifier.padding(horizontal = 8.dp)) {
                 Text(stringResource(R.string.plugin_authorization_retry))
             }
@@ -126,3 +144,13 @@ private fun PluginOAuthPreview(authorization: PluginOAuthAuthorization) {
         )
     }
 }
+
+@Preview(name = "等待授权", showBackground = true)
+@Preview(name = "等待授权深色", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PluginOAuthWaitingPreview() = PluginOAuthPreview(PluginOAuthAuthorization.Waiting)
+
+@Preview(name = "授权过期", showBackground = true)
+@Preview(name = "授权过期深色", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PluginOAuthExpiredPreview() = PluginOAuthPreview(PluginOAuthAuthorization.Expired)

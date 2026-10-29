@@ -17,7 +17,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +45,7 @@ import github.ponyhuang.gimi.ui.chatcontent.ChatTextContent
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 
 /** 把会话消息角色映射为共享气泡组件的角色（[ChatMessageBubble] 与业务模型解耦）。 */
@@ -90,23 +90,40 @@ fun MessageBubble(
             // 完全无可见内容的用户消息（如历史回显的空事件）：不渲染空气泡。
             return
         }
-        if (images.isNotEmpty()) {
-            // 用户图片一律以无边框自适应卡片排在气泡上方（ChatGPT 式）：
-            // 单图按原宽高比放大、多图方形网格；文字/文件仍走灰底气泡。
-            Column(modifier = modifier) {
+        // 用户消息：灰底气泡只包正文，复制操作行与助手回答的操作行一样
+        // 隔离在气泡下方（ChatGPT 式）；纯图片消息无正文时没有复制入口。
+        Column(modifier = modifier) {
+            if (images.isNotEmpty()) {
+                // 用户图片一律以无边框自适应卡片排在气泡上方：
+                // 单图按原宽高比放大、多图方形网格；文字/文件仍走灰底气泡。
                 SentImages(images = images)
-                if (hasBubbleBody) {
-                    UserBubbleBody(
-                        message = message,
-                        visibleTextParts = visibleTextParts,
-                        otherAttachments = otherAttachments,
-                        partChannelProvider = partChannelProvider,
-                        onOpenDocument = onOpenDocument,
-                    )
+            }
+            if (hasBubbleBody) {
+                ChatMessageBubble(
+                    role = ChatBubbleRole.USER,
+                    modifier = if (images.isNotEmpty()) Modifier.padding(top = 4.dp) else Modifier,
+                ) {
+                    Column {
+                        visibleTextParts.forEach { part ->
+                            RenderTextPart(
+                                part = part,
+                                partial = message.partial,
+                                chunkChannel = partChannelProvider(part.id),
+                                fillAvailableWidth = false,
+                            )
+                        }
+                        MessageAttachments(
+                            attachments = otherAttachments,
+                            onOpenDocument = onOpenDocument,
+                        )
+                    }
+                }
+                userReplyTextForCopy(visibleTextParts)?.let { text ->
+                    UserCopyAction(text = text)
                 }
             }
-            return
         }
+        return
     }
 
     ChatMessageBubble(
@@ -114,7 +131,7 @@ fun MessageBubble(
         modifier = modifier,
         assistantHorizontalInset = 4.dp,
     ) {
-        Column(modifier = if (fillsBubbleWidth) Modifier.fillMaxWidth() else Modifier) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             visibleTextParts.forEach { part ->
                 RenderTextPart(
                     part = part,
@@ -161,33 +178,24 @@ private val InvisibleCharCodes = setOf(
     0xFEFF, // BOM / zero-width NBSP
 )
 
-/** 用户图片消息的正文气泡：文本段与非图片附件，沿用共享灰底气泡样式。 */
+/** 用户消息可复制的正文：各可见文本段按序拼接；无可复制文本时返回 null。 */
+private fun userReplyTextForCopy(visibleTextParts: List<TextPart>): String? =
+    visibleTextParts.joinToString(separator = "") { it.text }.takeIf(String::isNotBlank)
+
+/**
+ * 用户气泡下方的复制操作行：隔离在灰底气泡外面、跟随用户气泡居右，
+ * 按钮样式与助手回答的操作行（[AssistantMessageActions]）一致，仅少了语音播放入口。
+ */
 @Composable
-private fun UserBubbleBody(
-    message: Message,
-    visibleTextParts: List<TextPart>,
-    otherAttachments: List<github.ponyhuang.gimi.domain.conversation.model.FileAttachment>,
-    partChannelProvider: (partId: String) -> ReceiveChannel<String>?,
-    onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit,
-) {
-    ChatMessageBubble(
-        role = ChatBubbleRole.USER,
-        modifier = Modifier.padding(top = 4.dp),
+private fun UserCopyAction(text: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 2.dp),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column {
-            visibleTextParts.forEach { part ->
-                RenderTextPart(
-                    part = part,
-                    partial = message.partial,
-                    chunkChannel = partChannelProvider(part.id),
-                    fillAvailableWidth = false,
-                )
-            }
-            MessageAttachments(
-                attachments = otherAttachments,
-                onOpenDocument = onOpenDocument,
-            )
-        }
+        CopyIconButton(text = text, clipLabel = "user message")
     }
 }
 
@@ -205,6 +213,48 @@ private fun assistantReplyTextForCopy(message: Message): String? {
         .takeIf(String::isNotBlank)
 }
 
+/**
+ * 消息复制按钮：复制 [text] 到剪贴板，成功后短暂显示 ✓ 并弹 Toast。
+ * 操作行是次要动作：按钮压到 32dp（图标 16dp），让整行更小巧、紧贴气泡。
+ */
+@Composable
+private fun CopyIconButton(
+    text: String,
+    clipLabel: String,
+) {
+    val clipboard = LocalClipboard.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val copiedMessage = stringResource(R.string.chat_message_copied)
+    // 复制成功后的短暂 ✓ 反馈：动作有始有终，不只依赖 Toast（部分 ROM 会吞掉）。
+    var justCopied by remember { mutableStateOf(false) }
+    IconButton(
+        onClick = {
+            scope.launch {
+                clipboard.setClipEntry(
+                    ClipEntry(ClipData.newPlainText(clipLabel, text)),
+                )
+                justCopied = true
+                Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                delay(1_600.milliseconds)
+                justCopied = false
+            }
+        },
+        modifier = Modifier.size(32.dp),
+    ) {
+        Icon(
+            imageVector = if (justCopied) Icons.Default.Check else Icons.Default.ContentCopy,
+            contentDescription = stringResource(R.string.chat_message_copy),
+            tint = if (justCopied) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            modifier = Modifier.size(16.dp),
+        )
+    }
+}
+
 /** A compact action row shown after a completed assistant reply. */
 @Composable
 private fun AssistantMessageActions(
@@ -213,56 +263,29 @@ private fun AssistantMessageActions(
     speechPlaybackState: SpeechPlaybackState,
     onToggleSpeechPlayback: (messageId: String, text: String) -> Unit,
 ) {
-    val clipboard = LocalClipboard.current
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 4.dp),
+            .padding(top = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val copiedMessage = stringResource(R.string.chat_message_copied)
-        // 复制成功后的短暂 ✓ 反馈：动作有始有终，不只依赖 Toast（部分 ROM 会吞掉）。
-        var justCopied by remember { mutableStateOf(false) }
-        IconButton(
-            onClick = {
-                scope.launch {
-                    clipboard.setClipEntry(
-                        ClipEntry(ClipData.newPlainText("assistant response", text)),
-                    )
-                    justCopied = true
-                    Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
-                    delay(1_600)
-                    justCopied = false
-                }
-            },
-        ) {
-            Icon(
-                imageVector = if (justCopied) Icons.Default.Check else Icons.Default.ContentCopy,
-                contentDescription = stringResource(R.string.chat_message_copy),
-                tint = if (justCopied) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier.size(18.dp),
-            )
-        }
+        CopyIconButton(text = text, clipLabel = "assistant response")
         val isCurrent = speechPlaybackState.messageId == messageId
         val status = if (isCurrent) speechPlaybackState.status else SpeechPlaybackStatus.Idle
-        IconButton(onClick = { onToggleSpeechPlayback(messageId, text) }) {
+        IconButton(
+            onClick = { onToggleSpeechPlayback(messageId, text) },
+            modifier = Modifier.size(32.dp),
+        ) {
             when (status) {
                 SpeechPlaybackStatus.Loading -> CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(16.dp),
                     strokeWidth = 2.dp,
                 )
                 SpeechPlaybackStatus.Playing -> Icon(
                     imageVector = Icons.Default.Pause,
                     contentDescription = stringResource(R.string.chat_message_pause_playback),
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(16.dp),
                 )
                 SpeechPlaybackStatus.Paused,
                 SpeechPlaybackStatus.Idle,
@@ -277,7 +300,7 @@ private fun AssistantMessageActions(
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(16.dp),
                 )
             }
         }

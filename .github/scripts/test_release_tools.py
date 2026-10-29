@@ -143,17 +143,26 @@ class ReleaseToolsTest(unittest.TestCase):
             dist = Path(folder)
             for key in release.PLUGINS:
                 (dist / f'Gimi-plugin-{key}-v0.13.0.apk').write_bytes(key.encode())
-            release.write_plugin_subscription(release.ROOT, dist, 'pony-huang/Gimi', '0.13.0')
+            release.write_plugin_subscription(release.ROOT, dist, 'pony-huang/Gimi', '0.13.0', 1001)
             catalog = json.loads((dist / 'plugin-subscription.json').read_text(encoding='utf-8'))
             originals = {entry['key']: entry for entry in release.plugin_catalog(release.ROOT)['entries']}
             for entry in catalog['entries']:
                 key = entry['key']
                 self.assertEqual(entry['apkUrl'],
                                  f'https://github.com/pony-huang/Gimi/releases/download/v0.13.0/Gimi-plugin-{key}-v0.13.0.apk')
+                self.assertEqual(entry['versionCode'], 1001)
+                self.assertEqual(entry['versionName'], '0.13.0')
                 self.assertEqual(entry['sizeBytes'], len(key.encode()))
                 self.assertEqual(entry['sha256'], hashlib.sha256(key.encode()).hexdigest())
-                self.assertEqual({k: v for k, v in entry.items() if k not in ('apkUrl', 'sha256', 'sizeBytes')},
+                self.assertEqual({k: v for k, v in entry.items() if k not in ('apkUrl', 'sha256', 'sizeBytes', 'versionCode', 'versionName')},
                                  originals[key])
+
+    def test_subscription_rejects_invalid_apk_version_code(self):
+        for code in (None, True, 0, -1, 2100000001, '61'):
+            with self.subTest(code=code), tempfile.TemporaryDirectory(dir=release.ROOT / 'temp') as folder:
+                with self.assertRaises(ValueError):
+                    release.write_plugin_subscription(release.ROOT, Path(folder), 'pony-huang/Gimi', '0.13.0', code)
+                self.assertFalse((Path(folder) / 'plugin-subscription.json').exists())
 
     def test_subscription_rejects_missing_empty_and_oversized_apk(self):
         for size in (None, 0, 50 * 1024 * 1024 + 1):
@@ -163,14 +172,15 @@ class ReleaseToolsTest(unittest.TestCase):
                     with (dist / 'Gimi-plugin-zhihu-v0.13.0.apk').open('wb') as apk:
                         apk.truncate(size)
                 with self.assertRaises(ValueError):
-                    release.write_plugin_subscription(release.ROOT, dist, 'pony-huang/Gimi', '0.13.0')
+                    release.write_plugin_subscription(release.ROOT, dist, 'pony-huang/Gimi', '0.13.0', 1001)
                 self.assertFalse((dist / 'plugin-subscription.json').exists())
 
     def test_catalog_rejects_invalid_metadata(self):
         original = release.plugin_catalog(release.ROOT)
         for field, value in (('key', 'unknown'), ('packageName', 'other.app'), ('pluginVersion', 0),
                              ('pluginVersion', True), ('title', ''), ('summary', {'zh': '说明'}),
-                             ('tags', [1]), ('apkUrl', 'https://example.test/old.apk')):
+                             ('tags', [1]), ('apkUrl', 'https://example.test/old.apk'),
+                             ('versionCode', 61), ('versionName', '0.13.0')):
             with self.subTest(field=field, value=value), tempfile.TemporaryDirectory(
                 dir=release.ROOT / 'temp'
             ) as folder:

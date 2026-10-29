@@ -1,10 +1,12 @@
 package github.ponyhuang.gimi.domain.plugin.usecase
 
 import github.ponyhuang.gimi.domain.plugin.model.PluginCatalogEntry
+import github.ponyhuang.gimi.domain.plugin.model.PluginDescriptor
 import github.ponyhuang.gimi.domain.plugin.model.PluginInstallFailure
 import github.ponyhuang.gimi.domain.plugin.model.PluginInstallResult
 import github.ponyhuang.gimi.domain.plugin.model.PluginPackageInstallException
 import github.ponyhuang.gimi.domain.plugin.model.PluginReleaseAsset
+import github.ponyhuang.gimi.domain.plugin.model.isUpdateFor
 import github.ponyhuang.gimi.domain.plugin.model.selectPluginAsset
 import github.ponyhuang.gimi.domain.plugin.repository.PluginPackageInstaller
 import github.ponyhuang.gimi.domain.plugin.repository.PluginReleaseRepository
@@ -23,8 +25,12 @@ class InstallPluginUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(
         entry: PluginCatalogEntry,
+        installed: PluginDescriptor? = null,
         onProgress: (Float) -> Unit,
     ): PluginInstallResult {
+        if (installed != null && !entry.isUpdateFor(installed)) {
+            return PluginInstallResult.Failed(PluginInstallFailure.NOT_AN_UPDATE)
+        }
         val asset = directAssetOrNull(entry) ?: run {
             val release = try {
                 releaseRepository.latestRelease()
@@ -38,7 +44,7 @@ class InstallPluginUseCase @Inject constructor(
         }
         return try {
             PluginInstallResult.Ready(
-                packageInstaller.downloadAndVerify(asset, onProgress),
+                packageInstaller.downloadAndVerify(asset, entry.packageName, entry.versionCode, onProgress),
             )
         } catch (e: CancellationException) {
             throw e

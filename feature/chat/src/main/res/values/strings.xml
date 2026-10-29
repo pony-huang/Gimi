@@ -1,9 +1,26 @@
 <resources>
+    <string name="chat_subtask_parent_read">需要主助手读取文件或处理授权</string>
+    <string name="chat_subtasks_running">正在分析 · %1$d / %2$d 已完成</string>
+    <string name="chat_subtasks_failed">部分完成 · %1$d 个任务失败</string>
+    <string name="chat_subtasks_stopped">已停止 · %1$d / %2$d 已完成</string>
+    <string name="chat_subtasks_interrupted">任务已中断</string>
+    <string name="chat_subtasks_completed">已完成 %1$d 个任务</string>
+    <string name="chat_subtasks_elapsed">%1$d 秒</string>
+    <string name="chat_subtask_queued">排队中</string>
+    <string name="chat_subtask_running">分析中</string>
+    <string name="chat_subtask_completed">已完成</string>
+    <string name="chat_subtask_failed">失败</string>
+    <string name="chat_subtask_cancelled">已取消</string>
+    <string name="chat_subtask_interrupted">已中断</string>
+    <string name="chat_subtask_timeout">请求超时，未自动重试</string>
+    <string name="chat_subtask_error">未能完成分析，未自动重试</string>
+    <string name="chat_subtask_tool_completed">已完成：%1$s</string>
+    <string name="chat_subtask_tool_started">工具步骤：%1$s</string>
     <!-- 现有 ChatComposer 键 -->
     <string name="stream_ai_compose_speech_to_text_idle_button">语音输入</string>
     <string name="stream_ai_compose_composer_mic_permission_message">录制音频需要麦克风权限</string>
     <string name="stream_ai_compose_composer_mic_permission_action">设置</string>
-    <string name="stream_ai_compose_composer_input_placeholder">问问助手</string>
+    <string name="stream_ai_compose_composer_input_placeholder">Ask</string>
     <string name="stream_ai_compose_composer_stop_button">停止</string>
     <string name="stream_ai_compose_composer_send_button">发送</string>
     <string name="stream_ai_compose_composer_add_attachments_button">添加上下文</string>
@@ -48,8 +65,8 @@
     <string name="chat_official_tool_text_to_image_description">根据文字描述生成图片</string>
     <string name="chat_official_tool_image_to_image">图生图</string>
     <string name="chat_official_tool_image_to_image_description">根据参考图片和文字描述生成图片</string>
-    <string name="chat_official_tool_kimi_formulas">Kimi 公式</string>
-    <string name="chat_official_tool_kimi_formulas_description">使用 Kimi 的公式计算能力</string>
+    <string name="chat_official_tool_kimi_web_tools">Kimi 联网工具</string>
+    <string name="chat_official_tool_kimi_web_tools_description">使用 Kimi 搜索网页或抓取正文</string>
     <string name="chat_official_tool_glm_web_search">GLM 网页搜索</string>
     <string name="chat_official_tool_glm_web_search_description">调用智谱搜索引擎获取最新的互联网信息</string>
     <string name="chat_official_tool_web_reader">网页阅读</string>
@@ -155,6 +172,7 @@
     <string name="chat_notice_attachment_unsupported_or_too_large">附件类型不受支持或文件过大：%1$s</string>
     <string name="chat_notice_document_total_size_limit">文档附件合计不能超过 50 MB</string>
     <string name="chat_notice_mcp_server_skipped">MCP 服务器“%1$s”连接失败，本次会话已跳过</string>
+    <string name="chat_notice_remote_agent_skipped">A2A Agent“%1$s”连接失败，本次会话已跳过</string>
     <string name="chat_notice_memory_search_failed">Mem0 记忆搜索失败，本轮将不使用云记忆</string>
     <string name="chat_notice_memory_write_failed">Mem0 记忆保存失败，本轮回答不受影响</string>
 
@@ -216,8 +234,8 @@
     <string name="chat_notice_delete_failed">有会话未能删除，请重试。</string>
     <string name="chat_choice_show_full_text">查看选项全文</string>
     <string name="chat_choice_close_full_text">关闭</string>
-    <string name="chat_official_tool_deepseek_web_search">DeepSeek 网页搜索</string>
-    <string name="chat_official_tool_deepseek_web_fetch">DeepSeek 网页抓取</string>
+    <string name="chat_official_tool_deepseek_web_search">网页搜索</string>
+    <string name="chat_official_tool_deepseek_web_fetch">网页抓取</string>
     <string name="chat_official_tool_deepseek_web_search_description">搜索网页，返回链接、摘要和可选正文。</string>
     <string name="chat_official_tool_deepseek_web_fetch_description">抓取指定网页，返回标题和 Markdown 正文。</string>
     <string name="chat_a2ui_failed">界面暂时无法显示，请让助手重试。</string>
@@ -226,30 +244,13 @@
 
     <!-- A2UI 天气卡片 -->
     <string name="chat_weather_today">今天</string>
-    <string name="chat_weather_tomorrow">明天</string>
-    <string name="chat_weather_day_index">第 %1$d 天</string>
     <string name="chat_weather_updated_at">更新于 %1$s</string>
     <string name="chat_weather_temperature_value">%1$d°</string>
     <string name="chat_weather_percent_value">%1$d%%</string>
     <string name="chat_weather_not_available">—</string>
-    <string name="chat_weather_feels_high_low">体感 %1$d° · 最高 %2$d° / 最低 %3$d°</string>
-    <string name="chat_weather_metric_feels_like">体感</string>
     <string name="chat_weather_metric_humidity">湿度</string>
     <string name="chat_weather_metric_wind">风</string>
     <string name="chat_weather_metric_precipitation">降水</string>
-    <string name="chat_weather_metric_uv">紫外线</string>
-    <string name="chat_weather_metric_air_quality">空气</string>
-    <string name="chat_weather_next_hours">接下来</string>
-    <string name="chat_weather_daily">逐日</string>
-    <string name="chat_weather_forecast_range">未来 %1$d 天</string>
-    <string name="chat_weather_low_temperature">/ %1$d°</string>
-    <string name="chat_weather_rainy_days">降雨 %1$d 天</string>
-    <string name="chat_weather_average_high">平均高温</string>
-    <string name="chat_weather_lowest">最低温度</string>
-    <string name="chat_weather_temperature_spread">温差</string>
-    <string name="chat_weather_sunrise">日出 %1$s</string>
-    <string name="chat_weather_sunset">日落 %1$s</string>
-    <string name="chat_weather_wind_direction_speed">%1$s %2$d km/h</string>
     <string name="chat_weather_wind_speed">%1$d km/h</string>
     <string name="chat_weather_condition_clear">晴</string>
     <string name="chat_weather_condition_partly_cloudy">晴间多云</string>
@@ -270,6 +271,17 @@
     <string name="chat_player_artwork">专辑封面</string>
     <string name="chat_player_generic_name">音乐</string>
 
+    <!-- A2UI 发现卡组 -->
+    <string name="chat_option_deck_default_title">待选方案</string>
+    <string name="chat_option_deck_position">%1$d / %2$d</string>
+    <string name="chat_option_deck_item_image">方案图片</string>
+    <string name="chat_option_deck_open_image">查看大图</string>
+    <string name="chat_option_deck_close_image">关闭大图</string>
+    <string name="chat_option_deck_browse_hint">左右滑动浏览；点击按钮提交选择。</string>
+    <string name="chat_option_deck_empty_title">这一轮都看完啦</string>
+    <string name="chat_option_deck_empty_summary">接受 %1$d · 跳过 %2$d</string>
+    <string name="chat_option_deck_empty_restart">再看一遍</string>
+
     <!-- A2UI 新闻列表 -->
     <!-- A2UI 只读数据表格 -->
     <string name="chat_table_default_heading">数据表格</string>
@@ -280,4 +292,33 @@
     <string name="chat_table_scroll_both">左右滑动查看列，上下滑动查看行</string>
     <string name="chat_timeline_steps">%1$d 个步骤</string>
     <string name="chat_timeline_elapsed">共 %1$.1f 秒</string>
+    <string name="chat_player_playing">正在播放</string>
+    <string name="chat_player_paused">已暂停</string>
+    <string name="chat_player_saved">已收藏</string>
+    <string name="chat_player_save">收藏</string>
+    <string name="chat_player_previous">上一首</string>
+    <string name="chat_player_shuffle">随机播放</string>
+    <string name="chat_player_repeat">切换循环模式</string>
+    <string name="chat_weather_location_today">%1$s · 今天</string>
+    <string name="chat_weather_high_low">最高 %1$d° / 最低 %2$d°</string>
+    <string name="chat_a2ui_collection_empty">暂无内容</string>
+    <string name="chat_a2ui_position_vertical">%1$d / %2$d · 上下滚动</string>
+    <string name="chat_a2ui_position_horizontal">%1$d / %2$d · 左右滑动</string>
+    <string name="chat_a2ui_expanded">已展开</string>
+    <string name="chat_a2ui_collapsed">已收起</string>
+    <string name="chat_a2ui_expand">展开内容</string>
+    <string name="chat_a2ui_collapse">收起内容</string>
+    <string name="session_export_single">导出会话</string>
+    <string name="session_export_actions">会话操作</string>
+    <string name="session_delete_single">删除会话</string>
+    <string name="session_export_empty">暂无会话可导出</string>
+    <string name="session_export_blocked">任务进行中，结束后可导出</string>
+    <string name="session_export_succeeded">会话已导出</string>
+    <string name="session_export_failed">导出失败，请重试</string>
+    <string name="chat_official_tool_kimi_search_basic">Basic 搜索</string>
+    <string name="chat_official_tool_kimi_search_basic_description">返回摘要和可选网页正文</string>
+    <string name="chat_official_tool_kimi_search_pro">Pro 搜索</string>
+    <string name="chat_official_tool_kimi_search_pro_description">返回相关正文片段，支持站点与时间筛选</string>
+    <string name="chat_official_tool_kimi_fetch">网页抓取</string>
+    <string name="chat_official_tool_kimi_fetch_description">获取指定网页的 Markdown 正文</string>
 </resources>

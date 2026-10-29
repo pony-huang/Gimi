@@ -1,12 +1,14 @@
 <div align="center">
 
-<img src="doc/icon.webp" width="120" alt="Gimi" />
+<img src="doc/icon.webp" width="192" alt="Gimi" />
 
 # Gimi
 
 **An Android AI assistant with conversations, attachments, and settings stored on the device.**
 
-Supports text and voice interaction, phone tools, background app control, and extensions through official tools, APK plugins, MCP, skills, and a cloud sandbox.
+Supports text and voice interaction, native agent-generated cards, phone tools, background app
+control, and extensions through AppFunctions, official tools, APK plugins, MCP, remote A2A agents,
+skills, and a cloud sandbox.
 
 [![CI](https://github.com/pony-huang/Gimi/actions/workflows/ci.yml/badge.svg)](https://github.com/pony-huang/Gimi/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/pony-huang/Gimi)](https://github.com/pony-huang/Gimi/releases/latest)
@@ -21,10 +23,10 @@ Supports text and voice interaction, phone tools, background app control, and ex
 ## Overview
 
 With your own API key, use chat to check your calendar, set alarms, play media, adjust brightness,
-search and read authorized files, and call official provider tools, plugins, and remote MCP tools.
-After Shizuku authorization, models with image understanding can also inspect and operate other apps
-in the background. With an E2B API key, it can also run shell commands and code in an isolated cloud
-sandbox.
+search and read accessible files, and call official provider tools, plugins, remote MCP servers,
+remote A2A agents, and enabled AppFunctions from other Android apps. After Shizuku authorization,
+models with image understanding can also inspect and operate other apps in the background. With an
+E2B API key, it can also run shell commands and code in an isolated cloud sandbox.
 
 ## Feature reference
 
@@ -33,6 +35,10 @@ sandbox.
 Stream replies. Attach photos from camera or gallery, add documents or audio supported by the model,
 or receive images shared from other apps. View images and local file search results in the
 conversation. Thinking, tool calls, and results are grouped by turn and can be expanded for details.
+
+Agent replies can also contain native A2UI surfaces such as option decks, a music player, simplified
+weather cards, tables, panels, links, and media controls. These cards are generated from validated
+catalog data, update in place as a response streams, and send interactions back to the Agent.
 
 Configure each conversation independently: its model, MCP connections, official tools, and reasoning
 effort. Tool loading mode (load on demand or load everything each turn) is a global switch in
@@ -79,6 +85,18 @@ Complete replies can be read aloud automatically.
 Enable *Custom tools* in *Settings → Tool access* to choose individual local tools; when it is off,
 all local tools are available.
 
+### AppFunctions
+
+On supported Android 16+ devices, Gimi can discover capabilities declared by other installed apps.
+Enable individual apps in *Settings → AppFunciton* to make their AppFunctions available to the
+Agent. The settings page shows each app's functions, parameters, and current system state.
+
+Cross-app execution requires the privileged `EXECUTE_APP_FUNCTIONS` permission, and the target app
+may still restrict which functions Gimi can call. Many devices do not expose a normal settings
+switch for this permission. For local testing on a supported device, use the
+[AppFunction execution session guide](spec/en/appfunctions.md) to temporarily launch Gimi through
+ADB with the Shell identity.
+
 ### Background app control
 
 Let the Agent inspect and operate other apps in the background while you continue using your phone.
@@ -106,7 +124,7 @@ capabilities in the conversation's *Official tools* panel.
 | **Anthropic** | Web search |
 | **MiniMax** | Web search, text-to-image, reference-image generation |
 | **GLM (Zhipu)** | Web search, webpage reading |
-| **Kimi** | Kimi tool collection (formulas) |
+| **Kimi** | Kimi Search Basic, Search Pro, and web fetch |
 
 Provider-executed web search (Anthropic, MiniMax) runs on the provider's side and is offered under
 the service's Anthropic protocol. MiniMax image generation can be used with chat models from other
@@ -121,6 +139,17 @@ resources each server exposes. Disable any server anytime.
 
 In *Settings → MCP*, tap **Import** and paste the `mcpServers` JSON or curl snippet from the server
 documentation.
+
+### Remote agents (A2A)
+
+Connect agents that implement the A2A protocol in *Settings → A2A*. Add the Agent URL, an optional
+Bearer token, and enable the agent; Gimi tests the connection and reads its Agent Card to show the
+declared skills, input/output formats, and streaming support. Enabled agents become delegation
+targets during chat, so the main assistant can hand a suitable task to a remote agent and use its
+result in the conversation.
+
+The Android client uses A2A JSON-RPC over HTTP. A small local sample server and device setup notes
+are available in the [A2A server guide](a2a-server/README.md).
 
 ### Cloud sandbox
 
@@ -157,9 +186,12 @@ The default subscription contains:
 - **V2EX**: notifications, node/topic/reply browsing, and account information (requires a Personal Access Token)
 - **微博 Weibo**: trending searches, AI search summaries, posts from the authorized account, and Super Topic browsing, posting, comments, and replies (requires App ID and App Secret)
 - **小红书 Xiaohongshu**: login, feeds and search, profiles and notes, comments and interactions, notifications, and image/video publishing
+- **网易云音乐 NetEase Cloud Music**: anonymous or QR sign-in, music and lyric search, profiles, playlists, song details, authorized audio URLs, playlist creation, adding/removing songs, and liked-song actions (requires App ID, an RSA PKCS#8 private key, and endpoint permissions; playback control, cloud uploads, and note publishing are unavailable)
 
 **About Xiaohongshu**: The plugin operates the website directly with an on-device WebView, without an
 MCP server or relay URL.
+
+flow, supported tools, and platform limitations.
 
 Third parties can build their own with the public plugin API.
 
@@ -176,13 +208,16 @@ and supporting resources. With the cloud sandbox configured, the Agent can run a
 inside that conversation's sandbox and can also prepare and install a skill archive from the sandbox
 itself.
 
-### Folders and workspace
+### Files and workspace
 
-Authorize local document folders in *Settings → Folders* and revoke access anytime. Searching shared
-photos, videos, and audio uses the corresponding system permissions.
+Gimi searches file names across all accessible mounted shared storage after all-files access is
+granted in Android settings, including files that are not indexed by MediaStore. Private app
+directories are excluded. The permission is requested when a file search needs it; if it is
+declined, Gimi does not repeatedly prompt. Shared photo, video, and audio search also honors the
+corresponding media permissions.
 
-Chat attachments are saved in a local workspace. View, open, or delete multiple files in
-*Settings → Cache*.
+Chat attachments are saved in a local workspace. View, open, or delete multiple files in *Settings
+→ Cache*.
 
 ### Authorization and data
 
@@ -190,8 +225,11 @@ Chat attachments are saved in a local workspace. View, open, or delete multiple 
 - The permission mode — request approval or full approval — is global; full approval automatically
   allows tool calls that require confirmation.
 - Local tools can be restricted individually through *Custom tools*; system permissions are granted as needed.
+- All-files access controls document search across shared storage and can be revoked in Android
+  settings at any time.
 - The Permissions page describes the purpose of each permission.
-- API keys are stored on the device and used only to call the corresponding configured services.
+- API keys, remote-agent tokens, and other credentials are stored on the device and used only to
+  call the corresponding configured services or endpoints.
 
 ## Model
 
@@ -223,15 +261,15 @@ capabilities depend on the selected model.
    suggestions in *Settings → Smart recommendations*.
 7. Start chatting.
 
-Optional extensions include MCP servers, plugins, skills, official tools, authorized folders, the
-E2B cloud sandbox, and Shizuku background app control.
+Optional extensions include MCP servers, remote A2A agents, AppFunctions, plugins, skills, official
+tools, all-files access, the E2B cloud sandbox, and Shizuku background app control.
 
 ## Privacy
 
 Gimi collects nothing: no analytics, no telemetry, no accounts, no developer servers. Conversations
-stay on your device; network requests serve configured or enabled model, speech, MCP, plugin, and
-Mem0 services, skill downloads, the E2B sandbox, and GitHub updates. See [PRIVACY.md](PRIVACY.md) ·
-[隐私政策](PRIVACY.zh-CN.md).
+stay on your device; network requests serve configured or enabled model, speech, MCP, remote A2A,
+plugin, and Mem0 services, skill downloads, the E2B sandbox, and GitHub updates. See
+[PRIVACY.md](PRIVACY.md) · [隐私政策](PRIVACY.zh-CN.md).
 
 ## Contributing
 
@@ -251,7 +289,6 @@ please describe the use case it addresses; discuss substantial feature or interf
 - [xpzouying/xiaohongshu-mcp](https://github.com/xpzouying/xiaohongshu-mcp)
 - [V2EX API](https://www.v2ex.com/go/v2exapi)
 - [Zhihu Open Platform](https://developer.zhihu.com/docs)
-- [AMap MCP service](https://lbs.amap.com/api/mcp-server/summary)
 
 ## License
 
@@ -259,4 +296,11 @@ please describe the use case it addresses; discuss substantial feature or interf
 
 ## Development and release workflow
 
-[See the release guide](spec/en/releasing.md) for CI checks, automated changelogs, version PRs, signing setup, and release retries.
+[See the release guide](spec/en/releasing.md) for CI checks, automated changelogs, version PRs,
+signing setup, and release retries.
+
+- [AppFunction execution session guide](spec/en/appfunctions.md): run release or debug builds with
+  the temporary Shell identity required for cross-app AppFunctions.
+- [A2A sample server](a2a-server/README.md): run a local Agent for end-to-end client testing.
+- [NetEase plugin notes](spec/zh/netease-plugin.md): integration details and platform limits
+  (Chinese).

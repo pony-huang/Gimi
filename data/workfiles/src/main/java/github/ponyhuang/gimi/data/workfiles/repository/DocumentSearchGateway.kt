@@ -1,10 +1,9 @@
 package github.ponyhuang.gimi.data.workfiles.repository
 
-import android.content.Context
-import android.net.Uri
-import android.provider.DocumentsContract
-import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.domain.workfiles.model.WorkFileSearchResult
+import java.io.File
+import java.io.IOException
+import java.util.PriorityQueue
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.coroutineContext
@@ -12,85 +11,70 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
-/** Isolates recursive DocumentsProvider traversal from repository policy. */
+/** 隔离共享存储权限和文件系统遍历。 */
 interface DocumentSearchGateway {
-    suspend fun search(treeUri: String, query: String): List<WorkFileSearchResult>
-
-    suspend fun contains(treeUri: String, contentUri: String): Boolean
+    fun hasAccess(): Boolean
+    suspend fun search(query: String, limit: Int): List<WorkFileSearchResult>
+    suspend fun contains(contentUri: String): Boolean
 }
 
-/** Android DocumentsProvider traversal used by local document search. */
+/** 直接遍历已挂载共享存储，覆盖未进入 MediaStore 索引的文档。 */
 @Singleton
 class AndroidDocumentSearchGateway @Inject constructor(
-    @ApplicationContext private val context: Context,
+    private val access: SharedStorageAccess,
 ) : DocumentSearchGateway {
-    override suspend fun search(
-        treeUri: String,
-        query: String,
-    ): List<WorkFileSearchResult> = withContext(Dispatchers.IO) {
-        val parsedTree = runCatching { Uri.parse(treeUri) }.getOrNull() ?: return@withContext emptyList()
-        val rootId = runCatching { DocumentsContract.getTreeDocumentId(parsedTree) }.getOrNull()
-            ?: return@withContext emptyList()
-        val results = mutableListOf<WorkFileSearchResult>()
-        searchChildren(parsedTree, rootId, query, mutableSetOf(), results)
-        results
-    }
+    override fun hasAccess(): Boolean = access.hasAccess()
 
-    override suspend fun contains(treeUri: String, contentUri: String): Boolean =
+    override suspend fun search(query: String, limit: Int): List<WorkFileSearchResult> =
         withContext(Dispatchers.IO) {
-            val tree = runCatching { Uri.parse(treeUri) }.getOrNull() ?: return@withContext false
-            val document = runCatching { Uri.parse(contentUri) }.getOrNull() ?: return@withContext false
-            runCatching {
-                DocumentsContract.isChildDocument(context.contentResolver, tree, document)
-            }.getOrDefault(false)
+            if (!hasAccess()) return@withContext emptyList()
+            newestSharedFiles(access.roots(), query, limit).map { file ->
+                WorkFileSearchResult(
+                    contentUri = access.uriForFile(file).toString(),
+                    displayName = file.name,
+                    mimeType = sharedFileMimeType(file),
+                    sizeBytes = file.length(),
+                    modifiedTimeMillis = file.lastModified(),
+                )
+            }
         }
 
-    private suspend fun searchChildren(
-        treeUri: Uri,
-        parentId: String,
-        query: String,
-        visitedDirectoryIds: MutableSet<String>,
-        results: MutableList<WorkFileSearchResult>,
-    ) {
+    override suspend fun contains(contentUri: String): Boolean = withContext(Dispatchers.IO) {
+        access.fileForUri(contentUri) != null
+    }
+}
+
+/** 只保留最新的有限结果；遍历期间响应取消，目录别名不会形成循环。 */
+internal suspend fun newestSharedFiles(roots: List<File>, query: String, limit: Int): List<File> {
+    val policy = SharedStorageFilePolicy(roots)
+    val newest = PriorityQueue<File>(compareBy<File> { it.lastModified() }.thenBy { it.path })
+    val pending = ArrayDeque<File>().apply { addAll(roots) }
+    val visited = mutableSetOf<String>()
+    val foundPaths = mutableSetOf<String>()
+    while (pending.isNotEmpty()) {
         coroutineContext.ensureActive()
-        if (!visitedDirectoryIds.add(parentId) || results.size >= MAX_GATEWAY_RESULTS) return
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentId)
-        runCatching {
-            context.contentResolver.query(childrenUri, PROJECTION, null, null, null)?.use { cursor ->
-                while (cursor.moveToNext() && results.size < MAX_GATEWAY_RESULTS) {
-                    coroutineContext.ensureActive()
-                    val documentId = cursor.getString(0) ?: continue
-                    val displayName = cursor.getString(1).orEmpty()
-                    val mimeType = cursor.getString(2).orEmpty()
-                    if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) {
-                        searchChildren(treeUri, documentId, query, visitedDirectoryIds, results)
-                    } else if (displayName.contains(query, ignoreCase = true)) {
-                        results += WorkFileSearchResult(
-                            contentUri = DocumentsContract.buildDocumentUriUsingTree(
-                                treeUri,
-                                documentId,
-                            ).toString(),
-                            displayName = displayName,
-                            mimeType = mimeType,
-                            sizeBytes = cursor.getLong(3),
-                            modifiedTimeMillis = cursor.getLong(4),
-                        )
-                    }
+        val directory = pending.removeLast()
+        val children = try {
+            val canonical = directory.canonicalFile
+            if (!visited.add(canonical.path)) continue
+            canonical.listFiles().orEmpty()
+        } catch (_: SecurityException) {
+            continue
+        } catch (_: IOException) {
+            continue
+        }
+        for (child in children) {
+            coroutineContext.ensureActive()
+            val file = policy.resolve(child) ?: continue
+            if (file.isDirectory) {
+                pending.add(file)
+            } else if (file.isFile && file.name.contains(query, ignoreCase = true) && foundPaths.add(file.path)) {
+                newest.add(file)
+                if (newest.size > limit.coerceIn(1, 50)) {
+                    foundPaths.remove(newest.poll().path)
                 }
             }
-        }.onFailure { throwable ->
-            if (throwable is kotlinx.coroutines.CancellationException) throw throwable
         }
     }
-
-    private companion object {
-        const val MAX_GATEWAY_RESULTS = 200
-        val PROJECTION = arrayOf(
-            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-            DocumentsContract.Document.COLUMN_MIME_TYPE,
-            DocumentsContract.Document.COLUMN_SIZE,
-            DocumentsContract.Document.COLUMN_LAST_MODIFIED,
-        )
-    }
+    return newest.toList().sortedWith(compareByDescending<File> { it.lastModified() }.thenBy { it.path })
 }

@@ -6,21 +6,18 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolAvailability
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolBinding
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
-import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSpec
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSupport
 import github.ponyhuang.gimi.domain.modelcatalog.model.canProvideOfficialTools
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
-import github.ponyhuang.gimi.domain.modelcatalog.repository.KimiFormulaSource
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** 官方工具目录实现：组合纯支持规则、来源服务配置和动态函数目录。 */
+/** 官方工具目录实现：组合纯支持规则、来源服务配置和固定函数目录。 */
 @Singleton
 class DefaultOfficialToolFunctionCatalog @Inject constructor(
     private val support: OfficialToolSupport,
     private val modelServices: AgentModelConfigurationSource,
-    private val kimiFormulas: KimiFormulaSource,
 ) : OfficialToolFunctionCatalog {
     override val all: List<OfficialToolSpec> = support.all
     private val specsById = all.associateBy { it.toolId }
@@ -54,15 +51,7 @@ class DefaultOfficialToolFunctionCatalog @Inject constructor(
         if (spec.staticFunctionIds.isNotEmpty()) {
             return spec.staticFunctionIds.map { OfficialToolFunction(id = it, name = it, description = it) }
         }
-        if (toolId != OfficialToolIds.KIMI_FORMULAS) return emptyList()
-        val service = sourceService(spec.serviceId) ?: return emptyList()
-        return kimiFormulas.fetch(service.id, service.apiKey).map { declaration ->
-            OfficialToolFunction(
-                id = declaration.name,
-                name = declaration.name,
-                description = declaration.description,
-            )
-        }
+        return emptyList()
     }
 
     private fun sourceService(serviceId: String): LLMModelSetting? = modelServices.currentServices()

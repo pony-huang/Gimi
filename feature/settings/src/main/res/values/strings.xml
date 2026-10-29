@@ -14,6 +14,8 @@
     <string name="settings_default_model_subtitle">配置各项功能的默认模型</string>
 
     <string name="settings_mcp_title">MCP</string>
+    <string name="settings_remote_agents_title">A2A</string>
+    <string name="settings_remote_agents_subtitle">接入 A2A 协议的智能体</string>
     <string name="settings_mcp_subtitle">连接远程工具服务</string>
 
     <string name="settings_plugins_title">插件</string>
@@ -22,13 +24,9 @@
     <string name="settings_skills_title">Skills</string>
     <string name="settings_skills_subtitle">安装Skills</string>
 
-    <string name="settings_work_files_title">文件夹</string>
-    <string name="settings_work_files_subtitle">授权助手访问本机文件夹</string>
     <string name="settings_workspace_title">缓存区</string>
     <string name="settings_workspace_subtitle">管理聊天附件文件</string>
 
-    <string name="settings_tool_authorization_title">工具授权</string>
-    <string name="settings_tool_authorization_subtitle">选择允许助手使用的本地工具</string>
     <string name="settings_mobile_use_title">Shizuku</string>
     <string name="settings_mobile_use_subtitle">Agent 后台操作其他应用</string>
     <string name="settings_permissions_title">权限管理</string>
@@ -66,8 +64,8 @@
     <string name="update_open_app_details">打开应用详情</string>
     <string name="update_failed_title">更新失败</string>
     <string name="update_retry">重试</string>
-    <string name="settings_recommendations_title">智能推荐</string>
-    <string name="settings_recommendations_subtitle">配置任务建议与预生成</string>
+    <string name="settings_recommendations_title">个性化服务</string>
+    <string name="settings_recommendations_subtitle">配置任务建议与工具授权</string>
 
     <string name="logs_title">日志</string>
     <string name="logs_subtitle">查看和导出最近 24 小时的日志</string>
@@ -87,4 +85,13 @@
     <string name="settings_group_assistant">助手偏好</string>
     <string name="settings_group_permissions">权限与设备</string>
     <string name="settings_group_about">关于</string>
+    <string name="settings_appfunction_title">AppFunciton</string>
+    <string name="settings_appfunction_subtitle">发现并使用应用提供的功能</string>
+    <string name="session_export_all">导出全部会话</string>
+    <string name="session_export_subtitle">一个会话保存为 JSONL，多个会话打包为 ZIP</string>
+    <string name="session_export_working">正在导出，请稍候…</string>
+    <string name="session_export_empty">暂无会话可导出</string>
+    <string name="session_export_blocked">任务进行中，结束后可导出</string>
+    <string name="session_export_succeeded">会话已导出</string>
+    <string name="session_export_failed">导出失败，请重试</string>
 </resources>

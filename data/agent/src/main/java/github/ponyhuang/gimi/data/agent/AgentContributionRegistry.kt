@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.data.agent
 
+import com.google.adk.kt.agents.BaseAgent
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.data.agent.tools.search.ToolCandidateSource
@@ -48,6 +49,10 @@ class AgentContributionRegistry @Inject constructor(
     /** 聚合各贡献方的检索候选源（ON_DEMAND 模式）。 */
     suspend fun candidateSources(spec: AgentBuildSpec): List<ToolCandidateSource> =
         sortedContributions.flatMap { contribution -> contribution.candidateSources(spec) }
+
+    /** 聚合各贡献方直接声明的 sub-agent。 */
+    suspend fun subAgents(spec: AgentBuildSpec): List<BaseAgent> =
+        sortedContributions.flatMap { contribution -> contribution.subAgents(spec) }
 
     /** 聚合各贡献方的扁平工具目录（旁路聚合用）。 */
     suspend fun toolCatalog(context: AgentToolCatalogContext): List<AgentToolCatalogEntry> =

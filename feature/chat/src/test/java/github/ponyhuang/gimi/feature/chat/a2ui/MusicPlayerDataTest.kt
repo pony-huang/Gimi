@@ -86,6 +86,31 @@ class MusicPlayerDataTest {
     }
 
     @Test
+    fun missingCapabilitiesAndStatesNeverEnableNewControls() {
+        val data = requireNotNull(MusicPlayerData.fromA2ui(mapOf("title" to "Track")))
+        assertEquals(false, data.canSeek)
+        assertEquals(false, data.canPrevious)
+        assertEquals(false, data.canSave)
+        assertNull(data.isSaved)
+        assertNull(data.shuffleEnabled)
+        assertNull(data.repeatMode)
+    }
+
+    @Test
+    fun preservesVerifiedStatesAndRejectsUnknownRepeatMode() {
+        val data = requireNotNull(MusicPlayerData.fromA2ui(mapOf(
+            "title" to "Track", "isSaved" to false, "shuffleEnabled" to true,
+            "repeatMode" to "track", "canSeek" to true, "canSave" to true,
+        )))
+        assertEquals(false, data.isSaved)
+        assertEquals(true, data.shuffleEnabled)
+        assertEquals("track", data.repeatMode)
+        assertTrue(data.canSeek)
+        assertTrue(data.canSave)
+        assertNull(requireNotNull(MusicPlayerData.fromA2ui(mapOf("title" to "Track", "repeatMode" to "invalid"))).repeatMode)
+    }
+
+    @Test
     fun rejectsPayloadWithoutTitle() {
         assertNull(MusicPlayerData.fromA2ui(mapOf("provider" to "Spotify")))
     }

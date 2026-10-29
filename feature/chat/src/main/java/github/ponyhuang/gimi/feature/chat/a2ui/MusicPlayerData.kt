@@ -57,6 +57,18 @@ internal data class MusicPlayerData(
     val deviceName: String?,
     val trackUrl: String?,
     val playbackContext: MusicPlaybackContext,
+    /** 服务确认的收藏状态；未知时不展示虚假的已收藏状态。 */
+    val isSaved: Boolean? = null,
+    /** 服务返回的随机播放状态。 */
+    val shuffleEnabled: Boolean? = null,
+    /** off、context 或 track；未知时不推测循环模式。 */
+    val repeatMode: String? = null,
+    /** 当前工具与设备是否支持对应操作；缺失时禁用新增控制。 */
+    val canSeek: Boolean = false,
+    val canPrevious: Boolean = false,
+    val canShuffle: Boolean = false,
+    val canRepeat: Boolean = false,
+    val canSave: Boolean = false,
 ) {
     /** 根据快照时间外推当前播放位置；缺少时长或暂停时返回可用位置。 */
     fun positionAt(nowEpochMs: Long): Long? {
@@ -92,6 +104,14 @@ internal data class MusicPlayerData(
                 deviceName = map.string("deviceName"),
                 trackUrl = map.string("trackUrl"),
                 playbackContext = MusicPlaybackContext.fromWire(map.string("playbackContext")),
+                isSaved = map.boolean("isSaved"),
+                shuffleEnabled = map.boolean("shuffleEnabled"),
+                repeatMode = map.string("repeatMode")?.takeIf { it in setOf("off", "context", "track") },
+                canSeek = map.boolean("canSeek") == true,
+                canPrevious = map.boolean("canPrevious") == true,
+                canShuffle = map.boolean("canShuffle") == true,
+                canRepeat = map.boolean("canRepeat") == true,
+                canSave = map.boolean("canSave") == true,
             )
         }
     }
@@ -101,6 +121,14 @@ private val musicPlayerSchema = A2uiObjectSchema(
     description = "Music player snapshot for any provider. Map available fields exactly; " +
         "never invent progress, duration, device, artwork, or track identity.",
     properties = mapOf(
+        "isSaved" to A2uiBooleanSchema("Verified library membership; omit if unknown."),
+        "shuffleEnabled" to A2uiBooleanSchema("Verified shuffle state; omit if unknown."),
+        "repeatMode" to A2uiStringSchema("Verified repeat mode: off, context, track."),
+        "canSeek" to A2uiBooleanSchema("True only when tools and current device allow seeking."),
+        "canPrevious" to A2uiBooleanSchema("True only when tools and current device allow previous."),
+        "canShuffle" to A2uiBooleanSchema("True only when tools and current device allow shuffle."),
+        "canRepeat" to A2uiBooleanSchema("True only when tools and current device allow repeat."),
+        "canSave" to A2uiBooleanSchema("True only when library check/save/remove tools are available."),
         "provider" to A2uiStringSchema(
             "Human-readable service name, for example Spotify, 网易云音乐, QQ音乐, or Apple Music.",
         ),

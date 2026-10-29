@@ -22,10 +22,16 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.channelFlow
+import github.ponyhuang.gimi.domain.conversation.repository.SubtaskRunRepository
 
 @Singleton
 class AdkChatAgentRepository @Inject constructor(
     private val runner: AgentChatRunner,
+    private val subtasks: SubtaskRunRepository? = null,
 ) : ChatAgentRepository {
     override suspend fun createExecution(
         sessionId: String,
@@ -46,7 +52,7 @@ class AdkChatAgentRepository @Inject constructor(
                 retry: Boolean,
             ): Flow<ChatRunEvent> = execution.send(
                 github.ponyhuang.gimi.domain.a2ui.A2uiInteractionCodec.encode(interaction), retry = retry,
-            ).map { it.toDomain() }
+            ).map { it.toDomain() }.withSubtaskProgress(sessionId)
 
             override suspend fun send(
                 text: String,
@@ -54,14 +60,14 @@ class AdkChatAgentRepository @Inject constructor(
                 retry: Boolean,
             ): Flow<ChatRunEvent> = execution.send(
                 text, fileAttachments, retry,
-            ).map { it.toDomain() }
+            ).map { it.toDomain() }.withSubtaskProgress(sessionId)
 
             override suspend fun respondToToolConfirmation(
                 confirmationCallId: String,
                 confirmed: Boolean,
             ): Flow<ChatRunEvent> = execution.respondToToolConfirmation(
                 confirmationCallId, confirmed,
-            ).map { it.toDomain() }
+            ).map { it.toDomain() }.withSubtaskProgress(sessionId)
 
             override suspend fun respondToInputRequest(
                 callId: String,
@@ -69,7 +75,36 @@ class AdkChatAgentRepository @Inject constructor(
                 value: String,
             ): Flow<ChatRunEvent> = execution.respondToInputRequest(
                 callId, toolName, UserInputToolProtocol.responsePayload(toolName, value),
-            ).map { it.toDomain() }
+            ).map { it.toDomain() }.withSubtaskProgress(sessionId)
+        }
+    }
+
+    /** 观察先于模型执行启动；子任务仅发领域快照，不冒充主模型正文或完成事件。 */
+    private fun Flow<ChatRunEvent>.withSubtaskProgress(sessionId: String): Flow<ChatRunEvent> {
+        val repository = subtasks ?: return this
+        return channelFlow {
+            var invocationId: String? = null
+            suspend fun publish(batch: github.ponyhuang.gimi.domain.conversation.model.SubtaskBatch) {
+                send(ChatRunEvent(
+                    id = "subtasks:${batch.id}", invocationId = batch.invocationId, author = "subtasks",
+                    parts = emptyList(), functionCalls = emptyList(), functionResponses = emptyList(),
+                    partial = false, turnComplete = false, errorCode = null, errorMessage = null,
+                    timestamp = batch.createdAt, subtaskBatch = batch,
+                ))
+            }
+            val observer = launch(start = CoroutineStart.UNDISPATCHED) {
+                repository.observe(sessionId).collect { publish(it) }
+            }
+            try {
+                this@withSubtaskProgress.collect {
+                    invocationId = it.invocationId ?: invocationId
+                    send(it)
+                }
+                // 最后一次状态先持久化再回送，避免主流快速结束时取消观察者而漏掉完成快照。
+                repository.load(sessionId).filter { it.invocationId == invocationId }.forEach { publish(it) }
+            } finally {
+                observer.cancelAndJoin()
+            }
         }
     }
 

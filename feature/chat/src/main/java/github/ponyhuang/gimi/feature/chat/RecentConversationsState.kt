@@ -21,7 +21,7 @@ data class RecentConversationsState(
 sealed interface RecentConversationsAction {
     /** 更新标题/末条消息搜索词。 */
     data class Search(val query: String) : RecentConversationsAction
-    /** 进入多选；长按时同时选中指定会话。 */
+    /** 进入多选；带 sessionId 时同时预选该会话。 */
     data class StartSelection(val sessionId: String? = null) : RecentConversationsAction
     /** 切换一个可删除会话的勾选状态。 */
     data class ToggleSelection(val sessionId: String) : RecentConversationsAction

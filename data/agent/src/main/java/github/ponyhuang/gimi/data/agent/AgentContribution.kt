@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.data.agent
 
+import com.google.adk.kt.agents.BaseAgent
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.data.agent.tools.search.ToolCandidateSource
@@ -39,6 +40,13 @@ interface AgentContribution {
 
     /** ON_DEMAND 模式下进入 `ToolSearchToolset` 的检索候选源。 */
     suspend fun candidateSources(spec: AgentBuildSpec): List<ToolCandidateSource> = emptyList()
+
+    /**
+     * 直接挂到 LlmAgent.subAgents 的 sub-agent（如远程 A2A agent）；不贡献工具的
+     * 能力方可在此把非 LLM 子能力接入 agent 树，由模型经 `transfer_to_agent` 委派。
+     * 构建可能涉及网络/IO，实现方自行降级失败项，不得抛出中断整体装配。
+     */
+    suspend fun subAgents(spec: AgentBuildSpec): List<BaseAgent> = emptyList()
 
     /**
      * 展开当前全部可用工具的扁平目录（只枚举声明、不执行工具），供推荐生成、

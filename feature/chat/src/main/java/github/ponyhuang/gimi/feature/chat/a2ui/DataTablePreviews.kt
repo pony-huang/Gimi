@@ -61,6 +61,14 @@ private fun DataTablePreviewCanvas(dark: Boolean) {
                         columns = listOf(DataTableColumn("名称"), DataTableColumn("数量", true), DataTableColumn("金额", true)),
                         rows = emptyList(),
                     ))
+                    // 超过十行的表格用于检查表体视口高度与纵向滚动提示。
+                    DataTableCard(DataTableData(
+                        heading = "长列表结果",
+                        columns = listOf(DataTableColumn("序号"), DataTableColumn("名称"), DataTableColumn("耗时", true)),
+                        rows = (1..12).map { index ->
+                            listOf(index.toString(), "任务 $index", "${index * 120} ms")
+                        },
+                    ))
                 }
             }
         }

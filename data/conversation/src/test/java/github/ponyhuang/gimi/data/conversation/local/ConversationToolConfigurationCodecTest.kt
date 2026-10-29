@@ -14,7 +14,7 @@ class ConversationToolConfigurationCodecTest {
             pendingMcpCredentialServerId = "server-1",
             enabledOfficialFunctionIds = mapOf(
                 "mimo_web_search" to setOf("mimo_web_search"),
-                "kimi_formulas" to setOf(
+                "kimi_web_tools" to setOf(
                     ConversationToolConfiguration.ALL_FUNCTIONS_MARKER,
                 ),
             ),

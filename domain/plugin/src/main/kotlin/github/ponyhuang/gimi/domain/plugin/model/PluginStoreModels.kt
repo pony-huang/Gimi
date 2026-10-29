@@ -29,7 +29,9 @@ data class LocalizedText(
  * @property description 详情页描述。
  * @property highlights 详情页能力要点。
  * @property sortOrder 目录内的展示顺序，数值越小越靠前。
- * @property pluginVersion 目录发布时的插件自身版本，供展示与后续更新判断。
+ * @property pluginVersion 插件自身行为版本，不用于 APK 更新判断。
+ * @property versionCode 发布 APK 的安装版本；缺失时不提示更新。
+ * @property versionName 发布 APK 的展示版本。
  * @property releaseAssetPrefix GitHub Release 资产名前缀，如 `Gimi-plugin-zhihu-v`。
  * @property repoUrl 插件所属仓库地址，仅用于详情页外链。
  * @property iconKey 宿主内置图标映射键，不依赖网络图片。
@@ -54,6 +56,8 @@ data class PluginCatalogEntry(
     val apkUrl: String? = null,
     val sha256: String? = null,
     val sizeBytes: Long? = null,
+    val versionCode: Long? = null,
+    val versionName: String? = null,
 )
 
 /** 订阅目录来源；远端失败时回退到内置目录。 */
@@ -103,13 +107,17 @@ enum class PluginInstallFailure {
     NO_RELEASE_ASSET,
     PACKAGE_TOO_LARGE,
     STORAGE,
+    INVALID_PACKAGE,
+    NOT_AN_UPDATE,
     UNKNOWN,
 }
 
 /** 安装流程结果；成功时携带待交给系统安装器的本地 APK 路径。 */
 sealed interface PluginInstallResult {
+    /** 下载与校验完成；[apkPath] 为受管缓存里的 APK。 */
     data class Ready(val apkPath: String) : PluginInstallResult
 
+    /** 准备安装失败；[failure] 供 UI 本地化展示。 */
     data class Failed(val failure: PluginInstallFailure) : PluginInstallResult
 }
 
@@ -126,3 +134,8 @@ fun PluginRelease.selectPluginAsset(prefix: String): PluginReleaseAsset? =
     assets.firstOrNull { asset ->
         asset.name.startsWith(prefix) && asset.name.endsWith(".apk", ignoreCase = true)
     }
+
+/** 仅同一 Android 包的更高安装版本可覆盖更新；插件行为版本与版本名称不参与比较。 */
+fun PluginCatalogEntry.isUpdateFor(installed: PluginDescriptor): Boolean =
+    packageName == installed.packageName && installed.versionCode > 0L &&
+        versionCode != null && versionCode > installed.versionCode

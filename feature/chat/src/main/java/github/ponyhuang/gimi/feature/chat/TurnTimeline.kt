@@ -44,6 +44,11 @@ data class TurnTimeline(
  * assistant 轮次内按时间顺序排列的一个展示分段。
  */
 sealed interface TurnSegment {
+    /** 委派任务属于原时间线中的一个活动段，内部展开父子任务与工具步骤。 */
+    data class Subtasks(
+        val id: String,
+        val batch: github.ponyhuang.gimi.domain.conversation.model.SubtaskBatch,
+    ) : TurnSegment
     /**
      * 一段助手正文。保留原始 [Message] 以继续驱动流式打字机 channel、附件与错误渲染。
      *
@@ -196,6 +201,9 @@ private fun List<Message>.toTurnTimeline(
     val segments = mutableListOf<TurnSegment>()
     val activityEntries = mutableListOf<TimelineEntry>()
     val seenToolEntries = mutableSetOf<ToolCallKey>()
+    val batches = mapNotNull(Message::subtaskBatch).associateBy { it.id }
+    val delegatedCallIds = batches.values.map { it.callId }.toSet()
+    val seenBatches = mutableSetOf<String>()
     var activityGroupCount = 0
 
     // 思考与工具活动都发生在其后的正文之前，因此正文段出现前无条件 flush 缓冲，
@@ -211,6 +219,12 @@ private fun List<Message>.toTurnTimeline(
     }
 
     forEach { message ->
+        message.subtaskBatch?.let { batch ->
+            if (seenBatches.add(batch.id)) {
+                flushActivity()
+                segments += TurnSegment.Subtasks("subtasks:${batch.id}", batches.getValue(batch.id))
+            }
+        }
         message.textParts
             .filter { it.thought && it.text.isNotBlank() }
             .forEach { part -> activityEntries += TimelineEntry.Thought(part.id, part.text) }
@@ -221,6 +235,7 @@ private fun List<Message>.toTurnTimeline(
         }
 
         message.visibleFunctionCalls().forEach { call ->
+            if (call.name == "delegate_tasks" && call.id in delegatedCallIds) return@forEach
             val key = ToolCallKey(call.id, call.name)
             if (seenToolEntries.add(key)) {
                 activityEntries += TimelineEntry.ToolCall(
@@ -237,6 +252,7 @@ private fun List<Message>.toTurnTimeline(
         }
 
         message.visibleFunctionResponses().forEach { response ->
+            if (response.name == "delegate_tasks" && response.id in delegatedCallIds) return@forEach
             val key = ToolCallKey(response.id, response.name)
             if (key !in callsByKey && seenToolEntries.add(key)) {
                 activityEntries += TimelineEntry.ToolCall(
@@ -299,10 +315,14 @@ private fun Message.hasAnswerContent(): Boolean =
 /** 活跃状态使用稳定的活动组 key，首个工具到达时不会重置用户的展开选择。 */
 internal fun TurnTimeline.displaySegments(status: ChatRunStatus? = null): List<TurnSegment> {
     val visible = segments.filter { segment ->
-        segment is TurnSegment.Answer ||
+        segment is TurnSegment.Answer || segment is TurnSegment.Subtasks ||
             (segment is TurnSegment.Activity && segment.entries.any { it is TimelineEntry.ToolCall })
     }.toMutableList()
-    if (isRunning && status != null) {
+    val activeBatch = (segments.lastOrNull() as? TurnSegment.Subtasks)?.batch?.tasks?.any {
+        it.status == github.ponyhuang.gimi.domain.conversation.model.SubtaskStatus.RUNNING ||
+            it.status == github.ponyhuang.gimi.domain.conversation.model.SubtaskStatus.QUEUED
+    } == true
+    if (isRunning && status != null && !activeBatch) {
         val current = segments.lastOrNull() as? TurnSegment.Activity
             ?: TurnSegment.Activity("$turnId:a${segments.count { it is TurnSegment.Activity }}", emptyList())
         if (visible.none { it is TurnSegment.Activity && it.id == current.id }) visible += current

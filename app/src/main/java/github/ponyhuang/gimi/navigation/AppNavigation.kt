@@ -36,8 +36,12 @@ import github.ponyhuang.gimi.feature.chat.ChatDestination
 import github.ponyhuang.gimi.feature.chat.ChatEntryProvider
 import github.ponyhuang.gimi.feature.chat.ChatNavigationCallbacks
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
+import github.ponyhuang.gimi.feature.a2a.A2aEntryProvider
+import github.ponyhuang.gimi.feature.a2a.RemoteAgentDestination
 import github.ponyhuang.gimi.feature.assistant.AssistantSurface
 import github.ponyhuang.gimi.feature.assistant.AssistantSurfaceMode
+import github.ponyhuang.gimi.feature.appfunction.AppFunctionDestination
+import github.ponyhuang.gimi.feature.appfunction.AppFunctionEntryProvider
 import github.ponyhuang.gimi.feature.mcp.McpDestination
 import github.ponyhuang.gimi.feature.mcp.McpEntryProvider
 import github.ponyhuang.gimi.feature.memory.MemoryDestination
@@ -61,8 +65,6 @@ import github.ponyhuang.gimi.feature.skills.SkillsDestination
 import github.ponyhuang.gimi.feature.skills.SkillsEntryProvider
 import github.ponyhuang.gimi.feature.toolauthorization.ToolAuthorizationDestination
 import github.ponyhuang.gimi.feature.toolauthorization.ToolAuthorizationEntryProvider
-import github.ponyhuang.gimi.feature.workfiles.WorkFilesDestination
-import github.ponyhuang.gimi.feature.workfiles.WorkFilesEntryProvider
 import github.ponyhuang.gimi.feature.workspace.WorkspaceDestination
 import github.ponyhuang.gimi.feature.workspace.WorkspaceEntryProvider
 import github.ponyhuang.gimi.voice.AssistantPanelInteractor
@@ -167,15 +169,13 @@ fun MainScreen(
                             navigate(ModelSettingsDestination.Defaults)
                         },
                         onNavigateToMcpServers = { navigate(McpDestination.ServerList) },
+                        onNavigateToRemoteAgents = { navigate(RemoteAgentDestination.AgentList) },
+                        onNavigateToAppFunctions = { navigate(AppFunctionDestination.Apps) },
                         onNavigateToSandbox = { navigate(SandboxDestination.Settings) },
                         onNavigateToPlugins = { navigate(PluginDestination.Settings) },
                         onNavigateToSkills = { navigate(SkillsDestination.Settings) },
-                        onNavigateToWorkFiles = { navigate(WorkFilesDestination.Settings) },
                         onNavigateToWorkspace = { navigate(WorkspaceDestination.Manager) },
                         onNavigateToPermissions = { navigate(PermissionDestination.Settings) },
-                        onNavigateToToolAuthorization = {
-                            navigate(ToolAuthorizationDestination.Settings)
-                        },
                         onNavigateToMobileUse = {
                             navigate(MobileUseDestination.Settings)
                         },
@@ -188,18 +188,22 @@ fun MainScreen(
                 ) || ModelSettingsEntryProvider(destination, goBack, navigate) ||
                     SandboxEntryProvider(destination, goBack) ||
                     McpEntryProvider(destination, goBack, navigate, replaceCurrent) ||
+                    A2aEntryProvider(destination, goBack, navigate) ||
+                    AppFunctionEntryProvider(destination, goBack, navigate) ||
                     PluginEntryProvider(destination, goBack, navigate) ||
                     ToolAuthorizationEntryProvider(destination, goBack, navigate) ||
                     MobileUseEntryProvider(destination, goBack) ||
                     RecommendationEntryProvider(
                         destination = destination,
                         onBack = goBack,
-                        onOpenPermissions = { navigate(PermissionDestination.Settings) },
+                        onOpenToolAuthorization = {
+                            navigate(ToolAuthorizationDestination.Settings)
+                        },
+                        onOpenFastModelSettings = { navigate(ModelSettingsDestination.Defaults) },
                     ) ||
                     MemoryEntryProvider(destination, goBack, navigate) ||
                     PermissionEntryProvider(destination, goBack) ||
                     SkillsEntryProvider(destination, goBack) ||
-                    WorkFilesEntryProvider(destination, goBack) ||
                     WorkspaceEntryProvider(destination, goBack)
 
                 check(handled) { "No feature entry provider for $destination" }

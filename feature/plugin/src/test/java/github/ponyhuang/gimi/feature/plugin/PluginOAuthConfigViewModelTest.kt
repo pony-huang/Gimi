@@ -10,6 +10,7 @@ import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -69,6 +70,31 @@ class PluginOAuthConfigViewModelTest {
         assertEquals("provider-b", viewModel.state.value.pluginId)
         assertEquals(false, viewModel.state.value.enabled)
         assertEquals("provider-a" to "oauth_status", repository.lastAction)
+    }
+
+    @Test
+    fun pendingStatusUpdatesAutomaticallyAndStopsAfterAuthorization() = runTest {
+        val repository = FakeRepository()
+        var calls = 0
+        repository.read = { PluginActionOutcome(if (++calls < 3) "pending" else "authorized") }
+        val viewModel = PluginOAuthConfigViewModel(repository)
+        viewModel.bind("provider", enabled = true, busy = false)
+        runCurrent()
+        assertEquals(PluginOAuthAuthorization.Waiting, viewModel.state.value.authorization)
+        advanceTimeBy(6_000)
+        runCurrent()
+        assertEquals(PluginOAuthAuthorization.Authorized, viewModel.state.value.authorization)
+        assertEquals(3, calls)
+    }
+
+    @Test
+    fun expiredStatusIsNotReportedAsAuthorizationFailure() = runTest {
+        val repository = FakeRepository()
+        repository.read = { PluginActionOutcome("expired") }
+        val viewModel = PluginOAuthConfigViewModel(repository)
+        viewModel.bind("provider", enabled = true, busy = false)
+        advanceUntilIdle()
+        assertEquals(PluginOAuthAuthorization.Expired, viewModel.state.value.authorization)
     }
 
     private class FakeRepository : PluginRepository {

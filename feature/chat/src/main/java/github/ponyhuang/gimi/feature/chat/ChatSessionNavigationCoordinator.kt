@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.feature.chat
 import android.util.Log
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
+import github.ponyhuang.gimi.domain.conversation.repository.NoAvailableAssistantModelException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -29,6 +30,7 @@ internal class ChatSessionNavigationCoordinator(
     private val showRuntime: (String, Boolean) -> Unit,
     private val publishRuntime: (ChatSessionRuntime) -> Unit,
     private val clearSpeechSession: () -> Unit,
+    private val emitNotice: (ChatNotice) -> Unit,
 ) {
     var navigationVersion = 0L
         private set
@@ -112,7 +114,15 @@ internal class ChatSessionNavigationCoordinator(
         navigationVersion++
         val navigationAtReset = navigationVersion
         scope.launch {
-            val newId = createConversationWithDefaults()
+            // 未配置密钥属于可恢复的配置状态，不能让异常逃出 ViewModel 协程导致进程退出。
+            val newId = try {
+                createConversationWithDefaults()
+            } catch (_: NoAvailableAssistantModelException) {
+                if (navigationAtReset == navigationVersion) {
+                    emitNotice(ChatNotice.ConfigureChatModel)
+                }
+                return@launch
+            }
             if (navigationAtReset != navigationVersion) return@launch
             if (newId.isNotBlank()) {
                 switchSession(newId)

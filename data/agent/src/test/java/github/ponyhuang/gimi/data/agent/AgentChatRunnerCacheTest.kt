@@ -373,7 +373,11 @@ class AgentChatRunnerCacheTest {
     }
 
     private fun runtime(selection: ModelSelection? = null) = AgentRuntime(
-        agent = mockk<LlmAgent>(relaxed = true),
+        // 1.5 新增可空 mode；宽松 mock 会伪造非空模式并触发 rootNode 入口校验。
+        agent = LlmAgent(name = "cache_fixture", model = object : Model {
+            override val name = "cache_fixture"
+            override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {}
+        }),
         modelRuntime = ModelRuntimeMetadata(
             serviceId = selection?.serviceId ?: "service",
             baseType = ApiProtocol.OpenaiChatcompletions,

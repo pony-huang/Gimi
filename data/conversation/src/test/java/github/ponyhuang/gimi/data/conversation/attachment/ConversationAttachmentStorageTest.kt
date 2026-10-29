@@ -1,11 +1,5 @@
 package github.ponyhuang.gimi.data.conversation.attachment
 
-import github.ponyhuang.gimi.core.storage.BackupPolicy
-import github.ponyhuang.gimi.core.storage.StorageArea
-import github.ponyhuang.gimi.core.storage.StorageLifecycle
-import github.ponyhuang.gimi.core.storage.workspaceDirectorySpec
-import github.ponyhuang.gimi.data.conversation.conversationAttachmentDirectorySpec
-import github.ponyhuang.gimi.data.conversation.conversationDraftDirectorySpec
 import github.ponyhuang.gimi.domain.conversation.model.AttachmentCategory
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import java.io.File
@@ -38,18 +32,6 @@ class ConversationAttachmentStorageTest {
             sizeBytes = bytes.size.toLong(),
             category = AttachmentCategory.DOCUMENT,
         )
-    }
-
-    @Test
-    fun workspaceIsPersistentUserManagedStorageWhileDraftsAreTemporary() {
-        assertEquals(StorageArea.FILES, workspaceDirectorySpec.area)
-        assertEquals(StorageLifecycle.PERSISTENT, workspaceDirectorySpec.lifecycle)
-        assertEquals(BackupPolicy.EXCLUDED, workspaceDirectorySpec.backupPolicy)
-        assertEquals(StorageArea.CACHE, conversationDraftDirectorySpec.area)
-        assertEquals(StorageLifecycle.TEMPORARY, conversationDraftDirectorySpec.lifecycle)
-        // 遗留的按会话目录保留旧声明，仅供旧数据随会话删除自然收缩。
-        assertEquals(StorageArea.FILES, conversationAttachmentDirectorySpec.area)
-        assertEquals(StorageLifecycle.PERSISTENT, conversationAttachmentDirectorySpec.lifecycle)
     }
 
     @Test

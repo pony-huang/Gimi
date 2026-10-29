@@ -28,3 +28,14 @@ val conversationDraftDirectorySpec = ManagedDirectorySpec(
     backupPolicy = BackupPolicy.EXCLUDED,
     sharingPolicy = SharingPolicy.PRIVATE,
 )
+
+/** 会话导出写入用户文档前使用的私有暂存目录。 */
+val conversationExportDirectorySpec = ManagedDirectorySpec(
+    id = "conversation.exports",
+    owner = "data:conversation",
+    area = StorageArea.CACHE,
+    relativePath = "conversation/exports",
+    lifecycle = StorageLifecycle.TEMPORARY,
+    backupPolicy = BackupPolicy.EXCLUDED,
+    sharingPolicy = SharingPolicy.PRIVATE,
+)

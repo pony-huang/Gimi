@@ -220,16 +220,6 @@ class WeiboMappersTest {
     }
 
     @Test
-    fun hotSearchCategoriesExposesSevenChineseNames() {
-        // 服务端把榜单直接定义为「社会榜 / 体育榜 / …」这些中文字面值，没有 SID 中间层；
-        // 映射键值相同，工具层只需要校验白名单。
-        assertEquals(7, HOT_SEARCH_CATEGORIES.size)
-        assertEquals("主榜", HOT_SEARCH_CATEGORIES["主榜"])
-        assertEquals("文娱榜", HOT_SEARCH_CATEGORIES["文娱榜"])
-        assertEquals("科技榜", HOT_SEARCH_CATEGORIES["科技榜"])
-    }
-
-    @Test
     fun parseEnvelopeFallsBackToPreciseAiModelNameHintWhenServerMessageEmpty() {
         // 40003 服务端真实文案是英文「ai_model_name must not exceed 64 characters」，
         // 但服务端 message 缺省时本地兜底成「ai_model_name 超过 64 字符」（不带

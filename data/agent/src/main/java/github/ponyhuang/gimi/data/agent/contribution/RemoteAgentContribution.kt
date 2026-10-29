@@ -21,7 +21,7 @@ class RemoteAgentContribution @Inject constructor(
 
     override val id: String = ID
 
-    override fun revision(): Any? = repository.revision.value
+    override fun revision(): Any? = repository.revision.value to runtimeCache.retryRevision
 
     override suspend fun subAgents(spec: AgentBuildSpec): List<BaseAgent> =
         runtimeCache.currentSubAgents(spec)

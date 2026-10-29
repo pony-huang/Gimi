@@ -10,6 +10,7 @@ import com.google.adk.kt.types.ThinkingLevel
 import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.data.agent.tools.search.ToolSearchToolset
 import github.ponyhuang.gimi.data.agent.tools.search.ToolVectorSearch
+import github.ponyhuang.gimi.data.agent.a2a.RemoteAgentFailureRecovery
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import javax.inject.Inject
@@ -90,6 +91,8 @@ class AgentFactory @Inject constructor(
         tools = contributions.tools(spec),
         toolsets = toolsets,
         subAgents = subAgents,
+        beforeModelCallbacks = listOf(RemoteAgentFailureRecovery.beforeModel),
+        beforeToolCallbacks = listOf(RemoteAgentFailureRecovery.beforeTool),
     )
 }
 

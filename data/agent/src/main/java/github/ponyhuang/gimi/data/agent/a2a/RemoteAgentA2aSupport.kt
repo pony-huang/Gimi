@@ -4,13 +4,8 @@ import com.google.adk.kt.a2a.jvm.A2AAgent
 import github.ponyhuang.gimi.domain.a2a.model.RemoteAgentCardSnapshot
 import github.ponyhuang.gimi.domain.a2a.model.RemoteAgentConfig
 import github.ponyhuang.gimi.domain.a2a.model.RemoteAgentSkillSnapshot
-import java.io.IOException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.a2aproject.sdk.client.http.A2AHttpClient
-import org.a2aproject.sdk.jsonrpc.common.json.JsonUtil
 import org.a2aproject.sdk.spec.AgentCard
-import org.a2aproject.sdk.spec.util.Utils
 
 /** 远程 A2A agent 的公共装配参数：卡片拉取超时与网络异常摘要截取。 */
 
@@ -31,27 +26,6 @@ internal fun RemoteAgentConfig.httpClientFor(baseHttpClient: A2AHttpClient): A2A
             headerValue = "Bearer $bearerToken",
         )
     }
-
-/**
- * 拉取并解析标准 `/.well-known/agent-card.json` 卡片。
- *
- * 与 adk-kotlin 内部 resolveAgentCard 同构（proto-free，JsonUtil 解析）。卡片是可缓存的
- * 网络产物；agent 实例本身不可复用（BaseAgent 挂树时写入 parentAgent，二次挂载抛
- * "already has a parent"），必须由缓存到的卡片按次新建（见 RemoteAgentRuntimeCache）。
- */
-internal suspend fun fetchRemoteAgentCard(
-    config: RemoteAgentConfig,
-    baseHttpClient: A2AHttpClient,
-): AgentCard = withContext(Dispatchers.IO) {
-    val cardUrl = Utils.buildCardUrl(Utils.stripWellKnownSuffix(config.endpointUrl), Utils.DEFAULT_AGENT_CARD_PATH)
-    val response = config.httpClientFor(baseHttpClient).createGet()
-        .url(cardUrl)
-        .addHeader("Accept", A2AHttpClient.APPLICATION_JSON)
-        .get()
-    check(response.success()) { "Failed to fetch agent card from $cardUrl: HTTP ${response.status()}" }
-    JsonUtil.fromJson(response.body(), AgentCard::class.java)
-        ?: throw IOException("Empty agent card response from $cardUrl")
-}
 
 /**
  * 由已解析的卡片新建 agent 实例。每次 agent 树装配都须调用本函数取得全新实例，

@@ -4,7 +4,7 @@ import github.ponyhuang.gimi.domain.a2a.model.RemoteAgentConfig
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
-import org.a2aproject.sdk.client.http.android.AndroidA2AHttpClient
+import github.ponyhuang.gimi.data.agent.a2a.RemoteAgentCardFetcher
 import org.a2aproject.sdk.jsonrpc.common.json.JsonUtil
 import org.a2aproject.sdk.spec.AgentCapabilities
 import org.a2aproject.sdk.spec.AgentCard
@@ -21,7 +21,7 @@ import org.junit.Test
 class AdkRemoteAgentConnectionTesterTest {
 
     private lateinit var server: MockWebServer
-    private val tester = AdkRemoteAgentConnectionTester(AndroidA2AHttpClient())
+    private val tester = AdkRemoteAgentConnectionTester(RemoteAgentCardFetcher())
 
     @Before
     fun setUp() {

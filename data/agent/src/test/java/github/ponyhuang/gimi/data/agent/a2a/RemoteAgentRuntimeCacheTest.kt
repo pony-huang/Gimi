@@ -1,8 +1,18 @@
 package github.ponyhuang.gimi.data.agent.a2a
 
 import com.google.adk.kt.agents.LlmAgent
+import com.google.adk.kt.agents.ResumabilityConfig
+import com.google.adk.kt.apps.App
+import com.google.adk.kt.models.LlmRequest
+import com.google.adk.kt.models.LlmResponse
 import com.google.adk.kt.models.Model
+import com.google.adk.kt.runners.InMemoryRunner
+import com.google.adk.kt.types.Content
+import com.google.adk.kt.types.FunctionCall
+import com.google.adk.kt.types.Part
 import github.ponyhuang.gimi.data.agent.AgentBuildSpec
+import github.ponyhuang.gimi.data.agent.AgentChatExecution
+import github.ponyhuang.gimi.data.agent.AgentChatRunner
 import github.ponyhuang.gimi.domain.a2a.model.RemoteAgentConfig
 import github.ponyhuang.gimi.domain.a2a.model.SkippedRemoteAgent
 import github.ponyhuang.gimi.domain.a2a.repository.RemoteAgentRepository
@@ -11,6 +21,9 @@ import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.toList
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.a2aproject.sdk.client.http.android.AndroidA2AHttpClient
@@ -81,7 +94,7 @@ class RemoteAgentRuntimeCacheTest {
     }
 
     private fun cache(): RemoteAgentRuntimeCache =
-        RemoteAgentRuntimeCache(repository, AndroidA2AHttpClient(), skipReporter)
+        RemoteAgentRuntimeCache(repository, AndroidA2AHttpClient(), skipReporter, RemoteAgentCardFetcher())
 
     private fun enqueueCard(name: String = "remote-agent") {
         server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody(cardJson(name)))
@@ -233,5 +246,84 @@ class RemoteAgentRuntimeCacheTest {
 
         assertTrue(agents.isEmpty())
         assertTrue(skipReporter.skipped.value.single().reason?.contains("HTTP 500") == true)
+    }
+
+    @Test
+    fun invalidAgentAssemblyDoesNotBlockHealthyAgents() = runBlocking {
+        enqueueCard()
+        enqueueCard()
+        repository.save(RemoteAgentConfig(name = "invalid/name", endpointUrl = server.url("/").toString()))
+        repository.save(RemoteAgentConfig(name = "healthy", endpointUrl = server.url("/").toString()))
+
+        val agents = cache().currentSubAgents(spec)
+
+        assertEquals(listOf("healthy"), agents.map { it.name })
+        assertEquals("invalid/name", skipReporter.skipped.value.single().displayName)
+    }
+
+    @Test
+    fun failedRemoteCallReturnsToAssistantWithoutResendingAndNextTurnWorks() = runBlocking {
+        enqueueCard()
+        server.enqueue(MockResponse().setResponseCode(503).setBody("unavailable"))
+        server.enqueue(MockResponse().setResponseCode(503).setBody("still unavailable"))
+        server.enqueue(MockResponse().setResponseCode(503).setBody("unavailable in other session"))
+        repository.save(RemoteAgentConfig(name = "weather_agent", endpointUrl = server.url("/").toString()))
+        val subAgents = cache().currentSubAgents(spec)
+        val requests = mutableListOf<LlmRequest>()
+        val model = object : Model {
+            override val name = "recovery-fixture"
+            override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {
+                requests += request
+                val part = if (requests.size in setOf(1, 2, 4, 6)) {
+                    Part(functionCall = FunctionCall(
+                        id = "transfer-${requests.size}",
+                        name = "transfer_to_agent",
+                        args = mapOf("agent_name" to "weather_agent"),
+                    ))
+                } else Part(text = "assistant continued")
+                emit(LlmResponse(content = Content(role = "model", parts = listOf(part))))
+            }
+        }
+        val runner = InMemoryRunner(App(
+            appName = AgentChatRunner.APP_NAME,
+            rootAgent = LlmAgent(
+                name = "Assistant",
+                model = model,
+                subAgents = subAgents,
+                beforeModelCallbacks = listOf(RemoteAgentFailureRecovery.beforeModel),
+                beforeToolCallbacks = listOf(RemoteAgentFailureRecovery.beforeTool),
+            ),
+            resumabilityConfig = ResumabilityConfig(isResumable = true),
+        ))
+        val execution = AgentChatExecution("user", "recovery-session", runner, emptyMap())
+
+        val first = execution.send("use weather").toList()
+        val next = execution.send("continue chat").toList()
+        val other = AgentChatExecution("user", "other-session", runner, emptyMap()).send("use weather").toList()
+
+        assertTrue(first.any { it.author == "Assistant" && it.content?.parts?.any { part -> part.text == "assistant continued" } == true })
+        assertTrue(next.any { it.author == "Assistant" && it.content?.parts?.any { part -> part.text == "assistant continued" } == true })
+        assertTrue(requests[1].contents.toString().contains("remote_agent_unavailable"))
+        assertTrue(requests[1].config.tools.orEmpty().flatMap { it.functionDeclarations.orEmpty() }
+            .none { it.name == "transfer_to_agent" })
+        assertTrue(requests[3].config.tools.orEmpty().flatMap { it.functionDeclarations.orEmpty() }
+            .any { it.name == "transfer_to_agent" })
+        assertTrue(other.any { it.author == "Assistant" && it.content?.parts?.any { part -> part.text == "assistant continued" } == true })
+        assertEquals(4, server.requestCount) // 一次卡片、每个新轮次至多一次任务；同轮重复委派不触网。
+        runner.close()
+    }
+
+    @Test
+    fun unavailableCardInvalidatesRunnerRevisionAndCanRecoverOnNextBuild() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(503))
+        enqueueCard()
+        repository.save(RemoteAgentConfig(name = "weather_agent", endpointUrl = server.url("/").toString()))
+        val runtimeCache = cache()
+        val revision = runtimeCache.retryRevision
+
+        assertTrue(runtimeCache.currentSubAgents(spec).isEmpty())
+        assertTrue(runtimeCache.retryRevision > revision)
+        assertEquals("weather_agent", runtimeCache.currentSubAgents(spec).single().name)
+        assertTrue(skipReporter.skipped.value.isEmpty())
     }
 }

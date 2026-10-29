@@ -3,12 +3,16 @@ package github.ponyhuang.gimi.data.agent.a2a
 import com.google.adk.kt.a2a.agent.BaseRemoteA2AAgent
 import com.google.adk.kt.agents.BaseAgent
 import github.ponyhuang.gimi.data.agent.AgentBuildSpec
+import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.domain.a2a.model.RemoteAgentConfig
 import github.ponyhuang.gimi.domain.a2a.model.SkippedRemoteAgent
 import github.ponyhuang.gimi.domain.a2a.repository.RemoteAgentRepository
 import github.ponyhuang.gimi.domain.a2a.repository.RemoteAgentSkipReporter
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
@@ -32,7 +36,9 @@ class RemoteAgentRuntimeCache @Inject constructor(
     private val repository: RemoteAgentRepository,
     private val baseHttpClient: A2AHttpClient,
     private val skipReporter: RemoteAgentSkipReporter,
+    private val cardFetcher: RemoteAgentCardFetcher,
 ) {
+    /** 同一配置的已解析卡片；实例须按树重新创建。 */
     private data class CachedCard(
         val config: RemoteAgentConfig,
         val card: AgentCard,
@@ -48,6 +54,11 @@ class RemoteAgentRuntimeCache @Inject constructor(
     private val cardCache = mutableMapOf<String, CachedCard>()
     private var cachedSignature: List<List<String>> = emptyList()
 
+    /** 探测失败后使下一轮重新装配；避免 Runner 永久缓存缺少远程能力的树。 */
+    @Volatile
+    var retryRevision: Long = 0L
+        private set
+
     /** 返回当前应挂到 agent 树上的远程 sub-agent；跳过结果整体发布到 [skipReporter]。 */
     suspend fun currentSubAgents(spec: AgentBuildSpec): List<BaseAgent> = mutex.withLock {
         val enabled = repository.currentAgents().filter { it.isEnabled }
@@ -59,15 +70,25 @@ class RemoteAgentRuntimeCache @Inject constructor(
 
         val skipped = mutableListOf<SkippedRemoteAgent>()
         val seenNames = mutableSetOf<String>()
-        val agents = enabled.mapNotNull { config ->
+        val uniqueConfigs = enabled.filter { config ->
             val displayName = config.agentTreeName()
             // agent 名是 transfer_to_agent 的委派目标，必须树内唯一；重名配置后来者跳过。
             if (!seenNames.add(displayName)) {
                 skipped += SkippedRemoteAgent(config.id, displayName, REASON_DUPLICATE_NAME)
-                return@mapNotNull null
+                false
+            } else {
+                true
             }
-            val outcome = resolveCard(config)
+        }
+        // 独立端点并发探测，多个坏连接的等待上限不再按配置数累加；缓存写入仍在锁内串行完成。
+        val outcomes = coroutineScope {
+            uniqueConfigs.map { config -> async { config to resolveCard(config) } }.awaitAll()
+        }
+        var hasUnavailableCard = false
+        val agents = outcomes.mapNotNull { (config, outcome) ->
+            val displayName = config.agentTreeName()
             if (outcome.card == null) {
+                hasUnavailableCard = true
                 skipped += SkippedRemoteAgent(
                     remoteAgentId = config.id,
                     displayName = displayName,
@@ -75,9 +96,17 @@ class RemoteAgentRuntimeCache @Inject constructor(
                 )
                 return@mapNotNull null
             }
+            cardCache[config.id] = CachedCard(config, outcome.card)
             // 每次装配新建实例：同一卡片挂到多棵树/多次重建都安全。
-            newRemoteA2aAgent(config, outcome.card, baseHttpClient)
+            cancellationAwareRunCatching {
+                ResilientRemoteAgent(newRemoteA2aAgent(config, outcome.card, baseHttpClient))
+            }.getOrElse { failure ->
+                cardCache.remove(config.id)
+                skipped += SkippedRemoteAgent(config.id, displayName, failureSummary(failure))
+                null
+            }
         }
+        if (hasUnavailableCard) retryRevision += 1L
         skipReporter.publish(skipped)
         agents
     }
@@ -86,12 +115,11 @@ class RemoteAgentRuntimeCache @Inject constructor(
     private suspend fun resolveCard(config: RemoteAgentConfig): CardOutcome {
         cardCache[config.id]?.let { return CardOutcome(it.card, null) }
         val outcome = withTimeoutOrNull(REMOTE_AGENT_CARD_TIMEOUT_MS) {
-            runCatching { fetchRemoteAgentCard(config, baseHttpClient) }.fold(
+            cancellationAwareRunCatching { cardFetcher.fetch(config) }.fold(
                 onSuccess = { card -> CardOutcome(card, null) },
                 onFailure = { failure -> CardOutcome(null, failureSummary(failure)) },
             )
         } ?: CardOutcome(null, null)
-        outcome.card?.let { card -> cardCache[config.id] = CachedCard(config, card) }
         return outcome
     }
 

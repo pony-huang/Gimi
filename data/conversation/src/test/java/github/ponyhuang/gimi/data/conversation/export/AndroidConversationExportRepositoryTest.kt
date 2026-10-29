@@ -14,6 +14,8 @@ import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FunctionCall
 import com.google.adk.kt.types.FunctionResponse
 import com.google.adk.kt.types.Part
+import github.ponyhuang.gimi.core.storage.StorageRegistry
+import github.ponyhuang.gimi.data.conversation.conversationExportDirectorySpec
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -52,10 +54,11 @@ class AndroidConversationExportRepositoryTest {
     private val output = ByteArrayOutputStream()
 
     private fun repository(): AndroidConversationExportRepository {
-        every { context.cacheDir } returns files.root
+        val storageRegistry = mockk<StorageRegistry>()
+        every { storageRegistry.resolve(conversationExportDirectorySpec.id, create = true) } returns files.root
         every { context.contentResolver } returns resolver
         every { resolver.openOutputStream(any(), "wt") } returns output
-        return AndroidConversationExportRepository(context, service)
+        return AndroidConversationExportRepository(context, service, storageRegistry)
     }
 
     private fun session(id: String, events: List<Event> = emptyList()) = Session(

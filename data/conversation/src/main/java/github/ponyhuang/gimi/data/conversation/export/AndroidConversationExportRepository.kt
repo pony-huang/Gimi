@@ -5,6 +5,8 @@ import android.net.Uri
 import com.google.adk.kt.sessions.SessionKey
 import com.google.adk.kt.sessions.SessionService
 import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.gimi.core.storage.StorageRegistry
+import github.ponyhuang.gimi.data.conversation.conversationExportDirectorySpec
 import github.ponyhuang.gimi.domain.conversation.export.ConversationExportRepository
 import github.ponyhuang.gimi.domain.conversation.export.ConversationExportRequest
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
@@ -29,6 +31,7 @@ import kotlinx.coroutines.withContext
 class AndroidConversationExportRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sessionService: SessionService,
+    private val storageRegistry: StorageRegistry,
 ) : ConversationExportRepository {
     override suspend fun prepare(sessionId: String?): ConversationExportRequest? = withContext(Dispatchers.IO) {
         val ids = if (sessionId != null) {
@@ -57,7 +60,11 @@ class AndroidConversationExportRepository @Inject constructor(
     override suspend fun export(request: ConversationExportRequest, destination: String): Unit =
         withContext(Dispatchers.IO) {
             require(request.sessionIds.isNotEmpty())
-            val staged = File.createTempFile("session-export-", ".tmp", context.cacheDir)
+            val staged = File.createTempFile(
+                "session-export-",
+                ".tmp",
+                storageRegistry.resolve(conversationExportDirectorySpec.id, create = true),
+            )
             try {
                 staged.outputStream().buffered().use { output -> writeArchive(request, output) }
                 currentCoroutineContext().ensureActive()

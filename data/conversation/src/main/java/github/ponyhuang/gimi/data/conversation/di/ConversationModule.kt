@@ -13,6 +13,7 @@ import github.ponyhuang.gimi.core.storage.ManagedDirectorySpec
 import github.ponyhuang.gimi.data.conversation.attachment.AndroidChatAttachmentRepository
 import github.ponyhuang.gimi.data.conversation.conversationAttachmentDirectorySpec
 import github.ponyhuang.gimi.data.conversation.conversationDraftDirectorySpec
+import github.ponyhuang.gimi.data.conversation.conversationExportDirectorySpec
 import github.ponyhuang.gimi.data.conversation.export.AndroidConversationExportRepository
 import github.ponyhuang.gimi.data.conversation.local.ConversationMetadataDatabase
 import github.ponyhuang.gimi.data.conversation.repository.AdkConversationRepository
@@ -49,6 +50,11 @@ object ConversationModule {
     @IntoSet
     fun provideConversationDraftDirectorySpec(): ManagedDirectorySpec =
         conversationDraftDirectorySpec
+
+    @Provides
+    @IntoSet
+    fun provideConversationExportDirectorySpec(): ManagedDirectorySpec =
+        conversationExportDirectorySpec
 
     @Provides
     @Singleton

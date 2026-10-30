@@ -15,8 +15,9 @@
     <string name="recommendation_status_updated">Last updated: %1$s</string>
     <string name="recommendation_status_error">Update failed: %1$s</string>
     <string name="recommendation_status_retrying">Update failed: %1$s. Retrying in %2$d s.</string>
-    <string name="recommendation_tools_section">Tools and permissions</string>
-    <string name="recommendation_toolauth_title">Tool authorization</string>
-    <string name="recommendation_toolauth_subtitle">Choose which local tools the assistant may use</string>
+    <string name="recommendation_tools_section">Tools</string>
     <string name="recommendation_close">Close</string>
+    <string name="recommendation_tool_loading_title">Tool loading</string>
+    <string name="recommendation_tool_loading_always">Load all tools for every turn</string>
+    <string name="recommendation_tool_loading_on_demand">Load tools on demand to save context</string>
 </resources>

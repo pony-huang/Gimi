@@ -14,6 +14,7 @@ android {
 dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":domain:recommendation"))
+    implementation(project(":domain:conversation"))
     implementation(project(":domain:modelcatalog"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.foundation)

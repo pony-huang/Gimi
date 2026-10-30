@@ -15,7 +15,6 @@ import github.ponyhuang.gimi.data.agent.tools.system.MediaTool
 import github.ponyhuang.gimi.data.agent.tools.system.PeopleTool
 import github.ponyhuang.gimi.data.agent.tools.system.ReadLocalFileTool
 import github.ponyhuang.gimi.data.agent.tools.system.SettingsTool
-import github.ponyhuang.gimi.data.agent.tools.system.WebTool
 import github.ponyhuang.gimi.data.agent.tools.system.generatedTools
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDefinition
 import github.ponyhuang.gimi.domain.toolauthorization.repository.LocalToolDefinitionSource
@@ -41,7 +40,6 @@ class LocalToolCatalog @Inject constructor(
     peopleTool: PeopleTool,
     readLocalFileTool: ReadLocalFileTool,
     settingsTool: SettingsTool,
-    webTool: WebTool,
 ) : LocalToolDefinitionSource {
 
     private val localTools: List<BaseTool> = buildList {
@@ -59,7 +57,6 @@ class LocalToolCatalog @Inject constructor(
         addAll(mediaTool.generatedTools())
         addAll(peopleTool.generatedTools())
         addAll(settingsTool.generatedTools())
-        addAll(webTool.generatedTools())
     }.also { tools ->
         // 向量命中后仍按工具 ID 解析执行实例，因此目录级 ID 必须唯一。
         val duplicateIds = tools

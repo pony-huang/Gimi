@@ -7,6 +7,7 @@ data class ToolDefinition(
     val description: String,
 )
 
+/** 本地工具的展示信息与可用状态，注册工具统一可用。 */
 data class ToolDescriptor(
     val id: String,
     val name: String,

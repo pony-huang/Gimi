@@ -20,7 +20,7 @@ import javax.inject.Singleton
 /**
  * 本地系统工具贡献方。
  *
- * - revision 跟随全局工具授权开关；
+ * - revision 标识完整本地目录的进程内版本；
  * - 副屏工具集在两种模式下均按 Shizuku 运行状态动态声明；
  * - ALWAYS_AVAILABLE 模式直接声明 [LocalToolset]（内部按请求过滤），ON_DEMAND 模式
  *   转为单个扁平检索候选源；

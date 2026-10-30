@@ -14,7 +14,6 @@ import github.ponyhuang.gimi.data.agent.tools.system.MediaTool
 import github.ponyhuang.gimi.data.agent.tools.system.PeopleTool
 import github.ponyhuang.gimi.data.agent.tools.system.ReadLocalFileTool
 import github.ponyhuang.gimi.data.agent.tools.system.SettingsTool
-import github.ponyhuang.gimi.data.agent.tools.system.WebTool
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -94,6 +93,5 @@ class LocalToolCatalogTest {
         // 真实实例：手写 FunctionTool 无 KSP 生成物，relaxed mock 的 name/确认门无法参与断言。
         readLocalFileTool = ReadLocalFileTool(mockk(relaxed = true), mockk(relaxed = true)),
         settingsTool = mockk<SettingsTool>(relaxed = true),
-        webTool = mockk<WebTool>(relaxed = true),
     )
 }

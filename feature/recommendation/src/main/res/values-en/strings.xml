@@ -18,8 +18,9 @@
     <string name="recommendation_conversation_section">Conversation UI</string>
     <string name="recommendation_a2ui_title">A2UI interactive cards</string>
     <string name="recommendation_a2ui_subtitle">Let the assistant show forms, controls, and structured results as native cards</string>
-    <string name="recommendation_tools_section">Tools and permissions</string>
-    <string name="recommendation_toolauth_title">Tool authorization</string>
-    <string name="recommendation_toolauth_subtitle">Choose which local tools the assistant may use</string>
+    <string name="recommendation_tools_section">Tools</string>
     <string name="recommendation_close">Close</string>
+    <string name="recommendation_tool_loading_title">Tool loading</string>
+    <string name="recommendation_tool_loading_always">Load all tools for every turn</string>
+    <string name="recommendation_tool_loading_on_demand">Load tools on demand to save context</string>
 </resources>

@@ -1,10 +1,12 @@
 package github.ponyhuang.gimi.feature.recommendation
 
+import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationRefreshStatus
 
 /**
  * 智能推荐设置页状态。
  *
+ * @property toolAccessMode 本地工具的加载方式。
  * @property enabled 是否开启推荐。
  * @property intervalHours 当前更新间隔。
  * @property intervals 可选的合法间隔。
@@ -16,6 +18,7 @@ import github.ponyhuang.gimi.domain.recommendation.model.RecommendationRefreshSt
  * @property a2uiEnabled 是否允许 Agent 生成原生 A2UI 交互卡片。
  */
 data class RecommendationSettingsUiState(
+    val toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
     val enabled: Boolean = true,
     val intervalHours: Int = 2,
     val intervals: List<Int> = listOf(1, 2, 6, 12, 24),
@@ -28,6 +31,8 @@ data class RecommendationSettingsUiState(
 )
 
 sealed interface RecommendationSettingsAction {
+    /** 修改本地工具加载方式。 */
+    data class SetToolAccessMode(val mode: ToolAccessMode) : RecommendationSettingsAction
     data class SetEnabled(val enabled: Boolean) : RecommendationSettingsAction
     data class SetIntervalHours(val intervalHours: Int) : RecommendationSettingsAction
     data class SetA2uiEnabled(val enabled: Boolean) : RecommendationSettingsAction

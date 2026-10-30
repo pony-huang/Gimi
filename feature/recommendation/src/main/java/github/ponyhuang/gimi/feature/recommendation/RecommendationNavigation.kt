@@ -16,13 +16,11 @@ sealed interface RecommendationDestination : NavKey {
 fun RecommendationEntryProvider(
     destination: NavKey,
     onBack: () -> Unit,
-    onOpenToolAuthorization: () -> Unit,
     onOpenFastModelSettings: () -> Unit,
 ): Boolean = when (destination) {
     RecommendationDestination.Settings -> {
         RecommendationSettingsRoute(
             onBack = onBack,
-            onOpenToolAuthorization = onOpenToolAuthorization,
             onOpenFastModelSettings = onOpenFastModelSettings,
         )
         true

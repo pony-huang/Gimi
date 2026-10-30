@@ -36,6 +36,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationRefreshStatus
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
@@ -54,7 +55,6 @@ import java.time.format.FormatStyle
 fun RecommendationSettingsScreen(
     state: RecommendationSettingsUiState,
     onAction: (RecommendationSettingsAction) -> Unit,
-    onOpenToolAuthorization: () -> Unit,
     onOpenFastModelSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -148,11 +148,24 @@ fun RecommendationSettingsScreen(
             item { PreferenceSectionTitle(stringResource(R.string.recommendation_tools_section)) }
             item {
                 PreferenceGroupCard {
-                    PreferenceListItem(
+                    PreferenceSwitchItem(
                         icon = Icons.Default.Rule,
-                        title = stringResource(R.string.recommendation_toolauth_title),
-                        subtitle = stringResource(R.string.recommendation_toolauth_subtitle),
-                        onClick = onOpenToolAuthorization,
+                        title = stringResource(R.string.recommendation_tool_loading_title),
+                        subtitle = stringResource(
+                            if (state.toolAccessMode == ToolAccessMode.ALWAYS_AVAILABLE) {
+                                R.string.recommendation_tool_loading_always
+                            } else {
+                                R.string.recommendation_tool_loading_on_demand
+                            },
+                        ),
+                        checked = state.toolAccessMode == ToolAccessMode.ALWAYS_AVAILABLE,
+                        onCheckedChange = { enabled ->
+                            onAction(
+                                RecommendationSettingsAction.SetToolAccessMode(
+                                    if (enabled) ToolAccessMode.ALWAYS_AVAILABLE else ToolAccessMode.ON_DEMAND,
+                                ),
+                            )
+                        },
                     )
                 }
             }
@@ -259,7 +272,6 @@ private fun RecommendationSettingsScreenEnabledPreview() {
                 refreshStatus = RecommendationRefreshStatus.Scheduled,
             ),
             onAction = {},
-            onOpenToolAuthorization = {},
             onOpenFastModelSettings = {},
         )
     }
@@ -279,7 +291,6 @@ private fun RecommendationSettingsScreenRetryPreview() {
                 retryDelaySeconds = 30,
             ),
             onAction = {},
-            onOpenToolAuthorization = {},
             onOpenFastModelSettings = {},
         )
     }
@@ -296,7 +307,6 @@ private fun RecommendationSettingsScreenDisabledPreview() {
                 lastError = "权限不足，无法读取使用记录",
             ),
             onAction = {},
-            onOpenToolAuthorization = {},
             onOpenFastModelSettings = {},
         )
     }
@@ -314,7 +324,6 @@ private fun RecommendationSettingsScreenFastModelMissingPreview() {
                 fastModelReady = false,
             ),
             onAction = {},
-            onOpenToolAuthorization = {},
             onOpenFastModelSettings = {},
         )
         FastModelRequiredDialog(
@@ -330,6 +339,7 @@ private fun RecommendationSettingsPagePreview(
     dark: Boolean,
     enabled: Boolean = true,
     error: Boolean = false,
+    toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
     a2uiEnabled: Boolean = true,
 ) {
     AsssistantaiTheme(darkTheme = dark) {
@@ -340,6 +350,7 @@ private fun RecommendationSettingsPagePreview(
             RecommendationSettingsScreen(
                 state = RecommendationSettingsUiState(
                     enabled = enabled,
+                    toolAccessMode = toolAccessMode,
                     intervalHours = 2,
                     refreshStatus = if (error) {
                         RecommendationRefreshStatus.Refreshing
@@ -351,7 +362,6 @@ private fun RecommendationSettingsPagePreview(
                     a2uiEnabled = a2uiEnabled,
                 ),
                 onAction = {},
-                onOpenToolAuthorization = {},
                 onOpenFastModelSettings = {},
                 modifier = modifier,
             )
@@ -397,8 +407,20 @@ fun RecommendationSettingsPageErrorDarkPreview() {
 
 @Preview(showBackground = true)
 @Composable
+fun RecommendationSettingsPageOnDemandLightPreview() {
+    RecommendationSettingsPagePreview(false, toolAccessMode = ToolAccessMode.ON_DEMAND)
+}
+
+@Preview(showBackground = true)
+@Composable
 fun RecommendationSettingsPageA2uiDisabledLightPreview() {
     RecommendationSettingsPagePreview(false, a2uiEnabled = false)
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RecommendationSettingsPageOnDemandDarkPreview() {
+    RecommendationSettingsPagePreview(true, toolAccessMode = ToolAccessMode.ON_DEMAND)
 }
 
 @Preview(showBackground = true)

@@ -63,8 +63,6 @@ import github.ponyhuang.gimi.feature.settings.SettingsEntryProvider
 import github.ponyhuang.gimi.feature.settings.SettingsNavigationCallbacks
 import github.ponyhuang.gimi.feature.skills.SkillsDestination
 import github.ponyhuang.gimi.feature.skills.SkillsEntryProvider
-import github.ponyhuang.gimi.feature.toolauthorization.ToolAuthorizationDestination
-import github.ponyhuang.gimi.feature.toolauthorization.ToolAuthorizationEntryProvider
 import github.ponyhuang.gimi.feature.workspace.WorkspaceDestination
 import github.ponyhuang.gimi.feature.workspace.WorkspaceEntryProvider
 import github.ponyhuang.gimi.voice.AssistantPanelInteractor
@@ -191,14 +189,10 @@ fun MainScreen(
                     A2aEntryProvider(destination, goBack, navigate) ||
                     AppFunctionEntryProvider(destination, goBack, navigate) ||
                     PluginEntryProvider(destination, goBack, navigate) ||
-                    ToolAuthorizationEntryProvider(destination, goBack, navigate) ||
                     MobileUseEntryProvider(destination, goBack) ||
                     RecommendationEntryProvider(
                         destination = destination,
                         onBack = goBack,
-                        onOpenToolAuthorization = {
-                            navigate(ToolAuthorizationDestination.Settings)
-                        },
                         onOpenFastModelSettings = { navigate(ModelSettingsDestination.Defaults) },
                     ) ||
                     MemoryEntryProvider(destination, goBack, navigate) ||

@@ -139,7 +139,6 @@ dependencies {
     implementation(project(":feature:a2a"))
     implementation(project(":feature:appfunction"))
     implementation(project(":feature:permissions"))
-    implementation(project(":feature:toolauthorization"))
     implementation(project(":feature:settings"))
     implementation(project(":feature:plugin"))
     implementation(project(":feature:skills"))

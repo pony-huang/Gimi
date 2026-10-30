@@ -18,8 +18,9 @@
     <string name="recommendation_conversation_section">对话界面</string>
     <string name="recommendation_a2ui_title">A2UI 交互卡片</string>
     <string name="recommendation_a2ui_subtitle">允许助手用原生卡片展示表单、控件和结构化结果</string>
-    <string name="recommendation_tools_section">工具与权限</string>
-    <string name="recommendation_toolauth_title">工具授权</string>
-    <string name="recommendation_toolauth_subtitle">选择允许助手使用的本地工具</string>
+    <string name="recommendation_tools_section">工具</string>
     <string name="recommendation_close">关闭</string>
+    <string name="recommendation_tool_loading_title">工具加载</string>
+    <string name="recommendation_tool_loading_always">全量加载，随轮就绪</string>
+    <string name="recommendation_tool_loading_on_demand">按需加载，节省上下文</string>
 </resources>

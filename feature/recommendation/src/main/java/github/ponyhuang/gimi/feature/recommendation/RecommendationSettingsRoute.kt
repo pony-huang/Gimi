@@ -12,7 +12,6 @@ import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 @Composable
 fun RecommendationSettingsRoute(
     onBack: () -> Unit,
-    onOpenToolAuthorization: () -> Unit,
     onOpenFastModelSettings: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: RecommendationSettingsViewModel = hiltViewModel(),
@@ -26,7 +25,6 @@ fun RecommendationSettingsRoute(
         RecommendationSettingsScreen(
             state = state,
             onAction = viewModel::onAction,
-            onOpenToolAuthorization = onOpenToolAuthorization,
             onOpenFastModelSettings = onOpenFastModelSettings,
             modifier = scaffoldModifier,
         )

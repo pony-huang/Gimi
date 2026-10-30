@@ -6,6 +6,8 @@
 
 **An Android AI assistant with your own API keys, phone tools, and extensible agents.**
 
+Built as a fully native Android app with Jetpack Compose.
+
 [![CI](https://github.com/pony-huang/Gimi/actions/workflows/ci.yml/badge.svg)](https://github.com/pony-huang/Gimi/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/pony-huang/Gimi)](https://github.com/pony-huang/Gimi/releases/latest)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)

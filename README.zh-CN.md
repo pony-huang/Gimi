@@ -6,6 +6,8 @@
 
 **使用自己的 API Key，在 Android 上对话、调用手机工具并扩展 Agent 能力。**
 
+使用 Jetpack Compose 构建的纯原生 Android 应用。
+
 [![CI](https://github.com/pony-huang/Gimi/actions/workflows/ci.yml/badge.svg)](https://github.com/pony-huang/Gimi/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/pony-huang/Gimi)](https://github.com/pony-huang/Gimi/releases/latest)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)

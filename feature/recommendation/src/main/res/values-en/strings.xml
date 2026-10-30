@@ -15,6 +15,9 @@
     <string name="recommendation_status_updated">Last updated: %1$s</string>
     <string name="recommendation_status_error">Update failed: %1$s</string>
     <string name="recommendation_status_retrying">Update failed: %1$s. Retrying in %2$d s.</string>
+    <string name="recommendation_conversation_section">Conversation UI</string>
+    <string name="recommendation_a2ui_title">A2UI interactive cards</string>
+    <string name="recommendation_a2ui_subtitle">Let the assistant show forms, controls, and structured results as native cards</string>
     <string name="recommendation_tools_section">Tools and permissions</string>
     <string name="recommendation_toolauth_title">Tool authorization</string>
     <string name="recommendation_toolauth_subtitle">Choose which local tools the assistant may use</string>

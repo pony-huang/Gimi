@@ -30,8 +30,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationRefreshStatus
@@ -58,6 +60,7 @@ fun RecommendationSettingsScreen(
 ) {
     var showIntervalDialog by remember { mutableStateOf(false) }
     var showFastModelDialog by remember { mutableStateOf(false) }
+    val a2uiLogo = ImageVector.vectorResource(R.drawable.ic_a2ui_logo)
     PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -126,6 +129,20 @@ fun RecommendationSettingsScreen(
                             }
                         }
                     }
+                }
+            }
+            item { PreferenceSectionTitle(stringResource(R.string.recommendation_conversation_section)) }
+            item {
+                PreferenceGroupCard {
+                    PreferenceSwitchItem(
+                        icon = a2uiLogo,
+                        title = stringResource(R.string.recommendation_a2ui_title),
+                        subtitle = stringResource(R.string.recommendation_a2ui_subtitle),
+                        checked = state.a2uiEnabled,
+                        onCheckedChange = { checked ->
+                            onAction(RecommendationSettingsAction.SetA2uiEnabled(checked))
+                        },
+                    )
                 }
             }
             item { PreferenceSectionTitle(stringResource(R.string.recommendation_tools_section)) }
@@ -313,6 +330,7 @@ private fun RecommendationSettingsPagePreview(
     dark: Boolean,
     enabled: Boolean = true,
     error: Boolean = false,
+    a2uiEnabled: Boolean = true,
 ) {
     AsssistantaiTheme(darkTheme = dark) {
         PreferenceScaffold(
@@ -330,6 +348,7 @@ private fun RecommendationSettingsPagePreview(
                     },
                     lastError = if (error) "网络暂时不可用，请稍后重试" else null,
                     retryDelaySeconds = if (error) 30 else null,
+                    a2uiEnabled = a2uiEnabled,
                 ),
                 onAction = {},
                 onOpenToolAuthorization = {},
@@ -374,4 +393,16 @@ fun RecommendationSettingsPageErrorLightPreview() {
 @Composable
 fun RecommendationSettingsPageErrorDarkPreview() {
     RecommendationSettingsPagePreview(true, error = true)
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RecommendationSettingsPageA2uiDisabledLightPreview() {
+    RecommendationSettingsPagePreview(false, a2uiEnabled = false)
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RecommendationSettingsPageA2uiDisabledDarkPreview() {
+    RecommendationSettingsPagePreview(true, a2uiEnabled = false)
 }

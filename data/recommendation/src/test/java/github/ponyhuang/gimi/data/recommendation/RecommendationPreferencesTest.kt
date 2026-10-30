@@ -10,6 +10,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RecommendationPreferencesTest {
@@ -26,6 +27,19 @@ class RecommendationPreferencesTest {
         val restored = repository(preferences, scheduler).state.value
         assertEquals(6, restored.settings.intervalHours)
         assertEquals(snapshot, restored.snapshot)
+    }
+
+    @Test
+    fun a2uiSettingDefaultsToEnabledAndPersistsChanges() {
+        val preferences = FakePreferences()
+        val scheduler = mockk<RecommendationWorkScheduler>(relaxed = true)
+        val repository = repository(preferences, scheduler)
+
+        assertTrue(repository.state.value.settings.a2uiEnabled)
+
+        repository.setA2uiEnabled(false)
+
+        assertFalse(repository(preferences, scheduler).state.value.settings.a2uiEnabled)
     }
 
     @Test

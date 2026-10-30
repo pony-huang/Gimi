@@ -8,20 +8,33 @@ import github.ponyhuang.gimi.data.agent.AgentBuildSpec
 import github.ponyhuang.gimi.data.agent.AgentContribution
 import github.ponyhuang.gimi.data.agent.AgentLLMModelFactory
 import github.ponyhuang.gimi.domain.a2ui.*
+import github.ponyhuang.gimi.domain.recommendation.repository.RecommendationRepository
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.serialization.json.*
 
-/** UI 能力在两种工具模式下均可直接访问；不加入推荐生成的业务工具目录。 */
+/**
+ * UI 能力在两种工具模式下均可直接访问；不加入推荐生成的业务工具目录。
+ *
+ * 开关取自「个性化服务」设置：关闭时不声明 [GenerateA2uiTool]，模型既看不到工具声明
+ * 也收不到 A2UI 指令；同时开关进入 revision，使已缓存的运行时在下次发送时重建。
+ */
 class A2uiToolContribution @Inject constructor(
     private val models: AgentLLMModelFactory,
     private val protocol: A2uiProtocol,
+    private val settings: RecommendationRepository,
 ) : AgentContribution {
     override val id = "a2ui"
-    override fun revision(): Any? = null
-    override fun tools(spec: AgentBuildSpec): List<BaseTool> = listOf(
-        GenerateA2uiTool(A2uiGeneration(models.createModel(models.selectModelConfig(spec.selection)), protocol), protocol),
-    )
+    override fun revision(): Any? = a2uiEnabled()
+    override fun tools(spec: AgentBuildSpec): List<BaseTool> = if (a2uiEnabled()) {
+        listOf(
+            GenerateA2uiTool(A2uiGeneration(models.createModel(models.selectModelConfig(spec.selection)), protocol), protocol),
+        )
+    } else {
+        emptyList()
+    }
+
+    private fun a2uiEnabled(): Boolean = settings.state.value.settings.a2uiEnabled
 }
 
 /** ADK 专用适配，运行数据仅从当前 invocation 获取，缓存实例不持有会话可变状态。 */

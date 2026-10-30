@@ -13,6 +13,7 @@ interface RecommendationRepository {
 
     fun setEnabled(enabled: Boolean)
     fun setIntervalHours(intervalHours: Int)
+    fun setA2uiEnabled(enabled: Boolean)
     fun requestRefresh()
 }
 

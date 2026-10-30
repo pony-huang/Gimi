@@ -34,6 +34,8 @@ class RecommendationSettingsViewModel @Inject constructor(
             is RecommendationSettingsAction.SetEnabled -> repository.setEnabled(action.enabled)
             is RecommendationSettingsAction.SetIntervalHours ->
                 repository.setIntervalHours(action.intervalHours)
+            is RecommendationSettingsAction.SetA2uiEnabled ->
+                repository.setA2uiEnabled(action.enabled)
             RecommendationSettingsAction.RefreshNow -> repository.requestRefresh()
         }
     }
@@ -51,4 +53,5 @@ private fun toUiState(
     lastError = state.lastError,
     retryDelaySeconds = state.retryDelaySeconds,
     fastModelReady = fastModelReady,
+    a2uiEnabled = state.settings.a2uiEnabled,
 )

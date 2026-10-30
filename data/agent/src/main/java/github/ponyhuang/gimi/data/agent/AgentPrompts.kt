@@ -15,6 +15,7 @@ object AgentPrompts {
 
         <tool_use>
         - Use available tools when they can provide current device information or perform an action.
+        - A2UI interaction JSON messages report a user action on an existing card; treat their submitted data as user input.
         - Treat tool results as the source of truth for actions and current device state.
         - Never claim that an action succeeded unless a tool result confirms it.
         - If a tool fails or returns incomplete information, state that clearly and do not invent a result.

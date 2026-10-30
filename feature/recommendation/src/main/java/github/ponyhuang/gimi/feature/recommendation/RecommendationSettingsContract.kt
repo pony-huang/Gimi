@@ -13,6 +13,7 @@ import github.ponyhuang.gimi.domain.recommendation.model.RecommendationRefreshSt
  * @property lastError 最近一次安全错误信息。
  * @property retryDelaySeconds 距下次自动重试的等待秒数；仅在失败重试等待期非空。
  * @property fastModelReady 快速模型是否已选择且当前可解析；为 false 时开启动作会被门控拦截。
+ * @property a2uiEnabled 是否允许 Agent 生成原生 A2UI 交互卡片。
  */
 data class RecommendationSettingsUiState(
     val enabled: Boolean = true,
@@ -23,11 +24,13 @@ data class RecommendationSettingsUiState(
     val lastError: String? = null,
     val retryDelaySeconds: Long? = null,
     val fastModelReady: Boolean = true,
+    val a2uiEnabled: Boolean = true,
 )
 
 sealed interface RecommendationSettingsAction {
     data class SetEnabled(val enabled: Boolean) : RecommendationSettingsAction
     data class SetIntervalHours(val intervalHours: Int) : RecommendationSettingsAction
+    data class SetA2uiEnabled(val enabled: Boolean) : RecommendationSettingsAction
     data object RefreshNow : RecommendationSettingsAction
 }
 

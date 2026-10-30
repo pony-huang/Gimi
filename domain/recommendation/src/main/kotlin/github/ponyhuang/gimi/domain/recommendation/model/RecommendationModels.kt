@@ -50,14 +50,16 @@ data class RecommendationSnapshot(
 }
 
 /**
- * 全局推荐更新设置。
+ * 个性化服务设置。
  *
  * @property enabled 是否展示并安排更新推荐。
  * @property intervalHours WorkManager 周期的大致小时数。
+ * @property a2uiEnabled 是否允许 Agent 生成原生 A2UI 交互卡片；关闭后不再向模型暴露该能力。
  */
 data class RecommendationSettings(
     val enabled: Boolean = true,
     val intervalHours: Int = DEFAULT_INTERVAL_HOURS,
+    val a2uiEnabled: Boolean = true,
 ) {
     init {
         require(intervalHours in SUPPORTED_INTERVAL_HOURS) { "Unsupported recommendation interval: $intervalHours" }

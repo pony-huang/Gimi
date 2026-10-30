@@ -67,6 +67,14 @@ class RecommendationPreferences @Inject constructor(
         if (updated.enabled) scheduler.schedulePeriodic(updated.intervalHours)
     }
 
+    override fun setA2uiEnabled(enabled: Boolean) {
+        val settings = mutableState.value.settings
+        if (settings.a2uiEnabled == enabled) return
+        val updated = settings.copy(a2uiEnabled = enabled)
+        persistSettings(updated)
+        mutableState.update { current -> current.copy(settings = updated) }
+    }
+
     override fun requestRefresh() {
         if (!mutableState.value.settings.enabled) return
         mutableState.update {
@@ -135,6 +143,7 @@ class RecommendationPreferences @Inject constructor(
         preferences.edit {
             putBoolean(ENABLED_KEY, settings.enabled)
             putInt(INTERVAL_HOURS_KEY, settings.intervalHours)
+            putBoolean(A2UI_ENABLED_KEY, settings.a2uiEnabled)
         }
     }
 
@@ -148,6 +157,7 @@ class RecommendationPreferences @Inject constructor(
         val settings = RecommendationSettings(
             enabled = preferences.getBoolean(ENABLED_KEY, true),
             intervalHours = interval,
+            a2uiEnabled = preferences.getBoolean(A2UI_ENABLED_KEY, true),
         )
         val snapshot = preferences.getString(SNAPSHOT_KEY, null)
             ?.let(::decodeSnapshot)
@@ -202,6 +212,7 @@ class RecommendationPreferences @Inject constructor(
         const val PREFERENCES_NAME = "agent_recommendations"
         const val ENABLED_KEY = "enabled"
         const val INTERVAL_HOURS_KEY = "interval_hours"
+        const val A2UI_ENABLED_KEY = "a2ui_enabled"
         const val SNAPSHOT_KEY = "snapshot_json"
     }
 }

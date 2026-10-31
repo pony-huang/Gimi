@@ -42,6 +42,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
+import github.ponyhuang.gimi.ui.preference.PreferenceSectionNote
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceSwitchItem
@@ -132,6 +133,7 @@ fun RecommendationSettingsScreen(
                 }
             }
             item { PreferenceSectionTitle(stringResource(R.string.recommendation_conversation_section)) }
+            item { PreferenceSectionNote(stringResource(R.string.recommendation_a2ui_note)) }
             item {
                 PreferenceGroupCard {
                     PreferenceSwitchItem(
@@ -146,6 +148,7 @@ fun RecommendationSettingsScreen(
                 }
             }
             item { PreferenceSectionTitle(stringResource(R.string.recommendation_tools_section)) }
+            item { PreferenceSectionNote(stringResource(R.string.recommendation_tool_loading_note)) }
             item {
                 PreferenceGroupCard {
                     PreferenceSwitchItem(

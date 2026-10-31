@@ -314,4 +314,7 @@
     <string name="chat_a2ui_generating">Generating card…</string>
     <string name="chat_a2ui_cancelled">Card generation cancelled</string>
     <string name="chat_a2ui_retry">Retry</string>
+    <string name="chat_thinking_mode">Thinking mode</string>
+    <string name="chat_thinking_enabled">On</string>
+    <string name="chat_thinking_disabled">Off</string>
 </resources>

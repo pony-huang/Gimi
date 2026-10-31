@@ -15,6 +15,7 @@ import github.ponyhuang.gimi.pluginapi.AgentPlugin
  *
  * @property selection 显式模型选择；为 null 时按"聊天页当前选择 → 默认模型"解析。
  * @property toolAccessMode 工具声明加载模式，决定直接声明与 `tool_search` 检索的分界。
+ * @property thinkingEnabled 是否开启模型思考。
  * @property reasoningEffort 当前会话的推理强度，映射为 ADK ThinkingLevel。
  * @property pluginRuntime 与本次构建绑定的插件运行时快照；由缓存查找时点统一捕获，
  *   保证插件 revision（缓存键组成部分）与实际装配的插件一致。
@@ -24,4 +25,5 @@ data class AgentBuildSpec(
     val toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
     val reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM,
     val pluginRuntime: PluginRuntimeSnapshot<AgentPlugin>,
+    val thinkingEnabled: Boolean = true,
 )

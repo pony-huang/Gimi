@@ -76,6 +76,19 @@ class AgentFactoryToolAccessTest {
     }
 
     @Test
+    fun disablingThinkingOverridesTheRetainedEffort() = runTest {
+        val agent = fixture().create(
+            reasoningEffort = ReasoningEffort.HIGH,
+            thinkingEnabled = false,
+        ).agent as LlmAgent
+
+        val config = agent.generateContentConfig?.thinkingConfig
+        assertEquals(false, config?.includeThoughts)
+        assertEquals(0, config?.thinkingBudget)
+        assertEquals(null, config?.thinkingLevel)
+    }
+
+    @Test
     fun alwaysAvailableAttachesOfficialToolsetDirectlyWithoutSearchGateway() = runTest {
         val fixture = fixture()
 
@@ -275,10 +288,12 @@ class AgentFactoryToolAccessTest {
         suspend fun create(
             toolAccessMode: ToolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE,
             reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM,
+            thinkingEnabled: Boolean = true,
         ): AgentRuntime = agentFactory.create(
             AgentBuildSpec(
                 toolAccessMode = toolAccessMode,
                 reasoningEffort = reasoningEffort,
+                thinkingEnabled = thinkingEnabled,
                 pluginRuntime = pluginRuntime,
             ),
         )

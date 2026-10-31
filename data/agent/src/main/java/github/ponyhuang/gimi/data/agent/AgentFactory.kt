@@ -85,7 +85,11 @@ class AgentFactory @Inject constructor(
         name = "Assistant",
         model = model,
         generateContentConfig = GenerateContentConfig(
-            thinkingConfig = ThinkingConfig(thinkingLevel = spec.reasoningEffort.toAdkThinkingLevel()),
+            thinkingConfig = if (spec.thinkingEnabled) {
+                ThinkingConfig(thinkingLevel = spec.reasoningEffort.toAdkThinkingLevel())
+            } else {
+                ThinkingConfig(includeThoughts = false, thinkingBudget = 0)
+            },
         ),
         instruction = Instruction(AgentPrompts.defaultAssistantInstruction()),
         tools = contributions.tools(spec),

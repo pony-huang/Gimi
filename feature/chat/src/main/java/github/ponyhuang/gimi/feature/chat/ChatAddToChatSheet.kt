@@ -107,6 +107,7 @@ internal fun ChatAddToChatSheet(
     imagesEnabled: Boolean,
     filesEnabled: Boolean,
     onReasoningEffortChange: (ReasoningEffort) -> Unit,
+    onThinkingEnabledChange: (Boolean) -> Unit = {},
     onMcpServerEnabledChange: (String, Boolean) -> Unit,
     onFullAccessChange: (Boolean) -> Unit,
     onOfficialToolOpened: (String) -> Unit,
@@ -219,6 +220,7 @@ internal fun ChatAddToChatSheet(
                                 AddToChatPage.REASONING_EFFORT -> ReasoningEffortPage(
                                     state = state,
                                     onEffortChange = onReasoningEffortChange,
+                                    onThinkingEnabledChange = onThinkingEnabledChange,
                                 )
                                 AddToChatPage.MCP -> McpServersPage(
                                     state = state,
@@ -314,9 +316,11 @@ private fun AddToChatHome(
                 NavigationRow(
                     icon = Icons.Default.Psychology,
                     title = stringResource(R.string.chat_reasoning_effort_title),
-                    subtitle = reasoningEffortLabel(
-                        state.configuration?.reasoningEffort ?: ReasoningEffort.MEDIUM,
-                    ),
+                    subtitle = if (state.configuration?.thinkingEnabled == false) {
+                        stringResource(R.string.chat_thinking_disabled)
+                    } else {
+                        reasoningEffortLabel(state.configuration?.reasoningEffort ?: ReasoningEffort.MEDIUM)
+                    },
                     onClick = onOpenReasoningEffort,
                     testTag = "reasoning-effort-nav",
                 )
@@ -473,6 +477,7 @@ private fun permissionModeLabel(fullAccess: Boolean): String = stringResource(
 private fun ReasoningEffortPage(
     state: ChatAddToChatState,
     onEffortChange: (ReasoningEffort) -> Unit,
+    onThinkingEnabledChange: (Boolean) -> Unit = {},
 ) {
     Column(Modifier.wrapContentHeight().testTag("reasoning-effort-page")) {
         PageStatus(state)
@@ -486,11 +491,26 @@ private fun ReasoningEffortPage(
             modifier = Modifier.wrapContentHeight(),
             contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
         ) {
+            item {
+                GroupedListItem(first = true, last = true, withIcon = false) {
+                    GimiBottomSheetSwitchRow(
+                        label = stringResource(R.string.chat_thinking_mode),
+                        description = stringResource(
+                            if (state.configuration?.thinkingEnabled != false) R.string.chat_thinking_enabled
+                            else R.string.chat_thinking_disabled,
+                        ),
+                        checked = state.configuration?.thinkingEnabled != false,
+                        enabled = state.configuration != null && !state.isMutationBlocked,
+                        onCheckedChange = onThinkingEnabledChange,
+                    )
+                }
+            }
+            item { Box(Modifier.height(16.dp)) }
             itemsIndexed(ReasoningEffort.entries, key = { _, effort -> effort.name }) { index, effort ->
                 GroupedListItem(first = index == 0, last = index == ReasoningEffort.entries.lastIndex, withIcon = false) {
                     GimiBottomSheetOptionRow(
                         selected = state.configuration?.reasoningEffort == effort,
-                        enabled = state.configuration != null && !state.isMutationBlocked,
+                        enabled = state.configuration != null && !state.isMutationBlocked && state.configuration.thinkingEnabled,
                         onClick = { onEffortChange(effort) },
                         label = reasoningEffortLabel(effort),
                         description = reasoningEffortDescription(effort),
@@ -1282,6 +1302,18 @@ private fun DeepSeekOfficialToolsPreview() {
             ),
             onFunctionEnabledChange = { _, _, _ -> },
             onRetry = {},
+        )
+    }
+}
+
+@Preview(name = "思考已关闭·浅色", showBackground = true, widthDp = 390, locale = "zh")
+@Preview(name = "思考已关闭·深色", showBackground = true, widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun ChatThinkingDisabledPreview() {
+    ChatSheetPreviewTheme {
+        ReasoningEffortPage(
+            state = previewAddToChatState(configuration = ConversationToolConfiguration(thinkingEnabled = false)),
+            onEffortChange = {},
         )
     }
 }

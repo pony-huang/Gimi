@@ -66,6 +66,7 @@ class AgentChatRunner(
      *
      * @property selection 构建 Agent 时使用的显式模型选择（模型名称）。
      * @property toolAccessMode 工具声明加载模式。
+     * @property thinkingEnabled 是否开启思考，防止复用开关状态不同的 Agent。
      * @property reasoningEffort 当前会话的推理强度。
      * @property revision 构建时的外部配置版本（各贡献方 revision 的组合，
      *   含工具授权/MCP/模型目录/插件运行时）。
@@ -74,6 +75,7 @@ class AgentChatRunner(
         val selection: ModelSelection?,
         val toolAccessMode: ToolAccessMode,
         val reasoningEffort: ReasoningEffort,
+        val thinkingEnabled: Boolean,
         val revision: Any,
     )
 
@@ -119,14 +121,16 @@ class AgentChatRunner(
     ): AgentChatExecution {
         val toolAccessMode = toolAccessRepository.defaultToolAccessMode.value
         val reasoningEffort = toolConfiguration?.reasoningEffort ?: ReasoningEffort.MEDIUM
+        val thinkingEnabled = toolConfiguration?.thinkingEnabled ?: true
         val buildConfiguration = configuration()
-        val key = AgentKey(selection, toolAccessMode, reasoningEffort, buildConfiguration.revision)
+        val key = AgentKey(selection, toolAccessMode, reasoningEffort, thinkingEnabled, buildConfiguration.revision)
         return runnerMutex.withLock {
             val runtime = runtimes[key] ?: factory(
                 AgentBuildSpec(
                     selection = selection,
                     toolAccessMode = toolAccessMode,
                     reasoningEffort = reasoningEffort,
+                    thinkingEnabled = thinkingEnabled,
                     pluginRuntime = buildConfiguration.pluginRuntime,
                 ),
             ).let { agentRuntime ->

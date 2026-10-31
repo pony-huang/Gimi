@@ -222,6 +222,9 @@ fun ChatRoute(
             onNewConversation = {
                 viewModel.onAction(ChatAction.NewConversation)
             },
+            onThinkingEnabledChange = { enabled ->
+                viewModel.onAction(ChatAction.SetThinkingEnabled(enabled))
+            },
             onReasoningEffortChange = { effort ->
                 viewModel.onAction(ChatAction.SetReasoningEffort(effort))
             },

@@ -223,6 +223,7 @@ class ChatViewModel @Inject constructor(
                 }
             }
             is ChatAction.SelectModel -> selectModel(action.selection)
+            is ChatAction.SetThinkingEnabled -> toolConfigurationCoordinator.setThinkingEnabled(action.enabled)
             is ChatAction.SetReasoningEffort -> toolConfigurationCoordinator.setReasoningEffort(action.effort)
             is ChatAction.SetMcpServerEnabled ->
                 toolConfigurationCoordinator.setMcpServerEnabled(action.serverId, action.enabled)

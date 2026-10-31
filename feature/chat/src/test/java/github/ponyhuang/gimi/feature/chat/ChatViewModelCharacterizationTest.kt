@@ -1477,6 +1477,31 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun thinkingSwitchPreservesSelectedEffortAcrossDisableAndEnable() = runTest {
+        val fixture = fixture(configured = true)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        fixture.viewModel.onAction(ChatAction.SetReasoningEffort(
+            github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort.HIGH,
+        ))
+        advanceUntilIdle()
+        fixture.viewModel.onAction(ChatAction.SetThinkingEnabled(false))
+        advanceUntilIdle()
+        assertEquals(false, fixture.viewModel.uiState.value.toolConfiguration?.thinkingEnabled)
+        assertEquals(
+            github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort.HIGH,
+            fixture.viewModel.uiState.value.toolConfiguration?.reasoningEffort,
+        )
+        fixture.viewModel.onAction(ChatAction.SetThinkingEnabled(true))
+        advanceUntilIdle()
+        assertEquals(true, fixture.viewModel.uiState.value.toolConfiguration?.thinkingEnabled)
+        assertEquals(
+            github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort.HIGH,
+            fixture.viewModel.uiState.value.toolConfiguration?.reasoningEffort,
+        )
+    }
+
+    @Test
     fun officialFunctionsExpandTheMarkerAndReuseLoadedDescriptors() = runTest {
         val catalog = toolFunctionCatalog()
         val fixture = fixture(configured = true, officialCatalogOverride = catalog)

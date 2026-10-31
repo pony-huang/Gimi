@@ -94,6 +94,25 @@ class AgentChatRunnerCacheTest {
     }
 
     @Test
+    fun thinkingSwitchUsesSeparateRuntimeAndReusesOriginalWhenRestored() = runTest {
+        val builtSpecs = mutableListOf<AgentBuildSpec>()
+        val runner = AgentChatRunner(
+            factory = { spec -> builtSpecs += spec; runtime(spec.selection) },
+            sessionService = mockk<SessionService>(relaxed = true),
+            artifactService = null,
+            memoryService = InMemoryMemoryService(),
+            toolAccessRepository = FakeToolAccessRepository(),
+        )
+        val enabled = ConversationToolConfiguration()
+        runner.createExecution("user", "session", toolConfiguration = enabled)
+        runner.createExecution("user", "session", toolConfiguration = enabled.copy(thinkingEnabled = false))
+        runner.createExecution("user", "session", toolConfiguration = enabled)
+
+        assertEquals(listOf(true, false), builtSpecs.map { it.thinkingEnabled })
+        assertEquals(enabled.reasoningEffort, builtSpecs.last().reasoningEffort)
+    }
+
+    @Test
     fun retryResumesSdkInvocationWithoutAppendingAnotherUserMessage() = runTest {
         verifySdkRetry(failureMode = "exception")
     }

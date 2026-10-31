@@ -324,4 +324,7 @@
     <string name="chat_a2ui_generating">正在生成卡片…</string>
     <string name="chat_a2ui_cancelled">卡片生成已取消</string>
     <string name="chat_a2ui_retry">重试</string>
+    <string name="chat_thinking_mode">思考模式</string>
+    <string name="chat_thinking_enabled">已开启</string>
+    <string name="chat_thinking_disabled">已关闭</string>
 </resources>

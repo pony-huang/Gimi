@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.data.conversation.local
 
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -10,6 +11,8 @@ class ConversationToolConfigurationCodecTest {
     @Test
     fun roundTripPreservesEverySessionSetting() {
         val configuration = ConversationToolConfiguration(
+            thinkingEnabled = false,
+            reasoningEffort = ReasoningEffort.HIGH,
             enabledMcpServerIds = setOf("server-1"),
             pendingMcpCredentialServerId = "server-1",
             enabledOfficialFunctionIds = mapOf(

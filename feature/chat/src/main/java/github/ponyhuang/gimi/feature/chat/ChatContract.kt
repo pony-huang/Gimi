@@ -76,6 +76,9 @@ sealed interface ChatAction {
     /** 为当前会话选择聊天模型。 */
     data class SelectModel(val selection: ModelSelection) : ChatAction
 
+    /** 开关当前会话的思考模式；关闭时保留原有推理强度。 */
+    data class SetThinkingEnabled(val enabled: Boolean) : ChatAction
+
     /** 设置当前会话发给模型的推理强度。 */
     data class SetReasoningEffort(val effort: ReasoningEffort) : ChatAction
 

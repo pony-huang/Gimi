@@ -41,7 +41,8 @@ enum class ReasoningEffort {
  * @property enabledMcpServerIds 当前会话选择的 MCP server ID。
  * @property pendingMcpCredentialServerId 当前会话最近一次等待补充认证凭据的 MCP server ID。
  * @property enabledOfficialFunctionIds 按官方工具(厂商唯一 ID)分组的函数选择。
- * @property reasoningEffort 当前会话请求模型时采用的推理强度。
+ * @property reasoningEffort 当前会话请求模型时采用的推理强度，关闭后仍保留以便恢复。
+ * @property thinkingEnabled 是否向模型开启思考。
  */
 @Serializable
 data class ConversationToolConfiguration(
@@ -49,6 +50,7 @@ data class ConversationToolConfiguration(
     val pendingMcpCredentialServerId: String? = null,
     val enabledOfficialFunctionIds: Map<String, Set<String>> = emptyMap(),
     val reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM,
+    val thinkingEnabled: Boolean = true,
 ) {
     fun enabledOfficialFunctionIds(toolId: String): Set<String> =
         enabledOfficialFunctionIds[toolId].orEmpty()

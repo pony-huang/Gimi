@@ -10,7 +10,6 @@ import com.google.adk.kt.types.Role
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.serialization.adkJson
 import github.ponyhuang.gimi.data.agent.tools.modelRuntimeMetadataOrNull
-import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 
 internal const val INLINE_DEFINITIONS = "selkie.inline_tool_definitions"
 internal fun inlinePendingKey(agentName: String): String = "selkie.inline_tools.pending:$agentName"
@@ -24,7 +23,7 @@ internal object InlineToolSearchEvents {
         request: LlmRequest,
         available: List<FunctionDeclaration>,
     ): LlmRequest {
-        if (context.modelRuntimeMetadataOrNull()?.baseType != ApiProtocol.Anthropic) {
+        if (toolLoadingMode(context.modelRuntimeMetadataOrNull()) == ToolLoadingMode.RESULT) {
             return request
         }
         val invocation = context.invocationContext

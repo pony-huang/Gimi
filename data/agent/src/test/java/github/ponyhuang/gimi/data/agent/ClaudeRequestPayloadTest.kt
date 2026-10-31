@@ -102,9 +102,9 @@ class ClaudeRequestPayloadTest {
     @Test
     fun searchedToolsAreDefinedAfterEmptyResultsWithoutChangingTopLevelTools() {
         val request = inlineSearchRequest(listOf("clock"), "clock")
-        val body = capture("deepseek-v4-pro", request)
+        val body = capture("deepseek-flash", request)
 
-        assertEquals(listOf("tool_search"), body["tools"]!!.jsonArray.map { it.jsonObject["name"].text() })
+        assertEquals("tool_search", body["tools"]!!.jsonArray.first().jsonObject["name"].text())
         val messages = body["messages"]!!.jsonArray
         val result = messages[2].jsonObject["content"]!!.jsonArray.single().jsonObject
         assertEquals("tool_result", result["type"].text())
@@ -114,41 +114,54 @@ class ClaudeRequestPayloadTest {
         val block = addition["content"]!!.jsonArray.single().jsonObject
         assertEquals("tool_addition", block["type"].text())
         val tool = block["tool"]!!.jsonObject
-        assertEquals("tool_definition", tool["type"].text())
-        assertEquals("clock", tool["definition"]!!.jsonObject["name"].text())
-        assertEquals("inline-tools-2026-09-15", lastBetaHeader)
+        assertEquals("tool_reference", tool["type"].text())
+        assertEquals("clock", tool["name"].text())
+        val deferred = body["tools"]!!.jsonArray.last().jsonObject
+        assertEquals("true", deferred["defer_loading"].text())
+        assertEquals("object", deferred["input_schema"]!!.jsonObject["type"].text())
+        assertNull(lastBetaHeader)
     }
 
     @Test
     fun followupAfterInterruptedModelKeepsSystemAfterUserResults() {
         val request = inlineSearchRequest(listOf("clock"), "clock")
-        val body = capture("deepseek-v4-pro", request.copy(contents = request.contents + userContent()))
+        val body = capture("deepseek-flash", request.copy(contents = request.contents + userContent()))
         assertEquals(listOf("user", "assistant", "user", "system"),
             body["messages"]!!.jsonArray.map { it.jsonObject["role"].text() })
         assertEquals(4, request.contents.size)
     }
 
     @Test
-    fun inlineDefinitionCanCarryTheNativeClaudeCacheBreakpoint() {
+    fun unadaptedEndpointDoesNotReceiveInlineBlocksOrBetaHeader() {
         val body = capture("claude-opus-5-5", inlineSearchRequest(listOf("clock"), "clock"))
-        val block = body["messages"]!!.jsonArray.last().jsonObject["content"]!!.jsonArray.last().jsonObject
-        assertEquals("tool_addition", block["type"].text())
-        assertEquals("ephemeral", block.cacheType())
+        assertFalse(body.toString().contains("tool_addition"))
+        assertFalse(body.toString().contains("defer_loading"))
+        assertEquals(listOf("tool_search", "clock"), body["tools"]!!.jsonArray.map { it.jsonObject["name"].text() })
+        assertNull(lastBetaHeader)
+    }
+
+    @Test
+    fun deferredCatalogIsDeclaredBeforeTheFirstSearch() {
+        val body = capture("deepseek-flash", inlineSearchRequest(listOf("clock")))
+        val clock = body["tools"]!!.jsonArray.last().jsonObject
+        assertEquals("clock", clock["name"].text())
+        assertEquals("true", clock["defer_loading"].text())
+        assertFalse(body.toString().contains("tool_addition"))
     }
 
     @Test
     fun replacingSearchSelectionWithdrawsPreviouslyLoadedTools() {
-        val body = capture("deepseek-v4-pro", inlineSearchRequest(listOf("calendar"), "clock", "calendar"))
+        val body = capture("deepseek-flash", inlineSearchRequest(listOf("calendar"), "clock", "calendar"))
         val messages = body["messages"]!!.jsonArray
         val blocks = messages.last().jsonObject["content"]!!.jsonArray.map { it.jsonObject }
         assertEquals(listOf("tool_removal", "tool_addition"), blocks.map { it["type"].text() })
         assertEquals("clock", blocks.first()["tool"]!!.jsonObject["name"].text())
-        assertEquals(listOf("tool_search"), body["tools"]!!.jsonArray.map { it.jsonObject["name"].text() })
+        assertEquals("tool_search", body["tools"]!!.jsonArray.first().jsonObject["name"].text())
     }
 
     @Test
     fun disabledSearchedToolIsWithdrawnBeforeContinuing() {
-        val body = capture("deepseek-v4-pro", inlineSearchRequest(emptyList(), "clock"))
+        val body = capture("deepseek-flash", inlineSearchRequest(emptyList(), "clock"))
         val blocks = body["messages"]!!.jsonArray.last().jsonObject["content"]!!.jsonArray.map { it.jsonObject }
         assertEquals("tool_removal", blocks.last()["type"].text())
         assertEquals("clock", blocks.last()["tool"]!!.jsonObject["name"].text())
@@ -156,6 +169,7 @@ class ClaudeRequestPayloadTest {
 
     private var lastBetaHeader: String? = null
 
+    @OptIn(com.google.adk.kt.annotations.FrameworkInternalApi::class)
     private fun inlineSearchRequest(enabled: List<String>, vararg searches: String): LlmRequest {
         val contents = buildList {
             add(userContent())
@@ -175,7 +189,14 @@ class ClaudeRequestPayloadTest {
                 ))))
             }
         }
+        val catalog = (enabled + searches.toList()).distinct().map {
+            com.google.adk.kt.serialization.adkJson.encodeToString(FunctionDeclaration.serializer(),
+                FunctionDeclaration(name = it, description = "Read $it"))
+        }
         return LlmRequest(contents = contents, config = GenerateContentConfig(
+            systemInstruction = Content(parts = listOf(Part(partMetadata = mapOf(
+                "selkie.deferred_tool_catalog" to catalog,
+            )))),
             tools = listOf(Tool(functionDeclarations = (listOf("tool_search") + enabled).map {
                 FunctionDeclaration(name = it, description = "Read $it")
             })),
@@ -506,6 +527,10 @@ class ClaudeRequestPayloadTest {
             name = model,
             client = client,
             maxTokens = maxTokens,
+            runtime = if (model.startsWith("deepseek")) ModelRuntimeMetadata(
+                "deepseek", github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Anthropic,
+                model, "https://api.deepseek.com/anthropic",
+            ) else null,
         )
         server.enqueue(
             MockResponse()

@@ -19,13 +19,15 @@ import kotlinx.coroutines.future.await
  *
  * @param client 由调用方配置和管理的 SDK 客户端，支持自定义端点。
  * @param maxTokens 请求未指定输出上限时的默认值，沿用原有 8196；思考预算另行校验。
+ * @param runtime 厂商、模型及端点信息；缺失或未适配时使用普通工具搜索结果。
  */
 class Claude(
     override val name: String,
     private val client: AnthropicClient,
     maxTokens: Int = 8196,
+    runtime: github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata? = null,
 ) : Model {
-    private val requests = ClaudeRequestConverter(name, maxTokens)
+    private val requests = ClaudeRequestConverter(name, maxTokens, github.ponyhuang.gimi.data.agent.tools.search.toolLoadingMode(runtime))
 
     init {
         require(maxTokens > 0) { "Claude maxTokens must be positive" }

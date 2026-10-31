@@ -42,7 +42,7 @@ class ToolSearchToolsetTest {
             github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata.of(
                 github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata(
                     "deepseek", github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Anthropic,
-                    "deepseek-v4-pro", "https://example.test",
+                    "deepseek-flash", "https://api.deepseek.com/anthropic",
                 ), null, true,
             ),
         )
@@ -51,6 +51,23 @@ class ToolSearchToolsetTest {
         assertTrue(result.isEmpty())
         val pending = actions.stateDelta[inlinePendingKey(readonly.agentName)] as List<*>
         assertTrue((pending.single() as String).contains("clock"))
+    }
+
+    @Test
+    fun unadaptedAnthropicEndpointKeepsTheOriginalSearchResult() = runTest {
+        val readonly = spyk(context())
+        every { readonly.runConfig } returns RunConfig(customMetadata =
+            github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata.of(
+                github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata(
+                    "minimax", github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Anthropic,
+                    "MiniMax-M3", "https://api.minimax.io/anthropic",
+                ), null, true,
+            ),
+        )
+        val actions = EventActions()
+        val result = toolset(listOf(tool("clock"))).search("clock", toolContext(readonly, actions))
+        assertEquals(listOf("clock"), result.loadedToolNames())
+        assertFalse(actions.stateDelta.containsKey(inlinePendingKey(readonly.agentName)))
     }
 
     @Test

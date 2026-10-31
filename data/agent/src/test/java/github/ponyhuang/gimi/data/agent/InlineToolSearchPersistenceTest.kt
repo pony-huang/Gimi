@@ -74,7 +74,7 @@ class InlineToolSearchPersistenceTest {
             rootAgent = LlmAgent(name = "agent", model = model, tools = listOf(search, clock)),
         ), sessionService = sessions)
         val metadata = ToolRunMetadata.of(ModelRuntimeMetadata(
-            "deepseek", ApiProtocol.Anthropic, "deepseek-v4-pro", "https://example.test",
+            "deepseek", ApiProtocol.Anthropic, "deepseek-flash", "https://api.deepseek.com/anthropic",
         ), null, true)
         val execution = AgentChatExecution("user", "session", runner, metadata)
         try {

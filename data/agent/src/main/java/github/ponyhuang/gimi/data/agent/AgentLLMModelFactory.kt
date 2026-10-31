@@ -110,6 +110,7 @@ class AgentLLMModelFactory @Inject constructor(
 
             ApiProtocol.Anthropic -> Claude(
                 name = cfg.modelId,
+                runtime = cfg.toRuntimeMetadata(),
                 client = AnthropicOkHttpClient.builder()
                     .baseUrl(cfg.fullBaseUrl)
                     .apiKey(cfg.apiKey)

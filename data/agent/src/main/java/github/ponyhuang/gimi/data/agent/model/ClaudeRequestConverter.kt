@@ -33,6 +33,8 @@ import com.google.adk.kt.annotations.FrameworkInternalApi
 import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.serialization.adkJson
 import github.ponyhuang.gimi.data.agent.tools.search.INLINE_DEFINITIONS
+import github.ponyhuang.gimi.data.agent.tools.search.ToolLoadingMode
+import github.ponyhuang.gimi.data.agent.tools.search.DEFERRED_CATALOG
 import com.google.adk.kt.serialization.jsonElementToAny
 import com.google.adk.kt.tools.toJsonSchema
 import com.google.adk.kt.types.Content
@@ -48,7 +50,11 @@ import com.google.adk.kt.types.Tool as AdkTool
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 
 /** 纯请求转换：处理历史、媒体、普通工具、缓存及 schema；传输与产品思考规则分别维护。 */
-internal class ClaudeRequestConverter(private val name: String, private val defaultMaxTokens: Int) {
+internal class ClaudeRequestConverter(
+    private val name: String,
+    private val defaultMaxTokens: Int,
+    private val loadingMode: ToolLoadingMode = ToolLoadingMode.RESULT,
+) {
     private val jsonMapper = jsonMapper()
 
     fun convert(request: LlmRequest): MessageCreateParams {
@@ -58,7 +64,7 @@ internal class ClaudeRequestConverter(private val name: String, private val defa
         val thinking = ClaudeThinkingPolicy.resolve(modelName, request.config.thinkingConfig, maxTokens)
         val cache = promptCacheControl(modelName, request)
         val contents = request.contents.normalizeForAnthropic()
-        val inlineNames = contents.flatMap(::inlineDeclarations).mapTo(mutableSetOf()) { it.name }
+        val useReferences = loadingMode == ToolLoadingMode.DEEPSEEK_REFERENCE
         val activeNames = request.config.tools.orEmpty().flatMap { it.functionDeclarations.orEmpty() }
             .mapTo(mutableSetOf()) { it.name }
         val offered = mutableSetOf<String>()
@@ -68,10 +74,11 @@ internal class ClaudeRequestConverter(private val name: String, private val defa
                 if (content.role == Role.SYSTEM && content.parts.any {
                     INLINE_DEFINITIONS in it.partMetadata.orEmpty()
                 }) {
+                    if (!useReferences) continue
                     val names = definitions.mapTo(mutableSetOf()) { it.name }
                     val blocks = (offered - names).map(::toolRemoval) + definitions.map { declaration ->
                         mapOf("type" to "tool_addition", "tool" to mapOf(
-                            "type" to "tool_definition", "definition" to declaration.toAnthropicTool(),
+                            "type" to "tool_reference", "name" to declaration.name,
                         ))
                     }
                     if (blocks.isNotEmpty()) add(inlineSystemMessage(blocks))
@@ -81,7 +88,7 @@ internal class ClaudeRequestConverter(private val name: String, private val defa
                     contentToAnthropicMessageParam(content)?.let(::add)
                 }
             }
-            val withdrawn = offered - activeNames
+            val withdrawn = if (useReferences) offered - activeNames else emptySet()
             if (withdrawn.isNotEmpty()) {
                 val blocks = withdrawn.map(::toolRemoval)
                 if (lastOrNull()?.role() == MessageParam.Role.SYSTEM) {
@@ -101,14 +108,20 @@ internal class ClaudeRequestConverter(private val name: String, private val defa
             if (cache == null) builder.system(system)
             else builder.systemOfTextBlockParams(listOf(TextBlockParam.builder().text(system).cacheControl(cache).build()))
         }
-        toAnthropicTools(request.config.tools?.map { tool ->
-            tool.copy(functionDeclarations = tool.functionDeclarations?.filter { it.name !in inlineNames })
-        }).takeIf { it.isNotEmpty() }?.let {
-            builder.tools(markLastToolForCache(it, cache))
-        }
-        if (inlineNames.isNotEmpty()) {
-            builder.putAdditionalHeader("anthropic-beta", "inline-tools-2026-09-15")
-        }
+        val declared = toAnthropicTools(request.config.tools)
+        val deferred = if (useReferences) {
+            // 历史中被撤下的工具也必须保留可解析的引用，最后的 removal 控制当前可用性。
+            val snapshots = request.config.systemInstruction?.parts.orEmpty().flatMap {
+                (it.partMetadata?.get(DEFERRED_CATALOG) as? List<*>).orEmpty().filterIsInstance<String>()
+            }.map { decodeDeclaration(it) } + contents.flatMap(::inlineDeclarations)
+            snapshots.distinctBy { it.name }.map { declaration ->
+                ToolUnion.ofTool(declaration.toAnthropicTool().toBuilder()
+                    .putAdditionalProperty("defer_loading", from(true)).build())
+            }
+        } else emptyList()
+        val deferredNames = deferred.map { it.asTool().name() }.toSet()
+        val tools = declared.filter { !it.isTool() || it.asTool().name() !in deferredNames } + deferred
+        if (tools.isNotEmpty()) builder.tools(markLastToolForCache(tools, cache))
         thinking.thinking?.let { builder.thinking(it) }
         val format = structuredOutputFormat(request)
         if (thinking.effort != null || format != null) {
@@ -129,6 +142,10 @@ internal class ClaudeRequestConverter(private val name: String, private val defa
         request.config.stopSequences?.let { builder.stopSequences(it) }
         return builder.build()
     }
+
+    @OptIn(FrameworkInternalApi::class)
+    private fun decodeDeclaration(snapshot: String): FunctionDeclaration =
+        adkJson.decodeFromString(FunctionDeclaration.serializer(), snapshot)
 
     @OptIn(FrameworkInternalApi::class)
     private fun inlineDeclarations(content: Content): List<FunctionDeclaration> =

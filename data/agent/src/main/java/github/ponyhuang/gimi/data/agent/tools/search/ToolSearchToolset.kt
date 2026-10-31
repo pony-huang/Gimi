@@ -14,7 +14,6 @@ import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.data.agent.tools.modelRuntimeMetadataOrNull
 import github.ponyhuang.gimi.data.agent.tools.search.ToolSearchToolset.Companion.STATE_KEY_LOADED_TOOLS
-import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -59,8 +58,8 @@ interface ToolCandidateSource {
  * 选中的工具名会写入 session state（[STATE_KEY_LOADED_TOOLS]），后续请求 —— 包括
  * 新的用户轮次 —— 都继续携带这些工具声明，保持请求前缀稳定（前缀缓存友好），
  * 模型也不需要每轮重新检索。确认恢复时同样从持久化 state 重建选择，不依赖
- * 进程内状态。Anthropic 将选中的声明保存为独立 system 事件，由协议层转成内联工具定义；
- * 其他协议继续在顶层 tools 中声明。
+ * 进程内状态。已适配的 DeepSeek Flash 将选中声明保存为独立 system 事件，由协议层转成工具引用；
+ * 其他厂商、模型和端点继续返回普通搜索结果并在顶层 tools 中声明。
  */
 internal class ToolSearchToolset(
     private val sources: List<ToolCandidateSource>,
@@ -102,12 +101,18 @@ internal class ToolSearchToolset(
                 ),
             ),
         )
-        if (toolContext.context.modelRuntimeMetadataOrNull()?.baseType != ApiProtocol.Anthropic) {
+        if (toolLoadingMode(toolContext.context.modelRuntimeMetadataOrNull()) == ToolLoadingMode.RESULT) {
             return request
         }
+        // 只传递当前启用目录的声明；执行器仍只注册搜索命中的工具。
+        val catalog = discoverEnabled(toolContext.context).uniqueCandidates.map { it.declarationJson }
+        val system = request.config.systemInstruction ?: Content(parts = emptyList())
+        val deferredRequest = request.copy(config = request.config.copy(
+            systemInstruction = system.copy(parts = system.parts + Part(partMetadata = mapOf(DEFERRED_CATALOG to catalog))),
+        ))
         return InlineToolSearchEvents.appendPending(
             toolContext,
-            request,
+            deferredRequest,
             getTools(toolContext.context).mapNotNull { it.declaration() },
         )
     }
@@ -148,7 +153,7 @@ internal class ToolSearchToolset(
         // 命中即持久化：写入 session state，后续请求（含新用户轮次）继续携带这些声明。
         toolContext.actions.stateDelta[STATE_KEY_LOADED_TOOLS] = selected.map { it.tool.name }
 
-        if (toolContext.context.modelRuntimeMetadataOrNull()?.baseType == ApiProtocol.Anthropic) {
+        if (toolLoadingMode(toolContext.context.modelRuntimeMetadataOrNull()) == ToolLoadingMode.DEEPSEEK_REFERENCE) {
             toolContext.actions.stateDelta[inlinePendingKey(toolContext.context.agentName)] =
                 selected.map { it.declarationJson }
             return emptyMap()

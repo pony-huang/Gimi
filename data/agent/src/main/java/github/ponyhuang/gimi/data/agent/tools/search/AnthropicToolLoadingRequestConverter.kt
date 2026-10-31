@@ -35,6 +35,10 @@ internal class AnthropicToolLoadingRequestConverter(
         val builder = params.toBuilder()
         val activeNames = request.config.tools.orEmpty().flatMap { it.functionDeclarations.orEmpty() }
             .mapTo(mutableSetOf()) { it.name }
+        val historicalDeclarations = contents.flatMap(::inlineDeclarations)
+        // DeepSeek 只接受 tool_addition，不支持 tool_removal。需要撤下旧工具时，
+        // 仅在本次请求使用当前声明，去掉历史加载标记；不改写持久化历史或重发全部目录。
+        if (historicalDeclarations.any { it.name !in activeNames }) return params
         val offered = mutableSetOf<String>()
         val messages = buildList {
             for (content in contents) {
@@ -42,38 +46,23 @@ internal class AnthropicToolLoadingRequestConverter(
                 if (content.role == Role.SYSTEM && content.parts.any {
                     INLINE_DEFINITIONS in it.partMetadata.orEmpty()
                 }) {
-                    val names = definitions.mapTo(mutableSetOf()) { it.name }
-                    val blocks = (offered - names).map(::toolRemoval) + definitions.map { declaration ->
+                    val blocks = definitions.filter { offered.add(it.name) }.map { declaration ->
                         mapOf("type" to "tool_addition", "tool" to mapOf(
                             "type" to "tool_reference", "name" to declaration.name,
                         ))
                     }
                     if (blocks.isNotEmpty()) add(inlineSystemMessage(blocks))
-                    offered.clear()
-                    offered.addAll(names)
                 } else {
                     convertContent(content)?.let(::add)
-                }
-            }
-            val withdrawn = offered - activeNames
-            if (withdrawn.isNotEmpty()) {
-                val blocks = withdrawn.map(::toolRemoval)
-                if (lastOrNull()?.role() == MessageParam.Role.SYSTEM) {
-                    // 将撤销追加到同一 system 消息，保留历史定义，不改写早期前缀。
-                    val previous = removeAt(lastIndex)
-                    val raw = jsonMapper.convertValue(previous, Map::class.java)
-                    add(inlineSystemMessage((raw["content"] as List<*>) + blocks))
-                } else {
-                    add(inlineSystemMessage(blocks))
                 }
             }
         }
         builder.messages(messages)
         val declared = standard.toAnthropicTools(request.config.tools)
-        // 历史中被撤下的工具也必须保留可解析的引用，最后的 removal 控制当前可用性。
+        // 内联路径只添加当前仍可用的工具；撤销场景已转为普通声明。
         val snapshots = request.config.systemInstruction?.parts.orEmpty().flatMap {
             (it.partMetadata?.get(DEFERRED_CATALOG) as? List<*>).orEmpty().filterIsInstance<String>()
-        }.map(::decodeDeclaration) + contents.flatMap(::inlineDeclarations)
+        }.map(::decodeDeclaration) + historicalDeclarations
         val declarations = snapshots.distinctBy { it.name }
         val deferred = standard.toAnthropicTools(listOf(AdkTool(functionDeclarations = declarations)))
             .map { tool ->
@@ -110,11 +99,6 @@ internal class AnthropicToolLoadingRequestConverter(
                     adkJson.decodeFromString(FunctionDeclaration.serializer(), it)
                 }
         }
-
-    private fun toolRemoval(name: String): Map<String, Any> = mapOf(
-        "type" to "tool_removal",
-        "tool" to mapOf("type" to "tool_reference", "name" to name),
-    )
 
     // SDK 已支持 system 角色；尚未建模的内联块通过原始 JSON 扩展发送。
     private fun inlineSystemMessage(blocks: List<*>): MessageParam = MessageParam.builder()

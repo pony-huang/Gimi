@@ -24,8 +24,8 @@ internal const val TOOL_SEARCH_NAME: String = "tool_search"
 /**
  * 单次模型请求可动态暴露的工具声明预算。
  *
- * @property maxTools 最多同时暴露的业务工具数量。
- * @property maxSchemaBytes 工具声明序列化为 UTF-8 JSON 后允许的总字节数。
+ * @property maxTools 同时暴露的业务工具数量软上限；首个完整工具集可独占请求并超出上限。
+ * @property maxSchemaBytes 工具声明 UTF-8 JSON 总字节数软上限；完整工具集采用相同例外。
  */
 internal data class ToolAccessBudget(
     val maxTools: Int = 8,
@@ -45,9 +45,15 @@ interface ToolCandidateSource {
     val id: String
     val displayName: String
 
+    /** 命中任意成员后整组加载；组内工具不能被单工具预算截断。 */
+    val loadAsGroup: Boolean get() = false
+
     suspend fun loadAllTools(readonlyContext: ReadonlyContext?): List<BaseTool>
 
     suspend fun loadEnabledTools(readonlyContext: ReadonlyContext?): List<BaseTool>
+
+    /** 仅在该来源被选中时注入工具集的请求期说明。 */
+    suspend fun processLlmRequest(toolContext: ToolContext, llmRequest: LlmRequest): LlmRequest = llmRequest
 }
 
 /**
@@ -83,7 +89,7 @@ internal class ToolSearchToolset(
         toolContext: ToolContext,
         llmRequest: LlmRequest,
     ): LlmRequest {
-        val request = llmRequest.appendInstructions(
+        var request = llmRequest.appendInstructions(
             Content(
                 parts = listOf(
                     Part(
@@ -93,6 +99,7 @@ internal class ToolSearchToolset(
                               provide, call `tool_search` first.
                             - Matching tool definitions become available in the next model step; never guess or imitate
                               an undeclared tool call.
+                            - Plugin toolsets load as a complete group together with their usage instructions.
                             - When catalog descriptions are in English, search with concise English capability keywords.
                             - After matching tools become available, continue the user's task with those declared tools.
                             </tool_search>
@@ -101,6 +108,16 @@ internal class ToolSearchToolset(
                 ),
             ),
         )
+        val selectedNames = latestSelection(toolContext.context).orEmpty().toSet()
+        val groupedSources = sources.filter(ToolCandidateSource::loadAsGroup)
+        if (selectedNames.isNotEmpty() && groupedSources.isNotEmpty()) {
+            val selectedSourceIds = discoverEnabled(toolContext.context).uniqueCandidates
+                .filter { it.tool.name in selectedNames }
+                .mapTo(hashSetOf(), ToolCandidate::sourceId)
+            for (source in groupedSources.filter { it.id in selectedSourceIds }) {
+                request = source.processLlmRequest(toolContext, request)
+            }
+        }
         if (toolLoadingMode(toolContext.context.modelRuntimeMetadataOrNull()) == ToolLoadingMode.RESULT) {
             return request
         }
@@ -136,7 +153,7 @@ internal class ToolSearchToolset(
         )
         val ranked = matches.mapNotNull { match -> enabledByKey[match.key] }
 
-        val selected = selectWithinBudget(ranked)
+        val selected = selectWithinBudget(ranked, enabledTools.uniqueCandidates)
         if (selected.isEmpty()) {
             return unchangedSearchResult(
                 ambiguous = allTools.ambiguousCandidates(
@@ -161,7 +178,7 @@ internal class ToolSearchToolset(
 
         return mapOf(
             KEY_LOADED_TOOLS to selected.map { it.summary() },
-            KEY_OMITTED_MATCH_COUNT to ranked.size - selected.size,
+            KEY_OMITTED_MATCH_COUNT to ranked.count { candidate -> selected.none { it.key == candidate.key } },
             KEY_AMBIGUOUS_TOOLS to allTools.ambiguousCandidates(
                 matches.mapTo(hashSetOf(), ToolVectorMatch::key),
             ),
@@ -261,14 +278,26 @@ internal class ToolSearchToolset(
             .firstOrNull()
     }
 
-    private fun selectWithinBudget(ranked: List<ToolCandidate>): List<ToolCandidate> {
+    private fun selectWithinBudget(
+        ranked: List<ToolCandidate>,
+        enabled: List<ToolCandidate>,
+    ): List<ToolCandidate> {
         val selected = mutableListOf<ToolCandidate>()
+        val groupedSourceIds = sources.filter(ToolCandidateSource::loadAsGroup).mapTo(hashSetOf()) { it.id }
+        val visitedGroups = hashSetOf<String>()
         var usedBytes = 0
         for (candidate in ranked) {
             if (selected.size >= budget.maxTools) break
-            val bytes = schemaBytes(candidate)
-            if (selected.isEmpty() || usedBytes + bytes <= budget.maxSchemaBytes) {
-                selected += candidate
+            val group = if (candidate.sourceId in groupedSourceIds) {
+                if (!visitedGroups.add(candidate.sourceId)) continue
+                enabled.filter { it.sourceId == candidate.sourceId }
+            } else listOf(candidate)
+            val bytes = group.sumOf(::schemaBytes)
+            // 首个命中的工具集允许独占请求并超出软预算，避免拆散认证、查询、执行流程。
+            if (selected.isEmpty() ||
+                (selected.size + group.size <= budget.maxTools && usedBytes + bytes <= budget.maxSchemaBytes)
+            ) {
+                selected += group
                 usedBytes += bytes
             }
         }
@@ -365,7 +394,7 @@ internal class ToolSearchToolset(
         private const val KEY_SELECTION_CHANGED = "selection_changed"
         private const val MAX_DESCRIPTION_LENGTH = 240
         private const val TOOL_SEARCH_DESCRIPTION =
-            "Searches enabled local, MCP, and formula tools by capability. Matching tool " +
+            "Searches enabled local, MCP, plugin, and formula tools by capability. Matching tool " +
                     "definitions become available in the next model step."
     }
 
@@ -394,6 +423,7 @@ internal class ToolSearchToolset(
                 key = key,
                 text = buildString {
                     appendLine("Tool: ${tool.name}")
+                    appendLine("Source: $sourceDisplayName")
                     appendLine("Description: ${tool.description}")
                     append("Input schema: $declarationJson")
                 },

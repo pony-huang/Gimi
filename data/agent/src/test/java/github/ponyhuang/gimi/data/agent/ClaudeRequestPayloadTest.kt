@@ -150,21 +150,53 @@ class ClaudeRequestPayloadTest {
     }
 
     @Test
-    fun replacingSearchSelectionWithdrawsPreviouslyLoadedTools() {
-        val body = capture("deepseek-flash", inlineSearchRequest(listOf("calendar"), "clock", "calendar"))
-        val messages = body["messages"]!!.jsonArray
-        val blocks = messages.last().jsonObject["content"]!!.jsonArray.map { it.jsonObject }
-        assertEquals(listOf("tool_removal", "tool_addition"), blocks.map { it["type"].text() })
-        assertEquals("clock", blocks.first()["tool"]!!.jsonObject["name"].text())
-        assertEquals("tool_search", body["tools"]!!.jsonArray.first().jsonObject["name"].text())
+    fun replacingSearchSelectionUsesCurrentDeclarationsWithoutUnsupportedRemovalBlocks() {
+        val request = inlineSearchRequest(listOf("calendar"), "clock", "calendar")
+        val body = capture("deepseek-flash", request)
+        assertFalse(body.toString().contains("tool_removal"))
+        assertFalse(body.toString().contains("tool_addition"))
+        assertFalse(body.toString().contains("defer_loading"))
+        assertEquals(listOf("tool_search", "calendar"), body["tools"]!!.jsonArray.map { it.jsonObject["name"].text() })
+        assertEquals(7, request.contents.size)
     }
 
     @Test
     fun disabledSearchedToolIsWithdrawnBeforeContinuing() {
         val body = capture("deepseek-flash", inlineSearchRequest(emptyList(), "clock"))
-        val blocks = body["messages"]!!.jsonArray.last().jsonObject["content"]!!.jsonArray.map { it.jsonObject }
-        assertEquals("tool_removal", blocks.last()["type"].text())
-        assertEquals("clock", blocks.last()["tool"]!!.jsonObject["name"].text())
+        assertFalse(body.toString().contains("tool_removal"))
+        assertFalse(body.toString().contains("tool_addition"))
+        assertFalse(body.toString().contains("defer_loading"))
+        assertEquals(listOf("tool_search"), body["tools"]!!.jsonArray.map { it.jsonObject["name"].text() })
+    }
+
+    @Test
+    fun withdrawingAToolPreservesItsHistoricalCallAndResult() {
+        val request = inlineSearchRequest(listOf("calendar"), "clock", "calendar")
+        val historicalCall = Content(role = Role.MODEL, parts = listOf(Part(functionCall = FunctionCall(
+            id = "clock_call", name = "clock", args = emptyMap(),
+        ))))
+        val historicalResult = Content(role = Role.USER, parts = listOf(Part(functionResponse = FunctionResponse(
+            id = "clock_call", name = "clock", response = mapOf("time" to "12:00"),
+        ))))
+        val history = request.contents.take(4) + listOf(historicalCall, historicalResult) + request.contents.drop(4)
+        val body = capture("deepseek-flash", request.copy(contents = history))
+        val blocks = body["messages"]!!.jsonArray.flatMap { it.jsonObject["content"]!!.jsonArray }
+            .map { it.jsonObject }
+        assertTrue(blocks.any { it["type"].text() == "tool_use" && it["id"].text() == "clock_call" })
+        assertTrue(blocks.any { it["type"].text() == "tool_result" && it["tool_use_id"].text() == "clock_call" })
+        assertFalse(body.toString().contains("tool_removal"))
+        assertEquals(listOf("tool_search", "calendar"), body["tools"]!!.jsonArray.map { it.jsonObject["name"].text() })
+        assertEquals(historicalCall, history[4])
+    }
+
+    @Test
+    fun repeatedAndAdditiveSearchesOnlyDeclareNewToolReferences() {
+        val body = capture("deepseek-flash", inlineSearchRequest(listOf("clock", "calendar"), "clock", "clock", "calendar"))
+        val additions = body["messages"]!!.jsonArray.flatMap { it.jsonObject["content"]!!.jsonArray }
+            .map { it.jsonObject }.filter { it["type"].text() == "tool_addition" }
+        assertEquals(listOf("clock", "calendar"), additions.map { it["tool"]!!.jsonObject["name"].text() })
+        assertFalse(body.toString().contains("tool_removal"))
+        assertTrue(body.toString().contains("defer_loading"))
     }
 
     private var lastBetaHeader: String? = null

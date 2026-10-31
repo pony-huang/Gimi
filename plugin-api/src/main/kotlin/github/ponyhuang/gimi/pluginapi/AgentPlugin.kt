@@ -49,7 +49,8 @@ interface AgentPlugin : Plugin {
     /**
      * 插件注入到 Agent 的工具；默认无。
      *
-     * 宿主在构建 Agent 时，把每个插件返回的工具一并挂到 `LlmAgent.tools`。
+     * 常驻模式直接挂到 `LlmAgent.tools`；按需模式将每个插件的直接工具作为一组，
+     * 检索命中后整组声明。
      */
     fun tools(): List<BaseTool> = emptyList()
 
@@ -58,8 +59,8 @@ interface AgentPlugin : Plugin {
      *
      * 与 [tools] 的区别：ADK 会在每次模型请求时调用
      * [com.google.adk.kt.tools.Toolset.getTools]，并按请求期上下文（ReadonlyContext）
-     * 返回工具，适合需要按会话或授权状态动态裁剪的工具组。宿主构建 Agent 时把每个
-     * 插件返回的 Toolset 一并挂到 `LlmAgent.toolsets`。
+     * 返回工具，适合需要按会话或授权状态动态裁剪的工具组。常驻模式直接挂到
+     * `LlmAgent.toolsets`；按需模式命中后整组声明，并注入该 Toolset 的请求期说明。
      */
     fun toolSets(): List<Toolset> = emptyList()
 

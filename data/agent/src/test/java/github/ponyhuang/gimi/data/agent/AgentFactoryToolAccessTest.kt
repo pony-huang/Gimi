@@ -3,12 +3,16 @@ package github.ponyhuang.gimi.data.agent
 import com.google.adk.kt.agents.LlmAgent
 import com.google.adk.kt.agents.ReadonlyContext
 import com.google.adk.kt.models.Model
+import com.google.adk.kt.models.LlmRequest
+import com.google.adk.kt.events.EventActions
 import com.google.adk.kt.skills.SkillSource
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.tools.Toolset
 import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.types.ThinkingLevel
+import com.google.adk.kt.types.Content
+import com.google.adk.kt.types.Part
 import github.ponyhuang.gimi.data.agent.contribution.BaseToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.LocalToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.McpToolContribution
@@ -25,6 +29,8 @@ import github.ponyhuang.gimi.data.agent.tools.official.OfficialToolFactory
 import github.ponyhuang.gimi.data.agent.tools.search.TOOL_SEARCH_NAME
 import github.ponyhuang.gimi.data.agent.tools.search.ToolSearchToolset
 import github.ponyhuang.gimi.data.agent.tools.search.ToolVectorSearch
+import github.ponyhuang.gimi.data.agent.tools.search.ToolVectorMatch
+import github.ponyhuang.gimi.data.agent.tools.search.ToolVectorDocument
 import github.ponyhuang.gimi.data.agent.tools.system.LocalToolset
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
@@ -181,15 +187,83 @@ class AgentFactoryToolAccessTest {
     }
 
     @Test
-    fun pluginToolsetsAreAttachedInBothAccessModes() = runTest {
+    fun pluginToolsAreDeclaredDirectlyOnlyInAlwaysAvailableMode() = runTest {
         val pluginToolset = FakePluginToolset("playback_control")
-        val fixture = fixture(pluginToolsets = listOf(pluginToolset))
+        val pluginTool = declarationTool("plugin_action")
+        val fixture = fixture(pluginTools = listOf(pluginTool), pluginToolsets = listOf(pluginToolset))
 
         val always = fixture.create(toolAccessMode = ToolAccessMode.ALWAYS_AVAILABLE).agent as LlmAgent
         val onDemand = fixture.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
 
         assertTrue("always-available 模式应挂载插件 Toolset", pluginToolset in always.toolsets)
-        assertTrue("on-demand 模式应挂载插件 Toolset", pluginToolset in onDemand.toolsets)
+        assertTrue(pluginTool in always.tools)
+        assertTrue("按需模式不应直接挂载插件 Toolset", pluginToolset !in onDemand.toolsets)
+        assertTrue("按需模式不应直接声明插件工具", pluginTool !in onDemand.tools)
+        assertEquals(
+            listOf(TOOL_SEARCH_NAME),
+            onDemand.toolsets.filterIsInstance<ToolSearchToolset>().single().getTools().map(BaseTool::name),
+        )
+    }
+
+    @Test
+    fun onDemandLoadsTheWholeMatchedPluginToolsetWithItsInstructions() = runTest {
+        val groupedNames = listOf("music_search") + (1..9).map { "music_action_$it" }
+        val matched = FakePluginToolset(groupedNames.first(), groupedNames.drop(1))
+        val unrelated = FakePluginToolset("unrelated_action")
+        val vectorSearch = mockk<ToolVectorSearch>()
+        coEvery { vectorSearch.search(any(), any(), any(), any()) } answers {
+            val documents = secondArg<List<ToolVectorDocument>>()
+            listOf(ToolVectorMatch(documents.single { it.text.startsWith("Tool: music_search\n") }.key, 0.0))
+        }
+        val fixture = fixture(pluginToolsets = listOf(matched, unrelated), vectorSearch = vectorSearch)
+        val agent = fixture.create(toolAccessMode = ToolAccessMode.ON_DEMAND).agent as LlmAgent
+        val search = agent.toolsets.filterIsInstance<ToolSearchToolset>().single()
+        val state = mutableMapOf<String, Any>()
+        val readonly = mockk<ReadonlyContext>(relaxed = true) {
+            every { this@mockk.state } answers { state }
+            every { runConfig } returns null
+        }
+        coEvery { readonly.getEvents(any()) } returns emptyList()
+        val actions = EventActions()
+        val context = mockk<ToolContext> {
+            every { this@mockk.context } returns readonly
+            every { this@mockk.actions } returns actions
+        }
+
+        assertEquals(listOf(TOOL_SEARCH_NAME), search.getTools(readonly).map(BaseTool::name))
+        search.processLlmRequest(context, LlmRequest())
+        assertEquals(0, matched.processedRequests)
+        assertEquals(0, unrelated.processedRequests)
+
+        val result = search.search("music", context)
+        state.putAll(actions.stateDelta)
+
+        // 超过默认 8 个工具的软预算也必须保持 Toolset 完整，不能丢失登录或执行工具。
+        assertEquals(listOf(TOOL_SEARCH_NAME) + groupedNames, search.getTools(readonly).map(BaseTool::name))
+        assertEquals(0, result["omitted_match_count"])
+        val processed = search.processLlmRequest(context, LlmRequest())
+        val instructions = processed.config.systemInstruction!!.parts.mapNotNull(Part::text).joinToString("\n")
+        assertTrue(instructions.contains("instructions:music_search"))
+        assertTrue(!instructions.contains("instructions:unrelated_action"))
+        assertEquals(1, matched.processedRequests)
+        assertEquals(0, unrelated.processedRequests)
+        val loaded = search.getTools(readonly).single { it.name == "music_action_9" }
+        assertEquals(emptyMap<String, Any>(), loaded.run(context, emptyMap()))
+    }
+
+    @Test
+    fun onDemandCanDiscoverPluginsThatOnlyExposeDirectTools() = runTest {
+        val provider = FakePluginRuntimeProvider(listOf(FakeAgentPlugin(
+            "direct", pluginTools = listOf(declarationTool("login"), declarationTool("query")),
+        )))
+        val contribution = PluginToolContribution(provider)
+        val sources = contribution.candidateSources(AgentBuildSpec(
+            toolAccessMode = ToolAccessMode.ON_DEMAND,
+            pluginRuntime = provider.runtime.value,
+        ))
+        assertEquals(listOf("login", "query"), sources.single().loadEnabledTools(null).map(BaseTool::name))
+        assertTrue(sources.single().loadAsGroup)
+        assertTrue(contribution.candidateSources(AgentBuildSpec(pluginRuntime = provider.runtime.value)).isEmpty())
     }
 
     /** 组装好的工厂与构建用插件快照，提供按默认参数构建 Agent 的便捷入口。 */
@@ -214,7 +288,9 @@ class AgentFactoryToolAccessTest {
         localTools: List<BaseTool> = emptyList(),
         confirmationRequiredToolIds: Set<String> = emptySet(),
         officialCatalog: OfficialToolFunctionCatalog = officialCatalog(),
+        pluginTools: List<BaseTool> = emptyList(),
         pluginToolsets: List<Toolset> = emptyList(),
+        vectorSearch: ToolVectorSearch = mockk(relaxed = true),
         mcpConfigurationTool: McpConfigurationTool = mockk(relaxed = true) {
             every { name } returns McpConfigurationTool.NAME
         },
@@ -246,7 +322,7 @@ class AgentFactoryToolAccessTest {
         val modelFactory = mockk<AgentLLMModelFactory>()
         every { modelFactory.selectModelConfig(any()) } returns modelConfig()
         every { modelFactory.createModel(any()) } returns mockk<Model>(relaxed = true)
-        val plugin = FakeAgentPlugin("test", pluginToolsets = pluginToolsets)
+        val plugin = FakeAgentPlugin("test", pluginTools = pluginTools, pluginToolsets = pluginToolsets)
         val pluginRuntimeProvider = FakePluginRuntimeProvider(plugins = listOf(plugin))
 
         val officialToolset = DefaultOfficialToolset(officialCatalog, mockk<OfficialToolFactory>(), FakeToolAccessRepository())
@@ -272,7 +348,7 @@ class AgentFactoryToolAccessTest {
             agentFactory = AgentFactory(
                 contributions = registry,
                 agentLLMModelFactory = modelFactory,
-                toolVectorSearch = mockk<ToolVectorSearch>(relaxed = true),
+                toolVectorSearch = vectorSearch,
             ),
             pluginRuntime = pluginRuntimeProvider.runtime.value,
             officialToolset = officialToolset,
@@ -308,9 +384,17 @@ class AgentFactoryToolAccessTest {
     /** 模拟插件返回的 ADK [Toolset]：忽略请求期上下文，恒定出一个工具。 */
     private class FakePluginToolset(
         private val toolName: String,
+        private val additionalNames: List<String> = emptyList(),
     ) : Toolset {
+        var processedRequests: Int = 0
+
         override suspend fun getTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
-            listOf(declarationTool(toolName))
+            (listOf(toolName) + additionalNames).map(::declarationTool)
+
+        override suspend fun processLlmRequest(toolContext: ToolContext, llmRequest: LlmRequest): LlmRequest {
+            processedRequests++
+            return llmRequest.appendInstructions(Content(parts = listOf(Part(text = "instructions:$toolName"))))
+        }
     }
 
     private class FakeToolAccessRepository(

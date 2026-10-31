@@ -1,7 +1,9 @@
 package github.ponyhuang.gimi.data.agent.tools.search
 
 import com.google.adk.kt.agents.ReadonlyContext
+import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.tools.BaseTool
+import com.google.adk.kt.tools.ToolContext
 import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.data.agent.McpToolsetHandle
 import github.ponyhuang.gimi.data.agent.tools.modelRuntimeMetadataOrNull
@@ -44,13 +46,14 @@ internal class McpServerSource(
 /**
  * 通用 [Toolset] 适配器：把任意 ADK [Toolset] 暴露为 [ToolCandidateSource]。
  *
- * 用于 search 模式以外的"想再外加一个 Toolset 当 source"的场合。MCP 单独的
+ * 用于按需模式下的动态工具集；[loadAsGroup] 指定是否整组加载。MCP 单独的
  * [McpServerSource] 不走这里 —— 它每个 server 一份，保持失败隔离与单一来源归类。
  */
 internal class ToolsetCandidateSource(
     override val id: String,
     override val displayName: String,
     private val toolset: Toolset,
+    override val loadAsGroup: Boolean = false,
 ) : ToolCandidateSource {
     override suspend fun loadAllTools(readonlyContext: ReadonlyContext?): List<BaseTool> =
         toolset.getTools(readonlyContext)
@@ -58,6 +61,9 @@ internal class ToolsetCandidateSource(
     override suspend fun loadEnabledTools(
         readonlyContext: ReadonlyContext?,
     ): List<BaseTool> = loadAllTools(readonlyContext)
+
+    override suspend fun processLlmRequest(toolContext: ToolContext, llmRequest: LlmRequest): LlmRequest =
+        toolset.processLlmRequest(toolContext, llmRequest)
 }
 
 /**

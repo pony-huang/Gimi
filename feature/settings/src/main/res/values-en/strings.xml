@@ -65,7 +65,7 @@
     <string name="update_failed_title">Update failed</string>
     <string name="update_retry">Retry</string>
     <string name="settings_recommendations_title">Personalized services</string>
-    <string name="settings_recommendations_subtitle">Configure suggestions and tool authorization</string>
+    <string name="settings_recommendations_subtitle">Configure smart recommendations, interactive cards, and tool loading</string>
 
     <string name="logs_title">Logs</string>
     <string name="logs_subtitle">View and export logs from the last 24 hours</string>

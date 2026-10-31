@@ -5,7 +5,6 @@ import com.google.adk.kt.agents.ResumabilityConfig
 import com.google.adk.kt.apps.App
 import com.google.adk.kt.artifacts.ArtifactService
 import com.google.adk.kt.memory.MemoryService
-import com.google.adk.kt.plugins.LoggingPlugin
 import com.google.adk.kt.plugins.Plugin
 import com.google.adk.kt.runners.InMemoryRunner
 import com.google.adk.kt.sessions.SessionService
@@ -98,7 +97,7 @@ class AgentChatRunner(
     ): InMemoryRunner = InMemoryRunner(
         app = App(
             appName = APP_NAME,
-            plugins = mutableListOf(LoggingPlugin()) + plugins(pluginRuntime),
+            plugins = plugins(pluginRuntime),
             rootAgent = agent,
             resumabilityConfig = ResumabilityConfig(isResumable = true),
             // 对话摘要压缩

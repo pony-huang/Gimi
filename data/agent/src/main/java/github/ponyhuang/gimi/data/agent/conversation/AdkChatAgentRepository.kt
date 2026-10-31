@@ -1,6 +1,8 @@
 package github.ponyhuang.gimi.data.agent.conversation
 
 import com.google.adk.kt.events.Event
+import com.google.adk.kt.types.FunctionResponse
+import github.ponyhuang.gimi.domain.a2ui.A2uiGenerationTaskCodec
 import com.google.adk.kt.types.FunctionCall
 import android.util.Log
 import github.ponyhuang.gimi.data.agent.AgentChatRunner
@@ -32,7 +34,13 @@ import github.ponyhuang.gimi.domain.conversation.repository.SubtaskRunRepository
 class AdkChatAgentRepository @Inject constructor(
     private val runner: AgentChatRunner,
     private val subtasks: SubtaskRunRepository? = null,
+    private val a2uiRetry: github.ponyhuang.gimi.data.agent.a2ui.A2uiCreateRetry? = null,
 ) : ChatAgentRepository {
+    override fun retryA2ui(
+        sessionId: String, selection: ModelSelection, callId: String,
+        capabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities,
+    ): Flow<ChatRunEvent> = requireNotNull(a2uiRetry).retry(sessionId, selection, callId, capabilities).map { it.toDomain() }
+
     override suspend fun createExecution(
         sessionId: String,
         selection: ModelSelection,
@@ -112,7 +120,7 @@ class AdkChatAgentRepository @Inject constructor(
         id = id,
         invocationId = invocationId,
         author = author,
-        parts = content?.parts.orEmpty().map { part ->
+        parts = (if (author == A2uiGenerationTaskCodec.AUTHOR) emptyList() else content?.parts.orEmpty()).map { part ->
             ChatRunPart(
                 text = part.text,
                 thought = part.thought == true,
@@ -141,7 +149,7 @@ class AdkChatAgentRepository @Inject constructor(
             )
         },
         functionCalls = functionCalls().map { it.toDomain() },
-        functionResponses = functionResponses().map {
+        functionResponses = (functionResponses() + listOfNotNull(asyncA2uiResponse())).map {
             val parsed = parseLocalFileSearchResult(it.name, it.response)
             // 本地搜索“找到了文件却不出轮播”只能靠这条日志排查，成功/失败路径都留线索。
             if (parsed == null && isLocalFileSearchTool(it.name)) {
@@ -151,6 +159,7 @@ class AdkChatAgentRepository @Inject constructor(
                 id = it.id,
                 name = it.name,
                 a2uiDocument = github.ponyhuang.gimi.domain.a2ui.A2uiToolResult.extract(it.name, it.response),
+                a2uiTask = if (it.name == github.ponyhuang.gimi.domain.a2ui.A2uiToolResult.TOOL_NAME) A2uiGenerationTaskCodec.extract(it.response) else null,
                 a2uiFailed = it.name == github.ponyhuang.gimi.domain.a2ui.A2uiToolResult.TOOL_NAME && it.response["success"] == false,
                 localFileSearchResult = parsed,
                 confirmationApproved = if (
@@ -208,4 +217,13 @@ class AdkChatAgentRepository @Inject constructor(
         const val USER_ID = AgentSessionIdentity.DEFAULT_USER_ID
         const val TAG = "AdkChatAgentRepository"
     }
+}
+
+/** 宿主结果是 system 事件，避免在模型上下文中伪造第二个 function response。 */
+@Suppress("UNCHECKED_CAST")
+private fun Event.asyncA2uiResponse(): FunctionResponse? {
+    if (author != A2uiGenerationTaskCodec.AUTHOR) return null
+    val result = customMetadata?.get(A2uiGenerationTaskCodec.RESULT_KEY) as? Map<String, Any?> ?: return null
+    val task = A2uiGenerationTaskCodec.extract(result) ?: return null
+    return FunctionResponse(id = task.callId, name = github.ponyhuang.gimi.domain.a2ui.A2uiToolResult.TOOL_NAME, response = result)
 }

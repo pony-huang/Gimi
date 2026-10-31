@@ -221,6 +221,8 @@ data class FunctionResponseView(
     val a2uiDocument: github.ponyhuang.gimi.domain.a2ui.A2uiDocument? = null,
     /** The generation tool exhausted its format correction; diagnostic details remain in the tool result. */
     val a2uiFailed: Boolean = false,
+    /** 异步创建的输入和状态；完成后仍保留，供关联原消息。 */
+    val a2uiTask: github.ponyhuang.gimi.domain.a2ui.A2uiGenerationTask? = null,
 )
 
 /**

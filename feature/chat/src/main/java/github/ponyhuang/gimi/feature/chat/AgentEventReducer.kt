@@ -9,6 +9,7 @@ import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.conversation.usecase.ChatRunEventMapper
 import github.ponyhuang.gimi.domain.conversation.usecase.summarizeValue
 import github.ponyhuang.gimi.domain.conversation.usecase.toView
+import github.ponyhuang.gimi.domain.conversation.usecase.updateA2uiTask
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 
 /**
@@ -55,6 +56,12 @@ internal class AgentEventReducer(
      */
     fun applyEvent(sessionId: String, event: ChatRunEvent, runToken: Any) {
         if (runtimeOrNull(sessionId)?.runToken !== runToken) return
+        if (event.author == github.ponyhuang.gimi.domain.a2ui.A2uiGenerationTaskCodec.AUTHOR) {
+            val runtime = runtimeFor(sessionId)
+            event.functionResponses.forEach { runtime.messages = runtime.messages.updateA2uiTask(it.toView()) }
+            publishRuntime(runtime)
+            return
+        }
         if (event.subtaskBatch != null) {
             val runtime = runtimeFor(sessionId)
             val message = buildMessageFromParts(event) ?: return
@@ -106,7 +113,9 @@ internal class AgentEventReducer(
             runtime.lease?.updatePhase(phase)
         }
         when {
-            event.turnComplete -> runtime.isAgentRunning = false
+            event.turnComplete -> runtime.isAgentRunning = runtime.messages.any { message ->
+                message.functionResponses.any { it.a2uiTask?.status == github.ponyhuang.gimi.domain.a2ui.A2uiGenerationStatus.PENDING }
+            }
             event.partial -> runtime.isAgentRunning = true
         }
         publishRuntime(runtime)

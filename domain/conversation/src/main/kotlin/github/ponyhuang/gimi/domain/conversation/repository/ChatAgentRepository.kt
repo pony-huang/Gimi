@@ -9,6 +9,14 @@ import kotlinx.coroutines.flow.Flow
 
 /** 构建一次会话执行；缓存及 SDK 对象由 data 层封装。 */
 interface ChatAgentRepository {
+    /** 原位重试创建任务，只生成展示内容，不重新发送用户消息或业务工具。 */
+    fun retryA2ui(
+        sessionId: String,
+        selection: ModelSelection,
+        callId: String,
+        capabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities,
+    ): Flow<ChatRunEvent> = kotlinx.coroutines.flow.flow { error("A2UI retry is not supported") }
+
     suspend fun createExecution(
         sessionId: String,
         selection: ModelSelection,

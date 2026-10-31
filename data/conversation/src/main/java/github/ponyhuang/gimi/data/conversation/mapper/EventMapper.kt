@@ -18,6 +18,9 @@ import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.model.UserInputToolCallNames
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import java.io.File
+import github.ponyhuang.gimi.domain.a2ui.A2uiGenerationTaskCodec
+import github.ponyhuang.gimi.domain.conversation.usecase.updateA2uiTask
+import github.ponyhuang.gimi.domain.conversation.usecase.interruptA2uiTasks
 
 /**
  * ADK `Event` ↔ UI `Message` 的映射工具。
@@ -44,6 +47,16 @@ object EventMapper {
      * - 内容为空的 Event（无 text part、无 tool call/response、无 error）→ 返回 `null`。
      */
     fun fromEvent(event: Event): Message? {
+        if (event.author == A2uiGenerationTaskCodec.AUTHOR) {
+            @Suppress("UNCHECKED_CAST")
+            val result = event.customMetadata?.get(A2uiGenerationTaskCodec.RESULT_KEY) as? Map<String, Any?> ?: return null
+            val task = A2uiGenerationTaskCodec.extract(result) ?: return null
+            return Messages.fromAssistant(id = event.id, invocationId = event.invocationId,
+                author = event.author, timestamp = event.timestamp).copy(functionResponses = listOf(
+                FunctionResponse(id = task.callId, name = github.ponyhuang.gimi.domain.a2ui.A2uiToolResult.TOOL_NAME,
+                    response = result).toView(),
+            ))
+        }
         // system 事件用于模型上下文重放，不作为聊天气泡展示。
         if (event.content?.role == "system") return null
         // 错误优先：与 ChatViewModel.applyEvent 的"错误优先"分支对齐。
@@ -120,7 +133,14 @@ object EventMapper {
             runCatching { fromEvent(event) }
                 .onFailure { Log.w(TAG, "Skipping unreadable event ${event.id}", it) }
                 .getOrNull()
-        }
+        }.fold(mutableListOf<Message>()) { messages, message ->
+            if (message.author == A2uiGenerationTaskCodec.AUTHOR) {
+                val updated = message.functionResponses.fold(messages.toList()) { current, response -> current.updateA2uiTask(response) }
+                messages.clear()
+                messages.addAll(updated)
+            } else messages.add(message)
+            messages
+        }.interruptA2uiTasks()
 
     // ── 内部 helper ─────────────────────────────────────────────────────
 
@@ -279,6 +299,7 @@ object EventMapper {
             diagnoseLocalSearchResponse(name, response)
         }
         return FunctionResponseView(
+            a2uiTask = if (name == github.ponyhuang.gimi.domain.a2ui.A2uiToolResult.TOOL_NAME) A2uiGenerationTaskCodec.extract(response) else null,
             a2uiDocument = github.ponyhuang.gimi.domain.a2ui.A2uiToolResult.extract(name, response),
             a2uiFailed = name == github.ponyhuang.gimi.domain.a2ui.A2uiToolResult.TOOL_NAME && response["success"] == false,
             id = id.orEmpty(),

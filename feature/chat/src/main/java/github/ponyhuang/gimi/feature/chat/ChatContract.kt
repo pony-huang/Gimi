@@ -21,6 +21,9 @@ sealed interface ChatAction {
     /** 交给 SDK 恢复最近失败轮次。 */
     data object RetryFailedTurn : ChatAction
 
+    /** 按已归档输入原位重试卡片，不重放业务操作。 */
+    data class RetryA2ui(val callId: String) : ChatAction
+
     /** 返回/恢复聊天页；若当前会话在后台仍在生成，重新播种流式 channel 并刷新 UI。 */
     data object ResumeChat : ChatAction
 

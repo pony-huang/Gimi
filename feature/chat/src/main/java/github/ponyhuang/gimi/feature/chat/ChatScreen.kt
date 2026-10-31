@@ -147,6 +147,7 @@ fun ChatScaffold(
     recommendations: List<AgentRecommendation> = emptyList(),
     onRecommendationClick: (String) -> Unit = {},
     onRetryFailedTurn: () -> Unit = {},
+    onRetryA2ui: (String) -> Unit = {},
 ) {
 
     val listState = rememberLazyListState()
@@ -540,6 +541,8 @@ fun ChatScaffold(
                                             ) {
                                                 MessageRow(
                                                     message = message,
+                                                    onRetryA2ui = onRetryA2ui,
+                                                    a2uiRetryEnabled = !state.isAgentRunning,
                                                     a2uiSurfaces = state.a2uiSurfaces.filterKeys { state.a2uiOwners[it] == message.id }.values.toList(),
                                                     partChannelProvider = partChannelProvider,
                                                     speechPlaybackState = speechPlaybackState,
@@ -791,6 +794,8 @@ private fun FailedTurnActions(
 private fun MessageRow(
     message: Message,
     a2uiSurfaces: List<androidx.a2ui.model.processor.A2uiSurfaceModel> = emptyList(),
+    a2uiRetryEnabled: Boolean = false,
+    onRetryA2ui: (String) -> Unit = {},
     partChannelProvider: (partId: String) -> ReceiveChannel<String>?,
     speechPlaybackState: github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState,
     onToggleSpeechPlayback: (messageId: String, text: String) -> Unit,
@@ -799,7 +804,8 @@ private fun MessageRow(
 ) {
     if (message.role == MessageRole.Assistant && message.textParts.none { !it.thought && it.text.isNotBlank() } &&
         message.fileAttachments.isEmpty() && message.functionResponses.any { it.a2uiDocument != null } &&
-        a2uiSurfaces.isEmpty() && message.functionResponses.none { it.a2uiFailed }) return
+        a2uiSurfaces.isEmpty() && message.functionResponses.none { it.a2uiFailed ||
+            (it.a2uiTask != null && it.a2uiTask?.status != github.ponyhuang.gimi.domain.a2ui.A2uiGenerationStatus.COMPLETED) }) return
     if (message.error != null) {
         ErrorBubble(message = message, modifier = modifier)
     } else {
@@ -811,15 +817,14 @@ private fun MessageRow(
             onOpenDocument = onOpenDocument,
             modifier = modifier,
             a2uiContent = {
-                if (a2uiSurfaces.isNotEmpty()) {
+                val tasks = message.functionResponses.mapNotNull { it.a2uiTask }
+                if (a2uiSurfaces.isNotEmpty() || tasks.isNotEmpty() || message.functionResponses.any { it.a2uiFailed }) {
                     github.ponyhuang.gimi.feature.chat.a2ui.ChatA2uiContent(
                         surfaces = a2uiSurfaces,
-                        failed = false,
-                    )
-                } else if (message.functionResponses.any { it.a2uiFailed }) {
-                    github.ponyhuang.gimi.feature.chat.a2ui.ChatA2uiContent(
-                        surfaces = emptyList(),
-                        failed = true,
+                        failed = message.functionResponses.any { it.a2uiFailed },
+                        tasks = tasks,
+                        retryEnabled = a2uiRetryEnabled,
+                        onRetry = onRetryA2ui,
                     )
                 }
             },

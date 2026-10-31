@@ -310,7 +310,7 @@ private fun List<Message>.selectToolResponses(): Map<ToolCallKey, FunctionRespon
 private fun Message.hasAnswerContent(): Boolean =
     error != null ||
         textParts.any { !it.thought && it.text.isNotBlank() } ||
-        fileAttachments.isNotEmpty() || functionResponses.any { it.a2uiDocument != null || it.a2uiFailed }
+        fileAttachments.isNotEmpty() || functionResponses.any { it.a2uiDocument != null || it.a2uiFailed || it.a2uiTask != null }
 
 /** 活跃状态使用稳定的活动组 key，首个工具到达时不会重置用户的展开选择。 */
 internal fun TurnTimeline.displaySegments(status: ChatRunStatus? = null): List<TurnSegment> {

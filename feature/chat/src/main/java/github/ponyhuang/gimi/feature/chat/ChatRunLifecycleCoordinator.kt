@@ -23,6 +23,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import github.ponyhuang.gimi.domain.conversation.usecase.interruptA2uiTasks
 
 /**
  * 会话运行的启动、暂停恢复、取消与收尾；发送和交互恢复共用同一套 lease/token 规则。
@@ -137,6 +138,7 @@ internal class ChatRunLifecycleCoordinator(
         val job = runtime.job
         job?.cancel()
         runtime.job = null
+        runtime.messages = runtime.messages.interruptA2uiTasks()
         if (releaseLease) {
             runtime.execution = null
             val lease = runtime.lease
@@ -219,6 +221,7 @@ internal class ChatRunLifecycleCoordinator(
         val runtime = runtimeFor(sessionId)
         if (runtime.runToken !== runToken) return
         runtime.job = null
+        runtime.messages = runtime.messages.interruptA2uiTasks()
         val pending = runtime.pendingToolConfirmations.firstOrNull()
         val autoApproved = runtime.autoApprovedConfirmations.firstOrNull()
         val pendingInput = runtime.pendingInputRequests.firstOrNull()

@@ -23,6 +23,12 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.cancelAndJoin
+import github.ponyhuang.gimi.data.agent.a2ui.A2uiCreateScope
+import github.ponyhuang.gimi.data.agent.a2ui.taskResult
+import github.ponyhuang.gimi.domain.a2ui.A2uiGenerationTaskCodec
+import github.ponyhuang.gimi.domain.a2ui.A2uiGenerationStatus
 
 /** 单轮执行句柄，恢复只使用创建时的 Runner 与元数据，不访问全局配置或 LRU。 */
 class AgentChatExecution internal constructor(
@@ -78,7 +84,7 @@ class AgentChatExecution internal constructor(
                 streamingMode = StreamingMode.SSE,
                 customMetadata = customMetadata,
             ),
-        ).transform { event ->
+        ).withAsyncA2uiCreates().transform { event ->
             captureConfirmations(event)
             emit(event)
             // SDK 错误事件也属于失败；立即结束收集，避免被记为已完成而无法恢复。
@@ -165,7 +171,7 @@ class AgentChatExecution internal constructor(
                 streamingMode = StreamingMode.SSE,
                 customMetadata = customMetadata,
             ),
-        ).transform { event ->
+        ).withAsyncA2uiCreates().transform { event ->
             captureConfirmations(event)
             emit(event)
             if (event.errorCode != null || !event.errorMessage.isNullOrBlank()) {
@@ -178,6 +184,44 @@ class AgentChatExecution internal constructor(
         event.functionCalls().filter {
             it.name == FunctionCall.REQUEST_CONFIRMATION_FUNCTION_CALL_NAME
         }.mapNotNullTo(pendingConfirmationIds) { it.id }
+    }
+
+    /** 正文与创建并行；结果在 Runner 结束后归档，整轮完成仍等待所有卡片。 */
+    private fun Flow<Event>.withAsyncA2uiCreates(): Flow<Event> = channelFlow {
+        val creates = A2uiCreateScope(this)
+        suspend fun persist(result: Map<String, Any>): Event? {
+            val task = requireNotNull(A2uiGenerationTaskCodec.extract(result))
+            val session = runner.sessionService.getSession(
+                SessionKey(AgentChatRunner.APP_NAME, userId, sessionId),
+            ) ?: return null
+            val event = Event(
+                author = A2uiGenerationTaskCodec.AUTHOR,
+                invocationId = task.invocationId,
+                content = Content(role = Role.SYSTEM, parts = listOf(Part(
+                    text = "A2UI surface ${task.surfaceId}: ${task.status.name.lowercase()}.",
+                ))),
+                customMetadata = mapOf(A2uiGenerationTaskCodec.RESULT_KEY to result),
+            )
+            runner.sessionService.appendEvent(session, event)
+            return event
+        }
+        try {
+            withContext(creates) { this@withAsyncA2uiCreates.collect { send(it) } }
+            for (entry in creates.snapshot()) {
+                val result = entry.result.await()
+                val event = persist(entry.replacement?.plus(taskResult(entry.task.copy(status = A2uiGenerationStatus.COMPLETED))) ?: result)
+                entry.delivered = true
+                if (event != null) send(event)
+            }
+        } finally {
+            // 停止、模型错误或宿主销毁都结束尚未交付的占位；不能留下永久 loading。
+            withContext(NonCancellable) {
+                for (entry in creates.snapshot().filterNot { it.delivered }) {
+                    entry.result.cancelAndJoin()
+                    persist(taskResult(entry.task.copy(status = A2uiGenerationStatus.CANCELLED)))
+                }
+            }
+        }
     }
 
     private fun Flow<Event>.releaseMobileUseOnCompletion(): Flow<Event> = onStart {

@@ -2136,6 +2136,7 @@ class ChatViewModelCharacterizationTest {
                 appNotificationManager = appNotificationManager,
                 appUpdateRepository = appUpdateRepository,
                 a2uiProtocol = mockk(relaxed = true),
+                chatAgent = agent,
             ),
             conversations = conversations,
             sessionResolver = sessionResolver,

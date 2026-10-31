@@ -121,6 +121,7 @@ fun ChatFunctionResponse.toView(): FunctionResponseView =
         confirmationApproved = confirmationApproved,
         a2uiDocument = a2uiDocument,
         a2uiFailed = a2uiFailed,
+        a2uiTask = a2uiTask,
     )
 
 fun summarizeValue(value: Any?): String = when (value) {

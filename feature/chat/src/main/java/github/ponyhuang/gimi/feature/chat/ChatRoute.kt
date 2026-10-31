@@ -254,6 +254,7 @@ fun ChatRoute(
                 currentSessionId.isNotBlank() && !uiState.isInitializing
             }.orEmpty(),
             onSharedMediaConsumed = onSharedMediaConsumed,
+            onRetryA2ui = { viewModel.onAction(ChatAction.RetryA2ui(it)) },
             onRetryFailedTurn = {
                 viewModel.onAction(ChatAction.RetryFailedTurn)
             },

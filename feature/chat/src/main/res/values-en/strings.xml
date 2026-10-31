@@ -311,4 +311,7 @@
     <string name="chat_official_tool_kimi_search_pro_description">Return relevant passages with site and date filters</string>
     <string name="chat_official_tool_kimi_fetch">Web fetch</string>
     <string name="chat_official_tool_kimi_fetch_description">Fetch a page as Markdown</string>
+    <string name="chat_a2ui_generating">Generating card…</string>
+    <string name="chat_a2ui_cancelled">Card generation cancelled</string>
+    <string name="chat_a2ui_retry">Retry</string>
 </resources>

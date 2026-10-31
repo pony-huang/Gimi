@@ -96,6 +96,7 @@ class ChatViewModel @Inject constructor(
     private val appNotificationManager: AppNotificationManager,
     private val appUpdateRepository: AppUpdateRepository,
     private val a2uiProtocol: github.ponyhuang.gimi.domain.a2ui.A2uiProtocol,
+    private val chatAgent: github.ponyhuang.gimi.domain.conversation.repository.ChatAgentRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -196,6 +197,7 @@ class ChatViewModel @Inject constructor(
         when (action) {
             ChatAction.CancelVoiceTranscription -> voiceDictation.cancel()
             ChatAction.RetryFailedTurn -> turnRecoveryCoordinator.retry()
+            is ChatAction.RetryA2ui -> retryA2ui(action.callId)
             ChatAction.ResumeChat -> resumeChat()
             ChatAction.StopStreaming -> runLifecycleCoordinator.stopStreaming()
             is ChatAction.ToggleSpeechPlayback ->
@@ -704,6 +706,25 @@ class ChatViewModel @Inject constructor(
      * streaming state，直接沿用旧 channel 会留下截断的 Markdown 文本，重新切换会话之所以
      * 能修复正是因为它走了这条历史读取路径。
      */
+    private fun retryA2ui(callId: String) {
+        val sessionId = _uiState.value.sessionId
+        val runtime = sessionRuntimes[sessionId] ?: return
+        if (runtime.isActive || sessionNavigationCoordinator.loadingSessionId != null) return
+        val task = runtime.messages.flatMap { it.functionResponses }.firstOrNull { it.a2uiTask?.callId == callId }?.a2uiTask ?: return
+        if (task.status !in setOf(github.ponyhuang.gimi.domain.a2ui.A2uiGenerationStatus.FAILED,
+                github.ponyhuang.gimi.domain.a2ui.A2uiGenerationStatus.CANCELLED)) return
+        if (sessionRuntimes.values.count { it.isActive } >= MAX_PARALLEL_TASKS) {
+            emitNotice(ChatNotice.ParallelTaskLimitReached)
+            return
+        }
+        val selection = runtime.modelSelection ?: _uiState.value.currentModelSelection ?: return
+        runLifecycleCoordinator.launchRun(runtime) { token ->
+            chatAgent.retryA2ui(sessionId, selection, callId, a2ui.capabilities).collect {
+                eventReducer.applyEvent(sessionId, it, token)
+            }
+        }
+    }
+
     private fun resumeChat() {
         val sessionId = _uiState.value.sessionId
         if (sessionId.isBlank()) return

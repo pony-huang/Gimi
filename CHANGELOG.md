@@ -2,6 +2,25 @@
 
 版本 PR 根据 Conventional Commits 自动生成后续版本记录；合并前请整理用户可见的变化与升级注意事项。
 
+## [0.14.1](https://github.com/pony-huang/Gimi/compare/v0.14.0...v0.14.1) (2026-10-31)
+
+
+### Features
+
+* **a2ui:** generate cards asynchronously with inline retry ([074bed7](https://github.com/pony-huang/Gimi/commit/074bed70912a4a6d5b82ed5ea70b06fac7b87f3f))
+* **agent:** load Anthropic tools through system messages ([e5ffe76](https://github.com/pony-huang/Gimi/commit/e5ffe76302323af70590a008c50396b14a152f62))
+* **chat:** add thinking mode toggle with grouped effort options ([b5afaaa](https://github.com/pony-huang/Gimi/commit/b5afaaa02e4de6fa2a600277968e7790cc436016))
+* **recommendation:** add A2UI toggle to personalized services ([d5a50fe](https://github.com/pony-huang/Gimi/commit/d5a50fe2dbfbca6bf4fa6d6765f4c5fe343c9081))
+* **recommendation:** note A2UI and tool loading costs in settings ([7907d8c](https://github.com/pony-huang/Gimi/commit/7907d8cefd6068f204a8a3f3de68218b690a9fc5))
+
+
+### Bug Fixes
+
+* **agent:** adapt DeepSeek deferred tool references ([6bfe98c](https://github.com/pony-huang/Gimi/commit/6bfe98c360b42de4b73400fb197318291c45966e))
+* **agent:** load plugin toolsets on demand safely ([9904b70](https://github.com/pony-huang/Gimi/commit/9904b70839b8933827fc0d5b8bef95bf01fe39a7))
+* **agent:** remove noisy logging plugin ([3e4a82f](https://github.com/pony-huang/Gimi/commit/3e4a82f9aee1c1fae70f6cfe591872ba3dd2631b))
+* **settings:** align personalized services description ([31149b7](https://github.com/pony-huang/Gimi/commit/31149b71936e54190b16b568749a2c6a5cd1f391))
+
 ## [0.14.0](https://github.com/pony-huang/Gimi/compare/v0.13.1...v0.14.0) (2026-10-29)
 
 

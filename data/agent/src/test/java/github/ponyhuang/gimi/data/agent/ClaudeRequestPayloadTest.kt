@@ -100,6 +100,89 @@ class ClaudeRequestPayloadTest {
     }
 
     @Test
+    fun searchedToolsAreDefinedAfterEmptyResultsWithoutChangingTopLevelTools() {
+        val request = inlineSearchRequest(listOf("clock"), "clock")
+        val body = capture("deepseek-v4-pro", request)
+
+        assertEquals(listOf("tool_search"), body["tools"]!!.jsonArray.map { it.jsonObject["name"].text() })
+        val messages = body["messages"]!!.jsonArray
+        val result = messages[2].jsonObject["content"]!!.jsonArray.single().jsonObject
+        assertEquals("tool_result", result["type"].text())
+        assertEquals("", result["content"].text())
+        val addition = messages[3].jsonObject
+        assertEquals("system", addition["role"].text())
+        val block = addition["content"]!!.jsonArray.single().jsonObject
+        assertEquals("tool_addition", block["type"].text())
+        val tool = block["tool"]!!.jsonObject
+        assertEquals("tool_definition", tool["type"].text())
+        assertEquals("clock", tool["definition"]!!.jsonObject["name"].text())
+        assertEquals("inline-tools-2026-09-15", lastBetaHeader)
+    }
+
+    @Test
+    fun followupAfterInterruptedModelKeepsSystemAfterUserResults() {
+        val request = inlineSearchRequest(listOf("clock"), "clock")
+        val body = capture("deepseek-v4-pro", request.copy(contents = request.contents + userContent()))
+        assertEquals(listOf("user", "assistant", "user", "system"),
+            body["messages"]!!.jsonArray.map { it.jsonObject["role"].text() })
+        assertEquals(4, request.contents.size)
+    }
+
+    @Test
+    fun inlineDefinitionCanCarryTheNativeClaudeCacheBreakpoint() {
+        val body = capture("claude-opus-5-5", inlineSearchRequest(listOf("clock"), "clock"))
+        val block = body["messages"]!!.jsonArray.last().jsonObject["content"]!!.jsonArray.last().jsonObject
+        assertEquals("tool_addition", block["type"].text())
+        assertEquals("ephemeral", block.cacheType())
+    }
+
+    @Test
+    fun replacingSearchSelectionWithdrawsPreviouslyLoadedTools() {
+        val body = capture("deepseek-v4-pro", inlineSearchRequest(listOf("calendar"), "clock", "calendar"))
+        val messages = body["messages"]!!.jsonArray
+        val blocks = messages.last().jsonObject["content"]!!.jsonArray.map { it.jsonObject }
+        assertEquals(listOf("tool_removal", "tool_addition"), blocks.map { it["type"].text() })
+        assertEquals("clock", blocks.first()["tool"]!!.jsonObject["name"].text())
+        assertEquals(listOf("tool_search"), body["tools"]!!.jsonArray.map { it.jsonObject["name"].text() })
+    }
+
+    @Test
+    fun disabledSearchedToolIsWithdrawnBeforeContinuing() {
+        val body = capture("deepseek-v4-pro", inlineSearchRequest(emptyList(), "clock"))
+        val blocks = body["messages"]!!.jsonArray.last().jsonObject["content"]!!.jsonArray.map { it.jsonObject }
+        assertEquals("tool_removal", blocks.last()["type"].text())
+        assertEquals("clock", blocks.last()["tool"]!!.jsonObject["name"].text())
+    }
+
+    private var lastBetaHeader: String? = null
+
+    private fun inlineSearchRequest(enabled: List<String>, vararg searches: String): LlmRequest {
+        val contents = buildList {
+            add(userContent())
+            searches.forEachIndexed { index, name ->
+                add(Content(role = Role.MODEL, parts = listOf(Part(functionCall = FunctionCall(
+                    id = "search_$index", name = "tool_search", args = mapOf("query" to name),
+                )))))
+                add(Content(role = Role.USER, parts = listOf(Part(functionResponse = FunctionResponse(
+                    id = "search_$index", name = "tool_search", response = emptyMap(),
+                )))))
+                add(Content(role = Role.SYSTEM, parts = listOf(Part(
+                    text = "", partMetadata = mapOf(
+                        "selkie.inline_tool_definitions" to listOf(
+                            """{"name":"$name","description":"Read $name","parameters":{"type":"OBJECT","properties":{}}}""",
+                        ),
+                    ),
+                ))))
+            }
+        }
+        return LlmRequest(contents = contents, config = GenerateContentConfig(
+            tools = listOf(Tool(functionDeclarations = (listOf("tool_search") + enabled).map {
+                FunctionDeclaration(name = it, description = "Read $it")
+            })),
+        ))
+    }
+
+    @Test
     fun nativeClaudeRequestsCarryCacheBreakpointsOnSystemToolsAndLastMessage() {
         val body = capture("claude-sonnet-4-5", requestWithTool())
 
@@ -430,8 +513,11 @@ class ClaudeRequestPayloadTest {
                 .setBody(MESSAGE_RESPONSE),
         )
         try {
-            runBlocking { claude.generateContent(request, stream = false).toList() }
-            return Json.parseToJsonElement(server.takeRequest().body.readUtf8()).jsonObject
+            val responses = runBlocking { claude.generateContent(request, stream = false).toList() }
+            val sent = server.takeRequest(5, java.util.concurrent.TimeUnit.SECONDS)
+                ?: error("No HTTP request: ${responses.map { it.errorMessage }}")
+            lastBetaHeader = sent.getHeader("anthropic-beta")
+            return Json.parseToJsonElement(sent.body.readUtf8()).jsonObject
         } finally {
             client.close()
         }

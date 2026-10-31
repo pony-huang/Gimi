@@ -44,6 +44,8 @@ object EventMapper {
      * - 内容为空的 Event（无 text part、无 tool call/response、无 error）→ 返回 `null`。
      */
     fun fromEvent(event: Event): Message? {
+        // system 事件用于模型上下文重放，不作为聊天气泡展示。
+        if (event.content?.role == "system") return null
         // 错误优先：与 ChatViewModel.applyEvent 的"错误优先"分支对齐。
         val errMsg = event.errorMessage
         if (event.errorCode != null || !errMsg.isNullOrBlank()) {

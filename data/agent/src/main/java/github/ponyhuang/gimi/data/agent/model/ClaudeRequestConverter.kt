@@ -31,6 +31,8 @@ import com.anthropic.models.messages.UrlPdfSource
 import com.anthropic.models.messages.WebSearchTool20250305
 import com.google.adk.kt.annotations.FrameworkInternalApi
 import com.google.adk.kt.models.LlmRequest
+import com.google.adk.kt.serialization.adkJson
+import github.ponyhuang.gimi.data.agent.tools.search.INLINE_DEFINITIONS
 import com.google.adk.kt.serialization.jsonElementToAny
 import com.google.adk.kt.tools.toJsonSchema
 import com.google.adk.kt.types.Content
@@ -55,7 +57,43 @@ internal class ClaudeRequestConverter(private val name: String, private val defa
         require(maxTokens > 0) { "Claude maxOutputTokens must be positive" }
         val thinking = ClaudeThinkingPolicy.resolve(modelName, request.config.thinkingConfig, maxTokens)
         val cache = promptCacheControl(modelName, request)
-        val messages = request.contents.normalizeForAnthropic().mapNotNull(::contentToAnthropicMessageParam)
+        val contents = request.contents.normalizeForAnthropic()
+        val inlineNames = contents.flatMap(::inlineDeclarations).mapTo(mutableSetOf()) { it.name }
+        val activeNames = request.config.tools.orEmpty().flatMap { it.functionDeclarations.orEmpty() }
+            .mapTo(mutableSetOf()) { it.name }
+        val offered = mutableSetOf<String>()
+        val messages = buildList {
+            for (content in contents) {
+                val definitions = inlineDeclarations(content)
+                if (content.role == Role.SYSTEM && content.parts.any {
+                    INLINE_DEFINITIONS in it.partMetadata.orEmpty()
+                }) {
+                    val names = definitions.mapTo(mutableSetOf()) { it.name }
+                    val blocks = (offered - names).map(::toolRemoval) + definitions.map { declaration ->
+                        mapOf("type" to "tool_addition", "tool" to mapOf(
+                            "type" to "tool_definition", "definition" to declaration.toAnthropicTool(),
+                        ))
+                    }
+                    if (blocks.isNotEmpty()) add(inlineSystemMessage(blocks))
+                    offered.clear()
+                    offered.addAll(names)
+                } else {
+                    contentToAnthropicMessageParam(content)?.let(::add)
+                }
+            }
+            val withdrawn = offered - activeNames
+            if (withdrawn.isNotEmpty()) {
+                val blocks = withdrawn.map(::toolRemoval)
+                if (lastOrNull()?.role() == MessageParam.Role.SYSTEM) {
+                    // 将撤销追加到同一 system 消息，保留历史定义，不改写早期前缀。
+                    val previous = removeAt(lastIndex)
+                    val raw = jsonMapper.convertValue(previous, Map::class.java)
+                    add(inlineSystemMessage((raw["content"] as List<*>) + blocks))
+                } else {
+                    add(inlineSystemMessage(blocks))
+                }
+            }
+        }
         val builder = MessageCreateParams.builder().model(modelName).maxTokens(maxTokens.toLong())
             .messages(if (cache == null) messages else messages.withCacheBreakpoint(cache))
         val system = request.config.systemInstruction?.parts?.mapNotNull { it.text }?.joinToString("\n").orEmpty()
@@ -63,8 +101,13 @@ internal class ClaudeRequestConverter(private val name: String, private val defa
             if (cache == null) builder.system(system)
             else builder.systemOfTextBlockParams(listOf(TextBlockParam.builder().text(system).cacheControl(cache).build()))
         }
-        toAnthropicTools(request.config.tools).takeIf { it.isNotEmpty() }?.let {
+        toAnthropicTools(request.config.tools?.map { tool ->
+            tool.copy(functionDeclarations = tool.functionDeclarations?.filter { it.name !in inlineNames })
+        }).takeIf { it.isNotEmpty() }?.let {
             builder.tools(markLastToolForCache(it, cache))
+        }
+        if (inlineNames.isNotEmpty()) {
+            builder.putAdditionalHeader("anthropic-beta", "inline-tools-2026-09-15")
         }
         thinking.thinking?.let { builder.thinking(it) }
         val format = structuredOutputFormat(request)
@@ -86,6 +129,26 @@ internal class ClaudeRequestConverter(private val name: String, private val defa
         request.config.stopSequences?.let { builder.stopSequences(it) }
         return builder.build()
     }
+
+    @OptIn(FrameworkInternalApi::class)
+    private fun inlineDeclarations(content: Content): List<FunctionDeclaration> =
+        content.parts.flatMap { part ->
+            (part.partMetadata?.get(INLINE_DEFINITIONS) as? List<*>).orEmpty()
+                .filterIsInstance<String>().map {
+                    adkJson.decodeFromString(FunctionDeclaration.serializer(), it)
+                }
+        }
+
+    private fun toolRemoval(name: String): Map<String, Any> = mapOf(
+        "type" to "tool_removal",
+        "tool" to mapOf("type" to "tool_reference", "name" to name),
+    )
+
+    // SDK 已支持 system 角色；尚未建模的内联块通过原始 JSON 扩展发送。
+    private fun inlineSystemMessage(blocks: List<*>): MessageParam = MessageParam.builder()
+        .role(MessageParam.Role.SYSTEM)
+        .contentOfBlockParams(blocks.map { jsonMapper.convertValue(it, ContentBlockParam::class.java) })
+        .build()
 
     /**
      * 本次请求的 prompt cache 断点，`null` 表示不打断点。
@@ -242,7 +305,7 @@ internal class ClaudeRequestConverter(private val name: String, private val defa
 
         functionResponse?.let { fr ->
             val response = fr.response
-            val result = response["result"]
+            val result = if (fr.name == "tool_search" && response.isEmpty()) "" else response["result"]
                 ?.let { jsonMapper.writeValueAsString(it) }
                 ?: jsonMapper.writeValueAsString(response)
             return ofToolResult(
@@ -267,6 +330,7 @@ internal class ClaudeRequestConverter(private val name: String, private val defa
 
     private fun toClaudeRole(role: String) = when (role) {
         "model", "assistant" -> MessageParam.Role.ASSISTANT
+        Role.SYSTEM -> MessageParam.Role.SYSTEM
         else -> MessageParam.Role.USER
     }
 
@@ -359,7 +423,13 @@ private fun ContentBlockParam.withCacheControl(
     isDocument() -> ofDocument(asDocument().toBuilder().cacheControl(cacheControl).build())
     isToolUse() -> ofToolUse(asToolUse().toBuilder().cacheControl(cacheControl).build())
     isToolResult() -> ofToolResult(asToolResult().toBuilder().cacheControl(cacheControl).build())
-    else -> null
+    else -> {
+        val mapper = jsonMapper()
+        val raw = mapper.convertValue(this, Map::class.java)
+        if (raw["type"] in setOf("tool_addition", "tool_removal")) {
+            mapper.convertValue(raw + ("cache_control" to cacheControl), ContentBlockParam::class.java)
+        } else null
+    }
 }
 
 /** Claude 结构化输出拒绝的 schema 关键字，改写到 description 里提示模型。 */
@@ -449,6 +519,19 @@ internal fun List<Content>.normalizeForAnthropic(): List<Content> {
         if (content.parts.isEmpty()) continue
         val role = content.role.toAnthropicContentRole()
         val previous = merged.lastOrNull()
+        if (role == Role.USER && previous?.role == Role.SYSTEM) {
+            // 模型调用失败后用户可能直接追问；system 必须位于最后一条 user 之后。
+            // 只调整发送副本，已持久化的事件及工具快照保持不变。
+            val system = merged.removeAt(merged.lastIndex)
+            val user = merged.lastOrNull()
+            if (user?.role == Role.USER) {
+                merged[merged.lastIndex] = user.copy(parts = user.parts + content.parts)
+            } else {
+                merged += content.copy(role = role)
+            }
+            merged += system
+            continue
+        }
         if (previous?.role == role) {
             merged[merged.lastIndex] = previous.copy(parts = previous.parts + content.parts)
         } else {
@@ -488,5 +571,6 @@ private fun List<FunctionCall>.interruptedToolResults(results: List<Part>): List
 
 private fun String?.toAnthropicContentRole(): String = when (this) {
     Role.MODEL, "assistant" -> Role.MODEL
+    Role.SYSTEM -> Role.SYSTEM
     else -> Role.USER
 }

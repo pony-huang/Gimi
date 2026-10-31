@@ -25,6 +25,7 @@ import io.mockk.coEvery
 import kotlinx.coroutines.CancellationException
 import org.junit.Assert.assertSame
 import io.mockk.every
+import io.mockk.spyk
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -33,6 +34,24 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ToolSearchToolsetTest {
+
+    @Test
+    fun anthropicSearchReturnsEmptyAndPersistsPendingDefinitions() = runTest {
+        val readonly = spyk(context())
+        every { readonly.runConfig } returns RunConfig(customMetadata =
+            github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata.of(
+                github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata(
+                    "deepseek", github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Anthropic,
+                    "deepseek-v4-pro", "https://example.test",
+                ), null, true,
+            ),
+        )
+        val actions = EventActions()
+        val result = toolset(listOf(tool("clock"))).search("clock", toolContext(readonly, actions))
+        assertTrue(result.isEmpty())
+        val pending = actions.stateDelta[inlinePendingKey(readonly.agentName)] as List<*>
+        assertTrue((pending.single() as String).contains("clock"))
+    }
 
     @Test
     fun toolWithContextualDefaultInParameterSchemaCanBeDiscoveredAndSerialized() = runTest {

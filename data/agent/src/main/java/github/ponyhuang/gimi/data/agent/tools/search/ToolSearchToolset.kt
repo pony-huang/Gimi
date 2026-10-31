@@ -14,6 +14,7 @@ import com.google.adk.kt.types.Schema
 import com.google.adk.kt.types.Type
 import github.ponyhuang.gimi.data.agent.tools.modelRuntimeMetadataOrNull
 import github.ponyhuang.gimi.data.agent.tools.search.ToolSearchToolset.Companion.STATE_KEY_LOADED_TOOLS
+import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -58,7 +59,8 @@ interface ToolCandidateSource {
  * 选中的工具名会写入 session state（[STATE_KEY_LOADED_TOOLS]），后续请求 —— 包括
  * 新的用户轮次 —— 都继续携带这些工具声明，保持请求前缀稳定（前缀缓存友好），
  * 模型也不需要每轮重新检索。确认恢复时同样从持久化 state 重建选择，不依赖
- * 进程内状态。
+ * 进程内状态。Anthropic 将选中的声明保存为独立 system 事件，由协议层转成内联工具定义；
+ * 其他协议继续在顶层 tools 中声明。
  */
 internal class ToolSearchToolset(
     private val sources: List<ToolCandidateSource>,
@@ -77,27 +79,38 @@ internal class ToolSearchToolset(
         return listOf(searchTool)
     }
 
+    @OptIn(FrameworkInternalApi::class)
     override suspend fun processLlmRequest(
         toolContext: ToolContext,
         llmRequest: LlmRequest,
-    ): LlmRequest = llmRequest.appendInstructions(
-        Content(
-            parts = listOf(
-                Part(
-                    text = """
-                        <tool_search>
-                        - When the user needs an action or current device information that the declared tools cannot
-                          provide, call `tool_search` first.
-                        - Matching tool definitions become available in the next model step; never guess or imitate
-                          an undeclared tool call.
-                        - When catalog descriptions are in English, search with concise English capability keywords.
-                        - After matching tools become available, continue the user's task with those declared tools.
-                        </tool_search>
-                    """.trimIndent(),
+    ): LlmRequest {
+        val request = llmRequest.appendInstructions(
+            Content(
+                parts = listOf(
+                    Part(
+                        text = """
+                            <tool_search>
+                            - When the user needs an action or current device information that the declared tools cannot
+                              provide, call `tool_search` first.
+                            - Matching tool definitions become available in the next model step; never guess or imitate
+                              an undeclared tool call.
+                            - When catalog descriptions are in English, search with concise English capability keywords.
+                            - After matching tools become available, continue the user's task with those declared tools.
+                            </tool_search>
+                        """.trimIndent(),
+                    ),
                 ),
             ),
-        ),
-    )
+        )
+        if (toolContext.context.modelRuntimeMetadataOrNull()?.baseType != ApiProtocol.Anthropic) {
+            return request
+        }
+        return InlineToolSearchEvents.appendPending(
+            toolContext,
+            request,
+            getTools(toolContext.context).mapNotNull { it.declaration() },
+        )
+    }
 
     internal suspend fun search(
         rawQuery: String,
@@ -134,6 +147,12 @@ internal class ToolSearchToolset(
 
         // 命中即持久化：写入 session state，后续请求（含新用户轮次）继续携带这些声明。
         toolContext.actions.stateDelta[STATE_KEY_LOADED_TOOLS] = selected.map { it.tool.name }
+
+        if (toolContext.context.modelRuntimeMetadataOrNull()?.baseType == ApiProtocol.Anthropic) {
+            toolContext.actions.stateDelta[inlinePendingKey(toolContext.context.agentName)] =
+                selected.map { it.declarationJson }
+            return emptyMap()
+        }
 
         return mapOf(
             KEY_LOADED_TOOLS to selected.map { it.summary() },
@@ -358,7 +377,7 @@ internal class ToolSearchToolset(
         val sourceDisplayName: String,
         val tool: BaseTool,
     ) {
-        private val declarationJson: String = adkJson.encodeToString(
+        val declarationJson: String = adkJson.encodeToString(
             FunctionDeclaration.serializer(),
             requireNotNull(tool.declaration()),
         )

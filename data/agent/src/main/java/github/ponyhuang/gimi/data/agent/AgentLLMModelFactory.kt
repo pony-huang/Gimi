@@ -7,6 +7,8 @@ import com.google.adk.kt.models.openai.ChatCompletions
 import com.google.adk.kt.types.HttpOptions
 import github.ponyhuang.gimi.data.agent.execution.AttachmentResolvingModel
 import github.ponyhuang.gimi.data.agent.model.Claude
+import github.ponyhuang.gimi.data.agent.tools.search.AnthropicToolLoadingRequestConverter
+import github.ponyhuang.gimi.data.agent.tools.search.toolLoadingMode
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedAgentModel
@@ -110,7 +112,10 @@ class AgentLLMModelFactory @Inject constructor(
 
             ApiProtocol.Anthropic -> Claude(
                 name = cfg.modelId,
-                runtime = cfg.toRuntimeMetadata(),
+                requestConverter = AnthropicToolLoadingRequestConverter(
+                    cfg.modelId, 8196,
+                    toolLoadingMode(cfg.toRuntimeMetadata()),
+                )::convert,
                 client = AnthropicOkHttpClient.builder()
                     .baseUrl(cfg.fullBaseUrl)
                     .apiKey(cfg.apiKey)

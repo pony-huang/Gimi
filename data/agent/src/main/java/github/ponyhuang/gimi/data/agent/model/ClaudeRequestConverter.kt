@@ -31,10 +31,6 @@ import com.anthropic.models.messages.UrlPdfSource
 import com.anthropic.models.messages.WebSearchTool20250305
 import com.google.adk.kt.annotations.FrameworkInternalApi
 import com.google.adk.kt.models.LlmRequest
-import com.google.adk.kt.serialization.adkJson
-import github.ponyhuang.gimi.data.agent.tools.search.INLINE_DEFINITIONS
-import github.ponyhuang.gimi.data.agent.tools.search.ToolLoadingMode
-import github.ponyhuang.gimi.data.agent.tools.search.DEFERRED_CATALOG
 import com.google.adk.kt.serialization.jsonElementToAny
 import com.google.adk.kt.tools.toJsonSchema
 import com.google.adk.kt.types.Content
@@ -53,7 +49,6 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 internal class ClaudeRequestConverter(
     private val name: String,
     private val defaultMaxTokens: Int,
-    private val loadingMode: ToolLoadingMode = ToolLoadingMode.RESULT,
 ) {
     private val jsonMapper = jsonMapper()
 
@@ -64,43 +59,7 @@ internal class ClaudeRequestConverter(
         val thinking = ClaudeThinkingPolicy.resolve(modelName, request.config.thinkingConfig, maxTokens)
         val cache = promptCacheControl(modelName, request)
         val contents = request.contents.normalizeForAnthropic()
-        val useReferences = loadingMode == ToolLoadingMode.DEEPSEEK_REFERENCE
-        val activeNames = request.config.tools.orEmpty().flatMap { it.functionDeclarations.orEmpty() }
-            .mapTo(mutableSetOf()) { it.name }
-        val offered = mutableSetOf<String>()
-        val messages = buildList {
-            for (content in contents) {
-                val definitions = inlineDeclarations(content)
-                if (content.role == Role.SYSTEM && content.parts.any {
-                    INLINE_DEFINITIONS in it.partMetadata.orEmpty()
-                }) {
-                    if (!useReferences) continue
-                    val names = definitions.mapTo(mutableSetOf()) { it.name }
-                    val blocks = (offered - names).map(::toolRemoval) + definitions.map { declaration ->
-                        mapOf("type" to "tool_addition", "tool" to mapOf(
-                            "type" to "tool_reference", "name" to declaration.name,
-                        ))
-                    }
-                    if (blocks.isNotEmpty()) add(inlineSystemMessage(blocks))
-                    offered.clear()
-                    offered.addAll(names)
-                } else {
-                    contentToAnthropicMessageParam(content)?.let(::add)
-                }
-            }
-            val withdrawn = if (useReferences) offered - activeNames else emptySet()
-            if (withdrawn.isNotEmpty()) {
-                val blocks = withdrawn.map(::toolRemoval)
-                if (lastOrNull()?.role() == MessageParam.Role.SYSTEM) {
-                    // 将撤销追加到同一 system 消息，保留历史定义，不改写早期前缀。
-                    val previous = removeAt(lastIndex)
-                    val raw = jsonMapper.convertValue(previous, Map::class.java)
-                    add(inlineSystemMessage((raw["content"] as List<*>) + blocks))
-                } else {
-                    add(inlineSystemMessage(blocks))
-                }
-            }
-        }
+        val messages = contents.mapNotNull(::contentToAnthropicMessageParam)
         val builder = MessageCreateParams.builder().model(modelName).maxTokens(maxTokens.toLong())
             .messages(if (cache == null) messages else messages.withCacheBreakpoint(cache))
         val system = request.config.systemInstruction?.parts?.mapNotNull { it.text }?.joinToString("\n").orEmpty()
@@ -108,20 +67,9 @@ internal class ClaudeRequestConverter(
             if (cache == null) builder.system(system)
             else builder.systemOfTextBlockParams(listOf(TextBlockParam.builder().text(system).cacheControl(cache).build()))
         }
-        val declared = toAnthropicTools(request.config.tools)
-        val deferred = if (useReferences) {
-            // 历史中被撤下的工具也必须保留可解析的引用，最后的 removal 控制当前可用性。
-            val snapshots = request.config.systemInstruction?.parts.orEmpty().flatMap {
-                (it.partMetadata?.get(DEFERRED_CATALOG) as? List<*>).orEmpty().filterIsInstance<String>()
-            }.map { decodeDeclaration(it) } + contents.flatMap(::inlineDeclarations)
-            snapshots.distinctBy { it.name }.map { declaration ->
-                ToolUnion.ofTool(declaration.toAnthropicTool().toBuilder()
-                    .putAdditionalProperty("defer_loading", from(true)).build())
-            }
-        } else emptyList()
-        val deferredNames = deferred.map { it.asTool().name() }.toSet()
-        val tools = declared.filter { !it.isTool() || it.asTool().name() !in deferredNames } + deferred
-        if (tools.isNotEmpty()) builder.tools(markLastToolForCache(tools, cache))
+        toAnthropicTools(request.config.tools).takeIf { it.isNotEmpty() }?.let {
+            builder.tools(markLastToolForCache(it, cache))
+        }
         thinking.thinking?.let { builder.thinking(it) }
         val format = structuredOutputFormat(request)
         if (thinking.effort != null || format != null) {
@@ -142,30 +90,6 @@ internal class ClaudeRequestConverter(
         request.config.stopSequences?.let { builder.stopSequences(it) }
         return builder.build()
     }
-
-    @OptIn(FrameworkInternalApi::class)
-    private fun decodeDeclaration(snapshot: String): FunctionDeclaration =
-        adkJson.decodeFromString(FunctionDeclaration.serializer(), snapshot)
-
-    @OptIn(FrameworkInternalApi::class)
-    private fun inlineDeclarations(content: Content): List<FunctionDeclaration> =
-        content.parts.flatMap { part ->
-            (part.partMetadata?.get(INLINE_DEFINITIONS) as? List<*>).orEmpty()
-                .filterIsInstance<String>().map {
-                    adkJson.decodeFromString(FunctionDeclaration.serializer(), it)
-                }
-        }
-
-    private fun toolRemoval(name: String): Map<String, Any> = mapOf(
-        "type" to "tool_removal",
-        "tool" to mapOf("type" to "tool_reference", "name" to name),
-    )
-
-    // SDK 已支持 system 角色；尚未建模的内联块通过原始 JSON 扩展发送。
-    private fun inlineSystemMessage(blocks: List<*>): MessageParam = MessageParam.builder()
-        .role(MessageParam.Role.SYSTEM)
-        .contentOfBlockParams(blocks.map { jsonMapper.convertValue(it, ContentBlockParam::class.java) })
-        .build()
 
     /**
      * 本次请求的 prompt cache 断点，`null` 表示不打断点。
@@ -225,7 +149,7 @@ internal class ClaudeRequestConverter(
             .build()
     }
 
-    private fun contentToAnthropicMessageParam(content: Content): MessageParam? {
+    internal fun contentToAnthropicMessageParam(content: Content): MessageParam? {
         val blocks = content.parts.mapNotNull { it.toContentBlockParam() }
         if (blocks.isEmpty()) return null
         return MessageParam.builder()
@@ -322,7 +246,7 @@ internal class ClaudeRequestConverter(
 
         functionResponse?.let { fr ->
             val response = fr.response
-            val result = if (fr.name == "tool_search" && response.isEmpty()) "" else response["result"]
+            val result = response["result"]
                 ?.let { jsonMapper.writeValueAsString(it) }
                 ?: jsonMapper.writeValueAsString(response)
             return ofToolResult(
@@ -374,7 +298,7 @@ internal class ClaudeRequestConverter(
             .build()
     }
 
-    private fun toAnthropicTools(tools: List<AdkTool>?): List<ToolUnion> =
+    internal fun toAnthropicTools(tools: List<AdkTool>?): List<ToolUnion> =
         tools.orEmpty().flatMap { it.functionDeclarations.orEmpty() }
             .map(::toAnthropicToolUnion)
 
@@ -440,13 +364,7 @@ private fun ContentBlockParam.withCacheControl(
     isDocument() -> ofDocument(asDocument().toBuilder().cacheControl(cacheControl).build())
     isToolUse() -> ofToolUse(asToolUse().toBuilder().cacheControl(cacheControl).build())
     isToolResult() -> ofToolResult(asToolResult().toBuilder().cacheControl(cacheControl).build())
-    else -> {
-        val mapper = jsonMapper()
-        val raw = mapper.convertValue(this, Map::class.java)
-        if (raw["type"] in setOf("tool_addition", "tool_removal")) {
-            mapper.convertValue(raw + ("cache_control" to cacheControl), ContentBlockParam::class.java)
-        } else null
-    }
+    else -> null
 }
 
 /** Claude 结构化输出拒绝的 schema 关键字，改写到 description 里提示模型。 */

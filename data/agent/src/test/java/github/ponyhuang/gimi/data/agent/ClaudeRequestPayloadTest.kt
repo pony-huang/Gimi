@@ -527,10 +527,15 @@ class ClaudeRequestPayloadTest {
             name = model,
             client = client,
             maxTokens = maxTokens,
-            runtime = if (model.startsWith("deepseek")) ModelRuntimeMetadata(
-                "deepseek", github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Anthropic,
-                model, "https://api.deepseek.com/anthropic",
-            ) else null,
+            requestConverter = github.ponyhuang.gimi.data.agent.tools.search.AnthropicToolLoadingRequestConverter(
+                model, maxTokens,
+                github.ponyhuang.gimi.data.agent.tools.search.toolLoadingMode(
+                    if (model.startsWith("deepseek")) ModelRuntimeMetadata(
+                        "deepseek", github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.Anthropic,
+                        model, "https://api.deepseek.com/anthropic",
+                    ) else null,
+                ),
+            )::convert,
         )
         server.enqueue(
             MockResponse()

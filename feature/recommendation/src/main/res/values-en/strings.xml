@@ -16,9 +16,11 @@
     <string name="recommendation_status_error">Update failed: %1$s</string>
     <string name="recommendation_status_retrying">Update failed: %1$s. Retrying in %2$d s.</string>
     <string name="recommendation_conversation_section">Conversation UI</string>
+    <string name="recommendation_a2ui_note">Cards are generated on demand by the model, so responses may be slower and use extra tokens.</string>
     <string name="recommendation_a2ui_title">A2UI interactive cards</string>
     <string name="recommendation_a2ui_subtitle">Let the assistant show forms, controls, and structured results as native cards</string>
     <string name="recommendation_tools_section">Tools</string>
+    <string name="recommendation_tool_loading_note">Loading all tools keeps them ready every turn but uses more context and tokens; on-demand loading reduces both.</string>
     <string name="recommendation_close">Close</string>
     <string name="recommendation_tool_loading_title">Tool loading</string>
     <string name="recommendation_tool_loading_always">Load all tools for every turn</string>

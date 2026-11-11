@@ -4,9 +4,15 @@
 
 ## [1.0.0-beta.1](https://github.com/pony-huang/Gimi/compare/v0.14.1...v1.0.0-beta.1) (2026-11-11)
 
+> **⚠️ 升级提醒：本次更新可能导致应用闪退。若出现闪退，请卸载后重新安装。卸载会清除应用本地数据，请提前备份重要内容。**
+>
+> **⚠️ Upgrade warning — This update may cause the app to crash. If it crashes, uninstall the app and reinstall it. Uninstalling clears local app data. Back up important content first.**
+
 首个 1.0.0 测试版本，语音能力、聊天界面与智能体工具链的一次大更新。
 
-### 新增
+### 中文
+
+#### 新增
 
 - **实时语音通话**：新增 OpenAI Realtime 与 Qwen-Audio Realtime（阿里云百炼）两种原生全双工实时模式，支持自动断句与随时打断；「实时助手」模式可在通话过程中调用已授权的手机工具、MCP、插件、AppFunction 与沙盒工具。
 - **语音模式**：语音通话提供「轻聊」「助手」「实时」「实时助手」四种模式；实时模式改为按需连接，挂断后保留页面。
@@ -14,12 +20,11 @@
 - **千问语音**：新增 qwen-audio 3.1/3.0 的流式识别、flash/plus 合成与 realtime 模型，实时音色由服务配置下发。
 - **官方语音预设**：内置官方语音提示词预设，可在语音抽屉中直接选用。
 - **后台通话**：实时语音通话切到后台后继续运行，通知栏可查看并操作。
-- **手机控制子智能体**：新增 direct-phone-control 骨架，mobile use 独立为单独模块。
 - **聊天界面**：支持预测返回手势的抽屉、重做输入卡片与顶部胶囊、统一模型与音色选择器，语音通话中的模型状态可直接在顶部查看。
 - **设置**：分组重排，主题相关项移入个性化选项，推荐更新独立成页。
 - **品牌**：新增日间与夜间两套启动图标，统一通用主题配色与单色图标。
 
-### 修复
+#### 修复
 
 - **语音**：回声干扰导致 VAD 误判、待响应时通话挂起、播放回声误开启新回合、后台通知不可操作、模式切换时可用性误判、跨模型音色解析错误。
 - **聊天**：抽屉遮罩隐藏后未释放触摸输入、模型选择器空态异常、顶部胶囊描边不一致。
@@ -27,11 +32,38 @@
 - **A2UI / A2A**：评审问题修复，常用控件不再返回结果卡片。
 - **通知**：任务与语音通话通知可靠性修复。
 
-### 升级注意事项
+#### 升级注意事项
 
-- 版本号与安装版本（versionCode）已递增，可在已安装的旧版本上直接覆盖升级；本次未变更本地数据库结构，无需清除应用数据。
+- 本次为 1.0.0 测试版，升级后可能出现闪退。若出现闪退，请卸载后重新安装，并重新配置所需服务与权限。
 - 后台应用控制仍需在 **设置 → 个性化选项** 配置 Shizuku（ADB shell 模式），并授予悬浮窗权限与图像模型权限；文本输入与原生元素操作还需要 Gimi 无障碍服务。
 - 插件继续通过 Releases 或应用内订阅目录安装，下载后校验 SHA-256；插件与主应用共用同一版本号。
+
+### English
+
+The first 1.0.0 beta brings a major update to voice, chat, and agent tools.
+
+#### New features
+
+- **Realtime voice calls** — Native full-duplex OpenAI Realtime and Qwen-Audio Realtime (Alibaba Cloud Bailian), with automatic turn detection and interruption. Realtime Assistant can invoke authorized phone, MCP, plugin, AppFunction, and sandbox tools during calls.
+- **Voice modes** — Choose Light Chat, Assistant, Realtime, or Realtime Assistant. Realtime connections start on demand, and the call page stays open after hanging up.
+- **Speech services** — Configure speech recognition and synthesis separately from chat models, with searchable service pickers for Qwen, MiniMax, MiMo, and OpenAI. Qwen and OpenAI also support native realtime voice.
+- **Qwen voice** — Streaming recognition with qwen-audio 3.1/3.0, flash/plus synthesis, realtime models, and service-provided realtime voice choices.
+- **Voice presets and background calls** — Built-in official voice prompt presets are available in the voice drawer. Realtime calls continue in the background with notification controls.
+- **Chat interface** — Predictive-back drawer gestures, redesigned input cards and top capsules, unified model and voice pickers, and model status visible during voice calls.
+- **Settings and appearance** — Reorganized settings, theme options under personalization, a dedicated recommendation-update page, day/night launcher icons, and consistent theme colors and monochrome icons.
+
+#### Fixes
+
+- **Voice** — Improved echo handling and VAD, pending-response call behavior, background notification controls, mode availability checks, and voice resolution across models.
+- **Chat** — Fixed blocked touch input after dismissing the drawer overlay, empty model-picker states, and inconsistent top-capsule outlines.
+- **Agents** — Hardened plugins and token storage, sanitized MCP credentials and headers, adapted DeepSeek deferred tool references, and isolated remote-agent failures.
+- **A2UI / A2A and notifications** — Addressed review findings, stopped returning result cards for common controls, and improved task and voice-call notification reliability.
+
+#### Upgrade notes
+
+- This beta may crash after upgrading. If it crashes, uninstall and reinstall the app, then configure the required services and permissions again. Uninstalling clears local app data, so back up important content first.
+- Background app control requires Shizuku in ADB shell mode under Settings → Personalization, plus overlay and image-model permissions. Text input and native element operations also require the Gimi accessibility service.
+- Install plugins from Releases or the in-app subscription catalog. Downloads are checked with SHA-256, and plugins share the app version.
 
 ## [0.14.1](https://github.com/pony-huang/Gimi/compare/v0.14.0...v0.14.1) (2026-10-31)
 

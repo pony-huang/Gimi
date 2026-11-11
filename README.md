@@ -44,7 +44,9 @@ Presets: <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/hea
 
 Gimi supports Chat Completions and Anthropic-compatible endpoints. Attachment, reasoning, and tool capabilities depend on the selected model and protocol.
 
-Voice uses separate speech services configured in **Settings → Speech models**: Qwen (DashScope), MiniMax, MiMo, and OpenAI provide recognition and synthesis, while OpenAI Realtime and Qwen-Audio Realtime power the native full-duplex Realtime modes.
+Voice uses separate speech services configured in **Settings → Speech models**: Qwen (Alibaba Cloud Bailian), MiniMax, MiMo, and OpenAI provide recognition and synthesis, while OpenAI Realtime and Qwen-Audio Realtime power the native full-duplex Realtime modes.
+
+Qwen (Alibaba Cloud Bailian, reached through the DashScope platform) covers the whole voice path. Its `qwen-audio` models offer streaming recognition, whole-utterance transcription, and `flash`/`plus` synthesis, with each generation and tier shipping its own voice set covering Mandarin, dialect, and multilingual voices. The `qwen-audio` Realtime models open a native full-duplex WebSocket session in which the server detects turns and handles interruption; their session voice is chosen in **Settings → Default models** and is separate from the synthesis voices. Qwen Realtime also accepts function calls, so the Realtime assistant mode can use authorized tools during a Qwen call.
 
 Enable official tools in **Settings → LLM models**, then select them in the conversation:
 

@@ -100,7 +100,7 @@ automatic Draft body. The GitHub Release and the in-app update dialog read the s
 
 ## Production build and publication
 
-The release workflow accepts only `vX.Y.Z` and `vX.Y.Z-rc.N`, checks that the tag, the file version,
+The release workflow accepts only `vX.Y.Z`, `vX.Y.Z-beta.N`, and `vX.Y.Z-rc.N`, checks that the tag, the file version,
 and the manifest agree, and that the tag points at the exact commit in main's history. Publication steps check out the resolved commit SHA.
 
 Publication builds the main app and five plugins without repeating full CI, retaining version,
@@ -148,11 +148,11 @@ Existing saved subscription lists remain user-owned; use “Restore default sour
 URL. Preview local generation using fixture APKs only through the release-tool tests; production
 catalogs are generated from signed artifacts by CI, never committed or manually uploaded.
 
-Stable releases become latest; RCs are marked prerelease and do not affect the app's
+Stable releases become latest; betas and RCs are marked prerelease and do not affect the app's
 `/releases/latest` update channel. After publishing, check download, in-place install, and core
-features on a physical device; validate important versions through an RC first.
+features on a physical device; validate important versions through a prerelease first.
 
-## Manual tags, RCs, and retries
+## Manual tags, prereleases, and retries
 
 A manual release also needs the version files, the manifest, an incremented versionCode, and the
 matching CHANGELOG section committed and merged into main before the matching tag is pushed. For
@@ -163,9 +163,11 @@ git tag v0.11.0-rc.1
 git push origin v0.11.0-rc.1
 ```
 
-RC numbering starts at 1; the stable release and every RC use their own incremented versionCode.
-Automatic version PRs cover stable releases, while RCs ship through a manual version commit and tag.
-After an RC, check the target version of the next release-please version PR; to pin it explicitly, use
+Prerelease numbering starts at 1; the stable release and every prerelease use their own incremented
+versionCode. Automatic version PRs cover stable releases, while betas and RCs ship through a manual
+version commit and tag. Prerelease tiers are ordered `beta` before `rc` before the stable release,
+so `1.0.0-beta.1` precedes `1.0.0-rc.1`, which precedes `1.0.0`.
+After a prerelease, check the target version of the next release-please version PR; to pin it explicitly, use
 a `Release-As: 0.11.0` footer in the merge commit.
 
 A failed release keeps the unpublished Draft. After fixing the environment or the secrets, re-run

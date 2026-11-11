@@ -29,6 +29,16 @@ class ReleaseToolsTest(unittest.TestCase):
         self.assertEqual(sorted(versions, key=release.version_key),
                          ['0.6.9', '0.7.0-rc.2', '0.7.0-rc.10', '0.7.0'])
 
+    def test_beta_sorts_before_rc_and_stable(self):
+        versions = ['1.0.0', '1.0.0-rc.1', '1.0.0-beta.1', '1.0.0-beta.2', '0.9.9']
+        self.assertEqual(sorted(versions, key=release.version_key),
+                         ['0.9.9', '1.0.0-beta.1', '1.0.0-beta.2', '1.0.0-rc.1', '1.0.0'])
+
+    def test_extracts_beta_release_notes_heading(self):
+        text = ('## [1.0.0-beta.1](https://example.test) (2026-11-11)\n\n### 新增\n\n- 实时语音\n\n'
+                '## 0.14.1\n\n旧内容\n')
+        self.assertEqual(release.notes(text, '1.0.0-beta.1'), '### 新增\n\n- 实时语音\n')
+
     def test_double_digit_minor_versions_and_release_notes(self):
         self.assertGreater(release.version_key('0.10.2'), release.version_key('0.6.3'))
         text = '## [0.10.3](https://example.test) (2026-10-05)\n\n- 新增功能\n\n## 0.10.2\n\n- 已发布版本\n'
@@ -36,7 +46,7 @@ class ReleaseToolsTest(unittest.TestCase):
         self.assertEqual(release.notes(text, '0.10.2'), '- 已发布版本\n')
 
     def test_rejects_invalid_versions(self):
-        for version in ('v0.6.4', '01.2.3', '1.2', '1.2.3-rc.0', '1.2.3; echo hi', '1.2.3-beta.1'):
+        for version in ('v0.6.4', '01.2.3', '1.2', '1.2.3-rc.0', '1.2.3-beta.0', '1.2.3; echo hi'):
             with self.subTest(version=version), self.assertRaises(ValueError):
                 release.version_key(version)
 
@@ -100,6 +110,24 @@ class ReleaseToolsTest(unittest.TestCase):
                 release, 'run', side_effect=['commit', 'commit', '{"assets": [{"name":"app.apk","size":3}]}']
             ), patch.object(release.subprocess, 'run') as execute:
                 release.publish('v0.7.0-rc.1')
+                commands = [call.args[0] for call in execute.call_args_list]
+                self.assertIn('--prerelease', commands[1])
+                self.assertIn('--draft=false', commands[-1])
+                self.assertIn('--latest=false', commands[-1])
+
+    def test_complete_upload_publishes_beta_without_latest(self):
+        with tempfile.TemporaryDirectory(dir=release.ROOT / 'temp') as folder:
+            root = Path(folder)
+            dist = root / 'temp/release/dist'
+            dist.mkdir(parents=True)
+            (dist / 'app.apk').write_bytes(b'apk')
+            (root / 'temp/release/notes.md').write_text('notes')
+            with patch.object(release, 'ROOT', root), patch.object(
+                release, 'config', return_value=('1.0.0-beta.1', 1001)
+            ), patch.object(release, 'releases', return_value=[]), patch.object(
+                release, 'run', side_effect=['commit', 'commit', '{"assets": [{"name":"app.apk","size":3}]}']
+            ), patch.object(release.subprocess, 'run') as execute:
+                release.publish('v1.0.0-beta.1')
                 commands = [call.args[0] for call in execute.call_args_list]
                 self.assertIn('--prerelease', commands[1])
                 self.assertIn('--draft=false', commands[-1])

@@ -240,4 +240,4 @@ Load specs on demand:
 | [Realtime voice test coverage](spec/en/voice/testing.md) | writing, moving, or deleting realtime voice tests, or judging what only device verification can cover |
 | [Plugins](spec/en/plugin/plugins.md) | adding or changing a plugin, or its integrated platform |
 | [Testing and verification](spec/en/testing.md) | writing or evaluating tests, diagnosing cross-platform failures, changing HTTP/paid integrations |
-| [Releasing](spec/en/releasing.md) | changing CI/CD workflows or release wiring, version PRs, RCs, tag-based releases |
+| [Releasing](spec/en/releasing.md) | changing CI/CD workflows or release wiring, version PRs, prereleases, tag-based releases |

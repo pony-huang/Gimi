@@ -56,15 +56,15 @@ Release 正文在构建时从对应版本的 CHANGELOG 段落提取，覆盖 Dra
 
 ## 正式构建与发布
 
-发布工作流只允许 `vX.Y.Z` 与 `vX.Y.Z-rc.N`，检查 tag、文件版本、manifest 一致，且 tag 指向 main 历史中的准确提交。发布 checkout 已解析的 commit SHA。
+发布工作流只允许 `vX.Y.Z`、`vX.Y.Z-beta.N` 与 `vX.Y.Z-rc.N`，检查 tag、文件版本、manifest 一致，且 tag 指向 main 历史中的准确提交。发布 checkout 已解析的 commit SHA。
 
 发版不重复执行完整 CI，直接构建主 App 和五个插件，并保留版本、签名和产物校验。缺少正式签名配置时停止；密码通过 Gradle 环境变量传递，不拼入命令。每个 APK 都检查 applicationId、versionName、versionCode 和签名证书，主 App 检查上一已公开版本的安装版本号。
 
 全部产物通过后上传到 Draft Release，核对附件名称和大小，最后公开。附件包含 arm64-v8a / universal App APK、五个插件 APK、`SHA256SUMS` 和包含 commit / 版本 / 证书指纹的 `release-metadata.json`。主 App 文件名保留 ABI 后缀，适配应用内更新选择逻辑。R8 mapping 作为内部 Actions Artifact 保存 90 天，应在过期前另行归档长期需要的文件。
 
-正式版本设为 latest；RC 标记为 prerelease，不影响应用的 `/releases/latest` 更新通道。发布后真机检查下载、覆盖安装和核心功能；重要版本优先通过 RC 验证。
+正式版本设为 latest；beta 与 RC 标记为 prerelease，不影响应用的 `/releases/latest` 更新通道。发布后真机检查下载、覆盖安装和核心功能；重要版本优先通过预发布验证。
 
-## 手动 tag、RC 和失败重试
+## 手动 tag、预发布和失败重试
 
 手动发版也需要先把版本文件、manifest、递增的 versionCode 和对应 CHANGELOG 段落提交并合并 main，再推送匹配的 tag。例如：
 
@@ -73,7 +73,7 @@ git tag v0.11.0-rc.1
 git push origin v0.11.0-rc.1
 ```
 
-RC 序号从 1 起；正式版本与每个 RC 使用各自递增的 versionCode。当前自动版本 PR 负责正式版本，RC 通过手动版本提交和 tag 发布。发过 RC 后，核对下一次 release-please 版本 PR 的目标版本；如需明确指定目标版本，可在合并提交中使用 `Release-As: 0.11.0` footer。
+预发布序号从 1 起；正式版本与每个预发布使用各自递增的 versionCode。当前自动版本 PR 负责正式版本，beta 与 RC 通过手动版本提交和 tag 发布。预发布层级按 `beta` 早于 `rc`、`rc` 早于正式版本排序，因此 `1.0.0-beta.1` 早于 `1.0.0-rc.1`，后者早于 `1.0.0`。发过预发布后，核对下一次 release-please 版本 PR 的目标版本；如需明确指定目标版本，可在合并提交中使用 `Release-As: 0.11.0` footer。
 
 发布失败会保留未公开 Draft。修复环境或密钥配置后，在 Actions → Publish Android Release → Run workflow 填入已有 tag 补跑；补跑不会构建手动选择分支上的其他源码，也不会新建 tag。由 release-please 生成的 Draft 应在下一次合并版本 PR 前补跑完成，避免多个未完成的发布。
 

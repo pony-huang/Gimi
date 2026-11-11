@@ -9,7 +9,7 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = re.compile(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc\.([1-9]\d*))?')
+VERSION = re.compile(r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(beta|rc)\.([1-9]\d*))?')
 PLUGINS = ('spotify', 'zhihu', 'xiaohongshu', 'v2ex', 'weibo', 'netease')
 PLUGIN_CATALOG = Path('data/plugin/src/main/assets/plugin_catalog.json')
 
@@ -93,18 +93,22 @@ def run(*args):
 def version_key(version):
     match = VERSION.fullmatch(version)
     if not match:
-        raise ValueError('Version must be X.Y.Z or X.Y.Z-rc.N')
-    major, minor, patch, rc = match.groups()
-    return tuple(map(int, (major, minor, patch))) + (int(rc) if rc else float('inf'),)
+        raise ValueError('Version must be X.Y.Z, X.Y.Z-beta.N or X.Y.Z-rc.N')
+    major, minor, patch, tier, number = match.groups()
+    base = tuple(map(int, (major, minor, patch)))
+    # 预发布层级：beta 早于 rc，rc 早于正式版。
+    if tier is None:
+        return base + (2, 0)
+    return base + (0 if tier == 'beta' else 1, int(number))
 
 
 def config(root=ROOT):
-    version = (root / 'version.txt').read_text().strip()
+    version = (root / 'version.txt').read_text(encoding='utf-8').strip()
     version_key(version)
-    codes = re.findall(r'^releaseVersionCode=(\d+)\s*$', (root / 'gradle.properties').read_text(), re.M)
+    codes = re.findall(r'^releaseVersionCode=(\d+)\s*$', (root / 'gradle.properties').read_text(encoding='utf-8'), re.M)
     if len(codes) != 1 or not 0 < int(codes[0]) <= 2100000000:
         raise ValueError('Exactly one valid releaseVersionCode is required')
-    manifest = json.loads((root / '.release-please-manifest.json').read_text())
+    manifest = json.loads((root / '.release-please-manifest.json').read_text(encoding='utf-8'))
     if manifest['.'] != version:
         raise ValueError('version.txt and release-please manifest differ')
     return version, int(codes[0])
@@ -112,7 +116,7 @@ def config(root=ROOT):
 
 def notes(text, version):
     # release-please uses both linked and plain SemVer headings, sometimes with dates.
-    sections = list(re.finditer(r'^## (?:\[)?(\d+\.\d+\.\d+(?:-rc\.[1-9]\d*)?)(?:\]|\s|$).*$', text, re.M))
+    sections = list(re.finditer(r'^## (?:\[)?(\d+\.\d+\.\d+(?:-(?:beta|rc)\.[1-9]\d*)?)(?:\]|\s|$).*$', text, re.M))
     matches = [(i, item) for i, item in enumerate(sections) if item[1] == version]
     if len(matches) != 1:
         raise ValueError(f'Exactly one CHANGELOG entry for {version} is required')
@@ -151,10 +155,10 @@ def validate(tag):
     current_release(items, tag)
     previous = latest_release(items)
     if previous and version_key(version) <= version_key(previous['tag_name'].removeprefix('v')):
-        raise ValueError('Release version must exceed all published versions, including RCs')
+        raise ValueError('Release version must exceed all published versions, including prereleases')
     output = ROOT / 'temp/release'
     output.mkdir(parents=True, exist_ok=True)
-    (output / 'notes.md').write_text(notes((ROOT / 'CHANGELOG.md').read_text(), version))
+    (output / 'notes.md').write_text(notes((ROOT / 'CHANGELOG.md').read_text(encoding='utf-8'), version))
     print(f'Validated {tag}, versionCode={code}')
 
 
@@ -205,11 +209,11 @@ def package(aapt, apksigner):
     (destination / 'release-metadata.json').write_text(json.dumps({
         'versionName': version, 'versionCode': code, 'commit': run('git', 'rev-parse', 'HEAD'),
         'certificateSha256': fingerprint,
-    }, indent=2) + '\n')
+    }, indent=2) + '\n', encoding='utf-8')
     write_plugin_subscription(ROOT, destination, os.environ['GITHUB_REPOSITORY'], version, code)
     (destination / 'SHA256SUMS').write_text(''.join(
         f'{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n'
-        for path in sorted(destination.iterdir()) if path.name != 'SHA256SUMS'))
+        for path in sorted(destination.iterdir()) if path.name != 'SHA256SUMS'), encoding='utf-8')
     print(f'Validated and packaged {len(entries)} signed APKs')
 
 
@@ -222,7 +226,7 @@ def publish(tag):
     if run('git', 'rev-parse', 'FETCH_HEAD^{commit}') != run('git', 'rev-parse', 'HEAD'):
         raise ValueError('Remote tag changed during the release build')
     note_path = ROOT / 'temp/release/notes.md'
-    flags = ['--prerelease'] if '-rc.' in version else []
+    flags = ['--prerelease'] if re.search(r'-(?:beta|rc)\.', version) else []
     if release is None:
         subprocess.run(['gh', 'release', 'create', tag, '--verify-tag', '--draft', '--title', tag,
                         '--notes-file', str(note_path), *flags], check=True)
@@ -252,7 +256,7 @@ if __name__ == '__main__':
     if args.command == 'check':
         plugin_catalog(ROOT)
         version, _ = config()
-        notes((ROOT / 'CHANGELOG.md').read_text(), version)
+        notes((ROOT / 'CHANGELOG.md').read_text(encoding='utf-8'), version)
         if args.base_ref and subprocess.run(
             ['git', 'cat-file', '-e', f'{args.base_ref}:version.txt'],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,

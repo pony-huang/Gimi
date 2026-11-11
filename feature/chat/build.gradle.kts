@@ -35,7 +35,7 @@ dependencies {
     implementation(project(":domain:mcp"))
     implementation(project(":domain:a2a"))
     implementation(project(":domain:memory"))
-    implementation(project(":domain:speech"))
+    implementation(project(":domain:voice"))
     implementation(project(":domain:toolauthorization"))
     implementation(project(":domain:recommendation"))
     implementation(platform(libs.androidx.compose.bom))

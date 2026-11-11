@@ -48,7 +48,7 @@ class McpSettingsViewModelCharacterizationTest {
 
             viewModel.onAction(McpSettingsAction.ToggleServer(server, enabled = false))
             advanceUntilIdle()
-            verify { repository.save(server.copy(isEnabled = false)) }
+            coVerify { repository.save(server.copy(isEnabled = false)) }
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -57,7 +57,7 @@ class McpSettingsViewModelCharacterizationTest {
     fun successfulImportPublishesResultAndRequestsClose() = runTest {
         val repository = repository()
         val importResult = McpImportResult(created = 1)
-        every { repository.importJson("{}") } returns importResult
+        coEvery { repository.importJson("{}") } returns importResult
         val viewModel = viewModel(repository)
 
         viewModel.effects.test {
@@ -101,7 +101,7 @@ class McpSettingsViewModelCharacterizationTest {
             assertEquals(McpSettingsEffect.Saved, awaitItem())
             cancelAndIgnoreRemainingEvents()
         }
-        verify { repository.save(match { it.name == "Server" && it.endpointUrl == "https://example.com/mcp" }) }
+        coVerify { repository.save(match { it.name == "Server" && it.endpointUrl == "https://example.com/mcp" }) }
     }
 
     @Test
@@ -127,7 +127,7 @@ class McpSettingsViewModelCharacterizationTest {
                 } while (state.isTestingConnection || state.connectionError == null)
 
                 assertEquals("无法连接到服务器", state.connectionError)
-                verify(exactly = 0) { repository.save(any()) }
+                coVerify(exactly = 0) { repository.save(any()) }
 
                 // 修改配置后错误应被清除（旧结论失效）。
                 viewModel.onAction(McpSettingsAction.EditorChanged(draft.copy(name = "Server2")))
@@ -145,7 +145,7 @@ class McpSettingsViewModelCharacterizationTest {
     @Test
     fun unexpectedImportFailureIsShownWithoutClosing() = runTest {
         val repository = repository()
-        every { repository.importJson(any()) } throws IllegalStateException("storage unavailable")
+        coEvery { repository.importJson(any()) } throws IllegalStateException("storage unavailable")
         val viewModel = viewModel(repository)
 
         viewModel.effects.test {
@@ -196,7 +196,7 @@ class McpSettingsViewModelCharacterizationTest {
             } while (state.isTestingConnection || state.connectionError == null)
 
             assertEquals("mcp.connection_error", state.connectionError)
-            verify(exactly = 0) { repository.save(any()) }
+            coVerify(exactly = 0) { repository.save(any()) }
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -204,7 +204,7 @@ class McpSettingsViewModelCharacterizationTest {
     @Test
     fun editorSaveWithPersistenceFailureIsBlockedWithError() = runTest {
         val repository = repository()
-        every { repository.save(any()) } throws IllegalStateException("storage unavailable")
+        coEvery { repository.save(any()) } throws IllegalStateException("storage unavailable")
         val viewModel = viewModel(repository)
 
         viewModel.uiState.test {

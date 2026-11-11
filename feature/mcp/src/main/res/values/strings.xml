@@ -24,6 +24,7 @@
     <string name="mcp_import_error_invalid_json">MCP JSON 格式无效</string>
     <string name="mcp_import_error_mcp_servers_not_object">mcpServers 必须是对象</string>
     <string name="mcp_import_error_invalid_curl">curl MCP 配置无效</string>
+    <string name="mcp_import_error_unsupported_sse">暂不支持 SSE 传输的 MCP 服务器，请改用 Streamable HTTP 端点</string>
     <string name="mcp_import_error_storage_failure">MCP 配置无法安全保存，请重试</string>
     <string name="mcp_connection_error_default">无法连接到服务器，请检查配置</string>
     <string name="mcp_save_error_default">MCP 配置保存失败，请重试</string>

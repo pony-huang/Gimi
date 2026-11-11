@@ -45,7 +45,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @Composable
 fun McpServerListScreen(
@@ -254,7 +254,7 @@ private fun McpListRow(
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun McpServerListScreenEmptyPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         McpServerListScreen(
             state = McpSettingsUiState(),
             onAction = {},
@@ -277,7 +277,7 @@ private fun McpServerListScreenWithServersPreview() {
         endpointUrl = "https://mcp.example.com/mcp",
         isEnabled = true,
     )
-    AsssistantaiTheme {
+    GimiTheme {
         McpServerListScreen(
             state = McpSettingsUiState(
                 servers = listOf(server),

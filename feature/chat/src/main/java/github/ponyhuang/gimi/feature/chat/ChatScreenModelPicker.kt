@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,18 +29,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
+import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.ui.settings.llmmodel.LLMModelServiceIcon
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /**
  * 聊天输入栏中的当前模型显示与切换组件。
@@ -61,13 +66,15 @@ data class EnabledModelRow(
 )
 
 /**
- * 输入栏中显示当前激活模型名称、服务品牌图标和下拉箭头。
+ * 输入栏中显示当前激活模型名称、思考强度标签、服务品牌图标和下拉箭头。
  *
+ * - 素色 chip：无底色，仅品牌图标 + 模型名 + 强度标签 + caret。
  * - 仅对左侧品牌图标做 1.4s 周期的 alpha 反向循环（0.55 ↔ 1.0），文字本身不动，
  *   避免触发布局抖动与文字偏移。
  * - `modelName == null`（没有任何已启用服务）时跳过动效与 caret，文字改用 error 色。
  *
  * @param modelName 当前应显示的模型名；`null` 时进入"未选择模型"空态。
+ * @param effortLabel 当前思考强度标签（如"低"）；null 表示思考关闭或不展示。
  * @param onClick 整行点击回调；加载态传入 `null` 时禁用点击。
  */
 @Composable
@@ -78,6 +85,7 @@ fun ModelStatusDisplay(
     isLoading: Boolean,
     onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    effortLabel: String? = null,
 ) {
     val isActive = modelName != null
     val infinite = rememberInfiniteTransition(label = "active-model")
@@ -91,48 +99,52 @@ fun ModelStatusDisplay(
         label = "iconAlpha",
     )
 
-    Surface(
-        onClick = { onClick?.invoke() },
-        enabled = onClick != null,
-        shape = RoundedCornerShape(24.dp),
-        // 模型入口比输入栏背景抬一级，与抽屉中的选项保持中性容器层级。
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = modifier.heightIn(min = 32.dp),
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(enabled = onClick != null) { onClick?.invoke() }
+            .heightIn(min = 36.dp)
+            .padding(horizontal = 6.dp, vertical = 8.dp),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-        ) {
-            if (isActive) {
-                LLMModelServiceIcon(
-                    serviceId = serviceId.orEmpty(),
-                    modifier = Modifier
-                        .size(22.dp)
-                        .alpha(iconAlpha),
-                    contentPadding = 4.dp,
-                )
-                Spacer(Modifier.width(6.dp))
-            }
-            Text(
-                text = modelName ?: emptyText,
-                modifier = Modifier.weight(1f, fill = false),
-                style = MaterialTheme.typography.labelMedium,
-                color = when {
-                    isActive -> MaterialTheme.colorScheme.onSurface
-                    isLoading -> MaterialTheme.colorScheme.onSurfaceVariant
-                    else -> MaterialTheme.colorScheme.error
-                },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        if (isActive) {
+            LLMModelServiceIcon(
+                serviceId = serviceId.orEmpty(),
+                modifier = Modifier
+                    .size(22.dp)
+                    .alpha(iconAlpha),
+                contentPadding = 4.dp,
             )
-            if (isActive) {
-                Spacer(Modifier.width(2.dp))
-                Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = stringResource(R.string.chat_model_picker_change),
-                    modifier = Modifier.size(18.dp),
-                )
-            }
+            Spacer(Modifier.width(4.dp))
+        }
+        Text(
+            text = modelName ?: emptyText,
+            modifier = Modifier.weight(1f, fill = false),
+            style = MaterialTheme.typography.labelMedium,
+            color = when {
+                isActive -> MaterialTheme.colorScheme.onSurface
+                isLoading -> MaterialTheme.colorScheme.onSurfaceVariant
+                else -> MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (isActive && effortLabel != null) {
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = effortLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (isActive) {
+            Spacer(Modifier.width(2.dp))
+            Icon(
+                imageVector = Icons.Default.ArrowDropDown,
+                contentDescription = stringResource(R.string.chat_model_picker_change),
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -140,12 +152,14 @@ fun ModelStatusDisplay(
 /**
  * 输入栏中的模型入口及底部选择抽屉。
  *
- * 点击标题 → 打开模型选择底部抽屉；选中行：
+ * 点击标题 → 打开模型选择底部抽屉（一级厂商、二级模型+思考强度）；选中行：
  * 1. 写入当前模型选择；
- * 2. 关闭抽屉；
+ * 2. 保持抽屉打开，按新模型的支持情况更新思考强度控件，直到用户手动关闭；
  * 3. [ChatViewModel.selectModel] 持久化当前会话的选择并重建后续消息使用的 agent。
  *
  * @param isAgentRunning 当前 Agent turn 是否仍在进行。
+ * @param toolConfiguration 当前会话工具配置；用于 chip 的思考强度标签与二级页滑杆。
+ * @param reasoningEnabled 思考强度控件是否可交互（会话运行中禁用）。
  * @param onPickerVisibilityChange 模型选择抽屉显示状态变化回调。
  * @param modifier 修饰符，透传给模型入口的根 `Box`。
  */
@@ -160,6 +174,10 @@ fun ModelTitleAndPicker(
     onModelSwitchBlocked: () -> Unit,
     onPickerVisibilityChange: (Boolean) -> Unit = { },
     modifier: Modifier = Modifier,
+    toolConfiguration: ConversationToolConfiguration? = null,
+    reasoningEnabled: Boolean = true,
+    onReasoningEffortChange: (ReasoningEffort) -> Unit = { _ -> },
+    onThinkingEnabledChange: (Boolean) -> Unit = { },
 ) {
     // 解析后用于 TopAppBar 中央显示的模型。显式选择命中走 resolveSelection，
     // 否则回退到"第一个启用服务 → 第一个非空组 → 第一个模型"。两个都没有则 null（空态）。
@@ -195,6 +213,10 @@ fun ModelTitleAndPicker(
         }
     }
     var showModelPicker by remember { mutableStateOf(false) }
+    // chip 上的思考强度标签：思考开启时显示档位名，关闭或无配置时省略。
+    val effortLabel = toolConfiguration?.let {
+        if (it.thinkingEnabled) reasoningEffortLabel(it.reasoningEffort) else null
+    }
 
     // 模型选择器由宿主决定可用宽度；输入框内保持左对齐并在窄屏省略长名称。
     Box(
@@ -210,6 +232,7 @@ fun ModelTitleAndPicker(
                 is CatalogLoadState.Failed -> stringResource(R.string.chat_model_load_failed)
             },
             isLoading = loadState == CatalogLoadState.Loading,
+            effortLabel = effortLabel,
             onClick = when {
                 loadState == CatalogLoadState.Loading -> null
                 displayedModelName == null -> onConfigureModels
@@ -240,13 +263,17 @@ fun ModelTitleAndPicker(
                         modelId = row.model.id,
                     )
                 )
-                showModelPicker = false
-                onPickerVisibilityChange(false)
             },
             onDismiss = {
                 showModelPicker = false
                 onPickerVisibilityChange(false)
             },
+            toolConfiguration = toolConfiguration,
+            // OpenAI Chat Completions 协议不支持推理强度；未解析出模型时同样隐藏控件。
+            reasoningSupported = displayedModel?.service?.apiProtocol != ApiProtocol.OpenaiChatcompletions,
+            reasoningEnabled = reasoningEnabled,
+            onReasoningEffortChange = onReasoningEffortChange,
+            onThinkingEnabledChange = onThinkingEnabledChange,
         )
     }
 }
@@ -282,10 +309,10 @@ private fun List<LLMModelSetting>.firstConfiguredChatSelection(): ModelSelection
 private fun LLMModelSetting.isConfiguredForChat(): Boolean =
     isEnabled && apiKey.isNotBlank() && groups.any { group -> group.models.any(Model::isChatModel) }
 
-// 远端拉取的模型不会带 isTts 标记（OpenAiCompatibleModelServiceGateway 只取 id），
+// 远端拉取的模型不会带语音能力标记（OpenAiCompatibleModelServiceGateway 只取 id），
 // 这里额外按 id/name 中的 "tts" 关键字兜底过滤，避免语音合成模型混入聊天候选。
 internal fun Model.isChatModel(): Boolean =
-    !isStt && !isTts && !id.contains("tts", ignoreCase = true) &&
+    ModelCapability.LLM in capabilities && !id.contains("tts", ignoreCase = true) &&
             !name.contains("tts", ignoreCase = true)
 
 internal fun previewModelServices(): List<LLMModelSetting> = listOf(
@@ -329,7 +356,7 @@ internal fun previewModelServices(): List<LLMModelSetting> = listOf(
 @Preview(showBackground = true)
 @Composable
 private fun ModelStatusDisplayActivePreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ModelStatusDisplay(
             modelName = "GPT-4o",
             serviceId = "openai",
@@ -343,7 +370,7 @@ private fun ModelStatusDisplayActivePreview() {
 @Preview(showBackground = true)
 @Composable
 private fun ModelStatusDisplayEmptyPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ModelStatusDisplay(
             modelName = null,
             serviceId = null,
@@ -357,7 +384,7 @@ private fun ModelStatusDisplayEmptyPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun ModelTitleAndPickerPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ModelTitleAndPicker(
             services = previewModelServices(),
             currentSelection = ModelSelection(

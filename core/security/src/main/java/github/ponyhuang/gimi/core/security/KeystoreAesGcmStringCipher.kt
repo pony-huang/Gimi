@@ -41,6 +41,9 @@ class KeystoreAesGcmStringCipher(private val keyAlias: String) {
         null
     }
 
+    /** 严格读取：失败保留密钥与密文，由调用方决定恢复策略。 */
+    fun decryptOrThrow(payload: String): String = decrypt(payload)
+
     fun deleteKey() {
         KeyStore.getInstance(ANDROID_KEY_STORE).apply {
             load(null)

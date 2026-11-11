@@ -75,7 +75,8 @@ internal fun projectReplies(array: JSONArray, max: Int = 100): Map<String, Any?>
         "total" to total,
         "shown" to shown,
         "truncated" to (total > shown),
-        "replies" to (0 until shown).map { projectReply(array.optJSONObject(it)) },
+        // 单条元素类型异常（如字符串/数字）只跳过该条，不让整批结果崩溃。
+        "replies" to (0 until shown).mapNotNull { i -> array.optJSONObject(i)?.let(::projectReply) },
     )
 }
 
@@ -127,7 +128,10 @@ internal fun projectNotifications(array: JSONArray, max: Int = 50): Map<String, 
         "total" to total,
         "shown" to shown,
         "truncated" to (total > shown),
-        "notifications" to (0 until shown).map { projectNotification(array.optJSONObject(it)) },
+        // 单条元素类型异常只跳过该条，不让整批结果崩溃。
+        "notifications" to (0 until shown).mapNotNull { i ->
+            array.optJSONObject(i)?.let(::projectNotification)
+        },
     )
 }
 

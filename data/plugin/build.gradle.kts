@@ -17,6 +17,7 @@ android {
 dependencies {
     implementation(project(":core:apk"))
     implementation(project(":core:network"))
+    implementation(project(":core:security"))
     implementation(project(":core:storage"))
     // SPI 仅供本模块加载和实现插件使用；真实消费者需显式声明 :plugin-api。
     implementation(project(":plugin-api"))

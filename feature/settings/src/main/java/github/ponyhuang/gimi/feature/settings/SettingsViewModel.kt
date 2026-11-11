@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 
-/** 设置首页只负责分发导航意图；页面内开关由各功能页自己持有状态。 */
+/** 设置首页分发导航意图；页面内其他开关由各功能页自己持有状态。 */
 @HiltViewModel
 class SettingsViewModel @Inject constructor() : ViewModel() {
     private val mutableEffects = MutableSharedFlow<SettingsEffect>()
@@ -16,6 +16,7 @@ class SettingsViewModel @Inject constructor() : ViewModel() {
 
     fun onAction(action: SettingsAction) {
         when (action) {
+            SettingsAction.OpenSpeechModels -> emitEffect(SettingsEffect.NavigateToSpeechModels)
             SettingsAction.OpenModelService -> emitEffect(SettingsEffect.NavigateToModelService)
             SettingsAction.OpenDefaultModels -> emitEffect(SettingsEffect.NavigateToDefaultModels)
             SettingsAction.OpenMcpServers -> emitEffect(SettingsEffect.NavigateToMcpServers)
@@ -26,7 +27,6 @@ class SettingsViewModel @Inject constructor() : ViewModel() {
             SettingsAction.OpenSkills -> emitEffect(SettingsEffect.NavigateToSkills)
             SettingsAction.OpenWorkspace -> emitEffect(SettingsEffect.NavigateToWorkspace)
             SettingsAction.OpenPermissions -> emitEffect(SettingsEffect.NavigateToPermissions)
-            SettingsAction.OpenMobileUse -> emitEffect(SettingsEffect.NavigateToMobileUse)
             SettingsAction.OpenRecommendations ->
                 emitEffect(SettingsEffect.NavigateToRecommendations)
             SettingsAction.OpenMemory -> emitEffect(SettingsEffect.NavigateToMemory)

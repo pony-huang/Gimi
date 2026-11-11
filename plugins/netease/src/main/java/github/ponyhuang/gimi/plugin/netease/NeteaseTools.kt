@@ -44,20 +44,32 @@ internal class NeteaseTool(private val spec: NeteaseToolSpec) : FunctionTool(spe
             mapOf("error" to "网易云网络请求失败，请稍后重试")
         } catch (error: IllegalArgumentException) {
             mapOf("error" to error.message)
-        } catch (error: IllegalStateException) {
-            mapOf("error" to error.message)
         } catch (_: JSONException) {
             mapOf("error" to "网易云响应格式无效")
+        } catch (error: RuntimeException) {
+            // 兜底收口未预料的运行时异常，避免单次工具调用异常把宿主会话打断。
+            mapOf("error" to (error.message ?: "网易云工具执行失败"))
         }
     }
 }
 
-/** 深层过滤意外回显的凭证，登录结果仅返回状态，不把 token 交给模型。 */
+/** 工具返回值的体积上限：列表条数与单段文本长度，防止整包响应撑爆上下文。 */
+private const val MAX_RESULT_ITEMS: Int = 50
+private const val MAX_RESULT_TEXT_LENGTH: Int = 8_000
+
+/** 深层过滤意外回显的凭证，登录结果仅返回状态，不把 token 交给模型；同时截断超大结果。 */
 private fun sanitize(value: Any?): Any? = when (value) {
     is Map<*, *> -> value.entries.filterNot { (key, _) ->
         key.toString().lowercase().replace("_", "") in setOf("accesstoken", "refreshtoken", "privatekey", "clientsecret", "sign")
     }.associate { it.key.toString() to sanitize(it.value) }
-    is List<*> -> value.map(::sanitize)
+    is List<*> ->
+        value.take(MAX_RESULT_ITEMS).map(::sanitize) +
+            if (value.size > MAX_RESULT_ITEMS) listOf("…（共 ${value.size} 条，已截断至 $MAX_RESULT_ITEMS 条）") else emptyList()
+    is String -> if (value.length > MAX_RESULT_TEXT_LENGTH) {
+        value.take(MAX_RESULT_TEXT_LENGTH) + "…（已截断）"
+    } else {
+        value
+    }
     else -> value
 }
 

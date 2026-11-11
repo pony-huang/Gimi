@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -31,7 +32,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.plugin.model.LocalizedText
 import github.ponyhuang.gimi.domain.plugin.model.PluginInstallFailure
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 目录 iconKey 到宿主内置矢量图的映射；未知 key 回退通用插件图标。 */
 internal fun pluginStoreIconResource(iconKey: String): Int = when (iconKey) {
@@ -76,11 +77,20 @@ internal fun PluginIcon(
                 contentScale = ContentScale.Fit,
             )
         } else {
+            val iconRes = pluginStoreIconResource(iconKey)
             Image(
-                painter = painterResource(pluginStoreIconResource(iconKey)),
+                painter = painterResource(iconRes),
                 contentDescription = null,
                 modifier = Modifier.size(size * 0.68f),
                 contentScale = ContentScale.Fit,
+                // 默认占位图标自带 ?android:attr/colorControlNormal，平台主题恒为 Light，
+                // 深色模式下会变成深色图标压在深色底上；这里改用主题的中性文字色。
+                // 第三方插件的品牌图标保持原色，不做 tint。
+                colorFilter = if (iconRes == R.drawable.ic_plugin_default) {
+                    ColorFilter.tint(MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    null
+                },
             )
         }
     }
@@ -189,7 +199,7 @@ internal fun pluginInstallFailureMessage(failure: PluginInstallFailure): Int = w
 @Preview(name = "网易云品牌图标 · 深色", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun NeteasePluginIconPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         Surface {
             PluginIcon(iconKey = "netease", size = 56.dp)
         }

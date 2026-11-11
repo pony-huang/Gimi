@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.ui.components.GimiListDefaults
 import github.ponyhuang.gimi.ui.components.GimiSwitch
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import github.ponyhuang.gimi.ui.theme.PreferenceCanvasDark
 import github.ponyhuang.gimi.ui.theme.PreferenceCanvasLight
 import github.ponyhuang.gimi.ui.theme.PreferenceGroupCardDark
@@ -109,16 +109,19 @@ fun PreferenceSectionTitle(
 /**
  * 分组标题下的小字备注：用更小的字号和次要文字色说明整组的前提或限制。
  * 左右缩进与 [PreferenceSectionTitle] 一致，紧跟标题摆放。
+ *
+ * @property color 文字颜色，默认次要文字色；需要强调失败原因时可传错误色。
  */
 @Composable
 fun PreferenceSectionNote(
     text: String,
     modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = color,
         modifier = modifier.padding(start = 32.dp, end = 32.dp, top = 0.dp, bottom = 10.dp),
     )
 }
@@ -150,9 +153,11 @@ fun PreferenceGroupCard(
  * `showDivider` 为 true 时在行底部绘制与文字左缘对齐的内缩分隔线。
  *
  * @property iconContainer 图标圆形底色，默认主题蓝。
- * @property iconTint 圆底上的字形色，默认白色；禁用等特殊态可改为灰色组合。
+ * @property iconTint 圆底上的字形色，默认取 onPrimary 与 primary 圆底成对；禁用等特殊态可改为灰色组合。
  * @property iconSize 图标本身的尺寸；品牌图标可使用与容器相同的尺寸以保留原始外观。
  * @property subtitleMaxLines 说明文字的最大行数；需要完整解释功能的设置项可单独放宽。
+ * @property titleColor 标题文字色，默认继承行内内容色；禁用态可只降级文字而不用整行透明度。
+ * @property subtitleColor 说明文字颜色，默认次要文字色。
  * @property onLongClick 长按行为；提供后行改为 combinedClickable，用于进入多选等模式。
  * @param leadingIcon 自定义图标槽位；提供时以透明背景替换默认图标，沿用列表的对齐尺寸。
  */
@@ -165,10 +170,12 @@ fun PreferenceListItem(
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
     iconContainer: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) Color.Transparent else MaterialTheme.colorScheme.primary,
-    iconTint: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) MaterialTheme.colorScheme.onSurfaceVariant else Color.White,
+    iconTint: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary,
     iconSize: Dp = GimiListDefaults.IconSize,
     showDivider: Boolean = false,
     subtitleMaxLines: Int = 2,
+    titleColor: Color = Color.Unspecified,
+    subtitleColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
     leadingIcon: (@Composable (Modifier) -> Unit)? = null,
 ) {
@@ -216,6 +223,7 @@ fun PreferenceListItem(
                 Text(
                     text = title,
                     style = if (compact) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleMedium,
+                    color = titleColor,
                     maxLines = if (compact) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -223,7 +231,7 @@ fun PreferenceListItem(
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = subtitleColor,
                         maxLines = subtitleMaxLines,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 1.dp),
@@ -260,7 +268,7 @@ fun PreferenceSwitchItem(
     onClick: (() -> Unit)? = null,
     switchEnabled: Boolean = true,
     iconContainer: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) Color.Transparent else MaterialTheme.colorScheme.primary,
-    iconTint: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) MaterialTheme.colorScheme.onSurfaceVariant else Color.White,
+    iconTint: Color = if (LocalPreferenceStyle.current == PreferenceStyle.Compact) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onPrimary,
     iconSize: Dp = GimiListDefaults.IconSize,
     showDivider: Boolean = false,
 ) {
@@ -340,7 +348,7 @@ fun PreferenceBanner(
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferencePageContainerPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PreferencePageContainer {
             PreferenceSectionTitle(text = "分组标题")
             PreferenceGroupCard {
@@ -359,7 +367,7 @@ private fun PreferencePageContainerPreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferenceSectionTitlePreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PreferenceSectionTitle(text = "分组标题")
     }
 }
@@ -368,7 +376,7 @@ private fun PreferenceSectionTitlePreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferenceGroupCardPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PreferenceGroupCard {
             PreferenceListItem(
                 icon = Icons.Default.Info,
@@ -389,7 +397,7 @@ private fun PreferenceGroupCardPreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferenceListItemPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PreferenceListItem(
             icon = Icons.Default.Info,
             title = "设置项",
@@ -403,7 +411,7 @@ private fun PreferenceListItemPreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferenceListItemWithTrailingPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PreferenceListItem(
             icon = Icons.Default.Info,
             title = "带尾部内容的设置项",
@@ -423,7 +431,7 @@ private fun PreferenceListItemWithTrailingPreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferenceSwitchItemPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PreferenceGroupCard {
             PreferenceSwitchItem(
                 icon = Icons.Default.Info,
@@ -447,7 +455,7 @@ private fun PreferenceSwitchItemPreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferenceBannerInfoPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PreferenceBanner(
             text = "信息提示文案",
             tone = PreferenceBannerTone.Info,
@@ -459,7 +467,7 @@ private fun PreferenceBannerInfoPreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferenceBannerErrorPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PreferenceBanner(
             text = "错误提示文案",
             tone = PreferenceBannerTone.Error,

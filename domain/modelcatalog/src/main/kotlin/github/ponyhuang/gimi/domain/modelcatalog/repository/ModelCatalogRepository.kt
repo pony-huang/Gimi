@@ -4,6 +4,8 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.modelcatalog.model.RealtimeVoiceOverride
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnectionResult
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import kotlinx.coroutines.flow.Flow
 
@@ -26,6 +28,12 @@ interface ModelCatalogRepository {
 
     fun observeTtsVoice(): Flow<String>
 
+    /** Realtime 模式的默认模型；null 表示未配置。 */
+    fun observeRealtimeSelection(): Flow<ModelSelection?>
+
+    /** Realtime 会话音色的自定义覆盖；null 表示使用模型缺省音色。 */
+    fun observeRealtimeVoice(): Flow<RealtimeVoiceOverride?>
+
     fun currentService(serviceId: String): LLMModelSetting?
 
     fun currentServices(): List<LLMModelSetting>
@@ -37,6 +45,12 @@ interface ModelCatalogRepository {
     fun currentTtsSelection(): ModelSelection?
 
     fun currentTtsVoice(): String
+
+    /** Realtime 模式的默认模型；null 表示未配置。 */
+    fun currentRealtimeSelection(): ModelSelection?
+
+    /** Realtime 会话音色的自定义覆盖；null 表示使用模型缺省音色。 */
+    fun currentRealtimeVoice(): RealtimeVoiceOverride?
 
     /** Process-local selection used by the active agent; this is not a persisted default. */
     fun setRuntimeSelection(selection: ModelSelection?)
@@ -50,9 +64,6 @@ interface ModelCatalogRepository {
     /** 暂停保留连接、模型和工具偏好。 */
     suspend fun setServiceEnabled(serviceId: String, enabled: Boolean): Boolean
 
-    /** 清除用户配置和凭据，保留厂商目录。 */
-    suspend fun deleteService(serviceId: String): Boolean
-
     fun selectAssistantModel(selection: ModelSelection)
 
     fun selectFastModel(selection: ModelSelection)
@@ -62,10 +73,16 @@ interface ModelCatalogRepository {
     fun selectTtsModel(selection: ModelSelection)
 
     fun selectTtsVoice(voiceId: String)
+
+    /** 选择 Realtime 模式的默认模型；null 表示取消配置（Realtime 模式随之不可进入）。 */
+    fun selectRealtimeModel(selection: ModelSelection?)
+
+    /** 设置 Realtime 会话音色的自定义覆盖；null 表示回到模型缺省音色。 */
+    fun selectRealtimeVoice(override: RealtimeVoiceOverride?)
 }
 
 interface ModelServiceRemoteGateway {
-    suspend fun validateConnection(service: LLMModelSetting): Boolean
+    suspend fun validateConnection(service: LLMModelSetting): ServiceConnectionResult
 
     suspend fun fetchModels(service: LLMModelSetting): List<Model>
 }

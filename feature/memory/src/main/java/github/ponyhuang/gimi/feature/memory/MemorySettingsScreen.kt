@@ -30,7 +30,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -47,7 +46,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceSwitchItem
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @Composable
 fun MemorySettingsScreen(
@@ -129,9 +128,12 @@ fun MemorySettingsScreen(
                                 iconSize = 24.dp,
                                 title = stringResource(R.string.memory_history_title),
                                 subtitle = stringResource(R.string.memory_history_subtitle),
-                                modifier = Modifier.alpha(
-                                    if (state.hasStoredToken) ENABLED_HISTORY_ALPHA else DISABLED_HISTORY_ALPHA,
-                                ),
+                                // 没有 token 时该行不可用：只降级文字颜色，不用整行透明度，
+                                // 避免把品牌图标和描边一起冲淡。
+                                titleColor = if (state.hasStoredToken) Color.Unspecified
+                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                                subtitleColor = if (state.hasStoredToken) MaterialTheme.colorScheme.onSurfaceVariant
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
                                 showDivider = true,
                                 onClick = onNavigateToHistory.takeIf { state.hasStoredToken },
                             )
@@ -203,14 +205,11 @@ fun MemorySettingsScreen(
 }
 }
 
-private const val ENABLED_HISTORY_ALPHA = 1f
-private const val DISABLED_HISTORY_ALPHA = 0.5f
-
 @Preview(showBackground = true)
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun MemorySettingsScreenPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         MemorySettingsScreen(
             state = MemorySettingsUiState(hasStoredToken = true),
             onAction = {},

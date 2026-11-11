@@ -123,9 +123,16 @@ class BackgroundAppViewModel @Inject constructor(private val repository: MobileU
                         previous.sessionId == action.sessionId && previous.event.gestureId == action.event.gestureId
                     ) pendingTouches.removeLast()
                     pendingTouches.addLast(action)
+                    // 输入长时间阻塞时事件会持续入队；有界丢弃最旧事件，避免手势队列无限增长。
+                    if (pendingTouches.size > MAX_PENDING_TOUCHES) pendingTouches.removeFirst()
                 }
                 wakeInput.trySend(Unit)
             }
         }
+    }
+
+    private companion object {
+        /** 投递队列上限；连续 MOVE 有合并，超限只在消费端卡死时出现。 */
+        const val MAX_PENDING_TOUCHES = 64
     }
 }

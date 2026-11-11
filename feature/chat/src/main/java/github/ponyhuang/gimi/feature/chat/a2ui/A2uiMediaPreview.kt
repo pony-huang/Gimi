@@ -11,7 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** Media3 官方视频与音频控件的浅色、深色离线预览；预览不加载样本媒体。 */
 @Preview(showBackground = true, heightDp = 640)
@@ -22,7 +22,7 @@ import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
 )
 @Composable
 fun A2uiMediaPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         Column(
             modifier = Modifier.safeDrawingPadding().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),

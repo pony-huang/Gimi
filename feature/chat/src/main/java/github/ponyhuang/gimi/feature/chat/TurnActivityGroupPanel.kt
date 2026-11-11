@@ -41,7 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import kotlinx.coroutines.delay
 
 /**
@@ -302,7 +302,7 @@ private val previewActivityGroup = TurnSegment.Activity(
 @Preview(name = "步骤摘要折叠", showBackground = true)
 @Composable
 private fun TurnActivityCollapsedPreview() {
-    AsssistantaiTheme(darkTheme = false) {
+    GimiTheme(darkTheme = false) {
         TurnActivityGroupPanel(previewActivityGroup, false, {})
     }
 }
@@ -310,7 +310,7 @@ private fun TurnActivityCollapsedPreview() {
 @Preview(name = "步骤摘要展开", showBackground = true)
 @Composable
 private fun TurnActivityExpandedPreview() {
-    AsssistantaiTheme(darkTheme = false) {
+    GimiTheme(darkTheme = false) {
         TurnActivityGroupPanel(previewActivityGroup, true, {})
     }
 }
@@ -318,7 +318,7 @@ private fun TurnActivityExpandedPreview() {
 @Preview(name = "步骤摘要展开（深色）", showBackground = true)
 @Composable
 private fun TurnActivityExpandedDarkPreview() {
-    AsssistantaiTheme(darkTheme = true) {
+    GimiTheme(darkTheme = true) {
         TurnActivityGroupPanel(previewActivityGroup, true, {})
     }
 }
@@ -326,7 +326,7 @@ private fun TurnActivityExpandedDarkPreview() {
 @Preview(name = "运行胶囊 · 收起", showBackground = true)
 @Composable
 private fun TurnActivityRunningPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         TurnActivityGroupPanel(
             segment = previewActivityGroup,
             expanded = false,
@@ -342,7 +342,7 @@ private fun TurnActivityRunningPreview() {
 @Preview(name = "运行胶囊 · 展开深色", showBackground = true)
 @Composable
 private fun TurnActivityRunningDarkPreview() {
-    AsssistantaiTheme(darkTheme = true) {
+    GimiTheme(darkTheme = true) {
         TurnActivityGroupPanel(
             segment = previewActivityGroup.copy(entries = previewActivityGroup.entries + TimelineEntry.ToolCall(
                 callId = "search", name = "web_search", argsSummary = "", status = ToolCallStatus.Running,

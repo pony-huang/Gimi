@@ -38,6 +38,9 @@ class AgentContributionRegistry @Inject constructor(
     /** 全部贡献方 revision 的组合值，作为 Agent 运行时缓存键的配置维度。 */
     fun revision(): Any = sortedContributions.map { contribution -> contribution.id to contribution.revision() }
 
+    /** 排序后的贡献方只读视图；旁路装配（如实时语音工具桥）按 id 白名单筛选来源。 */
+    val all: List<AgentContribution> get() = sortedContributions
+
     /** 聚合各贡献方直接声明的工具集。 */
     fun toolsets(spec: AgentBuildSpec): List<Toolset> =
         sortedContributions.flatMap { contribution -> contribution.toolsets(spec) }

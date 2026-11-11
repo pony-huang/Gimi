@@ -9,9 +9,13 @@ import github.ponyhuang.gimi.core.security.KeystoreAesGcmStringCipher
 import github.ponyhuang.gimi.data.modelcatalog.toData
 import github.ponyhuang.gimi.data.modelcatalog.toDomain
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.hasValidConnectionConfiguration
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.isRecognition
 import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceKind
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
+import github.ponyhuang.gimi.domain.modelcatalog.model.RealtimeVoiceOverride
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.ResolvedAgentModel
 import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurationSource
@@ -53,6 +57,8 @@ internal data class ModelServiceSettings(
     val isAdded: Boolean = false,
     /** null 表示沿用已有目录；空列表表示用户显式选择零个模型。 */
     val selectedGroups: List<StoredModelGroup>? = null,
+    /** 百炼业务空间 ID（可选）；null/空白走官方默认域名。 */
+    val workspaceId: String? = null,
 )
 
 /**
@@ -75,7 +81,7 @@ class ModelServiceRepository @Inject constructor(
         Context.MODE_PRIVATE,
     )
     private val cipher = KeystoreAesGcmStringCipher(KEY_ALIAS)
-    private val defaultSettings = LLMModelConfigs.services.associate { provider ->
+    private val defaultSettings = (LLMModelConfigs.services + SpeechModelConfigs.services).associate { provider ->
         provider.serviceId to provider.toSettings()
     }
     // Keep construction cheap: Android Keystore can take noticeable time to create its
@@ -93,6 +99,8 @@ class ModelServiceRepository @Inject constructor(
     private val _defaultTtsVoice = MutableStateFlow(
         preferences.getString(DEFAULT_TTS_VOICE_KEY, null) ?: DEFAULT_TTS_VOICE,
     )
+    private val _defaultRealtimeSelection = MutableStateFlow(readSelection(DEFAULT_REALTIME_MODEL_KEY))
+    private val _defaultRealtimeVoice = MutableStateFlow(readRealtimeVoiceOverride())
 
     val services: StateFlow<List<LLMModelProvider>> = _services.asStateFlow()
     val loadState: StateFlow<ModelCatalogLoadState> = _loadState.asStateFlow()
@@ -107,6 +115,10 @@ class ModelServiceRepository @Inject constructor(
     /** Explicitly configured text-to-speech model; there is intentionally no implicit fallback. */
     val defaultTtsSelection: StateFlow<ModelSelection?> = _defaultTtsSelection.asStateFlow()
     val defaultTtsVoice: StateFlow<String> = _defaultTtsVoice.asStateFlow()
+    /** Explicitly configured Realtime model; null means the Realtime mode is unavailable. */
+    val defaultRealtimeSelection: StateFlow<ModelSelection?> = _defaultRealtimeSelection.asStateFlow()
+    /** Custom Realtime session voice; null means the selected model's vendor default voice. */
+    val defaultRealtimeVoice: StateFlow<RealtimeVoiceOverride?> = _defaultRealtimeVoice.asStateFlow()
 
     override val runtimeSelection: StateFlow<ModelSelection?> get() = currentSelection
     override val fastSelection: StateFlow<ModelSelection?> get() = fastModelSelection
@@ -174,6 +186,10 @@ class ModelServiceRepository @Inject constructor(
 
     override fun observeTtsVoice() = defaultTtsVoice
 
+    override fun observeRealtimeSelection() = defaultRealtimeSelection
+
+    override fun observeRealtimeVoice() = defaultRealtimeVoice
+
     override fun currentService(serviceId: String): LLMModelSetting? = getService(serviceId)?.toDomain()
 
     override fun currentServices(): List<LLMModelSetting> = services.value.map { it.toDomain() }
@@ -185,6 +201,10 @@ class ModelServiceRepository @Inject constructor(
     override fun currentTtsSelection(): ModelSelection? = defaultTtsSelection.value
 
     override fun currentTtsVoice(): String = defaultTtsVoice.value
+
+    override fun currentRealtimeSelection(): ModelSelection? = defaultRealtimeSelection.value
+
+    override fun currentRealtimeVoice(): RealtimeVoiceOverride? = defaultRealtimeVoice.value
 
     override fun setRuntimeSelection(selection: ModelSelection?) {
         setCurrentSelection(selection)
@@ -215,6 +235,7 @@ class ModelServiceRepository @Inject constructor(
                 apiBaseUrl = service.apiBaseUrl.trim().trimEnd('/'),
                 anthropicBaseUrl = service.anthropicBaseUrl.trim().trimEnd('/'),
                 baseType = service.apiProtocol.toData(),
+                workspaceId = service.workspaceId?.trim()?.ifEmpty { null },
                 selectedGroups = service.groups.map { group ->
                     StoredModelGroup(
                         groupId = group.id,
@@ -223,9 +244,8 @@ class ModelServiceRepository @Inject constructor(
                             StoredModel(
                                 modelId = model.id,
                                 modelName = model.name,
-                                isStt = model.isStt,
-                                isTts = model.isTts,
                                 capabilities = model.capabilities,
+                                multimodal = model.multimodal,
                             )
                         },
                     )
@@ -243,17 +263,6 @@ class ModelServiceRepository @Inject constructor(
             if (enabled && current.apiKey.isBlank()) return@synchronized false
             // 暂停仅改变运行时可用性，不覆盖用户对厂商工具的选择。
             commitSettings(serviceId, current.copy(isEnabled = enabled))
-        }
-    }
-
-    override suspend fun deleteService(serviceId: String): Boolean = withContext(Dispatchers.IO) {
-        awaitReady()
-        synchronized(settingsMutationLock) {
-            val defaults = defaultSettings[serviceId] ?: return@synchronized false
-            commitSettings(serviceId, defaults.copy(
-                isAdded = false, isEnabled = false, isOfficialToolsEnabled = false,
-                apiKey = "", selectedGroups = null,
-            ))
         }
     }
 
@@ -285,6 +294,14 @@ class ModelServiceRepository @Inject constructor(
 
     override fun selectTtsVoice(voiceId: String) {
         setDefaultTtsVoice(voiceId)
+    }
+
+    override fun selectRealtimeModel(selection: ModelSelection?) {
+        setDefaultRealtimeSelection(selection)
+    }
+
+    override fun selectRealtimeVoice(override: RealtimeVoiceOverride?) {
+        setDefaultRealtimeVoice(override)
     }
 
     fun getService(serviceId: String): LLMModelProvider? =
@@ -335,6 +352,22 @@ class ModelServiceRepository @Inject constructor(
         preferences.edit { putString(DEFAULT_TTS_VOICE_KEY, normalized) }
     }
 
+    fun setDefaultRealtimeSelection(selection: ModelSelection?) {
+        _defaultRealtimeSelection.value = selection
+        persistSelection(DEFAULT_REALTIME_MODEL_KEY, selection)
+    }
+
+    fun setDefaultRealtimeVoice(override: RealtimeVoiceOverride?) {
+        _defaultRealtimeVoice.value = override
+        preferences.edit {
+            if (override == null) {
+                remove(DEFAULT_REALTIME_VOICE_KEY)
+            } else {
+                putString(DEFAULT_REALTIME_VOICE_KEY, modelCatalogJson.encodeToString(override))
+            }
+        }
+    }
+
     fun setCurrentSelection(selection: ModelSelection?) {
         _currentSelection.value = selection
     }
@@ -357,13 +390,17 @@ class ModelServiceRepository @Inject constructor(
             it.provider.apiKey.isNotBlank() && it.model.isChatModel
         }
 
-    /** Resolves a configured STT model only when its enabled provider has a usable API key. */
+    /** Resolves a configured recognition model only when its enabled provider has a usable API key. */
     fun resolveSpeechSelection(selection: ModelSelection?): ResolvedModel? =
-        resolveRawSelection(selection)?.takeIf { it.model.isStt && it.provider.apiKey.isNotBlank() }
+        resolveRawSelection(selection)?.takeIf {
+            it.model.capabilities.any { it.isRecognition } && it.provider.apiKey.isNotBlank()
+        }
 
-    /** Resolves a configured TTS model only when its enabled provider has a usable API key. */
+    /** Resolves a configured synthesis model only when its enabled provider has a usable API key. */
     fun resolveTtsSelection(selection: ModelSelection?): ResolvedModel? =
-        resolveRawSelection(selection)?.takeIf { it.model.isTts && it.provider.apiKey.isNotBlank() }
+        resolveRawSelection(selection)?.takeIf {
+            ModelCapability.TTS in it.model.capabilities && it.provider.apiKey.isNotBlank()
+        }
 
     private fun resolveRawSelection(selection: ModelSelection?): ResolvedModel? {
         if (selection == null) return null
@@ -384,6 +421,10 @@ class ModelServiceRepository @Inject constructor(
         // Insert providers that are missing from the Room snapshot so newly built-in
         // vendors appear on a fresh install without losing prior user data.
         seedMissingModelCatalog(database)
+        // Drop rows for services that no longer exist in the built-in catalogs (e.g. the
+        // former standalone realtime services merged into their vendor's speech service);
+        // otherwise their stale rows resurface in the picker with a fallback Chat kind.
+        removeRemovedModelCatalog(database)
         // Merge newly built-in model groups / items into providers the user already
         // has, so adding a model to an existing DefaultModelServices.services entry in
         // an app update surfaces in the running app's settings without clearing the
@@ -410,17 +451,21 @@ class ModelServiceRepository @Inject constructor(
             )
         // 接口标准白名单是静态元数据，按 serviceId 从默认清单回填；
         // 持久化的协议若不在白名单内（例如厂商后来收紧了格式约束），回退到首个允许值。
-        val supportedBaseTypes = LLMModelConfigs.supportedBaseTypesFor(entity.serviceId)
+        val supportedBaseTypes = SpeechModelConfigs.supportedBaseTypesFor(entity.serviceId)
         val baseType = providerSettings.baseType.takeIf { it in supportedBaseTypes }
             ?: supportedBaseTypes.first()
         return LLMModelProvider(
             serviceId = entity.serviceId,
-            serviceName = entity.serviceName,
+            // 展示名是品牌元数据：内置服务按 serviceId 从内置清单回填。
+            // 数据库里存的是首次安装时的快照，应用内改名后旧安装不会自动更新，
+            // 因此在读取时回填，改名才能对所有安装生效。
+            serviceName = builtInServiceName(entity.serviceId) ?: entity.serviceName,
             isAdded = providerSettings.isAdded || providerSettings.apiKey.isNotBlank(),
             isEnabled = providerSettings.isEnabled,
             isOfficialToolsEnabled = providerSettings.isOfficialToolsEnabled,
             apiKey = providerSettings.apiKey,
             apiBaseUrl = providerSettings.apiBaseUrl,
+            workspaceId = providerSettings.workspaceId,
             baseType = baseType,
             supportedBaseTypes = supportedBaseTypes,
             anthropicBaseUrl = providerSettings.anthropicBaseUrl,
@@ -434,9 +479,8 @@ class ModelServiceRepository @Inject constructor(
                         LLMModelItem(
                             modelId = it.modelId,
                             modelName = it.modelName,
-                            isStt = it.isStt,
-                            isTts = it.isTts,
                             capabilities = it.capabilities,
+                            multimodal = it.multimodal,
                         )
                     },
                 )
@@ -446,8 +490,14 @@ class ModelServiceRepository @Inject constructor(
             iconRes = LLMModelConfigs.iconFor(entity.serviceId),
             homepageUrl = entity.homepageUrl,
             keyHelpUrl = entity.keyHelpUrl,
+            kind = entity.serviceKind.toServiceKind(),
+            endpointSchemes = SpeechModelConfigs.fromServiceId(entity.serviceId)?.endpointSchemes ?: setOf("http", "https"),
         )
     }
+
+    /** 目录里的服务种类标识；未知取值按聊天服务处理，保证旧数据不会让服务不可用。 */
+    private fun String.toServiceKind(): ModelServiceKind =
+        runCatching { ModelServiceKind.valueOf(this) }.getOrDefault(ModelServiceKind.Chat)
 
     private fun decodeGroups(json: String): List<StoredModelGroup> =
         runCatching { modelCatalogJson.decodeFromString<List<StoredModelGroup>>(json) }
@@ -461,6 +511,7 @@ class ModelServiceRepository @Inject constructor(
         baseType = baseType,
         anthropicBaseUrl = anthropicBaseUrl,
         isAdded = apiKey.isNotBlank(),
+        workspaceId = workspaceId,
     )
 
     private fun readSettings(): Map<String, ModelServiceSettings>? {
@@ -492,6 +543,12 @@ class ModelServiceRepository @Inject constructor(
             runCatching { modelCatalogJson.decodeFromString<ModelSelection>(encoded) }.getOrNull()
         }
 
+    /** 读取 Realtime 音色覆盖；损坏的持久化数据按未配置处理。 */
+    private fun readRealtimeVoiceOverride(): RealtimeVoiceOverride? =
+        preferences.getString(DEFAULT_REALTIME_VOICE_KEY, null)?.let { encoded ->
+            runCatching { modelCatalogJson.decodeFromString<RealtimeVoiceOverride>(encoded) }.getOrNull()
+        }
+
     private fun persistSelection(key: String, selection: ModelSelection?) {
         preferences.edit {
             if (selection == null) remove(key) else putString(key, modelCatalogJson.encodeToString(selection))
@@ -500,7 +557,10 @@ class ModelServiceRepository @Inject constructor(
 
     private companion object {
         const val TAG = "ModelServiceRepository"
-        const val PREFERENCES_NAME = "model_service_settings_v2"
+        // v3：StoredModel.capabilities 由 MultimodalCapabilities 对象改为 Set<ModelCapability> 数组，
+        // v2 blob 里的旧形态解码必然失败并整体回退默认值。开发期选择换名整体重建，
+        // 而不是为旧 payload 写兼容适配（见仓库重构约定）。
+        const val PREFERENCES_NAME = "model_service_settings_v3"
         const val SETTINGS_KEY = "encrypted_settings"
         const val DEFAULT_ASSISTANT_MODEL_KEY = "default_assistant_model"
         const val FAST_MODEL_KEY = "fast_model"
@@ -508,6 +568,19 @@ class ModelServiceRepository @Inject constructor(
         const val DEFAULT_TTS_MODEL_KEY = "default_tts_model"
         const val DEFAULT_TTS_VOICE_KEY = "default_tts_voice"
         const val DEFAULT_TTS_VOICE = "mimo_default"
+        const val DEFAULT_REALTIME_MODEL_KEY = "default_realtime_model"
+        const val DEFAULT_REALTIME_VOICE_KEY = "default_realtime_voice"
         const val KEY_ALIAS = "model_service_settings_key_v2"
     }
 }
+
+/**
+ * 内置清单里的服务展示名。
+ *
+ * 品牌名是静态元数据，聊天服务与语音服务都按 serviceId 查内置清单；
+ * 目录里没有的服务返回 null，由调用方回退到数据库里持久化的名字。
+ */
+private fun builtInServiceName(serviceId: String): String? =
+    (LLMModelConfigs.services + SpeechModelConfigs.services)
+        .firstOrNull { it.serviceId == serviceId }
+        ?.serviceName

@@ -9,6 +9,7 @@ import github.ponyhuang.gimi.pluginapi.PluginConfig
 import github.ponyhuang.gimi.pluginapi.PluginConfigAction
 import github.ponyhuang.gimi.pluginapi.PluginConfigActionExecution
 import github.ponyhuang.gimi.pluginapi.PluginConfigField
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
@@ -21,7 +22,9 @@ class NeteasePlugin : AgentPlugin {
     override val pluginId: String = "netease"
     override val displayName: String = "网易云音乐"
     override val version: Int = 1
-    override val toolCount: Int = 15
+
+    // 工具数从目录定义动态推导，避免目录增删后硬编码数字漂移。
+    override val toolCount: Int get() = neteaseTools(account).size
 
     @Volatile private var context: Context? = null
     @Volatile private var resourcesContext: Context? = null
@@ -29,6 +32,8 @@ class NeteasePlugin : AgentPlugin {
     private val account by lazy {
         NeteaseAccount(NeteaseApi(), AndroidNeteaseSessionStore(requireNotNull(context)), { credentials })
     }
+    // 插件与宿主进程同生命周期，scope 不设独立关闭路径是有意的；
+    // 凭证变更经 configure() → login.cancel() 收敛后台轮询。
     private val loginDelegate = lazy { NeteaseLogin(account, CoroutineScope(SupervisorJob() + Dispatchers.IO)) }
     private val login by loginDelegate
     private val toolsets by lazy { listOf(NeteaseToolset { neteaseTools(account) }) }
@@ -39,6 +44,7 @@ class NeteasePlugin : AgentPlugin {
         get() = PluginConfig(
             fields = listOf(
                 PluginConfigField.Text("app_id", label(R.string.netease_app_id)),
+                PluginConfigField.Text("client_secret", label(R.string.netease_client_secret), secret = true),
                 PluginConfigField.Text("private_key", label(R.string.netease_private_key), secret = true),
             ),
             actions = listOf(
@@ -56,7 +62,12 @@ class NeteasePlugin : AgentPlugin {
     }
 
     override fun configure(values: Map<String, String>) {
-        val next = NeteaseCredentials(values["app_id"].orEmpty().trim(), values["private_key"].orEmpty())
+        val next = NeteaseCredentials(
+            values["app_id"].orEmpty().trim(),
+            values["private_key"].orEmpty(),
+            // 令牌刷新接口需要 client secret；历史配置可能没有该字段，留空由刷新时报错提示补全。
+            values["client_secret"].orEmpty(),
+        )
         if (loginDelegate.isInitialized() && (credentials.appId != next.appId || credentials.privateKey != next.privateKey)) login.cancel()
         credentials = next
     }
@@ -84,6 +95,10 @@ class NeteasePlugin : AgentPlugin {
                 }
                 else -> super.runConfigAction(actionId)
             }
+        } catch (cancelled: CancellationException) {
+            // 取消必须传播（JVM 上 CancellationException 是 IllegalStateException 子类，
+            // 不能被下面的登录失败 catch 吞成 {error}）。
+            throw cancelled
         } catch (error: NeteaseApiException) {
             failureFor(error)
         } catch (error: NeteaseNetworkException) {

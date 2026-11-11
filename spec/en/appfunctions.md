@@ -74,7 +74,7 @@ Keep this terminal open. The expected initial output includes:
 INSTRUMENTATION_STATUS: AppFunctionShell=permission granted
 ```
 
-Then open Gimi and go to **Settings → AppFunciton**. Pull down to refresh the
+Then open Gimi and go to **Settings → AppFunction**. Pull down to refresh the
 application list. The permission-required message should be replaced by the
 discoverable AppFunction applications.
 
@@ -131,7 +131,7 @@ Run the start command again for the next session.
 | `lacks the AppFunction session entry` | The installed APK predates this integration or is not the variant you selected. Build and install a current APK. |
 | `Specify -Serial` | Multiple devices are visible. Use `adb devices -l` and pass the intended serial. |
 | `Device did not grant the Shell AppFunction identity` | The device or OS policy does not expose this Shell identity. Use a supported device/build; a normal permission grant cannot bypass this restriction. |
-| App shows the permission-required message | Confirm the start command is still running, the Gimi process was not restarted, and you opened **Settings → AppFunciton** after the session started. |
+| App shows the permission-required message | Confirm the start command is still running, the Gimi process was not restarted, and you opened **Settings → AppFunction** after the session started. |
 | AppFunction list is empty | Pull down to refresh. Newly installed provider apps may need time to be indexed. |
 | Session ends after an update or reboot | Start a new session with the script or manual ADB command. |
 

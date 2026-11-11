@@ -40,13 +40,13 @@ class ValidateChatAttachmentsUseCase @Inject constructor() {
             ?.models?.firstOrNull { it.id == selection.modelId }
             ?: return ChatAttachmentValidationFailure.ModelUnavailable
         val (supportedMimeTypes, maxInlineBytes) = when (drafts.first().category) {
-            AttachmentCategory.IMAGE -> model.capabilities.vision?.let {
+            AttachmentCategory.IMAGE -> model.multimodal.vision?.let {
                 it.supportedMimeTypes to it.maxInlineBytes
             }
-            AttachmentCategory.AUDIO -> model.capabilities.audioInput?.let {
+            AttachmentCategory.AUDIO -> model.multimodal.audioInput?.let {
                 it.supportedMimeTypes to it.maxInlineBytes
             }
-            AttachmentCategory.DOCUMENT -> model.capabilities.documentInput?.let {
+            AttachmentCategory.DOCUMENT -> model.multimodal.documentInput?.let {
                 it.supportedMimeTypes to it.maxInlineBytes
             }
         } ?: return ChatAttachmentValidationFailure.CategoryUnsupported

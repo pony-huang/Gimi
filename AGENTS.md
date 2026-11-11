@@ -12,11 +12,11 @@
 - `:domain:<capability>` — domain models, repository interfaces, and use cases.
 - `:data:<capability>` — repository implementations, Room/Preferences/Keystore storage, Android gateways, network clients, and third-party SDK adapters.
 - `:feature:<capability>` — feature UI, routes, contracts, ViewModels, and feature-specific components.
-- `gradle/libs.versions.toml` — dependency/version catalog. Project working notes and temporary artifacts live under ignored `temp/`; long-lived documentation belongs in `spec/<lang>/` only after that directory is introduced.
+- `gradle/libs.versions.toml` — dependency/version catalog. Project working notes and temporary artifacts live under ignored `temp/`; long-lived documentation belongs in `spec/en/` with a Chinese companion in `spec/zh/`.
 
 ### Capabilities
 
-Current domain capabilities are `modelcatalog`, `assistant`, `conversation`, `speech`, `mcp`, `workfiles`, `permissions`, `toolauthorization`, `skills`, `appupdate`, `plugin`, `recommendation`, `memory`, `workspace`, and `appearance`. Provider/runtime-only data capabilities also include `agent`. Current features are `modelsettings`, `settings`, `mcp`, `workfiles`, `permissions`, `toolauthorization`, `skills`, `chat`, `assistant`, `plugin`, `recommendation`, `memory`, and `workspace`.
+Current domain capabilities are `modelcatalog`, `assistant`, `conversation`, `voice`, `mcp`, `workfiles`, `permissions`, `toolauthorization`, `skills`, `appupdate`, `plugin`, `recommendation`, `memory`, `workspace`, and `appearance`. Provider/runtime-only data capabilities also include `agent`. Current features are `modelsettings`, `settings`, `mcp`, `workfiles`, `permissions`, `toolauthorization`, `skills`, `chat`, `assistant`, `plugin`, `recommendation`, `memory`, and `workspace`.
 
 ### Ownership and placement
 
@@ -77,16 +77,15 @@ domain/data/core -X-> feature or app
 - Route composables collect state lifecycle-aware and own navigation, Toast/Snackbar delivery, activity results, permissions, URL opening, and other Android/UI side effects.
 - Screens and business components are stateless: state enters as parameters and events leave as callbacks. They do not fetch ViewModels, repositories, or Context, or launch business coroutines.
 - Keep loading, testing, refreshing, notices, and other ephemeral business-operation state in the ViewModel.
-- `:core:designsystem` components reference no ViewModels, repositories, domain models, navigation, Toast, network calls, or business coroutines; keep them independently previewable with fixture data. Accepted exception: `ui/settings/llmmodel/LLMModelServiceIcon` and its `ic_model_provider_*` drawables are shared brand assets consumed by both `:feature:chat` and `:feature:modelsettings`; they stay in `:core:designsystem` because feature-to-feature dependencies are forbidden.
+- `:core:designsystem` components reference no ViewModels, repositories, domain models, navigation, Toast, network calls, or business coroutines; keep them independently previewable with fixture data. Accepted exception: `ui/settings/llmmodel/LLMModelServiceIcon` and its `ic_model_provider_*` drawables are shared brand assets consumed by both `:feature:chat` and `:feature:modelsettings`; they stay in `:core:designsystem` because feature-to-feature dependencies are forbidden. Second exception: `ui/components/VoicePickerPage` and `ui/components/VoicePickerDialog` (with the `voice_picker_*`/`voice_gender_*`/`voice_group_*` strings and the `:domain:voice` api dependency) are the two presentations of the shared voice picker: the in-drawer page is consumed by `:feature:chat`, the dialog by `:feature:modelsettings`. Both stay in `:core:designsystem` so the shared copy and domain types live in one place without a feature-to-feature dependency.
 
 ### Preview-first UI design review
 
-- Any UI adjustment or UI iteration must begin with a preview design draft before implementation: a `@Preview @Composable`-based draft (using fake/fixture data, themable for light and dark) that renders the proposed layout, new states, and interaction entry points.
-- At the start of each UI task, ask whether the user wants rendered design images for remote review, unless they have already stated a preference for that task. Wait for the answer before choosing the image-delivery branch; draft preparation may continue meanwhile.
-- If requested, render the actual Compose draft, visually inspect the captures, and return viewable images in the conversation before asking for design approval. Include light/dark themes and the relevant changed states; keep image artifacts under `temp/`. Source files, file links, and compilation success alone do not fulfill image delivery. If rendering is unavailable, explain the specific blocker and agree on an alternative with the user.
-- If declined, skip image rendering and delivery and present the draft with a concise description. Declining images does not waive the design approval below unless the user explicitly says so.
-- Present the draft to the user for review; implementation work may start only after the user explicitly confirms the design. Do not skip this step for small visual tweaks unless the user says otherwise.
-- Keep the draft isolated from production wiring (no ViewModel/repository changes yet); once approved, merge it into the real screens, wire up state, and delete the draft file and any preview-only dependencies it required.
+Before changing UI, read [Preview-first UI design review](spec/en/ui/preview-first-design-review.md) for the design workflow, interaction continuity, and motion verification principles. Small, localized adjustments may proceed directly; larger changes require an isolated Compose preview draft, an image-delivery preference, and explicit design approval before implementation unless the user explicitly waives approval. Preserve relevant production previews and use proportional verification.
+
+### Brand styling
+
+Before designing UI or creating Gimi-branded visual artifacts, read [Gimi brand styling](spec/en/ui/brand-styling.md). Use the current blue-and-neutral theme, typography, component shapes, and semantic color roles as the visual baseline.
 
 ### Theming and insets
 
@@ -106,21 +105,7 @@ domain/data/core -X-> feature or app
 
 ### Compose A2UI (agentic UI) reference
 
-- Canonical references: Compose renderer page <https://developer.android.com/develop/ui/compose/agentic.md.txt> (retrieved 2026-10-19; the page and its protocol versions evolve, so re-fetch it before adopting or upgrading); A2UI protocol home <https://a2ui.org/>; protocol spec <https://a2ui.org/specification/v0.9.1-a2ui/>; catalogs <https://a2ui.org/concepts/catalogs/>.
-- Purpose: the Jetpack Compose A2UI renderer implements the A2UI protocol so agents can produce rich, interactive UI as native Compose components by emitting JSON. Agents never generate or execute arbitrary UI code; the component catalog is the contract that declares which components, properties, and functions they may use.
-- Artifacts and responsibilities:
-    - `androidx.a2ui.compose:compose-runtime` — fine-grained updates for streaming agent payloads through Compose Snapshot state; only affected components recompose.
-    - `androidx.a2ui.compose:compose-ui` — catalog and component implementation APIs, including progressive rendering, per-subcomponent loading states, animated transitions, and two-way data binding back to the agent.
-    - `androidx.a2ui:a2ui-model` and `androidx.a2ui:a2ui-engine` — protocol parsing and message processing, schema validation before payloads reach state models, component error states, and automatic error reporting so the agent can self-correct.
-    - `androidx.compose.material3:material3-a2ui` — optional ready-made Basic Catalog based on Material 3, with progressive rendering and Material theming.
-    - `androidx.a2ui.compose:compose-ui-testing` — dedicated testing APIs.
-- Architecture: the runtime and UI layers are design-system agnostic. Build a custom catalog for this project's design system or adopt the provided Basic Catalog.
-- Protocol compatibility: the renderer supports A2UI 0.9.1. Catalog schemas are tied to protocol versions, and clients can declare multiple supported catalog versions for capability negotiation with the agent. AndroidX binary compatibility rules apply: non-breaking additions enter core interfaces with default implementations, while incompatible changes deprecate old interfaces (for example `A2uiComponent`) and add new ones (`A2uiComponentV2`) alongside them.
-- Adoption guardrails: keep A2UI inside a dedicated feature or business-agnostic presentation/core slice; domain and data modules never depend on Compose or A2UI types. Treat agent JSON as untrusted input: validate it with `a2ui-engine` before it reaches UI state, surface component error states, and keep permission and credential decisions in their owning tested layers. Register only catalog components that follow the design-system, i18n, accessibility, and preview-first rules above. Before upgrading, verify the current protocol version and catalog negotiation behavior instead of assuming 0.9.1 is still current.
-
-## Integration References
-
-- Spotify: Before adding or changing Web API endpoints, OAuth, tool schemas, playback behavior, or Spotify content handling, read [Spotify integration reference](spec/en/spotify-building-with-ai.md). Re-fetch the linked official OpenAPI schema and relevant endpoint/policy pages for the capability being changed; the dated reference is not a frozen API contract.
+A2UI (agentic UI) lets the LLM agent produce interactive native Compose UI by emitting JSON; the component catalog is the contract, and agent JSON is untrusted input validated by `a2ui-engine` before it reaches UI state. Before adding or changing A2UI generation, validation, catalog components, or upgrading the androidx a2ui artifacts, read [A2UI business execution](spec/en/a2ui/a2ui-execution.md) — it owns the protocol background, canonical reference links, the end-to-end on-device pipeline, and the upgrade checklist.
 
 ## Build and Verification
 
@@ -138,44 +123,40 @@ Run from the repository root with `gradlew.bat` on Windows:
 
 Android Studio may run the `app` debug configuration on a device or emulator.
 
-### Fast validation and Jugg fallback
+### Fast validation
 
-- For Android compilation and deployment, prefer Android Studio's Jugg run configurations through `mcp_servers.mcpserver`. First call `get_run_configurations` with the repository's `projectPath`, then call `execute_run_configuration` with the returned `jugg:app` configuration (or the matching plugin's `jugg:*` configuration). This IDE MCP route takes priority over the Jugg CLI and direct Gradle commands.
-- Inspect the run output and, when returned, `fullOutputPath` until compilation reaches a terminal result. A successful MCP invocation or `Jugg compile started` only confirms startup. Report incremental compilation, Jugg's automatic Gradle fallback, deployment, and device verification separately; `No file changes` followed by Gradle fallback is not an incremental compile success.
-- If the IDE MCP route or required Jugg configuration is unavailable, try the Jugg CLI; if Jugg is unavailable, use conventional Gradle/Android CLI commands. For Jugg failures, inspect and report the cause before falling back under the rules below. Inspect Jugg's resolved command: it may run `:app:assembleDebug` with the configuration cache disabled rather than a narrow compile.
-- For JVM tests and required Gradle checks that Jugg's incremental path cannot establish, choose the smallest targets satisfying the testing rules below and combine compatible targets in one `gradlew.bat` invocation when practical. Existing Gradle commands remain the fallback and required-check reference. When a change requires both JVM tests and APK assembly, finish the focused tests and resolve their failures before starting assembly; combine compatible compile/test targets within that stage.
-- If Jugg produces no new output or progress for 30–60 seconds, inspect the output file and running build through command-line or non-UI APIs before retrying. A `Build Files Changed Confirm` dialog can block compilation; a missing device alone does not establish the cause. If available evidence indicates an IDE prompt, inspect and resolve it using the current diff and baseline. Resume the existing task rather than launching another waiting compile; record the blocker before taking a documented fallback.
-- If Jugg's embedded Kotlin compiler reports `INTERNAL_ERROR` with `Could not find installation home path` / missing `product-info.json`, classify it as an IDE/Jugg compiler-environment failure, not a Kotlin source error. Retry the incremental compiler at most once; if it repeats, validate with the required Gradle targets and report the Jugg failure separately.
-- If Jugg reports `READY_FULL_COMPILE (build.gradle.kts changed)`, inspect both `git diff` for build scripts and Jugg's `getLastBuildFile ... exists: false` entries. Missing Jugg history can trigger this verdict even when this task changed no build script. Accept one full build to re-establish the baseline, or use direct Gradle for compile-only validation; do not repeatedly retry incremental compile against the same state or delete build artifacts to force it.
-- Changes to Hilt/Room annotations, generated code, or bytecode transforms need the Gradle build required by the testing rules; Jugg's source-to-dex incremental path does not rerun every processor or transform. Keep one build running at a time.
+- For JVM tests and required Gradle checks, choose the smallest targets satisfying the testing rules below and combine compatible targets in one `gradlew.bat` invocation when practical. When a change requires both JVM tests and APK assembly, finish the focused tests and resolve their failures before starting assembly; combine compatible compile/test targets within that stage.
+- Changes to Hilt/Room annotations, generated code, or bytecode transforms need the Gradle build required by the testing rules. Keep one build running at a time.
+- Validate a coherent source state: finish or explicitly stop an active build before further edits, and associate each result with the source state it actually checked. Validate subsequent changes separately.
 - After switching branches, a generated-code failure referencing a removed class may come from stale outputs. Check the current source/dependency graph and generated-file timestamps, then clean only the affected module's generated outputs when confirmed. Use a repository-wide `clean` only when evidence shows the problem spans modules.
 - After a test failure, inspect the exact failing test and cause before rerunning. Repair a stale fixture or source issue, then rerun the same targeted tests; report unrelated failures separately. Reuse successful validation for behavior unchanged by subsequent edits. Record compilation, tests, APK assembly, deployment, and device verification separately; distinguish active build time from IDE/dialog waits and infrastructure retries. A combined test-and-assembly command's elapsed time is not the unit-test execution time.
 
 ### CI/CD (GitHub Actions, `.github/workflows/`)
 
-- `ci.yml` delegates to `verify.yml`: push/PR to `main` and explicit `workflow_dispatch` run Python release-tool tests, architecture checks, `testDebugUnitTest`, `assembleDebug`, plugin compilation, and `app:lintDebug` on JDK 21 (Ubuntu).
-- `release-please.yml`: main pushes maintain a Conventional Commits version PR updating `version.txt`, `.release-please-manifest.json`, and `CHANGELOG.md`; `prepare_version_pr.py` assigns `releaseVersionCode` in `gradle.properties` from main + 1 before explicitly dispatching CI. Re-running the same version PR retains its assigned code. On merge, release-please creates a tag and Draft Release and explicitly calls `release.yml`, avoiding `GITHUB_TOKEN` event suppression.
-- `release.yml`: `vX.Y.Z` / `vX.Y.Z-rc.N` tag pushes, manual dispatch with a required existing tag, or reusable calls verify the exact tagged commit, then build and validate formally signed App/plugin APKs. All four signing secrets are mandatory for publication; local signing priority remains CI properties > IDE wizard > debug fallback. CHANGELOG.md is the Release body source. Complete artifacts are uploaded to Draft before publication; published releases are immutable. R8 mapping is kept internally as an Actions Artifact. No Google Play publishing.
-- App and plugins share `version.txt` and `gradle.properties`'s `releaseVersionCode` through `gimi.android.application`. See `spec/en/releasing.md` for setup, version PR review, RCs, and retries.
+- Development branch pushes run CI verification; release automation maintains version PRs and publishes signed App/plugin APKs.
+- Read [Development, verification, and release](spec/en/releasing.md) before changing workflows or release wiring, reviewing version PRs, or handling RCs and release retries. Keep detailed CI/CD behavior in that spec; workflow files are the source of truth.
 
 ### Testing rules
 
-- Keep validation proportional to risk. During iteration, edit and review a coherent change before compiling; use the shortest relevant check at that checkpoint instead of rebuilding after each file. Escalate when the change crosses module contracts, persistence, security, generated code, or release wiring, or when a focused check exposes uncertainty.
-- Use TDD selectively for core business logic or complex problems with a meaningful test seam, or when the user explicitly requests it. Non-core code and simple changes, including UI, layout, window sizing, copy, and low-risk wiring, do not require TDD; implement directly and use proportional compilation, previews, or manual verification. This scope takes precedence over skills that prescribe TDD for every feature or bug fix.
-- Unit tests written for a task are normally development-time verification and should not be committed by default. Before committing, remove temporary test files and development-only additions to existing tests, or move reusable scratch tests under ignored `temp/`. Retain only coverage explicitly requested by the user or the smallest justified regression test for a necessary risk boundary; state the reason for any retained new test. Preserve existing tests that guard a real contract, boundary, error path, mapping rule, or documented regression, and make the minimal fixture/expectation updates needed to keep them valid. Tests that only restate data-class defaults, hardcoded literals, tool-name registries, prompt text, a one-line predicate re-implemented in the test, or a mock-echo verification carry no regression value and may be removed; drop the test dependencies that become unused with them. Passing a temporary test does not itself justify adding it to the repository.
-- Independent HTTP or paid tool integrations need focused boundary tests for request/response mapping, credential sourcing, validation, failure/retry behavior, and cancellation, plus domain tests for enablement and selection rules where applicable. Check the HTTP client's implicit retry behavior when duplicate requests affect cost or correctness. Give each behavior a primary test owner; add cross-layer tests only for wiring risks not already covered, rather than repeating the same static declarations across support-matrix, catalog, and factory tests.
-- When diagnosing and fixing a problem, inspect existing logic and available runtime evidence first. If these do not reveal the cause, use focused unit tests to reproduce the behavior and validate hypotheses, including for non-core code. This diagnostic exception does not require TDD; whether to commit the tests follows the test submission scope above.
-- Pure text-only changes, including documentation, comments, user-facing copy, and prompt wording, do not require adding or updating automated tests. This applies when the change does not also modify Kotlin control flow, parsing or interpolation logic, tool definitions, structured output contracts, resources wiring, or UI behavior. Review the diff and use only lightweight, directly relevant validation; do not run broad builds or test suites solely for these text-only edits.
-- Use JUnit 4 in the owning module's `src/test`; use behavior-based `*Test.kt` names. Put Android-specific gateway and system integration coverage in `src/androidTest`.
-- Behavior-preserving refactors of core business ViewModel transitions or externally visible repository behavior require characterization test coverage.
-- Changed core business rules require domain/use-case or ViewModel tests. Gateways/repositories implementing core behavior or necessary risk boundaries require applicable success, failure, exception, and mapping coverage.
-- For Compose UI, keep `@Preview` fixtures for relevant visual and conditional states; do not add automated UI interaction, layout, or screenshot tests. Copy selection by provider, icon choice/size, spacing, and text expansion do not require new unit tests when they only affect presentation; use previews and proportional compilation. Keep business rules and permission/credential decisions in their owning tested layers. Preserve existing business-behavior tests; new tests follow the submission policy above. Use manual device checks when needed.
-- Tests use fakes, MockWebServer, or mocked gateways, never live model APIs or real credentials.
-- After code changes, run `git diff --check` and compile each affected module. Run focused existing/new JVM tests for changed behavior and the characterization or boundary coverage required above; do not run an unrelated module's entire suite solely because code changed nearby.
-- Run `app:compileDebugKotlin` when public module contracts or app composition change. Run `app:assembleDebug` for DI/generated wiring, resource identifiers or wiring, manifest, build configuration, packaging, or deployment; assembly covers the app compile, so do not run both targets separately without a specific reason. Pure copy edits follow the text-only rule above.
-- Run full module/app test suites for broad refactors, integration milestones, pre-release checks, CI, or an explicit request; they are not a default gate for each iteration. Device tests are for hardware, permission, system integration, and UI behavior that JVM tests cannot establish, or when explicitly requested. State exactly which level passed.
-- Every module declares and verifies its own dependencies; compilation through an undeclared `:app` transitive dependency is not completion.
-- After repeated runner/device/infrastructure failures following a successful compile, stop retrying, hand off to manual verification, and record the successful compile, repeated failure, and any manual checks.
+Choose the smallest validation that covers the changed behavior and risk. Review a coherent change before running checks; escalate when focused results expose uncertainty.
+
+| Change | Default validation |
+|---|---|
+| Text-only documentation, comments, copy, or prompts | Review the diff and run `git diff --check`; no build or automated tests unless logic, structured contracts, resource wiring, or UI behavior also changes. |
+| Presentation-only Compose UI | Relevant `@Preview` states and affected-module compilation; manual device checks when needed. Do not add automated UI interaction, layout, or screenshot tests. |
+| Business behavior or a behavioral bug fix | Focused behavior tests in the owning layer and affected-module compilation. Core rules require domain/use-case or ViewModel coverage; repositories/gateways need applicable success, failure, exception, and mapping coverage. |
+| Behavior-preserving refactor of core ViewModel transitions or externally visible repository behavior | Characterization coverage and affected-module compilation. |
+| Public module contracts or app composition | `app:compileDebugKotlin` and focused tests for affected behavior. |
+| DI/generated wiring, resource identifiers or wiring, manifest, build configuration, packaging, or deployment | Required focused tests first, then `app:assembleDebug`. |
+
+- After code changes, run `git diff --check` and compile affected modules. A higher-level build satisfies compilation it actually covers; do not repeat covered compile targets. Every module must declare its own dependencies.
+- Use TDD selectively for core business logic, complex problems with a meaningful test seam, or an explicit user request. Simple UI, copy, and low-risk wiring do not require TDD. This scope takes precedence over blanket TDD skill requirements.
+- Keep the smallest useful regression tests protecting business behavior, external contracts, risk boundaries, or fixed defects; preserve existing meaningful coverage. Remove temporary diagnostic tests before committing or move reusable scratch work to ignored `temp/`. Judge tests by the independent behavior and failures they protect, not assertion length or whether expected values are literals.
+- Use JUnit 4 in the owning module's `src/test`, with behavior-based `*Test.kt` names; Android-specific integration tests belong in `src/androidTest`. Tests must run on Windows and Ubuntu with isolated fixtures, fakes or mocked gateways, and no live model APIs or real credentials.
+- Keep Compose business rules and permission/credential decisions in their owning tested layers. Retain previews for relevant visual and conditional states.
+- Full module/app suites are for broad refactors, integration milestones, pre-release checks, CI, or an explicit request. Use device checks for hardware, permissions, system integration, and UI behavior that JVM tests cannot establish.
+- Inspect the exact cause before retrying failures. Stop when the same infrastructure cause repeats without new evidence supporting another retry; report passed and incomplete checks and hand off remaining verification. Compilation success does not replace required tests or device checks.
+- Read [Testing and verification](spec/en/testing.md) when writing or evaluating tests, diagnosing cross-platform failures, or changing HTTP/paid integrations. It owns detailed fixture, boundary, diagnostic, and test-retention guidance. Report compilation, tests, assembly, deployment, and device verification separately.
 
 ## Refactoring, Git, and Security
 
@@ -196,7 +177,7 @@ Android Studio may run the `app` debug configuration on a device or emulator.
 ### Security
 
 - Never commit build outputs, caches, generated reports, IDE state, API keys, tokens, or credentials. Store local secrets in ignored `local.properties` or environment variables and revoke exposed credentials.
-- Filter build/IDE logs before emitting them to tool output or conversation. Prefer an allowlist of task progress, compiler diagnostics, and terminal build results; Jugg logs can contain complete environment-variable dumps. Exclude environment dumps and redact credentials before output, rather than printing raw log tails and filtering afterward.
+- Filter build/IDE logs before emitting them to tool output or conversation. Prefer an allowlist of task progress, compiler diagnostics, and terminal build results. Exclude environment dumps and redact credentials before output, rather than printing raw log tails and filtering afterward.
 - Treat untracked `app/release/` APKs as local artifacts; include or delete them only when explicitly requested.
 
 ## Working Files and Caches
@@ -234,3 +215,29 @@ android run --device "$serial" --apks=app\build\outputs\apk\debug\app-arm64-v8a-
 - If `android run`/`android screen capture` cannot resolve the serial (e.g. wireless `adb-tls` names), fall back to `adb -s "$serial" install -r <apk>`, launch with `adb -s "$serial" shell monkey -p <applicationId> -c android.intent.category.LAUNCHER 1`, and capture with `adb -s "$serial" exec-out screencap -p > screen.png`; record the fallback reason.
 - Use `android layout --device "$serial" --pretty` for hierarchy/text/bounds and `android screen capture -o build\device-screen.png` for visuals. When the CLI cannot resolve the device, `adb -s "$serial" shell uiautomator dump` + `cat` is the hierarchy fallback. Use narrowly scoped `adb -s "$serial" shell input ...` only when CLI lacks required input.
 - If the device is asleep or not foregrounded and CLI has no wake command, use only `adb -s "$serial" shell input keyevent KEYCODE_WAKEUP`, then re-check with `android layout` or `android screen capture`. Never bypass device security. Report persistent test changes such as model selection.
+
+## Spec documentation
+
+Long-lived spec documents live in `spec/en/` (English, read by agents) with Chinese companions under `spec/zh/` at the same relative path. Each document opens with a cross-language link (and, for dated references, a `Reviewed:` date and intended audience). When a business area gains a new spec document, add a row to the table below; keep the English and Chinese companions in sync when updating a spec.
+
+Load specs on demand:
+
+- Use the table's triggers to select documents before changing a documented area; leave unrelated specs unloaded. Read English by default; load the Chinese companion when editing or checking the translation.
+- Start with headings and read the relevant sections, including their constraints, known gaps, and required checks. Follow links only when needed for the task or explicitly required by the document; expand the reading scope when the change crosses areas.
+- Base implementation claims on inspected code and spec text. Treat unread content as unknown; when evidence is missing or conflicts, inspect the relevant source and state any unresolved uncertainty instead of inventing behavior.
+
+| Document (English) | Read before… |
+|---|---|
+| [Preview-first UI design review](spec/en/ui/preview-first-design-review.md) | changing UI or motion, deciding whether a design draft is required, or preparing design approval and image delivery |
+| [Gimi brand styling](spec/en/ui/brand-styling.md) | designing UI or creating Gimi-branded visual artifacts; choosing colors, typography, shapes, or brand assets |
+| [Predictive back support](spec/en/ui/predictive-back.md) | changing back navigation, system animations, drawer/bottom-sheet back handling, or verifying predictive back on a device |
+| [Agent business execution](spec/en/agent/agent-execution.md) | adding an `AgentContribution`, changing run lifecycle, confirmation, event pipeline, or cache-key behavior |
+| [A2UI business execution](spec/en/a2ui/a2ui-execution.md) | changing the `generate_a2ui` chain, protocol validation, chat catalog components, or upgrading a2ui artifacts |
+| [AppFunctions](spec/en/appfunctions.md) | adding or changing app function tools exposed to the agent |
+| [Realtime voice system](spec/en/voice/realtime-voice-system.md) | touching realtime voice; read its "Known gaps" section first |
+| [Realtime voice pipeline](spec/en/voice/pipeline.md) | changing capture, echo cancellation, VAD/segmentation, recognition, generation, synthesis/playback, or barge-in stage mechanics |
+| [Realtime voice state, devices, and lifecycle](spec/en/voice/runtime.md) | changing the voice state machine, audio device routing, foreground service, or timeout/retry/cancellation semantics |
+| [Realtime voice test coverage](spec/en/voice/testing.md) | writing, moving, or deleting realtime voice tests, or judging what only device verification can cover |
+| [Plugins](spec/en/plugin/plugins.md) | adding or changing a plugin, or its integrated platform |
+| [Testing and verification](spec/en/testing.md) | writing or evaluating tests, diagnosing cross-platform failures, changing HTTP/paid integrations |
+| [Releasing](spec/en/releasing.md) | changing CI/CD workflows or release wiring, version PRs, RCs, tag-based releases |

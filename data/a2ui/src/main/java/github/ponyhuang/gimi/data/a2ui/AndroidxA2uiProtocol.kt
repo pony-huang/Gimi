@@ -11,6 +11,7 @@ import github.ponyhuang.gimi.domain.a2ui.A2uiProtocol
 import github.ponyhuang.gimi.domain.a2ui.A2uiRecord
 import javax.inject.Inject
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
@@ -74,6 +75,10 @@ class AndroidxA2uiProtocol @Inject constructor() : A2uiProtocol {
                 messages.forEach(processor::processMessage)
                 val failures = withTimeout(5_000) { complete.await() }
                 require(failures.isEmpty()) { failures.joinToString("; ") }
+            } catch (timeout: TimeoutCancellationException) {
+                // 超时必须归一为校验失败：TimeoutCancellationException 是 CancellationException，
+                // 逃逸出去会静默取消调用方作用域，跳过生成子代理的一次纠正循环。
+                throw IllegalArgumentException("A2UI validation timed out", timeout)
             } finally {
                 job.cancel()
             }

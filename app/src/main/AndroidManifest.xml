@@ -12,10 +12,13 @@
     <uses-permission android:name="android.permission.EXECUTE_APP_FUNCTIONS"
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Android 14 起，后台持续使用麦克风必须以 microphone 类型启动前台服务。 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS" />
@@ -134,6 +137,10 @@
             android:name="github.ponyhuang.gimi.data.conversation.runtime.AgentExecutionService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+        <service
+            android:name="github.ponyhuang.gimi.data.voice.runtime.RealtimeVoiceCallService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
     </application>
 
 </manifest>

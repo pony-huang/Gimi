@@ -10,8 +10,9 @@ import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
-import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
+import github.ponyhuang.gimi.domain.mobileuse.MobileUseController
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseResult
+import github.ponyhuang.gimi.domain.mobileuse.MobileShellResult
 import github.ponyhuang.gimi.domain.mobileuse.MobileObservation
 import github.ponyhuang.gimi.domain.mobileuse.MobileBounds
 import github.ponyhuang.gimi.domain.mobileuse.MobileElement
@@ -21,9 +22,6 @@ import io.mockk.coVerify
 import io.mockk.confirmVerified
 import io.mockk.every
 import io.mockk.mockk
-import kotlinx.coroutines.async
-import kotlinx.coroutines.test.advanceTimeBy
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -33,192 +31,134 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MobileUseToolsTest {
-    private val repository = mockk<MobileUseRepository>()
+    private val repository = mockk<MobileUseController>()
     private val tools = MobileUseTools(repository).all().associateBy { it.name }
 
     @Test
     fun screenshotIsOnlyAttachedToImmediateNextRequest() = runTest {
         val jpeg = byteArrayOf(1, 2, 3, 4)
-        coEvery { repository.observe("turn-1") } returns
+        coEvery { repository.takeScreenshot("turn-1") } returns
             MobileUseResult("ready", "screenshot", 290, jpeg, 1080, 2400)
-        val tool = tools.getValue("mobile_observe")
-        val payload = tool.execute(context("turn-1"), emptyMap()) as Map<*, *>
+        val tool = tools.getValue("mobile_take_screenshot")
+        val payload = tool.execute(context("turn-1"), mapOf("intent" to "Inspect the screen")) as Map<*, *>
         assertEquals(1080, payload["width"])
         assertEquals(2400, payload["height"])
-        val request = LlmRequest(
-            contents = listOf(
-                Content(
-                    role = Role.USER,
-                    parts = listOf(
-                        Part(functionResponse = FunctionResponse(
-                            name = tool.name,
-                            id = "call-1",
-                            response = payload.entries.associate { it.key.toString() to it.value },
-                        )),
-                    ),
-                ),
-            ),
-        )
+        val request = LlmRequest(contents = listOf(Content(role = Role.USER, parts = listOf(
+            Part(functionResponse = FunctionResponse(name = tool.name, id = "call-1",
+                response = payload.entries.associate { it.key.toString() to it.value })),
+        ))))
         val enriched = tool.processLlmRequest(mockk(), request)
         assertArrayEquals(jpeg, enriched.contents.last().parts.last().inlineData?.data)
         assertEquals(1, tool.processLlmRequest(mockk(), request).contents.size)
     }
 
     @Test
-    fun typeTextTargetsCoordinatesOnOwnedDisplay() = runTest {
-        coEvery { repository.typeText("turn-1", "screen-1", 200, 300, "Faded") } returns
-            MobileUseResult("text_set", "done", 290, null, 1080, 2400)
-        val payload = tools.getValue("mobile_type_text").execute(
-            context("turn-1"), mapOf("observationId" to "screen-1", "x" to 200, "y" to 300, "text" to "Faded"),
-        ) as Map<*, *>
-        assertEquals("text_set", payload["status"])
-        coVerify(exactly = 1) { repository.typeText("turn-1", "screen-1", 200, 300, "Faded") }
-    }
-
-    @Test
-    fun relativeTapUsesNormalizedCoordinates() = runTest {
-        coEvery { repository.tapRelative("turn-1", "screen-1", 500, 975) } returns
-            MobileUseResult("tapped", "done", 290, null, 1080, 2400)
-        val payload = tools.getValue("mobile_tap_relative").execute(
-            context("turn-1"), mapOf("observationId" to "screen-1", "xPermille" to 500, "yPermille" to 975),
-        ) as Map<*, *>
-        assertEquals("tapped", payload["status"])
-        coVerify(exactly = 1) { repository.tapRelative("turn-1", "screen-1", 500, 975) }
-    }
-
-    @Test
-    fun waitDelaysWithoutCapturingOrChangingDisplay() = runTest {
-        val waiting = async {
-            tools.getValue("mobile_wait").execute(context("turn-1"), mapOf("seconds" to 3)) as Map<*, *>
-        }
-        runCurrent()
-        assertFalse(waiting.isCompleted)
-        advanceTimeBy(2_999)
-        runCurrent()
-        assertFalse(waiting.isCompleted)
-        advanceTimeBy(1)
-        runCurrent()
-        assertTrue(waiting.isCompleted)
-        assertEquals("waited", waiting.await()["status"])
-        confirmVerified(repository)
-    }
-
-    @Test
-    fun waitRejectsOutOfRangeDurations() = runTest {
-        val tool = tools.getValue("mobile_wait")
-        for (seconds in listOf(0, 1.5, 61)) {
-            val response = tool.execute(context("turn-1"), mapOf("seconds" to seconds)) as Map<*, *>
-            assertEquals("invalid_argument", response["status"])
-        }
-    }
-
-    @Test
-    fun missingTaskIdentityDoesNotOperateDisplay() = runTest {
-        val payload = tools.getValue("mobile_observe").execute(
-            mockk { every { context } returns mockk(relaxed = true) }, emptyMap(),
+    fun missingTaskIdentityDoesNotOperateScreen() = runTest {
+        val payload = tools.getValue("mobile_take_screenshot").execute(
+            mockk { every { context } returns mockk(relaxed = true) }, mapOf("intent" to "Inspect"),
         ) as Map<*, *>
         assertEquals("unavailable", payload["status"])
         assertNull(payload["imageToken"])
+        confirmVerified(repository)
     }
 
     @Test
     fun deliveredClickAndObservationTimeoutAreReportedIndependentlyWithoutRetry() = runTest {
-        coEvery { repository.click("turn-1", "screen-1", "a1") } returns MobileUseResult(
+        coEvery { repository.click("turn-1", 500, 600) } returns MobileUseResult(
             "clicked", "sent", actionStatus = "delivered",
             observation = MobileObservation("screen-2", "timeout", "no_post_action_frame", 800, 1, "not_captured"),
         )
-        val payload = tools.getValue("mobile_click").execute(
-            context("turn-1"), mapOf("observationId" to "screen-1", "elementId" to "a1"),
-        ) as Map<*, *>
+        val payload = execute("mobile_click", mapOf("x" to 500, "y" to 600))
         assertEquals("delivered", payload["actionStatus"])
         assertEquals("timeout", payload["observationStatus"])
-        assertEquals("screen-2", payload["observationId"])
-        coVerify(exactly = 1) { repository.click("turn-1", "screen-1", "a1") }
+        assertFalse(payload.containsKey("observationId"))
+        coVerify(exactly = 1) { repository.click("turn-1", 500, 600) }
         confirmVerified(repository)
     }
 
     @Test
-    fun changingObservationExposesSwipeModeAndDeliveredSwipeIsNotRepeated() = runTest {
-        val observation = MobileObservation("screen-2", "timeout", "changing", 10, 8, "available",
-            actionModes = listOf("native_elements", "pixel_coordinates", "swipe_coordinates", "back"))
-        coEvery { repository.swipe("turn-1", "screen-1", 450, 1200, 450, 400, 450) } returns
-            MobileUseResult("swiped", "sent", actionStatus = "delivered", observation = observation)
-        val payload = tools.getValue("mobile_swipe").execute(context("turn-1"), mapOf(
-            "observationId" to "screen-1", "x1" to 450, "y1" to 1200, "x2" to 450, "y2" to 400,
-        )) as Map<*, *>
-        assertEquals("delivered", payload["actionStatus"])
-        assertEquals("changing", payload["observationReason"])
-        assertEquals(observation.actionModes, payload["availableActionModes"])
-        coVerify(exactly = 1) { repository.swipe("turn-1", "screen-1", 450, 1200, 450, 400, 450) }
-        confirmVerified(repository)
-    }
-
-    @Test
-    fun screenshotAndElementsShareExplicitCoordinatesAndPreserveOcrUncertainty() = runTest {
-        coEvery { repository.observe("turn-1") } returns MobileUseResult(
-            "observed", "quiet", width = 1080, height = 2400,
-            observation = MobileObservation("screen-1", "settled", "quiet", 100, 7, "available+ocr_available", listOf(
-                MobileElement("a1", "accessibility", MobileBounds(10, 20, 30, 40), text = "确认", clickable = true, actions = listOf("click")),
-                MobileElement("o1", "ocr", MobileBounds(50, 60, 70, 80), text = "确认", actions = listOf("tap")),
+    fun screenshotDoesNotExposeInternalElementsOrDisplayIdentity() = runTest {
+        coEvery { repository.takeScreenshot("turn-1") } returns MobileUseResult(
+            "observed", "quiet", displayId = 290, width = 1080, height = 2400,
+            observation = MobileObservation("screen-1", "settled", "quiet", 100, 7, "available", listOf(
+                MobileElement("a1", "accessibility", MobileBounds(10, 20, 30, 40), text = "Confirm"),
             )),
         )
-        val payload = tools.getValue("mobile_observe").execute(context("turn-1"), emptyMap()) as Map<*, *>
-        assertEquals("screenshot_pixels", payload["coordinateSystem"])
-        val nodes = payload["nodes"] as List<Map<String, Any>>
-        assertEquals(listOf(50, 60, 70, 80), nodes[1]["bounds"])
-        assertEquals("ocr", nodes[1]["source"])
-        assertFalse(nodes[1].containsKey("clickable"))
-        assertEquals(listOf("tap"), nodes[1]["actions"])
-        assertEquals(true, nodes[0]["clickable"])
+        val payload = execute("mobile_take_screenshot")
+        assertFalse(payload.containsKey("nodes"))
+        assertFalse(payload.containsKey("displayId"))
+        assertFalse(payload.containsKey("observationId"))
+        assertEquals("normalized_0_999", payload["coordinateSystem"])
     }
 
     @Test
-    fun setTextUsesElementIdentityAndAcceptsEmptyReplacement() = runTest {
-        coEvery { repository.setText("turn-1", "screen-1", "a1", "") } returns
-            MobileUseResult("text_set", "done", actionStatus = "delivered")
-        val payload = tools.getValue("mobile_set_text").execute(
-            context("turn-1"), mapOf("observationId" to "screen-1", "elementId" to "a1", "text" to ""),
-        ) as Map<*, *>
-        assertEquals("text_set", payload["status"])
-        coVerify(exactly = 1) { repository.setText("turn-1", "screen-1", "a1", "") }
-    }
-
-    @Test
-    fun missingObservationAndFractionalCoordinatesDoNotSendActions() = runTest {
-        val tool = tools.getValue("mobile_tap")
+    fun invalidCoordinatesAndMissingIntentDoNotSendActions() = runTest {
         for (arguments in listOf(
-            mapOf("x" to 10, "y" to 20),
-            mapOf("observationId" to "screen-1", "x" to 10.5, "y" to 20),
-            mapOf("observationId" to "screen-1", "x" to Double.NaN, "y" to 20),
-        )) {
-            val payload = tool.execute(context("turn-1"), arguments) as Map<*, *>
-            assertEquals("invalid_argument", payload["status"])
-            assertEquals("not_sent", payload["actionStatus"])
+            mapOf("y" to 20), mapOf("x" to 10.5, "y" to 20),
+            mapOf("x" to Double.NaN, "y" to 20), mapOf("x" to 1000, "y" to 20),
+            mapOf("x" to 0, "y" to -1),
+        )) assertEquals("invalid_argument", execute("mobile_click", arguments)["status"])
+        assertEquals("invalid_argument", (tools.getValue("mobile_click").execute(
+            context("turn-1"), mapOf("x" to 1, "y" to 1),
+        ) as Map<*, *>)["status"])
+        confirmVerified(repository)
+    }
+
+    @Test
+    fun staleObservationIsReturnedWithoutAutomaticActionRetry() = runTest {
+        coEvery { repository.click("turn-1", 0, 999) } returns
+            MobileUseResult("stale_observation", "observe again", actionStatus = "not_sent")
+        assertEquals("stale_observation", execute("mobile_click", mapOf("x" to 0, "y" to 999))["status"])
+        coVerify(exactly = 1) { repository.click("turn-1", 0, 999) }
+        confirmVerified(repository)
+    }
+
+    @Test
+    fun optionalArgumentsAreMappedAndMalformedValuesAreRejected() = runTest {
+        coEvery { repository.type("turn-1", any(), any()) } returns MobileUseResult("text_typed", "done")
+        execute("mobile_type", mapOf("text" to "hello"))
+        execute("mobile_type", mapOf("text" to "world", "press_enter" to true))
+        assertEquals("invalid_argument", execute("mobile_type", mapOf("text" to "bad", "press_enter" to "true"))["status"])
+        coVerify(exactly = 1) { repository.type("turn-1", "hello", false) }
+        coVerify(exactly = 1) { repository.type("turn-1", "world", true) }
+        coEvery { repository.dragAndDrop("turn-1", 0, 999, 999, 0, 0) } returns MobileUseResult("dragged", "done")
+        execute("mobile_drag_and_drop", mapOf("start_x" to 0, "start_y" to 999, "end_x" to 999, "end_y" to 0))
+        assertEquals("invalid_argument", execute("mobile_drag_and_drop", mapOf(
+            "start_x" to 0, "start_y" to 999, "end_x" to 999, "end_y" to 0, "hold_ms" to -1,
+        ))["status"])
+        coVerify(exactly = 1) { repository.dragAndDrop("turn-1", 0, 999, 999, 0, 0) }
+        assertEquals("invalid_argument", execute("mobile_wait", mapOf("seconds" to 1.5))["status"])
+        assertEquals("invalid_argument", execute("mobile_press_key", mapOf("key" to "ENTER; HOME"))["status"])
+        confirmVerified(repository)
+    }
+
+    @Test
+    fun shellTimeoutAndPartialOutputAreReturnedWithoutRetry() = runTest {
+        coEvery { repository.runShell("turn-1", "some-command") } returns MobileUseResult(
+            "shell_timeout", "Inspect before retrying", actionStatus = "delivered",
+            shellResult = MobileShellResult(null, "partial result", timedOut = true, outputTruncated = true),
+        )
+        val payload = execute("mobile_run_shell", mapOf("command" to "some-command"))
+        assertEquals("shell_timeout", payload["status"])
+        assertEquals("partial result", payload["output"])
+        assertEquals(true, payload["timedOut"])
+        assertEquals(true, payload["outputTruncated"])
+        assertFalse(payload.containsKey("exitCode"))
+        coVerify(exactly = 1) { repository.runShell("turn-1", "some-command") }
+        confirmVerified(repository)
+    }
+
+    @Test
+    fun malformedShellArgumentsNeverReachThePrivilegedBackend() = runTest {
+        for (args in listOf(emptyMap(), mapOf("command" to 1), mapOf("command" to " "),
+            mapOf("command" to "x".repeat(4_001)), mapOf("command" to "echo\u0000bad"))) {
+            assertEquals("invalid_argument", execute("mobile_run_shell", args)["status"])
         }
         confirmVerified(repository)
     }
 
-    @Test
-    fun staleObservationIsReturnedToAgentWithoutAutomaticActionRetry() = runTest {
-        coEvery { repository.click("turn-1", "old", "a1") } returns
-            MobileUseResult("stale_observation", "observe again", actionStatus = "not_sent")
-        val payload = tools.getValue("mobile_click").execute(
-            context("turn-1"), mapOf("observationId" to "old", "elementId" to "a1"),
-        ) as Map<*, *>
-        assertEquals("stale_observation", payload["status"])
-        coVerify(exactly = 1) { repository.click("turn-1", "old", "a1") }
-        confirmVerified(repository)
-    }
-
-    @Test
-    fun stopClosesTheDisplayThroughTheOwningExecution() = runTest {
-        coEvery { repository.stopExecution("turn-1") } returns MobileUseResult("closed", "Background app closed.")
-        val result = tools.getValue("mobile_stop").execute(context("turn-1"), emptyMap()) as Map<*, *>
-        assertEquals("closed", result["status"])
-        coVerify(exactly = 1) { repository.stopExecution("turn-1") }
-        coVerify(exactly = 0) { repository.finishExecution(any()) }
-        coVerify(exactly = 0) { repository.closeSession(any()) }
-    }
+    private suspend fun execute(name: String, args: Map<String, Any?> = emptyMap()): Map<*, *> =
+        tools.getValue(name).execute(context("turn-1"), mapOf("intent" to "Perform the requested action") + args) as Map<*, *>
 
     private fun context(owner: String): ToolContext {
         val readonly = mockk<ReadonlyContext>()

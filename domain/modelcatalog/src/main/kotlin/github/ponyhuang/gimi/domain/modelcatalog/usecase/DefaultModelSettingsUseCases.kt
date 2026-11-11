@@ -19,8 +19,14 @@ class ObserveDefaultModelSettingsUseCase @Inject constructor(
         ) { services, assistant, fast, speech, tts ->
             PartialSettings(services, assistant, fast, speech, tts)
         },
-        repository.observeTtsVoice(),
-    ) { partial, voiceId ->
+        combine(
+            repository.observeTtsVoice(),
+            repository.observeRealtimeSelection(),
+            repository.observeRealtimeVoice(),
+        ) { voiceId, realtime, realtimeVoice ->
+            Triple(voiceId, realtime, realtimeVoice)
+        },
+    ) { partial, (voiceId, realtime, realtimeVoice) ->
         DefaultModelSettings(
             services = partial.services,
             assistantSelection = partial.assistant,
@@ -28,6 +34,8 @@ class ObserveDefaultModelSettingsUseCase @Inject constructor(
             speechSelection = partial.speech,
             ttsSelection = partial.tts,
             ttsVoiceId = voiceId,
+            realtimeSelection = realtime,
+            realtimeVoice = realtimeVoice,
         )
     }
 
@@ -48,4 +56,11 @@ class UpdateDefaultModelSettingsUseCase @Inject constructor(
     fun speech(selection: ModelSelection) = repository.selectSpeechModel(selection)
     fun tts(selection: ModelSelection) = repository.selectTtsModel(selection)
     fun voice(voiceId: String) = repository.selectTtsVoice(voiceId)
+
+    /** 选择 Realtime 默认模型；null 表示取消配置。 */
+    fun realtimeModel(selection: ModelSelection?) = repository.selectRealtimeModel(selection)
+
+    /** 设置 Realtime 音色覆盖；null 表示回到模型缺省音色。 */
+    fun realtimeVoice(override: github.ponyhuang.gimi.domain.modelcatalog.model.RealtimeVoiceOverride?) =
+        repository.selectRealtimeVoice(override)
 }

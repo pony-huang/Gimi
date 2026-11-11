@@ -34,7 +34,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceSwitchItem
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 无状态 Shizuku 设置页；开关、授权状态与展开态都来自 UiState，本层不读取服务或发起副屏操作。 */
 @Composable
@@ -205,7 +205,7 @@ private fun MobileUseReadyDarkPreview() = MobileUsePreview(
 /** 预览外壳：只补齐页面骨架与返回栏，其余状态由 fixture 提供。 */
 @Composable
 private fun MobileUsePreview(state: MobileUseUiState) {
-    AsssistantaiTheme {
+    GimiTheme {
         PreferenceScaffold(
             style = PreferenceStyle.Compact,
             title = stringResource(R.string.mobile_use_title),

@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.feature.settings
 import androidx.compose.runtime.Composable
 import androidx.navigation3.runtime.NavKey
 import github.ponyhuang.gimi.feature.settings.about.AboutRoute
+import github.ponyhuang.gimi.feature.settings.about.PrivacyPolicyRoute
 import kotlinx.serialization.Serializable
 
 /** Destinations owned by the application settings feature. */
@@ -14,12 +15,17 @@ sealed interface SettingsDestination : NavKey {
     /** 「关于」页：内含检查更新、项目主页等应用信息。 */
     @Serializable
     data object About : SettingsDestination
+
+    /** 隐私政策页：内嵌 WebView 打开仓库 wiki 页面。 */
+    @Serializable
+    data object PrivacyPolicy : SettingsDestination
 }
 
 /** Cross-capability navigation callbacks displayed by the settings hub. */
 class SettingsNavigationCallbacks(
     val onBack: () -> Unit,
     val onNavigateToModelService: () -> Unit,
+    val onNavigateToSpeechModels: () -> Unit,
     val onNavigateToDefaultModels: () -> Unit,
     val onNavigateToMcpServers: () -> Unit,
     val onNavigateToRemoteAgents: () -> Unit,
@@ -29,10 +35,10 @@ class SettingsNavigationCallbacks(
     val onNavigateToSkills: () -> Unit,
     val onNavigateToWorkspace: () -> Unit,
     val onNavigateToPermissions: () -> Unit,
-    val onNavigateToMobileUse: () -> Unit,
     val onNavigateToRecommendations: () -> Unit,
     val onNavigateToMemory: () -> Unit,
     val onNavigateToAbout: () -> Unit,
+    val onNavigateToPrivacyPolicy: () -> Unit,
 )
 
 /** Resolves the settings hub while the app supplies only cross-feature callbacks. */
@@ -47,6 +53,7 @@ fun SettingsEntryProvider(
             appVersionName = appVersionName,
             onBack = callbacks.onBack,
             onNavigateToModelService = callbacks.onNavigateToModelService,
+            onNavigateToSpeechModels = callbacks.onNavigateToSpeechModels,
             onNavigateToDefaultModels = callbacks.onNavigateToDefaultModels,
             onNavigateToMcpServers = callbacks.onNavigateToMcpServers,
             onNavigateToRemoteAgents = callbacks.onNavigateToRemoteAgents,
@@ -56,7 +63,6 @@ fun SettingsEntryProvider(
             onNavigateToSkills = callbacks.onNavigateToSkills,
             onNavigateToWorkspace = callbacks.onNavigateToWorkspace,
             onNavigateToPermissions = callbacks.onNavigateToPermissions,
-            onNavigateToMobileUse = callbacks.onNavigateToMobileUse,
             onNavigateToRecommendations = callbacks.onNavigateToRecommendations,
             onNavigateToMemory = callbacks.onNavigateToMemory,
             onNavigateToAbout = callbacks.onNavigateToAbout,
@@ -68,7 +74,13 @@ fun SettingsEntryProvider(
         AboutRoute(
             appVersionName = appVersionName,
             onBack = callbacks.onBack,
+            onOpenPrivacyPolicy = callbacks.onNavigateToPrivacyPolicy,
         )
+        true
+    }
+
+    SettingsDestination.PrivacyPolicy -> {
+        PrivacyPolicyRoute(onBack = callbacks.onBack)
         true
     }
 

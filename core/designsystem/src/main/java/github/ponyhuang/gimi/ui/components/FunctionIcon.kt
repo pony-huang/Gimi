@@ -9,7 +9,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.core.designsystem.R
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 工具入口和功能列表共享的图标；相邻文字提供语义，避免重复朗读。 */
 @Composable
@@ -25,11 +25,11 @@ fun FunctionIcon(modifier: Modifier = Modifier) {
 @Preview(name = "Function · 浅色", showBackground = true)
 @Composable
 private fun FunctionIconLightPreview() {
-    AsssistantaiTheme(darkTheme = false) { FunctionIcon(Modifier.size(24.dp)) }
+    GimiTheme(darkTheme = false) { FunctionIcon(Modifier.size(24.dp)) }
 }
 
 @Preview(name = "Function · 深色", showBackground = true, backgroundColor = 0xFF121212)
 @Composable
 private fun FunctionIconDarkPreview() {
-    AsssistantaiTheme(darkTheme = true) { FunctionIcon(Modifier.size(24.dp)) }
+    GimiTheme(darkTheme = true) { FunctionIcon(Modifier.size(24.dp)) }
 }

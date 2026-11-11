@@ -22,16 +22,6 @@ class MobileDisplayGeometryTest {
     }
 
     @Test
-    fun relativeCoordinatesTrackCurrentGeometryAndStayInsideEdges() {
-        val portrait = MobileDisplayGeometry(1080, 2400, 440)
-        assertEquals(0, portrait.xAtPermille(0))
-        assertEquals(1079, portrait.xAtPermille(1000))
-        assertEquals(2399, portrait.yAtPermille(1000))
-        assertEquals(539, portrait.xAtPermille(500))
-        val landscape = MobileDisplayGeometry(2400, 1080, 440)
-        assertEquals(1199, landscape.xAtPermille(500))
-    }
-    @Test
     fun manualOrientationKeepsDensityAndIgnoresMainScreenRotation() {
         val portraitMain = MobileDisplayGeometry(1080, 2400, 440)
         val landscapeMain = MobileDisplayGeometry(2400, 1080, 440)

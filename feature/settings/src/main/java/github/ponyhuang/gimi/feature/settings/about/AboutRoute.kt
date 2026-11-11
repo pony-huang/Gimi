@@ -36,6 +36,7 @@ private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
 fun AboutRoute(
     appVersionName: String,
     onBack: () -> Unit,
+    onOpenPrivacyPolicy: () -> Unit,
     modifier: Modifier = Modifier,
     updateViewModel: UpdateViewModel = hiltViewModel(),
     logsViewModel: LogsViewModel = hiltViewModel(),
@@ -104,6 +105,7 @@ fun AboutRoute(
             onOpenProjectPage = {
                 context.startActivity(Intent(Intent.ACTION_VIEW, PROJECT_URL.toUri()))
             },
+            onOpenPrivacyPolicy = onOpenPrivacyPolicy,
             onOpenLogs = logsViewModel::open,
             modifier = scaffoldModifier,
         )

@@ -13,7 +13,7 @@ import com.google.adk.kt.types.Part
 import com.google.adk.kt.types.Role
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
-import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
+import github.ponyhuang.gimi.domain.mobileuse.MobileUseController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
@@ -36,7 +36,7 @@ class AgentChatExecution internal constructor(
     private val sessionId: String,
     private val runner: InMemoryRunner,
     private val customMetadata: Map<String, Any>,
-    private val mobileUseRepository: MobileUseRepository? = null,
+    private val mobileUseController: MobileUseController? = null,
 ) {
     private val pendingConfirmationIds = linkedSetOf<String>()
     private val confirmationResponses = linkedMapOf<String, FunctionResponse>()
@@ -186,9 +186,13 @@ class AgentChatExecution internal constructor(
         }.mapNotNullTo(pendingConfirmationIds) { it.id }
     }
 
+    /** SDK 错误事件已投递后用于中止 Runner 收集的内部信号，不传播给下游。 */
+    private class SdkErrorHandled : RuntimeException()
+
     /** 正文与创建并行；结果在 Runner 结束后归档，整轮完成仍等待所有卡片。 */
     private fun Flow<Event>.withAsyncA2uiCreates(): Flow<Event> = channelFlow {
         val creates = A2uiCreateScope(this)
+        var stoppedBySdkError = false
         suspend fun persist(result: Map<String, Any>): Event? {
             val task = requireNotNull(A2uiGenerationTaskCodec.extract(result))
             val session = runner.sessionService.getSession(
@@ -206,12 +210,28 @@ class AgentChatExecution internal constructor(
             return event
         }
         try {
-            withContext(creates) { this@withAsyncA2uiCreates.collect { send(it) } }
-            for (entry in creates.snapshot()) {
-                val result = entry.result.await()
-                val event = persist(entry.replacement?.plus(taskResult(entry.task.copy(status = A2uiGenerationStatus.COMPLETED))) ?: result)
-                entry.delivered = true
-                if (event != null) send(event)
+            withContext(creates) {
+                try {
+                    this@withAsyncA2uiCreates.collect { event ->
+                        send(event)
+                        // SDK 错误事件也属于失败：投递后立即在 Runner 流的上游侧中止收集，
+                        // 避免 Runner 正常收尾把该 invocation 记为已完成、重试不再调用模型。
+                        // 失败异常仍由下游 transform 抛出，保证错误事件先被业务侧收到。
+                        if (event.errorCode != null || !event.errorMessage.isNullOrBlank()) {
+                            throw SdkErrorHandled()
+                        }
+                    }
+                } catch (_: SdkErrorHandled) {
+                    stoppedBySdkError = true
+                }
+            }
+            if (!stoppedBySdkError) {
+                for (entry in creates.snapshot()) {
+                    val result = entry.result.await()
+                    val event = persist(entry.replacement?.plus(taskResult(entry.task.copy(status = A2uiGenerationStatus.COMPLETED))) ?: result)
+                    entry.delivered = true
+                    if (event != null) send(event)
+                }
             }
         } finally {
             // 停止、模型错误或宿主销毁都结束尚未交付的占位；不能留下永久 loading。
@@ -226,11 +246,11 @@ class AgentChatExecution internal constructor(
 
     private fun Flow<Event>.releaseMobileUseOnCompletion(): Flow<Event> = onStart {
         ToolRunMetadata.mobileUseOwner(customMetadata)?.let { owner ->
-            mobileUseRepository?.registerExecution(owner, sessionId)
+            mobileUseController?.registerExecution(owner, sessionId)
         }
     }.onCompletion {
         val owner = ToolRunMetadata.mobileUseOwner(customMetadata) ?: return@onCompletion
         // 取消也释放本轮占用；画面属于聊天，保留到用户主动关闭。
-        withContext(NonCancellable) { mobileUseRepository?.finishExecution(owner) }
+        withContext(NonCancellable) { mobileUseController?.finishExecution(owner) }
     }
 }

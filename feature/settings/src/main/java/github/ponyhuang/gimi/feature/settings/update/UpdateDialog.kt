@@ -25,7 +25,7 @@ import github.ponyhuang.gimi.domain.appupdate.model.AppVersion
 import github.ponyhuang.gimi.domain.appupdate.repository.AppUpdateState
 import github.ponyhuang.gimi.domain.appupdate.repository.UpdateFailure
 import github.ponyhuang.gimi.feature.settings.R
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import github.ponyhuang.gimi.ui.theme.markdownContentTypography
 
 /** 检查更新对话框：发现新版本 → 下载中 → 下载完成/失败。 */
@@ -254,7 +254,7 @@ private fun previewUpdateInfo(): AppUpdateInfo = AppUpdateInfo(
 @Preview(name = "更新说明 · 深色", showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun UpdateDialogAvailablePreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         UpdateDialog(
             state = UpdateUiState(
                 status = AppUpdateState.Available(info = previewUpdateInfo(), currentVersion = "0.2.0"),
@@ -269,7 +269,7 @@ private fun UpdateDialogAvailablePreview() {
 @Preview(name = "更新说明 · 空状态", showBackground = true)
 @Composable
 private fun UpdateDialogEmptyChangelogPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         UpdateChangelogBody("0.10.2", "")
     }
 }
@@ -277,7 +277,7 @@ private fun UpdateDialogEmptyChangelogPreview() {
 @Preview(name = "更新说明 · 普通文本", showBackground = true)
 @Composable
 private fun UpdateDialogPlainChangelogPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         UpdateChangelogBody("0.10.2", "改善聊天体验，修复已知问题。")
     }
 }
@@ -285,7 +285,7 @@ private fun UpdateDialogPlainChangelogPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun UpdateDialogDownloadingPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         UpdateDialog(
             state = UpdateUiState(
                 status = AppUpdateState.Downloading(info = previewUpdateInfo(), progress = 0.42f),
@@ -300,7 +300,7 @@ private fun UpdateDialogDownloadingPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun UpdateDialogDownloadedPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         UpdateDialog(
             state = UpdateUiState(
                 status = AppUpdateState.Downloaded(

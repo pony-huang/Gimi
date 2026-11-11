@@ -1,0 +1,61 @@
+package github.ponyhuang.gimi.data.voice.remote
+
+import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnectionResult
+import github.ponyhuang.gimi.domain.voice.repository.SpeechConnectionProbe
+import java.io.IOException
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import kotlin.time.Duration.Companion.milliseconds
+
+/**
+ * OpenAI 兼容对话协议语音服务的连通性探测。
+ *
+ * 用 `GET {baseUrl}/models` 校验端点与密钥：只读目录、不产生计费请求。
+ * 2xx 即密钥可用；401/403 归为密钥错误，其余网络/服务端异常统一归为网络失败。
+ */
+@Singleton
+class OpenAiCompatibleConnectionProbe @Inject constructor(
+    private val okHttpClient: OkHttpClient,
+) : SpeechConnectionProbe {
+
+    // 仅覆盖端点可由用户配置的语音服务；聊天服务（deepseek 等）不在此列，
+    // 它们的连接测试由聊天服务的模型目录探测承担。openai-speech 与 qwen-audio
+    // 的端点已由厂商自有，分别由实时握手探测承担连接测试。
+    override val serviceIds: Set<String> = setOf("mimo-speech")
+
+    // 探测是服务级握手（校验密钥可用性），不限定具体能力
+    override val capabilities: Set<ModelCapability> = setOf(ModelCapability.TTS)
+
+    override suspend fun probe(service: LLMModelSetting): ServiceConnectionResult =
+        withContext(Dispatchers.IO) {
+            val request = Request.Builder()
+                .url(service.activeApiBaseUrl.trim().trimEnd('/') + "/models")
+                .header("Authorization", "Bearer ${service.apiKey.trim()}")
+                .build()
+            try {
+                val response = withTimeoutOrNull(PROBE_TIMEOUT_MS.milliseconds) {
+                    okHttpClient.newCall(request).execute()
+                } ?: return@withContext ServiceConnectionResult.NetworkFailed
+                response.use {
+                    when {
+                        it.isSuccessful -> ServiceConnectionResult.Succeeded
+                        it.code == 401 || it.code == 403 -> ServiceConnectionResult.AuthFailed
+                        else -> ServiceConnectionResult.NetworkFailed
+                    }
+                }
+            } catch (_: IOException) {
+                ServiceConnectionResult.NetworkFailed
+            }
+        }
+
+    private companion object {
+        const val PROBE_TIMEOUT_MS = 15_000L
+    }
+}

@@ -17,6 +17,9 @@ internal interface XiaohongshuBrowserGateway {
     suspend fun waitUntil(script: String, timeoutMillis: Long): Boolean
     suspend fun evaluate(script: String): String?
     suspend fun clearCookies()
+
+    /** 销毁底层浏览器资源；默认空实现便于测试桩，Android 实现销毁隐藏 WebView。 */
+    fun release() = Unit
 }
 
 /**
@@ -313,6 +316,10 @@ internal class DirectXiaohongshuService(
         require(browser.evaluate(replyNotificationScript(commentId, content)) == "true") {
             "未找到通知评论或回复控件"
         }
+        // 提交后确认回复文本真的渲染出来，不能点击完成就宣告成功。
+        require(browser.waitUntil(bodyContainsScript(content), INTERACTION_TIMEOUT_MS)) {
+            "回复未确认成功：提交后未在通知页出现"
+        }
         return mapOf("comment_id" to commentId, "content" to content, "success" to true)
     }
 
@@ -337,6 +344,8 @@ internal class DirectXiaohongshuService(
         val target = if (commentId == null && userId == null) {
             "document.querySelector('div.input-box div.content-edit span')?.click();"
         } else {
+            // 属性选择器整段用 JSONObject.quote 序列化成 JS 字符串字面量：
+            // LLM 可控的 userId/commentId 不能经模板字面量闭合注入任意 JS。
             """
             const comments = [...document.querySelectorAll('.parent-comment, .comment-item')];
             const target = comments.find(e =>
@@ -345,7 +354,7 @@ internal class DirectXiaohongshuService(
                  e.getAttribute('data-comment-id') === ${JSONObject.quote(commentId.orEmpty())})) ||
               (${JSONObject.quote(userId.orEmpty())} &&
                 (e.dataset.userId === ${JSONObject.quote(userId.orEmpty())} ||
-                 e.querySelector(`[data-user-id=${JSONObject.quote(userId.orEmpty())}]`)))
+                 e.querySelector(${JSONObject.quote("[data-user-id=${cssAttrValue(userId.orEmpty())}]")}) !== null))
             );
             if (!target) return false;
             target.querySelector('.right .interactions .reply, .reply')?.click();
@@ -368,6 +377,14 @@ internal class DirectXiaohongshuService(
 
     private fun commentRenderedScript(content: String): String =
         "document.querySelector('.comments-container')?.innerText.includes(${JSONObject.quote(content)}) === true"
+
+    /** 页面任意可见文本包含目标内容（通知页等无专属容器的场景做提交确认）。 */
+    private fun bodyContainsScript(text: String): String =
+        "document.body?.innerText?.includes(${JSONObject.quote(text)}) === true"
+
+    /** CSS 属性选择器值转义：反斜杠与双引号（querySelector 引号字符串内的合法转义）。 */
+    private fun cssAttrValue(value: String): String =
+        "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
     private fun notificationTab(value: String?): String = when (value.orEmpty().lowercase()) {
         "", "mentions" -> "mentions"

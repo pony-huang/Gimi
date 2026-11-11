@@ -23,7 +23,7 @@ internal class MultipartFile(
     val name: String,
     val fileName: String,
     val contentType: String,
-    val bytes: ByteArray,
+    val file: File,
 )
 
 /**
@@ -118,14 +118,14 @@ internal class ZhihuApi(
         val fields = buildList {
             knowledgeBaseId?.takeIf(String::isNotBlank)?.let { add(MultipartField("KnowledgeBaseID", it)) }
         }
-        val files = listOf(MultipartFile("File", file.name, contentTypeFor(file.name), file.readBytes()))
+        val files = listOf(MultipartFile("File", file.name, contentTypeFor(file.name), file))
         return data(postMultipart("/api/v1/knowledge/files", secret, fields, files))
     }
 
     /** PDF 上传：multipart 字段 `file`，返回 Data（含 file_id）。 */
     fun pdfUpload(secret: String, filePath: String): JSONObject {
         val file = requireFile(filePath)
-        val files = listOf(MultipartFile("file", file.name, contentTypeFor(file.name), file.readBytes()))
+        val files = listOf(MultipartFile("file", file.name, contentTypeFor(file.name), file))
         return data(postMultipart("/resources/v1/files", secret, emptyList(), files))
     }
 
@@ -188,7 +188,10 @@ internal class ZhihuApi(
         return connection.readJson()
     }
 
-    /** multipart 表单 POST：Content-Type 需带 boundary，且不设置 application/json。 */
+    /**
+     * multipart 表单 POST：Content-Type 需带 boundary，且不设置 application/json。
+     * 文件从磁盘流式写出（chunked 编码），不把整个请求体驻留内存。
+     */
     private fun postMultipart(
         path: String,
         secret: String,
@@ -196,15 +199,51 @@ internal class ZhihuApi(
         files: List<MultipartFile>,
     ): JSONObject {
         val boundary = "----ZhihuBoundary${System.nanoTime()}"
-        val body = buildMultipartBody(boundary, fields, files)
         val connection = URL(baseUrl + path).openConnection() as HttpURLConnection
-        connection.requestMethod = "POST"
-        connection.doOutput = true
-        connection.applyAuth(secret, contentType = null)
-        connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-        connection.setRequestProperty("Content-Length", body.size.toString())
-        connection.outputStream.use { it.write(body) }
-        return connection.readJson()
+        try {
+            connection.requestMethod = "POST"
+            connection.doOutput = true
+            connection.applyAuth(secret, contentType = null)
+            connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+            // 不设 Content-Length：平台自动转 chunked，允许边读文件边写。
+            connection.outputStream.use { out ->
+                fun write(s: String) = out.write(s.toByteArray(Charsets.UTF_8))
+                fun writeLine(s: String = "") {
+                    write(s)
+                    write("\r\n")
+                }
+                for (f in fields) {
+                    writeLine("--$boundary")
+                    writeLine("Content-Disposition: form-data; name=\"${f.name}\"")
+                    writeLine()
+                    writeLine(f.value)
+                }
+                for (f in files) {
+                    writeLine("--$boundary")
+                    writeLine("Content-Disposition: form-data; name=\"${f.name}\"; filename=\"${safeFileName(f.fileName)}\"")
+                    writeLine("Content-Type: ${f.contentType}")
+                    writeLine()
+                    f.file.inputStream().use { input ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        var total = 0L
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            total += read
+                            if (total > MAX_UPLOAD_BYTES) {
+                                throw IllegalStateException("文件超过 100MB 上传上限：${f.fileName}")
+                            }
+                            out.write(buffer, 0, read)
+                        }
+                    }
+                    writeLine()
+                }
+                write("--$boundary--")
+            }
+            return connection.readJson()
+        } finally {
+            connection.disconnect()
+        }
     }
 
     /** 设置鉴权头与超时；必须在写请求体之前调用（写体会触发连接，之后不能再改请求头）。 */
@@ -233,49 +272,31 @@ internal class ZhihuApi(
     /** path 段编码：URLEncoder 把空格编成 `+`，path 段需要 `%20`。 */
     private fun encPath(value: String): String = enc(value).replace("+", "%20")
 
-    /** 校验本地文件存在且不超过 100MB，供上传接口使用。 */
+    /** 校验本地文件在上传白名单目录内、存在且不超过 100MB，供上传接口使用。 */
     private fun requireFile(path: String): File {
-        val file = File(path)
+        // LLM 可控的路径不可直接读任意本地文件上传：canonical 化后必须落在白名单根目录内。
+        val file = File(path).canonicalFile
+        val allowed = uploadRoots.any { root ->
+            val canonicalRoot = root.canonicalFile
+            file.canonicalPath == canonicalRoot.canonicalPath ||
+                file.canonicalPath.startsWith(canonicalRoot.canonicalPath + File.separator)
+        }
+        if (!allowed) {
+            throw IllegalStateException("文件不在允许的上传目录内：$path")
+        }
         if (!file.exists() || !file.isFile) throw IllegalStateException("文件不存在：$path")
         if (file.length() > MAX_UPLOAD_BYTES) throw IllegalStateException("文件超过 100MB 上传上限：$path")
         return file
     }
+
+    /** 允许上传的根目录（宿主应用私有目录）；由插件 onAttach 注入。 */
+    @Volatile var uploadRoots: List<File> = emptyList()
 
     /** 通用异步任务创建：body 决定幂等键，同一 body 重试复用同一 task_id。 */
     private fun createTask(secret: String, kind: ZhihuTaskKind, body: JSONObject): JSONObject {
         val json = body.toString()
         val key = UUID.nameUUIDFromBytes(json.toByteArray(Charsets.UTF_8)).toString()
         return data(post("/api/v1/${kind.pathSegment}/tasks", secret, json, headers = mapOf("Idempotency-Key" to key)))
-    }
-
-    /** 组装 multipart 请求体：先文本字段后文件字段，结尾 `--boundary--`。 */
-    private fun buildMultipartBody(
-        boundary: String,
-        fields: List<MultipartField>,
-        files: List<MultipartFile>,
-    ): ByteArray {
-        val out = ByteArrayOutputStream()
-        fun write(s: String) = out.write(s.toByteArray(Charsets.UTF_8))
-        fun writeLine(s: String = "") {
-            write(s)
-            write("\r\n")
-        }
-        for (f in fields) {
-            writeLine("--$boundary")
-            writeLine("Content-Disposition: form-data; name=\"${f.name}\"")
-            writeLine()
-            writeLine(f.value)
-        }
-        for (f in files) {
-            writeLine("--$boundary")
-            writeLine("Content-Disposition: form-data; name=\"${f.name}\"; filename=\"${safeFileName(f.fileName)}\"")
-            writeLine("Content-Type: ${f.contentType}")
-            writeLine()
-            out.write(f.bytes)
-            writeLine()
-        }
-        write("--$boundary--")
-        return out.toByteArray()
     }
 
     /** 文件名清理：剔除会破坏 multipart 头的引号与控制字符。 */

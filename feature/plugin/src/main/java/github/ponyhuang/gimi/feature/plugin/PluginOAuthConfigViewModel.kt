@@ -58,6 +58,17 @@ class PluginOAuthConfigViewModel @Inject constructor(
 
     fun cancelCheck() {
         checkJob?.cancel()
+        checkJob = null
+        // 取消后必须复位：Checking/Waiting 停留会让 UI 永久显示「检查中」。
+        mutableState.update { current ->
+            if (current.authorization == PluginOAuthAuthorization.Checking ||
+                current.authorization == PluginOAuthAuthorization.Waiting
+            ) {
+                current.copy(authorization = PluginOAuthAuthorization.Unauthorized)
+            } else {
+                current
+            }
+        }
     }
 
     fun refresh() {

@@ -19,7 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import github.ponyhuang.gimi.core.designsystem.R
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /**
  * Shared settings-page shell that preserves the existing app-bar and back behavior.
@@ -80,7 +80,7 @@ fun PreferenceScaffold(
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PreferenceScaffoldPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PreferenceScaffold(
             title = "设置页标题",
             onBack = {},

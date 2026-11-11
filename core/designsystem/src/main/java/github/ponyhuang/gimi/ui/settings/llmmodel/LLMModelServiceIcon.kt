@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.ui.settings.llmmodel
 
+import android.content.res.Configuration
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -19,14 +20,16 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.core.designsystem.R
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /**
  * Consistent, brand-faithful icon treatment for model service surfaces.
  *
- * 图标资源来自 lobe-icons（SVG 转 vector drawable）：
- * - 有 `-color` 彩色版且浅色背景可辨的服务（DeepSeek / MiniMax / ChatGLM / Gemini）
+ * 图标资源来自 lobe-icons（SVG 转 vector drawable），按可辨性分三类：
+ * - 有 `-color` 彩色版且深浅色背景均可辨的服务（DeepSeek / MiniMax / ChatGLM / Gemini）
  *   统一使用彩色版，深浅色模式通用，只放 `res/drawable/`；
+ * - 彩色版在浅色背景下可辨、但在深色背景下不可辨（Qwen 深蓝主体）：
+ *   `res/drawable/` 放彩色版，`res/drawable-night/` 放深色模式用的浅色渐变版；
  * - 其余服务（OpenAI / Anthropic / XiaomiMiMo / Kimi）保留单色：
  *   lobe-icons 无其彩色版，或彩色版为白色主体（Kimi 白 K）在浅色背景下不可见；
  *   `res/drawable/` 为浅色模式用，`res/drawable-night/` 为深色模式反白/彩色版。
@@ -65,22 +68,28 @@ fun LLMModelServiceIcon(
     }
 }
 
+/**
+ * serviceId → 图标资源映射；core 模块不能反向依赖 data 模块，故以字面量维护。
+ * 新增语音/模型服务时，须同步此处与 `data/modelcatalog` 的 SpeechModelProvider 目录，
+ * 否则将静默回退到 SmartToy 占位图标。
+ */
 private fun modelServiceIconFor(serviceId: String): Int? = when (serviceId) {
     "deepseek" -> R.drawable.ic_model_provider_deepseek
-    "minimax" -> R.drawable.ic_model_provider_minimax
-    "mimo" -> R.drawable.ic_model_provider_xiaomimimo
-    "openai" -> R.drawable.ic_model_provider_openai
+    "minimax", "minimax-speech" -> R.drawable.ic_model_provider_minimax
+    "mimo", "mimo-speech" -> R.drawable.ic_model_provider_xiaomimimo
+    "openai", "openai-speech" -> R.drawable.ic_model_provider_openai
     "anthropic" -> R.drawable.ic_model_provider_anthropic
     "gemini" -> R.drawable.ic_model_provider_gemini
     "kimi" -> R.drawable.ic_model_provider_kimi
     "glm" -> R.drawable.ic_model_provider_chatglm
+    "qwen-audio" -> R.drawable.ic_model_provider_qwen
     else -> null
 }
 
 @Preview(showBackground = true)
 @Composable
 private fun LLMModelServiceIconKnownServicePreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         LLMModelServiceIcon(serviceId = "deepseek", modifier = Modifier.size(48.dp))
     }
 }
@@ -88,7 +97,16 @@ private fun LLMModelServiceIconKnownServicePreview() {
 @Preview(showBackground = true)
 @Composable
 private fun LLMModelServiceIconFallbackPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         LLMModelServiceIcon(serviceId = "unknown", modifier = Modifier.size(48.dp))
+    }
+}
+
+@Preview(showBackground = true)
+@Preview(name = "深色", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun LLMModelServiceIconQwenPreview() {
+    GimiTheme {
+        LLMModelServiceIcon(serviceId = "qwen-audio", modifier = Modifier.size(48.dp))
     }
 }

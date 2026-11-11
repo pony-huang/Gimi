@@ -1,7 +1,6 @@
 package github.ponyhuang.gimi.data.a2a.repository
 
 import android.content.Context
-import androidx.core.content.edit
 import dagger.hilt.android.qualifiers.ApplicationContext
 import github.ponyhuang.gimi.core.security.KeystoreAesGcmStringCipher
 import javax.inject.Inject
@@ -24,11 +23,11 @@ class KeystoreRemoteAgentStorage @Inject constructor(
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val cipher = KeystoreAesGcmStringCipher(KEY_ALIAS)
 
-    override fun read(): String? = preferences.getString(AGENTS_KEY, null)?.let(cipher::decryptHealing)
+    override fun read(): String? = preferences.getString(AGENTS_KEY, null)?.let(cipher::decryptOrThrow)
 
     override fun write(value: String) {
         val encrypted = cipher.encryptOrThrow(value)
-        preferences.edit(commit = true) { putString(AGENTS_KEY, encrypted) }
+        check(preferences.edit().putString(AGENTS_KEY, encrypted).commit()) { "Remote agent storage write failed" }
     }
 
     private companion object {

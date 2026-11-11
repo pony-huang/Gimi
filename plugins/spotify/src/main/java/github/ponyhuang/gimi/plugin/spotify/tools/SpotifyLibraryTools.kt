@@ -40,8 +40,8 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
         val json = api.get(
             "/me/playlists",
             mapOf(
-                "limit" to intArg(args, "limit", 50),
-                "offset" to intArg(args, "offset", 0),
+                "limit" to clampedIntArg(args, "limit", 50, 1, 50),
+                "offset" to clampedIntArg(args, "offset", 0, 0, 999),
             ),
         )
         mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json?.optJSONArray("items") ?: JSONArray()))
@@ -75,8 +75,8 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
         val json = api.get(
             "/playlists/$id/items",
             mapOf(
-                "limit" to intArg(args, "limit", 50),
-                "offset" to intArg(args, "offset", 0),
+                "limit" to clampedIntArg(args, "limit", 50, 1, 50),
+                "offset" to clampedIntArg(args, "offset", 0, 0, 999),
                 "additional_types" to "track,episode",
             ),
         )
@@ -98,8 +98,8 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
         val json = api.get(
             "/me/tracks",
             mapOf(
-                "limit" to intArg(args, "limit", 50),
-                "offset" to intArg(args, "offset", 0),
+                "limit" to clampedIntArg(args, "limit", 50, 1, 50),
+                "offset" to clampedIntArg(args, "offset", 0, 0, 999),
             ),
         )
         mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json?.optJSONArray("items") ?: JSONArray()))
@@ -117,7 +117,7 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
             ),
         ),
     ) { args ->
-        val json = api.get("/me/player/recently-played", mapOf("limit" to intArg(args, "limit", 50)))
+        val json = api.get("/me/player/recently-played", mapOf("limit" to clampedIntArg(args, "limit", 50, 1, 50)))
         mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json?.optJSONArray("items") ?: JSONArray()))
     },
     spotifyTool(
@@ -153,8 +153,8 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
             "/me/top/tracks",
             mapOf(
                 "time_range" to (strArg(args, "time_range") ?: "medium_term"),
-                "limit" to intArg(args, "limit", 50),
-                "offset" to intArg(args, "offset", 0),
+                "limit" to clampedIntArg(args, "limit", 50, 1, 50),
+                "offset" to clampedIntArg(args, "offset", 0, 0, 999),
             ),
         )
         mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json?.optJSONArray("items") ?: JSONArray()))
@@ -174,8 +174,8 @@ internal fun libraryTools(api: SpotifyApi): List<BaseTool> = listOf(
             "/me/top/artists",
             mapOf(
                 "time_range" to (strArg(args, "time_range") ?: "medium_term"),
-                "limit" to intArg(args, "limit", 50),
-                "offset" to intArg(args, "offset", 0),
+                "limit" to clampedIntArg(args, "limit", 50, 1, 50),
+                "offset" to clampedIntArg(args, "offset", 0, 0, 999),
             ),
         )
         mapOf(SpotifyTool.RESULT_KEY to PluginJson.toNative(json?.optJSONArray("items") ?: JSONArray()))

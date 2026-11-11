@@ -4,7 +4,6 @@ import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
-import github.ponyhuang.gimi.data.agent.debug.AgentDebugWebServer
 import github.ponyhuang.gimi.domain.appupdate.repository.AppUpdateRepository
 import github.ponyhuang.gimi.domain.recommendation.runtime.RecommendationStartupInitializer
 import javax.inject.Inject
@@ -20,12 +19,6 @@ class MainApplication : Application(), Configuration.Provider {
     @Inject lateinit var recommendationStartupInitializer: RecommendationStartupInitializer
     @Inject lateinit var appUpdateRepository: AppUpdateRepository
     @Inject lateinit var appLogRecorder: github.ponyhuang.gimi.data.logging.AppLogRecorder
-
-    /**
-     * debug 构建绑定 ADK Development WebServer（PC 浏览器经局域网观察 agent 会话）；
-     * release 绑定为空实现，start() 无任何开销，因此不按变体分支。
-     */
-    @Inject lateinit var agentDebugWebServer: AgentDebugWebServer
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -46,6 +39,5 @@ class MainApplication : Application(), Configuration.Provider {
         appScope.launch {
             appUpdateRepository.checkForUpdate(manual = false)
         }
-        agentDebugWebServer.start()
     }
 }

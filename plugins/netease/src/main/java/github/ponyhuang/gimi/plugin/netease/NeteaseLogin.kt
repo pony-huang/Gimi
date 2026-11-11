@@ -12,7 +12,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
-import org.json.JSONException
+import kotlin.time.Duration.Companion.milliseconds
 
 /** 单次扫码登录的后台控制器，打开链接后最多轮询五分钟；新登录和凭证修改取消旧任务。 */
 internal class NeteaseLogin(
@@ -36,7 +36,7 @@ internal class NeteaseLogin(
         phase = "pending"
         job = scope.launch {
             try {
-                withTimeout(300_000) {
+                withTimeout(300_000.milliseconds) {
                     while (true) {
                         val status = account.pollQr()["status"]
                         if (generation.get() != current) return@withTimeout
@@ -44,7 +44,7 @@ internal class NeteaseLogin(
                             803 -> { phase = "authorized"; return@withTimeout }
                             800 -> { phase = "expired"; return@withTimeout }
                         }
-                        delay(3_000)
+                        delay(3_000.milliseconds)
                     }
                 }
             } catch (_: TimeoutCancellationException) {
@@ -53,11 +53,9 @@ internal class NeteaseLogin(
                 throw cancelled
             } catch (error: IOException) {
                 fail(current, error)
-            } catch (error: IllegalStateException) {
-                fail(current, error)
-            } catch (error: IllegalArgumentException) {
-                fail(current, error)
-            } catch (error: JSONException) {
+            } catch (error: RuntimeException) {
+                // 未预料的运行时异常（含 IllegalStateException/JSONException 之外的平台异常）
+                // 也按单次扫码失败收口，避免轮询 job 死掉后 phase 卡在 pending。
                 fail(current, error)
             }
         }

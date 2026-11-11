@@ -20,4 +20,4 @@ internal fun toolLoadingMode(runtime: ModelRuntimeMetadata?): ToolLoadingMode {
     } else ToolLoadingMode.RESULT
 }
 
-internal const val DEFERRED_CATALOG = "selkie.deferred_tool_catalog"
+internal const val DEFERRED_CATALOG = "gimi.deferred_tool_catalog"

@@ -47,7 +47,7 @@ import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import java.time.Instant
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -267,7 +267,7 @@ private fun NegativeFeedbackDialog(
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun MemoryHistoryScreenEmptyPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         MemoryHistoryScreen(
             state = MemoryHistoryUiState(),
             onAction = {},
@@ -279,7 +279,7 @@ private fun MemoryHistoryScreenEmptyPreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun MemoryHistoryScreenWithMemoriesPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         MemoryHistoryScreen(
             state = MemoryHistoryUiState(
                 memories = listOf(

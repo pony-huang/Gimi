@@ -1,13 +1,5 @@
 package github.ponyhuang.gimi.feature.chat
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -35,38 +27,30 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.Icons
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DrawerState
-import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
@@ -80,14 +64,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.domain.conversation.model.Conversation
 import github.ponyhuang.gimi.ui.components.GimiListDefaults
 import github.ponyhuang.gimi.ui.components.GimiSearchField
@@ -95,7 +78,7 @@ import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyleScope
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 分组卡片圆角：与设置页分组卡片同值。 */
 private val DrawerGroupCornerRadius = 16.dp
@@ -106,69 +89,87 @@ private val DrawerGroupHorizontalPadding = 16.dp
 /** 紧凑行最小高度：与设置页 `PreferenceListItem` 一致。 */
 private val DrawerRowMinHeight = GimiListDefaults.MinHeight
 
-/** 底部渐隐高度：留出列表末尾滚到操作区下方淡出的空间。 */
-private val DrawerFooterHeight = 112.dp
+/** 底部渐隐高度：容纳右下角齿轮按钮及其留白。 */
+private val DrawerFooterHeight = 88.dp
+
+/** 常用功能行几何：图标 + 文字，与设置页列表行同一套语言。 */
+private val DrawerFunctionRowMinHeight = 56.dp
+private val DrawerFunctionIconSize = 22.dp
+private val DrawerFunctionDividerStart =
+    DrawerGroupHorizontalPadding + DrawerFunctionIconSize + GimiListDefaults.ContentSpacing
+
+/** 右下角齿轮按钮直径。 */
+private val DrawerGearButtonSize = 48.dp
 
 /**
- * 历史对话抽屉 —— 基于 Material3 [ModalNavigationDrawer] 的侧边栏。
+ * 历史对话抽屉 —— 预测性返回进度抽屉（[PredictiveBackDrawer]）的内容编排。
  *
- * 视觉与设置页 / "添加到聊天"面板同一套 One UI 语言：画布灰底承载白色分组卡片，
- * 列表行是紧凑设置行（标题 + 时间/末条消息，内缩分隔线），底部"设置 / 夜间模式"
- * 拼成一枚居中的胶囊操作组，列表末端用渐隐遮罩过渡到操作区。
+ * 视觉与设置页 / "添加到聊天"面板同一套 One UI 语言：画布灰底承载白色分组卡片。
+ * 结构自上而下：常用功能入口（新对话 / 语音通话 / 个性化）→ 搜索 + 管理 →
+ * 历史会话分组卡片，右下角是设置齿轮（含更新提醒点）。
+ * 夜间模式等外观配置已移至设置的"个性化"分组，抽屉不再直接切换。
  *
  * 作为根级组合包装 [content]，宿主屏幕（如 Scaffold）放在 [content] 内部。
- * 调用方持有 [drawerState] 与一个 [kotlinx.coroutines.CoroutineScope]，通过
- * `scope.launch { drawerState.open() }` 打开 / `drawerState.close()` 关闭抽屉。
+ * 调用方持有 `open` 目标状态并通过 [onOpenChange] 接收手势提交结果；
+ * 预测性返回、边缘滑动打开、拖拽关闭、遮罩点击关闭由 [PredictiveBackDrawer] 统一处理。
  *
- * @param drawerState         控制抽屉开关状态
- * @param conversations       由 Route/ViewModel 下发的对话列表；组件本身不解析业务依赖。
- * @param currentSessionId    当前正在使用的 session id；与该 id 匹配的 [Conversation] 行 MUST 高亮且不可删除（不允许删自己）。
- * @param onConversationClick 点击某个对话时回调（实现方负责关闭抽屉）
- * @param recentState         搜索、多选和删除进度状态
- * @param onRecentAction      最近会话操作，由 ViewModel 处理并再次校验删除保护
+ * @param open                 抽屉目标开关状态
+ * @param gesturesEnabled      是否启用抽屉手势；全屏页面（如语音通话页）覆盖主内容时应传 `false`，
+ *                             避免手势被遮挡层误捕获
+ * @param conversations        由 Route/ViewModel 下发的对话列表；组件本身不解析业务依赖。
+ * @param currentSessionId     当前正在使用的 session id；与该 id 匹配的 [Conversation] 行 MUST 高亮且不可删除（不允许删自己）。
+ * @param onConversationClick  点击某个对话时回调（实现方负责关闭抽屉）
+ * @param recentState          搜索、多选和删除进度状态
+ * @param onRecentAction       最近会话操作，由 ViewModel 处理并再次校验删除保护
+ * @param onNewConversationClick 点击"新对话"入口时回调（实现方负责新建会话并关闭抽屉）
+ * @param onVoiceCallClick     点击"语音通话"入口时回调（实现方负责打开语音页并关闭抽屉）
+ * @param onPersonalizeClick   点击"个性化"入口时回调（实现方负责跳转设置并关闭抽屉）
+ * @param onSettingsClick      点击右下角齿轮时回调（实现方负责关闭抽屉并跳转）
+ * @param showUpdateBadge      是否在齿轮上点亮更新提醒点
+ * @param onOpenChange         抽屉目标开关状态变化上报（手势提交、遮罩点击、拖拽收尾）
  * @param onExportConversation 长按菜单导出会话；实现方负责弹出系统文件选择器
  * @param onDeleteConversation 长按菜单删除单个会话；实现方负责再次校验删除保护
- * @param onSettingsClick     点击底部"设置"按钮时回调（实现方负责关闭抽屉并跳转）
- * @param themeMode           当前夜间模式偏好（跟随系统/浅色/深色）
- * @param onThemeModeChange   点击夜间模式按钮循环到下一模式时回调（实现方负责持久化并应用主题）
- * @param modifier            修饰符
- * @param content             抽屉背后的主屏幕内容
+ * @param content              抽屉背后的主屏幕内容
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatDrawer(
-    drawerState: DrawerState,
+    open: Boolean,
+    gesturesEnabled: Boolean = true,
     conversations: List<Conversation>,
     currentSessionId: String,
     conversationTaskStatuses: Map<String, ConversationTaskStatus> = emptyMap(),
     onConversationClick: (Conversation) -> Unit,
     recentState: RecentConversationsState = RecentConversationsState(),
     onRecentAction: (RecentConversationsAction) -> Unit = {},
-    onSettingsClick: () -> Unit,
-    themeMode: ThemeMode,
-    onThemeModeChange: (ThemeMode) -> Unit,
+    onNewConversationClick: () -> Unit = {},
+    onVoiceCallClick: () -> Unit = {},
+    onPersonalizeClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     showUpdateBadge: Boolean = false,
     exportState: SessionExportUiState = SessionExportUiState(hasConversations = true),
     onExportConversation: (String) -> Unit = {},
     onDeleteConversation: (String) -> Unit = {},
+    onOpenChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val historyListState = rememberLazyListState()
-    LaunchedEffect(drawerState.targetValue) {
-        if (drawerState.targetValue == DrawerValue.Open) {
+    LaunchedEffect(open) {
+        if (open) {
             // 稳定 key 会保留旧的可见项；打开最近列表时显式回到顶部，避免新会话藏在上方。
             historyListState.scrollToItem(0)
         }
     }
-    ModalNavigationDrawer(
-        drawerState = drawerState,
+    PredictiveBackDrawer(
+        open = open,
+        gesturesEnabled = gesturesEnabled,
+        // 多选期间返回键应优先结束选择（由调用方的 BackHandler 处理），这里让出返回手势。
+        backHandlerEnabled = !recentState.isSelecting,
+        onOpenChange = onOpenChange,
         modifier = modifier,
         drawerContent = {
-            ModalDrawerSheet(
-                // 与设置页同底色：灰画布承载白色分组卡片。
-                drawerContainerColor = preferenceCanvasColor(),
-            ) {
+            // 与设置页同底色：灰画布承载白色分组卡片；面板几何由宿主组件裁剪。
+            Box(Modifier.fillMaxSize().background(preferenceCanvasColor())) {
                 PreferenceStyleScope(PreferenceStyle.Compact) {
                     HistoryDrawerContent(
                         conversations = conversations,
@@ -177,9 +178,10 @@ fun ChatDrawer(
                         onConversationClick = onConversationClick,
                         recentState = recentState,
                         onRecentAction = onRecentAction,
+                        onNewConversationClick = onNewConversationClick,
+                        onVoiceCallClick = onVoiceCallClick,
+                        onPersonalizeClick = onPersonalizeClick,
                         onSettingsClick = onSettingsClick,
-                        themeMode = themeMode,
-                        onThemeModeChange = onThemeModeChange,
                         showUpdateBadge = showUpdateBadge,
                         listState = historyListState,
                         exportState = exportState,
@@ -189,14 +191,14 @@ fun ChatDrawer(
                 }
             }
         },
-        content = content
+        content = content,
     )
 }
 
 // ── 抽屉内容 ─────────────────────────────────────────────────────
 
 /**
- * 抽屉面板的内容：标题行 + 搜索框 + 历史对话分组卡片 + 底部操作区。
+ * 抽屉面板的内容：常用功能入口 + 搜索/管理区头 + 历史对话分组卡片 + 右下角齿轮。
  */
 @Composable
 private fun HistoryDrawerContent(
@@ -206,9 +208,10 @@ private fun HistoryDrawerContent(
     onConversationClick: (Conversation) -> Unit,
     recentState: RecentConversationsState,
     onRecentAction: (RecentConversationsAction) -> Unit,
+    onNewConversationClick: () -> Unit,
+    onVoiceCallClick: () -> Unit,
+    onPersonalizeClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    themeMode: ThemeMode,
-    onThemeModeChange: (ThemeMode) -> Unit,
     showUpdateBadge: Boolean = false,
     listState: LazyListState = rememberLazyListState(),
     exportState: SessionExportUiState = SessionExportUiState(hasConversations = true),
@@ -221,7 +224,7 @@ private fun HistoryDrawerContent(
     val visibleEligible = visible.map { it.id }.toSet().intersect(eligible)
     val allSelected = visibleEligible.isNotEmpty() && selectedIds.containsAll(visibleEligible)
     val canvas = preferenceCanvasColor()
-    // 与聊天页底部 composer 渐隐同源：列表末尾在操作区后方柔和消失。
+    // 与聊天页底部 composer 渐隐同源：列表末尾在齿轮区后方柔和消失。
     val bottomFadeBrush = remember(canvas) {
         Brush.verticalGradient(
             colorStops = arrayOf(
@@ -234,31 +237,35 @@ private fun HistoryDrawerContent(
     }
 
     Column(Modifier.fillMaxHeight().statusBarsPadding()) {
-        // 标题行与设置页 TopAppBar 同语：titleLarge 标题 + 右侧文字操作。
-        Row(
-            Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 16.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(R.string.chat_drawer_history_title),
-                // 抽屉打开时由标题承接初始焦点，避免自动进入搜索框并唤起输入法。
-                modifier = Modifier.focusable(),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.weight(1f))
-            TextButton(
-                enabled = !recentState.isDeleting && (conversations.isNotEmpty() || recentState.isSelecting),
-                onClick = {
-                    onRecentAction(if (recentState.isSelecting) RecentConversationsAction.FinishSelection else RecentConversationsAction.StartSelection())
-                },
-            ) {
-                Text(stringResource(if (recentState.isSelecting) R.string.chat_drawer_done else R.string.chat_drawer_manage))
-            }
-        }
+        // 隐形焦点承接点：抽屉打开后初始焦点落在这里，避免进入搜索框唤起输入法。
+        Box(Modifier.size(1.dp).focusable())
+        // 常用功能：图标 + 文字的紧凑入口行，免滚动直达高频操作。
+        DrawerFunctionEntry(
+            icon = Icons.Default.Add,
+            label = stringResource(R.string.chat_drawer_new_conversation),
+            isFirst = true,
+            isLast = false,
+            onClick = onNewConversationClick,
+        )
+        DrawerFunctionEntry(
+            icon = Icons.Default.Call,
+            label = stringResource(R.string.chat_drawer_voice_call),
+            isFirst = false,
+            isLast = false,
+            onClick = onVoiceCallClick,
+        )
+        DrawerFunctionEntry(
+            icon = Icons.Default.Palette,
+            label = stringResource(R.string.chat_drawer_personalize),
+            isFirst = false,
+            isLast = true,
+            onClick = onPersonalizeClick,
+        )
+        Spacer(Modifier.height(12.dp))
+        // 历史区头：搜索 + 管理并排；多选期间换成已选数 + 全选/取消全选。
         if (recentState.isSelecting) {
             Row(
-                Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, bottom = 4.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -274,23 +281,34 @@ private fun HistoryDrawerContent(
                     Text(stringResource(if (allSelected) R.string.chat_drawer_deselect_all else R.string.chat_drawer_select_all))
                 }
             }
-        }
-        // 搜索框与分组卡片同底色，去掉描边与指示线。
-        GimiSearchField(
-            value = recentState.query,
-            onValueChange = { onRecentAction(RecentConversationsAction.Search(it)) },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            enabled = !recentState.isDeleting,
-            placeholder = { Text(stringResource(R.string.chat_drawer_search)) },
-            trailingIcon = {
-                if (recentState.query.isNotEmpty()) {
-                    IconButton(onClick = { onRecentAction(RecentConversationsAction.Search("")) }) {
-                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.chat_drawer_clear_search))
-                    }
+        } else {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                GimiSearchField(
+                    value = recentState.query,
+                    onValueChange = { onRecentAction(RecentConversationsAction.Search(it)) },
+                    modifier = Modifier.weight(1f),
+                    enabled = !recentState.isDeleting,
+                    placeholder = stringResource(R.string.chat_drawer_search),
+                    trailingIcon = {
+                        if (recentState.query.isNotEmpty()) {
+                            IconButton(onClick = { onRecentAction(RecentConversationsAction.Search("")) }) {
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.chat_drawer_clear_search))
+                            }
+                        }
+                    },
+                )
+                TextButton(
+                    enabled = !recentState.isDeleting && conversations.isNotEmpty(),
+                    onClick = { onRecentAction(RecentConversationsAction.StartSelection()) },
+                    modifier = Modifier.padding(start = 4.dp),
+                ) {
+                    Text(stringResource(R.string.chat_drawer_manage))
                 }
-            },
-
-        )
+            }
+        }
         Box(Modifier.weight(1f).navigationBarsPadding().imePadding()) {
             LazyColumn(
                 state = listState,
@@ -333,33 +351,34 @@ private fun HistoryDrawerContent(
                 Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(DrawerFooterHeight)
                     .background(bottomFadeBrush),
             )
-            Row(
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 24.dp),
-                // 操作组水平居中：与列表卡片左右留白对称。
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
+            // 右下角齿轮：唯一的设置入口；有未发现的新版本时点亮提醒点。
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 20.dp, bottom = 20.dp),
             ) {
-                if (recentState.isSelecting) {
-                    Button(
-                        enabled = selectedIds.isNotEmpty() && !recentState.isDeleting,
-                        onClick = { onRecentAction(RecentConversationsAction.RequestDeletion) },
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                Surface(
+                    shape = CircleShape,
+                    color = preferenceGroupCardColor(),
+                    shadowElevation = 2.dp,
+                ) {
+                    IconButton(
+                        onClick = onSettingsClick,
+                        modifier = Modifier.size(DrawerGearButtonSize),
                     ) {
-                        if (recentState.isDeleting) {
-                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Delete, contentDescription = null)
-                        }
-                        Spacer(Modifier.size(8.dp))
-                        Text(stringResource(if (recentState.isDeleting) R.string.chat_drawer_deleting else R.string.chat_drawer_delete_count, selectedIds.size))
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.chat_settings),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
-                } else {
-                    DrawerFooterActionGroup(
-                        themeMode = themeMode,
-                        showUpdateBadge = showUpdateBadge,
-                        onSettingsClick = onSettingsClick,
-                        onThemeModeClick = { onThemeModeChange(themeMode.next()) },
+                }
+                if (showUpdateBadge) {
+                    Box(
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .size(10.dp)
+                            .background(MaterialTheme.colorScheme.error, CircleShape),
                     )
                 }
             }
@@ -384,121 +403,61 @@ private fun HistoryDrawerContent(
     }
 }
 
-// ── 底部操作组：设置 + 夜间模式 ────────────────────────────────
+// ── 常用功能入口 ────────────────────────────────────────────────
 
 /**
- * 底部操作组：设置与夜间模式拼成同一枚胶囊（两段之间没有间隙，只用一条内缩分隔线区分），
- * 整组由调用方居中摆放。两段各自消费点击；夜间模式段点击循环 跟随系统→浅色→深色，
- * 图标与文案用 [AnimatedContent] 做上滑淡入淡出过渡，切换连贯不生硬。
+ * 常用功能入口行：图标 + 文字，与设置页列表行同一套几何（行高、内缩分隔线、分组圆角）。
  */
 @Composable
-private fun DrawerFooterActionGroup(
-    themeMode: ThemeMode,
-    showUpdateBadge: Boolean,
-    onSettingsClick: () -> Unit,
-    onThemeModeClick: () -> Unit,
+private fun DrawerFunctionEntry(
+    icon: ImageVector,
+    label: String,
+    isFirst: Boolean,
+    isLast: Boolean,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier,
-        shape = CircleShape,
-        color = preferenceGroupCardColor(),
+    val shape = RoundedCornerShape(
+        topStart = if (isFirst) DrawerGroupCornerRadius else 0.dp,
+        topEnd = if (isFirst) DrawerGroupCornerRadius else 0.dp,
+        bottomStart = if (isLast) DrawerGroupCornerRadius else 0.dp,
+        bottomEnd = if (isLast) DrawerGroupCornerRadius else 0.dp,
+    )
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = DrawerGroupHorizontalPadding)
+            .clip(shape)
+            .background(preferenceGroupCardColor()),
     ) {
         Row(
-            modifier = Modifier.height(48.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = DrawerFunctionRowMinHeight)
+                .clickable(onClickLabel = label, onClick = onClick)
+                .padding(horizontal = DrawerGroupHorizontalPadding, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(GimiListDefaults.ContentSpacing),
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clickable(onClick = onSettingsClick)
-                    .padding(start = 16.dp, end = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = null,
-                    modifier = Modifier.size(22.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = stringResource(R.string.chat_settings),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium,
-                )
-                if (showUpdateBadge) {
-                    // 有未发现的新版本时在"设置"入口旁点亮提醒点。
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .background(MaterialTheme.colorScheme.error, CircleShape),
-                    )
-                }
-            }
-            VerticalDivider(
-                modifier = Modifier.height(24.dp),
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(DrawerFunctionIconSize),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        if (!isLast) {
+            HorizontalDivider(
+                modifier = Modifier.padding(start = DrawerFunctionDividerStart, end = DrawerGroupHorizontalPadding),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clickable(onClick = onThemeModeClick)
-                    .padding(start = 14.dp, end = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                val label = stringResource(themeModeLabelRes(themeMode))
-                AnimatedContent(
-                    targetState = themeMode,
-                    transitionSpec = { themeModeSlideSpec() },
-                    label = "themeModeIcon",
-                    modifier = Modifier.semantics { contentDescription = label },
-                ) { mode ->
-                    Icon(
-                        imageVector = themeModeIcon(mode),
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                AnimatedContent(
-                    targetState = themeMode,
-                    transitionSpec = { themeModeSlideSpec() },
-                    label = "themeModeLabel",
-                ) { mode ->
-                    Text(
-                        text = stringResource(themeModeLabelRes(mode)),
-                        style = MaterialTheme.typography.labelLarge,
-                        maxLines = 1,
-                    )
-                }
-            }
         }
     }
-}
-
-// 新内容从下方半格滑入并淡入、旧内容向上半格滑出并淡出，切换连贯不生硬。
-private fun themeModeSlideSpec(): ContentTransform =
-    slideInVertically(tween(220)) { it / 2 } + fadeIn(tween(220)) togetherWith
-        slideOutVertically(tween(220)) { -it / 2 } + fadeOut(tween(160))
-
-private fun ThemeMode.next(): ThemeMode = when (this) {
-    ThemeMode.SYSTEM -> ThemeMode.LIGHT
-    ThemeMode.LIGHT -> ThemeMode.DARK
-    ThemeMode.DARK -> ThemeMode.SYSTEM
-}
-
-private fun themeModeIcon(mode: ThemeMode): ImageVector = when (mode) {
-    ThemeMode.SYSTEM -> Icons.Default.BrightnessAuto
-    ThemeMode.LIGHT -> Icons.Default.LightMode
-    ThemeMode.DARK -> Icons.Default.DarkMode
-}
-
-private fun themeModeLabelRes(mode: ThemeMode): Int = when (mode) {
-    ThemeMode.SYSTEM -> R.string.chat_theme_system
-    ThemeMode.LIGHT -> R.string.chat_theme_light
-    ThemeMode.DARK -> R.string.chat_theme_dark
 }
 
 // ── 对话列表项 ──────────────────────────────────────────────────
@@ -734,7 +693,6 @@ private fun formatRelativeTime(timestamp: Long): String {
 
 // ── 预览 ────────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Preview(showBackground = true, showSystemUi = true, name = "打开")
 @Composable
 private fun ChatDrawerPreview() {
@@ -765,15 +723,13 @@ private fun ChatDrawerPreview() {
         )
     )
 
-    AsssistantaiTheme {
+    GimiTheme {
         ChatDrawer(
-            drawerState = rememberDrawerState(initialValue = DrawerValue.Open),
+            open = true,
             conversations = sampleConversations,
             currentSessionId = "1",
             onConversationClick = { },
-            onSettingsClick = { },
-            themeMode = ThemeMode.SYSTEM,
-            onThemeModeChange = { },
+            showUpdateBadge = true,
         ) {
             // 预览中作为占位的主屏幕内容
             Box(
@@ -786,19 +742,15 @@ private fun ChatDrawerPreview() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Preview(showBackground = true, showSystemUi = true, name = "打开（空状态）")
 @Composable
 private fun ChatDrawerEmptyPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ChatDrawer(
-            drawerState = rememberDrawerState(initialValue = DrawerValue.Open),
+            open = true,
             conversations = emptyList(),
             currentSessionId = "",
             onConversationClick = { },
-            onSettingsClick = { },
-            themeMode = ThemeMode.SYSTEM,
-            onThemeModeChange = { },
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -810,19 +762,15 @@ private fun ChatDrawerEmptyPreview() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Preview(showBackground = true, showSystemUi = true, name = "关闭")
 @Composable
 private fun ChatDrawerClosedPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ChatDrawer(
-            drawerState = rememberDrawerState(initialValue = DrawerValue.Closed),
+            open = false,
             conversations = emptyList(),
             currentSessionId = "",
             onConversationClick = { },
-            onSettingsClick = { },
-            themeMode = ThemeMode.SYSTEM,
-            onThemeModeChange = { },
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -864,7 +812,7 @@ private fun RecentContentPreview(
     ).mapIndexed { index, title ->
         Conversation(id = index.toString(), title = title, timestamp = System.currentTimeMillis() - (index + 9) * 3_600_000L)
     }
-    AsssistantaiTheme(darkTheme = darkTheme) {
+    GimiTheme(darkTheme = darkTheme) {
         Surface(color = preferenceCanvasColor()) {
             PreferenceStyleScope(PreferenceStyle.Compact) {
                 HistoryDrawerContent(
@@ -874,9 +822,10 @@ private fun RecentContentPreview(
                     onConversationClick = {},
                     recentState = recentState,
                     onRecentAction = {},
+                    onNewConversationClick = {},
+                    onVoiceCallClick = {},
+                    onPersonalizeClick = {},
                     onSettingsClick = {},
-                    themeMode = ThemeMode.SYSTEM,
-                    onThemeModeChange = {},
                     showUpdateBadge = true,
                 )
             }
@@ -888,7 +837,7 @@ private fun RecentContentPreview(
 @Preview(name = "单个会话导出 · 深色", widthDp = 360, heightDp = 150, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ConversationExportPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ConversationListItem(
             conversation = Conversation(id = "preview", title = "整理本周工作笔记", timestamp = System.currentTimeMillis()),
             isCurrent = true,
@@ -905,7 +854,7 @@ private fun ConversationExportPreview() {
 @Preview(name = "会话操作菜单 · 可用 · 深色", widthDp = 260, heightDp = 150, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ConversationActionsMenuPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         Box {
             ConversationActionsMenu(expanded = true, onDismiss = {}, canExport = true, canDelete = true, onExport = {}, onDelete = {})
         }
@@ -916,7 +865,7 @@ private fun ConversationActionsMenuPreview() {
 @Preview(name = "会话操作菜单 · 当前会话 · 深色", widthDp = 260, heightDp = 150, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ConversationActionsMenuBlockedPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         Box {
             ConversationActionsMenu(expanded = true, onDismiss = {}, canExport = true, canDelete = false, onExport = {}, onDelete = {})
         }
@@ -927,7 +876,7 @@ private fun ConversationActionsMenuBlockedPreview() {
 @Preview(name = "会话操作菜单 · 任务进行中 · 深色", widthDp = 260, heightDp = 150, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ConversationActionsMenuRunningPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         Box {
             ConversationActionsMenu(expanded = true, onDismiss = {}, canExport = false, canDelete = false, onExport = {}, onDelete = {})
         }

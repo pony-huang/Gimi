@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.feature.recommendation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveFastModelAvailabilityUseCase
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationSettings
@@ -18,25 +19,29 @@ import kotlinx.coroutines.flow.stateIn
 class RecommendationSettingsViewModel @Inject constructor(
     private val repository: RecommendationRepository,
     private val toolAccessRepository: ToolAccessRepository,
+    private val appearanceRepository: AppearanceRepository,
     observeFastModelAvailability: ObserveFastModelAvailabilityUseCase,
 ) : ViewModel() {
     val uiState: StateFlow<RecommendationSettingsUiState> = combine(
         repository.state,
         observeFastModelAvailability(),
         toolAccessRepository.defaultToolAccessMode,
-    ) { state, fastModelReady, mode ->
-        toUiState(state, fastModelReady).copy(toolAccessMode = mode)
+        appearanceRepository.themeMode,
+    ) { state, fastModelReady, mode, themeMode ->
+        toUiState(state, fastModelReady).copy(toolAccessMode = mode, themeMode = themeMode)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
         // stateIn 首帧兜底：combine 订阅后立即发出真实值，短暂窗口内沿用仓库当前状态。
         initialValue = toUiState(repository.state.value, fastModelReady = true).copy(
             toolAccessMode = toolAccessRepository.defaultToolAccessMode.value,
+            themeMode = appearanceRepository.themeMode.value,
         ),
     )
 
     fun onAction(action: RecommendationSettingsAction) {
         when (action) {
+            is RecommendationSettingsAction.SetThemeMode -> appearanceRepository.setThemeMode(action.mode)
             is RecommendationSettingsAction.SetToolAccessMode ->
                 toolAccessRepository.setDefaultToolAccessMode(action.mode)
             is RecommendationSettingsAction.SetEnabled -> repository.setEnabled(action.enabled)

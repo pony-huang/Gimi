@@ -35,6 +35,9 @@ internal class ChatA2uiCoordinator(
         val documents = mutableMapOf<String, A2uiDocument>()
         var owners: Map<String, String> = emptyMap()
         var surfaces: Map<String, A2uiSurfaceModel> = emptyMap()
+
+        /** 上一次完成重放的记录；流式发布高频进入 sync，用它跳过未变化历史的全量 JSON 解析。 */
+        var syncedRecords: List<A2uiRecord>? = null
         private val jobs = listOf(
             scope.launch(Dispatchers.Default) { processor.collectMessages() },
             scope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -73,6 +76,13 @@ internal class ChatA2uiCoordinator(
         } }
         if (records.isEmpty() && sessionId !in sessions) return
         val session = sessions.getOrPut(sessionId) { Session(sessionId) }
+        if (records == session.syncedRecords) {
+            // 记录未变化时跳过重放，但仍要重发当前 surfaces：切换会话回来时
+            // showRuntime 已把 uiState 的 a2uiSurfaces/a2uiOwners 清空，靠这里恢复。
+            onChanged(sessionId, session.surfaces, session.owners)
+            return
+        }
+        session.syncedRecords = records
         val active = protocol.replay(records).associateBy { it.surfaceId }
         session.owners = buildMap {
             messages.forEach { message -> message.functionResponses.forEach { response ->

@@ -14,13 +14,14 @@ interface McpRepository {
 
     fun server(id: String): McpServer?
 
-    fun save(server: McpServer)
+    /** 写路径涉及加密与磁盘 I/O，统一挂起以避免调用方阻塞主线程。 */
+    suspend fun save(server: McpServer)
 
-    fun delete(id: String)
+    suspend fun delete(id: String)
 
-    fun importConfiguration(content: String): McpImportResult = importJson(content)
+    suspend fun importConfiguration(content: String): McpImportResult = importJson(content)
 
-    fun importJson(json: String): McpImportResult
+    suspend fun importJson(json: String): McpImportResult
 
-    fun updateAuthorization(serverId: String, authorization: String): Boolean
+    suspend fun updateAuthorization(serverId: String, authorization: String): Boolean
 }

@@ -3,6 +3,8 @@ package github.ponyhuang.gimi.data.agent.execution
 import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.models.LlmResponse
 import com.google.adk.kt.models.Model
+import com.google.adk.kt.models.LiveConnection
+import com.google.adk.kt.annotations.ExperimentalLiveApi
 import com.google.adk.kt.types.Blob
 import com.google.adk.kt.types.FileData
 import com.google.adk.kt.types.Part
@@ -27,6 +29,10 @@ internal class AttachmentResolvingModel(
 
     override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> =
         delegate.generateContent(request.resolveAttachmentParts(), stream)
+
+    @OptIn(ExperimentalLiveApi::class)
+    override suspend fun connect(request: LlmRequest): LiveConnection =
+        delegate.connect(request.resolveAttachmentParts())
 }
 
 private fun LlmRequest.resolveAttachmentParts(): LlmRequest = copy(

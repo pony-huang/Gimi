@@ -1,0 +1,16 @@
+<resources>
+    <string name="notification_channel_name">Task notifications</string>
+    <string name="notification_channel_description">Notifications when a task completes or needs your action</string>
+    <string name="notification_task_completed_title">Task completed</string>
+    <string name="notification_task_completed_text">The assistant has finished the task</string>
+    <string name="notification_tool_execution_title">Running tool</string>
+    <string name="notification_tool_execution_text">The assistant is running a tool</string>
+    <string name="notification_tool_execution_tool_text">The assistant is running: %1$s</string>
+    <string name="notification_confirmation_title">Confirmation needed</string>
+    <string name="notification_confirmation_text">The assistant is waiting for your confirmation</string>
+    <string name="notification_confirmation_tool_text">The assistant is waiting for confirmation: %1$s</string>
+    <string name="notification_input_title">Input needed</string>
+    <string name="notification_input_text">The assistant is waiting for your input</string>
+    <string name="notification_choice_title">Choice needed</string>
+    <string name="notification_choice_text">The assistant is waiting for your choice</string>
+</resources>

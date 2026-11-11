@@ -11,10 +11,9 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.CatalogLoadState
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
-import github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState
+import github.ponyhuang.gimi.domain.voice.model.SpeechPlaybackState
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentTaskPhase
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
-import github.ponyhuang.gimi.domain.appearance.ThemeMode
 
 /**
  * The current UI state of the chat conversation.
@@ -71,8 +70,6 @@ data class ChatUiState(
     val availableMcpServers: List<McpServer> = emptyList(),
     val officialToolDescriptors: List<OfficialToolDescriptor> = emptyList(),
     val hasToolConfigurationError: Boolean = false,
-    /** 夜间模式偏好；由抽屉底部三态选择器写入，MainActivity 据此解析主题。默认跟随系统。 */
-    val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val isSpeechRecognitionAvailable: Boolean = false,
     /** 当前转写请求的后续意图；null 表示没有识别任务，任务由 ViewModel 管理。 */
     val voiceTranscriptionMode: VoiceInputMode? = null,
@@ -84,7 +81,7 @@ data class ChatUiState(
     val speechPlaybackState: SpeechPlaybackState = SpeechPlaybackState(),
     /**
      * 自动语音播报全局开关；开启时每轮 assistant 回复完成后自动朗读。
-     * 状态由 [github.ponyhuang.gimi.domain.speech.repository.SpeechSettingsRepository] 持久化，
+     * 状态由 [github.ponyhuang.gimi.domain.voice.repository.SpeechSettingsRepository] 持久化，
      * 跨会话保持，不随新会话重置。
      */
     val autoSpeakEnabled: Boolean = false,

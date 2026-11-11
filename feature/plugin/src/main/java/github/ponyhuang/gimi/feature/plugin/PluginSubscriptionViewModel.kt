@@ -69,10 +69,8 @@ class PluginSubscriptionViewModel @Inject constructor(
     private fun confirmAdd() {
         val value = local.value.draftUrl.trim()
         val error = when {
-            value.isEmpty() ||
-                !value.startsWith("https://", ignoreCase = true) ||
-                value.length > MAX_URL_LENGTH ||
-                value.any(Char::isWhitespace) -> PluginSubscriptionError.INVALID_URL
+            // 订阅源是可执行内容的来源：https + 合法域名 + 禁止 userinfo（user@host 绕过域名直觉）。
+            !isValidSubscriptionUrl(value) -> PluginSubscriptionError.INVALID_URL
 
             value in store.urls.value -> PluginSubscriptionError.DUPLICATE
             else -> null
@@ -85,6 +83,23 @@ class PluginSubscriptionViewModel @Inject constructor(
         local.update { it.copy(isAddDialogVisible = false, draftUrl = "", error = null) }
     }
 
+    /** 订阅地址本地校验：https scheme、可解析主机（域名/IP），无空白、无 userinfo、长度受限。 */
+    private fun isValidSubscriptionUrl(value: String): Boolean {
+        if (value.isEmpty() || value.length > MAX_URL_LENGTH) return false
+        if (value.any(Char::isWhitespace)) return false
+        if (!value.startsWith("https://", ignoreCase = true)) return false
+        // java.net.URI 而非 android.net.Uri：解析逻辑需在 JVM 单测环境可直接验证。
+        val uri = try {
+            java.net.URI(value)
+        } catch (_: java.net.URISyntaxException) {
+            return false
+        }
+        if (!uri.scheme.equals("https", ignoreCase = true)) return false
+        if (uri.userInfo != null) return false
+        val host = uri.host ?: return false
+        return host.matches(HOST_PATTERN)
+    }
+
     private data class LocalState(
         val isAddDialogVisible: Boolean = false,
         val draftUrl: String = "",
@@ -93,5 +108,6 @@ class PluginSubscriptionViewModel @Inject constructor(
 
     private companion object {
         const val MAX_URL_LENGTH = 2_048
+        val HOST_PATTERN = Regex("[A-Za-z0-9._-]+")
     }
 }

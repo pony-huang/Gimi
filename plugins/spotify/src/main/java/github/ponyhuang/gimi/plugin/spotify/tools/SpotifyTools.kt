@@ -83,11 +83,14 @@ internal fun intParam(
 
 internal suspend fun spotifyCall(block: suspend () -> Map<String, Any?>): Map<String, Any?> =
     withContext(Dispatchers.IO) {
-        runCatching { block() }
-            .getOrElse {
-                if (it is CancellationException) throw it
-                mapOf(SpotifyTool.ERROR_KEY to (it.message ?: "Spotify API call failed"))
-            }
+        try {
+            block()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            // 只收口 Exception：Error（OOM 等）不属于可恢复的 API 调用失败，保持向上传播。
+            mapOf(SpotifyTool.ERROR_KEY to (error.message ?: "Spotify API call failed"))
+        }
     }
 
 internal fun strArg(args: Map<String, Any?>, key: String): String? =
@@ -95,6 +98,10 @@ internal fun strArg(args: Map<String, Any?>, key: String): String? =
 
 internal fun intArg(args: Map<String, Any?>, key: String, default: Int): Int =
     (args[key] as? Number)?.toInt() ?: default
+
+/** 带夹取的整型参数：模型传出的值强制落在 [min]..[max]，与 schema 声明保持一致。 */
+internal fun clampedIntArg(args: Map<String, Any?>, key: String, default: Int, min: Int, max: Int): Int =
+    intArg(args, key, default).coerceIn(min, max)
 
 internal fun boolArg(args: Map<String, Any?>, key: String, default: Boolean): Boolean =
     (args[key] as? Boolean) ?: default

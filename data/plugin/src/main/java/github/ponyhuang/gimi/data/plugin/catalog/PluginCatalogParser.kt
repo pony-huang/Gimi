@@ -4,21 +4,36 @@ import github.ponyhuang.gimi.domain.plugin.model.LocalizedText
 import github.ponyhuang.gimi.domain.plugin.model.PluginCatalogEntry
 import javax.inject.Inject
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 
 /**
  * 解析插件订阅目录并做最小结构校验。
  *
- * 订阅文件可能来自用户配置的远端地址，因此单条无效数据选择跳过而不是让整个列表不可用；
- * 重复 key 只保留首次出现项。
+ * 订阅文件可能来自用户配置的远端地址，因此先按 JsonElement 解码再逐条转换：
+ * 单条结构损坏或字段非法只跳过该条，不让整个目录不可用；重复 key 只保留首次出现项。
  */
 class PluginCatalogParser @Inject constructor() {
 
     private val json = Json { ignoreUnknownKeys = true }
 
     fun parse(content: String): List<PluginCatalogEntry> {
-        val dto = json.decodeFromString<PluginCatalogDto>(content)
+        // 先解析为 JsonElement，再逐条解码 entries；任何一条失败（缺字段/类型不符）只丢弃该条。
+        val entriesArray = runCatching {
+            val root = json.parseToJsonElement(content)
+            if (root is JsonObject) {
+                root["entries"]?.jsonArray ?: JsonArray(emptyList())
+            } else {
+                root.jsonArray
+            }
+        }.getOrElse { return emptyList() }
         val seenKeys = mutableSetOf<String>()
-        return dto.entries
+        return entriesArray.mapNotNull { element ->
+            runCatching { json.decodeFromJsonElement<PluginCatalogEntryDto>(element) }.getOrNull()
+        }
             .mapNotNull { it.toDomainOrNull() }
             .filter { seenKeys.add(it.key) }
             .sortedWith(compareBy({ it.sortOrder }, { it.title }))

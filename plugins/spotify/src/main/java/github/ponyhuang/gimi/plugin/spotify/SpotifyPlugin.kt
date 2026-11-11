@@ -21,22 +21,22 @@ import github.ponyhuang.gimi.pluginapi.PluginActionCallbackRequest
  * Spotify plugin — connects the official Web API and injects content tools into the agent:
  * search / catalog / playlists / library / playback / top lists.
  *
- * Auth uses OAuth 2.0 Authorization Code. Fill in Client ID / Client Secret / Redirect URI
+ * Auth uses OAuth 2.0 Authorization Code + PKCE. Fill in Client ID / Redirect URI
  * (default `http://127.0.0.1:8888/callback`, registered in the Spotify Developer Dashboard),
  * then tap the "Authorize Spotify" config action (in-app WebView) or call the `spotify_login`
- * tool. Playback tools require Spotify Premium.
+ * tool. No client secret is needed (public client, PKCE S256).
+ * Playback tools require Spotify Premium.
  */
 class SpotifyPlugin : AgentPlugin {
 
     override val pluginId: String = "spotify"
     override val displayName: String = "Spotify"
-    override val version: Int = 2
+    override val version: Int = 3
     override val toolCount: Int = 35
 
     override val config: PluginConfig = PluginConfig(
         fields = listOf(
             PluginConfigField.Text(key = KEY_CLIENT_ID, label = "Client ID"),
-            PluginConfigField.Text(key = KEY_CLIENT_SECRET, label = "Client Secret", secret = true),
             PluginConfigField.Text(
                 key = KEY_REDIRECT_URI,
                 label = "Redirect URI",
@@ -51,7 +51,6 @@ class SpotifyPlugin : AgentPlugin {
     )
 
     @Volatile private var clientId: String = ""
-    @Volatile private var clientSecret: String = ""
     @Volatile private var redirectUri: String = DEFAULT_REDIRECT_URI
     @Volatile private var appContext: Context? = null
 
@@ -61,7 +60,6 @@ class SpotifyPlugin : AgentPlugin {
 
     override fun configure(values: Map<String, String>) {
         clientId = values[KEY_CLIENT_ID].orEmpty()
-        clientSecret = values[KEY_CLIENT_SECRET].orEmpty()
         redirectUri = values[KEY_REDIRECT_URI]?.takeIf(String::isNotBlank) ?: DEFAULT_REDIRECT_URI
     }
 
@@ -69,7 +67,7 @@ class SpotifyPlugin : AgentPlugin {
         TokenStore(requireNotNull(appContext) { "Spotify plugin has no attached context" })
     }
     private val auth: SpotifyAuth by lazy {
-        SpotifyAuth(tokenStore) { clientId to clientSecret }
+        SpotifyAuth(tokenStore) { clientId }
     }
     private val api: SpotifyApi by lazy {
         SpotifyApi(tokenStore, auth)
@@ -82,7 +80,7 @@ class SpotifyPlugin : AgentPlugin {
 
     private val toolList: List<BaseTool> by lazy {
         buildList {
-            addAll(authTools(auth, { clientId }, { clientSecret }, { redirectUri }) { appContext })
+            addAll(authTools(auth, { clientId }, { redirectUri }) { appContext })
             addAll(searchTools(api))
             addAll(libraryTools(api))
             addAll(playbackTools(api))
@@ -102,14 +100,14 @@ class SpotifyPlugin : AgentPlugin {
             PluginActionResult(message = if (api.authorizationStatus()) "authorized" else "unauthorized"),
         )
         ACTION_LOGIN -> PluginConfigActionExecution.Completed(
-            runCatching {
-                performLogin(auth, { clientId }, { clientSecret }, { redirectUri }) { appContext }
-            }.fold(
-                onSuccess = { message -> PluginActionResult(message = message) },
-                onFailure = { error ->
-                    PluginActionResult(message = error.message ?: "Authorization failed", success = false)
-                },
-            ),
+            try {
+                PluginActionResult(message = performLogin(auth, { clientId }, { redirectUri }) { appContext })
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                // 取消必须传播：runCatching 会把会话取消吞成失败结果。
+                throw cancelled
+            } catch (error: Exception) {
+                PluginActionResult(message = error.message ?: "Authorization failed", success = false)
+            },
         )
         else -> PluginConfigActionExecution.Completed(
             PluginActionResult(message = "Unknown action: $actionId", success = false),
@@ -121,7 +119,6 @@ class SpotifyPlugin : AgentPlugin {
         const val ACTION_AUTH_STATUS: String = "oauth_status"
         const val ACTION_DASHBOARD: String = "link:developer_dashboard"
         const val KEY_CLIENT_ID: String = "client_id"
-        const val KEY_CLIENT_SECRET: String = "client_secret"
         const val KEY_REDIRECT_URI: String = "redirect_uri"
         const val DEFAULT_REDIRECT_URI: String = "http://127.0.0.1:8888/callback"
     }

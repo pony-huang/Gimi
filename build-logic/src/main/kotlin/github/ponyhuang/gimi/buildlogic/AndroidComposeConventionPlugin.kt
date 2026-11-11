@@ -15,12 +15,10 @@ class AndroidComposeConventionPlugin : Plugin<Project> {
         if (pluginManager.hasPlugin("com.android.application")) {
             extensions.configure<ApplicationExtension> {
                 buildFeatures { compose = true }
-                testOptions.unitTests.isIncludeAndroidResources = true
             }
         } else {
             extensions.configure<LibraryExtension> {
                 buildFeatures { compose = true }
-                testOptions.unitTests.isIncludeAndroidResources = true
             }
         }
     }

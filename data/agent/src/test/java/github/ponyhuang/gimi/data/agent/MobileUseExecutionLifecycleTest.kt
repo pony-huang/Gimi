@@ -3,7 +3,7 @@ package github.ponyhuang.gimi.data.agent
 import com.google.adk.kt.events.Event
 import com.google.adk.kt.runners.InMemoryRunner
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
-import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
+import github.ponyhuang.gimi.domain.mobileuse.MobileUseController
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -21,7 +21,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class MobileUseExecutionLifecycleTest {
-    private val repository = mockk<MobileUseRepository>(relaxed = true)
+    private val repository = mockk<MobileUseController>(relaxed = true)
 
     private fun execution(events: Flow<Event>): AgentChatExecution {
         val runner = mockk<InMemoryRunner>()
@@ -40,7 +40,7 @@ class MobileUseExecutionLifecycleTest {
         execution.respondToInputRequest("input", "get_user_choice", mapOf("value" to "yes")).collect()
         coVerify(exactly = 2) { repository.registerExecution("turn", "chat") }
         coVerify(exactly = 2) { repository.finishExecution("turn") }
-        coVerify(exactly = 0) { repository.closeSession(any()) }
+        coVerify(exactly = 0) { repository.stopExecution(any()) }
     }
 
     @Test
@@ -50,7 +50,7 @@ class MobileUseExecutionLifecycleTest {
         assertEquals("run failed", failure?.message)
         coVerify { repository.registerExecution("turn", "chat") }
         coVerify { repository.finishExecution("turn") }
-        coVerify(exactly = 0) { repository.closeSession(any()) }
+        coVerify(exactly = 0) { repository.stopExecution(any()) }
     }
 
     @Test
@@ -61,6 +61,6 @@ class MobileUseExecutionLifecycleTest {
         started.await()
         job.cancelAndJoin()
         coVerify { repository.finishExecution("turn") }
-        coVerify(exactly = 0) { repository.closeSession(any()) }
+        coVerify(exactly = 0) { repository.stopExecution(any()) }
     }
 }

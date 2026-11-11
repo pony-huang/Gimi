@@ -11,7 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @Preview(name = "数据表格 · 浅色", widthDp = 390, heightDp = 820, showBackground = true)
 @Composable
@@ -28,7 +28,7 @@ private fun DataTableNarrowPreview() = DataTablePreviewCanvas(dark = false)
 
 @Composable
 private fun DataTablePreviewCanvas(dark: Boolean) {
-    AsssistantaiTheme(darkTheme = dark) {
+    GimiTheme(darkTheme = dark) {
         ChatA2uiTheme {
             Surface(Modifier.fillMaxSize()) {
                 Column(

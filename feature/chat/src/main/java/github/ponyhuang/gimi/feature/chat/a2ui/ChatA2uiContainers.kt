@@ -25,7 +25,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import github.ponyhuang.gimi.ui.components.GimiSheetBase
+import github.ponyhuang.gimi.ui.components.SheetHeight
 import androidx.compose.material3.PrimaryScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
@@ -157,14 +158,17 @@ internal object ChatA2uiDetailSheet : A2uiBasicCatalogV1.Modal {
             ChatA2uiChild(scope, A2uiComponentReference(triggerId), modifier)
         }
         if (open) {
-            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-            ModalBottomSheet(onDismissRequest = { open = false }, sheetState = sheetState) {
+            GimiSheetBase(
+                onDismissRequest = { open = false },
+                initialHeight = SheetHeight.Fraction(0.65f),
+                maxHeight = SheetHeight.Fraction(0.9f),
+            ) {
                 ProvideActionInterceptor(onIntercept = { payload ->
                     val local = (payload["event"] as? Map<*, *>)?.get("name") == "close_detail"
                     if (local) open = false
                     local
                 }) {
-                    Column(Modifier.fillMaxWidth().heightIn(max = 560.dp)
+                    Column(Modifier.fillMaxWidth()
                         .verticalScroll(rememberScrollState()).padding(20.dp)
                         .chatA2uiContainerAccessibility(accessibility),
                         verticalArrangement = Arrangement.spacedBy(16.dp)) {

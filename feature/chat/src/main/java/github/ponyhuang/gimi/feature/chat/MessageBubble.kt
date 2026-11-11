@@ -36,9 +36,9 @@ import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
-import github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState
-import github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackStatus
+import github.ponyhuang.gimi.ui.theme.GimiTheme
+import github.ponyhuang.gimi.domain.voice.model.SpeechPlaybackState
+import github.ponyhuang.gimi.domain.voice.model.SpeechPlaybackStatus
 import github.ponyhuang.gimi.ui.chatcontent.ChatBubbleRole
 import github.ponyhuang.gimi.ui.chatcontent.ChatMessageBubble
 import github.ponyhuang.gimi.ui.chatcontent.ChatTextContent
@@ -338,7 +338,7 @@ private fun RenderTextPart(
 @Preview(showBackground = true)
 @Composable
 private fun MessageBubblePreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.padding(8.dp)

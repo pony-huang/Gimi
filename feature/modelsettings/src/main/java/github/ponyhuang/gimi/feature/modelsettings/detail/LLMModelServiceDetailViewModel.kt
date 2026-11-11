@@ -6,20 +6,30 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentMutationResult
 import github.ponyhuang.gimi.domain.conversation.runtime.isBusy
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
+
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnectionResult
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
+
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
+
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
+
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceKind
+
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSupport
-import github.ponyhuang.gimi.domain.modelcatalog.usecase.DeleteModelServiceUseCase
+
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.LoadModelCandidatesUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.LoadModelServiceUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveModelServiceUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.RefreshModelCatalogUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.SaveModelServiceUseCase
-import github.ponyhuang.gimi.domain.modelcatalog.usecase.SetModelServiceEnabledUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.TestModelServiceConnectionUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.hasValidConnectionConfiguration
+import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityNotSupported
+import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityResolver
 import github.ponyhuang.gimi.feature.modelsettings.R
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -38,11 +48,10 @@ class ModelServiceDetailViewModel @Inject constructor(
     private val observeModelService: ObserveModelServiceUseCase,
     private val loadCandidates: LoadModelCandidatesUseCase,
     private val saveService: SaveModelServiceUseCase,
-    private val deleteService: DeleteModelServiceUseCase,
-    private val setServiceEnabled: SetModelServiceEnabledUseCase,
     private val testConnection: TestModelServiceConnectionUseCase,
     private val refreshCatalog: RefreshModelCatalogUseCase,
     private val runWhenAgentIdle: RunWhenAgentIdleUseCase,
+    private val voiceCapabilities: VoiceCapabilityResolver,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(LLMModelSettingDetailUiState())
     val uiState = _uiState.asStateFlow()
@@ -53,6 +62,7 @@ class ModelServiceDetailViewModel @Inject constructor(
     private var connectionJob: Job? = null
     private var refreshJob: Job? = null
     private var connectionRevision = 0L
+    private var catalogModels: Map<String, Model> = emptyMap()
 
     init {
         viewModelScope.launch {
@@ -68,6 +78,9 @@ class ModelServiceDetailViewModel @Inject constructor(
         when (action) {
             is LLMModelSettingDetailAction.Load -> load(action.serviceId)
             is LLMModelSettingDetailAction.ApiKeyChanged -> editConnection { it.copy(apiKey = action.value) }
+            is LLMModelSettingDetailAction.WorkspaceIdChanged -> editConnection {
+                it.copy(workspaceId = action.value.ifBlank { null })
+            }
             is LLMModelSettingDetailAction.ApiBaseUrlChanged -> editConnection {
                 if (it.apiProtocol == ApiProtocol.Anthropic) it.copy(anthropicBaseUrl = action.value)
                 else it.copy(apiBaseUrl = action.value)
@@ -81,9 +94,8 @@ class ModelServiceDetailViewModel @Inject constructor(
             is LLMModelSettingDetailAction.OfficialToolsEnabledChanged -> edit {
                 it.copy(isOfficialToolsEnabled = action.value)
             }
-            is LLMModelSettingDetailAction.EnabledChanged -> changeEnabled(action.value)
             is LLMModelSettingDetailAction.OpenPage -> openPage(action.page)
-            is LLMModelSettingDetailAction.ToggleModel -> if (state.canEdit) _uiState.update {
+            is LLMModelSettingDetailAction.ToggleModel -> if (state.canEdit && state.candidates.any { it.key == action.key }) _uiState.update {
                 it.copy(pendingModelKeys = if (action.key in it.pendingModelKeys) it.pendingModelKeys - action.key
                     else it.pendingModelKeys + action.key)
             }
@@ -95,12 +107,12 @@ class ModelServiceDetailViewModel @Inject constructor(
                 it.copy(isConnectionExpanded = !it.isConnectionExpanded, isProtocolMenuExpanded = false)
             }
             is LLMModelSettingDetailAction.NewLLMModelIdChanged -> _uiState.update { it.copy(newModelId = action.value) }
-            is LLMModelSettingDetailAction.NewLLMModelKindChanged -> _uiState.update { it.copy(newModelKind = action.value) }
+            is LLMModelSettingDetailAction.NewLLMModelKindChanged -> if (action.value in state.allowedModelKinds) {
+                _uiState.update { it.copy(newModelKind = action.value) }
+            }
             LLMModelSettingDetailAction.ToggleApiKeyVisibility -> _uiState.update { it.copy(isApiKeyVisible = !it.isApiKeyVisible) }
             LLMModelSettingDetailAction.ToggleProtocolMenu -> if (state.canEdit) _uiState.update { it.copy(isProtocolMenuExpanded = !it.isProtocolMenuExpanded) }
             LLMModelSettingDetailAction.DismissProtocolMenu -> _uiState.update { it.copy(isProtocolMenuExpanded = false) }
-            LLMModelSettingDetailAction.ToggleServiceMenu -> _uiState.update { it.copy(isServiceMenuExpanded = !it.isServiceMenuExpanded) }
-            LLMModelSettingDetailAction.DismissServiceMenu -> _uiState.update { it.copy(isServiceMenuExpanded = false) }
             LLMModelSettingDetailAction.ShowAddDialog -> if (state.canEdit) _uiState.update { it.copy(isAddDialogVisible = true) }
             LLMModelSettingDetailAction.DismissAddDialog -> _uiState.update { it.copy(isAddDialogVisible = false, newModelId = "") }
             LLMModelSettingDetailAction.ConfirmAddLLMModel -> addModel()
@@ -111,11 +123,6 @@ class ModelServiceDetailViewModel @Inject constructor(
             LLMModelSettingDetailAction.Back -> back()
             LLMModelSettingDetailAction.Discard -> viewModelScope.launch { close() }
             LLMModelSettingDetailAction.ContinueEditing -> _uiState.update { it.copy(isDiscardDialogVisible = false) }
-            LLMModelSettingDetailAction.RequestDelete -> if (state.canEdit) _uiState.update {
-                it.copy(isDeleteDialogVisible = true, isServiceMenuExpanded = false)
-            }
-            LLMModelSettingDetailAction.CancelDelete -> _uiState.update { it.copy(isDeleteDialogVisible = false) }
-            LLMModelSettingDetailAction.ConfirmDelete -> delete()
         }
     }
 
@@ -135,19 +142,25 @@ class ModelServiceDetailViewModel @Inject constructor(
                     return@launch
                 }
                 val groups = loadCandidates(id)
-                val draft = initial.editorDraft()
+                catalogModels = (groups + initial.groups).flatMap { it.models }.associateBy { it.id }
+                val category = initial.kind
+                val draft = initial.editorDraft(category)
                 _uiState.update {
                     it.copy(isLoading = false, service = draft, baseline = draft, supportedTools = toolsFor(draft),
-                        candidates = (groups + initial.groups).toRows().distinctBy { row -> row.key },
+                        newModelKind = if (category == ModelServiceKind.Speech) NewModelKind.Stt else NewModelKind.Chat,
+                        endpointStrategy = voiceCapabilities.endpointStrategy(draft.id),
+                        candidates = (groups + initial.groups).forService(category).toRows().distinctBy { row -> row.key },
                         candidateGroupNames = (groups + initial.groups).associate { group -> group.id to group.name })
                 }
                 observeModelService(id).collect { service ->
                     // 外部刷新不得覆盖未保存草稿；保存中也不让仓库回流打断表单。
                     _uiState.update { state ->
                         if (service == null || state.isDirty || state.isSaving) state
-                        else service.editorDraft().let { next ->
+                        else service.editorDraft(category).let { next ->
+                            catalogModels = catalogModels + service.groups.flatMap { it.models }.associateBy { it.id }
                             state.copy(service = next, baseline = next, supportedTools = toolsFor(next),
-                                candidates = (state.candidates + service.groups.toRows()).distinctBy { it.key },
+                                endpointStrategy = voiceCapabilities.endpointStrategy(next.id),
+                                candidates = (state.candidates + service.groups.forService(category).toRows()).distinctBy { it.key },
                                 candidateGroupNames = state.candidateGroupNames + service.groups.associate { it.id to it.name })
                         }
                     }
@@ -208,18 +221,18 @@ class ModelServiceDetailViewModel @Inject constructor(
     private fun addModel() {
         val state = _uiState.value
         val id = state.newModelId.trim()
-        if (!state.canEdit || id.isBlank()) return
+        if (!state.canEdit || id.isBlank() || state.newModelKind !in state.allowedModelKinds) return
         val service = state.service ?: return
         val existing = state.candidates.firstOrNull { it.model.id == id }
         val row = existing ?: LLMModelSettingDetailRow.LLMModelItem(
             "${service.id}-custom",
-            Model(id, id, isStt = state.newModelKind == NewModelKind.Stt, isTts = state.newModelKind == NewModelKind.Tts),
+            Model(id, id, capabilities = state.newModelKind.capabilities),
         )
         _uiState.update {
             it.copy(candidates = if (existing == null) it.candidates + row else it.candidates,
                 pendingModelKeys = it.pendingModelKeys + row.key,
                 candidateGroupNames = it.candidateGroupNames + (row.groupId to (it.candidateGroupNames[row.groupId] ?: service.name)),
-                isAddDialogVisible = false, newModelId = "", newModelKind = NewModelKind.Chat)
+                isAddDialogVisible = false, newModelId = "", newModelKind = state.allowedModelKinds.first())
         }
     }
 
@@ -231,7 +244,19 @@ class ModelServiceDetailViewModel @Inject constructor(
         connectionJob = viewModelScope.launch {
             _uiState.update { it.copy(isTestingKey = true, connectionResult = null) }
             try {
-                val result = testConnection(service)
+                // 语音服务没有模型目录接口，连接测试走该服务自己的协议握手：握手即校验密钥，且不计费。
+                // 服务未实现握手探测时明确报告不支持，而不是借用其它厂商的协议去连接。
+                // 只捕获"未实现探测"这一种预期失败；网络/密钥失败由 probe 自己返回结果值，
+                // 取消（离开页面）必须原样传播，否则会被误报成 Unsupported。
+                val result = if (service.kind != ModelServiceKind.Chat) {
+                    try {
+                        voiceCapabilities.connectionProbe(service.id).probe(service)
+                    } catch (error: VoiceCapabilityNotSupported) {
+                        ServiceConnectionResult.Unsupported
+                    }
+                } else {
+                    testConnection(service)
+                }
                 if (revision == connectionRevision) _uiState.update { it.copy(connectionResult = result) }
             } finally {
                 if (revision == connectionRevision) _uiState.update { it.copy(isTestingKey = false) }
@@ -250,7 +275,10 @@ class ModelServiceDetailViewModel @Inject constructor(
                 val result = refreshCatalog(service)
                 if (revision != connectionRevision) return@launch
                 result.fold(onSuccess = { models ->
-                    val validModels = models.filter { it.id.isNotBlank() }.distinctBy { it.id }
+                    // 远端目录可能缺失类型；先恢复本地元数据再按服务类别筛选，避免语音项被误当成 LLM。
+                    val knownModels = catalogModels + _uiState.value.candidates.associate { it.model.id to it.model }
+                    val validModels = models.map { knownModels[it.id] ?: it }
+                        .filter { it.id.isNotBlank() && it.supportedBy(service.kind) }.distinctBy { it.id }
                     _uiState.update { current ->
                         val known = current.candidates.associateBy { it.model.id }
                         val rows = validModels.map { model ->
@@ -284,29 +312,13 @@ class ModelServiceDetailViewModel @Inject constructor(
     private fun save() {
         val service = _uiState.value.service ?: return
         if (!service.hasValidConnectionConfiguration()) {
-            _uiState.update { it.copy(errorRes = R.string.modelsettings_invalid_connection, isDiscardDialogVisible = false) }
+            // wss 语音/Realtime 服务的接口地址不是 http(s)，通用文案会误导用户
+            val errorRes = if (service.kind != ModelServiceKind.Chat) R.string.modelsettings_invalid_connection_speech
+            else R.string.modelsettings_invalid_connection
+            _uiState.update { it.copy(errorRes = errorRes, isDiscardDialogVisible = false) }
             return
         }
-        write(LLMModelSettingDetailNotice.Saved, close = true) { saveService(service.copy(isAdded = true)) }
-    }
-
-    private fun delete() {
-        val id = serviceId ?: return
-        write(LLMModelSettingDetailNotice.Deleted, close = true) { deleteService(id) }
-    }
-
-    private fun changeEnabled(enabled: Boolean) {
-        val state = _uiState.value
-        val service = state.service ?: return
-        if (state.isDirty || !service.isAdded) return
-        write(notice = null, close = false) {
-            val result = setServiceEnabled(service.id, enabled)
-            if (result) _uiState.update {
-                val next = service.copy(isEnabled = enabled)
-                it.copy(service = next, baseline = next)
-            }
-            result
-        }
+        write(LLMModelSettingDetailNotice.Saved) { saveService(service.copy(isAdded = true)) }
     }
 
     private suspend fun close() {
@@ -315,19 +327,19 @@ class ModelServiceDetailViewModel @Inject constructor(
         _effects.send(LLMModelSettingDetailEffect.Close)
     }
 
-    private fun write(notice: LLMModelSettingDetailNotice?, close: Boolean, block: suspend () -> Boolean) {
+    private fun write(notice: LLMModelSettingDetailNotice, block: suspend () -> Boolean) {
         if (!_uiState.value.canEdit) return
         cancelConnectionOperations()
         _uiState.update { it.copy(isSaving = true, errorRes = null,
-            isServiceMenuExpanded = false, isDeleteDialogVisible = false, isDiscardDialogVisible = false) }
+            isDiscardDialogVisible = false) }
         viewModelScope.launch {
             try {
                 when (val result = runWhenAgentIdle(block)) {
                     AgentMutationResult.BlockedByActiveAgent -> _effects.send(
                         LLMModelSettingDetailEffect.ShowToast(LLMModelSettingDetailNotice.AgentMutationBlocked))
                     is AgentMutationResult.Applied -> if (result.value) {
-                        if (notice != null) _effects.send(LLMModelSettingDetailEffect.ShowToast(notice))
-                        if (close) close()
+                        _effects.send(LLMModelSettingDetailEffect.ShowToast(notice))
+                        close()
                     } else _uiState.update { it.copy(errorRes = R.string.modelsettings_write_failed) }
                 }
             } catch (cancelled: CancellationException) {
@@ -341,8 +353,21 @@ class ModelServiceDetailViewModel @Inject constructor(
     }
 }
 
-private fun LLMModelSetting.editorDraft(): LLMModelSetting = if (isAdded) this else
+private fun LLMModelSetting.editorDraft(category: ModelServiceKind): LLMModelSetting = if (isAdded) copy(groups = groups.forService(category)) else
     copy(isEnabled = true, isOfficialToolsEnabled = false, groups = emptyList())
+
+/** 分类只限制可配置的模型，不改写模型本身的多模态能力。 */
+private fun Model.supportedBy(kind: ModelServiceKind): Boolean = when (kind) {
+    ModelServiceKind.Chat -> ModelCapability.LLM in capabilities
+    ModelServiceKind.Speech -> ModelCapability.LLM !in capabilities && capabilities.any {
+        it == ModelCapability.STT || it == ModelCapability.ASR || it == ModelCapability.TTS ||
+            it == ModelCapability.Realtime
+    }
+}
+
+private fun List<ModelGroup>.forService(kind: ModelServiceKind): List<ModelGroup> = mapNotNull { group ->
+    group.copy(models = group.models.filter { it.supportedBy(kind) }).takeIf { it.models.isNotEmpty() }
+}
 
 private fun List<ModelGroup>.toRows(): List<LLMModelSettingDetailRow.LLMModelItem> = flatMap { group ->
     group.models.map { LLMModelSettingDetailRow.LLMModelItem(group.id, it) }

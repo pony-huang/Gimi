@@ -1,10 +1,14 @@
 package github.ponyhuang.gimi.feature.modelsettings.detail
 
 import androidx.annotation.StringRes
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceKind
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSpec
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnectionResult
+import github.ponyhuang.gimi.domain.voice.repository.EndpointStrategy
 import github.ponyhuang.gimi.feature.modelsettings.R
 
 /** 编辑器内部页面共享同一份草稿，子页返回不创建另一份配置。 */
@@ -15,28 +19,39 @@ data class LLMModelSettingDetailUiState(
     val isLoading: Boolean = true,
     val service: LLMModelSetting? = null,
     val baseline: LLMModelSetting? = null,
+    /**
+     * 该服务的端点来源策略。
+     *
+     * 端点由厂商自有的服务不展示"接入地址"字段：用户填写的地址不会参与请求构造，
+     * 让用户填写一个不生效的地址只会制造误解。
+     */
+    val endpointStrategy: EndpointStrategy = EndpointStrategy.ConfiguredBaseUrl,
     val page: ServiceEditorPage = ServiceEditorPage.Detail,
     val candidates: List<LLMModelSettingDetailRow.LLMModelItem> = emptyList(),
     val pendingModelKeys: Set<ServiceModelKey> = emptySet(),
     val candidateGroupNames: Map<String, String> = emptyMap(),
     val supportedTools: List<OfficialToolSpec> = emptyList(),
     val isTestingKey: Boolean = false,
-    val connectionResult: Boolean? = null,
+    val connectionResult: ServiceConnectionResult? = null,
     val isRefreshing: Boolean = false,
     val isSaving: Boolean = false,
     val isClosing: Boolean = false,
     val isApiKeyVisible: Boolean = false,
     val isConnectionExpanded: Boolean = false,
     val isProtocolMenuExpanded: Boolean = false,
-    val isServiceMenuExpanded: Boolean = false,
     val isAddDialogVisible: Boolean = false,
     val isDiscardDialogVisible: Boolean = false,
-    val isDeleteDialogVisible: Boolean = false,
     val newModelId: String = "",
     val newModelKind: NewModelKind = NewModelKind.Chat,
     val isMutationBlocked: Boolean = false,
     @param:StringRes val errorRes: Int? = null,
 ) {
+    /** 服务类别约束手动添加和模型分组；语音厂商接受级联与实时语音模型，不接受聊天模型。 */
+    val allowedModelKinds: List<NewModelKind>
+        get() = when (service?.kind) {
+            ModelServiceKind.Speech -> NewModelKind.entries.filter { it != NewModelKind.Chat }
+            else -> listOf(NewModelKind.Chat)
+        }
     val isDirty: Boolean get() = service != baseline
     val canEdit: Boolean get() = !isMutationBlocked && !isSaving && !isClosing
     val rows: List<LLMModelSettingDetailRow.LLMModelItem>
@@ -57,8 +72,6 @@ sealed interface LLMModelSettingDetailAction {
     data class ApiBaseUrlChanged(val value: String) : LLMModelSettingDetailAction
     /** 切换厂商支持的协议。 */
     data class ApiProtocolChanged(val value: ApiProtocol) : LLMModelSettingDetailAction
-    /** 暂停或恢复已保存的服务。 */
-    data class EnabledChanged(val value: Boolean) : LLMModelSettingDetailAction
     /** 修改聊天工具入口的草稿偏好。 */
     data class OfficialToolsEnabledChanged(val value: Boolean) : LLMModelSettingDetailAction
     /** 打开共享草稿的子页面。 */
@@ -75,16 +88,14 @@ sealed interface LLMModelSettingDetailAction {
     data class NewLLMModelIdChanged(val value: String) : LLMModelSettingDetailAction
     /** 修改手动添加的模型类型。 */
     data class NewLLMModelKindChanged(val value: NewModelKind) : LLMModelSettingDetailAction
+    /** 修改百炼业务空间 ID；留空走官方默认域名。 */
+    data class WorkspaceIdChanged(val value: String) : LLMModelSettingDetailAction
     /** 显示或隐藏密钥。 */
     data object ToggleApiKeyVisibility : LLMModelSettingDetailAction
     /** 切换协议菜单。 */
     data object ToggleProtocolMenu : LLMModelSettingDetailAction
     /** 关闭协议菜单。 */
     data object DismissProtocolMenu : LLMModelSettingDetailAction
-    /** 切换服务管理菜单。 */
-    data object ToggleServiceMenu : LLMModelSettingDetailAction
-    /** 关闭服务管理菜单。 */
-    data object DismissServiceMenu : LLMModelSettingDetailAction
     /** 打开手动添加。 */
     data object ShowAddDialog : LLMModelSettingDetailAction
     /** 关闭手动添加。 */
@@ -105,12 +116,6 @@ sealed interface LLMModelSettingDetailAction {
     data object Discard : LLMModelSettingDetailAction
     /** 继续编辑。 */
     data object ContinueEditing : LLMModelSettingDetailAction
-    /** 显示删除确认。 */
-    data object RequestDelete : LLMModelSettingDetailAction
-    /** 取消删除。 */
-    data object CancelDelete : LLMModelSettingDetailAction
-    /** 删除配置与凭据。 */
-    data object ConfirmDelete : LLMModelSettingDetailAction
 }
 
 sealed interface LLMModelSettingDetailNotice {
@@ -120,8 +125,6 @@ sealed interface LLMModelSettingDetailNotice {
     data object SettingNotFoundLLM : LLMModelSettingDetailNotice
     /** 配置成功保存。 */
     data object Saved : LLMModelSettingDetailNotice
-    /** 删除配置成功。 */
-    data object Deleted : LLMModelSettingDetailNotice
     /** Agent 正在运行，禁止改变配置。 */
     data object AgentMutationBlocked : LLMModelSettingDetailNotice
 }
@@ -141,8 +144,27 @@ sealed interface LLMModelSettingDetailRow {
     }
 }
 
+/**
+ * 用户为模型选择的任务类型。
+ *
+ * 每个类型对应一组 [github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability]；
+ * 选定类型即把该能力集合写进模型的能力集合。
+ */
 enum class NewModelKind(@StringRes val labelRes: Int) {
     Chat(R.string.modelsettings_model_kind_chat),
     Stt(R.string.modelsettings_model_kind_stt),
+    Asr(R.string.modelsettings_model_kind_asr),
     Tts(R.string.modelsettings_model_kind_tts),
+    Realtime(R.string.modelsettings_model_kind_realtime),
+    ;
+
+    /** 该类型对应的模型能力集合；Realtime 是独立的会话标记，不携带级联能力。 */
+    val capabilities: Set<ModelCapability>
+        get() = when (this) {
+            Chat -> setOf(ModelCapability.LLM)
+            Stt -> setOf(ModelCapability.STT)
+            Asr -> setOf(ModelCapability.ASR)
+            Tts -> setOf(ModelCapability.TTS)
+            Realtime -> setOf(ModelCapability.Realtime)
+        }
 }

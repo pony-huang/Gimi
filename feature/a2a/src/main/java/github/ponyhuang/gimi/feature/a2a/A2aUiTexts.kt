@@ -9,5 +9,10 @@ import androidx.compose.ui.res.stringResource
 internal fun localizeA2aError(error: String): String = when (error) {
     "a2a.connection_error" -> stringResource(R.string.a2a_connection_error_default)
     "a2a.save_error" -> stringResource(R.string.a2a_save_error_default)
-    else -> error
+    "a2a.storage_error" -> stringResource(R.string.a2a_storage_error)
+    "a2a.invalid_name" -> stringResource(R.string.a2a_invalid_name)
+    "a2a.invalid_url" -> stringResource(R.string.a2a_invalid_url)
+    "a2a.invalid_token" -> stringResource(R.string.a2a_invalid_token)
+    "a2a.duplicate_name" -> stringResource(R.string.a2a_duplicate_name)
+    else -> stringResource(R.string.a2a_connection_error_default)
 }

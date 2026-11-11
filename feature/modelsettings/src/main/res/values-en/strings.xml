@@ -42,28 +42,39 @@
     <!-- Model kind group names shared by default model settings, service model list and the add-model dialog -->
     <string name="modelsettings_model_kind_chat">LLM</string>
     <string name="modelsettings_model_kind_stt">STT</string>
+    <string name="modelsettings_model_kind_asr">ASR</string>
     <string name="modelsettings_model_kind_tts">TTS</string>
+    <string name="modelsettings_model_kind_realtime">Realtime voice</string>
+
+    <!-- Capability names: shared by the grouped model picker and the "not integrated" notice -->
+    <string name="modelsettings_capability_stt">speech transcription</string>
+    <string name="modelsettings_capability_asr">audio understanding</string>
+    <string name="modelsettings_capability_tts">speech synthesis</string>
+    <string name="modelsettings_model_capability_not_supported">This model has no %1$s integration</string>
 
 <string name="modelsettings_defaults_assistant_title">Default assistant model</string>
-    <string name="modelsettings_defaults_assistant_subtitle">Model used when creating a new assistant</string>
     <string name="modelsettings_defaults_quick_title">Quick model</string>
-    <string name="modelsettings_defaults_quick_subtitle">Used to generate conversation titles</string>
     <string name="modelsettings_defaults_stt_title">Speech recognition model</string>
     <string name="modelsettings_defaults_stt_subtitle">Used for voice input</string>
     <string name="modelsettings_defaults_tts_title">Speech synthesis model</string>
     <string name="modelsettings_defaults_tts_subtitle">Used to read assistant replies aloud</string>
     <string name="modelsettings_defaults_voice_title">Playback voice</string>
+    <string name="modelsettings_defaults_section_realtime">Realtime</string>
+    <string name="modelsettings_defaults_realtime_model_title">Realtime model</string>
+    <string name="modelsettings_defaults_realtime_voice_title">Realtime voice</string>
+    <string name="modelsettings_defaults_realtime_model_none">Do not use Realtime</string>
 
     <string name="modelsettings_dialog_pick_assistant">Select default assistant model</string>
     <string name="modelsettings_dialog_pick_quick">Select quick model</string>
     <string name="modelsettings_dialog_pick_stt">Select speech recognition model</string>
     <string name="modelsettings_dialog_pick_tts">Select speech synthesis model</string>
     <string name="modelsettings_dialog_pick_voice">Select playback voice</string>
-    <string name="modelsettings_dialog_no_voices">No voices available</string>
+    <string name="modelsettings_dialog_pick_realtime_model">Select Realtime model</string>
+    <string name="modelsettings_dialog_pick_realtime_voice">Select Realtime voice</string>
     <string name="modelsettings_dialog_no_models">No models available. Please enable at least one model in Model Services first.</string>
 
     <!-- Navigation screen titles (consumed by :app SettingsScaffold) -->
-    <string name="modelsettings_list_title">API access</string>
+    <string name="modelsettings_list_title">LLM models</string>
     <string name="modelsettings_defaults_screen_title">Default models</string>
     <string name="modelsettings_detail_title">Service details</string>
 
@@ -88,7 +99,7 @@
     <string name="modelsettings_extensions_summary">Configure provider tools in chat</string>
     <string name="modelsettings_api_protocol_anthropic_label">Anthropic Messages</string>
     <string name="modelsettings_saving">Saving…</string>
-    <string name="modelsettings_confirm_models">Confirm · %1$d models</string>
+    <string name="modelsettings_confirm_models">Apply selection (%1$d)</string>
     <string name="modelsettings_save_changes">Save changes</string>
     <string name="modelsettings_new_service_hint">Configuration takes effect after adding the service</string>
     <string name="modelsettings_paused_hint">Paused · Connection, models, and tool preferences are retained</string>
@@ -96,19 +107,13 @@
     <string name="modelsettings_manage_models">Manage models</string>
     <string name="modelsettings_no_selected_models">No models added yet</string>
     <string name="modelsettings_selected_model_count">%1$d models selected</string>
-    <string name="modelsettings_manage_service">Manage service</string>
-    <string name="modelsettings_pause_service">Pause service</string>
-    <string name="modelsettings_resume_service">Resume service</string>
-    <string name="modelsettings_save_before_manage">Save or discard changes before pausing or resuming the service.</string>
-    <string name="modelsettings_delete_service">Delete service</string>
-    <string name="modelsettings_delete_summary">Delete the API key, connection settings, and model selection. Unsaved changes will also be discarded. You can add the service again later.</string>
     <string name="modelsettings_unsaved_title">Save changes?</string>
     <string name="modelsettings_unsaved_summary">These changes have not been saved. Save before leaving?</string>
     <string name="modelsettings_discard">Discard</string>
     <string name="modelsettings_continue_editing">Keep editing</string>
     <string name="modelsettings_saved">Service configuration saved</string>
-    <string name="modelsettings_deleted">Service deleted</string>
     <string name="modelsettings_invalid_connection">Enter an API key and a valid HTTP or HTTPS API address.</string>
+    <string name="modelsettings_invalid_connection_speech">Enter an API key and a valid wss API address.</string>
     <string name="modelsettings_write_failed">The operation failed. The original configuration is unchanged. Please retry.</string>
     <string name="modelsettings_no_remote_models">No models returned. Keep the current selection or add models manually.</string>
     <string name="modelsettings_model_selection_hint">Choose models to use after saving the service. Going back cancels this model selection.</string>
@@ -144,5 +149,29 @@
     <string name="modelsettings_service_model_count">%1$d models</string>
     <string name="modelsettings_service_enabled_label">Enable %1$s</string>
     <string name="modelsettings_search_model_or_service">Search models or services</string>
-    <string name="modelsettings_search_voice">Search voices</string>
+    <!-- Qwen speech services connect over WebSocket, unlike the HTTP-based chat providers. -->
+    <string name="modelsettings_speech_endpoint_label">Endpoint</string>
+    <string name="modelsettings_speech_workspace_label">Workspace ID (optional)</string>
+    <string name="modelsettings_speech_workspace_hint">Leave empty to use the default workspace. When filled, requests go through that workspace\'s dedicated domain. Find the ID in the Model Studio console.</string>
+    <string name="modelsettings_speech_endpoint_fixed_hint">Endpoint is fixed by the vendor: %1$s</string>
+    <string name="modelsettings_notice_connection_failed_auth">Invalid key or no permission (401/403). Check the API key.</string>
+    <string name="modelsettings_notice_connection_failed_network">Cannot reach the speech service. Check the network or endpoint.</string>
+    <string name="modelsettings_notice_connection_unsupported">This service does not support connection testing.</string>
+    <string name="modelsettings_service_model_count_speech">Speech service · %1$d models</string>
+    <string name="modelsettings_speech_list_title">Speech models</string>
+    <string name="modelsettings_select_group">Select group</string>
+    <string name="modelsettings_selection_kind_llm">Chat · LLM</string>
+    <string name="modelsettings_selection_kind_stt">Speech recognition · STT</string>
+    <string name="modelsettings_selection_kind_asr">Audio understanding · ASR</string>
+    <string name="modelsettings_selection_kind_tts">Speech synthesis · TTS</string>
+    <string name="modelsettings_selection_empty_hint">No models selected. Applying clears this service’s models after the service is saved.</string>
+    <string name="modelsettings_selection_draft_hint">Apply to return to service settings, then save the service to make changes effective.</string>
+    <string name="modelsettings_qwen_audio_name">Qwen Audio %1$s · %2$s</string>
+    <string name="modelsettings_model_flash">Flash</string>
+    <string name="modelsettings_model_plus">Plus</string>
+    <string name="modelsettings_model_short_speech">Short-form recognition</string>
+    <string name="modelsettings_model_streaming">Streaming recognition</string>
+    <string name="modelsettings_model_description">%1$s · %2$s</string>
+
+    <!-- Voice picker copy moved to :core:designsystem (voice_picker_* / voice_gender_* / voice_group_*) shared by the chat voice page and default model settings. -->
 </resources>

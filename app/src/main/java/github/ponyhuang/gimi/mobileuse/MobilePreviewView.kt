@@ -60,7 +60,7 @@ internal class MobilePreviewView(
         scope.launch {
             bindingMutex.withLock {
                 if (output !== surface || !surface.isValid) return@withLock
-                val result = gateway.attachPreview(id, bindingId, surface, width, height)
+                val result = gateway.attachPreview(id, bindingId, surface, width, height, interactive)
                 if (output === surface && session.id == id) {
                     onAction(BackgroundAppAction.PreviewFailure(result.status != "preview_attached"))
                 }

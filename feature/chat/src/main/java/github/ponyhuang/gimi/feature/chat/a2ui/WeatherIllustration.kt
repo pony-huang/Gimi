@@ -17,7 +17,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.ui.theme.Yellow80
+import github.ponyhuang.gimi.ui.theme.IllustrationSunAmber
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -38,7 +38,7 @@ internal fun WeatherIllustration(condition: WeatherConditionCode, modifier: Modi
         Icon(icon, null, modifier.padding(12.dp), tint = MaterialTheme.colorScheme.primary)
         return
     }
-    val sun = Yellow80
+    val sun = IllustrationSunAmber
     val cloud = if (dark) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surfaceContainerHighest
     val rain = MaterialTheme.colorScheme.primary
     Canvas(modifier) {

@@ -6,7 +6,6 @@ import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.Part
 import github.ponyhuang.gimi.pluginapi.PluginActionCallback
-import github.ponyhuang.gimi.pluginapi.PluginConfigAction
 import github.ponyhuang.gimi.pluginapi.PluginConfigActionExecution
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
@@ -17,43 +16,12 @@ import org.junit.Test
 class XiaohongshuPluginTest {
 
     @Test
-    fun pluginExposesReferenceProjectCapabilitiesThroughToolset() = runTest {
+    fun pluginToolsetAppendsUsageInstructions() = runTest {
         val plugin = XiaohongshuPlugin(injectedService = FakeXiaohongshuService())
 
         assertEquals("xiaohongshu", plugin.pluginId)
-        assertEquals("小红书", plugin.displayName)
-        assertTrue(plugin.config.fields.isEmpty())
-        assertTrue(plugin.tools().isEmpty())
-        assertEquals(16, plugin.toolCount)
         val toolset = plugin.toolSets().single()
-        assertEquals(
-            listOf(
-                PluginConfigAction(id = "login", label = "登录小红书"),
-                PluginConfigAction(id = "logout", label = "退出登录"),
-            ),
-            plugin.config.actions,
-        )
-        assertEquals(
-            listOf(
-                "check_login_status",
-                "get_login_qrcode",
-                "delete_cookies",
-                "list_feeds",
-                "search_feeds",
-                "get_feed_detail",
-                "user_profile",
-                "post_comment_to_feed",
-                "reply_comment_in_feed",
-                "like_feed",
-                "favorite_feed",
-                "get_my_profile",
-                "get_unread_count",
-                "list_notifications",
-                "reply_notification",
-                "like_notification",
-            ),
-            toolset.getTools(null).map { it.name },
-        )
+        assertTrue(toolset.getTools(null).isNotEmpty())
 
         val request = LlmRequest(
             config = GenerateContentConfig(

@@ -1,183 +1,29 @@
 package github.ponyhuang.gimi.data.modelcatalog
 
-import org.junit.Assert.assertFalse
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * 内置目录元数据合并的行为。
+ *
+ * 应用升级时把新增的内置模型组并入用户已持久化的目录：用户自建模型必须原样保留，
+ * 内置语音模型的能力标记必须被补齐。
+ */
 class ModelCatalogOperationsTest {
-    @Test
-    fun syncRemoteModelsReplacesRemoteAndPreservesUserModels() {
-        val groups = listOf(
-            StoredModelGroup(
-                groupId = "group",
-                groupName = "Group",
-                models = listOf(
-                    StoredModel("stale", "Stale", StoredModelSource.REMOTE),
-                    StoredModel("custom", "Custom", StoredModelSource.USER),
-                ),
-            ),
-        )
-
-        val result = syncStoredRemoteModels(
-            existingGroups = groups,
-            serviceId = "service",
-            serviceName = "Service",
-            models = listOf(
-                LLMModelItem("fresh", "Fresh"),
-                LLMModelItem("custom", "Remote duplicate"),
-                LLMModelItem("fresh", "Duplicate"),
-            ),
-        )
-
-        assertEquals(listOf("fresh", "custom"), result.single().models.map { it.modelId })
-        assertEquals(StoredModelSource.REMOTE, result.single().models[0].source)
-        assertEquals(StoredModelSource.USER, result.single().models[1].source)
-    }
 
     @Test
-    fun appendAndRemoveLastModelKeepsProviderGroup() {
-        val appended = appendUserModel(
-            groups = emptyList(),
-            serviceId = "service",
-            serviceName = "Service",
-            model = LLMModelItem("custom", "Custom"),
-        )
-
-        val removed = removeStoredModel(appended, "service-default", "custom")
-
-        assertEquals(1, removed.size)
-        assertTrue(removed.single().models.isEmpty())
-    }
-
-    @Test
-    fun legacyStoredModelDefaultsToNonStt() {
-        // 旧持久化 blob（缺 isStt / capabilities / source 之外的字段）应被兼容 Json 正常读回。
+    fun legacyStoredModelDefaultsToChatCapability() {
+        // 旧持久化 blob（缺能力字段）应被兼容 Json 正常读回，并按可对话模型处理。
         val stored = modelCatalogJson.decodeFromString<StoredModel>(
             """{"modelId":"chat","modelName":"Chat","source":"REMOTE"}""",
         )
 
-        assertFalse(stored.isStt)
+        assertTrue(ModelCapability.LLM in stored.capabilities)
     }
 
-    @Test
-    fun syncRemoteModelsPreservesSpeechCapabilityAndGroup() {
-        val groups = listOf(
-            StoredModelGroup("chat", "Chat"),
-            StoredModelGroup(
-                groupId = "speech",
-                groupName = "Speech",
-                models = listOf(
-                    StoredModel("asr", "ASR", StoredModelSource.REMOTE, isStt = true),
-                ),
-            ),
-        )
-
-        val result = syncStoredRemoteModels(
-            existingGroups = groups,
-            serviceId = "service",
-            serviceName = "Service",
-            models = listOf(
-                LLMModelItem("chat-new", "Chat New"),
-                LLMModelItem("asr", "ASR New"),
-            ),
-        )
-
-        assertEquals(listOf("chat-new"), result[0].models.map { it.modelId })
-        assertEquals(listOf("asr"), result[1].models.map { it.modelId })
-        assertTrue(result[1].models.single().isStt)
-        assertEquals("ASR New", result[1].models.single().modelName)
-    }
-
-    @Test
-    fun syncRemoteModelsAutomaticallyGroupsStandardAndMimoNames() {
-        val standard = syncStoredRemoteModels(emptyList(), "service", "Service", listOf(
-            LLMModelItem("deepseek-v3-chat", "deepseek-v3-chat"),
-            LLMModelItem("deepseek-v4-chat", "deepseek-v4-chat"),
-        ))
-        assertEquals(listOf("deepseek-v3", "deepseek-v4"), standard.map { it.groupId })
-        val mimo = syncStoredRemoteModels(emptyList(), LLMModelType.Mimo.serviceId, "MIMO", listOf(
-            LLMModelItem("mimo-v2.5-pro-ultraspeed", "mimo-v2.5-pro-ultraspeed"),
-            LLMModelItem("mimo-v2.5-asr", "mimo-v2.5-asr"),
-            LLMModelItem("mimo-v2.5-tts", "mimo-v2.5-tts"),
-        ))
-        assertEquals(listOf("mimo-v2.5-pro", "mimo-v2.5-asr", "mimo-v2.5-tts"), mimo.map { it.groupId })
-        assertTrue(mimo[1].models.single().isStt)
-        assertTrue(mimo[2].models.single().isTts)
-    }
-
-    @Test
-    fun minimaxDefaultsIncludeOfficialAsrModel() {
-        val minimax = LLMModelConfigs.services.single { it.serviceId == LLMModelType.MiniMax.serviceId }
-
-        val asr = minimax.lLMModelGroups.single { it.groupId == "minimax-stt" }.models.single()
-        assertEquals("asr-1.0", asr.modelId)
-        assertTrue(asr.isStt)
-        assertFalse(asr.isTts)
-    }
-
-    @Test
-    fun syncRemoteModelsGroupsTwoSegmentModelIdsByFamily() {
-        val result = syncStoredRemoteModels(
-            existingGroups = emptyList(),
-            serviceId = LLMModelType.MiniMax.serviceId,
-            serviceName = "MiniMax",
-            models = listOf(
-                LLMModelItem("MiniMax-M3", "MiniMax-M3"),
-                LLMModelItem("MiniMax-M2.7", "MiniMax-M2.7"),
-                LLMModelItem("MiniMax-M2", "MiniMax-M2"),
-            ),
-        )
-
-        assertEquals(listOf("MiniMax"), result.map { it.groupId })
-        assertEquals(
-            listOf("MiniMax-M3", "MiniMax-M2.7", "MiniMax-M2"),
-            result.single().models.map { it.modelId },
-        )
-    }
-
-    @Test
-    fun syncRemoteModelsPreservesExistingSpeechModelsMissingFromChatCatalog() {
-        val result = syncStoredRemoteModels(
-            existingGroups = listOf(
-                StoredModelGroup(
-                    groupId = "minimax-tts",
-                    groupName = "MiniMax 语音合成",
-                    models = listOf(
-                        StoredModel(
-                            "speech-2.8-hd",
-                            "speech-2.8-hd",
-                            StoredModelSource.REMOTE,
-                            isTts = true,
-                        ),
-                    ),
-                ),
-            ),
-            serviceId = LLMModelType.MiniMax.serviceId,
-            serviceName = "MiniMax",
-            models = listOf(LLMModelItem("MiniMax-M2.7", "MiniMax-M2.7")),
-        )
-
-        val speechGroup = result.first { it.groupId == "minimax-tts" }
-        assertEquals(listOf("speech-2.8-hd"), speechGroup.models.map { it.modelId })
-        assertTrue(speechGroup.models.single().isTts)
-        assertEquals(
-            listOf("MiniMax-M2.7"),
-            result.first { it.groupId == "MiniMax" }.models.map { it.modelId },
-        )
-    }
-
-    @Test
-    fun syncRemoteModelsKeepsUserModelsInTheirExistingGroups() {
-        val groups = listOf(StoredModelGroup("custom", "Custom", models = listOf(
-            StoredModel("local-model", "Local", StoredModelSource.USER),
-        )))
-        val result = syncStoredRemoteModels(groups, "service", "Service", listOf(
-            LLMModelItem("vendor-v1-chat", "vendor-v1-chat"),
-        ))
-        assertEquals(listOf("custom", "vendor-v1"), result.map { it.groupId })
-        assertEquals(listOf("local-model"), result[0].models.map { it.modelId })
-    }
     @Test
     fun metadataUpgradeAddsDefaultSpeechGroupWithoutReplacingUserModels() {
         val existing = listOf(
@@ -192,7 +38,10 @@ class ModelCatalogOperationsTest {
                 groupId = "speech",
                 groupName = "Speech",
                 models = listOf(
-                    StoredModel("asr", "ASR", StoredModelSource.REMOTE, isStt = true),
+                    StoredModel(
+                        "asr", "ASR", StoredModelSource.REMOTE,
+                        capabilities = setOf(ModelCapability.STT),
+                    ),
                 ),
             ),
         )
@@ -200,7 +49,7 @@ class ModelCatalogOperationsTest {
         val upgraded = mergeDefaultModelMetadata(existing, defaults)
 
         assertEquals("custom", upgraded[0].models.single().modelId)
-        assertTrue(upgraded[1].models.single().isStt)
+        assertTrue(ModelCapability.STT in upgraded[1].models.single().capabilities)
         assertEquals(upgraded, mergeDefaultModelMetadata(upgraded, defaults))
     }
 
@@ -231,12 +80,12 @@ class ModelCatalogOperationsTest {
                 groupId = "minimax-tts",
                 groupName = "Minimax 语音合成",
                 models = listOf(
-                    StoredModel("speech-2.8-hd", "speech-2.8-hd", StoredModelSource.REMOTE, isTts = true),
-                    StoredModel("speech-2.8-turbo", "speech-2.8-turbo", StoredModelSource.REMOTE, isTts = true),
-                    StoredModel("speech-2.6-hd", "speech-2.6-hd", StoredModelSource.REMOTE, isTts = true),
-                    StoredModel("speech-2.6-turbo", "speech-2.6-turbo", StoredModelSource.REMOTE, isTts = true),
-                    StoredModel("speech-02-hd", "speech-02-hd", StoredModelSource.REMOTE, isTts = true),
-                    StoredModel("speech-02-turbo", "speech-02-turbo", StoredModelSource.REMOTE, isTts = true),
+                    StoredModel("speech-2.8-hd", "speech-2.8-hd", StoredModelSource.REMOTE, capabilities = setOf(ModelCapability.TTS)),
+                    StoredModel("speech-2.8-turbo", "speech-2.8-turbo", StoredModelSource.REMOTE, capabilities = setOf(ModelCapability.TTS)),
+                    StoredModel("speech-2.6-hd", "speech-2.6-hd", StoredModelSource.REMOTE, capabilities = setOf(ModelCapability.TTS)),
+                    StoredModel("speech-2.6-turbo", "speech-2.6-turbo", StoredModelSource.REMOTE, capabilities = setOf(ModelCapability.TTS)),
+                    StoredModel("speech-02-hd", "speech-02-hd", StoredModelSource.REMOTE, capabilities = setOf(ModelCapability.TTS)),
+                    StoredModel("speech-02-turbo", "speech-02-turbo", StoredModelSource.REMOTE, capabilities = setOf(ModelCapability.TTS)),
                 ),
             ),
         )
@@ -250,7 +99,7 @@ class ModelCatalogOperationsTest {
             chat.models.map { it.modelId },
         )
 
-        // 2. New TTS group is appended at the end with all six models flagged isTts.
+        // 2. New TTS group is appended at the end with all six models carrying the TTS capability.
         val tts = upgraded.first { it.groupId == "minimax-tts" }
         assertEquals(
             listOf(
@@ -263,10 +112,57 @@ class ModelCatalogOperationsTest {
             ),
             tts.models.map { it.modelId },
         )
-        assertTrue(tts.models.all { it.isTts })
+        assertTrue(tts.models.all { ModelCapability.TTS in it.capabilities })
 
         // 3. Re-running the merge with the same defaults is a no-op (idempotency assertion
         // covering upgradeDefaultModelMetadata's "only write when changed" guarantee).
         assertEquals(upgraded, mergeDefaultModelMetadata(upgraded, defaults))
+    }
+
+    @Test
+    fun minimaxDefaultsIncludeOfficialAsrModel() {
+        val minimax = SpeechModelConfigs.services.single { it.serviceId == "minimax-speech" }
+
+        val asr = minimax.lLMModelGroups.single { it.groupId == "minimax-stt" }.models.single()
+        assertEquals("asr-1.0", asr.modelId)
+        assertTrue(ModelCapability.STT in asr.capabilities)
+        assertFalse(ModelCapability.TTS in asr.capabilities)
+    }
+
+    @Test
+    fun minimaxDefaultsIncludeTtsModels() {
+        val minimax = SpeechModelConfigs.services.single { it.serviceId == "minimax-speech" }
+
+        val tts = minimax.lLMModelGroups.single { it.groupId == "minimax-tts" }.models
+        assertEquals(6, tts.size)
+        assertTrue(tts.all { ModelCapability.TTS in it.capabilities })
+    }
+
+    @Test
+    fun qwenDefaultsIncludeAsrAndTtsModels() {
+        val qwen = SpeechModelConfigs.services.single { it.serviceId == "qwen-audio" }
+
+        val asr = qwen.lLMModelGroups.single { it.groupId == "qwen-audio-asr" }.models
+        assertEquals(
+            listOf(
+                "qwen-audio-3.1-asr-flash-message",
+                "qwen-audio-3.1-asr-flash-streaming",
+                "qwen-audio-3.0-asr-flash-streaming",
+            ),
+            asr.map { it.modelId },
+        )
+        assertTrue(asr.all { ModelCapability.STT in it.capabilities })
+
+        val tts = qwen.lLMModelGroups.single { it.groupId == "qwen-audio-tts" }.models
+        assertEquals(
+            listOf(
+                "qwen-audio-3.1-tts-flash",
+                "qwen-audio-3.1-tts-plus",
+                "qwen-audio-3.0-tts-flash",
+                "qwen-audio-3.0-tts-plus",
+            ),
+            tts.map { it.modelId },
+        )
+        assertTrue(tts.all { ModelCapability.TTS in it.capabilities })
     }
 }

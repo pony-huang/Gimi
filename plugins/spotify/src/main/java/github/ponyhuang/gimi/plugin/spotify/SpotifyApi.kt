@@ -120,6 +120,9 @@ internal class SpotifyApi(
                     ?: throw IllegalStateException("Spotify is not authorized, run spotify_login first")
             }
             val response = executeRequest(url, method, token, body)
+            // 幂等保护：GET 可安全重试；POST/PUT/DELETE 首次请求一旦被服务端执行过，
+            // 401/429 的自动重放可能重复建歌单/重复加歌，一律直接抛错交由模型决策。
+            val idempotent = method == "GET"
             when (response.statusCode) {
                 in 200..299 -> {
                     // 播放控制成功只看状态码，不能在操作已执行后因响应体格式而报错或诱发重复操作。
@@ -130,7 +133,7 @@ internal class SpotifyApi(
                         response.toResult()
                     }
                 }
-                401 -> if (!retriedAfterRefresh && !tokenStore.refreshToken.isNullOrBlank()) {
+                401 -> if (idempotent && !retriedAfterRefresh && !tokenStore.refreshToken.isNullOrBlank()) {
                     retriedAfterRefresh = true
                     attempt++
                     auth.forceRefresh()
@@ -139,7 +142,7 @@ internal class SpotifyApi(
                     throw SpotifyApiException(response.statusCode, response.text)
                 }
                 429 -> {
-                    if (retriedAfterRateLimit >= MAX_RATE_LIMIT_ATTEMPTS) {
+                    if (!idempotent || retriedAfterRateLimit >= MAX_RATE_LIMIT_ATTEMPTS) {
                         throw SpotifyApiException(response.statusCode, response.text)
                     }
                     retriedAfterRateLimit++
@@ -160,7 +163,11 @@ internal class SpotifyApi(
     }
 
     private fun buildUrl(path: String, query: Map<String, Any?>): String = buildString {
-        append(baseUrl).append(path)
+        append(baseUrl)
+        // path 逐段编码：LLM 可控的 id（track_id 等）不得携带 / ? # 等改变请求目标的字符。
+        path.split('/').filter(String::isNotEmpty).forEach { segment ->
+            append('/').append(enc(segment).replace("+", "%20"))
+        }
         // 丢弃 null 与空字符串值（如未指定的 device_id），避免发多余的 `device_id=` 参数。
         val present = query.filterValues { it != null && (it !is String || it.isNotEmpty()) }
         if (present.isNotEmpty()) {
@@ -176,33 +183,38 @@ internal class SpotifyApi(
         body: JSONObject?,
     ): HttpResponse {
         val connection = openConnection(url)
-        connection.requestMethod = method
-        connection.connectTimeout = CONNECT_TIMEOUT_MS
-        connection.readTimeout = READ_TIMEOUT_MS
-        connection.useCaches = false
-        connection.setRequestProperty("Cache-Control", "no-cache")
-        connection.setRequestProperty("Authorization", "Bearer $token")
-        if (body != null) {
-            connection.doOutput = true
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+        try {
+            connection.requestMethod = method
+            connection.connectTimeout = CONNECT_TIMEOUT_MS
+            connection.readTimeout = READ_TIMEOUT_MS
+            connection.useCaches = false
+            // 禁止自动跟随 3xx：跟随会把 Authorization: Bearer 带到任意重定向目标。
+            connection.instanceFollowRedirects = false
+            connection.setRequestProperty("Cache-Control", "no-cache")
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            if (body != null) {
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+            }
+            val code = connection.responseCode
+            val text = if (code in 200..299) {
+                connection.inputStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            } else {
+                connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            }
+            val retryAfterMs = parseRetryAfter(connection.getHeaderField("Retry-After"))
+            return HttpResponse(code, text, retryAfterMs)
+        } finally {
+            connection.disconnect()
         }
-        val code = connection.responseCode
-        val text = if (code in 200..299) {
-            connection.inputStream?.bufferedReader()?.use { it.readText() }.orEmpty()
-        } else {
-            connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
-        }
-        val retryAfterMs = parseRetryAfter(connection.getHeaderField("Retry-After"))
-        connection.disconnect()
-        return HttpResponse(code, text, retryAfterMs)
     }
 
     private fun parseRetryAfter(header: String?): Long? {
         if (header.isNullOrBlank()) return null
-        // Spotify 文档：Retry-After 是非负整数秒。
+        // Spotify 文档：Retry-After 是非负整数秒；封顶防异常大值把会话挂死。
         val seconds = header.trim().toLongOrNull() ?: return null
-        return (seconds.coerceAtLeast(0L)) * 1000L
+        return seconds.coerceIn(0L, MAX_RETRY_AFTER_SECONDS) * 1000L
     }
 
     private fun defaultBackoffMs(attempt: Int): Long {
@@ -236,6 +248,9 @@ internal class SpotifyApi(
 
         /** 429 触发后的最大重试次数（首请求之外还能再发 MAX_RATE_LIMIT_ATTEMPTS 次）。 */
         const val MAX_RATE_LIMIT_ATTEMPTS: Int = 3
+
+        /** Retry-After 封顶秒数：防异常大值让 delay 把会话挂住数小时。 */
+        const val MAX_RETRY_AFTER_SECONDS: Long = 60L
 
         /** 指数退避的初始与封顶值（毫秒）。 */
         const val INITIAL_BACKOFF_MS: Long = 500L

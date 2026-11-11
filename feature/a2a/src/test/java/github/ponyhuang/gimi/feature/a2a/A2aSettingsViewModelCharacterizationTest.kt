@@ -13,6 +13,7 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -305,6 +306,81 @@ class A2aSettingsViewModelCharacterizationTest {
         }
     }
 
+    @Test
+    fun canceledProbeResetsBusyFlagForSaveAndTest() = runTest {
+        for (action in listOf(A2aSettingsAction.SaveEditor, A2aSettingsAction.TestConnection)) {
+            val tester = mockk<RemoteAgentConnectionTester> {
+                coEvery { test(any()) } throws kotlinx.coroutines.CancellationException("canceled")
+            }
+            val vm = viewModel(repository(), tester)
+            val collector = backgroundScope.launch(kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler)) {
+                vm.uiState.collect {}
+            }
+            vm.onAction(A2aSettingsAction.LoadEditor(null))
+            advanceUntilIdle()
+            val draft = requireNotNull(vm.uiState.value.editor).copy(
+                name = "weather", endpointUrl = "https://example.com",
+            )
+            vm.onAction(A2aSettingsAction.EditorChanged(draft))
+            vm.onAction(action)
+            advanceUntilIdle()
+            org.junit.Assert.assertFalse(vm.uiState.value.isTestingConnection)
+            collector.cancel()
+        }
+    }
+
+    @Test
+    fun existingAgentCanBeSavedOfflineAndDropsStaleCard() = runTest {
+        val agent = RemoteAgentConfig(id = "saved", name = "weather", endpointUrl = "https://old.example.com",
+            cardSnapshot = RemoteAgentCardSnapshot(name = "stale"))
+        val repo = repository(listOf(agent))
+        every { repo.agent("saved") } returns agent
+        val tester = tester(RemoteAgentProbeResult(reachable = false))
+        val vm = viewModel(repo, tester)
+        val collector = backgroundScope.launch(kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler)) {
+            vm.uiState.collect {}
+        }
+        vm.onAction(A2aSettingsAction.LoadEditor("saved"))
+        advanceUntilIdle()
+        vm.onAction(A2aSettingsAction.EditorChanged(requireNotNull(vm.uiState.value.editor).copy(
+            endpointUrl = "https://new.example.com",
+        )))
+        vm.onAction(A2aSettingsAction.SaveEditor)
+        advanceUntilIdle()
+        verify { repo.save(match { it.endpointUrl == "https://new.example.com" && it.cardSnapshot == null }) }
+        io.mockk.coVerify(exactly = 0) { tester.test(any()) }
+        collector.cancel()
+    }
+
+    @Test
+    fun invalidAndDuplicateDraftsDoNotProbeOrWrite() = runTest {
+        val agent = RemoteAgentConfig(id = "saved", name = "weather")
+        val repo = repository(listOf(agent))
+        val tester = tester(RemoteAgentProbeResult(reachable = true))
+        val vm = viewModel(repo, tester)
+        val collector = backgroundScope.launch(kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler)) {
+            vm.uiState.collect {}
+        }
+        vm.onAction(A2aSettingsAction.LoadEditor(null))
+        advanceUntilIdle()
+        val valid = requireNotNull(vm.uiState.value.editor).copy(name = "new_agent", endpointUrl = "https://example.com")
+        for ((draft, key) in listOf(
+            valid.copy(name = "user") to "a2a.invalid_name",
+            valid.copy(name = "invalid/name") to "a2a.invalid_name",
+            valid.copy(name = "weather") to "a2a.duplicate_name",
+            valid.copy(endpointUrl = "file:///tmp/agent") to "a2a.invalid_url",
+            valid.copy(bearerToken = "token\nother") to "a2a.invalid_token",
+        )) {
+            vm.onAction(A2aSettingsAction.EditorChanged(draft))
+            vm.onAction(A2aSettingsAction.SaveEditor)
+            advanceUntilIdle()
+            assertEquals(key, vm.uiState.value.connectionError)
+        }
+        verify(exactly = 0) { repo.save(any()) }
+        io.mockk.coVerify(exactly = 0) { tester.test(any()) }
+        collector.cancel()
+    }
+
     private fun viewModel(
         repository: RemoteAgentRepository,
         tester: RemoteAgentConnectionTester = tester(RemoteAgentProbeResult(reachable = true)),
@@ -312,7 +388,7 @@ class A2aSettingsViewModelCharacterizationTest {
         repository = repository,
         runWhenAgentIdle = RunWhenAgentIdleUseCase(FakeAgentRuntimeGate()),
         testConnection = tester,
-    )
+    ).also { it.ioDispatcher = mainDispatcherRule.dispatcher }
 
     private fun tester(result: RemoteAgentProbeResult): RemoteAgentConnectionTester = mockk {
         coEvery { test(any()) } returns result
@@ -321,5 +397,7 @@ class A2aSettingsViewModelCharacterizationTest {
     private fun repository(agents: List<RemoteAgentConfig> = emptyList()): RemoteAgentRepository =
         mockk(relaxed = true) {
             every { observeAgents() } returns MutableStateFlow(agents)
+            every { currentAgents() } returns agents
+            every { storageError } returns MutableStateFlow(false)
         }
 }

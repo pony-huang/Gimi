@@ -25,12 +25,17 @@ internal abstract class V2exTool(
 
     protected suspend fun call(block: suspend () -> Map<String, Any?>): Map<String, Any?> =
         withContext(Dispatchers.IO) {
-            runCatching {
+            try {
                 if (api.token.isBlank()) {
                     throw IllegalStateException("V2EX 插件未配置 Personal Access Token")
                 }
                 block()
-            }.getOrElse { mapOf(ERROR_KEY to (it.message ?: "V2EX API 调用失败")) }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                // 取消必须传播：runCatching 会把它吞成 {error} 结果。
+                throw cancelled
+            } catch (error: Exception) {
+                mapOf(ERROR_KEY to (error.message ?: "V2EX API 调用失败"))
+            }
         }
 
     companion object {
@@ -164,8 +169,9 @@ internal class V2exTokenCreateTool(api: V2exApi) : V2exTool(NAME, DESCRIPTION, a
                     enum = listOf("everything", "regular"),
                 ),
                 "expiration" to Schema(
-                    type = Type.INTEGER,
-                    description = "有效期秒数：2592000（30 天）/ 5184000（60 天）/ 7776000（90 天）/ 15552000（180 天），默认 2592000",
+                    // STRING + 枚举与执行侧解析一致；INTEGER 配字符串枚举是自相矛盾的声明。
+                    type = Type.STRING,
+                    description = "有效期：2592000（30 天）/ 5184000（60 天）/ 7776000（90 天）/ 15552000（180 天），默认 30 天",
                     enum = listOf("2592000", "5184000", "7776000", "15552000"),
                 ),
             ),
@@ -176,12 +182,17 @@ internal class V2exTokenCreateTool(api: V2exApi) : V2exTool(NAME, DESCRIPTION, a
     override suspend fun execute(context: ToolContext, args: Map<String, Any?>): Any =
         call {
             val scope = strArg(args, "scope") ?: throw IllegalStateException("缺少参数 scope")
-            writeResult(api.createToken(scope, longArg(args, "expiration", 2_592_000L)))
+            // expiration 只接受声明过的枚举值，其它输入回退默认 30 天。
+            val raw = (args["expiration"] as? String) ?: args["expiration"]?.toString().orEmpty()
+            val expiration = raw.toLongOrNull()?.takeIf { it in ALLOWED_EXPIRATIONS } ?: DEFAULT_EXPIRATION
+            writeResult(api.createToken(scope, expiration))
         }
 
     companion object {
         const val NAME: String = "v2ex_token_create"
         private const val DESCRIPTION: String = "创建新的 Personal Access Token（最多 10 个；regular scope 不能继续建令牌）。"
+        val ALLOWED_EXPIRATIONS: Set<Long> = setOf(2_592_000L, 5_184_000L, 7_776_000L, 15_552_000L)
+        const val DEFAULT_EXPIRATION: Long = 2_592_000L
     }
 }
 

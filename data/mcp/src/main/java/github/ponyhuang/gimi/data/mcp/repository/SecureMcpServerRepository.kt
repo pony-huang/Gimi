@@ -10,9 +10,13 @@ import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import java.net.URI
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
 @Singleton
@@ -28,6 +32,8 @@ class SecureMcpServerRepository @Inject constructor(
     }
     private val servers = MutableStateFlow(load())
     private val _revision = MutableStateFlow(0L)
+    /** 串行化写路径；配合 Dispatchers.IO 保证加解密与落盘不阻塞主线程。 */
+    private val mutex = Mutex()
 
     override val revision = _revision.asStateFlow()
 
@@ -37,157 +43,166 @@ class SecureMcpServerRepository @Inject constructor(
 
     override fun server(id: String): McpServer? = servers.value.firstOrNull { it.id == id }
 
-    @Synchronized
-    override fun save(server: McpServer) {
-        val updated = servers.value.toMutableList().apply {
-            val index = indexOfFirst { it.id == server.id }
-            if (index < 0) add(server) else set(index, server)
+    override suspend fun save(server: McpServer) = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val updated = servers.value.toMutableList().apply {
+                val index = indexOfFirst { it.id == server.id }
+                if (index < 0) add(server) else set(index, server)
+            }
+            persist(updated)
         }
-        persist(updated)
     }
 
-    @Synchronized
-    override fun delete(id: String) = persist(servers.value.filterNot { it.id == id })
+    override suspend fun delete(id: String) = withContext(Dispatchers.IO) {
+        mutex.withLock { persist(servers.value.filterNot { it.id == id }) }
+    }
 
     /** 接受设置页 JSON 或文档中可直接复制的 curl MCP 配置。 */
-    override fun importConfiguration(content: String): McpImportResult {
-        val portableJson = if (content.trimStart().startsWith("curl", ignoreCase = true)) {
-            curlToPortableJson(content)
-                ?: return McpImportResult(errorCode = McpImportError.INVALID_CURL)
-        } else {
-            content
+    override suspend fun importConfiguration(content: String): McpImportResult {
+        if (!content.trimStart().startsWith("curl", ignoreCase = true)) return importJson(content)
+        return when (val parsed = curlToPortableJson(content)) {
+            is CurlPortableJson.Parsed -> importJson(parsed.portableJson)
+            CurlPortableJson.SseUnsupported -> McpImportResult(errorCode = McpImportError.UNSUPPORTED_SSE)
+            null -> McpImportResult(errorCode = McpImportError.INVALID_CURL)
         }
-        return importJson(portableJson)
     }
 
-    @Synchronized
-    override fun updateAuthorization(serverId: String, authorization: String): Boolean {
-        val normalized = authorization.trim()
-        if (
-            normalized.isBlank() ||
-            normalized.length > MAX_FIELD_CHARACTERS ||
-            '\r' in normalized ||
-            '\n' in normalized ||
-            isCredentialPlaceholder(normalized)
-        ) {
-            return false
-        }
-        val index = servers.value.indexOfFirst { it.id == serverId }
-        if (index < 0) return false
-        val existing = servers.value[index]
-        val retainedHeaders = existing.headers.lineSequence()
-            .map(String::trim)
-            .filter(String::isNotEmpty)
-            .filterNot { line ->
-                line.substringBefore('=', missingDelimiterValue = "")
-                    .trim()
-                    .equals("Authorization", ignoreCase = true)
-            }
-            .toMutableList()
-            .apply { add("Authorization=$normalized") }
-            .joinToString("\n")
-        val updated = servers.value.toMutableList().apply {
-            set(index, existing.copy(bearerToken = "", headers = retainedHeaders))
-        }
-        persist(updated)
-        return true
-    }
-
-    @Synchronized
-    override fun importJson(json: String): McpImportResult {
-        if (json.length > MAX_IMPORT_CHARACTERS) {
-            return McpImportResult(errorCode = McpImportError.CONTENT_TOO_LARGE)
-        }
-        val root = runCatching { JsonParser.parseString(json).asJsonObject }
-            .getOrElse { return McpImportResult(errorCode = McpImportError.INVALID_JSON) }
-        val wrappedSource = root.get("mcpServers")
-        val source = when {
-            wrappedSource == null -> root
-            wrappedSource.isJsonObject -> wrappedSource.asJsonObject
-            else -> return McpImportResult(errorCode = McpImportError.MCP_SERVERS_NOT_OBJECT)
-        }
-        val updatedServers = servers.value.toMutableList()
-        val affectedServerIds = linkedSetOf<String>()
-        val credentialRequiredServerIds = linkedSetOf<String>()
-        var created = 0
-        var updated = 0
-        var skipped = 0
-        source.entrySet().take(MAX_IMPORT_SERVERS).forEach { (name, element) ->
-            val normalizedName = name.trim()
-            if (normalizedName.isEmpty() || normalizedName.length > MAX_FIELD_CHARACTERS) {
-                skipped++
-                return@forEach
-            }
-            val config = element.takeIf { it.isJsonObject }?.asJsonObject
-                ?: run { skipped++; return@forEach }
-            val url = config.string("url")?.trim()
-            if (url.isNullOrBlank() || url.length > MAX_FIELD_CHARACTERS) {
-                skipped++
-                return@forEach
-            }
-            val transport = when (config.string("type")?.lowercase()) {
-                "http", "streamablehttp", "streamable_http" -> McpTransport.STREAMABLE_HTTP
-                null -> McpTransport.STREAMABLE_HTTP
-                else -> null
-            }
-            if (transport == null) {
-                skipped++
-                return@forEach
-            }
-            val headerObject = config.get("headers")
-                ?.takeIf { it.isJsonObject }
-                ?.asJsonObject
-            // 占位认证值只建立“待补凭据”关联，绝不能作为真实 Header 落盘。
-            val credentialRequired = headerObject?.requiresAuthorizationCredential() == true
-            val headers = headerObject?.toHeaderLines().orEmpty()
-            val existingIndex = updatedServers.indexOfFirst { it.name.trim() == normalizedName }
-            if (existingIndex < 0) {
-                McpServer(
-                    name = normalizedName,
-                    endpointUrl = url,
-                    transport = transport,
-                    headers = headers,
-                ).also { server ->
-                    updatedServers += server
-                    affectedServerIds += server.id
-                    if (credentialRequired) credentialRequiredServerIds += server.id
-                    created++
+    override suspend fun updateAuthorization(serverId: String, authorization: String): Boolean =
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                val normalized = authorization.trim()
+                if (
+                    normalized.isBlank() ||
+                    normalized.length > MAX_FIELD_CHARACTERS ||
+                    '\r' in normalized ||
+                    '\n' in normalized ||
+                    isCredentialPlaceholder(normalized)
+                ) {
+                    return@withContext false
                 }
-            } else {
-                val existing = updatedServers[existingIndex]
-                // 重复导入模板时保留已配置的真实认证，避免占位符反向擦除可用凭据。
-                val preservedAuthorizationHeader = if (credentialRequired) {
-                    existing.authorizationHeaderLine()
+                val index = servers.value.indexOfFirst { it.id == serverId }
+                if (index < 0) return@withContext false
+                val existing = servers.value[index]
+                val retainedHeaders = existing.headers.lineSequence()
+                    .map(String::trim)
+                    .filter(String::isNotEmpty)
+                    .filterNot { line ->
+                        line.substringBefore('=', missingDelimiterValue = "")
+                            .trim()
+                            .equals("Authorization", ignoreCase = true)
+                    }
+                    .toMutableList()
+                    .apply { add("Authorization=$normalized") }
+                    .joinToString("\n")
+                val updated = servers.value.toMutableList().apply {
+                    set(index, existing.copy(bearerToken = "", headers = retainedHeaders))
+                }
+                persist(updated)
+                true
+            }
+        }
+
+    override suspend fun importJson(json: String): McpImportResult = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            if (json.length > MAX_IMPORT_CHARACTERS) {
+                return@withContext McpImportResult(errorCode = McpImportError.CONTENT_TOO_LARGE)
+            }
+            val root = runCatching { JsonParser.parseString(json).asJsonObject }
+                .getOrElse { return@withContext McpImportResult(errorCode = McpImportError.INVALID_JSON) }
+            val wrappedSource = root.get("mcpServers")
+            val source = when {
+                wrappedSource == null -> root
+                wrappedSource.isJsonObject -> wrappedSource.asJsonObject
+                else -> return@withContext McpImportResult(errorCode = McpImportError.MCP_SERVERS_NOT_OBJECT)
+            }
+            val updatedServers = servers.value.toMutableList()
+            val affectedServerIds = linkedSetOf<String>()
+            val credentialRequiredServerIds = linkedSetOf<String>()
+            var created = 0
+            var updated = 0
+            var skipped = 0
+            source.entrySet().take(MAX_IMPORT_SERVERS).forEach { (name, element) ->
+                val normalizedName = name.trim()
+                if (normalizedName.isEmpty() || normalizedName.length > MAX_FIELD_CHARACTERS) {
+                    skipped++
+                    return@forEach
+                }
+                val config = element.takeIf { it.isJsonObject }?.asJsonObject
+                    ?: run { skipped++; return@forEach }
+                val url = config.string("url")?.trim()
+                if (url.isNullOrBlank() || url.length > MAX_FIELD_CHARACTERS) {
+                    skipped++
+                    return@forEach
+                }
+                val transport = when (config.string("type")?.lowercase()) {
+                    "http", "streamablehttp", "streamable_http" -> McpTransport.STREAMABLE_HTTP
+                    null -> McpTransport.STREAMABLE_HTTP
+                    else -> null
+                }
+                if (transport == null) {
+                    skipped++
+                    return@forEach
+                }
+                val headerObject = config.get("headers")
+                    ?.takeIf { it.isJsonObject }
+                    ?.asJsonObject
+                // 占位认证值只建立“待补凭据”关联，绝不能作为真实 Header 落盘。
+                val credentialRequired = headerObject?.requiresAuthorizationCredential() == true
+                // 导入 JSON 自带非占位 Authorization 时视为用户显式更换凭据；否则保留已有 token，
+                // 避免重新导入同一模板时把编辑器里配置的 bearerToken 静默清空。
+                val importedRealAuthorization = headerObject?.hasRealAuthorizationHeader() == true
+                val headers = headerObject?.toHeaderLines().orEmpty()
+                val existingIndex = updatedServers.indexOfFirst {
+                    it.name.trim().equals(normalizedName, ignoreCase = true)
+                }
+                if (existingIndex < 0) {
+                    McpServer(
+                        name = normalizedName,
+                        endpointUrl = url,
+                        transport = transport,
+                        headers = headers,
+                    ).also { server ->
+                        updatedServers += server
+                        affectedServerIds += server.id
+                        if (credentialRequired) credentialRequiredServerIds += server.id
+                        created++
+                    }
                 } else {
-                    null
-                }
-                val mergedHeaders = listOfNotNull(
-                    headers.takeIf(String::isNotBlank),
-                    preservedAuthorizationHeader,
-                ).joinToString("\n")
-                updatedServers[existingIndex] = existing.copy(
-                    name = normalizedName,
-                    endpointUrl = url,
-                    transport = transport,
-                    bearerToken = existing.bearerToken.takeIf { credentialRequired }.orEmpty(),
-                    headers = mergedHeaders,
-                )
-                affectedServerIds += existing.id
-                if (credentialRequired && !existing.hasAuthorizationCredential()) {
-                    credentialRequiredServerIds += existing.id
-                }
-                updated++
+                    val existing = updatedServers[existingIndex]
+                    // 重复导入模板时保留已配置的真实认证，避免占位符反向擦除可用凭据。
+                    val preservedAuthorizationHeader = if (credentialRequired) {
+                        existing.authorizationHeaderLine()
+                    } else {
+                        null
+                    }
+                    val mergedHeaders = listOfNotNull(
+                        headers.takeIf(String::isNotBlank),
+                        preservedAuthorizationHeader,
+                    ).joinToString("\n")
+                    updatedServers[existingIndex] = existing.copy(
+                        name = normalizedName,
+                        endpointUrl = url,
+                        transport = transport,
+                        bearerToken = if (importedRealAuthorization) "" else existing.bearerToken,
+                        headers = mergedHeaders,
+                    )
+                    affectedServerIds += existing.id
+                    if (credentialRequired && !existing.hasAuthorizationCredential()) {
+                        credentialRequiredServerIds += existing.id
+                    }
+                    updated++
             }
         }
-        skipped += (source.size() - MAX_IMPORT_SERVERS).coerceAtLeast(0)
-        if (affectedServerIds.isNotEmpty()) persist(updatedServers)
-        return McpImportResult(
-            created = created,
-            updated = updated,
-            skipped = skipped,
-            affectedServerIds = affectedServerIds,
-            credentialRequiredServerIds = credentialRequiredServerIds,
-        )
+            skipped += (source.size() - MAX_IMPORT_SERVERS).coerceAtLeast(0)
+            if (affectedServerIds.isNotEmpty()) persist(updatedServers)
+            McpImportResult(
+                created = created,
+                updated = updated,
+                skipped = skipped,
+                affectedServerIds = affectedServerIds,
+                credentialRequiredServerIds = credentialRequiredServerIds,
+            )
+        }
     }
 
     private fun load(): List<McpServer> = runCatching {
@@ -218,13 +233,23 @@ private fun JsonObject.string(name: String): String? =
 
 private fun JsonObject.toHeaderLines(): String = entrySet()
     .mapNotNull { (name, value) ->
+        // 名称或值含 CR/LF 会伪造出额外 header 行（如注入 Authorization），直接丢弃该条。
+        if ('\n' in name || '\r' in name) return@mapNotNull null
         value.takeIf { it.isJsonPrimitive }
             ?.asString
+            ?.takeUnless { '\n' in it || '\r' in it }
             ?.takeUnless(::isCredentialPlaceholder)
             ?.let { "$name=$it" }
     }
     .joinToString("\n")
     .take(8_192)
+
+/** headers 中是否带有用户显式提供的真实（非占位符）Authorization。 */
+private fun JsonObject.hasRealAuthorizationHeader(): Boolean = entrySet().any { (name, value) ->
+    name.equals("Authorization", ignoreCase = true) &&
+        value.isJsonPrimitive &&
+        !isCredentialPlaceholder(value.asString)
+}
 
 private fun JsonObject.requiresAuthorizationCredential(): Boolean = entrySet().any { (name, value) ->
     name.equals("Authorization", ignoreCase = true) &&
@@ -262,13 +287,23 @@ private fun isCredentialPlaceholder(value: String): Boolean {
         normalized.equals("your_token", ignoreCase = true)
 }
 
-private fun curlToPortableJson(content: String): String? {
+/** curl 配置的解析产物；[Parsed] 携带可继续走 JSON 导入的 portable 配置。 */
+private sealed interface CurlPortableJson {
+    data class Parsed(val portableJson: String) : CurlPortableJson
+    data object SseUnsupported : CurlPortableJson
+}
+
+private fun curlToPortableJson(content: String): CurlPortableJson? {
     // 只做 shell 词法拆分，不执行命令；支持文档中常见的引号和反斜杠续行格式。
     val tokens = shellTokens(content.replace(Regex("\\\\\\s*\\r?\\n"), " "))
     if (tokens.firstOrNull()?.equals("curl", ignoreCase = true) != true) return null
     val url = tokens.firstOrNull { token ->
         token.startsWith("https://", ignoreCase = true) || token.startsWith("http://", ignoreCase = true)
     } ?: return null
+    if (url.trimEnd('/').endsWith("/sse", ignoreCase = true)) {
+        // SSE 传输已移除；给出明确错误而不是让它落到 importJson 里被静默 skip。
+        return CurlPortableJson.SseUnsupported
+    }
     val headers = linkedMapOf<String, String>()
     tokens.forEachIndexed { index, token ->
         val rawHeader = when {
@@ -279,24 +314,21 @@ private fun curlToPortableJson(content: String): String? {
         } ?: return@forEachIndexed
         val name = rawHeader.substringBefore(':', missingDelimiterValue = "").trim()
         val value = rawHeader.substringAfter(':', missingDelimiterValue = "").trim()
-        if (name.isNotBlank() && value.isNotBlank()) headers[name] = value
-    }
-    val transport = if (
-        url.trimEnd('/').endsWith("/sse", ignoreCase = true)
-    ) {
-        "sse"
-    } else {
-        "streamable_http"
+        if (name.isNotBlank() && value.isNotBlank() && '\n' !in name && '\r' !in name && '\n' !in value && '\r' !in value) {
+            headers[name] = value
+        }
     }
     val server = JsonObject().apply {
-        addProperty("type", transport)
+        addProperty("type", "streamable_http")
         addProperty("url", url)
         add("headers", JsonObject().apply { headers.forEach(::addProperty) })
     }
     // JsonObject.toString() 与 Gson().toJson(jsonObject) 等价；树操作为保留 Gson 依赖的唯一用途。
-    return JsonObject().apply {
-        add("mcpServers", JsonObject().apply { add(deriveServerName(url), server) })
-    }.toString()
+    return CurlPortableJson.Parsed(
+        JsonObject().apply {
+            add("mcpServers", JsonObject().apply { add(deriveServerName(url), server) })
+        }.toString(),
+    )
 }
 
 private fun shellTokens(command: String): List<String> {
@@ -325,8 +357,9 @@ private fun shellTokens(command: String): List<String> {
 
 private fun deriveServerName(url: String): String {
     val uri = runCatching { URI(url) }.getOrNull()
-    val hostParts = uri?.host.orEmpty().split('.')
-        .dropLast(1)
+    // 多级域名去掉 TLD；单标签 host（如 localhost）保留原样，避免整体被删空。
+    val hostLabels = uri?.host.orEmpty().split('.')
+    val hostParts = (if (hostLabels.size > 1) hostLabels.dropLast(1) else hostLabels)
         .filterNot { it in setOf("www", "api", "developer", "mcp") }
         .takeLast(2)
     val pathParts = uri?.path.orEmpty().split('/')

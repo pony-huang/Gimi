@@ -55,6 +55,8 @@ internal class NeteaseApi(
         val params = linkedMapOf(
             "appId" to credentials.appId,
             "signType" to "RSA_SHA256",
+            // 秒级时间戳即平台侧的重放窗口；签名参数集由开放平台契约固定（CLI 参考实现一致），
+            // 不能自加 nonce——服务端 canonical 不含未知字段会导致验签失败。
             "timestamp" to clock().toString(),
             "device" to requestDevice.toString(),
             "bizContent" to biz.toString(),
@@ -123,6 +125,14 @@ internal class NeteaseApi(
                                 else -> NeteaseNetworkFailure.Connection
                             }),
                         )
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (failure: RuntimeException) {
+                        // 平台连接状态机可能抛 IllegalStateException 等 RuntimeException
+                        // （如响应读取中连接被关闭）；统一按网络失败收口，不让插件崩溃。
+                        if (continuation.isActive) {
+                            continuation.resumeWithException(NeteaseNetworkException(NeteaseNetworkFailure.Connection))
+                        }
                     } finally {
                         connection.disconnect()
                     }

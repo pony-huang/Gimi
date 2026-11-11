@@ -1,7 +1,8 @@
+import java.util.zip.ZipFile
+
 plugins {
     id("gimi.android.library")
     id("gimi.android.hilt")
-    alias(libs.plugins.kotlin.kapt)
     alias(libs.plugins.kotlin.serialization)
 }
 
@@ -22,8 +23,26 @@ android {
             all {
                 val objectBoxTestWorkingDir = rootProject.file("temp/objectbox-tests")
                 it.workingDir = objectBoxTestWorkingDir
+                // ObjectBox 首次使用会把 native 库解压到工作目录（NativeLibraryLoader 按
+                // exists/length/lastModified 判断是否重写）。fork 间共享同一 workingDir，
+                // 并行时多 JVM 同时写 DLL 会撞 Windows 文件锁，因此由 Gradle 侧预解压：
+                // fork 启动时文件已存在且大小一致，loader 直接 load 不再写入。
                 it.doFirst {
                     objectBoxTestWorkingDir.mkdirs()
+                    val windowsJar = it.classpath
+                        .firstOrNull { file -> file.name.startsWith("objectbox-windows") }
+                        ?: return@doFirst
+                    ZipFile(windowsJar).use { zip ->
+                        val entry = zip.getEntry("objectbox-jni-windows-x64.dll") ?: return@use
+                        val dll = objectBoxTestWorkingDir.resolve("objectbox-jni-windows-x64.dll")
+                        if (!dll.exists() || dll.length() != entry.size) {
+                            zip.getInputStream(entry).use { input ->
+                                dll.outputStream().use { output -> input.copyTo(output) }
+                            }
+                            // 与 loader 的 URLConnection 时间戳对齐，避免 fork 内被判为过期重写。
+                            dll.setLastModified(entry.time)
+                        }
+                    }
                 }
             }
         }
@@ -31,6 +50,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":domain:voice"))
     implementation(project(":domain:a2ui"))
     implementation(project(":domain:skills"))
     implementation(project(":domain:sandbox"))
@@ -48,6 +68,9 @@ dependencies {
     implementation(project(":domain:plugin"))
     implementation(project(":plugin-api"))
     implementation(project(":domain:workfiles"))
+    // Realtime 语音模型与语音上传需要共享传输内核（VoiceWsKernel）与音频格式契约。
+    implementation(project(":core:network"))
+    implementation(project(":core:audio"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity)
@@ -68,6 +91,8 @@ dependencies {
     implementation(libs.protobuf.java.util)
     implementation(libs.google.adk.kotlin.integrations.openai)
     implementation(libs.okhttp)
+    // OpenAI Realtime 协议沿用语音链路惯例：Gson JsonObject 手工构建/解析。
+    implementation(libs.gson)
     implementation(libs.objectbox.android)
     implementation(libs.objectbox.kotlin)
     // mediapipe 传递的 protobuf-javalite 与 a2a-java spec-grpc 需要的完整版 protobuf-java
@@ -80,23 +105,13 @@ dependencies {
     implementation(libs.ktor.client.okhttp)
     implementation(libs.kotlinx.coroutines.core)
     ksp(libs.google.adk.kotlin.processor)
-    kapt(libs.objectbox.processor)
-
-    // 仅 debug 变体携带 ADK Development WebServer（Ktor/Netty 服务端 + Dev UI 静态资源），
-    // 供 PC 浏览器经局域网观察 agent 会话；release 构建不含任何 webserver 类。
-    // webserver 把 opentelemetry-sdk 声明为 runtime scope，补 debug 编译期依赖以消除
-    // ApiServerSpanExporter 超类型不可见的告警。
-    debugImplementation(libs.google.adk.kotlin.webserver) {
-        exclude(group = "io.modelcontextprotocol.sdk")
-    }
-    debugImplementation(libs.opentelemetry.sdk)
+    // 6.0.0-beta3 的 objectbox-processor 自带 KSP SPI，可不经 io.objectbox 插件直接挂 KSP
+    // （插件的 PrepareTask 持有 Project 引用，与配置缓存不兼容，故不启用插件）。
+    ksp(libs.objectbox.processor)
 
     testImplementation(project(":core:testing"))
     // 验证目录实现与 ADK 适配的边界；运行时只依赖 domain 契约。
     testImplementation(project(":data:modelcatalog"))
-    testImplementation(libs.google.adk.kotlin.webserver) {
-        exclude(group = "io.modelcontextprotocol.sdk")
-    }
     testImplementation(libs.junit)
     testImplementation(libs.org.json)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -110,15 +125,14 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
 }
 
-kapt {
-    arguments {
-        arg(
-            "objectbox.modelPath",
-            "$projectDir/objectbox-models/default.json",
-        )
-        arg(
-            "objectbox.myObjectBoxPackage",
-            "github.ponyhuang.gimi.data.agent.tools.search",
-        )
-    }
+// ObjectBox 代码生成参数改由 KSP 传入。
+ksp {
+    arg(
+        "objectbox.modelPath",
+        "$projectDir/objectbox-models/default.json",
+    )
+    arg(
+        "objectbox.myObjectBoxPackage",
+        "github.ponyhuang.gimi.data.agent.tools.search",
+    )
 }

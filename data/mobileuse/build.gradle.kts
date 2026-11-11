@@ -16,7 +16,6 @@ dependencies {
     implementation(project(":domain:mobileuse"))
     implementation(libs.shizuku.api)
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.mlkit.text.recognition.chinese)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

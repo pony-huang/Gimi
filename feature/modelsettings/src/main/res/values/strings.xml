@@ -48,29 +48,40 @@
     <!-- 模型种类分组名：默认模型页、服务详情模型列表与添加自定义模型共用，命名以默认模型页为准 -->
     <string name="modelsettings_model_kind_chat">LLM</string>
     <string name="modelsettings_model_kind_stt">STT</string>
+    <string name="modelsettings_model_kind_asr">ASR</string>
     <string name="modelsettings_model_kind_tts">TTS</string>
+    <string name="modelsettings_model_kind_realtime">Realtime 语音</string>
+
+    <!-- 能力名称：模型选择器按能力分组展示，以及"该模型未接入 XX"的说明共用 -->
+    <string name="modelsettings_capability_stt">语音转写</string>
+    <string name="modelsettings_capability_asr">音频理解</string>
+    <string name="modelsettings_capability_tts">语音合成</string>
+    <string name="modelsettings_model_capability_not_supported">该模型未接入%1$s</string>
 
     <!-- DefaultModelSettingsScreen -->
 <string name="modelsettings_defaults_assistant_title">默认模型</string>
-    <string name="modelsettings_defaults_assistant_subtitle">创建新助手时使用的模型</string>
     <string name="modelsettings_defaults_quick_title">快速模型</string>
-    <string name="modelsettings_defaults_quick_subtitle">用于自动生成会话标题</string>
     <string name="modelsettings_defaults_stt_title">语音识别模型</string>
     <string name="modelsettings_defaults_stt_subtitle">用于语音输入</string>
     <string name="modelsettings_defaults_tts_title">语音合成模型</string>
     <string name="modelsettings_defaults_tts_subtitle">用于朗读助手回复</string>
     <string name="modelsettings_defaults_voice_title">播放音色</string>
+    <string name="modelsettings_defaults_section_realtime">Realtime</string>
+    <string name="modelsettings_defaults_realtime_model_title">Realtime 模型</string>
+    <string name="modelsettings_defaults_realtime_voice_title">Realtime 音色</string>
+    <string name="modelsettings_defaults_realtime_model_none">不使用 Realtime</string>
 
     <string name="modelsettings_dialog_pick_assistant">选择默认模型</string>
     <string name="modelsettings_dialog_pick_quick">选择快速模型</string>
     <string name="modelsettings_dialog_pick_stt">选择语音识别模型</string>
     <string name="modelsettings_dialog_pick_tts">选择语音合成模型</string>
     <string name="modelsettings_dialog_pick_voice">选择播放音色</string>
-    <string name="modelsettings_dialog_no_voices">暂无可用音色</string>
+    <string name="modelsettings_dialog_pick_realtime_model">选择 Realtime 模型</string>
+    <string name="modelsettings_dialog_pick_realtime_voice">选择 Realtime 音色</string>
     <string name="modelsettings_dialog_no_models">暂无可用模型，请先在模型服务中启用至少一个模型。</string>
 
     <!-- 路由标题（由 :app 注入 SettingsScaffold 使用） -->
-    <string name="modelsettings_list_title">API 接入</string>
+    <string name="modelsettings_list_title">LLM 模型</string>
     <string name="modelsettings_defaults_screen_title">默认模型</string>
     <string name="modelsettings_detail_title">服务详情</string>
 
@@ -96,7 +107,7 @@
     <string name="modelsettings_extensions_summary">配置厂商工具在聊天中的使用入口</string>
     <string name="modelsettings_api_protocol_anthropic_label">Anthropic Messages</string>
     <string name="modelsettings_saving">正在保存…</string>
-    <string name="modelsettings_confirm_models">确认选择 · %1$d 个模型</string>
+    <string name="modelsettings_confirm_models">应用选择（%1$d）</string>
     <string name="modelsettings_save_changes">保存修改</string>
     <string name="modelsettings_new_service_hint">配置将在添加服务后生效</string>
     <string name="modelsettings_paused_hint">已暂停 · 连接、模型和工具偏好已保留</string>
@@ -104,19 +115,13 @@
     <string name="modelsettings_manage_models">管理模型</string>
     <string name="modelsettings_no_selected_models">尚未添加模型</string>
     <string name="modelsettings_selected_model_count">已选择 %1$d 个模型</string>
-    <string name="modelsettings_manage_service">管理服务</string>
-    <string name="modelsettings_pause_service">暂停服务</string>
-    <string name="modelsettings_resume_service">恢复服务</string>
-    <string name="modelsettings_save_before_manage">请先保存或放弃修改，再暂停或恢复服务。</string>
-    <string name="modelsettings_delete_service">删除服务</string>
-    <string name="modelsettings_delete_summary">删除此服务的密钥、连接配置和模型选择。未保存的修改也会丢弃，可稍后重新添加。</string>
     <string name="modelsettings_unsaved_title">保存修改？</string>
     <string name="modelsettings_unsaved_summary">当前修改尚未保存，是否保存后退出？</string>
     <string name="modelsettings_discard">放弃修改</string>
     <string name="modelsettings_continue_editing">继续编辑</string>
     <string name="modelsettings_saved">服务配置已保存</string>
-    <string name="modelsettings_deleted">服务已删除</string>
     <string name="modelsettings_invalid_connection">请填写 API 密钥和有效的 HTTP 或 HTTPS 接口地址。</string>
+    <string name="modelsettings_invalid_connection_speech">请填写 API 密钥和有效的 wss 接口地址。</string>
     <string name="modelsettings_write_failed">操作失败，原配置未改变。请重试。</string>
     <string name="modelsettings_no_remote_models">未获取到模型，可保留已有选择或手动添加。</string>
     <string name="modelsettings_model_selection_hint">勾选需要使用的模型，保存服务后生效。返回会取消本次模型勾选。</string>
@@ -144,7 +149,7 @@
     <string name="modelsettings_section_files">文件</string>
     <string name="modelsettings_section_tools">工具</string>
     <string name="modelsettings_provider_tools_summary">在聊天工具面板中选择使用</string>
-    <string name="modelsettings_model_selection_count">共 %1$d 个 · 已选 %2$d 个</string>
+    <string name="modelsettings_model_selection_count">%1$d 个模型 · 已选 %2$d 个</string>
     <string name="modelsettings_model_type_count">%1$s · %2$d</string>
     <string name="modelsettings_select_all">全选</string>
     <string name="modelsettings_clear_selection">清空</string>
@@ -152,5 +157,30 @@
     <string name="modelsettings_service_model_count">%1$d 个模型</string>
     <string name="modelsettings_service_enabled_label">启用 %1$s</string>
     <string name="modelsettings_search_model_or_service">搜索模型或服务</string>
-    <string name="modelsettings_search_voice">搜索音色</string>
+    <!-- Qwen 语音服务（WebSocket 接入），与聊天服务的 HTTP 接入配置区分。 -->
+    <string name="modelsettings_speech_endpoint_label">接入地址</string>
+    <string name="modelsettings_speech_workspace_label">业务空间 ID（可选）</string>
+    <string name="modelsettings_speech_workspace_hint">留空使用默认业务空间；填写后请求走该业务空间的专属域名，ID 见百炼控制台业务空间页</string>
+    <string name="modelsettings_speech_endpoint_fixed_hint">接入地址由官方固定：%1$s</string>
+    <string name="modelsettings_notice_connection_failed_auth">密钥无效或无权限（401/403），请检查 API 密钥。</string>
+    <string name="modelsettings_notice_connection_failed_network">无法连接语音服务，请检查网络或接入地址。</string>
+    <string name="modelsettings_notice_connection_unsupported">该服务不支持连接测试。</string>
+    <string name="modelsettings_service_model_count_speech">语音服务 · %1$d 个模型</string>
+    <string name="modelsettings_speech_list_title">语音模型</string>
+    <string name="modelsettings_select_group">全选本组</string>
+    <string name="modelsettings_selection_kind_llm">对话模型 LLM</string>
+    <string name="modelsettings_selection_kind_stt">语音识别 STT</string>
+    <string name="modelsettings_selection_kind_asr">音频理解 ASR</string>
+    <string name="modelsettings_selection_kind_tts">语音合成 TTS</string>
+    <string name="modelsettings_selection_empty_hint">未选择模型，应用后将清空此服务的模型；保存服务后生效。</string>
+    <string name="modelsettings_selection_draft_hint">应用后返回服务设置，保存服务后生效。</string>
+    <string name="modelsettings_qwen_audio_name">Qwen Audio %1$s · %2$s</string>
+    <string name="modelsettings_model_flash">Flash</string>
+    <string name="modelsettings_model_plus">Plus</string>
+    <string name="modelsettings_model_short_speech">短语音识别</string>
+    <string name="modelsettings_model_streaming">流式识别</string>
+    <string name="modelsettings_model_description">%1$s · %2$s</string>
+
+    <!-- 音色选择器文案已迁至 :core:designsystem（voice_picker_* / voice_gender_* / voice_group_*），供语音页与设置页共用。 -->
+
 </resources>

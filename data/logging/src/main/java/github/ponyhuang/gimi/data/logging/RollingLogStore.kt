@@ -3,6 +3,8 @@ package github.ponyhuang.gimi.data.logging
 import github.ponyhuang.gimi.domain.logging.LogSnapshot
 import java.io.File
 import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.ArrayDeque
 
 /** 单进程串行日志存储：分片轮转、逐条 24 小时过期、总字节数上限和有界查看。 */
@@ -17,7 +19,7 @@ internal class RollingLogStore(
     private var sequence = 0L
 
     init {
-        require(chunkBytes >= 1024 && maxBytes >= chunkBytes && previewBytes >= chunkBytes)
+        require(chunkBytes in 1024..maxBytes && previewBytes >= chunkBytes)
     }
 
     @Synchronized
@@ -64,7 +66,8 @@ internal class RollingLogStore(
             } else if (retained.size != original.size) {
                 val temporary = File(directory, "${file.name}.tmp")
                 temporary.writeText(retained.joinToString("\n", postfix = "\n"), Charsets.UTF_8)
-                if (!temporary.renameTo(file)) throw IOException("Cannot replace log chunk")
+                // 显式替换目标，避免 renameTo 在 Windows 上无法覆盖已有分片。
+                Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
             }
         }
         val files = chunks()

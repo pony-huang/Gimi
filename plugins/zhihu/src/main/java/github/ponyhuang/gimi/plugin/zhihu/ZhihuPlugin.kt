@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.plugin.zhihu
 
+import android.content.Context
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.Toolset
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
@@ -45,6 +46,12 @@ class ZhihuPlugin(
     @Volatile private var accessSecret: String = ""
 
     private val api = ZhihuApi()
+
+    override fun onAttach(context: Context) {
+        // 上传目录白名单 = 宿主应用私有目录（内部 + 外部 files）；
+        // LLM 传来的 filePath 只能落在这两个根下，阻断任意本地文件上传回传。
+        api.uploadRoots = listOfNotNull(context.filesDir, context.getExternalFilesDir(null))
+    }
 
     override fun configure(values: Map<String, String>) {
         accessSecret = values[KEY_ACCESS_SECRET].orEmpty()

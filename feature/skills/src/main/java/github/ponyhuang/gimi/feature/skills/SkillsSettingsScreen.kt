@@ -34,7 +34,7 @@ import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @Composable
 fun SkillsSettingsScreen(
@@ -207,7 +207,7 @@ fun SkillsSettingsScreen(
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun SkillsSettingsScreenEmptyPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         SkillsSettingsScreen(
             state = SkillsSettingsUiState(),
             onAction = {},
@@ -219,7 +219,7 @@ private fun SkillsSettingsScreenEmptyPreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun SkillsSettingsScreenWithSkillsPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         SkillsSettingsScreen(
             state = SkillsSettingsUiState(
                 skills = listOf(

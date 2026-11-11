@@ -11,9 +11,7 @@ import github.ponyhuang.gimi.domain.conversation.model.ChatTurnStatus
 import github.ponyhuang.gimi.domain.conversation.usecase.PrepareChatSendUseCase
 import github.ponyhuang.gimi.domain.conversation.usecase.ChatHistorySnapshot
 import github.ponyhuang.gimi.domain.conversation.usecase.ValidateChatAttachmentsUseCase
-import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.appupdate.repository.AppUpdateRepository
-import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.NoAvailableAssistantModelException
@@ -23,6 +21,7 @@ import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.MessageRole
 import github.ponyhuang.gimi.core.notifications.AppNotificationManager
 import github.ponyhuang.gimi.domain.conversation.model.TextPart
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.a2a.model.SkippedRemoteAgent
 import github.ponyhuang.gimi.domain.a2a.repository.RemoteAgentSkipReporter
@@ -35,10 +34,10 @@ import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import github.ponyhuang.gimi.domain.mcp.repository.McpSkipReporter
 import github.ponyhuang.gimi.domain.memory.model.MemoryOperation
 import github.ponyhuang.gimi.domain.memory.repository.MemoryRuntimeStatus
-import github.ponyhuang.gimi.domain.speech.repository.SpeechRecognitionRepository
-import github.ponyhuang.gimi.domain.speech.repository.SpeechPlaybackRepository
-import github.ponyhuang.gimi.domain.speech.repository.SpeechSettingsRepository
-import github.ponyhuang.gimi.domain.speech.usecase.markdownToSpeechText
+import github.ponyhuang.gimi.domain.voice.repository.SpeechRecognitionRepository
+import github.ponyhuang.gimi.domain.voice.repository.SpeechPlaybackRepository
+import github.ponyhuang.gimi.domain.voice.repository.SpeechSettingsRepository
+import github.ponyhuang.gimi.domain.voice.usecase.markdownToSpeechText
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import kotlinx.coroutines.currentCoroutineContext
@@ -79,7 +78,6 @@ class ChatViewModel @Inject constructor(
     private val repository: ConversationRepository,
     private val sessionResolver: ConversationSessionResolver,
     private val modelServices: ModelCatalogRepository,
-    private val appearanceRepository: AppearanceRepository,
     private val toolApproval: ToolApprovalRepository,
     private val toolAuthorization: ToolAuthorizationRepository,
     private val mcpRepository: McpRepository,
@@ -235,8 +233,6 @@ class ChatViewModel @Inject constructor(
             )
             is ChatAction.LoadOfficialToolFunctions -> toolConfigurationCoordinator.loadFunctions(action.toolId)
             ChatAction.ClearToolConfigurationError -> toolConfigurationCoordinator.clearError()
-            is ChatAction.SetThemeMode ->
-                appearanceRepository.setThemeMode(action.mode)
         }
     }
 
@@ -312,11 +308,6 @@ class ChatViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            appearanceRepository.themeMode.collect { mode ->
-                _uiState.update { it.copy(themeMode = mode) }
-            }
-        }
-        viewModelScope.launch {
             toolApproval.fullAccess.collect { enabled ->
                 _uiState.update { it.copy(fullAccess = enabled) }
             }
@@ -347,8 +338,8 @@ class ChatViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            speechPlaybackController.errors.collect { message ->
-                emitNotice(ChatNotice.Message(message))
+            speechPlaybackController.errors.collect { failure ->
+                emitNotice(ChatNotice.VoiceFailed(failure))
             }
         }
         viewModelScope.launch {
@@ -897,7 +888,7 @@ private fun List<LLMModelSetting>.isUsableChatSelection(selection: ModelSelectio
     if (!service.isEnabled || service.apiKey.isBlank()) return false
     val group = service.groups.firstOrNull { it.id == selection.groupId } ?: return false
     val model = group.models.firstOrNull { it.id == selection.modelId } ?: return false
-    return !model.isStt && !model.isTts
+    return ModelCapability.LLM in model.capabilities
 }
 
 /** 最近一轮若处于失败态，则可作为当前进程内“重试”的可恢复轮。 */

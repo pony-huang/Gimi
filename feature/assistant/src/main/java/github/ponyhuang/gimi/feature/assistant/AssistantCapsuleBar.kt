@@ -57,7 +57,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionPhase
 import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionState
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import kotlinx.coroutines.delay
 
 /** 胶囊态：底部居中悬浮胶囊 + 可选的提示文案（配置缺失/会话忙/链路错误）。 */
@@ -354,7 +354,7 @@ private fun AssistantLevelBars(
 @Preview(showBackground = true)
 @Composable
 private fun AssistantCapsuleOverlayIdlePreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         AssistantCapsuleOverlay(
             state = AssistantSessionState(phase = AssistantSessionPhase.PREPARING),
             onDismiss = {},
@@ -371,7 +371,7 @@ private fun AssistantCapsuleOverlayIdlePreview() {
 @Preview(showBackground = true)
 @Composable
 private fun AssistantCapsuleOverlayMissingConfigPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         AssistantCapsuleOverlay(
             state = AssistantSessionState(
                 phase = AssistantSessionPhase.MISSING_CONFIG,
@@ -390,7 +390,7 @@ private fun AssistantCapsuleOverlayMissingConfigPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun AssistantCapsuleBarIdlePreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         AssistantCapsuleBar(
             listening = false,
             transcribing = false,
@@ -409,7 +409,7 @@ private fun AssistantCapsuleBarIdlePreview() {
 @Preview(showBackground = true)
 @Composable
 private fun AssistantCapsuleBarListeningPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         AssistantCapsuleBar(
             listening = true,
             transcribing = false,
@@ -428,7 +428,7 @@ private fun AssistantCapsuleBarListeningPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun AssistantCapsuleBarRecordingPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         AssistantCapsuleBar(
             listening = false,
             transcribing = false,
@@ -447,7 +447,7 @@ private fun AssistantCapsuleBarRecordingPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun AssistantCapsuleBarTranscribingPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         AssistantCapsuleBar(
             listening = false,
             transcribing = true,
@@ -466,7 +466,7 @@ private fun AssistantCapsuleBarTranscribingPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun AssistantCapsuleBarDockedPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         AssistantCapsuleBar(
             listening = false,
             transcribing = false,

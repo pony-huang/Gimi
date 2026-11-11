@@ -44,7 +44,7 @@ data class PermissionSettingsRequest(
     val destination: PermissionSettingsDestination,
 )
 
-/** 权限管理页面状态；overlayGranted 表示系统允许在其他应用上方显示窗口。 */
+/** 权限页面状态；overlayGranted 表示系统允许在其他应用上方显示窗口。 */
 data class PermissionSettingsUiState(
     val groups: List<PermissionGroupUiModel> = emptyList(),
     val granted: Set<AppPermission> = emptySet(),

@@ -40,7 +40,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import kotlin.math.max
 
 /** Current zoom and pan values for the full-screen image preview. */
@@ -210,7 +210,7 @@ private const val MaxPreviewScale = 5f
 @Preview(showBackground = true)
 @Composable
 private fun ZoomableImagePreviewDialogPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ZoomableImagePreviewDialog(
             imageKey = "preview-bitmap",
             contentDescription = "预览图片",
@@ -223,7 +223,7 @@ private fun ZoomableImagePreviewDialogPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun ZoomableCoilImagePreviewDialogPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ZoomableCoilImagePreviewDialog(
             model = "https://example.com/sample-image.png",
             imageKey = "https://example.com/sample-image.png",

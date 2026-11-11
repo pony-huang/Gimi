@@ -6,17 +6,18 @@ import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Test
+import kotlinx.coroutines.test.runTest
 
 class SecureMcpServerRepositoryCharacterizationTest {
     @Test
-    fun removedSseEntriesAreNotReinterpretedAsHttp() {
+    fun removedSseEntriesAreNotReinterpretedAsHttp() = runTest {
         val storage = FakeStorage("""[{"id":"old","transport":"SSE","endpointUrl":"https://example.com/sse"},{"id":"http","transport":"STREAMABLE_HTTP","endpointUrl":"https://example.com/mcp"}]""")
         val repository = SecureMcpServerRepository(storage)
         assertEquals(listOf("http"), repository.currentServers().map { it.id })
     }
 
     @Test
-    fun importCurlCreatesHttpServerAndMarksPlaceholderAuthorizationAsPending() {
+    fun importCurlCreatesHttpServerAndMarksPlaceholderAuthorizationAsPending() = runTest {
         val repository = SecureMcpServerRepository(FakeStorage())
 
         val result = repository.importConfiguration(
@@ -40,7 +41,7 @@ class SecureMcpServerRepositoryCharacterizationTest {
     }
 
     @Test
-    fun updateAuthorizationReplacesOnlyAuthorizationAndPreservesOtherHeaders() {
+    fun updateAuthorizationReplacesOnlyAuthorizationAndPreservesOtherHeaders() = runTest {
         val repository = SecureMcpServerRepository(FakeStorage())
         val imported = repository.importConfiguration(
             """
@@ -61,7 +62,7 @@ class SecureMcpServerRepositoryCharacterizationTest {
     }
 
     @Test
-    fun reimportingCredentialTemplateDoesNotEraseExistingAuthorization() {
+    fun reimportingCredentialTemplateDoesNotEraseExistingAuthorization() = runTest {
         val repository = SecureMcpServerRepository(FakeStorage())
         repository.save(
             McpServer(
@@ -89,7 +90,7 @@ class SecureMcpServerRepositoryCharacterizationTest {
     }
 
     @Test
-    fun importPortableJsonUpdatesSameNameWithoutCreatingDuplicate() {
+    fun importPortableJsonUpdatesSameNameWithoutCreatingDuplicate() = runTest {
         val storage = FakeStorage()
         val repository = SecureMcpServerRepository(storage)
         val original = McpServer(
@@ -137,7 +138,7 @@ class SecureMcpServerRepositoryCharacterizationTest {
     }
 
     @Test
-    fun importPortableJsonAcceptsHttpAndSkipsSseAndStdio() {
+    fun importPortableJsonAcceptsHttpAndSkipsSseAndStdio() = runTest {
         val storage = FakeStorage()
         val repository = SecureMcpServerRepository(storage)
 
@@ -172,7 +173,7 @@ class SecureMcpServerRepositoryCharacterizationTest {
     }
 
     @Test
-    fun importPortableJsonDefaultsToHttpWhenTypeIsMissing() {
+    fun importPortableJsonDefaultsToHttpWhenTypeIsMissing() = runTest {
         val storage = FakeStorage()
         val repository = SecureMcpServerRepository(storage)
 
@@ -197,7 +198,7 @@ class SecureMcpServerRepositoryCharacterizationTest {
     }
 
     @Test
-    fun importPortableJsonPreservesMem0TokenAuthorization() {
+    fun importPortableJsonPreservesMem0TokenAuthorization() = runTest {
         val repository = SecureMcpServerRepository(FakeStorage())
 
         val result = repository.importJson(
@@ -221,13 +222,76 @@ class SecureMcpServerRepositoryCharacterizationTest {
     }
 
     @Test
-    fun invalidJsonReturnsLocalizedErrorCodeWithoutChangingServers() {
+    fun invalidJsonReturnsLocalizedErrorCodeWithoutChangingServers() = runTest {
         val repository = SecureMcpServerRepository(FakeStorage())
 
         val result = repository.importJson("not-json")
 
         assertEquals(McpImportError.INVALID_JSON, result.errorCode)
         assertEquals(emptyList<Any>(), repository.currentServers())
+    }
+
+    @Test
+    fun importJsonWithoutAuthorizationPreservesExistingBearerToken() = runTest {
+        val repository = SecureMcpServerRepository(FakeStorage())
+        repository.save(
+            McpServer(
+                id = "stable-id",
+                name = "github",
+                endpointUrl = "https://old.example.com/mcp",
+                bearerToken = "keep-me",
+            ),
+        )
+
+        val result = repository.importJson(
+            """
+            {
+              "mcpServers": {
+                "github": { "url": "https://new.example.com/mcp" }
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(1, result.updated)
+        val server = repository.currentServers().single()
+        assertEquals("keep-me", server.bearerToken)
+        assertEquals("https://new.example.com/mcp", server.endpointUrl)
+    }
+
+    @Test
+    fun importCurlSseEndpointReturnsUnsupportedSseWithoutImporting() = runTest {
+        val repository = SecureMcpServerRepository(FakeStorage())
+
+        val result = repository.importConfiguration("curl 'https://example.com/sse'")
+
+        assertEquals(McpImportError.UNSUPPORTED_SSE, result.errorCode)
+        assertEquals(0, repository.currentServers().size)
+    }
+
+    @Test
+    fun importJsonDropsHeaderNamesOrValuesContainingNewlines() = runTest {
+        val repository = SecureMcpServerRepository(FakeStorage())
+
+        repository.importJson(
+            """
+            {
+              "mcpServers": {
+                "evil": {
+                  "url": "https://example.com/mcp",
+                  "headers": {
+                    "X-A": "a
+Authorization=Bearer smuggled",
+                    "X
+-B": "clean"
+                  }
+                }
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals("", repository.currentServers().single().headers)
     }
 
     private class FakeStorage(

@@ -44,7 +44,7 @@ import github.ponyhuang.gimi.domain.modelcatalog.repository.AgentModelConfigurat
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeProvider
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import github.ponyhuang.gimi.domain.toolauthorization.repository.LocalToolDefinitionSource
-import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
+import github.ponyhuang.gimi.domain.mobileuse.MobileUseController
 import io.objectbox.Box
 import io.objectbox.BoxStore
 import org.a2aproject.sdk.client.http.A2AHttpClient
@@ -178,7 +178,7 @@ object AgentModule {
         contributionRegistry: AgentContributionRegistry,
         pluginRuntimeProvider: PluginRuntimeProvider<AgentPlugin>,
         toolAccessRepository: ToolAccessRepository,
-        mobileUseRepository: MobileUseRepository,
+        mobileUseController: MobileUseController,
     ): AgentChatRunner = AgentChatRunner(
         factory = { spec ->
             modelServices.awaitReady()
@@ -203,7 +203,7 @@ object AgentModule {
             }
         },
         toolAccessRepository = toolAccessRepository,
-        mobileUseRepository = mobileUseRepository,
+        mobileUseController = mobileUseController,
     )
 
 }

@@ -29,6 +29,8 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * 插件列表：合并已安装插件与订阅目录，负责启停、安装、卸载与刷新。
@@ -48,6 +50,10 @@ class PluginSettingsViewModel @Inject constructor(
     private val catalog = MutableStateFlow<CatalogState>(CatalogState.Loading)
     private val local = MutableStateFlow(LocalState())
     private var installJob: Job? = null
+
+    // 目录加载互斥 + 请求代号：并发触发时只让最新一次请求写结果，慢的旧请求不得覆盖。
+    private val catalogMutex = Mutex()
+    private var catalogGeneration = 0L
 
     private val mutableEffects = MutableSharedFlow<PluginSettingsEffect>(
         replay = 0,
@@ -103,27 +109,41 @@ class PluginSettingsViewModel @Inject constructor(
     }
 
     private suspend fun loadCatalog(force: Boolean) {
-        if (catalog.value !is CatalogState.Ready) {
-            catalog.value = CatalogState.Loading
+        val generation = ++catalogGeneration
+        catalogMutex.withLock {
+            // 已被更新的加载请求取代：本结果作废，避免乱序后写覆盖新目录。
+            if (generation != catalogGeneration) return
+            if (catalog.value !is CatalogState.Ready) {
+                catalog.value = CatalogState.Loading
+            }
+            val load = try {
+                catalogRepository.load(force = force)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                PluginCatalogLoad(
+                    entries = emptyList(),
+                    source = PluginCatalogSource.BUNDLED,
+                    error = true,
+                )
+            }
+            catalog.value = CatalogState.Ready(load)
         }
-        val load = try {
-            catalogRepository.load(force = force)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            PluginCatalogLoad(
-                entries = emptyList(),
-                source = PluginCatalogSource.BUNDLED,
-                error = true,
-            )
-        }
-        catalog.value = CatalogState.Ready(load)
     }
 
     private fun refresh() {
-        if (local.value.isRefreshing) return
+        // 在 update 的原子重算里完成互斥判定与置位，消除「检查在协程外、置位在协程内」的连点窗口。
+        var claimed = false
+        local.update { state ->
+            if (state.isRefreshing) {
+                state
+            } else {
+                claimed = true
+                state.copy(isRefreshing = true)
+            }
+        }
+        if (!claimed) return
         viewModelScope.launch {
-            local.update { it.copy(isRefreshing = true) }
             refreshInstallPermission()
             try {
                 val knownIds = repository.plugins.value.mapTo(mutableSetOf()) { it.id }
@@ -165,31 +185,39 @@ class PluginSettingsViewModel @Inject constructor(
             return
         }
         installJob = viewModelScope.launch {
-            setInstallState(entryKey, PluginInstallUiState.Resolving)
-            val result = installPlugin(entry, installed) { progress ->
-                setInstallState(
-                    entryKey,
-                    PluginInstallUiState.Downloading(progress.coerceIn(0f, 1f)),
-                )
-            }
-            when (result) {
-                is PluginInstallResult.Ready -> {
-                    val contentUri = installEnvironment.apkContentUri(result.apkPath)
-                    if (contentUri == null) {
-                        setInstallState(
-                            entryKey,
-                            PluginInstallUiState.Failed(PluginInstallFailure.STORAGE),
-                        )
-                    } else {
-                        setInstallState(entryKey, PluginInstallUiState.Idle)
-                        mutableEffects.emit(PluginSettingsEffect.LaunchInstaller(contentUri))
-                    }
+            // 安装用例抛出未映射异常时也必须把条目状态复位，不允许卡在 Resolving/Downloading。
+            try {
+                setInstallState(entryKey, PluginInstallUiState.Resolving)
+                val result = installPlugin(entry, installed) { progress ->
+                    setInstallState(
+                        entryKey,
+                        PluginInstallUiState.Downloading(progress.coerceIn(0f, 1f)),
+                    )
                 }
+                when (result) {
+                    is PluginInstallResult.Ready -> {
+                        val contentUri = installEnvironment.apkContentUri(result.apkPath)
+                        if (contentUri == null) {
+                            setInstallState(
+                                entryKey,
+                                PluginInstallUiState.Failed(PluginInstallFailure.STORAGE),
+                            )
+                        } else {
+                            setInstallState(entryKey, PluginInstallUiState.Idle)
+                            mutableEffects.emit(PluginSettingsEffect.LaunchInstaller(contentUri))
+                        }
+                    }
 
-                is PluginInstallResult.Failed -> setInstallState(
-                    entryKey,
-                    PluginInstallUiState.Failed(result.failure),
-                )
+                    is PluginInstallResult.Failed -> setInstallState(
+                        entryKey,
+                        PluginInstallUiState.Failed(result.failure),
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                setInstallState(entryKey, PluginInstallUiState.Idle)
+                throw cancelled
+            } catch (error: Exception) {
+                setInstallState(entryKey, PluginInstallUiState.Failed(PluginInstallFailure.UNKNOWN))
             }
         }
     }

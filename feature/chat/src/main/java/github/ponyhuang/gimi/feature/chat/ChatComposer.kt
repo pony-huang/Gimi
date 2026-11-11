@@ -9,12 +9,12 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.PickMultipleVisualMedia
 import github.ponyhuang.gimi.core.audio.VoiceAudioRecorder
+import github.ponyhuang.gimi.domain.voice.repository.toVoiceFailure
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -125,8 +125,6 @@ public fun ChatComposer(
     onExpandedChange: (Boolean) -> Unit = { },
     modelSelectorContent: @Composable () -> Unit = { },
     addToChatState: ChatAddToChatState = ChatAddToChatState(),
-    onReasoningEffortChange: (ReasoningEffort) -> Unit = { _ -> },
-    onThinkingEnabledChange: (Boolean) -> Unit = {},
     onMcpServerEnabledChange: (String, Boolean) -> Unit = { _, _ -> },
     onFullAccessChange: (Boolean) -> Unit = { _ -> },
     onOfficialToolOpened: (String) -> Unit = { _ -> },
@@ -147,6 +145,7 @@ public fun ChatComposer(
     val currentTranscriptionMode by rememberUpdatedState(voiceTranscriptionMode)
     var isSubmitting by remember { mutableStateOf(false) }
     var showAttachmentOptions by rememberSaveable { mutableStateOf(false) }
+    var showPermissionMode by rememberSaveable { mutableStateOf(false) }
     var pendingCameraUri by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCameraPath by rememberSaveable { mutableStateOf<String?>(null) }
     var voiceInputState: VoiceInputUiState by remember { mutableStateOf(VoiceInputUiState.Idle) }
@@ -158,7 +157,6 @@ public fun ChatComposer(
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val voiceNoAudioMessage = stringResource(R.string.chat_voice_no_audio_captured)
-    val voiceTranscriptionFailedMessage = stringResource(R.string.chat_voice_transcription_failed)
     val voiceRecordingFailedMessage = stringResource(R.string.chat_voice_recording_failed)
     val voiceNoTextMessage = stringResource(R.string.chat_voice_no_text_recognized)
     val mixedAttachmentMessage = stringResource(R.string.chat_attachment_mixed_types)
@@ -284,7 +282,14 @@ public fun ChatComposer(
                 voiceErrorMessage = if (error is EmptyVoiceTranscriptException) {
                     voiceNoTextMessage
                 } else {
-                    error.message ?: voiceTranscriptionFailedMessage
+                    // 按失败分类给出本地化文案：上游的原始错误（可能含厂商返回体）
+                    // 不适合直接展示给用户。
+                    context.getString(
+                        voiceFailureMessageRes(
+                            error.toVoiceFailure().kind,
+                            R.string.chat_voice_transcription_failed,
+                        ),
+                    )
                 }
                 onVoiceInputError(error)
             }
@@ -412,10 +417,12 @@ public fun ChatComposer(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("chat_composer_surface"),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(28.dp),
             color = chatCapsuleColor(),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+            border = chatCapsuleBorder(),
             tonalElevation = 0.dp,
+            // 仅保留轻微悬浮感，避免底边形成厚重阴影。
+            shadowElevation = 0.5.dp,
         ) {
             Column {
                 headerContent()
@@ -461,6 +468,11 @@ public fun ChatComposer(
                                     onExpandedChange = onExpandedChange,
                                     onAttachmentsClick = { if (!isSubmitting) showAttachmentOptions = true },
                                     modelSelectorContent = modelSelectorContent,
+                                    onPermissionModeClick = { if (!isSubmitting) showPermissionMode = true },
+                                    // 权限图标直接打开模式抽屉；
+                                    // 临时内容请求没有会话配置，不显示 chip。
+                                    showToolChip = addToChatState.configuration != null,
+                                    fullAccess = addToChatState.fullAccess,
                                     attachmentsEnabled = attachmentsEnabled,
                                 ),
                             )
@@ -469,6 +481,14 @@ public fun ChatComposer(
                 }
             }
         }
+    }
+
+    if (showPermissionMode) {
+        ChatPermissionModeSheet(
+            fullAccess = addToChatState.fullAccess,
+            onFullAccessChange = onFullAccessChange,
+            onDismiss = { showPermissionMode = false },
+        )
     }
 
     if (showAttachmentOptions && attachmentsEnabled) {
@@ -506,10 +526,7 @@ public fun ChatComposer(
             imagesEnabled = attachmentCapabilities.supportsImages,
             filesEnabled = attachmentCapabilities.supportsAudio ||
                 attachmentCapabilities.supportsDocuments,
-            onReasoningEffortChange = onReasoningEffortChange,
-            onThinkingEnabledChange = onThinkingEnabledChange,
             onMcpServerEnabledChange = onMcpServerEnabledChange,
-            onFullAccessChange = onFullAccessChange,
             onOfficialToolOpened = onOfficialToolOpened,
             onOfficialToolFunctionEnabledChange = onOfficialToolFunctionEnabledChange,
             onOfficialToolFunctionsRetry = onOfficialToolFunctionsRetry,

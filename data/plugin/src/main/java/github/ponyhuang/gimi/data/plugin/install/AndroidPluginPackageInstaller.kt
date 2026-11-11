@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.data.plugin.install
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import github.ponyhuang.gimi.core.apk.ApkInstaller
 import github.ponyhuang.gimi.core.network.HttpFileDownloadException
 import github.ponyhuang.gimi.core.network.HttpFileDownloader
 import github.ponyhuang.gimi.core.storage.StorageRegistry
@@ -22,14 +23,15 @@ import kotlinx.coroutines.withContext
  * 插件 APK 下载与校验实现。
  *
  * 安全边界：
- * - 只接受 HTTPS 与已知大小上限的资产；
- * - 下载后再次校验文件大小与 SHA-256（若提供）；
+ * - 只接受 HTTPS 与已知大小上限的资产，且必须携带 SHA-256（无可比对的完整性基线时拒绝安装）；
+ * - 下载后再次校验文件大小与 SHA-256，并与宿主应用比对签名，非同签名 APK 一律拒绝；
  * - 任一校验失败立即删除半成品，避免安装器拿到未校验文件。
  */
 @Singleton
 class AndroidPluginPackageInstaller @Inject constructor(
     @ApplicationContext private val context: Context,
     private val fileDownloader: HttpFileDownloader,
+    private val apkInstaller: ApkInstaller,
     private val storageRegistry: StorageRegistry,
 ) : PluginPackageInstaller {
 
@@ -41,6 +43,10 @@ class AndroidPluginPackageInstaller @Inject constructor(
     ): String = withContext(Dispatchers.IO) {
         if (!asset.downloadUrl.startsWith("https://", ignoreCase = true)) {
             throw PluginPackageInstallException(PluginInstallFailure.NETWORK)
+        }
+        // 无摘要则无法确认下载内容与发布方一致，直接拒绝（安装目录里的旧文件不受影响）。
+        if (asset.sha256.isNullOrBlank()) {
+            throw PluginPackageInstallException(PluginInstallFailure.CHECKSUM_MISMATCH)
         }
         if (asset.sizeBytes > MAX_APK_BYTES) {
             throw PluginPackageInstallException(PluginInstallFailure.PACKAGE_TOO_LARGE)
@@ -100,6 +106,11 @@ class AndroidPluginPackageInstaller @Inject constructor(
         if (archive == null || archive.packageName != packageName ||
             (versionCode != null && archive.longVersionCode != versionCode)
         ) {
+            destination.delete()
+            throw PluginPackageInstallException(PluginInstallFailure.INVALID_PACKAGE)
+        }
+        // 签名必须与宿主一致（fail-closed）：防止同名包被第三方重签名后经系统安装器替换。
+        if (!apkInstaller.hasSameSignature(destination)) {
             destination.delete()
             throw PluginPackageInstallException(PluginInstallFailure.INVALID_PACKAGE)
         }

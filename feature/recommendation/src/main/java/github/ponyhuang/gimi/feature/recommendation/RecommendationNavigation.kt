@@ -9,6 +9,10 @@ sealed interface RecommendationDestination : NavKey {
     /** Recommendation settings destination. */
     @Serializable
     data object Settings : RecommendationDestination
+
+    /** 「推荐更新」独立页：承载推荐开关、更新间隔与手动更新。 */
+    @Serializable
+    data object UpdateSettings : RecommendationDestination
 }
 
 /** Resolves recommendation-owned destinations and delegates cross-feature navigation. */
@@ -16,10 +20,23 @@ sealed interface RecommendationDestination : NavKey {
 fun RecommendationEntryProvider(
     destination: NavKey,
     onBack: () -> Unit,
+    navigate: (NavKey) -> Unit,
     onOpenFastModelSettings: () -> Unit,
+    onOpenSimpleChatPromptSettings: () -> Unit = {},
+    onOpenMobileUse: () -> Unit = {},
 ): Boolean = when (destination) {
     RecommendationDestination.Settings -> {
         RecommendationSettingsRoute(
+            onBack = onBack,
+            onOpenSimpleChatPromptSettings = onOpenSimpleChatPromptSettings,
+            onOpenMobileUse = onOpenMobileUse,
+            onOpenRecommendationUpdate = { navigate(RecommendationDestination.UpdateSettings) },
+        )
+        true
+    }
+
+    RecommendationDestination.UpdateSettings -> {
+        RecommendationUpdateSettingsRoute(
             onBack = onBack,
             onOpenFastModelSettings = onOpenFastModelSettings,
         )

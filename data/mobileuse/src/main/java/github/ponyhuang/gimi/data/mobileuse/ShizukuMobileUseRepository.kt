@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.data.mobileuse
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.IBinder
@@ -17,7 +18,12 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseAvailability
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
+import github.ponyhuang.gimi.domain.mobileuse.MobileUseController
+import github.ponyhuang.gimi.domain.mobileuse.MobileApp
+import github.ponyhuang.gimi.domain.mobileuse.MobileKey
+import github.ponyhuang.gimi.domain.mobileuse.MobileScreenCoordinates
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseResult
+import github.ponyhuang.gimi.domain.mobileuse.MobileShellResult
 import github.ponyhuang.gimi.domain.mobileuse.MobileBounds
 import github.ponyhuang.gimi.domain.mobileuse.MobileObservation
 import github.ponyhuang.gimi.domain.mobileuse.MobileDisplaySession
@@ -38,6 +44,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import rikka.shizuku.Shizuku
@@ -47,9 +54,8 @@ import kotlin.time.Duration.Companion.milliseconds
 @Singleton
 class ShizukuMobileUseRepository @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val textRecognizer: MobileScreenshotTextRecognizer,
     private val preferences: MobileUsePreferences,
-) : MobileUseRepository, MobileDisplayPreviewGateway {
+) : MobileUseRepository, MobileUseController, MobileDisplayPreviewGateway {
     override val enabled: StateFlow<Boolean> = preferences.enabled
     override val smallWindowEnabled: StateFlow<Boolean> = preferences.smallWindow
     private val sessions = MobileDisplaySessions()
@@ -60,38 +66,28 @@ class ShizukuMobileUseRepository @Inject constructor(
     private val args by lazy {
         Shizuku.UserServiceArgs(
             ComponentName(context.packageName, ShellMobileUseService::class.java.name),
-        ).tag("gimi.mobileuse.shell").version(5).daemon(false).processNameSuffix("mobileuse")
+        ).tag("gimi.mobileuse.shell").version(11).daemon(false).processNameSuffix("mobileuse")
     }
     private val guard = MobileObservationGuard()
+    // 连续 text_focus_unavailable 次数；仅在互斥锁内变更。到 2 时确定性硬停，不依赖模型自觉。
+    @Volatile private var consecutiveTextFocusUnavailable = 0
     @Volatile private var physicalSessionId: String? = null
     @Volatile private var displayId: Int? = null
     @Volatile private var service: IMobileUseService? = null
     @Volatile private var connection: ServiceConnection? = null
 
     init {
+        // 本循环只做断连探测：UserService 可能在 Shizuku 主进程退出后继续存活，
+        // 不能只依赖它的断连回调；几何刷新已移除，尺寸只在建屏和显式旋转时更新，
+        // 不能让预览或异常远端尺寸改写坐标基准。
         scope.launch {
             while (true) {
                 delay(400)
                 val current = displaySession.value ?: continue
-                // UserService 可能在 Shizuku 主进程退出后继续存活，不能只依赖它的断连回调。
                 if (!Shizuku.pingBinder()) {
                     mutex.withLock {
                         if (displaySession.value?.id == current.id && !Shizuku.pingBinder()) closeLocked()
                     }
-                    continue
-                }
-                val remote = service ?: continue
-                try {
-                    inputMutex.withLock {
-                        val geometry = remote.geometry(current.displayId)
-                        sessions.update(current.id, geometry[0], geometry[1])
-                    }
-                } catch (_: DeadObjectException) {
-                    if (service === remote) mutex.withLock { if (service === remote) closeLocked() }
-                } catch (_: RemoteException) {
-                    // 暂时不可读不发布旧几何；下一次刷新或断连回调处理。
-                } catch (_: RuntimeException) {
-                    // 不影响 AI 与人工输入通道的生命周期。
                 }
             }
         }
@@ -137,122 +133,229 @@ class ShizukuMobileUseRepository @Inject constructor(
 
     override fun textInputAvailable(): Boolean = MobileTextAccessibilityService.current() != null
 
-    override suspend fun observe(owner: String): MobileUseResult = perform(owner) { remote, id, delivery ->
-        observeResult(remote, id, owner, delivery, "observed", "Display observed.")
+    override suspend fun takeScreenshot(owner: String): MobileUseResult = perform(owner) { remote, id, delivery ->
+        observeResult(remote, id, owner, delivery, "observed", "Screen observed.")
     }
 
-    override suspend fun launch(owner: String, packageName: String): MobileUseResult =
+    override suspend fun openApp(owner: String, appName: String): MobileUseResult =
         perform(owner, action = true) { remote, id, delivery ->
-            val launcher = context.packageManager.getLaunchIntentForPackage(packageName)?.component
-                ?: return@perform invalid("app_unavailable", "No launchable activity for package $packageName.")
-            attempt(delivery) { remote.launch(launcher.flattenToString(), id); true }
-            displaySession.value?.let { current ->
-                val label = context.packageManager.getApplicationInfo(packageName, 0).loadLabel(context.packageManager).toString()
-                sessions.update(current.id, current.width, current.height, label)
+            val apps = launchableApps()
+            val requested = appName.trim()
+            if (requested.isEmpty()) return@perform invalid("invalid_argument", "app_name must not be blank.")
+            val candidates = apps.filter { it.packageName == requested }.ifEmpty {
+                apps.filter { it.name.equals(requested, ignoreCase = true) }
             }
-            observeResult(remote, id, owner, delivery, "launched", "App launched; inspect the observation.")
-        }
-
-    override suspend fun click(owner: String, observationId: String, elementId: String): MobileUseResult =
-        onObserved(owner, observationId, elementId = elementId, coordinateBounds = { screen ->
-            screen.elements.firstOrNull { it.id == elementId }?.bounds
-        }) { remote, id, screen, delivery ->
-            val element = screen.elements.firstOrNull { it.id == elementId }
-                ?: return@onObserved invalid("invalid_argument", "Unknown elementId in this observation.")
-            val accepted = when {
-                element.source == "ocr" && "tap" in element.actions ->
-                    attempt(delivery) {
-                        remote.tap(id, element.bounds.centerX, element.bounds.centerY); true
-                    }
-                "click" in element.actions -> {
-                    val target = screen.native.targets[elementId]
-                        ?: return@onObserved invalid("stale_observation", "Node no longer available; observe again.")
-                    val accessibility = MobileTextAccessibilityService.current()
-                        ?: return@onObserved invalid("accessibility_required", "Accessibility service disconnected.")
-                    attempt(delivery) {
-                        accessibility.performNodeAction(id, screen.frame.width, screen.frame.height, target, "click")
-                    }
+            if (candidates.size != 1) return@perform MobileUseResult(
+                if (candidates.isEmpty()) "app_unavailable" else "ambiguous_app",
+                "Use list_apps and supply an exact name or package name; ambiguous names are not opened.",
+                apps = candidates,
+            )
+            val app = candidates.single()
+            val launcher = context.packageManager.getLaunchIntentForPackage(app.packageName)?.component
+                ?: return@perform invalid("app_unavailable", "No launchable activity for ${app.packageName}.")
+            var launchResult = MobileAppLaunchPolicy.START_REJECTED
+            val accepted = inputMutex.withLock {
+                attempt(delivery) {
+                    launchResult = remote.launch(launcher.flattenToString(), id)
+                    launchResult == MobileAppLaunchPolicy.STARTED
                 }
-                else -> return@onObserved invalid("unsupported_action", "Element does not support click.")
             }
-            observeResult(remote, id, owner, delivery, if (accepted) "clicked" else "action_rejected",
-                if (accepted) "Action sent once. OCR targets use a text-box center, not a verified button."
-                else "Node action rejected; observe again before choosing another action.")
+            if (!accepted) return@perform invalid(
+                when (launchResult) {
+                    MobileAppLaunchPolicy.MAIN_SCREEN_BUSY -> "app_in_use_on_main"
+                    MobileAppLaunchPolicy.OTHER_DISPLAY_BUSY -> "app_in_use_on_other_display"
+                    MobileAppLaunchPolicy.INSPECTION_UNAVAILABLE -> "app_state_unavailable"
+                    else -> "app_launch_rejected"
+                }, "App was not launched. Main-screen and other-display tasks are left with their current owner.",
+            )
+            displaySession.value?.let { current -> sessions.update(current.id, current.width, current.height, app.name) }
+            // 换了应用等于换了屏幕，上一屏的输入连败不再累计。
+            consecutiveTextFocusUnavailable = 0
+            observeResult(remote, id, owner, delivery, "launched", "App launched; inspect the screenshot.")
         }
 
-    override suspend fun setText(owner: String, observationId: String, elementId: String, text: String): MobileUseResult =
-        onObserved(owner, observationId, elementId = elementId) { remote, id, screen, delivery ->
-            val target = screen.native.targets[elementId]?.takeIf { "set_text" in it.element.actions }
-                ?: return@onObserved invalid("text_target_unavailable", "Element does not support native text replacement.")
-            val accessibility = MobileTextAccessibilityService.current()
-                ?: return@onObserved invalid("accessibility_required", "Accessibility service disconnected.")
-            val accepted = attempt(delivery) {
-                accessibility.performNodeAction(id, screen.frame.width, screen.frame.height, target, "set_text", text)
+    override suspend fun listApps(owner: String): MobileUseResult = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            executionRejection(owner)?.let { return@withLock it }
+            try {
+                MobileUseResult("apps_listed", "Launchable apps on this device.", apps = launchableApps())
+            } catch (_: RuntimeException) {
+                invalid("app_query_failed", "Unable to read launchable apps.")
             }
-            observeResult(remote, id, owner, delivery, if (accepted) "text_set" else "action_rejected",
-                if (accepted) "Text replaced." else "Text replacement rejected; no automatic action retry.")
         }
-
-    override suspend fun tap(owner: String, observationId: String, x: Int, y: Int): MobileUseResult =
-        onObserved(owner, observationId, coordinateBounds = { tapBounds(x, y) }) { remote, id, screen, delivery ->
-            if (!inside(screen.frame, x, y)) return@onObserved invalid("invalid_argument", "Point outside screenshot.")
-            attempt(delivery) { remote.tap(id, x, y); true }
-            observeResult(remote, id, owner, delivery, "tapped", "Tap sent once.")
-        }
-
-    override suspend fun tapRelative(owner: String, observationId: String, xPermille: Int, yPermille: Int): MobileUseResult =
-        onObserved(owner, observationId, coordinateBounds = { screen ->
-            if (xPermille !in 0..1000 || yPermille !in 0..1000) null else {
-                val geometry = MobileDisplayGeometry(screen.frame.width, screen.frame.height, 1)
-                tapBounds(geometry.xAtPermille(xPermille), geometry.yAtPermille(yPermille))
-            }
-        }) { remote, id, screen, delivery ->
-            if (xPermille !in 0..1000 || yPermille !in 0..1000) {
-                return@onObserved invalid("invalid_argument", "Relative coordinates must be 0..1000.")
-            }
-            val geometry = MobileDisplayGeometry(screen.frame.width, screen.frame.height, 1)
-            attempt(delivery) {
-                remote.tap(id, geometry.xAtPermille(xPermille), geometry.yAtPermille(yPermille)); true
-            }
-            observeResult(remote, id, owner, delivery, "tapped", "Relative tap sent once.")
-        }
-
-    override suspend fun swipe(
-        owner: String, observationId: String, x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Int,
-    ): MobileUseResult = onObserved(owner, observationId, coordinateBounds = { tapBounds(x1, y1) }, swipe = true) { remote, id, screen, delivery ->
-        if (!inside(screen.frame, x1, y1) || !inside(screen.frame, x2, y2) || durationMs !in 100..5000) {
-            return@onObserved invalid("invalid_argument", "Invalid swipe coordinates or duration.")
-        }
-        attempt(delivery) { remote.swipe(id, x1, y1, x2, y2, durationMs); true }
-        observeResult(remote, id, owner, delivery, "swiped", "Swipe sent once.")
     }
 
-    override suspend fun back(owner: String, observationId: String): MobileUseResult =
-        onObserved(owner, observationId, navigation = true) { remote, id, _, delivery ->
-            attempt(delivery) { remote.back(id); true }
-            observeResult(remote, id, owner, delivery, "back", "Back sent once.")
+    override suspend fun wait(owner: String, seconds: Int): MobileUseResult {
+        mutex.withLock { executionRejection(owner) }?.let { return it }
+        if (seconds !in 1..60) return invalid("invalid_argument", "seconds must be 1..60.")
+        delay(seconds * 1_000L)
+        return mutex.withLock {
+            // 醒来后除归属/占用复查外，还要求显示会话仍存活（与 perform 的守卫一致），
+            // 避免用户在等待期间关闭副屏后 Agent 仍按 waited 继续发动作。
+            executionRejection(owner) ?: run {
+                if (physicalSessionId != null && displaySession.value == null) {
+                    invalid("session_closed", "Background app is closing.")
+                } else {
+                    MobileUseResult("waited", "Waited ${seconds}s; take_screenshot to inspect progress.")
+                }
+            }
+        }
+    }
+
+    override suspend fun click(owner: String, x: Int, y: Int): MobileUseResult =
+        coordinateAction(owner, x, y) { remote, id, px, py, _, delivery ->
+            val accepted = inputMutex.withLock { attempt(delivery) { remote.tap(id, px, py) } }
+            observeResult(remote, id, owner, delivery, if (accepted) "clicked" else "action_rejected", "Click attempted once.")
         }
 
-    override suspend fun typeText(owner: String, observationId: String, x: Int, y: Int, text: String): MobileUseResult =
-        onObserved(owner, observationId, coordinateBounds = { tapBounds(x, y) }) { remote, id, screen, delivery ->
-            if (!inside(screen.frame, x, y)) return@onObserved invalid("invalid_argument", "Point outside screenshot.")
-            val accessibility = MobileTextAccessibilityService.current()
-                ?: return@onObserved invalid("accessibility_required",
-                    "Enable Gimi Text Input in Accessibility settings.")
-            fun replace() = attempt(delivery) {
-                accessibility.replaceText(id, screen.frame.width, screen.frame.height, x, y, text)
+    override suspend fun dragAndDrop(
+        owner: String, startX: Int, startY: Int, endX: Int, endY: Int, holdMs: Int,
+    ): MobileUseResult = coordinateAction(owner, startX, startY, swipe = holdMs == 0) { remote, id, px, py, screen, delivery ->
+        if (endX !in 0..999 || endY !in 0..999 || holdMs !in 0..5_000) {
+            return@coordinateAction invalid("invalid_argument", "Coordinates must be 0..999; hold_ms must be 0..5000.")
+        }
+        val accepted = inputMutex.withLock {
+            attempt(delivery) {
+                remote.gesture(id, px, py, MobileScreenCoordinates.pixel(endX, screen.frame.width),
+                    MobileScreenCoordinates.pixel(endY, screen.frame.height), holdMs, 450)
             }
-            var replaced = replace()
-            if (!replaced) {
-                // 只在明确拒绝写入时允许一次获焦；异常时结果未知，不能继续补发动作。
-                attempt(delivery) { remote.tap(id, x, y); true }
-                delay(200)
-                replaced = replace()
+        }
+        observeResult(remote, id, owner, delivery, if (accepted) "dragged" else "action_rejected", "Gesture attempted once.")
+    }
+
+    override suspend fun longPress(owner: String, x: Int, y: Int, seconds: Int): MobileUseResult =
+        coordinateAction(owner, x, y) { remote, id, px, py, _, delivery ->
+            if (seconds !in 1..5) return@coordinateAction invalid("invalid_argument", "seconds must be 1..5.")
+            val accepted = inputMutex.withLock { attempt(delivery) { remote.gesture(id, px, py, px, py, seconds * 1_000, 0) } }
+            observeResult(remote, id, owner, delivery, if (accepted) "long_pressed" else "action_rejected", "Long press attempted once.")
+        }
+
+    override suspend fun goBack(owner: String): MobileUseResult = pressKey(owner, MobileKey.BACK)
+
+    override suspend fun runShell(owner: String, command: String): MobileUseResult =
+        perform(owner, action = true, allowCreate = false) { remote, id, delivery ->
+            if (command.isBlank() || command.length > 4_000 || '\u0000' in command) {
+                return@perform invalid("invalid_argument", "command must contain 1..4000 characters without NUL.")
+            }
+            // input 默认写主屏且对非 ASCII 载荷抛 NPE：定向与校验必须在命令进入 shell 前完成。
+            val prepared = prepareShellInput(command, id) ?: return@perform invalid(
+                "invalid_argument",
+                "input text accepts ASCII only and cannot enter Chinese: use mobile_type for non-ASCII text, or type a short ASCII prefix and tap the app's own suggestion.",
+            )
+            var shell: MobileShellResult? = null
+            inputMutex.withLock {
+                attempt(delivery) {
+                    val payload = remote.runShell(id, prepared)
+                    shell = MobileShellResult(
+                        if (payload.containsKey("exitCode")) payload.getInt("exitCode") else null,
+                        payload.getString("output").orEmpty(), payload.getBoolean("timedOut"),
+                        payload.getBoolean("outputTruncated"),
+                    )
+                    // 命令非零退出或超时也可能已改变界面，不能当作未投递。
+                    true
+                }
+            }
+            val outcome = checkNotNull(shell)
+            val status = when {
+                outcome.timedOut -> "shell_timeout"
+                outcome.exitCode == 0 -> "shell_completed"
+                else -> "shell_failed"
+            }
+            // 命令结果不能因随后截图失败而丢失，否则模型可能重复执行有副作用的命令。
+            val observed = try {
+                observeResult(remote, id, owner, delivery, status, "Shell command attempted once; inspect output and screen before continuing.")
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (_: RemoteException) {
+                MobileUseResult(status, "Shell returned; screenshot unavailable. Do not automatically repeat the command.")
+            } catch (_: RuntimeException) {
+                MobileUseResult(status, "Shell returned; screenshot unavailable. Do not automatically repeat the command.")
+            }
+            observed.copy(shellResult = outcome)
+        }
+
+    /** 匹配以 input 开头的命令；input 的显示参数必须紧跟在 input 之后，不能落在子命令后面。 */
+    private val shellInputStart = Regex("""^\s*input\b""")
+    private val shellInputWithDisplay = Regex("""^\s*input\s+(?:-d|--display)\b""")
+    private val shellInputText = Regex("""^\s*input(?:\s+(?:-d|--display)\s+\S+)?\s+text\s+(.+)$""", RegexOption.DOT_MATCHES_ALL)
+
+    /**
+     * input 命令不带显示参数时默认作用于主屏：自动补上受控副屏的 -d，避免静默写错屏幕。
+     * input text 的非 ASCII 载荷会让平台命令抛 NPE，必须提前拒绝并指路 mobile_type；返回 null 表示拒绝。
+     */
+    private fun prepareShellInput(command: String, displayId: Int): String? {
+        val payload = shellInputText.find(command)?.groupValues?.get(1)
+        if (payload != null && payload.any { it.code !in 0x20..0x7E }) return null
+        return when {
+            shellInputWithDisplay.containsMatchIn(command) -> command
+            // 替换串不带尾随空格：原命令 input 后的空白原样保留，避免拼出双空格。
+            shellInputStart.containsMatchIn(command) -> shellInputStart.replaceFirst(command, "input -d $displayId")
+            else -> command
+        }
+    }
+
+    override suspend fun pressKey(owner: String, key: MobileKey): MobileUseResult =
+        onObserved(owner, navigation = key == MobileKey.BACK) { remote, id, _, delivery ->
+            val accepted = inputMutex.withLock { attempt(delivery) { remote.pressKey(id, key.name) } }
+            observeResult(remote, id, owner, delivery, if (accepted) "key_pressed" else "action_rejected", "${key.name} attempted once.")
+        }
+
+    override suspend fun type(owner: String, text: String, pressEnter: Boolean): MobileUseResult =
+        onObserved(owner, textInput = true) { remote, id, screen, delivery ->
+            // 走到这里说明焦点复核已通过，连败计数属于旧屏幕，作废。
+            consecutiveTextFocusUnavailable = 0
+            val target = checkNotNull(screen.native.focusedTextTarget())
+            val accessibility = MobileTextAccessibilityService.current()
+                ?: return@onObserved invalid("accessibility_required", "Enable Gimi Text Input in Accessibility settings.")
+            var outcome = MobileTextInputOutcome.REJECTED
+            var enterAccepted: Boolean? = null
+            inputMutex.withLock {
+                attempt(delivery) {
+                    outcome = if (accessibility.requiresPaste(id, target)) {
+                        accessibility.pasteText(id, text, { remote.preparePaste(id, text) }, { remote.restoreClipboard() }, target)
+                    } else accessibility.insertText(id, text, target)
+                    outcome != MobileTextInputOutcome.REJECTED
+                }
+                // 只有文本和光标均明确成功才发送 Enter；失败或结果未知时绝不补发提交。
+                if (outcome == MobileTextInputOutcome.INSERTED && pressEnter) {
+                    enterAccepted = attempt(delivery) { remote.pressKey(id, MobileKey.ENTER.name) }
+                }
             }
             observeResult(remote, id, owner, delivery,
-                if (replaced) "text_set" else "text_target_unavailable",
-                if (replaced) "Text replaced." else "Focus tap sent, but no editable node accepted text.")
+                when (outcome) {
+                    MobileTextInputOutcome.INSERTED if enterAccepted == false -> "text_typed_enter_rejected"
+                    MobileTextInputOutcome.INSERTED -> "text_typed"
+                    MobileTextInputOutcome.CURSOR_UNAVAILABLE -> "text_inserted_cursor_unavailable"
+                    MobileTextInputOutcome.REJECTED -> "text_target_unavailable"
+                    MobileTextInputOutcome.UNCONFIRMED -> "text_paste_unconfirmed"
+                },
+                when (outcome) {
+                    MobileTextInputOutcome.INSERTED if enterAccepted == false ->
+                        "Text inserted, but Enter was rejected; inspect before continuing and do not repeat the text."
+                    MobileTextInputOutcome.INSERTED -> "Text inserted at the focused selection."
+                    MobileTextInputOutcome.CURSOR_UNAVAILABLE -> "Text inserted but cursor restoration failed; Enter was not sent. Do not repeat text."
+                    MobileTextInputOutcome.REJECTED -> "No confirmed focused editable target accepted text; no tap or retry was sent."
+                    MobileTextInputOutcome.UNCONFIRMED -> "Paste was sent once but text could not be confirmed; Enter was not sent. Inspect and do not repeat text."
+                })
         }
+
+    private suspend fun coordinateAction(
+        owner: String, x: Int, y: Int, swipe: Boolean = false,
+        operation: suspend (IMobileUseService, Int, Int, Int, MobileObservedScreen, MobileActionDelivery) -> MobileUseResult,
+    ): MobileUseResult = onObserved(owner, coordinateBounds = { screen ->
+        if (x !in 0..999 || y !in 0..999) null else tapBounds(
+            MobileScreenCoordinates.pixel(x, screen.frame.width), MobileScreenCoordinates.pixel(y, screen.frame.height))
+    }, swipe = swipe) { remote, id, screen, delivery ->
+        if (x !in 0..999 || y !in 0..999) return@onObserved invalid("invalid_argument", "Coordinates must be 0..999.")
+        operation(remote, id, MobileScreenCoordinates.pixel(x, screen.frame.width),
+            MobileScreenCoordinates.pixel(y, screen.frame.height), screen, delivery)
+    }
+
+    private fun launchableApps(): List<MobileApp> = context.packageManager.queryIntentActivities(
+        Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), PackageManager.ResolveInfoFlags.of(0),
+    ).map { info -> MobileApp(info.loadLabel(context.packageManager).toString(), info.activityInfo.packageName) }
+        .distinctBy(MobileApp::packageName)
+        .sortedWith(compareBy<MobileApp, String>(String.CASE_INSENSITIVE_ORDER) { it.name }.thenBy { it.packageName })
 
     override suspend fun finishExecution(owner: String): MobileUseResult = withContext(Dispatchers.IO) {
         mutex.withLock {
@@ -260,8 +363,9 @@ class ShizukuMobileUseRepository @Inject constructor(
                 return@withLock invalid("not_active", "This execution no longer owns the display.")
             }
             guard.reset()
+            consecutiveTextFocusUnavailable = 0
             MobileUseResult("execution_finished", "Execution released. Background app and preview windows remain available for this chat.", displayId,
-                actionStatus = "delivered")
+                actionStatus = MobileUseResult.ACTION_DELIVERED)
         }
     }
 
@@ -277,7 +381,7 @@ class ShizukuMobileUseRepository @Inject constructor(
                 MobileExecutionAccess.BUSY -> return@withLock invalid("busy", "Another execution is using the display.")
             }
             inputMutex.withLock { closeLocked() }
-            MobileUseResult("closed", "Background display and preview windows closed.", actionStatus = "delivered")
+            MobileUseResult("closed", "Background display and preview windows closed.", actionStatus = MobileUseResult.ACTION_DELIVERED)
         }
     }
 
@@ -286,18 +390,18 @@ class ShizukuMobileUseRepository @Inject constructor(
         mutex.withLock {
             if (physicalSessionId == sessionId) inputMutex.withLock { closeLocked() }
         }
-        MobileUseResult("closed", "Background app closed.", actionStatus = "delivered")
+        MobileUseResult("closed", "Background app closed.", actionStatus = MobileUseResult.ACTION_DELIVERED)
     }
 
     override suspend fun manualTouch(sessionId: String, touch: MobileTouch): MobileUseResult = manual(sessionId) { remote, id ->
         if (remote.touch(id, touch.action.ordinal, touch.x, touch.y, touch.gestureId, touch.eventTimeMs)) {
-            MobileUseResult("delivered", "", actionStatus = "delivered")
+            MobileUseResult("delivered", "", actionStatus = MobileUseResult.ACTION_DELIVERED)
         } else invalid(if (touch.action == MobileTouchAction.DOWN) "input_unavailable" else "input_rejected", "Touch was not accepted.")
     }
 
     override suspend fun manualBack(sessionId: String): MobileUseResult = manual(sessionId) { remote, id ->
-        remote.back(id)
-        MobileUseResult("delivered", "", actionStatus = "delivered")
+        if (remote.back(id)) MobileUseResult("delivered", "", actionStatus = MobileUseResult.ACTION_DELIVERED)
+        else invalid("input_rejected", "Back was not accepted.")
     }
 
     override suspend fun manualRotate(sessionId: String): MobileUseResult {
@@ -305,15 +409,15 @@ class ShizukuMobileUseRepository @Inject constructor(
             val geometry = remote.rotateDisplay(id)
             require(geometry.size >= 2 && geometry[0] > 0 && geometry[1] > 0)
             sessions.update(sessionId, geometry[0], geometry[1])
-            MobileUseResult("delivered", "", displayId = id, width = geometry[0], height = geometry[1], actionStatus = "delivered")
+            MobileUseResult("delivered", "", displayId = id, width = geometry[0], height = geometry[1], actionStatus = MobileUseResult.ACTION_DELIVERED)
         }
         return if (result.status == "input_unavailable") invalid("rotation_unavailable", "Display orientation could not be changed.") else result
     }
 
-    override suspend fun attachPreview(sessionId: String, bindingId: String, surface: Surface, width: Int, height: Int): MobileUseResult =
+    override suspend fun attachPreview(sessionId: String, bindingId: String, surface: Surface, width: Int, height: Int, interactive: Boolean): MobileUseResult =
         manual(sessionId) { remote, id ->
-            remote.setPreview(id, bindingId, surface, width, height)
-            MobileUseResult("preview_attached", "", actionStatus = "delivered")
+            remote.setPreview(id, bindingId, surface, width, height, interactive)
+            MobileUseResult("preview_attached", "", actionStatus = MobileUseResult.ACTION_DELIVERED)
         }
 
     override suspend fun detachPreview(sessionId: String, bindingId: String) {
@@ -344,22 +448,84 @@ class ShizukuMobileUseRepository @Inject constructor(
         }
 
     private suspend fun onObserved(
-        owner: String, observationId: String, elementId: String? = null, navigation: Boolean = false,
-        coordinateBounds: ((MobileObservedScreen) -> MobileBounds?)? = null, swipe: Boolean = false,
+        owner: String, navigation: Boolean = false,
+        coordinateBounds: ((MobileObservedScreen) -> MobileBounds?)? = null, swipe: Boolean = false, textInput: Boolean = false,
         operation: suspend (IMobileUseService, Int, MobileObservedScreen, MobileActionDelivery) -> MobileUseResult,
-    ): MobileUseResult = perform(owner, action = true, allowCreate = false) { remote, id, delivery ->
-        val reading = readFrame(remote)
-        if (reading.error != null) return@perform invalid("stale_observation", "Capture error; observe again before acting.")
-        val frame = reading.frame
-        val native = nativeSnapshot(id, frame)
-        val nativeElementId = elementId?.takeIf { guard.latest?.native?.targets?.containsKey(it) == true }
-        val bounds = guard.latest?.let { coordinateBounds?.invoke(it) }
-        val rejection = guard.rejection(owner, id, observationId, now(), frame, native, nativeElementId, navigation, bounds, swipe)
-        if (rejection != null) {
-            guard.clear()
-            return@perform invalid("stale_observation", "$rejection; call mobile_observe before acting.")
+    ): MobileUseResult {
+        // 排队动作只能使用调用时已看到的观察，不能借用前一个并行动作刚生成的新截图。
+        val expectedObservation = guard.latest?.id
+        return perform(owner, action = true, allowCreate = false) { remote, id, delivery ->
+            val previous = guard.latest ?: return@perform invalid("stale_observation", "Take a screenshot before acting.")
+            if (previous.id != expectedObservation) return@perform invalid("stale_observation", "Observation changed while action was queued; inspect a new screenshot.")
+            val reading = readFrame(remote)
+            if (reading.error != null) return@perform invalid("stale_observation", "Capture error; observe again before acting.")
+            val frame = reading.frame
+            val native = nativeSnapshot(id, frame)
+            val bounds = guard.latest?.let { coordinateBounds?.invoke(it) }
+            val rejection = guard.rejection(owner, id, previous.id, now(), frame, native, navigation = navigation, coordinateBounds = bounds, swipe = swipe, textInput = textInput)
+            if (rejection != null) {
+                guard.clear()
+                // 焦点类失败靠重新截图救不了：必须返回指向"先点击字段"的结果码，
+                // 否则模型会陷入"截图→原样重试"的死循环（TapTap 搜索页实测出现过 6 次浪费）。
+                // 连续两次 text_focus_unavailable 说明该输入路径整体不可输入，直接硬停换路，
+                // 提示词约束对弱模型不可靠（魅族商店搜索页实测连试 3 次输入）。
+                // 无障碍服务未连接时快照为空，必须报真实原因，否则服务问题和假输入框混在同一结果码。
+                return@perform if (textInput) {
+                    val failures = if (rejection == "text_focus_unavailable" && previous.native.status == "available") {
+                        consecutiveTextFocusUnavailable += 1
+                        consecutiveTextFocusUnavailable
+                    } else 0
+                    textRejection(rejection, previous.native, failures)
+                } else invalid("stale_observation", "$rejection; call mobile_take_screenshot before acting.")
+            }
+            operation(remote, id, checkNotNull(guard.latest), delivery)
         }
-        operation(remote, id, checkNotNull(guard.latest), delivery)
+    }
+
+    /**
+     * 文本输入复核失败的结果码：首次失败指向"先点击字段"但带退出条件；
+     * 连续两次无焦点则硬停为 text_entry_unsupported，杜绝"点击→输入"死循环。
+     * 可编辑节点诊断帮助模型区分"忘了先点击"与"该屏根本没有可输入控件"。
+     */
+    private fun textRejection(
+        rejection: String, native: MobileAccessibilitySnapshot, consecutiveFocusFailures: Int,
+    ) = when {
+        // 真实原因优先：服务未连接或快照失败时，焦点类文案只会误导模型反复点击重试。
+        rejection == "text_focus_unavailable" && native.status == "accessibility_unavailable" ->
+            invalid("accessibility_required",
+                "The Gimi Text Input accessibility service is not connected, so editable fields cannot be found " +
+                    "or filled on this display and mobile_type always fails. Enable Gimi Text Input in the system " +
+                    "Accessibility settings, then take a screenshot and retry. Do not tap or retype before it is enabled.")
+        rejection == "text_focus_unavailable" && native.status == "accessibility_error" ->
+            invalid("text_observation_failed",
+                "The accessibility snapshot failed while reading this display, so text input cannot be validated. " +
+                    "Take a new screenshot and retry once; if it fails again, report the blocker instead of repeating.")
+        rejection == "text_focus_unavailable" && consecutiveFocusFailures >= 2 -> invalid("text_entry_unsupported",
+            "Two consecutive mobile_type attempts on this input path found no editable focus even after tapping " +
+                "the intended field. ${editableNodeReport(native)}Text entry cannot work here. " +
+                "Do not call mobile_type or chase focus with keys again. Switch to a tap-only route " +
+                "(browse lists, categories or suggestions and tap the target directly), ask the user to type " +
+                "on the controlled screen, or report the blocker to the user.")
+        rejection == "text_focus_unavailable" -> invalid("text_focus_unavailable",
+            "No focused editable field. First attempt only: tap the field with mobile_click, then call mobile_type. " +
+                "If this call already followed a tap on the intended field, the tapped element is likely a fake input " +
+                "(for example a rotating hot-search placeholder bar): do not tap the same coordinates or retype again. " +
+                "Verify with one screenshot, then switch to a real input page or another input path, or report the " +
+                "blocker to the user. ${editableNodeReport(native)}")
+        rejection == "text_focus_changed" -> invalid("text_focus_changed",
+            "Text focus changed since the screenshot: take a screenshot, tap the field again, then type once.")
+        rejection == "text_target_changed" -> invalid("text_focus_changed",
+            "The focused field or its selection changed: take a screenshot, tap the field again, then type once.")
+        else -> invalid("stale_observation", "$rejection; call mobile_take_screenshot before acting.")
+    }
+
+    /** 当前无障碍快照完全不含可编辑节点时明确告知：在本屏点多少次都造不出输入焦点。 */
+    private fun editableNodeReport(native: MobileAccessibilitySnapshot): String {
+        val editable = native.targets.values.count { it.ownElement.editable && it.ownElement.enabled }
+        return if (editable == 0) {
+            "The accessibility snapshot exposes no editable node on this screen; tapping cannot create one, " +
+                "and a retry only works if the tap navigates to a different screen. "
+        } else ""
     }
 
     private suspend fun perform(
@@ -368,24 +534,11 @@ class ShizukuMobileUseRepository @Inject constructor(
     ): MobileUseResult = withContext(Dispatchers.IO) {
         mutex.withLock {
             val delivery = MobileActionDelivery(action)
-            if (!enabled.value) {
-                return@withLock unavailable(MobileUseAvailability.DISABLED).copy(actionStatus = delivery.status)
-            }
-            when (sessions.claim(owner)) {
-                MobileExecutionAccess.ALLOWED -> Unit
-                MobileExecutionAccess.CLOSED -> return@withLock invalid("session_closed", "User closed the background app. Do not recreate it during this execution.")
-                MobileExecutionAccess.UNREGISTERED -> return@withLock invalid("execution_finished", "This execution ended; a new turn can open the app.")
-                MobileExecutionAccess.OTHER_CHAT -> return@withLock invalid("busy", "Another chat has an open background app. Ask the user to close it first.")
-                MobileExecutionAccess.BUSY -> return@withLock invalid("busy", "Another execution in this chat is using the display.")
-            }
+            executionRejection(owner)?.let { return@withLock it.copy(actionStatus = delivery.status) }
             if (physicalSessionId != null && displaySession.value == null) return@withLock invalid("session_closed", "Background app is closing.")
             if (!allowCreate && (displayId == null || service == null)) {
-                return@withLock invalid("stale_observation", "Display session ended; observe again.")
+                return@withLock invalid("stale_observation", "Display session ended; take a screenshot first.")
             }
-            val available = availability()
-            if (available != MobileUseAvailability.READY &&
-                available != MobileUseAvailability.BUSY
-            ) return@withLock unavailable(available).copy(actionStatus = delivery.status)
             try {
                 val remote = service ?: bind().also { service = it }
                 if (remote.uid() != 2000) {
@@ -400,6 +553,7 @@ class ShizukuMobileUseRepository @Inject constructor(
                     sessions.open(owner, sessionId, it, geometry[0], geometry[1])
                     Log.i("GimiMobileUse", "Display session created: $it")
                 }
+                // 观察最多等待六秒；不能在等待截图期间锁住人工触摸和预览输入。
                 operation(remote, id, delivery).copy(displayId = id, actionStatus = delivery.status)
             } catch (failure: CancellationException) {
                 throw failure
@@ -416,6 +570,19 @@ class ShizukuMobileUseRepository @Inject constructor(
         }
     }
 
+    private fun executionRejection(owner: String): MobileUseResult? {
+        if (!enabled.value) return unavailable(MobileUseAvailability.DISABLED)
+        when (sessions.claim(owner)) {
+            MobileExecutionAccess.ALLOWED -> Unit
+            MobileExecutionAccess.CLOSED -> return invalid("session_closed", "User closed the background app. Do not recreate it during this execution.")
+            MobileExecutionAccess.UNREGISTERED -> return invalid("execution_finished", "This execution ended; a new turn can open the app.")
+            MobileExecutionAccess.OTHER_CHAT -> return invalid("busy", "Another chat has an open background app. Ask the user to close it first.")
+            MobileExecutionAccess.BUSY -> return invalid("busy", "Another execution in this chat is using the display.")
+        }
+        val available = availability()
+        return if (available == MobileUseAvailability.READY || available == MobileUseAvailability.BUSY) null else unavailable(available)
+    }
+
     private fun operationFailure(failure: Exception, delivery: MobileActionDelivery): MobileUseResult {
         guard.clear()
         if (displayId == null) {
@@ -424,7 +591,7 @@ class ShizukuMobileUseRepository @Inject constructor(
         }
         Log.w("GimiMobileUse", "Operation failed; display retained; actionStatus=${delivery.status}", failure)
         return MobileUseResult("operation_failed",
-            "Operation or observation failed. Call mobile_observe; do not automatically repeat an action.",
+            "Operation or observation failed. Call mobile_take_screenshot; do not automatically repeat an action.",
             displayId = displayId, actionStatus = delivery.status)
     }
 
@@ -434,14 +601,15 @@ class ShizukuMobileUseRepository @Inject constructor(
     ): MobileUseResult {
         guard.clear()
         val startedAt = now()
+        val requiredFrameAfterMs = guard.requiredFrameAfterMs
         // 动作后的新帧要求跨 observe 调用保留；超时后的旧缓存不能在下一次观察中重新变成 settled。
-        val stability = MobileFrameStability(startedAt, guard.requiredFrameAfterMs)
+        val stability = MobileFrameStability(startedAt, requiredFrameAfterMs)
         var frame: CapturedMobileFrame? = null
         var native = MobileAccessibilitySnapshot("not_captured")
         var state = "timeout"
         var reason = "no_frame"
         var captureError: String? = null
-        while (now() - startedAt < 6_000) {
+        while (now() - startedAt < OBSERVATION_TIMEOUT_MS) {
             val reading = readFrame(remote)
             frame = reading.frame
             captureError = reading.error
@@ -459,44 +627,32 @@ class ShizukuMobileUseRepository @Inject constructor(
                     break
                 }
             }
+            val hasPostActionFrame = requiredFrameAfterMs == null ||
+                frame?.capturedAtMs?.let { it > requiredFrameAfterMs } == true
+            if (reading.error == null && frame != null && hasPostActionFrame &&
+                now() - startedAt >= CHANGING_OBSERVATION_GRACE_MS
+            ) {
+                native = nativeSnapshot(id, frame)
+                if (native.consistent) {
+                    // 轮播、广告和计时器可以长期变化；一帧动作后的画面已足够交给模型判断，
+                    // 后续动作会在发送前再次复核目标局部，而不是重复等待整屏静止。
+                    state = "changing"
+                    reason = stability.timeoutReason()
+                    break
+                }
+            }
             reason = if (captureError == null) stability.timeoutReason() else "capture_error"
             delay(if (frame == null) 300 else 150)
         }
-        val image = frame
         var elements = if (state == "settled") native.targets.values.map { it.element } else emptyList()
         var nodesStatus = if (state == "settled") native.status else "not_captured"
         var truncated = native.truncated
-        if (state == "settled" && image != null && elements.count { it.text != null || it.description != null } < 4) {
-            val ocr = textRecognizer.recognize(image)
-            val checked = readFrame(remote)
-            captureError = checked.error
-            val checkedNative = nativeSnapshot(id, checked.frame)
-            // OCR 和节点遍历均非原子采集；采集后再次复核，变化时丢弃元素而不返回错位坐标。
-            if (checked.error == null && checked.frame != null &&
-                image.jpeg.contentEquals(checked.frame.jpeg) &&
-                image.generation == checked.frame.generation && checkedNative == native
-            ) {
-                val additional = ocr.elements.filter { box ->
-                    elements.none { it.text == box.text && it.bounds.contains(box.bounds.centerX, box.bounds.centerY) }
-                }
-                truncated = truncated || ocr.truncated || elements.size + additional.size > 200
-                elements = (elements + additional).take(200)
-                nodesStatus = "${native.status}+${ocr.status}"
-                frame = checked.frame
-            } else {
-                state = "timeout"
-                reason = "changed_during_element_capture"
-                frame = checked.frame
-                elements = emptyList()
-                nodesStatus = "discarded_changed_elements"
-            }
-        }
         val observationId = UUID.randomUUID().toString()
         val observedAt = now()
         // 静止是观察信息，不是所有动作的前提；动态页面在动作前按目标局部复核。
-        val pixelActionsAllowed = state == "settled" || reason == "changing" || reason == "changed_during_element_capture"
-        val nativeActionsAllowed = pixelActionsAllowed
-        if (state != "settled" && frame != null && captureError == null) {
+        val pixelActionsAllowed = state == "settled" || state == "changing" ||
+            reason == "changing" || reason == "changed_during_element_capture"
+        if (state == "timeout" && frame != null && captureError == null) {
             native = nativeSnapshot(id, frame)
             elements = if (native.consistent) native.targets.values.map { it.element } else emptyList()
             nodesStatus = native.status
@@ -506,14 +662,13 @@ class ShizukuMobileUseRepository @Inject constructor(
         if (actionable) {
             guard.confirmFrame(frame)
             guard.record(MobileObservedScreen(observationId, owner, id, observedAt, frame, native, elements,
-                pixelActionsAllowed, nativeActionsAllowed, swipeActionsAllowed = pixelActionsAllowed))
+                actionsAllowed = pixelActionsAllowed))
         }
         if (frame == null) state = "frame_unavailable"
         val observation = MobileObservation(
             observationId, state, reason, frame?.let { (observedAt - it.capturedAtMs).coerceAtLeast(0) },
             frame?.sequence, nodesStatus, elements, truncated,
             actionModes = if (!actionable) emptyList() else buildList {
-                if (nativeActionsAllowed) add("native_elements")
                 if (pixelActionsAllowed) {
                     add("pixel_coordinates")
                     add("swipe_coordinates")
@@ -540,14 +695,16 @@ class ShizukuMobileUseRepository @Inject constructor(
             payload.getInt("width"), payload.getInt("height"), payload.getLong("capturedAtMs"),
             payload.getLong("sequence"), payload.getLong("generation"), jpeg, samples,
         )
+        val expected = displaySession.value
+        // AI 只接收完整副屏帧；缩略图或旋转前的缓存不能进入上下文，更不能建立点击依据。
+        if (frame != null && (expected == null || frame.width != expected.width || frame.height != expected.height)) {
+            return MobileFrameReading(null, "frame_geometry_mismatch")
+        }
         return MobileFrameReading(frame, payload.getString("error"))
     }
 
     /** 点按周围留出采样余量，拒绝目标附近的移动而允许屏幕其他区域动画。 */
     private fun tapBounds(x: Int, y: Int) = MobileBounds(x - 48, y - 48, x + 49, y + 49)
-
-    private fun inside(frame: CapturedMobileFrame, x: Int, y: Int): Boolean =
-        x in 0 until frame.width && y in 0 until frame.height
 
     private fun attempt(delivery: MobileActionDelivery, send: () -> Boolean): Boolean {
         val previousRequirement = guard.requiredFrameAfterMs
@@ -558,7 +715,8 @@ class ShizukuMobileUseRepository @Inject constructor(
         return accepted
     }
 
-    private fun invalid(status: String, message: String) = MobileUseResult(status, message, actionStatus = "not_sent")
+    private fun invalid(status: String, message: String) =
+        MobileUseResult(status, message, actionStatus = MobileUseResult.ACTION_NOT_SENT)
     private fun now(): Long = SystemClock.elapsedRealtime()
 
     /** 一次采集读取的可用帧和独立错误码，缓存画面不能掩盖采集错误。 */
@@ -589,6 +747,11 @@ class ShizukuMobileUseRepository @Inject constructor(
         try {
             Shizuku.bindUserService(args, candidate)
             return withTimeout(10_000.milliseconds) { deferred.await() }
+        } catch (failure: TimeoutCancellationException) {
+            // bind 超时不是协程取消；转成普通失败，perform 才能把错误结果交还工具调用，
+            // 否则 TimeoutCancellationException 会伪装成取消让这一轮静默中断。
+            closeLocked()
+            throw IllegalStateException("Shizuku service bind timed out", failure)
         } catch (failure: CancellationException) {
             closeLocked()
             throw failure
@@ -636,6 +799,12 @@ class ShizukuMobileUseRepository @Inject constructor(
         )
         else -> MobileUseResult("unsupported", "Virtual display is unsupported on this device.")
     }
+
+    private companion object {
+        /** 始终变化的页面也只需取得动作后的新帧；给首帧编码留出短暂时间。 */
+        const val CHANGING_OBSERVATION_GRACE_MS = 1_000L
+        const val OBSERVATION_TIMEOUT_MS = 6_000L
+    }
 }
 
 @Module
@@ -643,6 +812,8 @@ class ShizukuMobileUseRepository @Inject constructor(
 abstract class MobileUseModule {
     @Binds
     abstract fun bindMobileDisplayPreviewGateway(implementation: ShizukuMobileUseRepository): MobileDisplayPreviewGateway
+    @Binds
+    abstract fun bindMobileUseController(implementation: ShizukuMobileUseRepository): MobileUseController
     @Binds
     abstract fun bindMobileUseRepository(
         implementation: ShizukuMobileUseRepository,

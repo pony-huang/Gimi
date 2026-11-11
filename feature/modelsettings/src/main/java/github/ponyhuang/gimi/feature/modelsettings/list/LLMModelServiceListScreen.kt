@@ -32,7 +32,7 @@ import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionNote
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @Composable
 fun LLMModelServiceListScreen(
@@ -70,7 +70,7 @@ fun LLMModelServiceListScreen(
                     } }
                     if (providerPicker) item {
                         GimiSearchField(state.query, { onAction(ModelServiceListAction.QueryChanged(it)) },
-                            placeholder = { Text(stringResource(R.string.modelsettings_search_provider)) },
+                            placeholder = stringResource(R.string.modelsettings_search_provider),
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
                     }
                     item {
@@ -97,7 +97,7 @@ fun LLMModelServiceListScreen(
 @Preview(name = "服务列表 · 深色", showBackground = true, widthDp = 390, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ServiceListPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         LLMModelServiceListScreen(ModelServiceListUiState(loadState = CatalogLoadState.Ready,
             items = listOf(modelServicePreviewFixture().copy(id = "deepseek", name = "DeepSeek"),
                 modelServicePreviewFixture().copy(isEnabled = false))), {}, {})
@@ -108,15 +108,29 @@ private fun ServiceListPreview() {
 @Preview(name = "空列表 · 深色", showBackground = true, widthDp = 390, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun EmptyServiceListPreview() {
-    AsssistantaiTheme { LLMModelServiceListScreen(ModelServiceListUiState(loadState = CatalogLoadState.Ready), {}, {}) }
+    GimiTheme { LLMModelServiceListScreen(ModelServiceListUiState(loadState = CatalogLoadState.Ready), {}, {}) }
 }
 
 @Preview(name = "厂商选择", showBackground = true, widthDp = 390)
 @Preview(name = "厂商选择 · 深色", showBackground = true, widthDp = 390, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ProviderPickerPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         LLMModelServiceListScreen(ModelServiceListUiState(loadState = CatalogLoadState.Ready,
             items = listOf(modelServicePreviewFixture())), {}, {}, providerPicker = true)
+    }
+}
+
+@Preview(name = "语音厂商列表", showBackground = true, widthDp = 390)
+@Preview(name = "语音厂商列表 · 深色", showBackground = true, widthDp = 390, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun SpeechServiceListPreview() {
+    GimiTheme {
+        LLMModelServiceListScreen(ModelServiceListUiState(loadState = CatalogLoadState.Ready,
+            items = listOf(modelServicePreviewFixture().copy(id = "qwen-audio", name = "Qwen",
+                kind = github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceKind.Speech,
+                groups = modelServicePreviewFixture().groups.map { group ->
+                    group.copy(models = group.models.filter { github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability.TTS in it.capabilities })
+                }))), {}, {})
     }
 }

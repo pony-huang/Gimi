@@ -14,12 +14,15 @@ class SpotifyAuthTest {
 
     @Test
     fun authorizeUrlContainsCoreParamsAndScopes() {
-        val url = buildAuthorizeUrl("cid", "http://127.0.0.1:8888/callback", "st-1", SpotifyAuth.SCOPES)
+        val url = buildAuthorizeUrl("cid", "http://127.0.0.1:8888/callback", "st-1", "challenge-1", SpotifyAuth.SCOPES)
 
         assertTrue(url.startsWith("https://accounts.spotify.com/authorize?"))
         assertTrue(url.contains("client_id=cid"))
         assertTrue(url.contains("response_type=code"))
         assertTrue(url.contains("state=st-1"))
+        // PKCE S256 参数在授权 URL 上
+        assertTrue(url.contains("code_challenge=challenge-1"))
+        assertTrue(url.contains("code_challenge_method=S256"))
         assertTrue(url.contains("show_dialog=true"))
         assertTrue(url.contains("redirect_uri=http%3A%2F%2F127.0.0.1%3A8888%2Fcallback"))
         // 关键 scope 都在

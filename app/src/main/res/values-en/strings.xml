@@ -8,4 +8,5 @@
     <string name="plugin_incompatible_upgrade">The “%1$s” plugin is incompatible with this app and was skipped. Please upgrade the plugin.</string>
     <string name="plugins_incompatible_upgrade">%2$d plugins (%1$s) are incompatible with this app. Please upgrade them.</string>
     <string name="plugin_name_separator">, </string>
+    <string name="voice_call_notification_permission">Notifications are off, so the call will not appear in the status bar when backgrounded. Enable them in Settings → Permissions.</string>
 </resources>

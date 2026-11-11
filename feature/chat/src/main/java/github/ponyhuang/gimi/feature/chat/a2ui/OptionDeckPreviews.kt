@@ -7,7 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 旅行方案夹具：验证场景化动作、链接文案与长正文省略。 */
 private fun travelOptionDeckFixture(): OptionDeckData = OptionDeckData(
@@ -83,12 +83,12 @@ private fun designOptionDeckFixture(): OptionDeckData = OptionDeckData(
 @Preview(showBackground = true, widthDp = 360, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun OptionDeckTravelPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ChatA2uiTheme {
             OptionDeck(
                 data = travelOptionDeckFixture(),
-                onDecision = { _, _, _ -> },
-                onExhausted = { _, _ -> },
+                onDecision = { _, _, _, _ -> },
+                onExhausted = { _, _, _ -> },
                 onOpenUrl = {},
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
             )
@@ -100,12 +100,12 @@ private fun OptionDeckTravelPreview() {
 @Preview(showBackground = true, widthDp = 360, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun OptionDeckDesignPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ChatA2uiTheme {
             OptionDeck(
                 data = designOptionDeckFixture(),
-                onDecision = { _, _, _ -> },
-                onExhausted = { _, _ -> },
+                onDecision = { _, _, _, _ -> },
+                onExhausted = { _, _, _ -> },
                 onOpenUrl = {},
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
             )
@@ -116,12 +116,12 @@ private fun OptionDeckDesignPreview() {
 @Preview(showBackground = true, widthDp = 280, fontScale = 1.3f)
 @Composable
 private fun OptionDeckLargeFontPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ChatA2uiTheme {
             OptionDeck(
                 data = travelOptionDeckFixture(),
-                onDecision = { _, _, _ -> },
-                onExhausted = { _, _ -> },
+                onDecision = { _, _, _, _ -> },
+                onExhausted = { _, _, _ -> },
                 onOpenUrl = {},
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 initiallyAccepted = setOf("west-lake"),

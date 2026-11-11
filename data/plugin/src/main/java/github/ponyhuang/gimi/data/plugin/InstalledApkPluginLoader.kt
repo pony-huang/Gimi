@@ -27,6 +27,12 @@ import kotlinx.coroutines.CancellationException
  * （parent=宿主 classLoader，保证 ADK Plugin / AgentPlugin 类身份与宿主一致，避免
  * ClassCastException）→ 反射实例化 → apiVersion 校验 → 初始化。
  *
+ * 信任模型：插件 APK 由用户主动安装到设备（系统安装器会展示来源与权限），宿主信任
+ * 用户的侧载决定，不限定签名/发布者，因此支持官方与第三方插件。以加载后的
+ * 启停开关（PluginManager.setEnabled，默认可关闭）作为运行时控制手段；
+ * 经订阅目录下载安装的 APK 仍走 [github.ponyhuang.gimi.data.plugin.install.AndroidPluginPackageInstaller]
+ * 的同签名 + SHA-256 校验（防下载篡改，不针对第三方侧载）。
+ *
  * 单个插件失败仅跳过、不影响其它插件。仅支持纯 Kotlin 插件（无 native lib）。
  */
 class InstalledApkPluginLoader @Inject constructor(
@@ -44,7 +50,8 @@ class InstalledApkPluginLoader @Inject constructor(
      */
     override fun load(): List<LoadedPlugin> = synchronized(lock) {
         if (cache == null) {
-            cache = discover().associateBy { it.packageName }
+            // 查询失败时保留 null 缓存，下次 load() 重试；绝不把瞬时失败当成「无插件」。
+            cache = discover()?.associateBy { it.packageName }
         }
         cache.orEmpty().values.toList()
     }
@@ -52,11 +59,12 @@ class InstalledApkPluginLoader @Inject constructor(
     /**
      * 重新发现已安装插件 APK。已加载且未更新的包保留原实例（避免重复实例化与类加载器冲突）；
      * 新增的包与**安装更新时间变化**（同包名升级）的包重新实例化，已卸载的包从缓存移除。
+     * PackageManager 查询瞬时失败时保留既有缓存并返回空列表，不清空已加载插件。
      *
      * @return 本次新增或更新的插件。
      */
     override fun refresh(): List<LoadedPlugin> = synchronized(lock) {
-        val discovered = discover()
+        val discovered = discover() ?: return emptyList()
         val current = cache.orEmpty()
         val fresh = discovered.filter { candidate ->
             val old = current[candidate.packageName]
@@ -66,8 +74,8 @@ class InstalledApkPluginLoader @Inject constructor(
         fresh
     }
 
-    /** 全量发现并实例化（不读缓存）。 */
-    private fun discover(): List<LoadedPlugin> {
+    /** 全量发现并实例化（不读缓存）；查询失败返回 null，与「无插件」区分。 */
+    private fun discover(): List<LoadedPlugin>? {
         val services = runCatching {
             context.packageManager.queryIntentServices(
                 Intent(PluginApi.DISCOVERY_ACTION),
@@ -75,7 +83,7 @@ class InstalledApkPluginLoader @Inject constructor(
             )
         }.getOrElse { error ->
             Log.w(TAG, "Plugin discovery failed", error)
-            return emptyList()
+            return null
         }
         Log.d(TAG, "Discovered ${services.size} plugin package(s)")
         return try {

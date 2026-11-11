@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.Color
  *    一眼分辨说话方，无需看对齐方向。
  * 3. **可读性**：暖杏/焦糖的明度经过挑选 —— 不刺眼、不发灰，长时间对话不疲倦。
  *
- * 通过 [LocalUserBubbleColors] 在 [AsssistantaiTheme] 中按 dark/light 模式注入；
+ * 通过 [LocalUserBubbleColors] 在 [GimiTheme] 中按 dark/light 模式注入；
  * 调用方直接读取 [LocalUserBubbleColors.current]，无需中间 wrapper。
  */
 data class UserBubbleColors(
@@ -25,19 +25,19 @@ data class UserBubbleColors(
 /** 浅色模式 —— 低对比浅灰，保留文字可读性而不过分抢眼。 */
 val LightUserBubbleColors = UserBubbleColors(
     container = Color(0xFFE9E9E9),
-    onContainer = ChatGptLightText,
+    onContainer = NeutralLightText,
 )
 
 /** 深色模式 —— 深灰表面，和聊天背景形成柔和层级。 */
 val DarkUserBubbleColors = UserBubbleColors(
-    container = Color(0xFF303030),
-    onContainer = ChatGptDarkText,
+    container = Color(0xFF262626),
+    onContainer = NeutralDarkText,
 )
 
 /**
  * 当前主题下用户气泡的配色。
  *
- * 未通过 [AsssistantaiTheme] 包裹时回退到 [LightUserBubbleColors]，
+ * 未通过 [GimiTheme] 包裹时回退到 [LightUserBubbleColors]，
  * 这样 Preview / 单测场景不会拿到 `Color.Unspecified` 导致渲染失败。
  */
 val LocalUserBubbleColors = staticCompositionLocalOf { LightUserBubbleColors }

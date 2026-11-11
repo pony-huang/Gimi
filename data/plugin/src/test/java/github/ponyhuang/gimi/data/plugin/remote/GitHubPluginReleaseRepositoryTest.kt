@@ -43,7 +43,7 @@ class GitHubPluginReleaseRepositoryTest {
                   "assets": [
                     {
                       "name": "Gimi-plugin-zhihu-v0.13.0.apk",
-                      "browser_download_url": "https://example.com/zhihu.apk",
+                      "browser_download_url": "https://github.com/pony-huang/Gimi/releases/download/v1.0.0/zhihu.apk",
                       "size": 12345,
                       "digest": "sha256:$sha"
                     },
@@ -55,7 +55,7 @@ class GitHubPluginReleaseRepositoryTest {
                     },
                     {
                       "name": "missing-digest.apk",
-                      "browser_download_url": "https://example.com/no-digest.apk",
+                      "browser_download_url": "https://github.com/pony-huang/Gimi/releases/download/v1.0.0/no-digest.apk",
                       "size": 2
                     }
                   ]

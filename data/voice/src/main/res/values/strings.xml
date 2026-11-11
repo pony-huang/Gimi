@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_call_channel_name">实时语音通话</string>
+    <string name="voice_call_channel_description">通话在后台继续时的常驻状态、静音与结束入口</string>
+    <string name="voice_call_notification_foreground_failed">通话已转入后台运行，可能因系统限制中断</string>
+    <string name="voice_call_notification_title">实时语音通话进行中</string>
+    <string name="voice_call_notification_title_conversation">%1$s · 实时语音通话</string>
+    <string name="voice_call_notification_background">后台运行中</string>
+    <string name="voice_call_notification_text">点击返回通话</string>
+    <string name="voice_call_notification_listening">正在聆听…</string>
+    <string name="voice_call_notification_transcribing">正在识别语音…</string>
+    <string name="voice_call_notification_thinking">正在思考…</string>
+    <string name="voice_call_notification_speaking">正在回答…</string>
+    <string name="voice_call_notification_muted">麦克风已静音，通话仍在继续</string>
+    <string name="voice_call_notification_failed">连接异常，点击返回通话查看</string>
+    <string name="voice_call_notification_ending">正在结束通话并释放麦克风…</string>
+    <string name="voice_call_notification_end">结束通话</string>
+    <string name="voice_call_notification_mute">静音</string>
+    <string name="voice_call_notification_unmute">取消静音</string>
+    <string name="voice_call_notification_return">返回通话</string>
+</resources>

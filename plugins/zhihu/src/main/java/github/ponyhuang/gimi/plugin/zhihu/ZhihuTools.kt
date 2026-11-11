@@ -21,11 +21,16 @@ internal abstract class ZhihuTool(
 
     protected suspend fun call(block: suspend (secret: String) -> Map<String, Any?>): Map<String, Any?> =
         withContext(Dispatchers.IO) {
-            runCatching {
+            try {
                 val secret = secretProvider().takeIf(String::isNotBlank)
                     ?: throw IllegalStateException("知乎插件未配置 access_secret")
                 block(secret)
-            }.getOrElse { mapOf(ERROR_KEY to (it.message ?: "知乎 API 调用失败")) }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                // 取消必须传播：runCatching 会把它吞成 {error} 结果。
+                throw cancelled
+            } catch (error: Exception) {
+                mapOf(ERROR_KEY to (error.message ?: "知乎 API 调用失败"))
+            }
         }
 
     companion object {
@@ -89,7 +94,7 @@ internal class ZhihuSearchTool(api: ZhihuApi, secretProvider: () -> String) :
         call { secret ->
             val query = strArg(args, "query")
                 ?: throw IllegalStateException("缺少参数 query")
-            mapOf(RESULT_KEY to PluginJson.toNative(api.zhihuSearch(secret, query, intArg(args, "count", 10))))
+            mapOf(RESULT_KEY to PluginJson.toNative(api.zhihuSearch(secret, query, intArg(args, "count", 10).coerceIn(1, 10))))
         }
 
     companion object {
@@ -132,7 +137,7 @@ internal class ZhihuGlobalSearchTool(api: ZhihuApi, secretProvider: () -> String
             val result = api.globalSearch(
                 secret = secret,
                 query = query,
-                count = intArg(args, "count", 10),
+                count = intArg(args, "count", 10).coerceIn(1, 20),
                 filter = strArg(args, "filter"),
                 searchDb = strArg(args, "search_db"),
             )

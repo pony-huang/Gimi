@@ -11,8 +11,8 @@ import com.google.adk.kt.types.FunctionDeclaration
 import com.google.adk.kt.serialization.adkJson
 import github.ponyhuang.gimi.data.agent.tools.modelRuntimeMetadataOrNull
 
-internal const val INLINE_DEFINITIONS = "selkie.inline_tool_definitions"
-internal fun inlinePendingKey(agentName: String): String = "selkie.inline_tools.pending:$agentName"
+internal const val INLINE_DEFINITIONS = "gimi.inline_tool_definitions"
+internal fun inlinePendingKey(agentName: String): String = "gimi.inline_tools.pending:$agentName"
 
 /** 工具结果提交后再记录 system 事件；待提交快照随结果落库，取消后仍可恢复。 */
 @OptIn(com.google.adk.kt.annotations.FrameworkInternalApi::class)

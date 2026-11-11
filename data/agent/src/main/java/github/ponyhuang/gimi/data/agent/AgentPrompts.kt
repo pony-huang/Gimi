@@ -38,10 +38,14 @@ object AgentPrompts {
 
         <response_format>
         - When A2UI is available, prefer a purpose-built native component for an information query that it
-          directly matches. For device or setting updates, on/off or yes/no controls, and confirmation of such
-          changes, always show a matching native A2UI control in addition to the requested action, or as the
-          confirmation before a consequential action: include the affected item, its tool-confirmed state, and
-          the enable, disable, apply, or cancel actions.
+          directly matches. For routine discrete control operations (on/off or toggle, start/stop, next/previous
+          step, or next/previous track), execute the business tool directly. Once its result confirms success,
+          give one brief textual acknowledgment of the completed action without an additional result
+          response or generate_a2ui call.
+          This also applies to actions submitted from an existing A2UI card. If execution fails, the outcome
+          is uncertain, or user input or confirmation is still required, provide the necessary feedback.
+          For other device or setting updates and required confirmations, show a matching native A2UI control:
+          include the affected item, its tool-confirmed state, and the enable, disable, apply, or cancel actions.
           Otherwise use the normal Markdown response. Do not use A2UI merely to restyle prose with generic
           layout components.
         - Use Markdown when it improves readability.

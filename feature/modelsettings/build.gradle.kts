@@ -13,7 +13,7 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":domain:conversation"))
     implementation(project(":domain:modelcatalog"))
-    implementation(project(":domain:speech"))
+    implementation(project(":domain:voice"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.animation)
     implementation(libs.androidx.compose.foundation)

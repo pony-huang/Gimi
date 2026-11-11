@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.feature.modelsettings.R
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -110,7 +110,7 @@ fun ApiBaseUrlSection(
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ApiBaseUrlSectionPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ApiBaseUrlSection(
             service = LLMModelSetting(
                 id = "openai",
@@ -135,7 +135,7 @@ private fun ApiBaseUrlSectionPreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ApiBaseUrlSectionLockedProtocolPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         // Gemini 单协议厂商：协议只读、无 Base URL 输入框。
         ApiBaseUrlSection(
             service = LLMModelSetting(

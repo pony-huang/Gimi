@@ -304,20 +304,20 @@ class McpUseCasesTest {
             return serverResult
         }
 
-        override fun save(server: McpServer) {
+        override suspend fun save(server: McpServer) {
             savedServers += server
         }
 
-        override fun delete(id: String) {
+        override suspend fun delete(id: String) {
             deletedIds += id
         }
 
-        override fun importJson(json: String): McpImportResult {
+        override suspend fun importJson(json: String): McpImportResult {
             importedJson += json
             return importResult
         }
 
-        override fun updateAuthorization(serverId: String, authorization: String): Boolean {
+        override suspend fun updateAuthorization(serverId: String, authorization: String): Boolean {
             authorizationUpdates += serverId to authorization
             return updateAuthorizationResult
         }

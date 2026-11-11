@@ -16,6 +16,7 @@
     <string name="mcp_import_error_invalid_json">Invalid MCP JSON</string>
     <string name="mcp_import_error_mcp_servers_not_object">mcpServers must be an object</string>
     <string name="mcp_import_error_invalid_curl">Invalid curl MCP configuration</string>
+    <string name="mcp_import_error_unsupported_sse">SSE transport MCP servers are not supported. Use a Streamable HTTP endpoint.</string>
     <string name="mcp_import_error_storage_failure">MCP configuration could not be securely saved. Please try again.</string>
     <string name="mcp_connection_error_default">Could not connect to the server. Check the configuration and try again.</string>
     <string name="mcp_save_error_default">Could not save the MCP configuration. Please try again.</string>

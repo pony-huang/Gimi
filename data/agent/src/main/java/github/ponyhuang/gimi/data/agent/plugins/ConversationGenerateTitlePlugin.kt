@@ -167,11 +167,15 @@ class ConversationGenerateTitlePlugin(
                 ?.mapNotNull { it.text }
                 ?.joinToString("")
                 ?.takeIf(String::isNotBlank)
-                ?.let {
-                    pendingTitles[context.invocationId] = pending.copy(
-                        assistantText = it.take(MAX_PROMPT_TEXT_LENGTH),
-                    )
-                    Log.i(TAG, "First assistant response captured for ${context.invocationId}")
+                ?.let { text ->
+                    // compute 原子读改写，避免与 afterAgent 的 remove / beforeModel 的
+                    // putIfAbsent 并发交叉时把新 PendingTitle 或清空操作覆盖回去。
+                    val updated = pendingTitles.compute(context.invocationId) { _, existing ->
+                        existing?.copy(assistantText = text.take(MAX_PROMPT_TEXT_LENGTH))
+                    }
+                    if (updated != null) {
+                        Log.i(TAG, "First assistant response captured for ${context.invocationId}")
+                    }
                 }
         }
         return response
@@ -199,16 +203,19 @@ class ConversationGenerateTitlePlugin(
         }
 
         Log.i(TAG, "Generating AI title for ${context.invocationId}")
-        val llmAgent = context.agent as LlmAgent
-        val title = cancellationAwareRunCatching {
-            generateTitle(
-                llmAgent.model,
-                userText = pending.userText,
-                assistantText = assistantText,
-            )
-        }.onFailure { error ->
-            Log.w(TAG, "Conversation title generation failed", error)
-        }.getOrNull()
+        // 标题生成要求 LlmAgent 才有 model；其它 Agent 类型不做硬转换崩溃，直接回退占位标题。
+        val llmAgent = context.agent as? LlmAgent
+        val title = llmAgent?.let {
+            cancellationAwareRunCatching {
+                generateTitle(
+                    it.model,
+                    userText = pending.userText,
+                    assistantText = assistantText,
+                )
+            }.onFailure { error ->
+                Log.w(TAG, "Conversation title generation failed", error)
+            }.getOrNull()
+        }
 
         if (title != null) {
             completeTitleFlow(context, title)

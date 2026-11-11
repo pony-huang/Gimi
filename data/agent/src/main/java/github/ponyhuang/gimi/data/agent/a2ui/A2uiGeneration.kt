@@ -277,9 +277,12 @@ private fun optionDeckRoutingInstructions(capabilities: A2uiCapabilities): Strin
         - Use the user's language for all visible labels and copy.
         - The component renders horizontal browsing, progress and the exhausted state; do not add
           duplicate decision buttons and do not wrap it in a generic Card.
-        - It emits option_accept / option_reject (context: itemId, index, title, actionLabel)
-          for every decision and option_exhausted (context: accepted, rejected, total) when
+        - It emits option_accept / option_reject (context: itemId, index, title, actionLabel, round)
+          for every decision and option_exhausted (context: accepted, rejected, total, round) when
           the deck is finished. Run the matching business tools and update the same surface.
+          round starts at 0 and increases when the user restarts the deck locally; decisions with
+          round > 0 repeat earlier itemIds, so treat them as re-review and confirm before re-running
+          side-effect tools.
         - To offer another round, update the deck property in place with a new candidate list.
     """.trimIndent()
 }

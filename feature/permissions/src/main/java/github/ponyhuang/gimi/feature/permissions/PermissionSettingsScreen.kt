@@ -29,7 +29,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @Composable
 fun PermissionSettingsScreen(
@@ -169,7 +169,7 @@ private fun PermissionGroupStatus.label(): String = when (this) {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PermissionSettingsScreenDeniedPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PermissionSettingsScreen(
             state = PermissionSettingsUiState(
                 groups = listOf(
@@ -198,7 +198,7 @@ private fun PermissionSettingsScreenDeniedPreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PermissionSettingsScreenGrantedPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PermissionSettingsScreen(
             state = PermissionSettingsUiState(
                 groups = listOf(

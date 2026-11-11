@@ -163,6 +163,6 @@ class AgentLLMModelFactory @Inject constructor(
             .firstOrNull { it.id == serviceId }
             ?.groups?.flatMap { it.models }
             ?.firstOrNull { it.id == modelId }
-            ?.capabilities?.supportsImages == true,
+            ?.multimodal?.supportsImages == true,
     )
 }

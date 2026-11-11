@@ -1,5 +1,5 @@
 <resources>
-    <string name="appfunction_title">AppFunciton</string>
+    <string name="appfunction_title">AppFunction</string>
     <string name="appfunction_info_title">App function information</string>
     <string name="appfunction_loading">Discovering apps…</string>
     <string name="appfunction_save_failed">Could not save. Please try the switch again.</string>

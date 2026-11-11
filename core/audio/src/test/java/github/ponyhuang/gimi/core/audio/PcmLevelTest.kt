@@ -25,6 +25,16 @@ class PcmLevelTest {
         assertTrue(loud <= 1f)
     }
 
+    @Test
+    fun playbackReferenceLevelSharesTheMicrophoneScale() {
+        // 回声门控直接比较麦克风电平与播放参考电平，两种输入必须落在同一刻度上。
+        val samples = shortArrayOf(8_192, -8_192, 8_192, -8_192)
+        val bytes = pcm16(8_192, -8_192, 8_192, -8_192)
+        assertEquals(calculatePcm16Level(bytes), calculatePcm16Level(samples), 0.0001f)
+        assertEquals(0f, calculatePcm16Level(shortArrayOf()), 0f)
+        assertEquals(0f, calculatePcm16Level(shortArrayOf(0, 0)), 0f)
+    }
+
     private fun pcm16(vararg samples: Int): ByteArray = buildList {
         samples.forEach { sample ->
             val value = sample.toShort().toInt()

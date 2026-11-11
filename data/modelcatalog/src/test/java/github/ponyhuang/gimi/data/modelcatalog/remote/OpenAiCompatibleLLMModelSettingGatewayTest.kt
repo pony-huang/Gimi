@@ -2,6 +2,7 @@ package github.ponyhuang.gimi.data.modelcatalog.remote
 
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnectionResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancelAndJoin
@@ -39,7 +40,7 @@ class OpenAiCompatibleLLMModelSettingGatewayTest {
         server.enqueue(MockResponse().setResponseCode(200))
         val gateway = gateway()
 
-        assertTrue(gateway.validateConnection(service()))
+        assertEquals(ServiceConnectionResult.Succeeded, gateway.validateConnection(service()))
 
         val request = server.takeRequest()
         assertEquals("/models", request.path)
@@ -51,7 +52,7 @@ class OpenAiCompatibleLLMModelSettingGatewayTest {
     fun validateConnectionRejectsOtherStatusCodes() = runTest {
         server.enqueue(MockResponse().setResponseCode(204))
 
-        assertFalse(gateway().validateConnection(service()))
+        assertEquals(ServiceConnectionResult.NetworkFailed, gateway().validateConnection(service()))
     }
 
     @Test
@@ -85,7 +86,7 @@ class OpenAiCompatibleLLMModelSettingGatewayTest {
                 .setBody("""{"data":[{"id":"deepseek-test"}]}"""))
         }
         val gateway = gateway()
-        assertTrue(gateway.validateConnection(deepSeek))
+        assertEquals(ServiceConnectionResult.Succeeded, gateway.validateConnection(deepSeek))
         assertEquals(listOf("deepseek-test"), gateway.fetchModels(deepSeek).map { it.id })
         repeat(2) {
             val request = server.takeRequest()
@@ -111,7 +112,7 @@ class OpenAiCompatibleLLMModelSettingGatewayTest {
     @Test
     fun anthropicAddressAlreadyEndingInV1IsNotDuplicated() = runTest {
         server.enqueue(MockResponse().setResponseCode(200))
-        assertTrue(gateway().validateConnection(service().copy(apiProtocol = ApiProtocol.Anthropic,
+        assertEquals(ServiceConnectionResult.Succeeded, gateway().validateConnection(service().copy(apiProtocol = ApiProtocol.Anthropic,
             anthropicBaseUrl = server.url("/v1/").toString())))
         assertEquals("/v1/models", server.takeRequest().path)
     }

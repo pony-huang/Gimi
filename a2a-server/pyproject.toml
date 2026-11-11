@@ -6,9 +6,12 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "a2a-sdk[http-server]>=1.2.3",
-    "uvicorn",
-    "fastapi",
+    "uvicorn>=0.30",
+    "fastapi>=0.115",
 ]
+
+[project.optional-dependencies]
+grpc = ["a2a-sdk[grpc]>=1.2.3"]
 
 [dependency-groups]
 dev = [

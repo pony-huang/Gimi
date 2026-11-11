@@ -4,11 +4,14 @@ import github.ponyhuang.gimi.domain.a2a.model.RemoteAgentConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
-/** 远程 A2A agent 配置的持久化端口；实现方负责加密存储与跨进程一致的 revision 递增。 */
+/** 远程 A2A agent 配置的持久化端口；实现方负责加密存储与进程内单调 revision 递增。 */
 interface RemoteAgentRepository {
 
     /** 每次配置变更自增的版本号，作为 Agent 运行时缓存键的配置维度。 */
     val revision: StateFlow<Long>
+
+    /** 读取失败时进入只读态，保留原始存储；重新创建仓库后重试读取。 */
+    val storageError: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(false)
 
     fun observeAgents(): Flow<List<RemoteAgentConfig>>
 

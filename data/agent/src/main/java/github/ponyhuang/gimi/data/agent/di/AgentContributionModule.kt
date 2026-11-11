@@ -15,6 +15,7 @@ import github.ponyhuang.gimi.data.agent.contribution.PluginToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.RemoteAgentContribution
 import github.ponyhuang.gimi.data.agent.contribution.SkillToolContribution
 import github.ponyhuang.gimi.data.agent.contribution.SandboxToolContribution
+import github.ponyhuang.gimi.data.agent.phone.DirectPhoneContribution
 
 /**
  * Agent 能力贡献方多绑定注册。
@@ -70,4 +71,8 @@ abstract class AgentContributionModule {
     @Binds
     @IntoSet
     abstract fun bindRemoteAgentContribution(implementation: RemoteAgentContribution): AgentContribution
+
+    @Binds
+    @IntoSet
+    abstract fun bindDirectPhoneContribution(implementation: DirectPhoneContribution): AgentContribution
 }

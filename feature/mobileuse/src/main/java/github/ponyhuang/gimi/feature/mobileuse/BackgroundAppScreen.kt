@@ -32,13 +32,17 @@ fun BackgroundAppScreen(
     frame: @Composable (Modifier) -> Unit,
     modifier: Modifier = Modifier,
     toolbarModifier: Modifier = Modifier,
+    floatingWindow: Boolean = false,
     dialogHost: @Composable (onDismiss: () -> Unit, content: @Composable () -> Unit) -> Unit = { dismiss, content ->
         Dialog(onDismissRequest = dismiss, content = content)
     },
 ) {
-    Surface(modifier = modifier, shape = RectangleShape,
-        color = MaterialTheme.colorScheme.surfaceContainer, shadowElevation = if (smallWindow) 8.dp else 0.dp) {
-        BackgroundAppViewport(state, smallWindow, onAction, onCollapse, onSwitchWindow, frame, toolbarModifier)
+    if (floatingWindow || smallWindow) {
+        BackgroundAppFloatingPreview(state, compact = smallWindow, onExpand = onSwitchWindow, onCollapse = onCollapse,
+            onAction = onAction, frame = frame, modifier = modifier, dragModifier = toolbarModifier)
+    } else Surface(modifier = modifier, shape = RectangleShape,
+        color = MaterialTheme.colorScheme.surfaceContainer) {
+        BackgroundAppViewport(state, false, onAction, onCollapse, onSwitchWindow, frame, toolbarModifier)
     }
     if (state.rotationUnavailable) {
         dialogHost({ onAction(BackgroundAppAction.DismissRotationError) }) {

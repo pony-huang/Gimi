@@ -5,7 +5,7 @@ import github.ponyhuang.gimi.core.audio.VoiceAudioRecorder
 import github.ponyhuang.gimi.domain.assistant.model.AssistantInvocationSource
 import github.ponyhuang.gimi.domain.assistant.model.AssistantPresentationEvent
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
-import github.ponyhuang.gimi.domain.speech.repository.SpeechRecognitionRepository
+import github.ponyhuang.gimi.domain.voice.repository.SpeechRecognitionRepository
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton

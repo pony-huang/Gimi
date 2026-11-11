@@ -1,6 +1,9 @@
 <resources>
-    <string name="recommendation_settings_title">个性化服务</string>
+    <string name="recommendation_settings_title">个性化选项</string>
     <string name="recommendation_settings_section">推荐更新</string>
+    <string name="recommendation_update_page_title">推荐设置</string>
+    <string name="recommendation_update_nav_section">推荐</string>
+    <string name="recommendation_update_nav_subtitle">智能推荐、更新频率与手动刷新</string>
     <string name="recommendation_enabled_title">开启智能推荐</string>
     <string name="recommendation_enabled_subtitle">在空会话中显示由 Agent 生成的任务建议</string>
     <string name="recommendation_fast_model_required_title">需要先配置快速模型</string>
@@ -19,10 +22,21 @@
     <string name="recommendation_a2ui_note">卡片由模型按需生成，响应可能较慢，并会额外消耗 Token。</string>
     <string name="recommendation_a2ui_title">A2UI 交互卡片</string>
     <string name="recommendation_a2ui_subtitle">允许助手用原生卡片展示表单、控件和结构化结果</string>
+    <string name="recommendation_voice_section">语音</string>
+    <string name="recommendation_simple_chat_title">简单聊天预设</string>
+    <string name="recommendation_simple_chat_subtitle">自定义简单聊天使用的提示词</string>
     <string name="recommendation_tools_section">工具</string>
     <string name="recommendation_tool_loading_note">全量加载随轮直接可用，但会占用更多上下文和 Token；按需加载可减少消耗。</string>
     <string name="recommendation_close">关闭</string>
     <string name="recommendation_tool_loading_title">工具加载</string>
     <string name="recommendation_tool_loading_always">全量加载，随轮就绪</string>
     <string name="recommendation_tool_loading_on_demand">按需加载，节省上下文</string>
+    <string name="recommendation_device_section">设备控制</string>
+    <string name="recommendation_mobile_use_title">Shizuku</string>
+    <string name="recommendation_mobile_use_subtitle">Agent 后台操作其他应用</string>
+    <string name="recommendation_theme_section">主题</string>
+    <string name="recommendation_theme_mode_title">主题模式</string>
+    <string name="recommendation_theme_system">跟随系统</string>
+    <string name="recommendation_theme_light">白天</string>
+    <string name="recommendation_theme_dark">夜间</string>
 </resources>

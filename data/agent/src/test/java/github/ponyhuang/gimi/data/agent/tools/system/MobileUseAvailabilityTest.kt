@@ -7,7 +7,7 @@ import com.google.adk.kt.tools.ToolContext
 import github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata
 import github.ponyhuang.gimi.data.agent.tools.ToolRunMetadata
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseAvailability
-import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
+import github.ponyhuang.gimi.domain.mobileuse.MobileUseController
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import io.mockk.every
 import io.mockk.mockk
@@ -19,7 +19,7 @@ import org.junit.Test
 class MobileUseAvailabilityTest {
     @Test
     fun toolsetFollowsShizukuRuntimeAndVisionCapability() = runTest {
-        val repository = mockk<MobileUseRepository>()
+        val repository = mockk<MobileUseController>()
         val toolset = MobileUseTools(repository)
         every { repository.availability() } returns MobileUseAvailability.DISABLED
         assertEquals(emptyList<Any>(), toolset.getTools(context(supportsImages = true)))
@@ -34,7 +34,7 @@ class MobileUseAvailabilityTest {
 
     @Test
     fun instructionsAreIncludedOnlyWhenMobileUseIsOffered() = runTest {
-        val repository = mockk<MobileUseRepository>()
+        val repository = mockk<MobileUseController>()
         val toolset = MobileUseTools(repository)
         val readonly = context(supportsImages = true)
         val toolContext = mockk<ToolContext> { every { context } returns readonly }
@@ -46,14 +46,15 @@ class MobileUseAvailabilityTest {
         every { repository.availability() } returns MobileUseAvailability.READY
         val processed = toolset.processLlmRequest(toolContext, request)
         val instructions = processed.config.systemInstruction?.parts.orEmpty()
-            .mapNotNull { it.text }.joinToString("\n")
-            .replace(Regex("\\s+"), " ")
-        assertTrue(instructions.contains("background display associated with this chat"))
-        assertTrue(instructions.contains("Normal turn completion releases this execution"))
-        assertTrue(instructions.contains("keeping the background display and preview windows available"))
-        assertTrue(instructions.contains("Call mobile_stop only when the user requests closing"))
-        assertTrue(instructions.contains("closes the background display and preview windows"))
-        assertTrue(instructions.contains("request passwords or verification codes in chat or tool arguments"))
+            .mapNotNull { it.text }.joinToString("\n").replace(Regex("\\s+"), " ")
+        assertTrue(instructions.contains("current mobile backend"))
+        assertTrue(instructions.contains("managed internally; do not pass observationId"))
+        assertTrue(instructions.contains("mobile_type inserts at the current focused field"))
+        assertTrue(instructions.contains("Carousel banners, ads, video playback and clocks are unrelated animations"))
+        assertTrue(instructions.contains("do not wait for the whole screen to become settled"))
+        assertTrue(instructions.contains("soft keyboard is intentionally absent"))
+        assertTrue(instructions.contains("Do not wait for a keyboard"))
+        assertTrue(instructions.contains("use clipboard paste as a fallback"))
     }
 
     private fun context(supportsImages: Boolean): ReadonlyContext = mockk {

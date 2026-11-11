@@ -50,7 +50,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceSaveBar
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -317,7 +317,7 @@ internal fun McpEditorSaveBar(state: McpSettingsUiState, onAction: (McpSettingsA
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun McpServerEditorScreenLoadingPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         McpServerEditorScreen(
             state = McpSettingsUiState(editor = null),
             onAction = {},
@@ -329,7 +329,7 @@ private fun McpServerEditorScreenLoadingPreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun McpServerEditorScreenLoadedPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         McpServerEditorScreen(
             state = McpSettingsUiState(
                 editor = McpEditorDraft(

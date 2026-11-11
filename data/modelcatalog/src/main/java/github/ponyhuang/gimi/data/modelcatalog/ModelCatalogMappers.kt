@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.data.modelcatalog
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceKind
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.withDefaultAttachmentCapabilities
 
@@ -21,14 +22,16 @@ fun LLMModelProvider.toDomain(): LLMModelSetting = LLMModelSetting(
     iconRes = iconRes,
     homepageUrl = homepageUrl,
     keyHelpUrl = keyHelpUrl,
+    kind = kind,
+    endpointSchemes = endpointSchemes,
+    workspaceId = workspaceId,
 )
 
 fun Model.toData(): LLMModelItem = LLMModelItem(
     modelId = id,
     modelName = name,
-    isStt = isStt,
-    isTts = isTts,
     capabilities = capabilities,
+    multimodal = multimodal,
 )
 
 fun ApiProtocol.toData(): ApiBaseType = when (this) {
@@ -50,9 +53,8 @@ private fun LLMModelGroup.toDomain(): ModelGroup = ModelGroup(
         Model(
             id = item.modelId,
             name = item.modelName,
-            isStt = item.isStt,
-            isTts = item.isTts,
-            capabilities = item.capabilities.withDefaultAttachmentCapabilities(),
+            capabilities = item.capabilities,
+            multimodal = item.multimodal.withDefaultAttachmentCapabilities(),
         )
     },
 )

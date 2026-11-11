@@ -70,11 +70,15 @@ class XiaohongshuPlugin internal constructor(
             ),
         )
         ACTION_LOGOUT -> PluginConfigActionExecution.Completed(
-            runCatching { service.invoke("delete_cookies", emptyMap()) }
-                .fold(
-                    onSuccess = { PluginActionResult(message = "已退出小红书登录") },
-                    onFailure = { PluginActionResult(it.message ?: "退出登录失败", success = false) },
-                ),
+            try {
+                service.invoke("delete_cookies", emptyMap())
+                PluginActionResult(message = "已退出小红书登录")
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                // 取消必须传播：runCatching 会把会话取消吞成失败结果。
+                throw cancelled
+            } catch (error: Exception) {
+                PluginActionResult(error.message ?: "退出登录失败", success = false)
+            },
         )
         else -> PluginConfigActionExecution.Completed(
             PluginActionResult(message = "不支持的操作：$actionId", success = false),

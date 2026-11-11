@@ -97,11 +97,11 @@ class ToolRunMetadataTest {
 
         assertEquals(
             "github",
-            json.getValue("selkie.tool_config.mcp_server_ids").jsonArray.single()
+            json.getValue("gimi.tool_config.mcp_server_ids").jsonArray.single()
                 .jsonPrimitive.content,
         )
         assertFalse(
-            json.getValue("selkie.allow_confirmation_required_tools").jsonPrimitive.content
+            json.getValue("gimi.allow_confirmation_required_tools").jsonPrimitive.content
                 .toBoolean(),
         )
     }

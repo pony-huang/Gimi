@@ -1,6 +1,7 @@
 package github.ponyhuang.gimi.feature.settings
 
 import android.content.res.Configuration
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,8 +14,8 @@ import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Security
@@ -22,6 +23,9 @@ import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Modifier
@@ -40,8 +44,15 @@ import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
+/**
+ * 设置一级页：按用户实际使用频率排列分组与条目。
+ *
+ * 分组顺序为「模型 → 助手偏好 → 能力扩展 → 文件与工作区 → 系统 → 关于」：
+ * 模型是应用可用性的前提，助手偏好里的开关每轮对话都会生效，
+ * 能力扩展与文件工作区属于按需配置的进阶入口，权限与关于最少被访问，因此后置。
+ */
 @Composable
 fun SettingsScreen(
     appVersionName: String,
@@ -67,6 +78,12 @@ fun SettingsScreen(
                                 action = SettingsAction.OpenModelService,
                             ),
                             SettingsNavigationItem(
+                                icon = Icons.Default.Mic,
+                                title = stringResource(R.string.settings_speech_models_title),
+                                subtitle = stringResource(R.string.settings_speech_models_subtitle),
+                                action = SettingsAction.OpenSpeechModels,
+                            ),
+                            SettingsNavigationItem(
                                 icon = Icons.Default.Tune,
                                 title = stringResource(R.string.settings_default_model_title),
                                 subtitle = stringResource(R.string.settings_default_model_subtitle),
@@ -77,6 +94,32 @@ fun SettingsScreen(
                     )
                 }
             }
+            // 助手偏好紧跟模型：这里的开关决定每轮回复的呈现与工具开销，
+            // 是除模型外用户调整最频繁的一组，因此排在能力扩展之前。
+            item { PreferenceSectionTitle(stringResource(R.string.settings_group_assistant)) }
+            item {
+                PreferenceGroupCard {
+                    SettingsNavigationItems(
+                        items = listOf(
+                            SettingsNavigationItem(
+                                icon = Icons.Default.AutoAwesome,
+                                title = stringResource(R.string.settings_recommendations_title),
+                                subtitle = stringResource(R.string.settings_recommendations_subtitle),
+                                action = SettingsAction.OpenRecommendations,
+                            ),
+                            SettingsNavigationItem(
+                                icon = Icons.Default.Psychology,
+                                title = stringResource(R.string.settings_memory_title),
+                                subtitle = stringResource(R.string.settings_memory_subtitle),
+                                action = SettingsAction.OpenMemory,
+                            ),
+                        ),
+                        onAction = onAction,
+                    )
+                }
+            }
+            // 能力扩展按接入面排序：MCP 与 Skills 是日常对话最常触发的外部能力，
+            // 沙盒与插件面向进阶用法，AppFunction 与 A2A 依赖特定外部环境，启用面最窄。
             item { PreferenceSectionTitle(stringResource(R.string.settings_group_extensions)) }
             item {
                 PreferenceGroupCard {
@@ -89,16 +132,10 @@ fun SettingsScreen(
                                 action = SettingsAction.OpenMcpServers,
                             ),
                             SettingsNavigationItem(
-                                icon = Icons.Default.Hub,
-                                title = stringResource(R.string.settings_remote_agents_title),
-                                subtitle = stringResource(R.string.settings_remote_agents_subtitle),
-                                action = SettingsAction.OpenRemoteAgents,
-                            ),
-                            SettingsNavigationItem(
-                                icon = Icons.Default.Apps,
-                                title = stringResource(R.string.settings_appfunction_title),
-                                subtitle = stringResource(R.string.settings_appfunction_subtitle),
-                                action = SettingsAction.OpenAppFunctions,
+                                icon = Icons.Default.School,
+                                title = stringResource(R.string.settings_skills_title),
+                                subtitle = stringResource(R.string.settings_skills_subtitle),
+                                action = SettingsAction.OpenSkills,
                             ),
                             SettingsNavigationItem(
                                 icon = Icons.Default.Code,
@@ -107,16 +144,22 @@ fun SettingsScreen(
                                 action = SettingsAction.OpenSandbox,
                             ),
                             SettingsNavigationItem(
-                                icon = Icons.Default.School,
-                                title = stringResource(R.string.settings_skills_title),
-                                subtitle = stringResource(R.string.settings_skills_subtitle),
-                                action = SettingsAction.OpenSkills,
-                            ),
-                            SettingsNavigationItem(
                                 icon = Icons.Default.Extension,
                                 title = stringResource(R.string.settings_plugins_title),
                                 subtitle = stringResource(R.string.settings_plugins_subtitle),
                                 action = SettingsAction.OpenPlugins,
+                            ),
+                            SettingsNavigationItem(
+                                icon = Icons.Default.Apps,
+                                title = stringResource(R.string.settings_appfunction_title),
+                                subtitle = stringResource(R.string.settings_appfunction_subtitle),
+                                action = SettingsAction.OpenAppFunctions,
+                            ),
+                            SettingsNavigationItem(
+                                icon = Icons.Default.Hub,
+                                title = stringResource(R.string.settings_remote_agents_title),
+                                subtitle = stringResource(R.string.settings_remote_agents_subtitle),
+                                action = SettingsAction.OpenRemoteAgents,
                             ),
                         ),
                         onAction = onAction,
@@ -160,28 +203,6 @@ fun SettingsScreen(
                     )
                 }
             }
-            item { PreferenceSectionTitle(stringResource(R.string.settings_group_assistant)) }
-            item {
-                PreferenceGroupCard {
-                    SettingsNavigationItems(
-                        items = listOf(
-                            SettingsNavigationItem(
-                                icon = Icons.Default.Psychology,
-                                title = stringResource(R.string.settings_memory_title),
-                                subtitle = stringResource(R.string.settings_memory_subtitle),
-                                action = SettingsAction.OpenMemory,
-                            ),
-                            SettingsNavigationItem(
-                                icon = Icons.Default.AutoAwesome,
-                                title = stringResource(R.string.settings_recommendations_title),
-                                subtitle = stringResource(R.string.settings_recommendations_subtitle),
-                                action = SettingsAction.OpenRecommendations,
-                            ),
-                        ),
-                        onAction = onAction,
-                    )
-                }
-            }
             item { PreferenceSectionTitle(stringResource(R.string.settings_group_permissions)) }
             item {
                 PreferenceGroupCard {
@@ -192,12 +213,6 @@ fun SettingsScreen(
                                 title = stringResource(R.string.settings_permissions_title),
                                 subtitle = stringResource(R.string.settings_permissions_subtitle),
                                 action = SettingsAction.OpenPermissions,
-                            ),
-                            SettingsNavigationItem(
-                                icon = Icons.Default.Phonelink,
-                                title = stringResource(R.string.settings_mobile_use_title),
-                                subtitle = stringResource(R.string.settings_mobile_use_subtitle),
-                                action = SettingsAction.OpenMobileUse,
                             ),
                         ),
                         onAction = onAction,
@@ -260,7 +275,7 @@ private annotation class SettingsFormFactorPreviews
 @SettingsFormFactorPreviews
 @Composable
 private fun SettingsHomePreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PreferenceScaffold(style = PreferenceStyle.Compact, title = stringResource(R.string.settings_title), onBack = {}) { modifier ->
             SettingsScreen(
                 appVersionName = "1.0",
@@ -308,7 +323,7 @@ private fun SettingsExportEmptyPreview() {
 
 @Composable
 private fun SettingsExportStatePreview(state: SessionExportUiState) {
-    AsssistantaiTheme {
+    GimiTheme {
         SettingsScreen(appVersionName = "1.0", onAction = {}, exportState = state)
     }
 }

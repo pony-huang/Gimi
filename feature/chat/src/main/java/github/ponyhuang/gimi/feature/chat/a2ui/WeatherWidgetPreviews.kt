@@ -8,7 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @Preview(name = "当天天气 · 浅色", widthDp = 390, showBackground = true)
 @Composable
@@ -28,7 +28,7 @@ private fun WeatherTodayMissingPreview() = WeatherPreview(false, WeatherConditio
 
 @Composable
 private fun WeatherPreview(dark: Boolean, condition: WeatherConditionCode, missing: Boolean = false) {
-    AsssistantaiTheme(darkTheme = dark) {
+    GimiTheme(darkTheme = dark) {
         Surface(color = MaterialTheme.colorScheme.background) {
             Box(Modifier.padding(16.dp)) {
                 WeatherTodayWidget(WeatherWidgetData(

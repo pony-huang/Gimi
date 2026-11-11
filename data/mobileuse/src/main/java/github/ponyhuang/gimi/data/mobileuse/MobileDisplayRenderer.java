@@ -36,6 +36,7 @@ final class MobileDisplayRenderer implements AutoCloseable {
     private long lastCapture;
     private boolean closed;
     private boolean renderPending;
+    private boolean hasFrame;
     private final Runnable captureLatest = () -> {
         if (!closed) {
             draw(capture, width, height);
@@ -115,6 +116,8 @@ final class MobileDisplayRenderer implements AutoCloseable {
         this.width = width;
         this.height = height;
         texture.setDefaultBufferSize(width,height);
+        hasFrame = false;
+        handler.removeCallbacks(captureLatest);
         capture = window(surface);
         lastCapture = 0;
     }
@@ -128,7 +131,8 @@ final class MobileDisplayRenderer implements AutoCloseable {
             preview = surface == null ? EGL14.EGL_NO_SURFACE : window(surface);
             previewWidth = width;
             previewHeight = height;
-            if (surface != null) render();
+            // 切窗只重绘预览中的最近一帧，不消费输入纹理或伪造新的 AI 截图。
+            if (surface != null && hasFrame) draw(preview,previewWidth,previewHeight);
             return null;
         });
     }
@@ -139,6 +143,7 @@ final class MobileDisplayRenderer implements AutoCloseable {
         // SurfaceTexture 消费最新缓冲，窗口不会积压历史帧。截图限频，预览按绘制帧刷新。
         texture.updateTexImage();
         texture.getTransformMatrix(matrix);
+        hasFrame = true;
         long now = SystemClock.elapsedRealtime();
         if (now - lastCapture >= 150) {
             handler.removeCallbacks(captureLatest);

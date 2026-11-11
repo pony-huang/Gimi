@@ -50,7 +50,7 @@ data class RecommendationSnapshot(
 }
 
 /**
- * 个性化服务设置。
+ * 个性化选项设置。
  *
  * @property enabled 是否展示并安排更新推荐。
  * @property intervalHours WorkManager 周期的大致小时数。

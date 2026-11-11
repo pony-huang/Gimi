@@ -45,4 +45,9 @@
     <string name="a2a_card_provider">提供方</string>
     <string name="a2a_card_docs">文档</string>
     <string name="a2a_card_protocol_value">协议 %1$s</string>
+    <string name="a2a_storage_error">配置读取失败，已禁止写入以保留原始数据。请解锁设备后重启应用重试。</string>
+    <string name="a2a_invalid_name">名称须为字母数字组合，可用单个点、空格、下划线或连字符分隔；可以下划线开头，不能为 user。</string>
+    <string name="a2a_invalid_url">请输入有效的 HTTP 或 HTTPS 地址，且不含用户名、密码或片段。</string>
+    <string name="a2a_invalid_token">Bearer 凭据不能包含换行符。</string>
+    <string name="a2a_duplicate_name">该 Agent 名称已存在，请使用其他名称。</string>
 </resources>

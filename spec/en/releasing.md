@@ -2,6 +2,22 @@
 
 English · [简体中文](../zh/releasing.md)
 
+## Workflow responsibilities
+
+Workflow files under `.github/workflows/` are the source of truth:
+
+- `ci.yml` delegates development branch verification to `verify.yml`, which runs release-tool tests,
+  architecture checks, JVM tests, debug App assembly, plugin compilation, and `app:lintDebug` on
+  Ubuntu with JDK 21. See Day-to-day development below for trigger exclusions.
+- `release-please.yml` runs on main pushes or manual dispatch, maintains version PRs, and uses
+  `prepare_version_pr.py` to allocate `releaseVersionCode` once per PR without dispatching CI.
+  When a release is created, it explicitly calls `release.yml` to avoid `GITHUB_TOKEN` event suppression.
+- `release.yml` accepts version tag pushes, manual dispatch with an existing tag, or reusable calls.
+  It builds and validates signed App/plugin APKs from the exact tagged commit, uploads complete
+  artifacts to a Draft, then publishes an immutable GitHub Release. It does not publish to Google Play.
+- App and plugins share `version.txt` and `gradle.properties`'s `releaseVersionCode` through
+  `gimi.android.application`.
+
 ## Initial setup
 
 The release baseline is calibrated to the latest stable GitHub release, `0.10.2`, and recorded in

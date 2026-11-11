@@ -2,6 +2,15 @@
 
 [English](../en/releasing.md) · 简体中文
 
+## 工作流职责
+
+`.github/workflows/` 下的工作流文件是实际行为的依据：
+
+- `ci.yml` 将开发分支验证交给 `verify.yml`，在 Ubuntu / JDK 21 上运行发布工具测试、架构检查、JVM 单测、App Debug 打包、插件编译和 `app:lintDebug`。触发排除规则见下文“日常开发”。
+- `release-please.yml` 在 main 推送或手动派发时运行，维护版本 PR，并通过 `prepare_version_pr.py` 为每个 PR 分配一次 `releaseVersionCode`，不派发 CI。创建 Release 后显式调用 `release.yml`，避免 `GITHUB_TOKEN` 事件抑制。
+- `release.yml` 接受版本 tag 推送、指定已有 tag 的手动派发或可复用调用，从准确的 tag 提交构建并校验正式签名的 App/插件 APK，完整上传到 Draft 后公开为不可变的 GitHub Release，不发布到 Google Play。
+- App 和插件通过 `gimi.android.application` 共享 `version.txt` 和 `gradle.properties` 中的 `releaseVersionCode`。
+
 ## 首次启用
 
 发布基线已按 GitHub 最新正式版校准为 `0.10.2`，同步记录在 `version.txt`、`.release-please-manifest.json` 和 `CHANGELOG.md`；旧代码中的 `0.6.x` 不再作为版本依据。`bootstrap-sha` 指向 v0.10.2 对应提交 `c53a311cfc95adc2553a610ccccf9e778c436f93`，在找不到历史 Release 时作为提交扫描起点。后续版本 PR 从已发布版本继续推进，不重新发布 v0.10.2。

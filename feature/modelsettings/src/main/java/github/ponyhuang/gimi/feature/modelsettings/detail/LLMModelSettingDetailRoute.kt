@@ -28,18 +28,16 @@ fun LLMModelSettingDetailRoute(
     val noBrowser = stringResource(R.string.modelsettings_no_browser)
     val notFound = stringResource(R.string.modelsettings_notice_service_not_found)
     val saved = stringResource(R.string.modelsettings_saved)
-    val deleted = stringResource(R.string.modelsettings_deleted)
     val blocked = stringResource(R.string.modelsettings_agent_mutation_blocked)
     BackHandler { viewModel.onAction(LLMModelSettingDetailAction.Back) }
     LaunchedEffect(serviceId) { viewModel.onAction(LLMModelSettingDetailAction.Load(serviceId)) }
-    LaunchedEffect(viewModel, onBack, notFound, saved, deleted, blocked) {
+    LaunchedEffect(viewModel, onBack, notFound, saved, blocked) {
         viewModel.effects.collect { effect ->
             when (effect) {
                 is LLMModelSettingDetailEffect.ShowToast -> Toast.makeText(context, when (effect.notice) {
                     is LLMModelSettingDetailNotice.ModelsRefreshed -> context.getString(R.string.modelsettings_notice_models_synchronized, effect.notice.count)
                     LLMModelSettingDetailNotice.SettingNotFoundLLM -> notFound
                     LLMModelSettingDetailNotice.Saved -> saved
-                    LLMModelSettingDetailNotice.Deleted -> deleted
                     LLMModelSettingDetailNotice.AgentMutationBlocked -> blocked
                 }, Toast.LENGTH_SHORT).show()
                 LLMModelSettingDetailEffect.Close -> onBack()

@@ -4,6 +4,8 @@ import github.ponyhuang.gimi.core.common.coroutine.IoDispatcher
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceKind
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnectionResult
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelServiceRemoteGateway
 import java.io.IOException
 import javax.inject.Inject
@@ -25,11 +27,19 @@ class OpenAiCompatibleModelServiceGateway @Inject constructor(
 ) : ModelServiceRemoteGateway {
     private val json = Json { ignoreUnknownKeys = true }
 
-    override suspend fun validateConnection(service: LLMModelSetting): Boolean = withContext(ioDispatcher) {
-        execute(modelsRequest(service)).use { it.code == 200 }
+    override suspend fun validateConnection(service: LLMModelSetting): ServiceConnectionResult = withContext(ioDispatcher) {
+        execute(modelsRequest(service)).use { response ->
+            when (response.code) {
+                200 -> ServiceConnectionResult.Succeeded
+                401, 403 -> ServiceConnectionResult.AuthFailed
+                else -> ServiceConnectionResult.NetworkFailed
+            }
+        }
     }
 
     override suspend fun fetchModels(service: LLMModelSetting): List<Model> = withContext(ioDispatcher) {
+        // 非聊天服务没有模型目录接口，其模型清单由内置目录或手动添加给出。
+        require(service.kind == ModelServiceKind.Chat) { "非聊天服务不提供模型目录接口" }
         execute(modelsRequest(service)).use { response ->
             check(response.isSuccessful) { "Model list request failed with HTTP ${response.code}" }
             json.decodeFromString<OpenAiModelsResponse>(response.body.string()).data

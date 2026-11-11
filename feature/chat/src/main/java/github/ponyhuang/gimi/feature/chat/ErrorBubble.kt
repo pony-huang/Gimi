@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.conversation.model.Message
 import github.ponyhuang.gimi.domain.conversation.model.Messages
 import github.ponyhuang.gimi.ui.chatcontent.ChatMessageBubble
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /**
  * 错误气泡 — 用 `errorContainer` 红色色块展示 `Message.error`。
@@ -51,7 +51,7 @@ fun ErrorBubble(
 @Preview(showBackground = true)
 @Composable
 private fun ErrorBubblePreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ErrorBubble(message = Messages.fromError("rate limit exceeded"))
     }
 }

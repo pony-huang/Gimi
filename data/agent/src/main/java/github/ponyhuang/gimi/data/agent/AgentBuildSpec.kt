@@ -19,6 +19,10 @@ import github.ponyhuang.gimi.pluginapi.AgentPlugin
  * @property reasoningEffort 当前会话的推理强度，映射为 ADK ThinkingLevel。
  * @property pluginRuntime 与本次构建绑定的插件运行时快照；由缓存查找时点统一捕获，
  *   保证插件 revision（缓存键组成部分）与实际装配的插件一致。
+ * @property instructionSuffix 追加在默认助手指令之后的场景化补充（如实时语音的朗读要求）；
+ *   参与缓存键，不同后缀各自构建 Agent。
+ * @property a2uiSupported 调用方是否提供 A2UI 渲染能力（执行时传入 capabilities）。
+ *   为 false 时不声明 `generate_a2ui`，避免语音等无渲染端看到必然失败的工具；参与缓存键。
  */
 data class AgentBuildSpec(
     val selection: ModelSelection? = null,
@@ -26,4 +30,6 @@ data class AgentBuildSpec(
     val reasoningEffort: ReasoningEffort = ReasoningEffort.MEDIUM,
     val pluginRuntime: PluginRuntimeSnapshot<AgentPlugin>,
     val thinkingEnabled: Boolean = true,
+    val instructionSuffix: String = "",
+    val a2uiSupported: Boolean = true,
 )

@@ -69,6 +69,14 @@ class GitHubPluginReleaseRepository internal constructor(
         if (name.isEmpty() || name.length > MAX_ASSET_NAME_LENGTH) return null
         // 只接受 HTTPS 直链，避免降级为明文下载。
         if (!dto.downloadUrl.startsWith("https://", ignoreCase = true)) return null
+        // 下载主机限定 GitHub 官方域，防止 API 响应被篡改后把下载引流到任意主机。
+        // java.net.URI 解析，JVM 单测可直接验证。
+        val host = try {
+            java.net.URI(dto.downloadUrl).host?.lowercase()
+        } catch (_: java.net.URISyntaxException) {
+            null
+        }
+        if (host == null || host !in TRUSTED_DOWNLOAD_HOSTS) return null
         if (dto.size < 0) return null
         val sha256 = dto.digest
             ?.takeIf { it.startsWith(SHA256_PREFIX, ignoreCase = true) }
@@ -89,5 +97,12 @@ class GitHubPluginReleaseRepository internal constructor(
         const val MAX_ASSET_NAME_LENGTH = 256
         const val SHA256_PREFIX = "sha256:"
         val SHA256_PATTERN = Regex("[a-fA-F0-9]{64}")
+
+        // GitHub Release 资产的合法下载域（api.github.com 直链与 objects/release-assets CDN）。
+        val TRUSTED_DOWNLOAD_HOSTS = setOf(
+            "github.com",
+            "objects.githubusercontent.com",
+            "release-assets.githubusercontent.com",
+        )
     }
 }

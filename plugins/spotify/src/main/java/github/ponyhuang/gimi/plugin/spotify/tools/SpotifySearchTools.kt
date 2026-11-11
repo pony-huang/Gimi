@@ -60,8 +60,8 @@ internal fun searchTools(api: SpotifyApi): List<BaseTool> = listOf(
         val queryParams = buildMap<String, Any?> {
             put("q", query)
             put("type", type)
-            put("limit", intArg(args, "limit", 10))
-            put("offset", intArg(args, "offset", 0))
+            put("limit", clampedIntArg(args, "limit", 10, 1, 10))
+            put("offset", clampedIntArg(args, "offset", 0, 0, 999))
             // market omitted by default: Spotify rejects `from_token` on /search,
             // and an explicit code restricts to one region. Caller may opt in.
             strArg(args, "market")?.let { put("market", it) }
@@ -149,8 +149,8 @@ internal fun searchTools(api: SpotifyApi): List<BaseTool> = listOf(
     ) { args ->
         val id = strArg(args, "album_id") ?: throw IllegalStateException("Missing parameter album_id")
         val query = buildMap<String, Any?> {
-            put("limit", intArg(args, "limit", 50))
-            put("offset", intArg(args, "offset", 0))
+            put("limit", clampedIntArg(args, "limit", 50, 0, 50))
+            put("offset", clampedIntArg(args, "offset", 0, 0, 999))
             strArg(args, "market")?.let { put("market", it) }
         }
         val json = api.get("/albums/$id/tracks", query)

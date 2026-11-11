@@ -17,6 +17,8 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import org.json.JSONTokener
 import kotlin.time.Duration.Companion.milliseconds
@@ -28,12 +30,26 @@ internal class AndroidXiaohongshuBrowserGateway(
     private val mainHandler = Handler(Looper.getMainLooper())
     private var webView: WebView? = null
 
-    override suspend fun navigate(url: String) = withTimeout(NAVIGATION_TIMEOUT_MS.milliseconds) {
-        suspendCancellableCoroutine { continuation ->
-            mainHandler.post {
-                navContinuation = continuation
-                navCompleted = false
-                getOrCreateWebView().loadUrl(upgradeToHttps(url))
+    /** 导航互斥：navContinuation/navCompleted 是单例可变状态，并发 navigate 会互相覆盖等待者。 */
+    private val navigationMutex = Mutex()
+
+    override suspend fun navigate(url: String) = navigationMutex.withLock {
+        withTimeout(NAVIGATION_TIMEOUT_MS.milliseconds) {
+            suspendCancellableCoroutine { continuation ->
+                // 取消后清理等待者，避免残留的 continuation 被下一次导航误 resume。
+                continuation.invokeOnCancellation {
+                    mainHandler.post {
+                        if (navContinuation === continuation) {
+                            navContinuation = null
+                            navCompleted = false
+                        }
+                    }
+                }
+                mainHandler.post {
+                    navContinuation = continuation
+                    navCompleted = false
+                    getOrCreateWebView().loadUrl(upgradeToHttps(url))
+                }
             }
         }
     }
@@ -47,10 +63,17 @@ internal class AndroidXiaohongshuBrowserGateway(
         return false
     }
 
-    override suspend fun evaluate(script: String): String? = suspendCancellableCoroutine { continuation ->
-        mainHandler.post {
-            getOrCreateWebView().evaluateJavascript(script) { raw ->
-                if (continuation.isActive) continuation.resume(decodeWebViewResult(raw))
+    override suspend fun evaluate(script: String): String? = withTimeout(EVALUATE_TIMEOUT_MS.milliseconds) {
+        suspendCancellableCoroutine { continuation ->
+            mainHandler.post {
+                try {
+                    getOrCreateWebView().evaluateJavascript(script) { raw ->
+                        if (continuation.isActive) continuation.resume(decodeWebViewResult(raw))
+                    }
+                } catch (failure: Throwable) {
+                    // WebView 已销毁等场景：立即失败，不让调用方等超时。
+                    if (continuation.isActive) continuation.resumeWithException(failure)
+                }
             }
         }
     }
@@ -61,6 +84,14 @@ internal class AndroidXiaohongshuBrowserGateway(
                 CookieManager.getInstance().flush()
                 if (continuation.isActive) continuation.resume(Unit)
             }
+        }
+    }
+
+    /** 销毁隐藏 WebView。插件与宿主进程同生命周期，正常不需要调用；测试/显式回收时使用。 */
+    override fun release() {
+        mainHandler.post {
+            webView?.destroy()
+            webView = null
         }
     }
 
@@ -100,11 +131,11 @@ internal class AndroidXiaohongshuBrowserGateway(
     private inner class GimiWebViewClient : WebViewClient() {
         override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
             val upgraded = url?.let(::upgradeToHttps)
-            if (upgraded != url) {
+            if (upgraded != null && upgraded != url) {
                 // 站点在个别流程会 http:// 重定向；强制升级 https 再加载，
                 // 避免被宿主默认的明文拦截（net::ERR_CLEARTEXT_NOT_PERMITTED）。
                 view.stopLoading()
-                view.loadUrl(upgraded!!)
+                view.loadUrl(upgraded)
                 return
             }
             navCompleted = false
@@ -115,6 +146,10 @@ internal class AndroidXiaohongshuBrowserGateway(
             request: WebResourceRequest,
         ): Boolean {
             val target = request.url.toString()
+            // 主帧导航限定小红书域名：页面/脚本无法把已登录会话引流到第三方站点。
+            if (request.isForMainFrame && !isAllowedXhsHost(target)) {
+                return true
+            }
             val upgraded = upgradeToHttps(target)
             if (upgraded != target) {
                 view.loadUrl(upgraded)
@@ -158,6 +193,9 @@ internal class AndroidXiaohongshuBrowserGateway(
         private const val TAG = "XhsBrowserGateway"
         private const val NAVIGATION_TIMEOUT_MS = 60_000L
         private const val POLL_INTERVAL_MS = 250L
+
+        /** 单次 evaluateJavascript 的超时：脚本卡死不能挂起整个工具调用。 */
+        private const val EVALUATE_TIMEOUT_MS = 15_000L
         private const val DESKTOP_USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
@@ -166,6 +204,15 @@ internal class AndroidXiaohongshuBrowserGateway(
 
 /** 已知小红书域名；这些域在个别流程会走 http:// 重定向，需升级为 https。 */
 internal val XHS_CLEARTEXT_HOSTS: Set<String> = setOf("xiaohongshu.com", "xhscdn.com", "xhslink.com")
+
+/** 主帧导航允许的小红书站点域（含子域）；资源加载不受此限制。 */
+private val XHS_ALLOWED_MAIN_FRAME_HOSTS: Set<String> = setOf("xiaohongshu.com", "xhslink.com")
+
+/** URL 主机是否属于允许主帧导航的小红书域。 */
+internal fun isAllowedXhsHost(url: String): Boolean {
+    val host = runCatching { URI(url).host?.lowercase() }.getOrNull() ?: return false
+    return XHS_ALLOWED_MAIN_FRAME_HOSTS.any { host == it || host.endsWith(".$it") }
+}
 
 /** 已知域名上的明文 URL 升级为 https（主站全 https）；其他域名原样返回，不做盲目升级。 */
 internal fun upgradeToHttps(url: String): String {

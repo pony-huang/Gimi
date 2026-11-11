@@ -23,7 +23,8 @@ internal fun RemoteAgentConfig.httpClientFor(baseHttpClient: A2AHttpClient): A2A
         StaticHeaderA2AHttpClient(
             delegate = baseHttpClient,
             headerName = "Authorization",
-            headerValue = "Bearer $bearerToken",
+            headerValue = "Bearer ${bearerToken.trim()}",
+            endpointUrl = endpointUrl,
         )
     }
 
@@ -45,6 +46,9 @@ internal fun newRemoteA2aAgent(
 /** 把异常归约为单行失败摘要；不落盘、不含凭据，供跳过上报与编辑器错误展示共用。 */
 internal fun failureSummary(failure: Throwable): String? =
     failure.message?.lineSequence()?.firstOrNull()
+        ?.replace(Regex("https?://[^\\s]+", RegexOption.IGNORE_CASE), "[endpoint]")
+        ?.replace(Regex("Bearer\\s+[^\\s]+", RegexOption.IGNORE_CASE), "Bearer [redacted]")
+        ?.take(240)
 
 /**
  * 裁剪卡片中用户可读的字段形成快照；协议版本取自接口声明，多接口时保留首个。

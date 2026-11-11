@@ -255,10 +255,18 @@ class RemoteAgentRuntimeCacheTest {
         repository.save(RemoteAgentConfig(name = "invalid/name", endpointUrl = server.url("/").toString()))
         repository.save(RemoteAgentConfig(name = "healthy", endpointUrl = server.url("/").toString()))
 
-        val agents = cache().currentSubAgents(spec)
+        var now = 0L
+        val runtimeCache = cache().also { it.nanoTime = { now } }
+        val agents = runtimeCache.currentSubAgents(spec)
 
         assertEquals(listOf("healthy"), agents.map { it.name })
         assertEquals("invalid/name", skipReporter.skipped.value.single().displayName)
+        runtimeCache.currentSubAgents(spec)
+        assertEquals(2, server.requestCount)
+        now += 60_000_000_001L
+        enqueueCard()
+        runtimeCache.currentSubAgents(spec)
+        assertEquals(3, server.requestCount)
     }
 
     @Test
@@ -314,16 +322,113 @@ class RemoteAgentRuntimeCacheTest {
     }
 
     @Test
-    fun unavailableCardInvalidatesRunnerRevisionAndCanRecoverOnNextBuild() = runBlocking {
+    fun unavailableCardKeepsRunnerKeyStableUntilCooldownThenRecovers() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(503))
         enqueueCard()
         repository.save(RemoteAgentConfig(name = "weather_agent", endpointUrl = server.url("/").toString()))
         val runtimeCache = cache()
-        val revision = runtimeCache.retryRevision
-
+        var now = 0L
+        runtimeCache.nanoTime = { now }
+        val contribution = github.ponyhuang.gimi.data.agent.contribution.RemoteAgentContribution(repository, runtimeCache)
+        val revision = contribution.revision()
         assertTrue(runtimeCache.currentSubAgents(spec).isEmpty())
-        assertTrue(runtimeCache.retryRevision > revision)
+        repeat(3) {
+            assertEquals(revision, contribution.revision())
+            assertTrue(runtimeCache.currentSubAgents(spec).isEmpty())
+        }
+        assertEquals(1, server.requestCount)
+        now += 60_000_000_001L
+        assertTrue(contribution.revision() != revision)
         assertEquals("weather_agent", runtimeCache.currentSubAgents(spec).single().name)
         assertTrue(skipReporter.skipped.value.isEmpty())
     }
+    @Test
+    fun credentialClientRejectsCrossOriginAfterAnyBuilderChain() {
+        val client = StaticHeaderA2AHttpClient(AndroidA2AHttpClient(), "Authorization", "Bearer secret",
+            server.url("/").toString())
+        val foreign = "https://untrusted.example.com/rpc"
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            client.createGet().addHeader("Accept", "application/json").url(foreign)
+        }
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            client.createPost().body("{}").addHeaders(emptyMap()).url(foreign)
+        }
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            client.createDelete().url(server.url("/").toString()).addHeader("Accept", "application/json").url(foreign)
+        }
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            StaticHeaderA2AHttpClient(AndroidA2AHttpClient(), "Authorization", "Bearer secret\nother",
+                server.url("/").toString())
+        }
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun runtimeDoesNotFollowRedirectsWithCredentials() {
+        MockWebServer().use { foreign ->
+            foreign.start()
+            server.enqueue(MockResponse().setResponseCode(307).setHeader("Location", foreign.url("/")))
+            val client = StaticHeaderA2AHttpClient(AndroidA2AHttpClient(), "Authorization", "Bearer secret",
+                server.url("/").toString())
+            // SDK 对非 2xx 会抛 HTTP 异常；只关心未向重定向目标发出任何请求。
+            runCatching { client.createPost().url(server.url("/").toString()).body("{}").post() }
+            assertEquals("Bearer secret", server.takeRequest().getHeader("Authorization"))
+            assertEquals(0, foreign.requestCount)
+        }
+    }
+
+    @Test
+    fun offlineAgentDoesNotChurnRunnerCacheAndRecoversAfterCooldown() = runBlocking {
+        repeat(2) { server.enqueue(MockResponse().setResponseCode(503)) }
+        enqueueCard()
+        repository.save(RemoteAgentConfig(name = "weather", endpointUrl = server.url("/").toString()))
+        val runtimeCache = cache()
+        var now = 0L
+        runtimeCache.nanoTime = { now }
+        val contribution = github.ponyhuang.gimi.data.agent.contribution.RemoteAgentContribution(repository, runtimeCache)
+        val access = mockk<github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository>()
+        io.mockk.every { access.defaultToolAccessMode } returns MutableStateFlow(
+            github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode.ALWAYS_AVAILABLE,
+        )
+        var builds = 0
+        var lastChildren = emptyList<com.google.adk.kt.agents.BaseAgent>()
+        val runner = AgentChatRunner(
+            factory = { buildSpec ->
+                builds++
+                lastChildren = contribution.subAgents(buildSpec)
+                github.ponyhuang.gimi.data.agent.AgentRuntime(
+                    LlmAgent(name = "Assistant", model = object : Model {
+                        override val name = "fixture"
+                        override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> = flow {}
+                    }, subAgents = lastChildren),
+                    github.ponyhuang.gimi.data.agent.ModelRuntimeMetadata(
+                        "fixture", github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol.OpenaiChatcompletions,
+                        "fixture", "https://example.com",
+                    ),
+                )
+            },
+            sessionService = com.google.adk.kt.sessions.InMemorySessionService(),
+            artifactService = null,
+            memoryService = null,
+            toolAccessRepository = access,
+            configuration = {
+                github.ponyhuang.gimi.data.agent.AgentBuildConfigurationSnapshot(
+                    contribution.revision()!!, PluginRuntimeSnapshot(0L, emptyList()),
+                )
+            },
+        )
+        repeat(4) { runner.createExecution("user", "session-$it") }
+        assertEquals(1, builds)
+        assertEquals(1, server.requestCount)
+        now += 60_000_000_001L
+        repeat(4) { runner.createExecution("user", "retry-$it") }
+        assertEquals(2, builds)
+        assertEquals(2, server.requestCount)
+        now += 60_000_000_001L
+        repeat(4) { runner.createExecution("user", "recovered-$it") }
+        assertEquals(3, builds)
+        assertEquals(3, server.requestCount)
+        assertEquals("weather", lastChildren.single().name)
+    }
+
 }

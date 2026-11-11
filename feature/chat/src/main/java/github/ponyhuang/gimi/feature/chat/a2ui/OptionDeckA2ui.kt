@@ -69,7 +69,9 @@ import kotlinx.coroutines.launch
  * 按钮和链接文案由 Agent 根据当前业务语境提供。
  *
  * 所有决定通过 server event 交给主 Agent：option_accept / option_reject
- * （context 携带 itemId、index、title、actionLabel），翻完自动发 option_exhausted。
+ * （context 携带 itemId、index、title、actionLabel、round），翻完自动发 option_exhausted。
+ * round 从 0 开始，本地"重新开始"后递增；同一 itemId 在 round > 0 再次出现表示重玩，
+ * Agent 据此避免重复执行副作用工具。
  */
 internal class ChatA2uiOptionDeck(
     private val openUrl: (String) -> Unit,
@@ -96,12 +98,12 @@ internal class ChatA2uiOptionDeck(
         val data = properties.bind(OptionDeckA2uiProperty) ?: return
         OptionDeck(
             data = data,
-            onDecision = { item, index, accepted ->
+            onDecision = { item, index, accepted, round ->
                 val actionLabel = if (accepted) data.acceptLabel else data.rejectLabel
-                dispatchAction(optionDecisionAction(item, index, accepted, actionLabel))
+                dispatchAction(optionDecisionAction(item, index, accepted, actionLabel, round))
             },
-            onExhausted = { accepted, rejected ->
-                dispatchAction(optionExhaustedAction(accepted, rejected, data.items.size))
+            onExhausted = { accepted, rejected, round ->
+                dispatchAction(optionExhaustedAction(accepted, rejected, data.items.size, round))
             },
             onOpenUrl = openUrl,
             modifier = modifier,
@@ -114,6 +116,7 @@ internal fun optionDecisionAction(
     index: Int,
     accepted: Boolean,
     actionLabel: String,
+    round: Int,
 ): Map<String, Any?> = mapOf(
     "event" to mapOf(
         "name" to if (accepted) "option_accept" else "option_reject",
@@ -122,6 +125,7 @@ internal fun optionDecisionAction(
             "index" to index,
             "title" to item.title,
             "actionLabel" to actionLabel,
+            "round" to round,
         ),
     ),
 )
@@ -131,6 +135,7 @@ internal fun optionExhaustedAction(
     acceptedCount: Int,
     rejectedCount: Int,
     total: Int,
+    round: Int,
 ): Map<String, Any?> = mapOf(
     "event" to mapOf(
         "name" to "option_exhausted",
@@ -138,6 +143,7 @@ internal fun optionExhaustedAction(
             "accepted" to acceptedCount,
             "rejected" to rejectedCount,
             "total" to total,
+            "round" to round,
         ),
     ),
 )
@@ -151,8 +157,8 @@ internal fun optionExhaustedAction(
 @Composable
 internal fun OptionDeck(
     data: OptionDeckData,
-    onDecision: (item: OptionDeckItem, index: Int, accepted: Boolean) -> Unit,
-    onExhausted: (acceptedCount: Int, rejectedCount: Int) -> Unit,
+    onDecision: (item: OptionDeckItem, index: Int, accepted: Boolean, round: Int) -> Unit,
+    onExhausted: (acceptedCount: Int, rejectedCount: Int, round: Int) -> Unit,
     onOpenUrl: (String) -> Unit,
     modifier: Modifier = Modifier,
     initialPage: Int = 0,
@@ -171,6 +177,8 @@ internal fun OptionDeck(
         mutableStateOf(initiallyAccepted + initiallyRejected)
     }
     var exhausted by remember(data) { mutableStateOf(initiallyExhausted) }
+    // 本地重开轮次；随事件上报，Agent 用它区分首轮决定与重玩，避免重复执行副作用工具。
+    var round by remember(data) { mutableIntStateOf(0) }
     var zoomedItem by remember(data) { mutableStateOf<OptionDeckItem?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -181,10 +189,10 @@ internal fun OptionDeck(
         if (current.id in decidedIds) return
         decidedIds = decidedIds + current.id
         if (accepted) acceptedCount += 1 else rejectedCount += 1
-        onDecision(current, index, accepted)
+        onDecision(current, index, accepted, round)
         if (index >= items.lastIndex) {
             exhausted = true
-            onExhausted(acceptedCount, rejectedCount)
+            onExhausted(acceptedCount, rejectedCount, round)
         } else {
             scope.launch { pagerState.animateScrollToPage(index + 1) }
         }
@@ -232,6 +240,7 @@ internal fun OptionDeck(
                     rejectedCount = 0
                     decidedIds = emptySet()
                     exhausted = false
+                    round += 1
                     scope.launch { pagerState.scrollToPage(0) }
                 },
                 modifier = Modifier.heightIn(min = 430.dp),
@@ -455,9 +464,10 @@ private fun OptionDeckArtwork(
             .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
             .background(
                 Brush.linearGradient(
+                    // 单一强调色系：tertiary 已收敛到 primary 色阶，再拿它做渐变端点会退化成同色渐变。
                     listOf(
                         MaterialTheme.colorScheme.primaryContainer,
-                        MaterialTheme.colorScheme.tertiaryContainer,
+                        MaterialTheme.colorScheme.surfaceContainerHighest,
                     ),
                 ),
             )
@@ -481,7 +491,7 @@ private fun OptionDeckArtwork(
             Icon(
                 imageVector = Icons.Rounded.AutoAwesome,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.55f),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.size(56.dp),
             )
         }

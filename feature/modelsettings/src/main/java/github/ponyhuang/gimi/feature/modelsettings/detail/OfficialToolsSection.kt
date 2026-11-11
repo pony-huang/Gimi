@@ -14,7 +14,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -33,7 +32,7 @@ import github.ponyhuang.gimi.ui.components.GimiSwitch
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 此偏好只控制聊天工具入口，不代表自动调用；服务暂停时仍可编辑并保留偏好。 */
 @Composable
@@ -51,9 +50,15 @@ fun OfficialToolsSection(service: LLMModelSetting, supported: List<OfficialToolS
         FlowRow(Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             supported.forEach { tool ->
+                val toolsEnabled = service.isOfficialToolsEnabled
+                // 禁用态逐角色降级，不用整块 alpha：否则描边与文字会一起被冲淡，
+                // 也会连带影响子内容的可读性。
                 Surface(shape = RoundedCornerShape(8.dp), color = Color.Transparent,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    modifier = Modifier.alpha(if (service.isOfficialToolsEnabled) 1f else 0.5f)) {
+                    border = BorderStroke(
+                        1.dp,
+                        if (toolsEnabled) MaterialTheme.colorScheme.outlineVariant
+                        else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f),
+                    )) {
                     Text(stringResource(when (tool.toolId) {
                         OfficialToolIds.DEEPSEEK_WEB_SEARCH, OfficialToolIds.ANTHROPIC_WEB_SEARCH,
                         OfficialToolIds.MINIMAX_WEB_SEARCH, OfficialToolIds.GEMINI_WEB_SEARCH -> R.string.modelsettings_tool_search
@@ -63,7 +68,10 @@ fun OfficialToolsSection(service: LLMModelSetting, supported: List<OfficialToolS
                         OfficialToolIds.GEMINI_GOOGLE_MAPS -> R.string.modelsettings_tool_maps
                         OfficialToolIds.GLM_WEB_SEARCH -> R.string.modelsettings_tool_glm
                         else -> R.string.modelsettings_tool_kimi_web_tools
-                    }), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                    }), style = MaterialTheme.typography.bodySmall,
+                        color = if (toolsEnabled) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
                 }
             }
         }
@@ -75,7 +83,7 @@ fun OfficialToolsSection(service: LLMModelSetting, supported: List<OfficialToolS
 @Composable
 private fun InlineExtensionsPreview(@PreviewParameter(InlineExtensionsPreviewProvider::class) protocol: ApiProtocol) {
     val service = modelServicePreviewFixture().copy(apiProtocol = protocol)
-    AsssistantaiTheme { LLMModelSettingDetailScreen(LLMModelSettingDetailUiState(isLoading = false,
+    GimiTheme { LLMModelSettingDetailScreen(LLMModelSettingDetailUiState(isLoading = false,
         service = service, baseline = service,
         supportedTools = OfficialToolSupport().all.filter { it.serviceId == service.id && protocol in it.protocols }), {}, { _, _ -> }) }
 }

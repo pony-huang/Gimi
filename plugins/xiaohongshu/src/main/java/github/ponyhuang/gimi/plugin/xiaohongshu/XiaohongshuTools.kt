@@ -45,8 +45,14 @@ private class XiaohongshuFunctionTool(
     )
 
     override suspend fun execute(context: ToolContext, args: Map<String, Any?>): Any =
-        runCatching { service().invoke(name, args) }
-            .getOrElse { mapOf(ERROR_KEY to (it.message ?: "小红书操作失败")) }
+        try {
+            service().invoke(name, args)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            // 取消必须传播：宽泛捕获会把会话取消转成 {error} 结果。
+            throw cancelled
+        } catch (error: Exception) {
+            mapOf(ERROR_KEY to (error.message ?: "小红书操作失败"))
+        }
 
     companion object {
         const val ERROR_KEY: String = "error"

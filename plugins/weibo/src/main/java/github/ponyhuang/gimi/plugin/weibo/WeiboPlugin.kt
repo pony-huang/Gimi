@@ -78,16 +78,33 @@ class WeiboPlugin : AgentPlugin {
      * 宿主持久化配置变更后回调：把凭据重新写入 [WeiboApi]，必要时清掉旧 token。
      */
     override fun configure(values: Map<String, String>) {
-        val baseUrl = values[KEY_BASE_URL]?.takeIf(String::isNotBlank) ?: WeiboApi.DEFAULT_BASE_URL
+        // App Secret 会随 token 换取请求发往该主机：只放行官方域的 https 地址。
+        val baseUrl = values[KEY_BASE_URL]?.takeIf(String::isNotBlank)
+            ?.takeIf(::isAllowedBaseUrl)
+            ?: WeiboApi.DEFAULT_BASE_URL
         val appId = values[KEY_APP_ID].orEmpty()
         val appSecret = values[KEY_APP_SECRET].orEmpty()
         api.configure(baseUrl, appId, appSecret)
+    }
+
+    private fun isAllowedBaseUrl(value: String): Boolean {
+        // java.net.URI 而非 android.net.Uri：JVM 单测环境可直接解析。
+        val uri = try {
+            java.net.URI(value)
+        } catch (_: java.net.URISyntaxException) {
+            return false
+        }
+        val host = uri.host?.lowercase() ?: return false
+        return uri.scheme == "https" && host in ALLOWED_BASE_HOSTS
     }
 
     override fun onAttach(context: Context) = Unit
 
     companion object {
         const val PLUGIN_ID: String = "weibo"
+
+        /** App Secret 只发往微博官方域。 */
+        val ALLOWED_BASE_HOSTS: Set<String> = setOf("api.weibo.com", "open-im.api.weibo.com", "open.weibo.com")
 
         const val DISPLAY_NAME: String = "微博"
 

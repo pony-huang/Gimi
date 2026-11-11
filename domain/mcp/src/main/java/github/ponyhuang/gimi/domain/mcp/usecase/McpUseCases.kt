@@ -22,11 +22,11 @@ class ManageMcpServersUseCase @Inject constructor(
 ) {
     fun server(id: String) = repository.server(id)
 
-    fun save(server: McpServer) = repository.save(server)
+    suspend fun save(server: McpServer) = repository.save(server)
 
-    fun delete(id: String) = repository.delete(id)
+    suspend fun delete(id: String) = repository.delete(id)
 
-    fun importJson(json: String) = repository.importJson(json)
+    suspend fun importJson(json: String) = repository.importJson(json)
 }
 
 /**
@@ -116,6 +116,13 @@ class ConfigureMcpServerForConversationUseCase @Inject constructor(
         val existing = mcpRepository.currentServers().firstOrNull {
             it.name.trim().equals(normalizedName, ignoreCase = true)
         }
+        // headers 期望每行一条 name=value；CR 与无 '=' 的残行不落盘，防止伪造 header 行。
+        val normalizedHeaders = headers
+            .replace("\r", "")
+            .lineSequence()
+            .map(String::trim)
+            .filter { it.isNotEmpty() && '=' in it }
+            .joinToString("\n")
         val server = if (existing == null) {
             McpServer(
                 name = normalizedName,
@@ -123,7 +130,7 @@ class ConfigureMcpServerForConversationUseCase @Inject constructor(
                 endpointUrl = normalizedEndpoint,
                 transport = transport,
                 bearerToken = bearerToken.trim(),
-                headers = headers.trim(),
+                headers = normalizedHeaders,
                 isEnabled = enabled,
             )
         } else {
@@ -133,7 +140,7 @@ class ConfigureMcpServerForConversationUseCase @Inject constructor(
                 endpointUrl = normalizedEndpoint,
                 transport = transport,
                 bearerToken = bearerToken.trim(),
-                headers = headers.trim(),
+                headers = normalizedHeaders,
                 isEnabled = enabled,
             )
         }

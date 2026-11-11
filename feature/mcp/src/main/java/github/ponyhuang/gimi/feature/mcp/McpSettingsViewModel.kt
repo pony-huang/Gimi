@@ -129,34 +129,42 @@ class McpSettingsViewModel @Inject constructor(
     /**
      * 保存前先实时探测连通性：不可达则停留在编辑器并展示错误，严格阻止保存。
      * 探测是只读网络调用，不经过 [runWhenAgentIdle] 的 agent 忙碌门控。
+     * 探测期间用户可能继续编辑，因此保存前重读编辑器；快照已变化时对新快照重新探测，
+     * 确保落盘配置一定经过验证（编辑器被关闭则放弃保存）。
      */
     private fun saveEditor() {
-        val draft = localState.value.editor ?: return
-        if (draft.name.isBlank() || draft.endpointUrl.isBlank()) return
         if (localState.value.isTestingConnection) return
         viewModelScope.launch {
-            localState.update { it.copy(isTestingConnection = true, connectionError = null) }
-            val result = probeSafely { testConnection(draft.toServer()) }
-            if (result.reachable) {
-                try {
-                    runWhenAgentIdle {
-                        manageServers.save(draft.toServer())
-                        localState.update { it.copy(isTestingConnection = false) }
-                        _effects.tryEmit(McpSettingsEffect.Saved)
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
+            var draft = localState.value.editor ?: return@launch
+            while (true) {
+                if (draft.name.isBlank() || draft.endpointUrl.isBlank()) return@launch
+                localState.update { it.copy(isTestingConnection = true, connectionError = null) }
+                val result = probeSafely { testConnection(draft.toServer()) }
+                if (!result.reachable) {
                     localState.update {
-                        it.copy(isTestingConnection = false, connectionError = DEFAULT_SAVE_ERROR)
+                        it.copy(
+                            isTestingConnection = false,
+                            connectionError = result.errorMessage ?: DEFAULT_CONNECTION_ERROR,
+                        )
                     }
+                    return@launch
                 }
-            } else {
+                val latest = localState.value.editor
+                if (latest == null) return@launch
+                if (latest == draft) break
+                draft = latest
+            }
+            try {
+                runWhenAgentIdle {
+                    manageServers.save(draft.toServer())
+                    localState.update { it.copy(isTestingConnection = false) }
+                    _effects.tryEmit(McpSettingsEffect.Saved)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
                 localState.update {
-                    it.copy(
-                        isTestingConnection = false,
-                        connectionError = result.errorMessage ?: DEFAULT_CONNECTION_ERROR,
-                    )
+                    it.copy(isTestingConnection = false, connectionError = DEFAULT_SAVE_ERROR)
                 }
             }
         }
@@ -223,7 +231,7 @@ class McpSettingsViewModel @Inject constructor(
         McpProbeResult(reachable = false, errorMessage = DEFAULT_CONNECTION_ERROR)
     }
 
-    private fun mutate(block: () -> Unit) {
+    private fun mutate(block: suspend () -> Unit) {
         viewModelScope.launch { runWhenAgentIdle { block() } }
     }
 

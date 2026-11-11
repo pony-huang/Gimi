@@ -16,6 +16,7 @@ fun SettingsRoute(
     appVersionName: String,
     onBack: () -> Unit,
     onNavigateToModelService: () -> Unit,
+    onNavigateToSpeechModels: () -> Unit,
     onNavigateToDefaultModels: () -> Unit,
     onNavigateToMcpServers: () -> Unit,
     onNavigateToRemoteAgents: () -> Unit,
@@ -25,7 +26,6 @@ fun SettingsRoute(
     onNavigateToSkills: () -> Unit,
     onNavigateToWorkspace: () -> Unit,
     onNavigateToPermissions: () -> Unit,
-    onNavigateToMobileUse: () -> Unit,
     onNavigateToRecommendations: () -> Unit,
     onNavigateToMemory: () -> Unit,
     onNavigateToAbout: () -> Unit,
@@ -38,6 +38,7 @@ fun SettingsRoute(
     // 收集器随 ViewModel 保持稳定，但每次导航都使用最新的路由回调。
     val handleEffect by rememberUpdatedState<(SettingsEffect) -> Unit> { effect ->
         when (effect) {
+            SettingsEffect.NavigateToSpeechModels -> onNavigateToSpeechModels()
             SettingsEffect.NavigateToModelService -> onNavigateToModelService()
             SettingsEffect.NavigateToDefaultModels -> onNavigateToDefaultModels()
             SettingsEffect.NavigateToMcpServers -> onNavigateToMcpServers()
@@ -48,7 +49,6 @@ fun SettingsRoute(
             SettingsEffect.NavigateToSkills -> onNavigateToSkills()
             SettingsEffect.NavigateToWorkspace -> onNavigateToWorkspace()
             SettingsEffect.NavigateToPermissions -> onNavigateToPermissions()
-            SettingsEffect.NavigateToMobileUse -> onNavigateToMobileUse()
             SettingsEffect.NavigateToRecommendations -> onNavigateToRecommendations()
             SettingsEffect.NavigateToMemory -> onNavigateToMemory()
             SettingsEffect.NavigateToAbout -> onNavigateToAbout()

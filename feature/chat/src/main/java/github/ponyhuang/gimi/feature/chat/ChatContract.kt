@@ -3,7 +3,7 @@ package github.ponyhuang.gimi.feature.chat
 import github.ponyhuang.gimi.domain.conversation.model.DraftAttachment
 import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.gimi.domain.appearance.ThemeMode
+import github.ponyhuang.gimi.domain.voice.repository.VoiceFailure
 
 /**
  * 聊天页用户意图契约 — [ChatViewModel] 全部"发后即忘"的用户操作都经
@@ -79,7 +79,7 @@ sealed interface ChatAction {
     /** 开关当前会话的思考模式；关闭时保留原有推理强度。 */
     data class SetThinkingEnabled(val enabled: Boolean) : ChatAction
 
-    /** 设置当前会话发给模型的推理强度。 */
+    /** 选择当前会话的推理强度并启用思考模式。 */
     data class SetReasoningEffort(val effort: ReasoningEffort) : ChatAction
 
     /** 启用 / 停用某个 MCP server。 */
@@ -98,9 +98,6 @@ sealed interface ChatAction {
 
     /** 用户关闭工具配置保存失败的提示。 */
     data object ClearToolConfigurationError : ChatAction
-
-    /** 选择夜间模式（跟随系统/浅色/深色），持久化后由 MainActivity 解析主题。 */
-    data class SetThemeMode(val mode: ThemeMode) : ChatAction
 }
 
 /**
@@ -160,6 +157,14 @@ sealed interface ChatNotice {
 
     /** Mem0 会话写入失败，本轮回答仍然保留。 */
     data object MemoryWriteFailed : ChatNotice
+
+    /**
+     * 语音能力调用失败。
+     *
+     * 携带失败分类而不是原始错误文本：文案由 Route 按分类本地化，
+     * 同一类失败在合成与识别入口显示同一套措辞。
+     */
+    data class VoiceFailed(val failure: VoiceFailure) : ChatNotice
 
     /** 上游（语音播放等）给出的动态文本，不经资源映射。 */
     data class Message(val text: String) : ChatNotice

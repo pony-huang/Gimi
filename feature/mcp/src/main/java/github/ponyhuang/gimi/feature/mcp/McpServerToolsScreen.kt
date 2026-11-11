@@ -39,7 +39,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
@@ -207,7 +207,7 @@ private fun McpToolDetailsPreview() {
             putJsonArray("required") { add(kotlinx.serialization.json.JsonPrimitive("owner")) }
         },
     )
-    AsssistantaiTheme {
+    GimiTheme {
         PreferencePageContainer(style = PreferenceStyle.Compact) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 McpToolCard(tool, expanded = true, onToggle = {})

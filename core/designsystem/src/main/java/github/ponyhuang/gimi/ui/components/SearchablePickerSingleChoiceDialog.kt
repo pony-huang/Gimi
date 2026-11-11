@@ -5,12 +5,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import github.ponyhuang.gimi.core.designsystem.R
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 可搜索的紧凑单选弹窗；调用方持有查询，提供选项的可搜索文本与选择事件。 */
 @Composable
@@ -28,6 +27,8 @@ fun <T> SearchablePickerSingleChoiceDialog(
     emptyText: String,
     onPick: (T) -> Unit,
     onDismiss: () -> Unit,
+    /** 该选项是否可选；不可选的选项仍然显示，但不可点击。 */
+    enabled: (T) -> Boolean = { true },
 ) {
     val normalizedQuery = query.trim()
     val filtered = options.filter {
@@ -46,12 +47,12 @@ fun <T> SearchablePickerSingleChoiceDialog(
         emptyText = if (options.isEmpty()) emptyText else stringResource(R.string.picker_no_search_results),
         onPick = onPick,
         onDismiss = onDismiss,
-        compact = true,
+        enabled = enabled,
         searchField = {
             GimiSearchField(
                 value = query,
                 onValueChange = onQueryChange,
-                placeholder = { Text(searchPlaceholder) },
+                placeholder = searchPlaceholder,
                 trailingIcon = if (query.isEmpty()) null else {
                     {
                         IconButton(onClick = { onQueryChange("") }) {
@@ -77,9 +78,26 @@ private fun SearchablePickerResultPreview() = SearchablePickerPreviewContent("GP
 @Composable
 private fun SearchablePickerEmptyPreview() = SearchablePickerPreviewContent("不存在")
 
+@Preview(name = "含禁用项 · 浅色")
+@Preview(name = "含禁用项 · 深色", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun SearchablePickerDisabledPreview() {
+    GimiTheme {
+        SearchablePickerSingleChoiceDialog(
+            options = listOf("GPT-5", "Claude Sonnet", "Gemini Pro"),
+            query = "", onQueryChange = {}, searchText = { it },
+            selected = { it == "GPT-5" }, key = { it }, title = "选择默认模型",
+            searchPlaceholder = "搜索模型或服务", optionTitle = { it },
+            optionSubtitle = { if (it == "Claude Sonnet") "暂不支持" else "我的模型服务" },
+            emptyText = "暂无可选项", onPick = {}, onDismiss = {},
+            enabled = { it != "Claude Sonnet" },
+        )
+    }
+}
+
 @Composable
 private fun SearchablePickerPreviewContent(query: String) {
-    AsssistantaiTheme {
+    GimiTheme {
         SearchablePickerSingleChoiceDialog(
             options = listOf("GPT-5", "Claude Sonnet", "Gemini Pro"),
             query = query, onQueryChange = {}, searchText = { it },

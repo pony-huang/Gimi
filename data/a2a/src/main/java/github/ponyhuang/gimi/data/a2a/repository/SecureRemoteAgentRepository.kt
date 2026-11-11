@@ -21,6 +21,8 @@ class SecureRemoteAgentRepository @Inject constructor(
         ignoreUnknownKeys = true
         coerceInputValues = true
     }
+    private val readFailed = MutableStateFlow(false)
+    override val storageError = readFailed.asStateFlow()
     private val agents = MutableStateFlow(load())
     private val _revision = MutableStateFlow(0L)
 
@@ -46,9 +48,13 @@ class SecureRemoteAgentRepository @Inject constructor(
 
     private fun load(): List<RemoteAgentConfig> = runCatching {
         json.decodeFromString<List<RemoteAgentConfig>>(storage.read() ?: "[]")
-    }.getOrDefault(emptyList())
+    }.getOrElse {
+        readFailed.value = true
+        emptyList()
+    }
 
     private fun persist(value: List<RemoteAgentConfig>) {
+        check(!readFailed.value) { "Remote agent storage is unreadable; writes are blocked" }
         if (value == agents.value) return
         storage.write(json.encodeToString(value))
         agents.value = value

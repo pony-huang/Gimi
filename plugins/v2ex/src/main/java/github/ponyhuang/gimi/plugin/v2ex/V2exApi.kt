@@ -2,6 +2,8 @@ package github.ponyhuang.gimi.plugin.v2ex
 
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
@@ -47,11 +49,11 @@ internal class V2exApi(
         )
 
     /** 指定节点。 */
-    fun node(nodeName: String): JSONObject = resultObject(request("/nodes/$nodeName", "GET"))
+    fun node(nodeName: String): JSONObject = resultObject(request("/nodes/${encPath(nodeName)}", "GET"))
 
     /** 指定节点下的主题（分页）。 */
     fun nodeTopics(nodeName: String, page: Int): JSONArray =
-        resultArray(request("/nodes/$nodeName/topics", "GET", query = mapOf("p" to page.toString())))
+        resultArray(request("/nodes/${encPath(nodeName)}/topics", "GET", query = mapOf("p" to page.toString())))
 
     /** 指定主题详情。 */
     fun topic(topicId: Long): JSONObject = resultObject(request("/topics/$topicId", "GET"))
@@ -82,26 +84,49 @@ internal class V2exApi(
             }
         }
         val connection = URL(url).openConnection() as HttpURLConnection
-        connection.requestMethod = method
-        connection.connectTimeout = CONNECT_TIMEOUT_MS
-        connection.readTimeout = READ_TIMEOUT_MS
-        connection.setRequestProperty("Authorization", "Bearer $token")
-        if (body != null) {
-            connection.doOutput = true
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+        try {
+            connection.requestMethod = method
+            connection.connectTimeout = CONNECT_TIMEOUT_MS
+            connection.readTimeout = READ_TIMEOUT_MS
+            // 禁止自动跟随 3xx：跟随会把 Authorization: Bearer 带到任意重定向目标。
+            connection.instanceFollowRedirects = false
+            connection.setRequestProperty("Authorization", "Bearer $token")
+            if (body != null) {
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            }
+            val code = connection.responseCode
+            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+            // 响应体限长读入：异常大的响应不能把整包拉进内存。
+            val responseBody = stream?.use { it.readBoundedText(MAX_RESPONSE_BYTES) }.orEmpty()
+            if (code !in 200..299) {
+                throw IllegalStateException("V2EX API HTTP $code: $responseBody")
+            }
+            return responseBody
+        } finally {
+            connection.disconnect()
         }
-        val code = connection.responseCode
-        val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-        val responseBody = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-        connection.disconnect()
-        if (code !in 200..299) {
-            throw IllegalStateException("V2EX API HTTP $code: $responseBody")
-        }
-        return responseBody
     }
 
     private fun enc(value: String): String = URLEncoder.encode(value, "UTF-8")
+
+    /** path 段编码：LLM 可控的节点名不得携带 / ? # 等改变请求目标的字符。 */
+    private fun encPath(segment: String): String = enc(segment).replace("+", "%20")
+
+    private fun InputStream.readBoundedText(maxBytes: Int): String {
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var total = 0
+        while (true) {
+            val read = read(buffer)
+            if (read < 0) break
+            total += read
+            if (total > maxBytes) throw IllegalStateException("V2EX API 响应超过 $maxBytes 字节上限")
+            output.write(buffer, 0, read)
+        }
+        return output.toString(Charsets.UTF_8.name())
+    }
 
     companion object {
         const val DEFAULT_BASE_URL: String = "https://www.v2ex.com/api/v2"
@@ -111,5 +136,8 @@ internal class V2exApi(
 
         /** 读取响应超时；V2EX 按 IP 限流（600 次/小时），可能较慢。 */
         const val READ_TIMEOUT_MS: Int = 30_000
+
+        /** 响应体大小上限（字节）。 */
+        const val MAX_RESPONSE_BYTES: Int = 4 * 1024 * 1024
     }
 }

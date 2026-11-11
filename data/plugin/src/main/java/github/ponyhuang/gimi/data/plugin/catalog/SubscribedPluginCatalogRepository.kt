@@ -48,18 +48,22 @@ class SubscribedPluginCatalogRepository @Inject constructor(
             cached?.takeIf { it.cacheKey == cacheKey && now - it.loadedAt < CACHE_TTL_MS }
                 ?.let { return@withLock it.result }
         }
-        val result = if (urls.isEmpty()) {
-            PluginCatalogLoad(
+        val result: PluginCatalogLoad
+        val anyRemoteSuccess: Boolean
+        if (urls.isEmpty()) {
+            result = PluginCatalogLoad(
                 entries = readBundledEntries(),
                 source = PluginCatalogSource.BUNDLED,
                 error = false,
             )
+            anyRemoteSuccess = false
         } else {
             val remoteEntries = coroutineScope {
                 urls.map { url -> async { fetchRemote(url) } }.awaitAll()
             }
             val successful = remoteEntries.filterNotNull()
-            if (successful.isEmpty()) {
+            anyRemoteSuccess = successful.isNotEmpty()
+            result = if (successful.isEmpty()) {
                 PluginCatalogLoad(
                     entries = readBundledEntries(),
                     source = PluginCatalogSource.BUNDLED,
@@ -73,7 +77,11 @@ class SubscribedPluginCatalogRepository @Inject constructor(
                 )
             }
         }
-        cached = CachedCatalog(loadedAt = now, cacheKey = cacheKey, result = result)
+        // 全部远端订阅失败时回退内置目录但不写入缓存：允许用户在 TTL 内重试，
+        // 避免把瞬时网络故障缓存成 5 分钟的「假目录」。
+        if (urls.isEmpty() || anyRemoteSuccess) {
+            cached = CachedCatalog(loadedAt = now, cacheKey = cacheKey, result = result)
+        }
         result
     }
 

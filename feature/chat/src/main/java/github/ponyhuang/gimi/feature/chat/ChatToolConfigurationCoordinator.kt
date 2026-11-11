@@ -63,7 +63,7 @@ internal class ChatToolConfigurationCoordinator(
 
     fun setReasoningEffort(effort: ReasoningEffort) {
         updateToolConfiguration { configuration ->
-            configuration.copy(reasoningEffort = effort)
+            configuration.copy(thinkingEnabled = true, reasoningEffort = effort)
         }
     }
 

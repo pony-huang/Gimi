@@ -17,7 +17,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 紧凑开关：36×22dp 轨道保留 48dp 触控区域；整行处理点击时传入空回调，避免重复语义。 */
 @Composable
@@ -33,7 +33,10 @@ fun GimiSwitch(
             .copy(alpha = if (enabled) 1f else 0.38f),
         label = "switchTrack",
     )
-    val thumb = MaterialTheme.colorScheme.onPrimary.copy(alpha = if (enabled) 1f else 0.38f)
+    // 选中态拇指用 onPrimary（与 primary 轨道成对）；未选中态轨道是中性描边色，
+    // 拇指必须换用中性文字色，否则深色主题下会变成深蓝压深灰、几乎看不见。
+    val thumbColor = if (checked) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+    val thumb = thumbColor.copy(alpha = if (enabled) 1f else 0.38f)
     Box(
         modifier = modifier.size(48.dp).then(
             if (onCheckedChange == null) Modifier else Modifier.toggleable(
@@ -54,7 +57,7 @@ fun GimiSwitch(
 @Preview(name = "紧凑开关 · 深色", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun GimiSwitchPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         androidx.compose.foundation.layout.Row {
             GimiSwitch(true, {})
             GimiSwitch(false, {})

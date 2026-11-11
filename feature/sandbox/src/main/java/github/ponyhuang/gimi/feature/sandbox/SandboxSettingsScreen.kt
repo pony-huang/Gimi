@@ -59,7 +59,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 无状态沙盒表单；即时开关、配置草稿与各变量组展开态均由 ViewModel 驱动。 */
 @Composable
@@ -310,7 +310,7 @@ private fun SandboxLocalHttpPreview() = SandboxScreenPreview(SandboxSettingsUiSt
 
 @Composable
 private fun SandboxScreenPreview(state: SandboxSettingsUiState) {
-    AsssistantaiTheme {
+    GimiTheme {
         PreferenceScaffold(title = stringResource(R.string.sandbox_screen_title), onBack = {}, style = PreferenceStyle.Compact, bottomBar = { SandboxSettingsSaveBar(state, {}) }) {
             SandboxSettingsScreen(state, {}, {}, it)
         }

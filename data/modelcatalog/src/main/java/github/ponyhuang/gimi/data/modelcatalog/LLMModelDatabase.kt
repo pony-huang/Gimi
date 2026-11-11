@@ -9,6 +9,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
 import androidx.room.withTransaction
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
@@ -34,6 +35,13 @@ data class LLMModelConfigEntity(
     val modelGroupsJson: String,
     val homepageUrl: String,
     val keyHelpUrl: String,
+    /**
+     * 服务种类的持久化标识（[github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceKind]）。
+     *
+     * 显式落库而不是从"是否含聊天模型"推导：语音服务的模板里只有语音模型，
+     * 而聊天服务的聊天模型来自远端目录刷新，两者都会让推导结果随目录变化而翻转。
+     */
+    val serviceKind: String,
 )
 
 @Dao
@@ -55,11 +63,15 @@ interface LLMModelConfigDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(entities: List<LLMModelConfigEntity>)
+
+    @Query("DELETE FROM model_config WHERE serviceId = :serviceId")
+    suspend fun delete(serviceId: String)
 }
 
 @Database(
     entities = [LLMModelConfigEntity::class],
-    version = 1,
+    // v2 增加 serviceKind 列。目录只保存公共模板，用户密钥在 Keystore 里，重建不会丢配置。
+    version = 2,
     exportSchema = false,
 )
 abstract class LLMModelRoomDatabase : RoomDatabase() {
@@ -71,7 +83,7 @@ abstract class LLMModelRoomDatabase : RoomDatabase() {
 }
 
 internal fun lLMModelConfigEntities(): List<LLMModelConfigEntity> =
-    LLMModelConfigs.services.mapIndexed { index, provider ->
+    (LLMModelConfigs.services + SpeechModelConfigs.services).mapIndexed { index, provider ->
         LLMModelConfigEntity(
             serviceId = provider.serviceId,
             serviceName = provider.serviceName,
@@ -87,9 +99,8 @@ internal fun lLMModelConfigEntities(): List<LLMModelConfigEntity> =
                                 modelId = it.modelId,
                                 modelName = it.modelName,
                                 source = StoredModelSource.REMOTE,
-                                isStt = it.isStt,
-                                isTts = it.isTts,
                                 capabilities = it.capabilities,
+                                multimodal = it.multimodal,
                             )
                         },
                     )
@@ -97,6 +108,7 @@ internal fun lLMModelConfigEntities(): List<LLMModelConfigEntity> =
             ),
             homepageUrl = provider.homepageUrl,
             keyHelpUrl = provider.keyHelpUrl,
+            serviceKind = provider.kind.name,
         )
     }
 
@@ -116,6 +128,24 @@ internal suspend fun seedMissingModelCatalog(
         val missing = lLMModelConfigEntities()
             .filterNot { it.serviceId in existingIds }
         if (missing.isNotEmpty()) dao.upsertAll(missing)
+    }
+}
+
+/**
+ * 删除内置清单里已不存在的服务行（例如实时语音服务并入厂商语音服务后的旧模板）。
+ *
+ * 目录行只存公共模板，用户密钥在 Keystore 里，删除不丢配置；不清理的话旧行会以
+ * 回退后的 Chat 种类出现在厂商选择列表里。调用时机：每次启动时执行一次；幂等，安全。
+ */
+internal suspend fun removeRemovedModelCatalog(
+    database: LLMModelRoomDatabase,
+) {
+    database.withTransaction {
+        val dao = database.lLMModelConfigDao()
+        val builtInIds = lLMModelConfigEntities().mapTo(HashSet()) { it.serviceId }
+        dao.getAll()
+            .filterNot { it.serviceId in builtInIds }
+            .forEach { dao.delete(it.serviceId) }
     }
 }
 
@@ -164,7 +194,13 @@ internal data class StoredModel(
     val modelName: String,
     // 旧版本 blob 可能缺 source 字段（Gson 静默留 null），给默认值以免 kotlinx 抛缺字段异常。
     val source: StoredModelSource = StoredModelSource.REMOTE,
-    val isStt: Boolean = false,
-    val isTts: Boolean = false,
-    val capabilities: MultimodalCapabilities = MultimodalCapabilities(),
+    /**
+     * 该模型可承担的任务集合。
+     *
+     * 缺省视为可对话的 [ModelCapability.LLM] 模型：远端目录接口只返回模型 ID，
+     * 不携带能力元数据，因此未声明能力的模型必须仍能用于聊天。
+     */
+    val capabilities: Set<ModelCapability> = setOf(ModelCapability.LLM),
+    /** 该模型可接收的输入模态。 */
+    val multimodal: MultimodalCapabilities = MultimodalCapabilities(),
 )

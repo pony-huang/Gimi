@@ -17,7 +17,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @Composable
 fun McpServerAddOptionsScreen(
@@ -55,7 +55,7 @@ fun McpServerAddOptionsScreen(
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun McpServerAddOptionsScreenPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         McpServerAddOptionsScreen(
             onCreate = {},
             onImport = {},

@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceKind
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.ui.components.GimiListDefaults
 import github.ponyhuang.gimi.ui.components.GimiSwitch
@@ -55,6 +56,10 @@ fun ModelServiceCard(
                 val subtitle = when {
                     providerPicker && item.isAdded -> stringResource(R.string.modelsettings_provider_added)
                     providerPicker -> null
+                    item.kind == ModelServiceKind.Speech -> stringResource(
+                        R.string.modelsettings_service_model_count_speech,
+                        item.groups.sumOf { it.models.size },
+                    )
                     else -> stringResource(R.string.modelsettings_service_model_count, item.groups.sumOf { it.models.size })
                 }
                 if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall,

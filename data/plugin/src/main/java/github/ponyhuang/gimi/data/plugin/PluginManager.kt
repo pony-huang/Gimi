@@ -26,6 +26,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -66,7 +67,10 @@ class PluginManager @Inject constructor(
     //
     // PACKAGE_REPLACED 在某些设备上触发时系统底层 LoadedApk 缓存尚未完全刷新，
     // 立刻查询可能命中旧 APK；按 Android 插件热更新的实践，延迟 ~200ms 再 refresh 更稳妥。
+    // 连续多条广播只保留一个 pending job（新广播取消旧延迟），避免 refresh 风暴；
+    // PluginManager 为 @Singleton 且随进程存活，scope 无独立关闭路径是有意的。
     private val packageScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var pendingPackageRefresh: Job? = null
     private val packageChangeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val action = intent.action ?: return
@@ -74,7 +78,11 @@ class PluginManager @Inject constructor(
                 action == Intent.ACTION_PACKAGE_REMOVED ||
                 action == Intent.ACTION_PACKAGE_REPLACED
             ) {
-                packageScope.launch { delay(REFRESH_DELAY_MS.milliseconds); refresh() }
+                pendingPackageRefresh?.cancel()
+                pendingPackageRefresh = packageScope.launch {
+                    delay(REFRESH_DELAY_MS.milliseconds)
+                    refresh()
+                }
             }
         }
     }

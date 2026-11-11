@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /** 本机窗口形态；随副屏会话保留，用户可主动收起或关闭。 */
-enum class BackgroundAppPresentation { HIDDEN, BUBBLE, FULLSCREEN, SMALL_WINDOW }
+enum class BackgroundAppPresentation { HIDDEN, BUBBLE, FULLSCREEN, SMALL_WINDOW, EXPANDED_WINDOW }
 
 /** app 组合窗口与独立前台服务；无悬浮权限仍保留应用内入口。 */
 @Singleton
@@ -35,6 +35,7 @@ class BackgroundAppWindowHost @Inject constructor(
     private var started = false
     // 与显示会话一样只在进程内记忆；收起、全屏切换和服务重建不重置用户位置。
     internal var smallWindowGeometry: BackgroundAppWindowGeometry? = null
+    internal var expandedWindowGeometry: BackgroundAppWindowGeometry? = null
 
     fun start() {
         if (started) return
@@ -44,9 +45,11 @@ class BackgroundAppWindowHost @Inject constructor(
             repository.displaySession.collect { session ->
                 if (session?.id != lastId) {
                     lastId = session?.id
+                    smallWindowGeometry = null
+                    expandedWindowGeometry = null
                     mutablePresentation.value = if (session == null) {
                         BackgroundAppPresentation.HIDDEN
-                    } else BackgroundAppPresentation.BUBBLE
+                    } else collapsedPresentation()
                     if (session != null) ensureService()
                 }
                 // 单轮执行完成不代表副屏关闭；同一会话保持用户当前选择的窗口形态。
@@ -84,7 +87,7 @@ class BackgroundAppWindowHost @Inject constructor(
         }
         val serviceAvailable = ensureService()
         if (repository.smallWindowEnabled.value && canOverlay() && serviceAvailable) {
-            mutablePresentation.value = BackgroundAppPresentation.SMALL_WINDOW
+            mutablePresentation.value = BackgroundAppPresentation.EXPANDED_WINDOW
         } else {
             mutablePresentation.value = BackgroundAppPresentation.FULLSCREEN
             context.startActivity(Intent(context, BackgroundAppActivity::class.java)
@@ -93,8 +96,14 @@ class BackgroundAppWindowHost @Inject constructor(
     }
 
     fun collapse() {
-        mutablePresentation.value = if (repository.displaySession.value == null) BackgroundAppPresentation.HIDDEN else BackgroundAppPresentation.BUBBLE
+        mutablePresentation.value = collapsedPresentation()
         ensureService()
+    }
+
+    private fun collapsedPresentation(): BackgroundAppPresentation = when {
+        repository.displaySession.value == null -> BackgroundAppPresentation.HIDDEN
+        repository.smallWindowEnabled.value && canOverlay() -> BackgroundAppPresentation.SMALL_WINDOW
+        else -> BackgroundAppPresentation.BUBBLE
     }
 
     fun openPermissionSettings() {

@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.sandbox.SandboxSettingField
 import github.ponyhuang.gimi.domain.sandbox.SandboxTemplate
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 仅管理下拉展开这一展示状态，查询和配置变更通过同步事件交给 ViewModel。 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -139,7 +139,7 @@ private fun TemplatesFailurePreview() = TemplatePickerPreview(SandboxTemplateLoa
 
 @Composable
 private fun TemplatePickerPreview(loadState: SandboxTemplateLoadState, templates: List<SandboxTemplate> = emptyList()) {
-    AsssistantaiTheme {
+    GimiTheme {
         Surface {
             Column(Modifier.padding(16.dp)) {
                 SandboxTemplatePicker(SandboxSettingsUiState(template = "cli-template-id", templates = templates, templateLoadState = loadState), {})

@@ -1,11 +1,13 @@
 package github.ponyhuang.gimi.feature.recommendation
 
+import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationRefreshStatus
 
 /**
- * 智能推荐设置页状态。
+ * 个性化选项及推荐更新页面共享的偏好状态。
  *
+ * @property themeMode 应用主题模式。
  * @property toolAccessMode 本地工具的加载方式。
  * @property enabled 是否开启推荐。
  * @property intervalHours 当前更新间隔。
@@ -28,9 +30,12 @@ data class RecommendationSettingsUiState(
     val retryDelaySeconds: Long? = null,
     val fastModelReady: Boolean = true,
     val a2uiEnabled: Boolean = true,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
 )
 
 sealed interface RecommendationSettingsAction {
+    /** 切换并持久化应用主题模式。 */
+    data class SetThemeMode(val mode: ThemeMode) : RecommendationSettingsAction
     /** 修改本地工具加载方式。 */
     data class SetToolAccessMode(val mode: ToolAccessMode) : RecommendationSettingsAction
     data class SetEnabled(val enabled: Boolean) : RecommendationSettingsAction

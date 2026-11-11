@@ -21,16 +21,16 @@ import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
  * 存在但集合为空表示「会话显式不启用任何项」——两者不可混淆。
  */
 object ToolRunMetadata {
-    private const val KEY_MODEL_SERVICE_ID = "selkie.model.service_id"
-    private const val KEY_MODEL_PROTOCOL = "selkie.model.protocol"
-    private const val KEY_MODEL_ID = "selkie.model.id"
-    private const val KEY_MODEL_BASE_URL = "selkie.model.base_url"
-    private const val KEY_MODEL_SUPPORTS_IMAGES = "selkie.model.supports_images"
-    private const val KEY_MOBILE_USE_OWNER = "selkie.mobile_use.owner"
-    private const val KEY_PRESENT = "selkie.tool_config.present"
-    private const val KEY_MCP_SERVER_IDS = "selkie.tool_config.mcp_server_ids"
-    private const val KEY_OFFICIAL_FUNCTIONS = "selkie.tool_config.official_functions"
-    private const val KEY_ALLOW_CONFIRMATION_TOOLS = "selkie.allow_confirmation_required_tools"
+    private const val KEY_MODEL_SERVICE_ID = "gimi.model.service_id"
+    private const val KEY_MODEL_PROTOCOL = "gimi.model.protocol"
+    private const val KEY_MODEL_ID = "gimi.model.id"
+    private const val KEY_MODEL_BASE_URL = "gimi.model.base_url"
+    private const val KEY_MODEL_SUPPORTS_IMAGES = "gimi.model.supports_images"
+    private const val KEY_MOBILE_USE_OWNER = "gimi.mobile_use.owner"
+    private const val KEY_PRESENT = "gimi.tool_config.present"
+    private const val KEY_MCP_SERVER_IDS = "gimi.tool_config.mcp_server_ids"
+    private const val KEY_OFFICIAL_FUNCTIONS = "gimi.tool_config.official_functions"
+    private const val KEY_ALLOW_CONFIRMATION_TOOLS = "gimi.allow_confirmation_required_tools"
 
     /** 编码为 JSON-native metadata；[toolConfiguration] 为 null 时不写任何配置 key。 */
     fun of(

@@ -38,7 +38,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceSectionNote
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @Composable
 fun PluginSubscriptionRoute(
@@ -214,7 +214,7 @@ private fun PluginSubscriptionError.messageRes(): Int = when (this) {
 @Preview(name = "订阅源 · 深色", showBackground = true, widthDp = 390, heightDp = 700, locale = "zh", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PluginSubscriptionScreenPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PluginSubscriptionScreen(
             state = PluginSubscriptionUiState(
                 urls = listOf(
@@ -231,7 +231,7 @@ private fun PluginSubscriptionScreenPreview() {
 @Preview(name = "订阅源 · 空列表", showBackground = true, widthDp = 390, heightDp = 700, locale = "zh")
 @Composable
 private fun PluginSubscriptionScreenEmptyPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PluginSubscriptionScreen(
             state = PluginSubscriptionUiState(defaultUrl = "https://example.com/official.json"),
             onAction = {},

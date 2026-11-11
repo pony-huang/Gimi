@@ -54,6 +54,12 @@ public data class ComposerInputContentParams(
     val configurationReady: Boolean = true,
     /** 内容请求只允许文字或语音，隐藏普通聊天的附件入口。 */
     val attachmentsEnabled: Boolean = true,
+    /** 是否在动作行显示权限模式 chip；临时内容请求等无会话配置的场景为 false。 */
+    val showToolChip: Boolean = false,
+    /** 打开独立权限模式抽屉。 */
+    val onPermissionModeClick: () -> Unit = { },
+    /** 当前会话是否处于完全批准模式；chip 据此切换状态颜色和无障碍说明。 */
+    val fullAccess: Boolean = false,
 )
 
 /** Immutable presentation state for the composer's voice-input session. */

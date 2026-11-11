@@ -1,6 +1,9 @@
 <resources>
-    <string name="recommendation_settings_title">Personalized services</string>
+    <string name="recommendation_settings_title">Personalization options</string>
     <string name="recommendation_settings_section">Recommendation updates</string>
+    <string name="recommendation_update_page_title">Recommendation settings</string>
+    <string name="recommendation_update_nav_section">Recommendations</string>
+    <string name="recommendation_update_nav_subtitle">Smart recommendations, refresh interval, and manual refresh</string>
     <string name="recommendation_enabled_title">Enable smart recommendations</string>
     <string name="recommendation_enabled_subtitle">Show Agent-generated tasks in empty conversations</string>
     <string name="recommendation_fast_model_required_title">Fast model required</string>
@@ -19,10 +22,21 @@
     <string name="recommendation_a2ui_note">Cards are generated on demand by the model, so responses may be slower and use extra tokens.</string>
     <string name="recommendation_a2ui_title">A2UI interactive cards</string>
     <string name="recommendation_a2ui_subtitle">Let the assistant show forms, controls, and structured results as native cards</string>
+    <string name="recommendation_voice_section">Voice</string>
+    <string name="recommendation_simple_chat_title">Simple chat prompts</string>
+    <string name="recommendation_simple_chat_subtitle">Customize the prompt used by simple chat</string>
     <string name="recommendation_tools_section">Tools</string>
     <string name="recommendation_tool_loading_note">Loading all tools keeps them ready every turn but uses more context and tokens; on-demand loading reduces both.</string>
     <string name="recommendation_close">Close</string>
     <string name="recommendation_tool_loading_title">Tool loading</string>
     <string name="recommendation_tool_loading_always">Load all tools for every turn</string>
     <string name="recommendation_tool_loading_on_demand">Load tools on demand to save context</string>
+    <string name="recommendation_device_section">Device control</string>
+    <string name="recommendation_mobile_use_title">Shizuku</string>
+    <string name="recommendation_mobile_use_subtitle">Let the Agent use other apps in the background</string>
+    <string name="recommendation_theme_section">Theme</string>
+    <string name="recommendation_theme_mode_title">Theme mode</string>
+    <string name="recommendation_theme_system">Follow system</string>
+    <string name="recommendation_theme_light">Light</string>
+    <string name="recommendation_theme_dark">Dark</string>
 </resources>

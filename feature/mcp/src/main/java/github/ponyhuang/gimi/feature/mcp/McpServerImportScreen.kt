@@ -18,18 +18,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.mcp.model.McpImportError
+import kotlinx.coroutines.launch
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @Composable
 fun McpServerImportScreen(
@@ -37,7 +39,8 @@ fun McpServerImportScreen(
     onAction: (McpSettingsAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         Column(
             modifier = Modifier
@@ -83,8 +86,15 @@ fun McpServerImportScreen(
                     ) {
                         OutlinedButton(
                             onClick = {
-                                clipboard.getText()?.text?.let {
-                                    onAction(McpSettingsAction.ImportJsonChanged(it))
+                                // getClipEntry 为挂起 API，粘贴在协程内异步完成。
+                                scope.launch {
+                                    val clipData = clipboard.getClipEntry()?.clipData
+                                    val text = clipData
+                                        ?.takeIf { it.itemCount > 0 }
+                                        ?.getItemAt(0)?.text?.toString()
+                                    if (!text.isNullOrBlank()) {
+                                        onAction(McpSettingsAction.ImportJsonChanged(text))
+                                    }
                                 }
                             },
                             modifier = Modifier.weight(1f),
@@ -125,6 +135,7 @@ private fun importErrorText(error: McpImportError): String = stringResource(
         McpImportError.INVALID_JSON -> R.string.mcp_import_error_invalid_json
         McpImportError.MCP_SERVERS_NOT_OBJECT -> R.string.mcp_import_error_mcp_servers_not_object
         McpImportError.INVALID_CURL -> R.string.mcp_import_error_invalid_curl
+        McpImportError.UNSUPPORTED_SSE -> R.string.mcp_import_error_unsupported_sse
         McpImportError.STORAGE_FAILURE -> R.string.mcp_import_error_storage_failure
     },
 )
@@ -133,7 +144,7 @@ private fun importErrorText(error: McpImportError): String = stringResource(
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun McpServerImportScreenEmptyPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         McpServerImportScreen(
             state = McpSettingsUiState(),
             onAction = {},
@@ -145,7 +156,7 @@ private fun McpServerImportScreenEmptyPreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun McpServerImportScreenWithJsonPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         McpServerImportScreen(
             state = McpSettingsUiState(
                 importJson = "{\"mcpServers\":{\"context7\":{\"url\":\"https://mcp.example.com/mcp\"}}}",

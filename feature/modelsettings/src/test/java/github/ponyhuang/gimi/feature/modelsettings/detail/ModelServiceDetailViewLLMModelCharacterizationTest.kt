@@ -4,21 +4,27 @@ import app.cash.turbine.test
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
 import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceKind
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSupport
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnectionResult
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelCatalogRepository
 import github.ponyhuang.gimi.domain.modelcatalog.repository.ModelServiceRemoteGateway
-import github.ponyhuang.gimi.domain.modelcatalog.usecase.DeleteModelServiceUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.LoadModelCandidatesUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.LoadModelServiceUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.ObserveModelServiceUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.RefreshModelCatalogUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.SaveModelServiceUseCase
-import github.ponyhuang.gimi.domain.modelcatalog.usecase.SetModelServiceEnabledUseCase
 import github.ponyhuang.gimi.domain.modelcatalog.usecase.TestModelServiceConnectionUseCase
+import github.ponyhuang.gimi.domain.voice.repository.EndpointStrategy
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceSupport
+import github.ponyhuang.gimi.domain.voice.repository.SpeechConnectionProbe
+import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityNotSupported
+import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityResolver
 import github.ponyhuang.gimi.feature.modelsettings.R
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -84,7 +90,7 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
         fixture.load()
         fixture.viewModel.onAction(LLMModelSettingDetailAction.TestConnection)
         advanceUntilIdle()
-        assertEquals(false, fixture.viewModel.uiState.value.connectionResult)
+        assertEquals(ServiceConnectionResult.NetworkFailed, fixture.viewModel.uiState.value.connectionResult)
         coVerify(exactly = 0) { fixture.remote.validateConnection(any()) }
     }
 
@@ -125,8 +131,8 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
     }
 
     @Test
-    fun refreshCandidatesPreservesSelectionsAndSpeechMetadataWithoutSaving() = runTest {
-        val speech = Model("speech", "Speech", isTts = true)
+    fun llmRefreshPreservesSelectionsAndExcludesKnownSpeechModelsWithoutSaving() = runTest {
+        val speech = Model("speech", "Speech", capabilities = setOf(ModelCapability.TTS))
         val fixture = fixture(service().copy(groups = listOf(ModelGroup("chat", "Chat", listOf(Model("deepseek-chat", "deepseek-chat"), speech)))))
         fixture.load()
         coEvery { fixture.remote.fetchModels(any()) } returns listOf(Model("speech", "speech"), Model("new", "New"))
@@ -136,9 +142,9 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
         advanceUntilIdle()
         val state = fixture.viewModel.uiState.value
         assertEquals(before, state.pendingModelKeys)
-        assertTrue(state.candidates.first { it.model.id == "speech" }.model.isTts)
+        assertFalse(state.candidates.any { it.model.id == "speech" })
         assertTrue(state.candidates.any { it.model.id == "new" })
-        assertEquals(2, state.rows.size)
+        assertEquals(1, state.rows.size)
         coVerify(exactly = 0) { fixture.repository.saveService(any()) }
     }
 
@@ -239,46 +245,14 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
     }
 
     @Test
-    fun activeAgentPreventsSavePauseAndDeleteEvenIfItStartsImmediatelyBeforeWrite() = runTest {
+    fun activeAgentPreventsSaveEvenIfItStartsImmediatelyBeforeWrite() = runTest {
         val gate = FakeAgentRuntimeGate()
         val fixture = fixture(service(), gate)
         fixture.load()
         gate.state.value = FakeAgentRuntimeGate.busy().state.value
         fixture.viewModel.onAction(LLMModelSettingDetailAction.Save)
         advanceUntilIdle()
-        fixture.viewModel.onAction(LLMModelSettingDetailAction.EnabledChanged(false))
-        fixture.viewModel.onAction(LLMModelSettingDetailAction.ConfirmDelete)
-        advanceUntilIdle()
         coVerify(exactly = 0) { fixture.repository.saveService(any()) }
-        coVerify(exactly = 0) { fixture.repository.setServiceEnabled(any(), any()) }
-        coVerify(exactly = 0) { fixture.repository.deleteService(any()) }
-    }
-
-    @Test
-    fun pauseAndResumeKeepDraftToolPreference() = runTest {
-        val fixture = fixture(service().copy(isOfficialToolsEnabled = false))
-        fixture.load()
-        fixture.viewModel.onAction(LLMModelSettingDetailAction.EnabledChanged(false))
-        advanceUntilIdle()
-        fixture.viewModel.onAction(LLMModelSettingDetailAction.EnabledChanged(true))
-        advanceUntilIdle()
-        assertFalse(fixture.viewModel.uiState.value.service!!.isOfficialToolsEnabled)
-        coVerify { fixture.repository.setServiceEnabled("deepseek", false) }
-        coVerify { fixture.repository.setServiceEnabled("deepseek", true) }
-    }
-
-    @Test
-    fun deletionIsConfirmedBeforeRepositoryMutation() = runTest {
-        val fixture = fixture(service())
-        fixture.load()
-        fixture.viewModel.onAction(LLMModelSettingDetailAction.RequestDelete)
-        assertTrue(fixture.viewModel.uiState.value.isDeleteDialogVisible)
-        coVerify(exactly = 0) { fixture.repository.deleteService(any()) }
-        fixture.viewModel.effects.test {
-            fixture.viewModel.onAction(LLMModelSettingDetailAction.ConfirmDelete)
-            assertEquals(LLMModelSettingDetailEffect.ShowToast(LLMModelSettingDetailNotice.Deleted), awaitItem())
-            assertEquals(LLMModelSettingDetailEffect.Close, awaitItem())
-        }
     }
 
     @Test
@@ -297,32 +271,31 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
 
     @Test
     fun selectingCatalogModelsPreservesStableGroupIdAndDisplayName() = runTest {
-        val fixture = fixture(service())
+        val fixture = fixture(service().copy(kind = ModelServiceKind.Speech, groups = emptyList()))
         coEvery { fixture.repository.modelCandidates(any()) } returns service().groups +
-            ModelGroup("speech", "Speech models", listOf(Model("voice", "Voice", isTts = true)))
+            ModelGroup("speech", "Speech models", listOf(Model("voice", "Voice", capabilities = setOf(ModelCapability.TTS))))
         fixture.load()
         fixture.viewModel.onAction(LLMModelSettingDetailAction.OpenPage(ServiceEditorPage.Models))
         fixture.viewModel.onAction(LLMModelSettingDetailAction.ToggleModel(ServiceModelKey("speech", "voice")))
         fixture.viewModel.onAction(LLMModelSettingDetailAction.ConfirmModels)
         val group = fixture.viewModel.uiState.value.service!!.groups.first { it.id == "speech" }
         assertEquals("Speech models", group.name)
-        assertTrue(group.models.single().isTts)
+        assertTrue(ModelCapability.TTS in group.models.single().capabilities)
     }
 
     @Test
     fun bulkSelectionKeepsSpeechMetadataAndOnlyPersistsAfterSave() = runTest {
-        val configured = service().copy(groups = listOf(
-            ModelGroup("chat", "Chat", listOf(Model("chat", "Chat"))),
-            ModelGroup("speech", "Speech", listOf(Model("stt", "STT", isStt = true), Model("tts", "TTS", isTts = true))),
+        val configured = service().copy(kind = ModelServiceKind.Speech, groups = listOf(
+            ModelGroup("speech", "Speech", listOf(Model("stt", "STT", capabilities = setOf(ModelCapability.STT)), Model("tts", "TTS", capabilities = setOf(ModelCapability.TTS)))),
         ))
         val fixture = fixture(configured)
         fixture.load()
         fixture.viewModel.onAction(LLMModelSettingDetailAction.OpenPage(ServiceEditorPage.Models))
         fixture.viewModel.onAction(LLMModelSettingDetailAction.ClearModels)
         assertTrue(fixture.viewModel.uiState.value.pendingModelKeys.isEmpty())
-        assertEquals(3, fixture.viewModel.uiState.value.rows.size)
+        assertEquals(2, fixture.viewModel.uiState.value.rows.size)
         fixture.viewModel.onAction(LLMModelSettingDetailAction.SelectAllModels)
-        assertEquals(3, fixture.viewModel.uiState.value.pendingModelKeys.size)
+        assertEquals(2, fixture.viewModel.uiState.value.pendingModelKeys.size)
         fixture.viewModel.onAction(LLMModelSettingDetailAction.ConfirmModels)
         assertEquals(configured.groups, fixture.viewModel.uiState.value.service!!.groups)
         fixture.viewModel.onAction(LLMModelSettingDetailAction.OpenPage(ServiceEditorPage.Models))
@@ -389,6 +362,22 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
         }
     }
 
+    @Test
+    fun serviceCategoryRejectsInvalidManualModelTypes() = runTest {
+        for ((kind, invalid, expected) in listOf(
+            Triple(ModelServiceKind.Chat, NewModelKind.Tts, ModelCapability.LLM),
+            Triple(ModelServiceKind.Speech, NewModelKind.Chat, ModelCapability.STT),
+        )) {
+            val fixture = fixture(service().copy(kind = kind, groups = emptyList()))
+            fixture.load()
+            fixture.viewModel.onAction(LLMModelSettingDetailAction.NewLLMModelKindChanged(invalid))
+            fixture.viewModel.onAction(LLMModelSettingDetailAction.NewLLMModelIdChanged("custom"))
+            fixture.viewModel.onAction(LLMModelSettingDetailAction.ConfirmAddLLMModel)
+            fixture.viewModel.onAction(LLMModelSettingDetailAction.ConfirmModels)
+            assertEquals(setOf(expected), fixture.viewModel.uiState.value.rows.single().model.capabilities)
+        }
+    }
+
     private fun fixture(service: LLMModelSetting?, gate: FakeAgentRuntimeGate = FakeAgentRuntimeGate()): Fixture {
         val services = MutableStateFlow(service)
         val repository = mockk<ModelCatalogRepository>(relaxed = true) {
@@ -396,17 +385,28 @@ class ModelServiceDetailViewLLMModelCharacterizationTest {
             every { observeService(any()) } returns services
             coEvery { modelCandidates(any()) } returns service?.groups.orEmpty()
             coEvery { saveService(any()) } coAnswers { services.value = firstArg(); true }
-            coEvery { setServiceEnabled(any(), any()) } returns true
-            coEvery { deleteService(any()) } returns true
         }
         val remote = mockk<ModelServiceRemoteGateway>(relaxed = true)
         val vm = ModelServiceDetailViewModel(
             OfficialToolSupport(), LoadModelServiceUseCase(repository), ObserveModelServiceUseCase(repository),
-            LoadModelCandidatesUseCase(repository), SaveModelServiceUseCase(repository), DeleteModelServiceUseCase(repository),
-            SetModelServiceEnabledUseCase(repository), TestModelServiceConnectionUseCase(remote),
-            RefreshModelCatalogUseCase(remote), RunWhenAgentIdleUseCase(gate),
+            LoadModelCandidatesUseCase(repository), SaveModelServiceUseCase(repository),
+            TestModelServiceConnectionUseCase(remote), RefreshModelCatalogUseCase(remote), RunWhenAgentIdleUseCase(gate),
+            voiceCapabilities = AllCapabilitiesSupportedResolver,
         )
         return Fixture(vm, repository, remote, services)
+    }
+
+    /** 能力解析器的测试替身：所有服务都已接入全部能力。 */
+    private object AllCapabilitiesSupportedResolver : VoiceCapabilityResolver {
+        override fun isSupported(serviceId: String, capability: ModelCapability): Boolean = true
+
+        override fun connectionProbe(serviceId: String): SpeechConnectionProbe =
+            throw VoiceCapabilityNotSupported(serviceId, ModelCapability.TTS)
+
+        override fun endpointStrategy(serviceId: String): EndpointStrategy = EndpointStrategy.ConfiguredBaseUrl
+
+        /** 本替身只覆盖能力判定，不提供原生 Realtime 适配器声明。 */
+        override fun realtimeSupport(serviceId: String): RealtimeVoiceSupport? = null
     }
 
     private suspend fun Fixture.load() {

@@ -30,13 +30,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -46,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,6 +59,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
@@ -65,16 +70,19 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
-import github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort
 import github.ponyhuang.gimi.domain.mcp.model.McpServer
 import github.ponyhuang.gimi.domain.mcp.model.McpTransport
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunction
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolIds
 import github.ponyhuang.gimi.ui.components.FunctionIcon
-import github.ponyhuang.gimi.ui.components.GimiBottomSheet
-import github.ponyhuang.gimi.ui.components.GimiBottomSheetHeader
-import github.ponyhuang.gimi.ui.components.GimiBottomSheetOptionRow
-import github.ponyhuang.gimi.ui.components.GimiBottomSheetSwitchRow
+import github.ponyhuang.gimi.ui.components.GimiSheet
+import github.ponyhuang.gimi.ui.components.GimiSheetBase
+import github.ponyhuang.gimi.ui.components.GimiSheetIconAction
+import github.ponyhuang.gimi.ui.components.GimiSheetTitleRow
+import github.ponyhuang.gimi.ui.components.LocalGimiSheetController
+import github.ponyhuang.gimi.ui.components.SheetHeight
+import github.ponyhuang.gimi.ui.components.GimiSheetOptionRow
+import github.ponyhuang.gimi.ui.components.GimiSheetSwitchRow
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
@@ -83,7 +91,8 @@ import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyleScope
 import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
+import kotlinx.coroutines.launch
 
 /** 列表上限与模型选择抽屉一致，内容较少时不强制撑高。 */
 private val ToolSheetListMaxHeight = 380.dp
@@ -91,8 +100,6 @@ private const val ToolSheetListHeightFraction = 0.55f
 
 private enum class AddToChatPage {
     HOME,
-    PERMISSION_MODE,
-    REASONING_EFFORT,
     MCP,
     OFFICIAL_TOOL,
 }
@@ -106,10 +113,7 @@ internal fun ChatAddToChatSheet(
     onChooseFiles: () -> Unit,
     imagesEnabled: Boolean,
     filesEnabled: Boolean,
-    onReasoningEffortChange: (ReasoningEffort) -> Unit,
-    onThinkingEnabledChange: (Boolean) -> Unit = {},
     onMcpServerEnabledChange: (String, Boolean) -> Unit,
-    onFullAccessChange: (Boolean) -> Unit,
     onOfficialToolOpened: (String) -> Unit,
     onOfficialToolFunctionEnabledChange: (String, String, Boolean) -> Unit,
     onOfficialToolFunctionsRetry: (String) -> Unit,
@@ -120,12 +124,20 @@ internal fun ChatAddToChatSheet(
     }
 
     PreferenceStyleScope(PreferenceStyle.Compact) {
-        GimiBottomSheet(onDismissRequest = onDismiss) {
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val maximumPageHeight = maxHeight * 0.92f
-                val toolListMaxHeight = (maxHeight * ToolSheetListHeightFraction)
-                    .coerceAtMost(ToolSheetListMaxHeight)
-                AnimatedContent(
+        val windowHeight = LocalConfiguration.current.screenHeightDp.dp
+        val toolListMaxHeight = (windowHeight * ToolSheetListHeightFraction)
+            .coerceAtMost(ToolSheetListMaxHeight)
+        GimiSheetBase(
+            onDismissRequest = onDismiss,
+            initialHeight = SheetHeight.Fraction(0.45f),
+            maxHeight = SheetHeight.Fraction(0.9f),
+            // 首页只有几个入口，列表页要放得下工具清单：按页切换主体高度上限。
+            height = when (page) {
+                AddToChatPage.HOME -> SheetHeight.Fraction(0.45f)
+                AddToChatPage.MCP, AddToChatPage.OFFICIAL_TOOL -> SheetHeight.Fraction(0.9f)
+            },
+        ) {
+            AnimatedContent(
                     targetState = page,
                     transitionSpec = {
                         val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
@@ -149,51 +161,40 @@ internal fun ChatAddToChatSheet(
                     label = "add-to-chat-page",
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = maximumPageHeight)
                         .testTag("add-to-chat-sheet-content"),
                 ) { currentPage ->
-                    Box(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.TopCenter,
                     ) {
-                        Column(
-                            modifier = Modifier.wrapContentHeight()
-                                .widthIn(max = 640.dp),
-                        ) {
-                            GimiBottomSheetHeader(
+                            GimiSheetTitleRow(
                                 title = when (currentPage) {
                                     AddToChatPage.HOME -> stringResource(R.string.chat_add_to_chat_title)
-                                    AddToChatPage.PERMISSION_MODE ->
-                                        stringResource(R.string.chat_permission_mode_title)
-                                    AddToChatPage.REASONING_EFFORT ->
-                                        stringResource(R.string.chat_reasoning_effort_title)
                                     AddToChatPage.MCP -> stringResource(R.string.chat_session_mcp_title)
                                     AddToChatPage.OFFICIAL_TOOL ->
                                         stringResource(R.string.chat_official_tools_title)
                                 },
+                                // 首页不放关闭 X：点遮罩、下拉横杆、系统返回都能收起抽屉；
+                                // 标题直接靠左，与下方卡片对齐。二级页仍保留返回箭头。
                                 navigationIcon = if (currentPage == AddToChatPage.HOME) {
-                                    Icons.Default.Close
+                                    null
                                 } else {
                                     Icons.AutoMirrored.Filled.ArrowBack
                                 },
-                                navigationContentDescription = stringResource(
-                                    if (currentPage == AddToChatPage.HOME) {
-                                        R.string.chat_add_to_chat_close
-                                    } else {
-                                        R.string.chat_add_to_chat_back
-                                    },
-                                ),
-                                onNavigationClick = {
-                                    if (currentPage == AddToChatPage.HOME) onDismiss()
-                                    else page = AddToChatPage.HOME
+                                navigationContentDescription = if (currentPage == AddToChatPage.HOME) {
+                                    null
+                                } else {
+                                    stringResource(R.string.chat_add_to_chat_back)
                                 },
-                                navigationModifier = Modifier.testTag(
-                                    if (currentPage == AddToChatPage.HOME) {
-                                        "add-to-chat-close"
-                                    } else {
-                                        "add-to-chat-back"
-                                    },
-                                ),
+                                onNavigationClick = if (currentPage == AddToChatPage.HOME) {
+                                    null
+                                } else {
+                                    ({ page = AddToChatPage.HOME })
+                                },
+                                navigationModifier = if (currentPage == AddToChatPage.HOME) {
+                                    Modifier
+                                } else {
+                                    Modifier.testTag("add-to-chat-back")
+                                },
                             )
                             when (currentPage) {
                                 AddToChatPage.HOME -> AddToChatHome(
@@ -203,24 +204,13 @@ internal fun ChatAddToChatSheet(
                                     onChooseFiles = onChooseFiles,
                                     imagesEnabled = imagesEnabled,
                                     filesEnabled = filesEnabled,
-                                    onOpenReasoningEffort = { page = AddToChatPage.REASONING_EFFORT },
                                     onOpenMcp = { page = AddToChatPage.MCP },
-                                    onOpenPermissionMode = { page = AddToChatPage.PERMISSION_MODE },
                                     onOpenOfficialTools = {
                                         state.officialTools.forEach { tool ->
                                             onOfficialToolOpened(tool.id)
                                         }
                                         page = AddToChatPage.OFFICIAL_TOOL
                                     },
-                                )
-                                AddToChatPage.PERMISSION_MODE -> PermissionModePage(
-                                    fullAccess = state.fullAccess,
-                                    onFullAccessChange = onFullAccessChange,
-                                )
-                                AddToChatPage.REASONING_EFFORT -> ReasoningEffortPage(
-                                    state = state,
-                                    onEffortChange = onReasoningEffortChange,
-                                    onThinkingEnabledChange = onThinkingEnabledChange,
                                 )
                                 AddToChatPage.MCP -> McpServersPage(
                                     state = state,
@@ -234,13 +224,11 @@ internal fun ChatAddToChatSheet(
                                     listMaxHeight = toolListMaxHeight,
                                 )
                             }
-                        }
                     }
                 }
             }
         }
     }
-}
 
 @Composable
 private fun AddToChatHome(
@@ -250,10 +238,8 @@ private fun AddToChatHome(
     onChooseFiles: () -> Unit,
     imagesEnabled: Boolean,
     filesEnabled: Boolean,
-    onOpenReasoningEffort: () -> Unit,
     onOpenMcp: () -> Unit,
     onOpenOfficialTools: () -> Unit,
-    onOpenPermissionMode: () -> Unit,
 ) {
     val listState = rememberLazyListState()
     LazyColumn(
@@ -305,26 +291,6 @@ private fun AddToChatHome(
         }
         item {
             GroupedCard(modifier = Modifier.testTag("session-configuration-group")) {
-                NavigationRow(
-                    icon = Icons.Default.Lock,
-                    title = stringResource(R.string.chat_permission_mode_title),
-                    subtitle = permissionModeLabel(state.fullAccess),
-                    onClick = onOpenPermissionMode,
-                    testTag = "permission-mode-nav",
-                )
-                SheetDivider()
-                NavigationRow(
-                    icon = Icons.Default.Psychology,
-                    title = stringResource(R.string.chat_reasoning_effort_title),
-                    subtitle = if (state.configuration?.thinkingEnabled == false) {
-                        stringResource(R.string.chat_thinking_disabled)
-                    } else {
-                        reasoningEffortLabel(state.configuration?.reasoningEffort ?: ReasoningEffort.MEDIUM)
-                    },
-                    onClick = onOpenReasoningEffort,
-                    testTag = "reasoning-effort-nav",
-                )
-                SheetDivider()
                 NavigationRow(
                     icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
                     title = stringResource(R.string.chat_session_mcp_title),
@@ -434,6 +400,44 @@ private fun NavigationRow(
     )
 }
 
+/** 输入胶囊权限图标直接打开的权限模式抽屉。 */
+@Composable
+internal fun ChatPermissionModeSheet(
+    fullAccess: Boolean,
+    onFullAccessChange: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    PreferenceStyleScope(PreferenceStyle.Compact) {
+        GimiSheet(
+            onDismissRequest = onDismiss,
+            title = stringResource(R.string.chat_permission_mode_title),
+            // 只有两个选项，抽屉贴着内容即可。
+            initialHeight = SheetHeight.Fraction(0.28f),
+            maxHeight = SheetHeight.Fraction(0.6f),
+            // 关闭放在右侧操作位：抽屉里一律"返回在左、关闭在右"。
+            trailing = {
+                GimiSheetIconAction(
+                    icon = Icons.Default.Close,
+                    contentDescription = stringResource(R.string.chat_add_to_chat_close),
+                    onClick = onDismiss,
+                )
+            },
+        ) {
+            val controller = LocalGimiSheetController.current
+            PermissionModePage(
+                fullAccess = fullAccess,
+                onFullAccessChange = { approved ->
+                    // 先播完收起动画再改权限，避免开关在抽屉消失的瞬间闪一下。
+                    controller.hide {
+                        onFullAccessChange(approved)
+                        onDismiss()
+                    }
+                },
+            )
+        }
+    }
+}
+
 @Composable
 private fun PermissionModePage(
     fullAccess: Boolean,
@@ -448,7 +452,7 @@ private fun PermissionModePage(
         // 权限模式沿用全局审批开关，运行中也允许切换以放行挂起的确认。
         GroupedCard(modifier = Modifier.padding(top = 8.dp)) {
             listOf(false, true).forEach { approveAll ->
-                GimiBottomSheetOptionRow(
+                GimiSheetOptionRow(
                     selected = fullAccess == approveAll,
                     enabled = true,
                     onClick = { onFullAccessChange(approveAll) },
@@ -460,8 +464,10 @@ private fun PermissionModePage(
                     modifier = Modifier.testTag(
                         if (approveAll) "permission-mode-full" else "permission-mode-request",
                     ),
+                    // 每次询问用防护图标、完全访问用自动放行图标，与抽屉其它菜单行共用图标槽位。
+                    icon = if (approveAll) Icons.Default.CheckCircle else Icons.Default.Shield,
                 )
-                if (!approveAll) SheetDivider(withIcon = false)
+                if (!approveAll) SheetDivider(withIcon = true)
             }
         }
     }
@@ -472,55 +478,6 @@ private fun permissionModeLabel(fullAccess: Boolean): String = stringResource(
     if (fullAccess) R.string.chat_permission_mode_full
     else R.string.chat_permission_mode_request,
 )
-
-@Composable
-private fun ReasoningEffortPage(
-    state: ChatAddToChatState,
-    onEffortChange: (ReasoningEffort) -> Unit,
-    onThinkingEnabledChange: (Boolean) -> Unit = {},
-) {
-    Column(Modifier.wrapContentHeight().testTag("reasoning-effort-page")) {
-        PageStatus(state)
-        Text(
-            text = stringResource(R.string.chat_reasoning_effort_openai_notice),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
-        )
-        LazyColumn(
-            modifier = Modifier.wrapContentHeight(),
-            contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
-        ) {
-            item {
-                GroupedListItem(first = true, last = true, withIcon = false) {
-                    GimiBottomSheetSwitchRow(
-                        label = stringResource(R.string.chat_thinking_mode),
-                        description = stringResource(
-                            if (state.configuration?.thinkingEnabled != false) R.string.chat_thinking_enabled
-                            else R.string.chat_thinking_disabled,
-                        ),
-                        checked = state.configuration?.thinkingEnabled != false,
-                        enabled = state.configuration != null && !state.isMutationBlocked,
-                        onCheckedChange = onThinkingEnabledChange,
-                    )
-                }
-            }
-            item { Box(Modifier.height(16.dp)) }
-            itemsIndexed(ReasoningEffort.entries, key = { _, effort -> effort.name }) { index, effort ->
-                GroupedListItem(first = index == 0, last = index == ReasoningEffort.entries.lastIndex, withIcon = false) {
-                    GimiBottomSheetOptionRow(
-                        selected = state.configuration?.reasoningEffort == effort,
-                        enabled = state.configuration != null && !state.isMutationBlocked && state.configuration.thinkingEnabled,
-                        onClick = { onEffortChange(effort) },
-                        label = reasoningEffortLabel(effort),
-                        description = reasoningEffortDescription(effort),
-                        modifier = Modifier.testTag("reasoning-effort-${effort.name.lowercase()}"),
-                    )
-                }
-            }
-        }
-    }
-}
 
 @Composable
 private fun OfficialToolsNavigationRow(
@@ -700,7 +657,7 @@ private fun OfficialToolFunctionRow(
     mutationEnabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
 ) {
-    GimiBottomSheetSwitchRow(
+    GimiSheetSwitchRow(
         leadingIcon = { FunctionIcon(it) },
         label = officialFunctionLabel(toolId, function.id),
         description = officialFunctionDescription(toolId, function.id, function.description),
@@ -783,7 +740,7 @@ private fun McpServerRow(
     mutationEnabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
 ) {
-    GimiBottomSheetSwitchRow(
+    GimiSheetSwitchRow(
         icon = ImageVector.vectorResource(github.ponyhuang.gimi.core.designsystem.R.drawable.ic_mcp),
         label = server.name.ifBlank { server.id },
         description = when (server.transport) {
@@ -853,7 +810,7 @@ private fun rememberLowerBoundaryNestedScrollConnection(
     }
 
 @Composable
-private fun PageStatus(state: ChatAddToChatState) {
+internal fun PageStatus(state: ChatAddToChatState) {
     Column {
         Text(
             stringResource(R.string.chat_session_only_notice),
@@ -896,26 +853,6 @@ private fun enabledCountText(count: Int, isMcp: Boolean): String =
     } else {
         stringResource(R.string.chat_session_tools_enabled_count, count)
     }
-
-@Composable
-private fun reasoningEffortLabel(effort: ReasoningEffort): String = stringResource(
-    when (effort) {
-        ReasoningEffort.MINIMAL -> R.string.chat_reasoning_effort_minimal
-        ReasoningEffort.LOW -> R.string.chat_reasoning_effort_low
-        ReasoningEffort.MEDIUM -> R.string.chat_reasoning_effort_medium
-        ReasoningEffort.HIGH -> R.string.chat_reasoning_effort_high
-    },
-)
-
-@Composable
-private fun reasoningEffortDescription(effort: ReasoningEffort): String = stringResource(
-    when (effort) {
-        ReasoningEffort.MINIMAL -> R.string.chat_reasoning_effort_minimal_description
-        ReasoningEffort.LOW -> R.string.chat_reasoning_effort_low_description
-        ReasoningEffort.MEDIUM -> R.string.chat_reasoning_effort_medium_description
-        ReasoningEffort.HIGH -> R.string.chat_reasoning_effort_high_description
-    },
-)
 
 @Composable
 private fun officialToolLabel(toolId: String): String = when (toolId) {
@@ -1023,6 +960,16 @@ private fun previewAddToChatState(
     errorMessage = errorMessage,
 )
 
+/** 首页标题行已不带关闭 X：静态验证标题靠左后与下方卡片留白的对齐关系。 */
+@Preview(name = "添加到聊天 · 首页标题 · 浅色", showBackground = true, widthDp = 390, locale = "zh")
+@Preview(name = "添加到聊天 · 首页标题 · 深色", showBackground = true, widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun ChatAddToChatHomeTitlePreview() {
+    ChatSheetPreviewTheme {
+        GimiSheetTitleRow(title = stringResource(R.string.chat_add_to_chat_title))
+    }
+}
+
 @Preview(name = "浅色", showBackground = true, widthDp = 390, locale = "zh")
 @Preview(name = "深色", showBackground = true, widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
@@ -1035,10 +982,8 @@ private fun ChatAddToChatHomePreview() {
             onChooseFiles = {},
             imagesEnabled = true,
             filesEnabled = true,
-            onOpenReasoningEffort = {},
             onOpenMcp = {},
             onOpenOfficialTools = {},
-            onOpenPermissionMode = {},
         )
     }
 }
@@ -1071,22 +1016,8 @@ private fun ChatAddToChatHomeWithErrorPreview() {
             onChooseFiles = {},
             imagesEnabled = true,
             filesEnabled = false,
-            onOpenReasoningEffort = {},
             onOpenMcp = {},
             onOpenOfficialTools = {},
-            onOpenPermissionMode = {},
-        )
-    }
-}
-
-@Preview(name = "浅色", showBackground = true, widthDp = 390, locale = "zh")
-@Preview(name = "深色", showBackground = true, widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
-@Composable
-private fun ChatAddToChatReasoningEffortPagePreview() {
-    ChatSheetPreviewTheme {
-        ReasoningEffortPage(
-            state = previewAddToChatState(),
-            onEffortChange = {},
         )
     }
 }
@@ -1198,7 +1129,7 @@ private fun ChatSheetPreviewTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    AsssistantaiTheme(darkTheme = darkTheme) {
+    GimiTheme(darkTheme = darkTheme) {
         PreferenceStyleScope(PreferenceStyle.Compact) {
             Surface(color = preferenceCanvasColor()) { content() }
         }
@@ -1302,18 +1233,6 @@ private fun DeepSeekOfficialToolsPreview() {
             ),
             onFunctionEnabledChange = { _, _, _ -> },
             onRetry = {},
-        )
-    }
-}
-
-@Preview(name = "思考已关闭·浅色", showBackground = true, widthDp = 390, locale = "zh")
-@Preview(name = "思考已关闭·深色", showBackground = true, widthDp = 390, locale = "zh", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
-@Composable
-private fun ChatThinkingDisabledPreview() {
-    ChatSheetPreviewTheme {
-        ReasoningEffortPage(
-            state = previewAddToChatState(configuration = ConversationToolConfiguration(thinkingEnabled = false)),
-            onEffortChange = {},
         )
     }
 }

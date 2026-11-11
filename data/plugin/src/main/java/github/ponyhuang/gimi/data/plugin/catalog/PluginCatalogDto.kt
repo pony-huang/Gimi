@@ -2,13 +2,6 @@ package github.ponyhuang.gimi.data.plugin.catalog
 
 import kotlinx.serialization.Serializable
 
-/** 插件订阅文件/内置目录的根结构。 */
-@Serializable
-internal data class PluginCatalogDto(
-    val schemaVersion: Int = 1,
-    val entries: List<PluginCatalogEntryDto> = emptyList(),
-)
-
 /** 单个插件条目的持久化形态；字段语义见 domain 的 PluginCatalogEntry。 */
 @Serializable
 internal data class PluginCatalogEntryDto(

@@ -214,7 +214,7 @@ class ClaudeRequestPayloadTest {
                 )))))
                 add(Content(role = Role.SYSTEM, parts = listOf(Part(
                     text = "", partMetadata = mapOf(
-                        "selkie.inline_tool_definitions" to listOf(
+                        "gimi.inline_tool_definitions" to listOf(
                             """{"name":"$name","description":"Read $name","parameters":{"type":"OBJECT","properties":{}}}""",
                         ),
                     ),
@@ -227,7 +227,7 @@ class ClaudeRequestPayloadTest {
         }
         return LlmRequest(contents = contents, config = GenerateContentConfig(
             systemInstruction = Content(parts = listOf(Part(partMetadata = mapOf(
-                "selkie.deferred_tool_catalog" to catalog,
+                "gimi.deferred_tool_catalog" to catalog,
             )))),
             tools = listOf(Tool(functionDeclarations = (listOf("tool_search") + enabled).map {
                 FunctionDeclaration(name = it, description = "Read $it")

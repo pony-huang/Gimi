@@ -81,10 +81,11 @@ class MobileDisplaySessions {
     fun claim(owner: String): MobileExecutionAccess {
         if (owner in closedExecutions) return MobileExecutionAccess.CLOSED
         val chatId = executions[owner] ?: return MobileExecutionAccess.UNREGISTERED
-        if (session.value?.chatId?.let { it != chatId } == true) return MobileExecutionAccess.OTHER_CHAT
+        val current = session.value
+        if (current != null && current.chatId != chatId) return MobileExecutionAccess.OTHER_CHAT
         if (activeOwner != null && activeOwner != owner) return MobileExecutionAccess.BUSY
         activeOwner = owner
-        if (session.value != null) sessionOwners.add(owner)
+        if (current != null) sessionOwners.add(owner)
         return MobileExecutionAccess.ALLOWED
     }
 

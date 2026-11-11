@@ -22,9 +22,16 @@ internal class NeteaseAccount(
         .digest((value.appId + "\u0000" + value.privateKey.replace("\\n", "\n").trim()).toByteArray())
         .joinToString("") { "%02x".format(it) }
 
+    /**
+     * 会话是否已过期。全模块统一语义：expiresAt <= 0 表示平台未给出有效期（视为不过期），
+     * 正值才与挂钟比较——status 与 business 使用同一判定，避免 0 值兜底各处不一致。
+     */
+    private fun isExpired(session: NeteaseSession): Boolean =
+        session.expiresAt > 0 && session.expiresAt <= clock()
+
     suspend fun status(): Map<String, Any?> = mutex.withLock {
         val session = store.read(identity(credentials()))
-        mapOf("authorized" to (session.accessToken.isNotBlank() && (session.expiresAt == 0L || session.expiresAt > clock())),
+        mapOf("authorized" to (session.accessToken.isNotBlank() && !isExpired(session)),
             "anonymous" to session.anonymous, "expires_at" to session.expiresAt)
     }
 
@@ -57,7 +64,7 @@ internal class NeteaseAccount(
         val c = credentials()
         var session = store.read(identity(c))
         // CLI 先获取有效 access token 再生成二维码；首次使用自动建立匿名会话。
-        if (session.accessToken.isBlank() || session.expiresAt > 0 && session.expiresAt <= clock()) {
+        if (session.accessToken.isBlank() || isExpired(session)) {
             // 发起新的扫码授权不能依赖旧 refresh token；CLI 同样先建立可用匿名会话。
             session = anonymousLogin(c)
         }
@@ -121,14 +128,20 @@ internal class NeteaseAccount(
         return save(c, data, session.anonymous, session.refreshToken)
     }
 
-    suspend fun business(path: String, biz: JSONObject = JSONObject(), post: Boolean = false, memberOnly: Boolean = true): Any = mutex.withLock {
-        val c = credentials()
-        var session = store.read(identity(c))
-        require(session.accessToken.isNotBlank()) { "请先匿名登录或扫码登录网易云" }
-        require(!memberOnly || !session.anonymous) { "此操作需要网易云账号登录，请先扫码登录" }
-        if (session.expiresAt > 0 && session.expiresAt <= clock() + 30_000) session = refresh(c, session)
+    suspend fun business(path: String, biz: JSONObject = JSONObject(), post: Boolean = false, memberOnly: Boolean = true): Any {
+        // 会话判定与令牌刷新在锁内完成；实际网络 IO 不持锁，避免慢请求把并发只读工具全部串行化。
+        val (c, token) = mutex.withLock {
+            val c = credentials()
+            var session = store.read(identity(c))
+            require(session.accessToken.isNotBlank()) { "请先匿名登录或扫码登录网易云" }
+            require(!memberOnly || !session.anonymous) { "此操作需要网易云账号登录，请先扫码登录" }
+            if (isExpired(session) || session.expiresAt > 0 && session.expiresAt <= clock() + 30_000) {
+                session = refresh(c, session)
+            }
+            c to session.accessToken
+        }
         // 不在业务错误或 401 后自动重放，避免批量加歌等写操作重复提交。
-        api.request(c, store.device, path, biz, session.accessToken, post)
+        return api.request(c, store.device, path, biz, token, post)
     }
 
     private fun save(c: NeteaseCredentials, data: JSONObject, anonymous: Boolean, fallbackRefresh: String = ""): NeteaseSession {

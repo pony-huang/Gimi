@@ -1,5 +1,6 @@
 package github.ponyhuang.gimi.data.appfunction
 
+import androidx.appfunctions.AppFunctionName
 import androidx.appfunctions.metadata.*
 import org.junit.Assert.*
 import org.junit.Test

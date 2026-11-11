@@ -19,7 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import github.ponyhuang.gimi.ui.theme.LocalUserBubbleColors
 
 /**
@@ -89,7 +89,7 @@ fun ChatMessageBubble(
 @Preview(showBackground = true)
 @Composable
 private fun ChatMessageBubbleUserPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ChatMessageBubble(role = ChatBubbleRole.USER) {
             Text(text = "用户消息示例")
         }
@@ -110,7 +110,7 @@ private fun ChatMessageBubbleAssistantDarkPreview() {
 
 @Composable
 private fun ChatMessageBubbleAssistantPreviewContent(darkTheme: Boolean) {
-    AsssistantaiTheme(darkTheme = darkTheme) {
+    GimiTheme(darkTheme = darkTheme) {
         Surface(color = MaterialTheme.colorScheme.background) {
             Column(
                 modifier = Modifier.padding(horizontal = 12.dp),

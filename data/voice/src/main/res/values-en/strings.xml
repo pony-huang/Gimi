@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_call_channel_name">Live voice calls</string>
+    <string name="voice_call_channel_description">Ongoing call status, mute and end controls while the app is in the background</string>
+    <string name="voice_call_notification_foreground_failed">The call continues in the background and may be interrupted by system limits</string>
+    <string name="voice_call_notification_title">Live voice call in progress</string>
+    <string name="voice_call_notification_title_conversation">%1$s · Live voice call</string>
+    <string name="voice_call_notification_background">Running in background</string>
+    <string name="voice_call_notification_text">Tap to return to the call</string>
+    <string name="voice_call_notification_listening">Listening…</string>
+    <string name="voice_call_notification_transcribing">Transcribing…</string>
+    <string name="voice_call_notification_thinking">Thinking…</string>
+    <string name="voice_call_notification_speaking">Replying…</string>
+    <string name="voice_call_notification_muted">Microphone muted, call still in progress</string>
+    <string name="voice_call_notification_failed">Connection issue, tap to return to the call</string>
+    <string name="voice_call_notification_ending">Ending the call and releasing the microphone…</string>
+    <string name="voice_call_notification_end">End call</string>
+    <string name="voice_call_notification_mute">Mute</string>
+    <string name="voice_call_notification_unmute">Unmute</string>
+    <string name="voice_call_notification_return">Return to call</string>
+</resources>

@@ -384,7 +384,7 @@ internal class ToolSearchToolset(
 
     internal companion object {
         /** session state 中持久化 `tool_search` 选中工具名的 key。 */
-        const val STATE_KEY_LOADED_TOOLS: String = "selkie.tool_search.loaded_tools"
+        const val STATE_KEY_LOADED_TOOLS: String = "gimi.tool_search.loaded_tools"
 
         private const val ARG_QUERY = "query"
         private const val KEY_LOADED_TOOLS = "loaded_tools"

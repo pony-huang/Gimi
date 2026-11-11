@@ -59,11 +59,32 @@ class SecureRemoteAgentRepositoryTest {
     }
 
     @Test
-    fun corruptStorage_loadsEmpty() {
+    fun corruptStorage_blocksSaveAndDeleteWithoutOverwritingPayload() {
         storage.content = "{ not json"
 
         val repository = SecureRemoteAgentRepository(storage)
 
         assertTrue(repository.currentAgents().isEmpty())
+        assertTrue(repository.storageError.value)
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) {
+            repository.save(RemoteAgentConfig(name = "new_agent"))
+        }
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) { repository.delete("missing") }
+        assertEquals("{ not json", storage.content)
+        assertEquals(0L, repository.revision.value)
     }
+    @Test
+    fun storageReadFailure_blocksWrites() {
+        var writes = 0
+        val repository = SecureRemoteAgentRepository(object : RemoteAgentStorage {
+            override fun read(): String? = throw IllegalStateException("keystore unavailable")
+            override fun write(value: String) { writes++ }
+        })
+        assertTrue(repository.storageError.value)
+        org.junit.Assert.assertThrows(IllegalStateException::class.java) {
+            repository.save(RemoteAgentConfig(name = "new_agent"))
+        }
+        assertEquals(0, writes)
+    }
+
 }

@@ -21,7 +21,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.feature.chat.R
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import github.ponyhuang.gimi.domain.a2ui.A2uiGenerationTask
 import github.ponyhuang.gimi.domain.a2ui.A2uiGenerationStatus
 
@@ -77,7 +77,7 @@ private fun A2uiTaskStatus(task: A2uiGenerationTask, retryEnabled: Boolean, onRe
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun A2uiTaskStatesPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ChatA2uiContent(emptyList(), failed = false, retryEnabled = true,
             tasks = listOf(A2uiGenerationStatus.PENDING, A2uiGenerationStatus.FAILED, A2uiGenerationStatus.CANCELLED)
                 .map { A2uiGenerationTask(it.name, it.name, "fixture", "fixture", setOf("Image"), it) })
@@ -94,5 +94,5 @@ private fun A2uiError() {
 @Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun A2uiErrorPreview() {
-    AsssistantaiTheme { ChatA2uiContent(emptyList(), failed = true) }
+    GimiTheme { ChatA2uiContent(emptyList(), failed = true) }
 }

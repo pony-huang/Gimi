@@ -28,7 +28,7 @@ import github.ponyhuang.gimi.ui.components.FunctionIcon
 import github.ponyhuang.gimi.ui.components.GimiListDefaults
 import github.ponyhuang.gimi.ui.components.GimiSwitch
 import github.ponyhuang.gimi.ui.preference.*
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 支持下拉刷新的应用列表与独立详情页，数据和操作均由 Route 传入。 */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -196,43 +196,43 @@ private val previewApp = AppFunctionApp("com.example.notes", "示例笔记", "�
 @Preview(name = "应用列表 · 深色", showBackground = true, widthDp = 393, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun AppFunctionListPreview() {
-    AsssistantaiTheme { AppFunctionScreen(AppFunctionUiState(catalog = AppFunctionCatalog(apps = listOf(previewApp)), isRefreshing = false), null, emptyMap(), {}, {}) }
+    GimiTheme { AppFunctionScreen(AppFunctionUiState(catalog = AppFunctionCatalog(apps = listOf(previewApp)), isRefreshing = false), null, emptyMap(), {}, {}) }
 }
 
 @Preview(name = "功能详情 · 浅色", showBackground = true, widthDp = 393)
 @Preview(name = "功能详情 · 深色", showBackground = true, widthDp = 393, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun AppFunctionDetailsPreview() {
-    AsssistantaiTheme { AppFunctionScreen(AppFunctionUiState(catalog = AppFunctionCatalog(apps = listOf(previewApp)), isRefreshing = false,
+    GimiTheme { AppFunctionScreen(AppFunctionUiState(catalog = AppFunctionCatalog(apps = listOf(previewApp)), isRefreshing = false,
         expandedFunctions = setOf("${previewApp.packageName}/${previewApp.functions.first().id}")), previewApp.packageName, emptyMap(), {}, {}) }
 }
 
 @Preview(name = "需要系统授权", showBackground = true)
 @Composable
 private fun AppFunctionPermissionPreview() {
-    AsssistantaiTheme { AppFunctionScreen(AppFunctionUiState(catalog = AppFunctionCatalog(AppFunctionAvailability.PERMISSION_REQUIRED), isRefreshing = false), null, emptyMap(), {}, {}) }
+    GimiTheme { AppFunctionScreen(AppFunctionUiState(catalog = AppFunctionCatalog(AppFunctionAvailability.PERMISSION_REQUIRED), isRefreshing = false), null, emptyMap(), {}, {}) }
 }
 
 @Preview(name = "正在加载", showBackground = true)
 @Composable
 private fun AppFunctionLoadingPreview() {
-    AsssistantaiTheme { AppFunctionScreen(AppFunctionUiState(), null, emptyMap(), {}, {}) }
+    GimiTheme { AppFunctionScreen(AppFunctionUiState(), null, emptyMap(), {}, {}) }
 }
 
 @Preview(name = "没有应用", showBackground = true)
 @Composable
 private fun AppFunctionEmptyPreview() {
-    AsssistantaiTheme { AppFunctionScreen(AppFunctionUiState(isRefreshing = false), null, emptyMap(), {}, {}) }
+    GimiTheme { AppFunctionScreen(AppFunctionUiState(isRefreshing = false), null, emptyMap(), {}, {}) }
 }
 
 @Preview(name = "设备不支持", showBackground = true)
 @Composable
 private fun AppFunctionUnsupportedPreview() {
-    AsssistantaiTheme { AppFunctionScreen(AppFunctionUiState(catalog = AppFunctionCatalog(AppFunctionAvailability.UNSUPPORTED), isRefreshing = false), null, emptyMap(), {}, {}) }
+    GimiTheme { AppFunctionScreen(AppFunctionUiState(catalog = AppFunctionCatalog(AppFunctionAvailability.UNSUPPORTED), isRefreshing = false), null, emptyMap(), {}, {}) }
 }
 
 @Preview(name = "查询失败", showBackground = true)
 @Composable
 private fun AppFunctionFailedPreview() {
-    AsssistantaiTheme { AppFunctionScreen(AppFunctionUiState(catalog = AppFunctionCatalog(AppFunctionAvailability.FAILED), isRefreshing = false), null, emptyMap(), {}, {}) }
+    GimiTheme { AppFunctionScreen(AppFunctionUiState(catalog = AppFunctionCatalog(AppFunctionAvailability.FAILED), isRefreshing = false), null, emptyMap(), {}, {}) }
 }

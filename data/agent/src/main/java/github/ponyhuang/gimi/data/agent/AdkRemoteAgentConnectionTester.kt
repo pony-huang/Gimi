@@ -12,7 +12,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** 基于真实 A2A 客户端栈的连通性探测：成功即代表卡片可拉取、可解析、可建立客户端。 */
+/** 基于真实 A2A 客户端栈的连通性探测：成功即代表卡片可拉取并解析；不代表委派接口可用。 */
 @Singleton
 class AdkRemoteAgentConnectionTester @Inject constructor(
     private val cardFetcher: RemoteAgentCardFetcher,
@@ -20,7 +20,7 @@ class AdkRemoteAgentConnectionTester @Inject constructor(
 
     override suspend fun test(config: RemoteAgentConfig): RemoteAgentProbeResult =
         withTimeoutOrNull(REMOTE_AGENT_CARD_TIMEOUT_MS) {
-            // 直接拉卡片并裁剪快照：与 buildRemoteA2aAgent 同一套解析路径，但把卡片内容带回给调用方。
+            // 直接拉卡片并裁剪快照：与运行时共用卡片解析路径，但把卡片内容带回给调用方。
             cancellationAwareRunCatching { cardFetcher.fetch(config).toSnapshot() }.fold(
                 onSuccess = { RemoteAgentProbeResult(reachable = true, card = it) },
                 onFailure = { failure ->

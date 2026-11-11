@@ -82,7 +82,7 @@ class AgentFactory @Inject constructor(
         toolsets: List<Toolset>,
         subAgents: List<BaseAgent>,
     ): BaseAgent = LlmAgent(
-        name = "Assistant",
+        name = github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity.ASSISTANT_NAME,
         model = model,
         generateContentConfig = GenerateContentConfig(
             thinkingConfig = if (spec.thinkingEnabled) {
@@ -91,7 +91,7 @@ class AgentFactory @Inject constructor(
                 ThinkingConfig(includeThoughts = false, thinkingBudget = 0)
             },
         ),
-        instruction = Instruction(AgentPrompts.defaultAssistantInstruction()),
+        instruction = Instruction(AgentPrompts.defaultAssistantInstruction() + spec.instructionSuffix),
         tools = contributions.tools(spec),
         toolsets = toolsets,
         subAgents = subAgents,

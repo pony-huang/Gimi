@@ -36,7 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import github.ponyhuang.gimi.feature.chat.R
 
 /** 聊天卡片标题统一使用紧凑层级，避免生成 h1/h2 时套用大标题及过量留白。 */
@@ -177,7 +177,7 @@ private fun Modifier.chatAccessibility(
 @Preview(showBackground = true, widthDp = 280, fontScale = 1.3f)
 @Composable
 private fun ChatA2uiControlsPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ChatA2uiTheme {
             Column(Modifier.padding(16.dp)) {
                 Card {

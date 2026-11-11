@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import github.ponyhuang.gimi.ui.theme.LocalUserBubbleColors
 
 /**
@@ -151,7 +151,7 @@ private val RecommendationCategory.icon: ImageVector
 @Preview(showBackground = true, widthDp = 360)
 @Composable
 private fun RecommendationPanelPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         RecommendationPanel(
             recommendations = listOf(
                 AgentRecommendation(

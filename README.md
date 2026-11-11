@@ -18,7 +18,7 @@ Built as a fully native Android app with Jetpack Compose.
 
 ## Features
 
-- **Chat and voice**: streaming replies, image/document/audio attachments where supported, speech input and reply playback, and native A2UI interactive cards.
+- **Chat and voice**: streaming replies, image/document/audio attachments where supported, speech input and reply playback, and native A2UI interactive cards. Voice calls offer four modes with automatic turn detection and interruption; the Realtime assistant mode can also use authorized tools during the call.
 - **Phone tools**: calendars, alarms, media, volume, brightness, location, contacts, apps, and local file search and reading.
 - **Background tasks**: continue conversations in the background, with notifications for approvals, input requests, and completion.
 - **Personalization**: per-conversation models and tools, task suggestions, on-device memory, and optional Mem0 memory.
@@ -30,9 +30,11 @@ Built as a fully native Android app with Jetpack Compose.
 Requires **Android 14+** and your own model API key.
 
 1. Download a matching app APK from [Releases](https://github.com/pony-huang/Gimi/releases/latest).
-2. In **Settings → API access**, configure a provider, test the connection, and enable it.
-3. In **Settings → Default models**, select a chat model and a quick model for titles and suggestions. Configure speech models and a voice if needed.
-4. Grant permissions as needed and start chatting. Manage suggestions, A2UI cards, and tool loading in **Settings → Personalized services**.
+2. In **Settings → LLM models**, configure a provider with your API key, test the connection, and enable it.
+3. In **Settings → Default models**, select a chat model and a quick model for titles and suggestions.
+4. Grant permissions as needed and start chatting. Manage suggestions, A2UI cards, and tool loading in **Settings → Personalization options**.
+
+For voice, configure speech services in **Settings → Speech models**, and pick a Realtime model and voice in **Settings → Default models** before using the Realtime modes. The voice page's **Chat modes** panel offers *Quick chat* (no saved history), *Assistant* (full agent with tools, saved to the conversation), *Realtime* (native full-duplex audio), and *Realtime assistant* (Realtime plus authorized phone, MCP, plugin, AppFunctions, and sandbox tools during the call). Realtime calls are not written to the conversation history.
 
 The global permission mode is available in the composer's **Add to chat** panel: *request approval* pauses sensitive tool calls for confirmation; *full approval* allows them automatically.
 
@@ -42,7 +44,9 @@ Presets: <img src="https://raw.githubusercontent.com/lobehub/lobe-icons/refs/hea
 
 Gimi supports Chat Completions and Anthropic-compatible endpoints. Attachment, reasoning, and tool capabilities depend on the selected model and protocol.
 
-Enable official tools in **Settings → API access**, then select them in the conversation:
+Voice uses separate speech services configured in **Settings → Speech models**: Qwen (DashScope), MiniMax, MiMo, and OpenAI provide recognition and synthesis, while OpenAI Realtime and Qwen-Audio Realtime power the native full-duplex Realtime modes.
+
+Enable official tools in **Settings → LLM models**, then select them in the conversation:
 
 | Provider | Official tools |
 |---|---|
@@ -66,7 +70,7 @@ Configure optional capabilities in Settings:
 | **Skills** | Install instructions and resources from a URL or local ZIP; run scripts with the sandbox configured. |
 | **Sandbox** | Configure an E2B API key for shell commands, Python/JavaScript, and files in an isolated environment per conversation. |
 | **AppFunctions** | Discover other apps' functions on supported Android 16+ devices; execution requires privileged system access. See the [execution guide](spec/en/appfunctions.md). |
-| **Shizuku** | Background app control requires Shizuku in ADB shell mode, an image-capable model, and overlay permission; text input and native element actions also need the Gimi Accessibility service. |
+| **Shizuku** | Configure it from **Settings → Personalization options**. Background app control requires Shizuku in ADB shell mode, an image-capable model, and overlay permission; text input and native element actions also need the Gimi Accessibility service. |
 
 Available plugins:
 
@@ -85,16 +89,13 @@ Some plugins require their own platform credentials and authorization. Third-par
 
 Conversations, attachments, and settings are stored on the device. The developer operates no servers and collects no analytics or telemetry. Relevant content is sent to the model and other services you configure or enable; these services follow their own privacy policies.
 
-Grant system permissions as needed and revoke them in Android settings. Document search across shared storage requires all-files access. See the [Privacy Policy](PRIVACY.md).
+Grant system permissions as needed and revoke them in Android settings. Document search across shared storage requires all-files access. See the [Privacy Policy](https://github.com/pony-huang/Gimi/wiki/Privacy-Policy).
 
 ## Contributing and documentation
 
 Issues, feature suggestions, translations, and code contributions are welcome. Describe the use case and discuss substantial changes in an issue first.
 
 - [Contributing](CONTRIBUTING.md)
-- [Development and releases](spec/en/releasing.md)
-- [AppFunction execution](spec/en/appfunctions.md)
-- [A2A sample server](a2a-server/README.md)
 - [Changelog](CHANGELOG.md)
 
 ## Thanks

@@ -1,5 +1,8 @@
 package github.ponyhuang.gimi.data.modelcatalog
 
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
+import github.ponyhuang.gimi.domain.modelcatalog.model.isVoiceTask
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceKind
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import kotlinx.serialization.Serializable
 
@@ -37,6 +40,18 @@ data class LLMModelProvider(
     val homepageUrl: String = "",
     val keyHelpUrl: String = "",
     val isAdded: Boolean = apiKey.isNotBlank(),
+    /**
+     * 服务种类。
+     *
+     * 语音服务的 [apiBaseUrl] 是厂商语音协议的接入端点（如 `wss://`），
+     * HTTP 语音服务使用固定协议；WebSocket 语音服务不使用聊天协议切换。
+     * 端点由厂商自有的服务该值仅作兜底展示，不参与请求构造。
+     */
+    val kind: ModelServiceKind = ModelServiceKind.Chat,
+    /** 模板允许的接入地址协议；与用户填写的地址分离。 */
+    val endpointSchemes: Set<String> = if (kind == ModelServiceKind.Chat) setOf("http", "https") else setOf("wss"),
+    /** 阿里云百炼业务空间 ID（可选）；空白走官方默认域名。与 [github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting.workspaceId] 对应。 */
+    val workspaceId: String? = null,
 ) {
     /** 当前 [baseType] 对应的实际请求地址。两种协议的地址分别保存，切换时互不覆盖。 */
     val activeApiBaseUrl: String
@@ -68,26 +83,26 @@ data class LLMModelGroup(
  *
  * @property modelId 平台精确模型 ID（如 `deepseek-v4-pro`），用于请求体。
  * @property modelName 模型展示名（如 `DeepSeek V4 Pro`）。
- * @property isStt 是否为专用语音识别模型；此类模型不能用于普通聊天。
- * @property isTts 是否为专用语音合成模型；此类模型不能用于普通聊天。
+ * @property capabilities 该模型可承担的任务集合；缺省视为可对话模型（远端目录不携带能力元数据），
+ * 仅含语音任务的模型不能用于普通聊天。
  * @property isChildPanelExpanded 占位字段 — 后续可挂"子配置面板"。
+ * @property multimodal 该模型可接收的输入模态，与 [capabilities] 正交。
  */
 data class LLMModelItem(
     val modelId: String,
     val modelName: String,
-    val isStt: Boolean = false,
-    val isTts: Boolean = false,
+    val capabilities: Set<ModelCapability> = setOf(ModelCapability.LLM),
     val isChildPanelExpanded: Boolean = false,
-    val capabilities: MultimodalCapabilities = MultimodalCapabilities(),
+    val multimodal: MultimodalCapabilities = MultimodalCapabilities(),
 )
 
-val LLMModelItem.supportsImages: Boolean get() = capabilities.supportsImages
-val LLMModelItem.supportsAudio: Boolean get() = capabilities.supportsAudio
-val LLMModelItem.supportsDocuments: Boolean get() = capabilities.supportsDocuments
+val LLMModelItem.supportsImages: Boolean get() = multimodal.supportsImages
+val LLMModelItem.supportsAudio: Boolean get() = multimodal.supportsAudio
+val LLMModelItem.supportsDocuments: Boolean get() = multimodal.supportsDocuments
 
 /** Whether this model can be used for ordinary assistant chat. */
 val LLMModelItem.isChatModel: Boolean
-    get() = !isStt && !isTts
+    get() = ModelCapability.LLM in capabilities
 
 /** Whether this provider is fully configured and allowed to serve chat requests. */
 val LLMModelProvider.isConfiguredForChat: Boolean
@@ -236,31 +251,7 @@ object LLMModelConfigs {
 
     val services: List<LLMModelProvider> = listOf(
         LLMModelType.DeepSeek.toProvider(),
-        LLMModelType.MiniMax.toProvider(
-            modelGroups = listOf(
-                LLMModelGroup(
-                    groupId = "minimax-stt",
-                    groupName = "Minimax Speech Recognition",
-                    isExpanded = true,
-                    models = listOf(
-                        LLMModelItem("asr-1.0", "asr-1.0", isStt = true),
-                    ),
-                ),
-                LLMModelGroup(
-                    groupId = "minimax-tts",
-                    groupName = "Minimax Speech",
-                    isExpanded = true,
-                    models = listOf(
-                        LLMModelItem("speech-2.8-hd", "speech-2.8-hd", isTts = true),
-                        LLMModelItem("speech-2.8-turbo", "speech-2.8-turbo", isTts = true),
-                        LLMModelItem("speech-2.6-hd", "speech-2.6-hd", isTts = true),
-                        LLMModelItem("speech-2.6-turbo", "speech-2.6-turbo", isTts = true),
-                        LLMModelItem("speech-02-hd", "speech-02-hd", isTts = true),
-                        LLMModelItem("speech-02-turbo", "speech-02-turbo", isTts = true),
-                    ),
-                ),
-            ),
-        ),
+        LLMModelType.MiniMax.toProvider(),
         LLMModelType.Mimo.toProvider(),
         LLMModelType.OpenAI.toProvider(),
         LLMModelType.Anthropic.toProvider(),

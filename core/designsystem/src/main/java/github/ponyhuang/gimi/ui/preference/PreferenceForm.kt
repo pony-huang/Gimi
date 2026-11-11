@@ -26,7 +26,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 统一的低强调填充式设置输入框；所有编辑、校验和密钥展示均由调用方控制。 */
 @Composable
@@ -125,7 +125,7 @@ fun PreferenceSaveBar(
 @Preview(name = "Compact form tablet", widthDp = 840, heightDp = 780)
 @Composable
 private fun PreferenceFormPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PreferenceScaffold(
             title = "连接配置",
             onBack = {},

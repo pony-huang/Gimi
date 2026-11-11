@@ -41,7 +41,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceSaveBar
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @Composable
 fun PluginConfigRoute(
@@ -272,7 +272,7 @@ private fun PluginSelectField(
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PluginConfigScreenEmptyPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PluginConfigScreen(
             state = PluginConfigUiState(pluginId = "zhihu"),
             onAction = {},
@@ -284,7 +284,7 @@ private fun PluginConfigScreenEmptyPreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PluginConfigScreenWithFieldsPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PluginConfigScreen(
             state = PluginConfigUiState(
                 pluginId = "zhihu",
@@ -341,7 +341,7 @@ private fun NeteaseLoginExpiredPreview() {
 
 @Composable
 private fun NeteaseLoginPreviewContent(message: String, authorized: Boolean = false) {
-    AsssistantaiTheme {
+    GimiTheme {
         PluginConfigScreen(
             state = PluginConfigUiState(
                 pluginId = "netease",

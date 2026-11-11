@@ -67,7 +67,7 @@ adb -s "<序列号>" install -r "app\build\outputs\apk\release\app-arm64-v8a-rel
 INSTRUMENTATION_STATUS: AppFunctionShell=permission granted
 ```
 
-随后打开 Gimi，进入 **设置 → AppFunciton**，下拉刷新应用列表。原先的
+随后打开 Gimi，进入 **设置 → AppFunction**，下拉刷新应用列表。原先的
 “尚未获得执行权限”提示应被可发现的应用列表替代。
 
 ## 调试版
@@ -121,7 +121,7 @@ adb -s "<序列号>" shell am force-stop github.ponyhuang.gimi.debug
 | 提示 `lacks the AppFunction session entry` | 已安装 APK 早于此次接入，或选错了正式版/调试版。重新构建并安装当前 APK。 |
 | 提示 `Specify -Serial` | 同时连接了多台设备。运行 `adb devices -l` 并传入目标序列号。 |
 | 提示 `Device did not grant the Shell AppFunction identity` | 当前设备或系统策略未开放该 Shell 身份。改用支持该方式的设备或系统构建；普通权限授权无法绕过。 |
-| 应用仍提示需要权限 | 确认启动命令仍在运行、Gimi 进程没有重启，并在会话启动后重新进入 **设置 → AppFunciton**。 |
+| 应用仍提示需要权限 | 确认启动命令仍在运行、Gimi 进程没有重启，并在会话启动后重新进入 **设置 → AppFunction**。 |
 | 应用列表为空 | 下拉刷新。新安装或更新的提供方应用可能需要等待系统完成索引。 |
 | 更新或重启后会话失效 | 按上文重新运行脚本或手动 ADB 命令。 |
 

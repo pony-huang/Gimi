@@ -41,7 +41,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceGroupCard
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @Composable
 fun RemoteAgentListScreen(
@@ -53,7 +53,10 @@ fun RemoteAgentListScreen(
 ) {
     PreferencePageContainer(modifier = modifier, style = PreferenceStyle.Compact) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (state.isMutationBlocked) {
+            state.connectionError?.let { error ->
+                PreferenceBanner(text = localizeA2aError(error), modifier = Modifier.padding(top = 8.dp))
+            }
+            if (state.isMutationBlocked && state.connectionError != "a2a.storage_error") {
                 PreferenceBanner(
                     text = stringResource(R.string.a2a_agent_mutation_blocked),
                     modifier = Modifier.padding(top = 8.dp),
@@ -229,7 +232,7 @@ private fun RemoteAgentListRow(
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun RemoteAgentListScreenEmptyPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         RemoteAgentListScreen(
             state = A2aSettingsUiState(),
             onAction = {},
@@ -243,7 +246,7 @@ private fun RemoteAgentListScreenEmptyPreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun RemoteAgentListScreenWithAgentsPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         RemoteAgentListScreen(
             state = A2aSettingsUiState(
                 agents = listOf(
@@ -262,6 +265,20 @@ private fun RemoteAgentListScreenWithAgentsPreview() {
                 ),
                 menuServerId = "agent-1",
             ),
+            onAction = {},
+            onCreateAgent = {},
+            onNavigateToEditor = {},
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun RemoteAgentListStorageErrorPreview() {
+    GimiTheme {
+        RemoteAgentListScreen(
+            state = A2aSettingsUiState(isMutationBlocked = true, connectionError = "a2a.storage_error"),
             onAction = {},
             onCreateAgent = {},
             onNavigateToEditor = {},

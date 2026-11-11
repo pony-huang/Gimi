@@ -49,7 +49,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -327,7 +327,7 @@ private val previewFixture = listOf(
 @Preview(name = "浏览 · 浅色", showBackground = true)
 @Composable
 private fun WorkspaceBrowsingLightPreview() {
-    AsssistantaiTheme(darkTheme = false) {
+    GimiTheme(darkTheme = false) {
         WorkspaceScreen(
             state = WorkspaceUiState(files = previewFixture, totalBytes = 3_965_337, isLoading = false),
             onAction = {},
@@ -340,7 +340,7 @@ private fun WorkspaceBrowsingLightPreview() {
 @Preview(name = "浏览 · 深色", showBackground = true)
 @Composable
 private fun WorkspaceBrowsingDarkPreview() {
-    AsssistantaiTheme(darkTheme = true) {
+    GimiTheme(darkTheme = true) {
         WorkspaceScreen(
             state = WorkspaceUiState(files = previewFixture, totalBytes = 3_965_337, isLoading = false),
             onAction = {},
@@ -353,7 +353,7 @@ private fun WorkspaceBrowsingDarkPreview() {
 @Preview(name = "多选 · 深色", showBackground = true)
 @Composable
 private fun WorkspaceSelectingDarkPreview() {
-    AsssistantaiTheme(darkTheme = true) {
+    GimiTheme(darkTheme = true) {
         WorkspaceScreen(
             state = WorkspaceUiState(
                 files = previewFixture,
@@ -371,7 +371,7 @@ private fun WorkspaceSelectingDarkPreview() {
 @Preview(name = "空态 · 浅色", showBackground = true)
 @Composable
 private fun WorkspaceEmptyLightPreview() {
-    AsssistantaiTheme(darkTheme = false) {
+    GimiTheme(darkTheme = false) {
         WorkspaceScreen(
             state = WorkspaceUiState(files = emptyList(), isLoading = false),
             onAction = {},
@@ -384,7 +384,7 @@ private fun WorkspaceEmptyLightPreview() {
 @Preview(name = "加载失败 · 浅色", showBackground = true)
 @Composable
 private fun WorkspaceLoadFailedLightPreview() {
-    AsssistantaiTheme(darkTheme = false) {
+    GimiTheme(darkTheme = false) {
         WorkspaceScreen(
             state = WorkspaceUiState(isLoading = false, loadFailed = true),
             onAction = {},

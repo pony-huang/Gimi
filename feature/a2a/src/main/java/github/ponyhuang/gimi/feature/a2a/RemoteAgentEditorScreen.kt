@@ -46,7 +46,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceSaveBar
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.PreferenceTextField
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @Composable
 fun RemoteAgentEditorScreen(
@@ -72,7 +72,7 @@ fun RemoteAgentEditorScreen(
                 .padding(vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            if (state.isMutationBlocked) {
+            if (state.isMutationBlocked && state.connectionError != "a2a.storage_error") {
                 PreferenceBanner(text = stringResource(R.string.a2a_agent_mutation_blocked))
             }
             // 启用开关是状态控制而非表单字段，置顶作主开关；
@@ -267,7 +267,7 @@ internal fun RemoteAgentEditorSaveBar(
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun RemoteAgentEditorScreenLoadingPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         RemoteAgentEditorScreen(
             state = A2aSettingsUiState(editor = null),
             onAction = {},
@@ -279,7 +279,7 @@ private fun RemoteAgentEditorScreenLoadingPreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun RemoteAgentEditorScreenNewPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         RemoteAgentEditorScreen(
             state = A2aSettingsUiState(
                 editor = RemoteAgentEditorDraft(
@@ -300,7 +300,7 @@ private fun RemoteAgentEditorScreenNewPreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun RemoteAgentEditorScreenExistingWithErrorPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         RemoteAgentEditorScreen(
             state = A2aSettingsUiState(
                 editor = RemoteAgentEditorDraft(
@@ -322,7 +322,7 @@ private fun RemoteAgentEditorScreenExistingWithErrorPreview() {
 @Preview(name = "Dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun RemoteAgentEditorScreenWithCardPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         RemoteAgentEditorScreen(
             state = A2aSettingsUiState(
                 editor = RemoteAgentEditorDraft(

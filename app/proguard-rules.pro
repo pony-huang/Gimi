@@ -4,12 +4,12 @@
 # Each entry below covers a case where R8 cannot prove a class is reachable
 # even though the runtime does (reflection, manifest lookup, native binding).
 # Everything else is handled by consumer-rules.pro embedded in each AAR
-# (Compose, Hilt, Room, openai-java, anthropic-java, google-adk, ktor) —
+# (Compose, Hilt, Room, anthropic-java, google-adk, ktor) —
 # those are merged automatically.
 #
 # 发版策略：只收缩、不混淆。历史上多次发版被 R8 改名坑（插件 ABI 的
 # DefaultConstructorMarker/Continuation/coroutines 被改短名、反射/序列化改名），
-# 而本项目已整树 keep github.ponyhuang.** / com.openai.** / com.anthropic.** /
+# 而本项目已整树 keep github.ponyhuang.** / com.anthropic.** /
 # com.google.adk.kt.**，混淆本就不省多少。禁用改名后这些「改名类」问题彻底消失，
 # 死代码收缩与资源收缩仍保留。缺失类告警（如 java.beans）仍靠下方 -dontwarn 处理。
 # ---------------------------------------------------------------------------
@@ -79,23 +79,6 @@
 # ---------------------------------------------------------------------------
 -keep class com.anthropic.** { *; }
 -dontwarn com.anthropic.**
-
-# ---------------------------------------------------------------------------
-# openai-java SDK
-#
-# Same JsonMissing failure mode as anthropic-java, with no bundled consumer
-# rules at all (META-INF/proguard/ is absent from openai-java-core). Without
-# these, even an empty "hello" message produces:
-#
-#   IllegalStateException: JsonMissing cannot be serialized (through reference
-#   chain: com.openai.models.chat.completions.ChatCompletionCreateParams$a["messages"]
-#   → ChatCompletionSystemMessageParam["name"])
-#
-# Keeping the entire `com.openai.**` tree costs another ~6 MB dex (the SDK
-# already ships ~20 970 schema classes; obfuscation savings are minimal).
-# ---------------------------------------------------------------------------
--keep class com.openai.** { *; }
--dontwarn com.openai.**
 
 # ---------------------------------------------------------------------------
 # Jackson Databind
@@ -234,3 +217,19 @@
     public <init>(android.content.Context);
     public void destroy();
 }
+
+# ---------------------------------------------------------------------------
+# ONNX Runtime Android（:core:audio 的 Silero VAD）
+#
+# onnxruntime-android 1.25.0 的 AAR 不带任何 consumer-rules，而 native 层在
+# OrtSession.run() 里用 FindClass/GetMethodID/NewObject 反射构造 Java 对象
+# （convertToTensorInfo -> TensorInfo、ValueInfo、MapInfo、SequenceInfo、
+# OnnxTensor、OrtSession$Result ...）。R8 会把这些类和构造器判为不可达并删除，
+# 于是 GetMethodID("<init>") 返回 null，ART 直接 JNI abort：
+#   "JNI DETECTED ERROR IN APPLICATION: mid == null in call to NewObject"
+# 真机表现为实时语音一开麦就 SIGABRT 闪退，且没有 Java 层异常堆栈（debug 包正常）。
+# ORT 的 Java 绑定层很小，整体保留；-dontobfuscate 已全局禁用改名。
+# 注意 `{ *; }` 不覆盖构造器，必须再显式 keep <init>。
+# ---------------------------------------------------------------------------
+-keep class ai.onnxruntime.** { *; }
+-keepclassmembers class ai.onnxruntime.** { <init>(...); }

@@ -10,7 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @Preview(name = "音乐播放器 · Spotify 浅色", showBackground = true, widthDp = 390, heightDp = 430)
 @Composable
@@ -95,7 +95,7 @@ private fun MusicPlayerApplePreview() {
 
 @Composable
 private fun MusicPlayerPreviewCanvas(darkTheme: Boolean, content: @Composable () -> Unit) {
-    AsssistantaiTheme(darkTheme = darkTheme) {
+    GimiTheme(darkTheme = darkTheme) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Box(Modifier.padding(16.dp)) {
                 content()

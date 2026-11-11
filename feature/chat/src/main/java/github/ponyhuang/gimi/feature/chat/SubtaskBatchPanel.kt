@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.conversation.model.SubtaskBatch
 import github.ponyhuang.gimi.domain.conversation.model.SubtaskRun
 import github.ponyhuang.gimi.domain.conversation.model.SubtaskStatus
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 原聊天 timeline 内的无状态任务树；展开意图交回 ViewModel，正文只由主助手输出。 */
 @Composable
@@ -135,19 +135,19 @@ private fun previewBatch() = SubtaskBatch("preview", "session", "invocation", "c
 
 @Preview(name = "子任务展开 · 浅色", showBackground = true, widthDp = 393)
 @Composable
-private fun SubtasksLightPreview() = AsssistantaiTheme { SubtaskBatchPanel(previewBatch(), true, {}) }
+private fun SubtasksLightPreview() = GimiTheme { SubtaskBatchPanel(previewBatch(), true, {}) }
 
 @Preview(name = "子任务展开 · 深色", showBackground = true, widthDp = 393)
 @Composable
-private fun SubtasksDarkPreview() = AsssistantaiTheme(darkTheme = true) { SubtaskBatchPanel(previewBatch(), true, {}) }
+private fun SubtasksDarkPreview() = GimiTheme(darkTheme = true) { SubtaskBatchPanel(previewBatch(), true, {}) }
 
 @Preview(name = "子任务收起", showBackground = true, widthDp = 393)
 @Composable
-private fun SubtasksCollapsedPreview() = AsssistantaiTheme { SubtaskBatchPanel(previewBatch(), false, {}) }
+private fun SubtasksCollapsedPreview() = GimiTheme { SubtaskBatchPanel(previewBatch(), false, {}) }
 
 @Preview(name = "子任务失败与取消", showBackground = true, widthDp = 393)
 @Composable
-private fun SubtasksFailurePreview() = AsssistantaiTheme { SubtaskBatchPanel(previewBatch().copy(tasks = listOf(
+private fun SubtasksFailurePreview() = GimiTheme { SubtaskBatchPanel(previewBatch().copy(tasks = listOf(
     SubtaskRun("1", "核对交付计划", "快速模型", SubtaskStatus.FAILED, error = "TIMEOUT"),
     SubtaskRun("2", "整理风险清单", "快速模型", SubtaskStatus.CANCELLED),
     SubtaskRun("3", "检查资料覆盖", "快速模型", SubtaskStatus.INTERRUPTED),

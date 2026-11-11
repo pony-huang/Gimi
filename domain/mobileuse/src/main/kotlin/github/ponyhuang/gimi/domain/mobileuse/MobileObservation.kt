@@ -14,6 +14,9 @@ data class MobileBounds(val left: Int, val top: Int, val right: Int, val bottom:
  * @property bounds 原始截图坐标中的边界。
  * @property actions 可执行动作：click、set_text 或 OCR 的坐标 tap。
  * @property clickable 无障碍报告的可点击性，OCR 无法确定时为 null。
+ * @property focused 是否拥有输入焦点，用于内部动作前复核。
+ * @property selectionStart 文本选区起点，未知时为 -1。
+ * @property selectionEnd 文本选区终点，未知时为 -1。
  * @property parentId 同一快照内的父节点编号；父节点可能因裁剪未被返回。
  */
 data class MobileElement(
@@ -34,18 +37,21 @@ data class MobileElement(
     val enabled: Boolean = true,
     val actions: List<String> = emptyList(),
     val confidence: Float? = null,
+    val focused: Boolean = false,
+    val selectionStart: Int = -1,
+    val selectionEnd: Int = -1,
 )
 
 /**
  * 有时限的画面观察结果，不承诺页面业务加载完成。
  * @property id 随机观察编号；后续动作必须引用最新编号。
- * @property state settled、timeout 或 frame_unavailable。
+ * @property state settled、changing、timeout 或 frame_unavailable；changing 可执行目标局部稳定的动作。
  * @property reason 稳定或超时的具体原因；空树与疑似空白不等同于加载中。
  * @property frameAgeMs 最近有效帧距返回时的时间；缓存帧不是动作完成证明。
  * @property frameSequence 当前截图采集序号。
  * @property nodesStatus 节点可用性及 OCR 兜底状态。
  * @property truncated 元素列表或遍历是否达到上限。
- * @property actionModes 当前观察允许的定位方式：native_elements、pixel_coordinates、swipe_coordinates、back；不要求整页静止。
+ * @property actionModes 当前观察允许的定位方式：pixel_coordinates、swipe_coordinates、back；不要求整页静止。
  */
 data class MobileObservation(
     val id: String,

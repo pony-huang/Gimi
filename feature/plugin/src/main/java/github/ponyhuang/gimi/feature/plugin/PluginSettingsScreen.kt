@@ -54,6 +54,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -69,7 +71,7 @@ import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @Composable
 fun PluginSettingsRoute(
@@ -156,14 +158,22 @@ fun PluginSettingsRoute(
 @Composable
 internal fun rememberPluginIcons(items: List<PluginListItemUi>): Map<String, ImageBitmap?> {
     val context = LocalContext.current
-    val installedPackages = items.mapNotNull { item ->
-        item.installed?.let { it.id to it.packageName }
-    }
-    return remember(installedPackages) {
-        installedPackages.associate { (id, packageName) ->
-            id to loadPluginIcon(context, packageName)?.toBitmap()?.asImageBitmap()
+    val installedPackages = remember(items) {
+        items.mapNotNull { item ->
+            item.installed?.let { it.id to it.packageName }
         }
     }
+    // 解码 Drawable/Bitmap 有磁盘与像素开销，放后台线程异步加载，避免首帧卡顿；
+    // 加载完成前条目回退默认矢量图。
+    var icons by remember(installedPackages) { mutableStateOf(emptyMap<String, ImageBitmap?>()) }
+    LaunchedEffect(installedPackages) {
+        icons = withContext(Dispatchers.Default) {
+            installedPackages.associate { (id, packageName) ->
+                id to loadPluginIcon(context, packageName)?.toBitmap()?.asImageBitmap()
+            }
+        }
+    }
+    return icons
 }
 
 /**
@@ -290,7 +300,7 @@ private fun PluginListSearchField(
         value = query,
         onValueChange = onQueryChange,
         modifier = Modifier.fillMaxWidth(),
-        placeholder = { Text(stringResource(R.string.plugin_list_search_label)) },
+        placeholder = stringResource(R.string.plugin_list_search_label),
         trailingIcon = {
             if (query.isNotEmpty()) {
                 IconButton(onClick = { onQueryChange("") }) {
@@ -523,7 +533,7 @@ private fun previewState(
 @Preview(name = "插件列表 · 深色", showBackground = true, widthDp = 390, heightDp = 900, locale = "zh", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PluginSettingsScreenPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PluginSettingsScreen(
             state = previewState(),
             icons = emptyMap(),
@@ -537,7 +547,7 @@ private fun PluginSettingsScreenPreview() {
 @Preview(name = "插件列表 · 安装中", showBackground = true, widthDp = 390, heightDp = 900, locale = "zh")
 @Composable
 private fun PluginSettingsScreenInstallingPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         val items = previewState().items.map { item ->
             if (item.key == "v2ex") {
                 item.copy(installState = PluginInstallUiState.Downloading(0.42f))
@@ -561,7 +571,7 @@ private fun PluginSettingsScreenInstallingPreview() {
 private fun PluginUpdateStatesPreview() {
     val catalog = previewCatalogEntry("zhihu", "知乎", "站内搜索、热榜、直答与知识库", "Search and knowledge bases").copy(versionCode = 61L, versionName = "1.1.0")
     val installed = PluginDescriptor("zhihu", "知乎", catalog.packageName, 1, 4, true, 60L, "1.0.0")
-    AsssistantaiTheme {
+    GimiTheme {
         LazyColumn(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),

@@ -23,28 +23,31 @@ internal fun BackgroundAppContent(
     modifier: Modifier = Modifier,
     toolbarModifier: Modifier = Modifier,
     onCollapsed: () -> Unit = {},
+    floating: Boolean = false,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(state.session?.id) { if (state.session == null) onCollapsed() }
-    BackgroundAppScreen(state, small, viewModel::onAction,
-        onCollapse = { host.collapse(); onCollapsed() },
-        onSwitchWindow = { host.switchWindow(!small); if (!small && host.canOverlay()) onCollapsed() },
-        frame = { frameModifier ->
-            state.session?.let { session ->
-                key(session.id) {
-                    Box(frameModifier) {
-                        AndroidView(modifier = Modifier.matchParentSize(),
-                            factory = { MobilePreviewView(it, gateway, session, interactive = !small, onAction = viewModel::onAction) },
-                            update = { it.updateSession(session) },
-                            onRelease = { it.cancelGesture() })
-                        // 在原生只读画面上方承接拖动，避免 TextureView 先消费触摸；贴边后仍能拉回。
-                        if (small) Box(Modifier.matchParentSize().then(toolbarModifier))
-                    }
+    val frame: @Composable (Modifier) -> Unit = { frameModifier ->
+        state.session?.let { session ->
+            key(session.id, small) {
+                Box(frameModifier) {
+                    AndroidView(modifier = Modifier.matchParentSize(),
+                        factory = { MobilePreviewView(it, gateway, session, interactive = !small, onAction = viewModel::onAction) },
+                        update = { it.updateSession(session) },
+                        onRelease = { it.cancelGesture() })
                 }
             }
-        }, modifier = modifier, toolbarModifier = toolbarModifier,
+        }
+    }
+    BackgroundAppScreen(state, small, viewModel::onAction,
+        onCollapse = { host.collapse(); onCollapsed() },
+        onSwitchWindow = {
+            if (floating) host.open()
+            else { host.switchWindow(!small); if (!small && host.canOverlay()) onCollapsed() }
+        },
+        frame = frame, modifier = modifier, toolbarModifier = toolbarModifier, floatingWindow = floating,
         dialogHost = { dismiss, content ->
-            if (small) BackgroundAppOverlayDialog(dismiss, content)
+            if (small || floating) BackgroundAppOverlayDialog(dismiss, content)
             else Dialog(onDismissRequest = dismiss, content = content)
         })
 }

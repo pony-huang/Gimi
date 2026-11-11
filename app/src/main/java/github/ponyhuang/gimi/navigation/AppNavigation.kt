@@ -149,8 +149,10 @@ fun MainScreen(
                 val handled = ChatEntryProvider(
                     destination = destination,
                     callbacks = ChatNavigationCallbacks(
+                        onBack = goBack,
                         onReturnToChat = returnToChat,
                         onOpenSettings = { navigate(SettingsDestination.Settings) },
+                        onOpenPersonalization = { navigate(RecommendationDestination.Settings) },
                         onConfigureModels = { navigate(ModelSettingsDestination.ServiceList) },
                         sharedMediaUris = currentSharedMediaUris,
                         onSharedMediaConsumed = consumeSharedMedia,
@@ -160,11 +162,12 @@ fun MainScreen(
                     appVersionName = BuildConfig.VERSION_NAME,
                     callbacks = SettingsNavigationCallbacks(
                         onBack = goBack,
+                        onNavigateToSpeechModels = { navigate(ModelSettingsDestination.SpeechServices) },
                         onNavigateToModelService = {
                             navigate(ModelSettingsDestination.ServiceList)
                         },
                         onNavigateToDefaultModels = {
-                            navigate(ModelSettingsDestination.Defaults)
+                            navigate(ModelSettingsDestination.Defaults())
                         },
                         onNavigateToMcpServers = { navigate(McpDestination.ServerList) },
                         onNavigateToRemoteAgents = { navigate(RemoteAgentDestination.AgentList) },
@@ -174,14 +177,12 @@ fun MainScreen(
                         onNavigateToSkills = { navigate(SkillsDestination.Settings) },
                         onNavigateToWorkspace = { navigate(WorkspaceDestination.Manager) },
                         onNavigateToPermissions = { navigate(PermissionDestination.Settings) },
-                        onNavigateToMobileUse = {
-                            navigate(MobileUseDestination.Settings)
-                        },
                         onNavigateToRecommendations = {
                             navigate(RecommendationDestination.Settings)
                         },
                         onNavigateToMemory = { navigate(MemoryDestination.Settings) },
                         onNavigateToAbout = { navigate(SettingsDestination.About) },
+                        onNavigateToPrivacyPolicy = { navigate(SettingsDestination.PrivacyPolicy) },
                     ),
                 ) || ModelSettingsEntryProvider(destination, goBack, navigate) ||
                     SandboxEntryProvider(destination, goBack) ||
@@ -193,7 +194,10 @@ fun MainScreen(
                     RecommendationEntryProvider(
                         destination = destination,
                         onBack = goBack,
-                        onOpenFastModelSettings = { navigate(ModelSettingsDestination.Defaults) },
+                        navigate = navigate,
+                        onOpenFastModelSettings = { navigate(ModelSettingsDestination.Defaults()) },
+                        onOpenSimpleChatPromptSettings = { navigate(ChatDestination.SimpleChatPromptSettings) },
+                        onOpenMobileUse = { navigate(MobileUseDestination.Settings) },
                     ) ||
                     MemoryEntryProvider(destination, goBack, navigate) ||
                     PermissionEntryProvider(destination, goBack) ||

@@ -8,30 +8,29 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.core.storage.AndroidAppDirectoryResolver
+import github.ponyhuang.gimi.feature.chat.realtime.RealtimeVoiceHost
 import github.ponyhuang.gimi.core.storage.ShareableFileUriFactory
 import github.ponyhuang.gimi.domain.conversation.model.FileAttachment
 import java.io.File
-import kotlinx.coroutines.launch
 
 /**
  * 自包含的 Chat 入口。该 Composable 拥有 [ChatViewModel]、[ChatRecommendationsViewModel]、
  * 抽屉、效果监听、文档/本地文件打开与搜索结果子页面；app 只传入跨 feature 跳转回调。
  */
 @OptIn(
-    ExperimentalMaterial3Api::class,
     ExperimentalLayoutApi::class,
     ExperimentalFoundationApi::class,
 )
@@ -42,6 +41,7 @@ import kotlinx.coroutines.launch
 fun ChatRoute(
     onReturnToChat: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenPersonalization: () -> Unit,
     onConfigureModels: () -> Unit,
     sharedMediaUris: List<Uri> = emptyList(),
     onSharedMediaConsumed: () -> Unit = {},
@@ -73,8 +73,14 @@ fun ChatRoute(
         stringResource(R.string.chat_notice_document_total_size_limit)
     val chatNoticeMemorySearchFailed = stringResource(R.string.chat_notice_memory_search_failed)
     val chatNoticeMemoryWriteFailed = stringResource(R.string.chat_notice_memory_write_failed)
-    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
+    // 抽屉目标开关状态：手势提交（预测性返回、拖拽、遮罩点击）经 onOpenChange 回写，
+    // 程序化开关（入口点击、返回收尾）直接赋值；动画收尾由 PredictiveBackDrawer 统一处理。
+    var drawerOpen by rememberSaveable { mutableStateOf(false) }
+    // 语音页外部打开请求计数：抽屉"语音通话"入口递增，RealtimeVoiceHost 消费后清零。
+    var voiceOpenRequest by rememberSaveable { mutableStateOf(0) }
+    // 语音页是全屏覆盖层：其可见期间关闭抽屉手势，避免边缘滑动被覆盖层误捕获；
+    // 文字聊天页保持默认手势行为（边缘右滑打开抽屉）。
+    var voicePageVisible by remember { mutableStateOf(false) }
 
     LifecycleResumeEffect(viewModel) {
         viewModel.onAction(ChatAction.ResumeChat)
@@ -126,6 +132,9 @@ fun ChatRoute(
                     )
                     ChatNotice.MemorySearchFailed -> chatNoticeMemorySearchFailed
                     ChatNotice.MemoryWriteFailed -> chatNoticeMemoryWriteFailed
+                    is ChatNotice.VoiceFailed -> context.getString(
+                        voiceFailureMessageRes(notice.failure.kind, R.string.chat_voice_playback_failed),
+                    )
                     is ChatNotice.Message -> notice.text
                 }
             }
@@ -133,135 +142,156 @@ fun ChatRoute(
         }
     }
 
-    BackHandler(enabled = drawerState.isOpen && uiState.recentConversations.isSelecting && !uiState.recentConversations.isDeleting) {
+    BackHandler(enabled = drawerOpen && uiState.recentConversations.isSelecting && !uiState.recentConversations.isDeleting) {
         viewModel.onAction(ChatAction.RecentConversations(RecentConversationsAction.FinishSelection))
     }
-    LaunchedEffect(drawerState.currentValue) {
-        if (drawerState.currentValue == DrawerValue.Closed) {
+    LaunchedEffect(drawerOpen) {
+        if (!drawerOpen) {
             viewModel.onAction(ChatAction.RecentConversations(RecentConversationsAction.FinishSelection))
         }
     }
 
     ChatDrawer(
-        drawerState = drawerState,
+        open = drawerOpen,
+        gesturesEnabled = !voicePageVisible,
+        onOpenChange = { drawerOpen = it },
         conversations = uiState.conversations,
         currentSessionId = currentSessionId,
         conversationTaskStatuses = uiState.conversationTaskStatuses,
         onConversationClick = { conversation ->
             viewModel.onAction(ChatAction.SwitchSession(conversation.id))
             onReturnToChat()
-            scope.launch { drawerState.close() }
+            drawerOpen = false
         },
         recentState = uiState.recentConversations,
         onRecentAction = { viewModel.onAction(ChatAction.RecentConversations(it)) },
+        onNewConversationClick = {
+            viewModel.onAction(ChatAction.NewConversation)
+            onReturnToChat()
+            drawerOpen = false
+        },
+        onVoiceCallClick = {
+            voiceOpenRequest += 1
+            drawerOpen = false
+        },
+        onPersonalizeClick = {
+            onReturnToChat()
+            onOpenPersonalization()
+            drawerOpen = false
+        },
         onSettingsClick = {
             onReturnToChat()
             onOpenSettings()
-            scope.launch { drawerState.close() }
-        },
-        themeMode = uiState.themeMode,
-        onThemeModeChange = { mode ->
-            viewModel.onAction(ChatAction.SetThemeMode(mode))
+            drawerOpen = false
         },
         showUpdateBadge = uiState.hasUpdateBadge,
         exportState = exportState,
         onExportConversation = exportViewModel::requestExport,
         onDeleteConversation = { viewModel.onAction(ChatAction.DeleteConversation(it)) },
     ) {
-        ChatScaffold(
-            state = uiState,
-            recommendations = recommendations,
-            onRecommendationClick = { prompt ->
-                viewModel.send(prompt, emptyList())
-            },
-            partChannelProvider = viewModel::partChannelFor,
-            onSend = viewModel::send,
-            onStop = { viewModel.onAction(ChatAction.StopStreaming) },
-            onTranscribeVoice = viewModel::transcribeVoice,
-            onCancelVoiceTranscription = { viewModel.onAction(ChatAction.CancelVoiceTranscription) },
-            onToggleSpeechPlayback = { messageId, markdown ->
-                viewModel.onAction(ChatAction.ToggleSpeechPlayback(messageId, markdown))
-            },
-            onToggleAutoSpeak = { viewModel.onAction(ChatAction.ToggleAutoSpeak) },
-            onOpenDocument = { attachment ->
-                openDocumentAttachment(context, attachment)
-            },
-            onToggleTimeline = { groupId ->
-                viewModel.onAction(ChatAction.ToggleTimeline(groupId))
-            },
-            onToolConfirmation = { confirmed ->
-                viewModel.onAction(ChatAction.RespondToToolConfirmation(confirmed))
-            },
-            onToolConfirmationAlwaysAllow = {
-                viewModel.onAction(
-                    ChatAction.RespondToToolConfirmation(
-                        confirmed = true,
-                        alwaysAllow = true,
-                    ),
-                )
-            },
-            onRespondToInputRequest = { callId, value ->
-                viewModel.onAction(ChatAction.RespondToInputRequest(callId, value))
-            },
-            onFullAccessChange = { enabled ->
-                viewModel.onAction(ChatAction.SetFullAccess(enabled))
-            },
-            onSelectModel = { selection ->
-                viewModel.onAction(ChatAction.SelectModel(selection))
-            },
-            onModelSwitchBlocked = {
-                Toast.makeText(
-                    context,
-                    chatNoticeModelSwitchBlocked,
-                    Toast.LENGTH_SHORT,
-                ).show()
-            },
-            onOpenDrawer = { scope.launch { drawerState.open() } },
-            onOpenSettings = onOpenSettings,
-            onConfigureModels = onConfigureModels,
-            onNewConversation = {
-                viewModel.onAction(ChatAction.NewConversation)
-            },
-            onThinkingEnabledChange = { enabled ->
-                viewModel.onAction(ChatAction.SetThinkingEnabled(enabled))
-            },
-            onReasoningEffortChange = { effort ->
-                viewModel.onAction(ChatAction.SetReasoningEffort(effort))
-            },
-            onMcpServerEnabledChange = { serverId, enabled ->
-                viewModel.onAction(ChatAction.SetMcpServerEnabled(serverId, enabled))
-            },
-            onOfficialToolOpened = { toolId ->
-                viewModel.onAction(ChatAction.LoadOfficialToolFunctions(toolId))
-            },
-            onOfficialToolFunctionEnabledChange = { toolId, functionId, enabled ->
-                val descriptors = viewModel.uiState.value.officialToolDescriptors
-                val supportedIds = descriptors
-                    .firstOrNull { it.id == toolId }
-                    ?.functions
-                    ?.mapTo(hashSetOf()) { it.id }
-                    .orEmpty()
-                viewModel.onAction(
-                    ChatAction.SetOfficialFunctionEnabled(
-                        toolId = toolId,
-                        functionId = functionId,
-                        enabled = enabled,
-                        supportedFunctionIds = supportedIds,
-                    ),
-                )
-            },
-            onOfficialToolFunctionsRetry = { toolId ->
-                viewModel.onAction(ChatAction.LoadOfficialToolFunctions(toolId))
-            },
-            sharedMediaUris = sharedMediaUris.takeIf {
-                currentSessionId.isNotBlank() && !uiState.isInitializing
-            }.orEmpty(),
-            onSharedMediaConsumed = onSharedMediaConsumed,
-            onRetryA2ui = { viewModel.onAction(ChatAction.RetryA2ui(it)) },
-            onRetryFailedTurn = {
-                viewModel.onAction(ChatAction.RetryFailedTurn)
-            },
-        )
+        RealtimeVoiceHost(
+            conversationId = currentSessionId,
+            selection = uiState.currentModelSelection,
+            conversationTitle = uiState.conversations.firstOrNull { it.id == currentSessionId }?.title.orEmpty(),
+            openVoiceRequest = voiceOpenRequest,
+            onOpenVoiceRequestConsumed = { voiceOpenRequest = 0 },
+            onVoiceVisibleChange = { voicePageVisible = it },
+        ) { onOpenVoice ->
+            ChatScaffold(
+                state = uiState,
+                recommendations = recommendations,
+                onRecommendationClick = { prompt ->
+                    viewModel.send(prompt, emptyList())
+                },
+                partChannelProvider = viewModel::partChannelFor,
+                onSend = viewModel::send,
+                onStop = { viewModel.onAction(ChatAction.StopStreaming) },
+                onTranscribeVoice = viewModel::transcribeVoice,
+                onCancelVoiceTranscription = { viewModel.onAction(ChatAction.CancelVoiceTranscription) },
+                onToggleSpeechPlayback = { messageId, markdown ->
+                    viewModel.onAction(ChatAction.ToggleSpeechPlayback(messageId, markdown))
+                },
+                onToggleAutoSpeak = { viewModel.onAction(ChatAction.ToggleAutoSpeak) },
+                onOpenVoice = onOpenVoice,
+                onOpenDocument = { attachment ->
+                    openDocumentAttachment(context, attachment)
+                },
+                onToggleTimeline = { groupId ->
+                    viewModel.onAction(ChatAction.ToggleTimeline(groupId))
+                },
+                onToolConfirmation = { confirmed ->
+                    viewModel.onAction(ChatAction.RespondToToolConfirmation(confirmed))
+                },
+                onToolConfirmationAlwaysAllow = {
+                    viewModel.onAction(
+                        ChatAction.RespondToToolConfirmation(
+                            confirmed = true,
+                            alwaysAllow = true,
+                        ),
+                    )
+                },
+                onRespondToInputRequest = { callId, value ->
+                    viewModel.onAction(ChatAction.RespondToInputRequest(callId, value))
+                },
+                onFullAccessChange = { enabled ->
+                    viewModel.onAction(ChatAction.SetFullAccess(enabled))
+                },
+                onSelectModel = { selection ->
+                    viewModel.onAction(ChatAction.SelectModel(selection))
+                },
+                onModelSwitchBlocked = {
+                    Toast.makeText(
+                        context,
+                        chatNoticeModelSwitchBlocked,
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                },
+                onOpenDrawer = { drawerOpen = true },
+                onConfigureModels = onConfigureModels,
+                onNewConversation = {
+                    viewModel.onAction(ChatAction.NewConversation)
+                },
+                onThinkingEnabledChange = { enabled ->
+                    viewModel.onAction(ChatAction.SetThinkingEnabled(enabled))
+                },
+                onReasoningEffortChange = { effort ->
+                    viewModel.onAction(ChatAction.SetReasoningEffort(effort))
+                },
+                onMcpServerEnabledChange = { serverId, enabled ->
+                    viewModel.onAction(ChatAction.SetMcpServerEnabled(serverId, enabled))
+                },
+                onOfficialToolOpened = { toolId ->
+                    viewModel.onAction(ChatAction.LoadOfficialToolFunctions(toolId))
+                },
+                onOfficialToolFunctionEnabledChange = { toolId, functionId, enabled ->
+                    val descriptors = viewModel.uiState.value.officialToolDescriptors
+                    val supportedIds = descriptors
+                        .firstOrNull { it.id == toolId }
+                        ?.functions
+                        ?.mapTo(hashSetOf()) { it.id }
+                        .orEmpty()
+                    viewModel.onAction(
+                        ChatAction.SetOfficialFunctionEnabled(
+                            toolId = toolId,
+                            functionId = functionId,
+                            enabled = enabled,
+                            supportedFunctionIds = supportedIds,
+                        ),
+                    )
+                },
+                onOfficialToolFunctionsRetry = { toolId ->
+                    viewModel.onAction(ChatAction.LoadOfficialToolFunctions(toolId))
+                },
+                sharedMediaUris = sharedMediaUris.takeIf {
+                    currentSessionId.isNotBlank() && !uiState.isInitializing
+                }.orEmpty(),
+                onSharedMediaConsumed = onSharedMediaConsumed,
+                onRetryA2ui = { viewModel.onAction(ChatAction.RetryA2ui(it)) },
+                onRetryFailedTurn = {
+                    viewModel.onAction(ChatAction.RetryFailedTurn)
+                },
+            )
+        }
     }
 }
 

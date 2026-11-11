@@ -5,7 +5,6 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -35,12 +34,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -81,7 +80,7 @@ import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import github.ponyhuang.gimi.domain.modelcatalog.model.MultimodalCapabilities
 import github.ponyhuang.gimi.domain.recommendation.model.AgentRecommendation
 import github.ponyhuang.gimi.domain.recommendation.model.RecommendationCategory
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -90,7 +89,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 聊天界面 Scaffold：
- * - 顶部浮动操作：抽屉按钮（[onOpenDrawer]）+ 新建对话（[onNewConversation]）+ 设置
+ * - 顶部浮动操作：左胶囊（[onOpenDrawer] + 语音通话）+ 右胶囊（[onNewConversation] + 自动播报）
  * - 底部输入卡片：文本、附件、模型选择与语音/发送操作。
  * - LazyColumn：消息流 + 流式输入自动跟随滚动 + 用户离开底部时显示「回到最新」FAB
  * - ChatInputBar：草稿由聊天页面共享保存，发送按钮在流式期间被禁用。
@@ -125,6 +124,7 @@ fun ChatScaffold(
     onCancelVoiceTranscription: () -> Unit = {},
     onToggleSpeechPlayback: (String, String) -> Unit,
     onToggleAutoSpeak: () -> Unit,
+    onOpenVoice: () -> Unit = {},
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit,
     onToggleTimeline: (groupId: String) -> Unit = {},
     onToolConfirmation: (Boolean) -> Unit,
@@ -134,7 +134,6 @@ fun ChatScaffold(
     onSelectModel: (github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection) -> Unit,
     onModelSwitchBlocked: () -> Unit,
     onOpenDrawer: () -> Unit,
-    onOpenSettings: () -> Unit,
     onConfigureModels: () -> Unit,
     onNewConversation: () -> Unit,
     onReasoningEffortChange: (ReasoningEffort) -> Unit,
@@ -175,7 +174,7 @@ fun ChatScaffold(
             ?.firstOrNull { it.id == selection?.groupId }
             ?.models
             ?.firstOrNull { it.id == selection?.modelId }
-            ?.capabilities
+            ?.multimodal
             ?: MultimodalCapabilities()
     }
     // 只要用户仍停留在底部，就让流式内容增长持续跟随；用户向上浏览历史时则停止抢占滚动。
@@ -301,9 +300,8 @@ fun ChatScaffold(
                     autoSpeakEnabled = state.autoSpeakEnabled,
                     onOpenDrawer = onOpenDrawer,
                     onNewConversation = onNewConversation,
-                    onOpenSettings = onOpenSettings,
                     onToggleAutoSpeak = onToggleAutoSpeak,
-                    showUpdateBadge = state.hasUpdateBadge,
+                    onOpenVoice = onOpenVoice,
                 )
                 Box(
                     modifier = Modifier
@@ -397,8 +395,6 @@ fun ChatScaffold(
                                     },
                                 ),
                                 attachmentCapabilities = attachmentCapabilities,
-                                onReasoningEffortChange = onReasoningEffortChange,
-                                onThinkingEnabledChange = onThinkingEnabledChange,
                                 onMcpServerEnabledChange = onMcpServerEnabledChange,
                                 onFullAccessChange = onFullAccessChange,
                                 onOfficialToolOpened = onOfficialToolOpened,
@@ -419,6 +415,11 @@ fun ChatScaffold(
                                         onPickerVisibilityChange = {
                                             isModelPickerVisible = it
                                         },
+                                        // 思考强度入口迁入模型抽屉二级页，由会话配置驱动。
+                                        toolConfiguration = state.toolConfiguration,
+                                        reasoningEnabled = !isAgentRunning,
+                                        onReasoningEffortChange = onReasoningEffortChange,
+                                        onThinkingEnabledChange = onThinkingEnabledChange,
                                     )
                                 },
                             )
@@ -610,10 +611,7 @@ private fun ChatScrollToLatestButton(onClick: () -> Unit) {
             modifier = Modifier.size(44.dp),
             shape = CircleShape,
             color = chatCapsuleColor(),
-            border = BorderStroke(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-            ),
+            border = chatCapsuleBorder(),
         ) {}
         IconButton(
             onClick = onClick,
@@ -631,15 +629,17 @@ private fun ChatScrollToLatestButton(onClick: () -> Unit) {
     }
 }
 
-/** Lightweight floating chat actions that keep model and settings controls out of the header. */
+/**
+ * 顶栏浮动操作：左胶囊（抽屉｜语音通话）+ 右胶囊（新建会话｜自动播报）。
+ * 设置与版本更新提醒统一由侧边抽屉承载，顶栏不再重复放入口。
+ */
 @Composable
 internal fun ChatHeaderActions(
     autoSpeakEnabled: Boolean,
     onOpenDrawer: () -> Unit,
     onNewConversation: () -> Unit,
-    onOpenSettings: () -> Unit,
     onToggleAutoSpeak: () -> Unit,
-    showUpdateBadge: Boolean = false,
+    onOpenVoice: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -649,23 +649,40 @@ internal fun ChatHeaderActions(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 视觉容器为 44dp，点击区仍为 48dp；背景不承接事件，避免缩小触摸范围。
-        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+        // 与输入胶囊共用容器色和描边，浅色主题下靠描边勾出边界；各自保留 48dp 点击区。
+        Box(contentAlignment = Alignment.Center) {
             Surface(
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.matchParentSize().padding(vertical = 2.dp),
                 shape = CircleShape,
                 color = chatCapsuleColor(),
+                border = chatCapsuleBorder(),
             ) {}
-            IconButton(
-                onClick = onOpenDrawer,
-                modifier = Modifier.size(48.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Menu,
-                    contentDescription = stringResource(R.string.chat_open_drawer),
-                    modifier = Modifier.size(22.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onOpenDrawer,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = stringResource(R.string.chat_open_drawer),
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                ChatHeaderDivider()
+                // 语音通话与「新建会话」对换：常用通话留在抽屉组，右侧胶囊统一为「新会话｜播报」。
+                IconButton(
+                    onClick = onOpenVoice,
+                    modifier = Modifier.size(48.dp)
+                        .testTag("chat_header_voice_call"),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Call,
+                        contentDescription = stringResource(R.string.voice_open_call),
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
 
@@ -674,8 +691,22 @@ internal fun ChatHeaderActions(
                 modifier = Modifier.matchParentSize().padding(vertical = 2.dp),
                 shape = CircleShape,
                 color = chatCapsuleColor(),
+                border = chatCapsuleBorder(),
             ) {}
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // 新建会话：与语音页右胶囊使用同一枚列表加号图标，两页入口视觉一致。
+                IconButton(
+                    onClick = onNewConversation,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
+                        contentDescription = stringResource(R.string.chat_new_conversation),
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                ChatHeaderDivider()
                 // 自动语音播报全局开关：开启态用 primary 高亮，关闭态回到普通前景色。
                 IconButton(
                     onClick = onToggleAutoSpeak,
@@ -692,7 +723,7 @@ internal fun ChatHeaderActions(
                                 R.string.chat_auto_speak_off
                             },
                         ),
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(24.dp),
                         tint = if (autoSpeakEnabled) {
                             MaterialTheme.colorScheme.primary
                         } else {
@@ -700,45 +731,23 @@ internal fun ChatHeaderActions(
                         },
                     )
                 }
-                IconButton(
-                    onClick = onNewConversation,
-                    modifier = Modifier.size(48.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
-                        contentDescription = stringResource(R.string.chat_new_conversation),
-                        modifier = Modifier.size(22.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Box {
-                    IconButton(
-                        onClick = onOpenSettings,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .testTag("chat_header_settings"),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.chat_settings),
-                            modifier = Modifier.size(22.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (showUpdateBadge) {
-                        // 有未发现的新版本时在设置图标右上角点亮提醒点。
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(top = 10.dp, end = 10.dp)
-                                .size(8.dp)
-                                .background(MaterialTheme.colorScheme.error, CircleShape),
-                        )
-                    }
-                }
             }
         }
     }
+}
+
+/**
+ * 顶栏胶囊内按钮间的竖分隔线：1dp 细线，高度约两倍图标，颜色与胶囊描边同源弱化。
+ * 语音页顶栏胶囊（新会话｜通话设备）复用同一分隔样式。
+ */
+@Composable
+internal fun ChatHeaderDivider() {
+    Box(
+        modifier = Modifier
+            .padding(vertical = 13.dp)
+            .size(width = 1.dp, height = 22.dp)
+            .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+    )
 }
 
 /**
@@ -799,7 +808,7 @@ private fun MessageRow(
     a2uiRetryEnabled: Boolean = false,
     onRetryA2ui: (String) -> Unit = {},
     partChannelProvider: (partId: String) -> ReceiveChannel<String>?,
-    speechPlaybackState: github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState,
+    speechPlaybackState: github.ponyhuang.gimi.domain.voice.model.SpeechPlaybackState,
     onToggleSpeechPlayback: (messageId: String, text: String) -> Unit,
     onOpenDocument: (github.ponyhuang.gimi.domain.conversation.model.FileAttachment) -> Unit,
     modifier: Modifier = Modifier
@@ -855,7 +864,7 @@ private fun previewChatRecommendations(): List<AgentRecommendation> = listOf(
 @Preview(showBackground = true)
 @Composable
 private fun ChatScaffoldEmptyPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ChatScaffold(
             state = ChatUiState(sessionId = "preview-session"),
             partChannelProvider = { null },
@@ -871,7 +880,6 @@ private fun ChatScaffoldEmptyPreview() {
             onSelectModel = {},
             onModelSwitchBlocked = {},
             onOpenDrawer = {},
-            onOpenSettings = {},
             onConfigureModels = {},
             onNewConversation = {},
             onReasoningEffortChange = {},
@@ -889,7 +897,7 @@ private fun ChatScaffoldEmptyPreview() {
     uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ChatScaffoldWithMessagesPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         val messages = listOf(
             Messages.fromUser("帮我查一下今天上海的天气"),
             Message(
@@ -924,7 +932,6 @@ private fun ChatScaffoldWithMessagesPreview() {
             onSelectModel = {},
             onModelSwitchBlocked = {},
             onOpenDrawer = {},
-            onOpenSettings = {},
             onConfigureModels = {},
             onNewConversation = {},
             onReasoningEffortChange = {},
@@ -946,7 +953,7 @@ private fun ChatScaffoldWithMessagesPreview() {
 )
 @Composable
 private fun ChatScrollToLatestButtonPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -959,32 +966,31 @@ private fun ChatScrollToLatestButtonPreview() {
     }
 }
 
-@Preview(showBackground = true)
+@Preview(name = "顶部操作 · 浅色", showBackground = true)
 @Preview(name = "顶部操作 · 深色", showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ChatHeaderActionsPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ChatHeaderActions(
             autoSpeakEnabled = true,
             onOpenDrawer = {},
             onNewConversation = {},
-            onOpenSettings = {},
             onToggleAutoSpeak = {},
         )
     }
 }
 
-@Preview(name = "顶部操作 · 更新提醒", showBackground = true)
+@Preview(name = "顶部操作 · 语音入口 · 浅色", showBackground = true)
+@Preview(name = "顶部操作 · 语音入口 · 深色", showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun ChatHeaderActionsUpdatePreview() {
-    AsssistantaiTheme {
+private fun ChatHeaderVoiceEntryPreview() {
+    GimiTheme {
         ChatHeaderActions(
             autoSpeakEnabled = false,
             onOpenDrawer = {},
             onNewConversation = {},
-            onOpenSettings = {},
             onToggleAutoSpeak = {},
-            showUpdateBadge = true,
+            onOpenVoice = {},
         )
     }
 }
@@ -1001,7 +1007,7 @@ private fun previewFailedTurn(): ChatTurn = ChatTurn(
 @Preview(showBackground = true)
 @Composable
 private fun FailedTurnActionsPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         FailedTurnActions(
             onRetry = {},
         )
@@ -1011,11 +1017,11 @@ private fun FailedTurnActionsPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun MessageRowUserPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         MessageRow(
             message = Messages.fromUser("帮我查一下今天上海的天气"),
             partChannelProvider = { null },
-            speechPlaybackState = github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState(),
+            speechPlaybackState = github.ponyhuang.gimi.domain.voice.model.SpeechPlaybackState(),
             onToggleSpeechPlayback = { _, _ -> },
             onOpenDocument = {},
         )
@@ -1025,7 +1031,7 @@ private fun MessageRowUserPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun MessageRowAssistantPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         MessageRow(
             message = Message(
                 author = "DefaultAssistant",
@@ -1033,7 +1039,7 @@ private fun MessageRowAssistantPreview() {
                 textParts = listOf(TextPart(text = "上海今天晴，28°C，适合出门。")),
             ),
             partChannelProvider = { null },
-            speechPlaybackState = github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState(),
+            speechPlaybackState = github.ponyhuang.gimi.domain.voice.model.SpeechPlaybackState(),
             onToggleSpeechPlayback = { _, _ -> },
             onOpenDocument = {},
         )
@@ -1043,7 +1049,7 @@ private fun MessageRowAssistantPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun ChatScaffoldFailedTurnPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         val messages = listOf(Messages.fromUser("帮我查一下今天上海的天气"))
         ChatScaffold(
             state = ChatUiState(
@@ -1065,7 +1071,6 @@ private fun ChatScaffoldFailedTurnPreview() {
             onSelectModel = {},
             onModelSwitchBlocked = {},
             onOpenDrawer = {},
-            onOpenSettings = {},
             onConfigureModels = {},
             onNewConversation = {},
             onReasoningEffortChange = {},

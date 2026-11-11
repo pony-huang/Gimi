@@ -5,4 +5,32 @@
     <string name="picker_cancel">取消</string>
     <string name="picker_no_search_results">没有匹配的选项</string>
     <string name="picker_clear_search">清除搜索</string>
+    <string name="gimi_sheet_drag_handle">拖动调整高度</string>
+    <!-- 音色选择抽屉：自 :feature:modelsettings 迁入，供聊天语音页与默认模型设置共用（见 AGENTS.md 共享豁免）。 -->
+    <string name="voice_picker_search">搜索名称、音色 ID、特质或场景</string>
+    <string name="voice_picker_current">当前：%1$s</string>
+    <string name="voice_picker_current_none">当前：使用默认音色</string>
+    <string name="voice_picker_current_custom">当前：%1$s（自定义值，不在系统音色列表中）</string>
+    <string name="voice_picker_no_match">没有匹配的系统音色</string>
+    <string name="voice_picker_no_voices">暂无可用音色</string>
+    <string name="voice_picker_use_query">使用「%1$s」</string>
+    <string name="voice_picker_manual_entry">手动输入音色 ID</string>
+    <string name="voice_picker_input_title">音色 ID</string>
+    <string name="voice_picker_input_note">直接填入音色 ID 即可；留空则使用该模型的默认音色。</string>
+    <string name="voice_picker_input_label">音色 ID</string>
+    <string name="voice_picker_default_hint">默认音色 %1$s</string>
+    <string name="voice_picker_naming_template">基础音色命名规则：%1$s</string>
+    <string name="voice_picker_open_docs">查看官方音色列表</string>
+    <string name="voice_picker_confirm">确定</string>
+    <string name="voice_picker_back">返回</string>
+    <string name="voice_filter_all">全部</string>
+    <string name="voice_gender_female">女</string>
+    <string name="voice_gender_male">男</string>
+    <string name="voice_gender_child">儿童</string>
+    <string name="voice_group_flagship">旗舰音色</string>
+    <string name="voice_group_multilingual">多语种与方言</string>
+    <string name="voice_group_quality_chinese">精品中文</string>
+    <string name="voice_group_quality_english">精品英文</string>
+    <string name="voice_group_other">其他音色</string>
+    <string name="voice_group_minority">小语种</string>
 </resources>

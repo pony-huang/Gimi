@@ -9,4 +9,5 @@
     <string name="plugin_incompatible_upgrade">“%1$s”插件版本与当前应用不兼容，已跳过加载，请升级插件。</string>
     <string name="plugins_incompatible_upgrade">%1$s等 %2$d 个插件与当前应用不兼容，请升级插件。</string>
     <string name="plugin_name_separator">、</string>
+    <string name="voice_call_notification_permission">通知权限未开启，切到后台后状态栏不会显示通话通知；请在「设置 → 权限」中开启</string>
 </resources>

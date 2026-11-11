@@ -450,9 +450,10 @@ private fun MusicPlayerArtwork(artworkUrl: String?, playing: Boolean) {
             .clip(RoundedCornerShape(16.dp))
             .background(
                 Brush.linearGradient(
+                    // 纯中性灰阶过渡：品牌蓝只做强调，不铺成渐变卡片。
                     listOf(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
                         MaterialTheme.colorScheme.surfaceContainerHighest,
+                        MaterialTheme.colorScheme.surfaceContainer,
                         MaterialTheme.colorScheme.surfaceContainerLow,
                     ),
                 ),

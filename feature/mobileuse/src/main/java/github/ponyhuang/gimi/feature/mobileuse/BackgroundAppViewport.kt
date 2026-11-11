@@ -46,7 +46,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.mobileuse.MobileDisplaySession
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 画面始终占满宿主；小窗仅提供窗口管理，全屏额外提供副屏返回和旋转。 */
 @Composable
@@ -60,7 +60,8 @@ internal fun BackgroundAppViewport(
     toolbarModifier: Modifier,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainerLow)) {
-        val compactControls = smallWindow && maxHeight >= 112.dp
+        // 高度足够容纳两行 48dp 按钮时改用两行排列，避免窄窗里横向滚动。
+        val twoRowControls = smallWindow && maxHeight >= 112.dp
         if (state.session != null) frame(Modifier.fillMaxSize())
         if (state.session == null || state.previewUnavailable) {
             Text(stringResource(if (state.session == null) R.string.background_app_disconnected else R.string.background_app_preview_unavailable),
@@ -78,7 +79,7 @@ internal fun BackgroundAppViewport(
             if (state.menuExpanded) {
                 Surface(modifier = Modifier.align(Alignment.TopCenter).then(dragModifier), shape = RoundedCornerShape(if (smallWindow) 24.dp else 28.dp),
                     shadowElevation = 6.dp, color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.96f)) {
-                    if (compactControls) {
+                    if (twoRowControls) {
                         // 固定小窗较窄，四个窗口动作排成两行，避免缩小点击目标或隐藏关键按钮。
                         Column(Modifier.padding(4.dp)) {
                             Row {
@@ -162,7 +163,7 @@ private fun FullscreenUnavailablePreview() = FullscreenPreview(dark = false, una
 
 @Composable
 private fun FullscreenPreview(dark: Boolean, menu: Boolean = false, landscape: Boolean = false, unavailable: Boolean = false) {
-    AsssistantaiTheme(darkTheme = dark) {
+    GimiTheme(darkTheme = dark) {
         BackgroundAppScreen(
             state = BackgroundAppUiState(
                 session = MobileDisplaySession("preview", "chat", 1, if (landscape) 2400 else 1080, if (landscape) 1080 else 2400),
@@ -192,7 +193,7 @@ private fun SmallWindowLandscapePreview() = SmallWindowPreview(dark = false, men
 
 @Composable
 private fun SmallWindowPreview(dark: Boolean, menu: Boolean = false, landscape: Boolean = false) {
-    AsssistantaiTheme(darkTheme = dark) {
+    GimiTheme(darkTheme = dark) {
         BackgroundAppScreen(
             state = BackgroundAppUiState(
                 session = MobileDisplaySession("preview", "chat", 1, if (landscape) 2340 else 1080, if (landscape) 1080 else 2340),
@@ -219,7 +220,7 @@ private fun WindowPlacementKeyboardPreview() = WindowPlacementPreview(dark = fal
 
 @Composable
 private fun WindowPlacementPreview(dark: Boolean, edge: Boolean = false, keyboard: Boolean = false) {
-    AsssistantaiTheme(darkTheme = dark) {
+    GimiTheme(darkTheme = dark) {
         Surface {
             Box(Modifier.fillMaxSize()) {
                 Text("07:30", Modifier.align(Alignment.TopStart).padding(16.dp))

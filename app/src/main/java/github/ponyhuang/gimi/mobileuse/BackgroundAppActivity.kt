@@ -22,7 +22,7 @@ import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
 import github.ponyhuang.gimi.feature.mobileuse.BackgroundAppViewModel
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import javax.inject.Inject
 
 /** 全屏只承载预览，不能抢走副屏目标 App 的原生输入连接。 */
@@ -47,7 +47,7 @@ class BackgroundAppActivity : ComponentActivity() {
         setContent {
             val mode by appearance.themeMode.collectAsStateWithLifecycle()
             val dark = when (mode) { ThemeMode.SYSTEM -> isSystemInDarkTheme(); ThemeMode.LIGHT -> false; ThemeMode.DARK -> true }
-            AsssistantaiTheme(darkTheme = dark) {
+            GimiTheme(darkTheme = dark) {
                 val presentation by host.presentation.collectAsStateWithLifecycle()
                 LaunchedEffect(presentation) { if (presentation != BackgroundAppPresentation.FULLSCREEN) finish() }
                 BackgroundAppContent(hiltViewModel<BackgroundAppViewModel>(), gateway, host, small = false,

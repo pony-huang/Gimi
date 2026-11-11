@@ -9,7 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 @Preview(name = "Compact composer light", widthDp = 390, heightDp = 780)
 @Composable
@@ -21,7 +21,7 @@ fun CompactComposerDarkPreview() = CompactComposerPreview(true)
 
 @Composable
 private fun CompactComposerPreview(dark: Boolean) {
-    AsssistantaiTheme(darkTheme = dark) {
+    GimiTheme(darkTheme = dark) {
         androidx.compose.material3.Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.background) {
             Column(Modifier.padding(horizontal = 12.dp, vertical = 32.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)) {
                 Text("紧凑输入胶囊", style = MaterialTheme.typography.titleLarge)
@@ -53,7 +53,7 @@ private fun CompactPreviewCapsule(content: @Composable () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
         color = chatCapsuleColor(),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        border = chatCapsuleBorder(),
     ) { content() }
 }
 

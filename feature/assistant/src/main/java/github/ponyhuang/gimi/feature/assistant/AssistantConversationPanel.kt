@@ -54,7 +54,7 @@ import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionState
 import github.ponyhuang.gimi.ui.chatcontent.ChatBubbleRole
 import github.ponyhuang.gimi.ui.chatcontent.ChatMessageBubble
 import github.ponyhuang.gimi.ui.chatcontent.ChatTextContent
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /**
  * 面板态：通栏底部面板（顶部大圆角 + 拖动手柄），消息列表与聊天页同一渲染组件，
@@ -334,7 +334,7 @@ private fun AssistantMessageRow(message: AssistantMessage) {
 @Preview(showBackground = true)
 @Composable
 private fun AssistantConversationPanelEmptyPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         AssistantConversationPanel(
             state = AssistantSessionState(),
             onDismiss = {},
@@ -353,7 +353,7 @@ private fun AssistantConversationPanelEmptyPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun AssistantConversationPanelWithMessagesPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         AssistantConversationPanel(
             state = AssistantSessionState(
                 phase = AssistantSessionPhase.GENERATING,
@@ -383,7 +383,7 @@ private fun AssistantConversationPanelWithMessagesPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun AssistantConversationPanelErrorPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         AssistantConversationPanel(
             state = AssistantSessionState(
                 messages = listOf(

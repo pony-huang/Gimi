@@ -36,7 +36,7 @@ class ModelCatalogMappersTest {
                         LLMModelItem(
                             modelId = "chat-model",
                             modelName = "Chat model",
-                            capabilities = MultimodalCapabilities(
+                            multimodal = MultimodalCapabilities(
                                 vision = null,
                                 audioInput = null,
                                 documentInput = null,
@@ -47,10 +47,10 @@ class ModelCatalogMappersTest {
             ),
         )
 
-        val capabilities = provider.toDomain().groups.single().models.single().capabilities
+        val multimodal = provider.toDomain().groups.single().models.single().multimodal
 
-        assertTrue(capabilities.supportsImages)
-        assertTrue(capabilities.supportsAudio)
-        assertTrue(capabilities.supportsDocuments)
+        assertTrue(multimodal.supportsImages)
+        assertTrue(multimodal.supportsAudio)
+        assertTrue(multimodal.supportsDocuments)
     }
 }

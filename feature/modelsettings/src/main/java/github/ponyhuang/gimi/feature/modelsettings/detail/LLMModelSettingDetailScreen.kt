@@ -31,7 +31,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material.icons.filled.Visibility
@@ -40,8 +39,6 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -64,11 +61,16 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ApiProtocol
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
 import github.ponyhuang.gimi.domain.modelcatalog.model.Model
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelGroup
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelServiceKind
+import github.ponyhuang.gimi.domain.voice.repository.EndpointStrategy
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolSupport
+import github.ponyhuang.gimi.domain.modelcatalog.model.ServiceConnectionResult
+import github.ponyhuang.gimi.domain.modelcatalog.model.SpeechEndpoints
 import github.ponyhuang.gimi.feature.modelsettings.R
 import github.ponyhuang.gimi.ui.preference.PreferenceBanner
 import github.ponyhuang.gimi.ui.preference.PreferenceBannerTone
@@ -79,7 +81,7 @@ import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceSectionTitle
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 无状态的完整编辑器；所有草稿和弹窗状态由 ViewModel 持有。 */
 @Composable
@@ -120,40 +122,49 @@ private fun ServiceEditorPageContent(
         style = PreferenceStyle.Compact,
         title = when (state.page) {
             ServiceEditorPage.Detail -> service?.name ?: stringResource(R.string.modelsettings_detail_title)
-            ServiceEditorPage.Models -> stringResource(R.string.modelsettings_manage_models)
+            ServiceEditorPage.Models -> stringResource(R.string.modelsettings_select_models)
         },
         onBack = { onAction(LLMModelSettingDetailAction.Back) },
         actions = {
             if (state.page == ServiceEditorPage.Models) {
-                IconButton(onClick = { onAction(LLMModelSettingDetailAction.RefreshModels) },
-                    enabled = state.canEdit && !state.isRefreshing && !service?.apiKey.isNullOrBlank()) {
-                    if (state.isRefreshing) CircularProgressIndicator(Modifier.size(24.dp))
-                    else Icon(Icons.Default.Refresh, stringResource(R.string.modelsettings_fetch_models))
+                if (service?.kind == ModelServiceKind.Chat) {
+                    IconButton(onClick = { onAction(LLMModelSettingDetailAction.RefreshModels) },
+                        enabled = state.canEdit && !state.isRefreshing && !service?.apiKey.isNullOrBlank()) {
+                        if (state.isRefreshing) CircularProgressIndicator(Modifier.size(24.dp))
+                        else Icon(Icons.Default.Refresh, stringResource(R.string.modelsettings_fetch_models))
+                    }
                 }
                 IconButton(onClick = { onAction(LLMModelSettingDetailAction.ShowAddDialog) }, enabled = state.canEdit) {
                     Icon(Icons.Default.Add, stringResource(R.string.modelsettings_manual_model))
                 }
             }
-            if (state.page == ServiceEditorPage.Detail && service?.isAdded == true) {
-                ServiceManagementMenu(state, onAction)
-            }
         },
         bottomBar = {
             if (service != null) {
                 Surface(color = preferenceCanvasColor()) {
-                    Button(
-                        onClick = { onAction(if (state.page == ServiceEditorPage.Models)
-                            LLMModelSettingDetailAction.ConfirmModels else LLMModelSettingDetailAction.Save) },
-                        enabled = state.canEdit,
-                        modifier = Modifier.fillMaxWidth().imePadding().navigationBarsPadding()
-                            .padding(horizontal = 24.dp, vertical = 12.dp).height(50.dp),
-                    ) {
-                        Text(stringResource(when {
-                            state.isSaving -> R.string.modelsettings_saving
-                            state.page == ServiceEditorPage.Models -> R.string.modelsettings_confirm_models
-                            service.isAdded -> R.string.modelsettings_save_changes
-                            else -> R.string.modelsettings_add_service
-                        }, *if (state.page == ServiceEditorPage.Models) arrayOf(state.pendingModelKeys.size) else emptyArray()))
+                    Column(Modifier.navigationBarsPadding().imePadding().padding(horizontal = 24.dp, vertical = 12.dp)) {
+                        if (state.page == ServiceEditorPage.Models) {
+                            Text(
+                                stringResource(if (state.pendingModelKeys.isEmpty()) R.string.modelsettings_selection_empty_hint
+                                    else R.string.modelsettings_selection_draft_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(bottom = 8.dp),
+                            )
+                        }
+                        Button(
+                            onClick = { onAction(if (state.page == ServiceEditorPage.Models)
+                                LLMModelSettingDetailAction.ConfirmModels else LLMModelSettingDetailAction.Save) },
+                            enabled = state.canEdit && !state.isLoading,
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                        ) {
+                            Text(stringResource(when {
+                                state.isSaving -> R.string.modelsettings_saving
+                                state.page == ServiceEditorPage.Models -> R.string.modelsettings_confirm_models
+                                service.isAdded -> R.string.modelsettings_save_changes
+                                else -> R.string.modelsettings_add_service
+                            }, *if (state.page == ServiceEditorPage.Models) arrayOf(state.pendingModelKeys.size) else emptyArray()))
+                        }
                     }
                 }
             }
@@ -166,7 +177,7 @@ private fun ServiceEditorPageContent(
             }
             if (state.isLoading) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
-            } else Column(Modifier.fillMaxSize().verticalScroll(editorScroll).padding(top = 8.dp, bottom = 24.dp)) {
+            } else Column(Modifier.fillMaxSize().verticalScroll(editorScroll).padding(top = if (state.page == ServiceEditorPage.Models) 0.dp else 8.dp, bottom = 24.dp)) {
                 if (state.isMutationBlocked) PreferenceBanner(stringResource(R.string.modelsettings_agent_mutation_blocked))
                 state.errorRes?.let { PreferenceBanner(stringResource(it), tone = PreferenceBannerTone.Error) }
                 if (service != null) when (state.page) {
@@ -199,65 +210,99 @@ private fun ServiceConnectionOverview(
             else -> R.string.modelsettings_saved_hint
         }), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    PreferenceSectionTitle(stringResource(R.string.modelsettings_section_connection))
-    PreferenceGroupCard {
-        Column(Modifier.padding(16.dp)) {
-            OutlinedTextField(
-                value = service.apiKey,
-                onValueChange = { onAction(LLMModelSettingDetailAction.ApiKeyChanged(it)) },
-                label = { Text(stringResource(R.string.modelsettings_api_key_label)) },
-                singleLine = true,
-                enabled = state.canEdit,
-                modifier = Modifier.fillMaxWidth(),
-                visualTransformation = if (state.isApiKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
-                trailingIcon = {
-                    IconButton(onClick = { onAction(LLMModelSettingDetailAction.ToggleApiKeyVisibility) }) {
-                        Icon(if (state.isApiKeyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                            stringResource(if (state.isApiKeyVisible) R.string.modelsettings_api_key_hide else R.string.modelsettings_api_key_show))
-                    }
-                },
-            )
-            val missingLink = stringResource(R.string.modelsettings_key_url_missing)
-            TextButton(onClick = { onOpenUrl(service.keyHelpUrl, missingLink) }) {
-                Text(stringResource(R.string.modelsettings_api_key_get_key))
+    // 分支判据必须与 ViewModel 的连接测试一致（按服务种类，而非端点 scheme）：
+    // 语音与 Realtime 服务没有聊天接口标准可选，连接区直接摊开显示；
+    // minimax-speech / mimo-speech 是 http scheme 的语音服务，同样走语音 probe 测试。
+    if (service.kind != ModelServiceKind.Chat) {
+        // 语音服务没有接口标准可选；端点由厂商自有的服务只提示写死的官方地址，
+        // 端点可配置的服务（OpenAI 兼容代理类）保留地址输入。
+        val missingLink = stringResource(R.string.modelsettings_key_url_missing)
+        // 会话音色不在服务配置里：它与具体 Realtime 模型绑定，由默认模型页管理。
+        val isQwenVoice = service.id == "qwen-audio"
+        SpeechServiceConnectionSection(
+            apiKey = service.apiKey,
+            isApiKeyVisible = state.isApiKeyVisible,
+            isTesting = state.isTestingKey,
+            testResult = state.connectionResult,
+            isEditingEnabled = state.canEdit,
+            onApiKeyChange = { onAction(LLMModelSettingDetailAction.ApiKeyChanged(it)) },
+            onToggleApiKeyVisibility = { onAction(LLMModelSettingDetailAction.ToggleApiKeyVisibility) },
+            onTestConnection = { onAction(LLMModelSettingDetailAction.TestConnection) },
+            onOpenKeyHelpUrl = { onOpenUrl(service.keyHelpUrl, missingLink) },
+            showsEndpointField = state.endpointStrategy == EndpointStrategy.ConfiguredBaseUrl,
+            endpoint = service.activeApiBaseUrl,
+            onEndpointChange = { onAction(LLMModelSettingDetailAction.ApiBaseUrlChanged(it)) },
+            endpointHint = fixedEndpointHint(service),
+            workspaceId = service.workspaceId.orEmpty(),
+            showsWorkspaceField = isQwenVoice,
+            onWorkspaceIdChange = { onAction(LLMModelSettingDetailAction.WorkspaceIdChanged(it)) },
+        )
+    } else {
+        PreferenceSectionTitle(stringResource(R.string.modelsettings_section_connection))
+        PreferenceGroupCard {
+            Column(Modifier.padding(16.dp)) {
+                OutlinedTextField(
+                    value = service.apiKey,
+                    onValueChange = { onAction(LLMModelSettingDetailAction.ApiKeyChanged(it)) },
+                    label = { Text(stringResource(R.string.modelsettings_api_key_label)) },
+                    singleLine = true,
+                    enabled = state.canEdit,
+                    modifier = Modifier.fillMaxWidth(),
+                    visualTransformation = if (state.isApiKeyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
+                    trailingIcon = {
+                        IconButton(onClick = { onAction(LLMModelSettingDetailAction.ToggleApiKeyVisibility) }) {
+                            Icon(if (state.isApiKeyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                stringResource(if (state.isApiKeyVisible) R.string.modelsettings_api_key_hide else R.string.modelsettings_api_key_show))
+                        }
+                    },
+                )
+                val missingLink = stringResource(R.string.modelsettings_key_url_missing)
+                TextButton(onClick = { onOpenUrl(service.keyHelpUrl, missingLink) }) {
+                    Text(stringResource(R.string.modelsettings_api_key_get_key))
+                }
             }
-        }
-        PreferenceListItem(icon = Icons.Outlined.Settings,
-            title = stringResource(R.string.modelsettings_connection_options),
-            subtitle = protocolLabel(service.apiProtocol),
-            onClick = { onAction(LLMModelSettingDetailAction.ToggleConnection) },
-            trailingContent = {
-                Icon(Icons.Default.ExpandMore,
-                    stringResource(if (state.isConnectionExpanded) R.string.modelsettings_collapse_connection else R.string.modelsettings_expand_connection),
-                    modifier = Modifier.rotate(connectionRotation))
-            })
-        AnimatedVisibility(
-            visible = state.isConnectionExpanded,
-            enter = expandVertically(tween(220, easing = FastOutSlowInEasing), expandFrom = Alignment.Top) + fadeIn(tween(160)),
-            exit = shrinkVertically(tween(200, easing = FastOutSlowInEasing), shrinkTowards = Alignment.Top) + fadeOut(tween(120)),
-        ) {
-            ApiBaseUrlSection(
-                service = service,
-                isMenuExpanded = state.isProtocolMenuExpanded,
-                onToggleMenu = { onAction(LLMModelSettingDetailAction.ToggleProtocolMenu) },
-                onDismissMenu = { onAction(LLMModelSettingDetailAction.DismissProtocolMenu) },
-                onProtocolChange = { onAction(LLMModelSettingDetailAction.ApiProtocolChanged(it)) },
-                onBaseUrlChange = { onAction(LLMModelSettingDetailAction.ApiBaseUrlChanged(it)) },
-                enabled = state.canEdit,
-            )
-        }
-        OutlinedButton(onClick = { onAction(LLMModelSettingDetailAction.TestConnection) },
-            enabled = state.canEdit && !state.isTestingKey && service.apiKey.isNotBlank(),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Text(stringResource(if (state.isTestingKey) R.string.modelsettings_key_testing else R.string.modelsettings_api_key_test))
-        }
-        state.connectionResult?.let { success ->
-            Text(stringResource(if (success) R.string.modelsettings_notice_connection_succeeded
-                else R.string.modelsettings_notice_connection_failed),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp))
+            PreferenceListItem(icon = Icons.Outlined.Settings,
+                title = stringResource(R.string.modelsettings_connection_options),
+                subtitle = protocolLabel(service.apiProtocol),
+                onClick = { onAction(LLMModelSettingDetailAction.ToggleConnection) },
+                trailingContent = {
+                    Icon(Icons.Default.ExpandMore,
+                        stringResource(if (state.isConnectionExpanded) R.string.modelsettings_collapse_connection else R.string.modelsettings_expand_connection),
+                        modifier = Modifier.rotate(connectionRotation))
+                })
+            AnimatedVisibility(
+                visible = state.isConnectionExpanded,
+                enter = expandVertically(tween(220, easing = FastOutSlowInEasing), expandFrom = Alignment.Top) + fadeIn(tween(160)),
+                exit = shrinkVertically(tween(200, easing = FastOutSlowInEasing), shrinkTowards = Alignment.Top) + fadeOut(tween(120)),
+            ) {
+                ApiBaseUrlSection(
+                    service = service,
+                    isMenuExpanded = state.isProtocolMenuExpanded,
+                    onToggleMenu = { onAction(LLMModelSettingDetailAction.ToggleProtocolMenu) },
+                    onDismissMenu = { onAction(LLMModelSettingDetailAction.DismissProtocolMenu) },
+                    onProtocolChange = { onAction(LLMModelSettingDetailAction.ApiProtocolChanged(it)) },
+                    onBaseUrlChange = { onAction(LLMModelSettingDetailAction.ApiBaseUrlChanged(it)) },
+                    enabled = state.canEdit,
+                )
+            }
+            OutlinedButton(onClick = { onAction(LLMModelSettingDetailAction.TestConnection) },
+                enabled = state.canEdit && !state.isTestingKey && service.apiKey.isNotBlank(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Text(stringResource(if (state.isTestingKey) R.string.modelsettings_key_testing else R.string.modelsettings_api_key_test))
+            }
+            state.connectionResult?.let { result ->
+                Text(stringResource(when (result) {
+                    ServiceConnectionResult.Succeeded -> R.string.modelsettings_notice_connection_succeeded
+                    ServiceConnectionResult.AuthFailed -> R.string.modelsettings_notice_connection_failed_auth
+                    ServiceConnectionResult.NetworkFailed -> R.string.modelsettings_notice_connection_failed
+                    ServiceConnectionResult.Unsupported -> R.string.modelsettings_notice_connection_unsupported
+                }),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (result == ServiceConnectionResult.Succeeded) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp))
+            }
         }
     }
     PreferenceSectionTitle(stringResource(R.string.modelsettings_section_models))
@@ -269,26 +314,6 @@ private fun ServiceConnectionOverview(
     }
     OfficialToolsSection(service, state.supportedTools, state.canEdit) {
         onAction(LLMModelSettingDetailAction.OfficialToolsEnabledChanged(it))
-    }
-}
-
-@Composable
-private fun ServiceManagementMenu(state: LLMModelSettingDetailUiState, onAction: (LLMModelSettingDetailAction) -> Unit) {
-    val service = state.service ?: return
-    Box {
-        IconButton(onClick = { onAction(LLMModelSettingDetailAction.ToggleServiceMenu) }) {
-            Icon(Icons.Default.MoreVert, stringResource(R.string.modelsettings_manage_service))
-        }
-        DropdownMenu(expanded = state.isServiceMenuExpanded,
-            onDismissRequest = { onAction(LLMModelSettingDetailAction.DismissServiceMenu) }) {
-            DropdownMenuItem(text = { Text(stringResource(if (service.isEnabled) R.string.modelsettings_pause_service
-                else R.string.modelsettings_resume_service)) }, enabled = state.canEdit && !state.isDirty,
-                onClick = { onAction(LLMModelSettingDetailAction.EnabledChanged(!service.isEnabled)) })
-            if (state.isDirty) Text(stringResource(R.string.modelsettings_save_before_manage),
-                style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-            DropdownMenuItem(text = { Text(stringResource(R.string.modelsettings_delete_service), color = MaterialTheme.colorScheme.error) },
-                enabled = state.canEdit, onClick = { onAction(LLMModelSettingDetailAction.RequestDelete) })
-        }
     }
 }
 
@@ -308,17 +333,16 @@ private fun ServiceEditorDialogs(state: LLMModelSettingDetailUiState, onAction: 
             }
         },
     )
-    if (state.isDeleteDialogVisible) AlertDialog(
-        onDismissRequest = { onAction(LLMModelSettingDetailAction.CancelDelete) },
-        title = { Text(stringResource(R.string.modelsettings_delete_service)) },
-        text = { Text(stringResource(R.string.modelsettings_delete_summary)) },
-        confirmButton = { TextButton(onClick = { onAction(LLMModelSettingDetailAction.ConfirmDelete) }, enabled = state.canEdit) {
-            Text(stringResource(R.string.modelsettings_delete_service), color = MaterialTheme.colorScheme.error)
-        } },
-        dismissButton = { TextButton(onClick = { onAction(LLMModelSettingDetailAction.CancelDelete) }) {
-            Text(stringResource(R.string.modelsettings_dialog_cancel))
-        } },
-    )
+}
+
+/**
+ * 端点由厂商自有的语音服务的固定地址提示；端点可配置的服务返回 null 不展示。
+ * 千问提示实时会话端点，业务空间 ID 非空时随草稿改写专属域名，与请求构造一致。
+ */
+private fun fixedEndpointHint(service: LLMModelSetting): String? = when (service.id) {
+    "qwen-audio" -> SpeechEndpoints.qwenRealtimeUrl(service.workspaceId)
+    "openai-speech" -> SpeechEndpoints.OPENAI_REALTIME_DEFAULT
+    else -> null
 }
 
 @Composable
@@ -335,7 +359,7 @@ internal fun modelServicePreviewFixture(): LLMModelSetting = LLMModelSetting(
     anthropicBaseUrl = "https://api.minimaxi.com/anthropic",
     groups = listOf(ModelGroup("minimax", "MiniMax", listOf(
         Model("MiniMax-M2.5", "MiniMax-M2.5"), Model("MiniMax-M2.5-highspeed", "MiniMax-M2.5-highspeed"),
-        Model("speech-2.8-hd", "speech-2.8-hd", isTts = true),
+        Model("speech-2.8-hd", "speech-2.8-hd", capabilities = setOf(ModelCapability.TTS)),
     ))),
 )
 
@@ -344,7 +368,7 @@ internal fun modelServicePreviewFixture(): LLMModelSetting = LLMModelSetting(
 @Composable
 private fun ServiceDetailPreview() {
     val service = modelServicePreviewFixture()
-    AsssistantaiTheme { LLMModelSettingDetailScreen(LLMModelSettingDetailUiState(isLoading = false,
+    GimiTheme { LLMModelSettingDetailScreen(LLMModelSettingDetailUiState(isLoading = false,
         service = service, baseline = service, supportedTools = OfficialToolSupport().all.filter { it.serviceId == service.id && service.apiProtocol in it.protocols }), {}, { _, _ -> }) }
 }
 
@@ -353,7 +377,7 @@ private fun ServiceDetailPreview() {
 @Composable
 private fun ExpandedConnectionPreview() {
     val service = modelServicePreviewFixture()
-    AsssistantaiTheme { LLMModelSettingDetailScreen(LLMModelSettingDetailUiState(isLoading = false,
+    GimiTheme { LLMModelSettingDetailScreen(LLMModelSettingDetailUiState(isLoading = false,
         service = service, baseline = service, isConnectionExpanded = true), {}, { _, _ -> }) }
 }
 
@@ -362,8 +386,8 @@ private fun ExpandedConnectionPreview() {
 @Composable
 private fun ConnectionFailurePreview() {
     val service = modelServicePreviewFixture()
-    AsssistantaiTheme { LLMModelSettingDetailScreen(LLMModelSettingDetailUiState(isLoading = false,
-        service = service, baseline = service, connectionResult = false), {}, { _, _ -> }) }
+    GimiTheme { LLMModelSettingDetailScreen(LLMModelSettingDetailUiState(isLoading = false,
+        service = service, baseline = service, connectionResult = ServiceConnectionResult.NetworkFailed), {}, { _, _ -> }) }
 }
 
 @Preview(name = "任务运行中", widthDp = 390, heightDp = 844, locale = "zh")
@@ -371,6 +395,6 @@ private fun ConnectionFailurePreview() {
 @Composable
 private fun BusyServicePreview() {
     val service = modelServicePreviewFixture()
-    AsssistantaiTheme { LLMModelSettingDetailScreen(LLMModelSettingDetailUiState(isLoading = false,
+    GimiTheme { LLMModelSettingDetailScreen(LLMModelSettingDetailUiState(isLoading = false,
         service = service, baseline = service, isMutationBlocked = true), {}, { _, _ -> }) }
 }

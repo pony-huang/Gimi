@@ -38,7 +38,7 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import kotlin.math.abs
 import kotlin.math.exp
 
@@ -196,7 +196,7 @@ internal fun formatRecordingTime(remainingSeconds: Int): String {
 @Preview(name = "Tablet recording", device = Devices.TABLET, showBackground = true)
 @Composable
 private fun VoiceRecordingContentPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         DefaultVoiceRecordingContent(
             VoiceRecordingContentParams(
                 levels = List(36) { index -> ((index % 7) + 1) / 8f },

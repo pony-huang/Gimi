@@ -181,3 +181,123 @@ def test_streaming_last_chunk_marks_completion(client: TestClient):
 
     assert last_artifact_update is not None
     assert last_artifact_update['lastChunk'] is True
+
+# 生命周期边界：正常、异常与取消都不能遗留运行中任务。
+def test_executor_cleans_up_completed_and_failed_tasks(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from server import SampleAgentExecutor
+    from a2a.types import Message, Part
+
+    monkeypatch.setattr('server.asyncio.sleep', AsyncMock())
+    context = SimpleNamespace(
+        message=Message(message_id='m', parts=[Part(text='hi')]),
+        task_id='t', context_id='c', get_user_input=lambda: 'hi',
+    )
+    executor = SampleAgentExecutor()
+    queue = SimpleNamespace(enqueue_event=AsyncMock())
+    asyncio.run(executor.execute(context, queue))
+    assert not executor.running_tasks
+    queue.enqueue_event.side_effect = RuntimeError('queue closed')
+    with pytest.raises(RuntimeError):
+        asyncio.run(executor.execute(context, queue))
+    assert not executor.running_tasks
+
+
+@pytest.mark.parametrize('operation', ['execute', 'cancel'])
+def test_executor_rejects_missing_context(operation):
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from server import SampleAgentExecutor
+    from a2a.utils.errors import InvalidParamsError
+
+    context = SimpleNamespace(message=None, task_id=None, context_id=None)
+    queue = SimpleNamespace(enqueue_event=AsyncMock())
+    with pytest.raises(InvalidParamsError):
+        asyncio.run(getattr(SampleAgentExecutor(), operation)(context, queue))
+    queue.enqueue_event.assert_not_called()
+
+
+def test_cancel_running_task_prevents_completion(monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from server import SampleAgentExecutor
+    from a2a.types import Message, Part, TaskStatusUpdateEvent, TaskState
+
+    executor = SampleAgentExecutor()
+    queue = SimpleNamespace(enqueue_event=AsyncMock())
+    context = SimpleNamespace(message=Message(message_id='m', parts=[Part(text='hi')]),
+                              task_id='t', context_id='c', get_user_input=lambda: 'hi')
+
+    async def cancel_during_work(_):
+        await executor.cancel(context, queue)
+
+    monkeypatch.setattr('server.asyncio.sleep', cancel_during_work)
+    asyncio.run(executor.execute(context, queue))
+    assert not executor.running_tasks
+    states = [call.args[0].status.state for call in queue.enqueue_event.call_args_list
+              if isinstance(call.args[0], TaskStatusUpdateEvent)]
+    assert TaskState.TASK_STATE_CANCELED in states
+    assert TaskState.TASK_STATE_COMPLETED not in states
+
+
+def test_v03_routes_accept_legacy_message_send():
+    client = TestClient(create_app(v03_compat=True))
+    response = client.post(JSONRPC_URL, json=rpc('message/send', {
+        'message': {'role': 'user', 'parts': [{'kind': 'text', 'text': 'hi'}], 'messageId': 'v03'}
+    }), headers={'A2A-Version': '0.3'})
+    assert response.status_code == 200
+    assert 'result' in response.json()
+
+
+def test_grpc_shares_http_handler_and_stops_when_http_exits(monkeypatch):
+    import asyncio
+    from unittest.mock import AsyncMock, Mock
+    import server
+    grpc = pytest.importorskip("grpc")
+    from a2a.types import a2a_pb2_grpc
+
+    grpc_server = Mock()
+    grpc_server.add_insecure_port.return_value = 50051
+    grpc_server.start = AsyncMock()
+    grpc_server.stop = AsyncMock()
+    grpc_server.wait_for_termination = AsyncMock(side_effect=asyncio.Event().wait)
+    monkeypatch.setattr(grpc.aio, 'server', lambda: grpc_server)
+    handlers = []
+    monkeypatch.setattr(a2a_pb2_grpc, 'add_A2AServiceServicer_to_server',
+                        lambda handler, _: handlers.append(handler))
+    http_apps = []
+
+    class HttpServer:
+        def __init__(self, config):
+            http_apps.append(config.app)
+        async def serve(self):
+            pass
+
+    monkeypatch.setattr(server.uvicorn, 'Server', HttpServer)
+    # 捕获构造时传入的 handler，验证传输共用状态，而非依赖 SDK 私有字段。
+    monkeypatch.setattr('a2a.server.request_handlers.GrpcHandler', lambda handler: handler)
+    asyncio.run(server.serve(enable_grpc=True))
+    assert handlers == [http_apps[0].state.request_handler]
+    card = TestClient(http_apps[0]).get('/.well-known/agent-card.json').json()
+    assert any(i['protocolBinding'] == 'GRPC' for i in card['supportedInterfaces'])
+    grpc_server.start.assert_awaited_once()
+    grpc_server.stop.assert_awaited_once_with(5)
+
+
+def test_grpc_bind_failure_is_reported_and_server_closed(monkeypatch):
+    import asyncio
+    from unittest.mock import AsyncMock, Mock
+    grpc = pytest.importorskip("grpc")
+    from server import serve
+
+    grpc_server = Mock()
+    grpc_server.add_insecure_port.return_value = 0
+    grpc_server.stop = AsyncMock()
+    monkeypatch.setattr(grpc.aio, 'server', lambda: grpc_server)
+    with pytest.raises(RuntimeError, match='Cannot bind'):
+        asyncio.run(serve(enable_grpc=True))
+    grpc_server.stop.assert_awaited_once_with(5)

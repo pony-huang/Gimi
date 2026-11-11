@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+        深色模式下的平台主题：与 Compose 的深色画布保持一致（纯黑底），
+        避免启动窗口与系统级弹层在深色下闪白。
+    -->
+    <style name="Theme.Asssistantai" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF000000</item>
+    </style>
+</resources>

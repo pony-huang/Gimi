@@ -22,23 +22,39 @@ internal class AndroidAppNotificationManager @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : AppNotificationManager {
     private val manager = NotificationManagerCompat.from(context)
+
+    // 交互与完成通知都按任务 tag 登记，取消时才能覆盖两类通知，且不误删并行会话的通知。
     private val interactionTags = mutableSetOf<String>()
+    private val completedTags = mutableSetOf<String>()
+
+    private val tagsLock = Any()
+
+    init {
+        createChannel()
+    }
 
     @SuppressLint("MissingPermission")
     override fun notifyTaskCompleted(taskId: String?) {
+        val tag = taskTag(taskId)
         // 只清理已经完成的任务，不能让并行会话的交互通知被先完成的任务误删。
-        cancelPendingInteractionNotifications(taskId)
+        cancelTaskNotifications(tag)
         if (!shouldNotify()) return
-        notify(
-            taskTag(taskId),
-            NOTIFICATION_TASK_COMPLETED,
-            baseBuilder()
-                .setContentTitle(context.getString(R.string.notification_task_completed_title))
-                .setContentText(context.getString(R.string.notification_task_completed_text))
-                .setSmallIcon(android.R.drawable.stat_sys_download_done)
-                .setAutoCancel(true)
-                .build(),
-        )
+        synchronized(tagsLock) {
+            completedTags += tag
+            // 完成通知是低打扰的状态确认：可见但不响铃、不 heads-up；notify 也放进锁内，
+            // 保证「登记-发出」与并发会话的「取消」串行化，发出后不会被旧 cancel 误删。
+            notify(
+                tag,
+                NOTIFICATION_TASK_COMPLETED,
+                baseBuilder()
+                    .setContentTitle(context.getString(R.string.notification_task_completed_title))
+                    .setContentText(context.getString(R.string.notification_task_completed_text))
+                    .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                    .setAutoCancel(true)
+                    .setSilent(true)
+                    .build(),
+            )
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -94,14 +110,27 @@ internal class AndroidAppNotificationManager @Inject constructor(
     }
 
     override fun cancelPendingInteractionNotifications(taskId: String?) {
-        val tags = synchronized(interactionTags) {
-            if (taskId == null) {
-                interactionTags.toList().also { interactionTags.clear() }
-            } else {
-                listOf(taskTag(taskId)).also { interactionTags.removeAll(it.toSet()) }
+        val tags = if (taskId == null) null else listOf(taskTag(taskId))
+        synchronized(tagsLock) {
+            // 取消与登记/发出在同一把锁内完成：并行会话重新发出的通知不会被先到的 cancel 误删。
+            val targets = tags ?: (interactionTags + completedTags).toList()
+            interactionTags.removeAll(targets.toSet())
+            completedTags.removeAll(targets.toSet())
+            targets.forEach { tag ->
+                manager.cancel(tag, NOTIFICATION_INTERACTION)
+                manager.cancel(tag, NOTIFICATION_TASK_COMPLETED)
             }
         }
-        tags.forEach { tag -> manager.cancel(tag, NOTIFICATION_INTERACTION) }
+    }
+
+    /** 只取消单个任务的两类通知，供完成路径收敛该任务的交互通知。 */
+    private fun cancelTaskNotifications(tag: String) {
+        synchronized(tagsLock) {
+            interactionTags.remove(tag)
+            completedTags.remove(tag)
+            manager.cancel(tag, NOTIFICATION_INTERACTION)
+            manager.cancel(tag, NOTIFICATION_TASK_COMPLETED)
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -113,17 +142,19 @@ internal class AndroidAppNotificationManager @Inject constructor(
     ) {
         if (!shouldNotify()) return
         val tag = taskTag(taskId)
-        synchronized(interactionTags) { interactionTags += tag }
-        notify(
-            tag,
-            NOTIFICATION_INTERACTION,
-            baseBuilder()
-                .setContentTitle(context.getString(titleRes))
-                .setContentText(text)
-                .setSmallIcon(icon)
-                .setOngoing(true)
-                .build(),
-        )
+        synchronized(tagsLock) {
+            interactionTags += tag
+            notify(
+                tag,
+                NOTIFICATION_INTERACTION,
+                baseBuilder()
+                    .setContentTitle(context.getString(titleRes))
+                    .setContentText(text)
+                    .setSmallIcon(icon)
+                    .setOngoing(true)
+                    .build(),
+            )
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -134,15 +165,13 @@ internal class AndroidAppNotificationManager @Inject constructor(
     private fun taskTag(taskId: String?): String =
         taskId?.takeIf(String::isNotBlank)?.let { "agent-task:$it" } ?: DEFAULT_TASK_TAG
 
-    private fun baseBuilder(): NotificationCompat.Builder {
-        ensureChannel()
-        return NotificationCompat.Builder(context, CHANNEL_ID)
+    private fun baseBuilder(): NotificationCompat.Builder =
+        NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentIntent(createLaunchPendingIntent())
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-    }
 
     private fun createLaunchPendingIntent(): PendingIntent? {
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
@@ -158,7 +187,7 @@ internal class AndroidAppNotificationManager @Inject constructor(
         )
     }
 
-    private fun ensureChannel() {
+    private fun createChannel() {
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,

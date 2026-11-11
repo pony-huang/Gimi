@@ -7,6 +7,7 @@ import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionS
 import github.ponyhuang.gimi.domain.conversation.repository.NoAvailableAssistantModelException
 import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import github.ponyhuang.gimi.domain.modelcatalog.model.LLMModelSetting
+import github.ponyhuang.gimi.domain.modelcatalog.model.ModelCapability
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelectionCodec
 import github.ponyhuang.gimi.domain.modelcatalog.model.OfficialToolFunctionCatalog
@@ -121,7 +122,7 @@ class DefaultConversationSessionResolver @Inject constructor(
                 .flatMap { service ->
                     service.groups.asSequence().flatMap { group ->
                         group.models.asSequence()
-                            .filter { !it.isStt && !it.isTts }
+                            .filter { ModelCapability.LLM in it.capabilities }
                             .map { ModelSelection(service.id, group.id, it.id) }
                     }
                 }
@@ -149,5 +150,5 @@ private fun List<LLMModelSetting>.isUsable(selection: ModelSelection): Boolean {
     if (!service.isEnabled || service.apiKey.isBlank()) return false
     val group = service.groups.firstOrNull { it.id == selection.groupId } ?: return false
     val model = group.models.firstOrNull { it.id == selection.modelId } ?: return false
-    return !model.isStt && !model.isTts
+    return ModelCapability.LLM in model.capabilities
 }

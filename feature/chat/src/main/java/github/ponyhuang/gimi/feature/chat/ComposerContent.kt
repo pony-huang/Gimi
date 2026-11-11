@@ -12,13 +12,17 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -38,6 +42,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -58,7 +63,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import github.ponyhuang.gimi.feature.chat.R
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import kotlinx.coroutines.launch
 
 /**
@@ -208,11 +213,21 @@ internal fun DefaultComposerInputContent(
                         )
                     }
 
+                    // 模型 chip 吃掉剩余空间并左对齐，窄屏时模型名省略；
+                    // 权限 chip 靠右与语音、发送相邻，状态一眼可辨。
                     Box(
                         modifier = Modifier.weight(1f),
                         contentAlignment = Alignment.CenterStart,
                     ) {
                         params.modelSelectorContent()
+                    }
+
+                    if (params.showToolChip) {
+                        ToolAccessChip(
+                            fullAccess = params.fullAccess,
+                            enabled = !params.isGenerating && params.configurationReady,
+                            onClick = params.onPermissionModeClick,
+                        )
                     }
 
                     VoiceButton(
@@ -397,6 +412,54 @@ private fun VoiceButton(
 
 private enum class ComposerTrailingButton { Send, Stop }
 
+/**
+ * 权限模式 chip：绿色表示请求批准，黄色表示完全批准，仅通过图标颜色呈现。
+ * 点击直接打开权限模式抽屉。
+ */
+@Composable
+private fun ToolAccessChip(
+    fullAccess: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val tint = if (fullAccess) ToolAccessFullColor else ToolAccessRequestColor
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(40.dp),
+        colors = IconButtonDefaults.iconButtonColors(
+            contentColor = tint,
+            disabledContentColor = tint.copy(alpha = 0.38f),
+        ),
+    ) {
+        Icon(
+            imageVector = Icons.Default.Security,
+            contentDescription = stringResource(
+                if (fullAccess) R.string.chat_permission_mode_full else R.string.chat_permission_mode_request,
+            ),
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+// 权限状态独立于品牌强调色，避免主题切换改变用户约定的绿／黄含义。
+private val ToolAccessRequestColor = Color(0xFF2E9B59)
+private val ToolAccessFullColor = Color(0xFFE0AB00)
+
+@Preview(name = "权限颜色 · 浅色", showBackground = true)
+@Preview(name = "权限颜色 · 深色", showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun ToolAccessChipPreview() {
+    GimiTheme {
+        Row {
+            ToolAccessChip(fullAccess = false, enabled = true, onClick = {})
+            ToolAccessChip(fullAccess = true, enabled = true, onClick = {})
+            ToolAccessChip(fullAccess = false, enabled = false, onClick = {})
+            ToolAccessChip(fullAccess = true, enabled = false, onClick = {})
+        }
+    }
+}
+
 @Composable
 private fun TrailingButton(
     button: ComposerTrailingButton?,
@@ -429,11 +492,17 @@ private fun TrailingIconButton(
     testTag: String,
     onClick: () -> Unit,
 ) {
+    // 实心圆用品牌蓝 primary/onPrimary：与语音录入行的取消、结束、发送胶囊保持同一套
+    // 动作色，蓝色只承担这一个动作焦点，不再用墨色圆单独当锚点。
     FilledIconButton(
         onClick = onClick,
         modifier = Modifier
             .size(40.dp)
             .testTag(testTag),
+        colors = IconButtonDefaults.filledIconButtonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        ),
     ) {
         Icon(
             painter = painterResource(icon),
@@ -484,7 +553,7 @@ internal fun DefaultIdleContent(onClick: () -> Unit, enabled: Boolean = true) {
 @Preview(showBackground = true)
 @Composable
 private fun DefaultComposerLeadingContentPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         DefaultComposerLeadingContent(
             params = ComposerLeadingContentParams(
                 isGenerating = false,
@@ -497,7 +566,7 @@ private fun DefaultComposerLeadingContentPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun DefaultComposerInputContentEmptyPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         DefaultComposerInputContent(
             modifier = Modifier,
             params = ComposerInputContentParams(
@@ -520,7 +589,7 @@ private fun DefaultComposerInputContentEmptyPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun DefaultComposerInputContentFilledPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         DefaultComposerInputContent(
             modifier = Modifier,
             params = ComposerInputContentParams(
@@ -548,7 +617,7 @@ private fun DefaultComposerInputContentFilledPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun DefaultComposerInputContentTranscribingPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         DefaultComposerInputContent(
             modifier = Modifier,
             params = ComposerInputContentParams(
@@ -572,7 +641,7 @@ private fun DefaultComposerInputContentTranscribingPreview() {
 @Preview(name = "转写并发送 · 深色", showBackground = true, widthDp = 360, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun TranscribingAndSendingContentPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         androidx.compose.material3.Surface(
             shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
             color = chatCapsuleColor(),
@@ -585,7 +654,7 @@ private fun TranscribingAndSendingContentPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun DefaultIdleContentPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         DefaultIdleContent(
             onClick = {},
             enabled = true,

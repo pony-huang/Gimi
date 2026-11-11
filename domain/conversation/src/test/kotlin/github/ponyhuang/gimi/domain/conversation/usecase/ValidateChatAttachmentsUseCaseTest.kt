@@ -45,7 +45,7 @@ class ValidateChatAttachmentsUseCaseTest {
 
     @Test
     fun modelWithoutDocumentCapabilityRejectsDocuments() {
-        val unavailable = model.copy(capabilities = MultimodalCapabilities(documentInput = null))
+        val unavailable = model.copy(multimodal = MultimodalCapabilities(documentInput = null))
         val source = service.copy(groups = listOf(ModelGroup("group", "Group", listOf(unavailable))))
         assertEquals(ChatAttachmentValidationFailure.CategoryUnsupported,
             validate(selection, listOf(source), listOf(draft("a.pdf", 100))))

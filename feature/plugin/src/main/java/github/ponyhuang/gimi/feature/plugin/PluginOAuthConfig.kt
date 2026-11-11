@@ -18,7 +18,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 公共 OAuth 配置装配：能力由动作声明决定，不识别服务商或插件 ID。 */
 @Composable
@@ -128,7 +128,7 @@ private fun PluginOAuthFailedPreview() = PluginOAuthPreview(PluginOAuthAuthoriza
 
 @Composable
 private fun PluginOAuthPreview(authorization: PluginOAuthAuthorization) {
-    AsssistantaiTheme {
+    GimiTheme {
         PluginConfigScreen(
             state = PluginConfigUiState(
                 pluginId = "example-provider",

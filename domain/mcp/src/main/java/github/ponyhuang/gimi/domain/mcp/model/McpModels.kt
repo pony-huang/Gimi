@@ -28,6 +28,9 @@ enum class McpImportError {
     INVALID_JSON,
     MCP_SERVERS_NOT_OBJECT,
     INVALID_CURL,
+
+    /** curl 配置指向 /sse 端点；SSE 传输已移除，需要使用 Streamable HTTP 端点。 */
+    UNSUPPORTED_SSE,
     STORAGE_FAILURE,
 }
 

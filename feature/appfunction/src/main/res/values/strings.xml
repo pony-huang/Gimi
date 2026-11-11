@@ -1,5 +1,5 @@
 <resources>
-    <string name="appfunction_title">AppFunciton</string>
+    <string name="appfunction_title">AppFunction</string>
     <string name="appfunction_info_title">应用功能信息</string>
     <string name="appfunction_loading">正在发现应用…</string>
     <string name="appfunction_save_failed">保存失败，请重新操作开关。</string>

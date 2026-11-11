@@ -1,6 +1,7 @@
 <resources>
     <string name="netease_app_name">Gimi 网易云音乐插件</string>
     <string name="netease_app_id">App ID</string>
+    <string name="netease_client_secret">Client Secret（令牌刷新需要）</string>
     <string name="netease_private_key">Private Key</string>
     <string name="netease_network_error">网易云请求失败，请检查网络、凭证或重新登录</string>
     <string name="netease_config_error">请检查 App ID 和 PKCS#8 私钥（PEM 或 Base64）</string>

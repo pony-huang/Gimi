@@ -17,7 +17,7 @@ import github.ponyhuang.gimi.domain.conversation.model.ToolAccessMode
 import github.ponyhuang.gimi.domain.conversation.repository.ToolAccessRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.AgentSessionIdentity
 import github.ponyhuang.gimi.domain.modelcatalog.model.ModelSelection
-import github.ponyhuang.gimi.domain.mobileuse.MobileUseRepository
+import github.ponyhuang.gimi.domain.mobileuse.MobileUseController
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginRuntimeSnapshot
 import github.ponyhuang.gimi.pluginapi.AgentPlugin
 import kotlinx.coroutines.sync.Mutex
@@ -59,7 +59,7 @@ class AgentChatRunner(
     },
     private val plugins: (PluginRuntimeSnapshot<AgentPlugin>) -> List<Plugin> = { emptyList() },
     private val toolAccessRepository: ToolAccessRepository,
-    private val mobileUseRepository: MobileUseRepository? = null,
+    private val mobileUseController: MobileUseController? = null,
 ) {
     /**
      * Agent 构建的唯一缓存键。
@@ -76,6 +76,8 @@ class AgentChatRunner(
         val toolAccessMode: ToolAccessMode,
         val reasoningEffort: ReasoningEffort,
         val thinkingEnabled: Boolean,
+        val instructionSuffix: String,
+        val a2uiSupported: Boolean,
         val revision: Any,
     )
 
@@ -118,12 +120,15 @@ class AgentChatRunner(
         allowConfirmationRequiredTools: Boolean = true,
         toolConfiguration: ConversationToolConfiguration? = null,
         a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities? = null,
+        instructionSuffix: String = "",
     ): AgentChatExecution {
         val toolAccessMode = toolAccessRepository.defaultToolAccessMode.value
         val reasoningEffort = toolConfiguration?.reasoningEffort ?: ReasoningEffort.MEDIUM
         val thinkingEnabled = toolConfiguration?.thinkingEnabled ?: true
         val buildConfiguration = configuration()
-        val key = AgentKey(selection, toolAccessMode, reasoningEffort, thinkingEnabled, buildConfiguration.revision)
+        // 无 capabilities 的执行端（如实时语音）不声明 generate_a2ui；构建产物按此分键缓存。
+        val a2uiSupported = a2uiCapabilities != null
+        val key = AgentKey(selection, toolAccessMode, reasoningEffort, thinkingEnabled, instructionSuffix, a2uiSupported, buildConfiguration.revision)
         return runnerMutex.withLock {
             val runtime = runtimes[key] ?: factory(
                 AgentBuildSpec(
@@ -132,6 +137,8 @@ class AgentChatRunner(
                     reasoningEffort = reasoningEffort,
                     thinkingEnabled = thinkingEnabled,
                     pluginRuntime = buildConfiguration.pluginRuntime,
+                    instructionSuffix = instructionSuffix,
+                    a2uiSupported = a2uiSupported,
                 ),
             ).let { agentRuntime ->
                 SharedRuntime(
@@ -152,7 +159,7 @@ class AgentChatRunner(
                 a2uiCapabilities?.let {
                     put(github.ponyhuang.gimi.data.agent.a2ui.GenerateA2uiTool.CAPABILITIES_KEY, kotlinx.serialization.json.Json.encodeToString(it))
                 }
-            }, mobileUseRepository)
+            }, mobileUseController)
         }
     }
 

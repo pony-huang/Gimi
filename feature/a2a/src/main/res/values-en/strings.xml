@@ -45,4 +45,9 @@
     <string name="a2a_card_provider">Provider</string>
     <string name="a2a_card_docs">Docs</string>
     <string name="a2a_card_protocol_value">protocol %1$s</string>
+    <string name="a2a_storage_error">Could not read settings. Writes are blocked to preserve stored data. Unlock your device and restart the app to retry.</string>
+    <string name="a2a_invalid_name">Use letters and digits separated by single dots, spaces, underscores or hyphens. An initial underscore is allowed; user is reserved.</string>
+    <string name="a2a_invalid_url">Enter a valid HTTP or HTTPS URL without credentials or a fragment.</string>
+    <string name="a2a_invalid_token">Bearer credentials cannot contain line breaks.</string>
+    <string name="a2a_duplicate_name">This agent name already exists. Choose another name.</string>
 </resources>

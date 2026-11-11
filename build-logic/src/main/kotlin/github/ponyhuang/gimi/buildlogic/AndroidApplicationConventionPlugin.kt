@@ -19,5 +19,7 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                 versionCode = providers.gradleProperty("releaseVersionCode").get().toInt()
             }
         }
+        applyUnitTestDefaults()
+        registerJvmTestAlias()
     }
 }

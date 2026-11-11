@@ -2,6 +2,8 @@ package github.ponyhuang.gimi.plugin.weibo
 
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
@@ -285,16 +287,28 @@ internal class WeiboApi(
     /**
      * 取当前可用 token，必要时换新。
      *
-     * 整段持锁（含网络 IO）：并发首调时只放一个请求出去，避免同一凭据被重复换 token；
-     * 插件工具本身是串行调用，序列化代价可忽略。
+     * 锁只保护缓存读写，换 token 的网络 IO 在锁外执行：慢请求/限流不再把并发工具
+     * 调用全部串行化。重复换 token 由「写回前双重检查」收敛——多个线程同时换出时，
+     * 后写者看到已有新鲜 token 则不覆盖，重复请求最多浪费一次、不产生错误状态。
      */
-    private fun validToken(forceRefresh: Boolean): String = synchronized(tokenLock) {
+    private fun validToken(forceRefresh: Boolean): String {
         val fingerprint = credentialFingerprint()
-        val current = cachedToken
-        if (!forceRefresh && current != null && current.fingerprint == fingerprint && current.isFresh(clock())) {
-            return@synchronized current.value
+        if (!forceRefresh) {
+            synchronized(tokenLock) {
+                val current = cachedToken
+                if (current != null && current.fingerprint == fingerprint && current.isFresh(clock())) {
+                    return current.value
+                }
+            }
         }
-        fetchToken(fingerprint).also { cachedToken = it }.value
+        val fetched = fetchToken(fingerprint)
+        synchronized(tokenLock) {
+            val current = cachedToken
+            if (current == null || current.fingerprint != fingerprint || !current.isFresh(clock())) {
+                cachedToken = fetched
+            }
+        }
+        return fetched.value
     }
 
     private fun fetchToken(fingerprint: String): CachedToken {
@@ -347,23 +361,43 @@ internal class WeiboApi(
             }
         }
         val connection = URL(url).openConnection() as HttpURLConnection
-        connection.requestMethod = method
-        connection.connectTimeout = CONNECT_TIMEOUT_MS
-        connection.readTimeout = READ_TIMEOUT_MS
-        connection.setRequestProperty("Accept", "application/json")
-        if (body != null) {
-            connection.doOutput = true
-            connection.setRequestProperty("Content-Type", "application/json")
-            // 用 JSONObject(Map) 构造器而非逐字段 put：R8 内联 lambda 时会把 put 误配成不存在的重载。
-            val payload = JSONObject(body).toString()
-            connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
+        try {
+            connection.requestMethod = method
+            connection.connectTimeout = CONNECT_TIMEOUT_MS
+            connection.readTimeout = READ_TIMEOUT_MS
+            // 禁止自动跟随 3xx：跟随会把 token 凭据带到任意重定向目标。
+            connection.instanceFollowRedirects = false
+            connection.setRequestProperty("Accept", "application/json")
+            if (body != null) {
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/json")
+                // 用 JSONObject(Map) 构造器而非逐字段 put：R8 内联 lambda 时会把 put 误配成不存在的重载。
+                val payload = JSONObject(body).toString()
+                connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
+            }
+            val status = connection.responseCode
+            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
+            // 响应体限长读入：异常大的响应不能把整包拉进内存。
+            val responseBody = stream?.use { it.readBoundedText(MAX_RESPONSE_BYTES) }.orEmpty()
+            if (status !in 200..299) throw WeiboHttpException(status, responseBody)
+            return responseBody
+        } finally {
+            connection.disconnect()
         }
-        val status = connection.responseCode
-        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-        val responseBody = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-        connection.disconnect()
-        if (status !in 200..299) throw WeiboHttpException(status, responseBody)
-        return responseBody
+    }
+
+    private fun InputStream.readBoundedText(maxBytes: Int): String {
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var total = 0
+        while (true) {
+            val read = read(buffer)
+            if (read < 0) break
+            total += read
+            if (total > maxBytes) throw WeiboHttpException(0, "微博响应超过 $maxBytes 字节上限")
+            output.write(buffer, 0, read)
+        }
+        return output.toString(Charsets.UTF_8.name())
     }
 
     private fun credentialFingerprint(): String = "$appId|$appSecret|$baseUrl"
@@ -410,6 +444,9 @@ internal class WeiboApi(
 
         /** 读取响应超时；智搜是同步生成摘要，可能较慢。 */
         const val READ_TIMEOUT_MS: Int = 30_000
+
+        /** 响应体大小上限（字节）。 */
+        const val MAX_RESPONSE_BYTES: Int = 4 * 1024 * 1024
 
         /** 服务端未声明有效期时的兜底：微博 token 名义有效期 2 小时。 */
         const val DEFAULT_TOKEN_EXPIRE_SECONDS: Long = 7_200

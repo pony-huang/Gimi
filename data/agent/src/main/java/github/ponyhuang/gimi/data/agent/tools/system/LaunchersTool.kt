@@ -41,7 +41,7 @@ class LaunchersTool @Inject constructor(
 
     @Tool(
         name = "list_installed_apps",
-        description = "Lists apps currently installed on the device, returning each app's display name and ID.",
+        description = "Lists apps currently installed on the device, returning each app's display name and ID. Prefer search_installed_apps to find a specific app; use this only when full enumeration is needed.",
     )
     fun listInstalledApps(): Map<String, Any> = appListResult(launchableApps())
 
@@ -59,7 +59,10 @@ class LaunchersTool @Inject constructor(
             app.name.contains(normalizedQuery, ignoreCase = true) ||
                 app.packageName.contains(normalizedQuery, ignoreCase = true)
         }
-        return appListResult(apps)
+        // 近义词搜不到目标（如"应用市场" vs "应用商店"）时给出下一步提示，避免模型直接全量列举。
+        return appListResult(apps) + if (apps.isEmpty()) mapOf(
+            "hint" to "No installed app matches. Try a shorter keyword or an alternative name, or call list_installed_apps to enumerate.",
+        ) else emptyMap()
     }
 
     @Tool(

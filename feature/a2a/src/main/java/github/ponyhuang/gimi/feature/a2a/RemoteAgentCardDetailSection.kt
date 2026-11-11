@@ -58,11 +58,13 @@ internal fun RemoteAgentCardDetailSection(snapshot: RemoteAgentCardSnapshot) {
             snapshot.skills.forEachIndexed { index, skill ->
                 CardSkillRow(skill = skill, showDivider = index > 0)
             }
-            CardMetaLine(
-                label = stringResource(R.string.a2a_card_input_output),
-                value = snapshot.defaultInputModes.joinToString("、") + " → " +
-                    snapshot.defaultOutputModes.joinToString("、"),
-            )
+            if (snapshot.defaultInputModes.isNotEmpty() || snapshot.defaultOutputModes.isNotEmpty()) {
+                CardMetaLine(
+                    label = stringResource(R.string.a2a_card_input_output),
+                    value = snapshot.defaultInputModes.joinToString("、") + " → " +
+                        snapshot.defaultOutputModes.joinToString("、"),
+                )
+            }
             snapshot.providerOrganization?.let { organization ->
                 CardMetaLine(
                     label = stringResource(R.string.a2a_card_provider),

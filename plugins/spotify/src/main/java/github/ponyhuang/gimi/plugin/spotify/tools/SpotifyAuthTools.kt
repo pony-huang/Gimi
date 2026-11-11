@@ -14,20 +14,19 @@ import kotlinx.coroutines.withContext
 internal fun authTools(
     auth: SpotifyAuth,
     clientId: () -> String,
-    clientSecret: () -> String,
     redirectUri: () -> String,
     appContext: () -> Context?,
 ): List<BaseTool> = listOf(
     spotifyTool(
         name = "spotify_login",
         description =
-            "Open the browser to complete Spotify OAuth authorization (configure Client ID/Secret first). " +
+            "Open the browser to complete Spotify OAuth authorization (configure Client ID first). " +
                 "Required before first use.",
         parameters = Schema(type = Type.OBJECT),
     ) {
         mapOf(
             SpotifyTool.RESULT_KEY to
-                performLogin(auth, clientId, clientSecret, redirectUri, appContext),
+                performLogin(auth, clientId, redirectUri, appContext),
         )
     },
     spotifyTool(
@@ -54,31 +53,34 @@ internal fun authTools(
 )
 
 /**
- * OAuth 登录流程：校验凭据 → 起本地回调服务器 → 开浏览器授权 → 等回调 → 换 token。
- * 工具与配置页动作共用。成功返回提示文本。
+ * OAuth 登录流程（PKCE）：校验凭据 → 生成 code_verifier/challenge → 起本地回调服务器 →
+ * 开浏览器授权 → 等回调 → 携 verifier 换 token。工具与配置页动作共用。成功返回提示文本。
  */
 internal suspend fun performLogin(
     auth: SpotifyAuth,
     clientId: () -> String,
-    clientSecret: () -> String,
     redirectUri: () -> String,
     appContext: () -> Context?,
 ): String = withContext(Dispatchers.IO) {
-    if (clientId().isBlank() || clientSecret().isBlank()) {
-        throw IllegalStateException("Configure Client ID and Client Secret in the plugin settings first")
+    if (clientId().isBlank()) {
+        throw IllegalStateException("Configure Client ID in the plugin settings first")
     }
     val context = appContext() ?: throw IllegalStateException("Plugin has no attached context")
     val redirect = redirectUri()
     val state = SpotifyAuth.newState()
+    val codeVerifier = SpotifyAuth.newCodeVerifier()
+    val codeChallenge = SpotifyAuth.codeChallengeS256(codeVerifier)
     // 先绑定回调端口，再开浏览器授权；否则回调到达时端口未监听会失败。
     val server = startCallbackServer(redirect, state)
     try {
         context.startActivity(
-            Intent(Intent.ACTION_VIEW, auth.authorizeUrl(clientId(), redirect, state).toUri())
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            Intent(
+                Intent.ACTION_VIEW,
+                auth.authorizeUrl(clientId(), redirect, state, codeChallenge).toUri(),
+            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
         val code = server.await()
-        auth.exchangeCode(code, redirect)
+        auth.exchangeCode(code, redirect, codeVerifier)
     } finally {
         server.close()
     }

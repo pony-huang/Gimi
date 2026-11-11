@@ -226,8 +226,9 @@ internal class WeiboCrowdTimelineTool(api: WeiboApi) : WeiboTool(NAME, DESCRIPTI
                 "page" to Schema(type = Type.INTEGER, description = "页码，默认 1"),
                 "since_id" to idParam("只取该微博 id 之后的内容"),
                 "max_id" to idParam("只取该微博 id 之前的内容，用于翻页"),
+                // STRING + 字符串枚举与声明一致；INTEGER 配字符串枚举是自相矛盾的 schema。
                 "sort_type" to Schema(
-                    type = Type.INTEGER,
+                    type = Type.STRING,
                     description = "排序：0 按时间，1 按热度",
                     enum = listOf("0", "1"),
                 ),
@@ -246,7 +247,7 @@ internal class WeiboCrowdTimelineTool(api: WeiboApi) : WeiboTool(NAME, DESCRIPTI
                 count = count,
                 sinceId = idArg(args, "since_id"),
                 maxId = idArg(args, "max_id"),
-                sortType = intArg(args, "sort_type")?.takeIf { it == 0 || it == 1 },
+                sortType = args["sort_type"]?.toString()?.trim()?.toIntOrNull()?.takeIf { it == 0 || it == 1 },
             )
             mapOf("topic_name" to topicName) + projectStatuses(timeline, count)
         }

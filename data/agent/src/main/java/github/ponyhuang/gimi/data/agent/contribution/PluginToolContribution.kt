@@ -3,6 +3,7 @@ package github.ponyhuang.gimi.data.agent.contribution
 import com.google.adk.kt.agents.ReadonlyContext
 import com.google.adk.kt.tools.BaseTool
 import com.google.adk.kt.tools.Toolset
+import github.ponyhuang.gimi.core.common.concurrent.cancellationAwareRunCatching
 import github.ponyhuang.gimi.data.agent.AgentBuildSpec
 import github.ponyhuang.gimi.data.agent.AgentContribution
 import github.ponyhuang.gimi.data.agent.AgentToolCatalogContext
@@ -68,7 +69,10 @@ class PluginToolContribution @Inject constructor(
         val directTools = runtime.enabledPlugins.flatMap { plugin -> plugin.tools() }
         val toolsetTools = runtime.enabledPlugins
             .flatMap { plugin -> plugin.toolSets() }
-            .flatMap { toolset -> runCatching { toolset.getTools(null) }.getOrDefault(emptyList()) }
+            // getTools 是 suspend 调用：取消必须继续传播，只有真实失败才回退为空列表。
+            .flatMap { toolset ->
+                cancellationAwareRunCatching { toolset.getTools(null) }.getOrDefault(emptyList())
+            }
         return listOf(AgentToolCatalogEntry(source = AgentToolCatalogEntry.SOURCE_PLUGIN, tools = directTools + toolsetTools))
     }
 

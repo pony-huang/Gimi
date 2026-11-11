@@ -10,8 +10,12 @@ import github.ponyhuang.gimi.domain.a2a.repository.RemoteAgentConnectionTester
 import github.ponyhuang.gimi.domain.a2a.repository.RemoteAgentRepository
 import github.ponyhuang.gimi.domain.conversation.runtime.isBusy
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
+import java.net.URI
+import java.net.URISyntaxException
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,6 +24,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @HiltViewModel
 class A2aSettingsViewModel @Inject constructor(
@@ -27,21 +32,22 @@ class A2aSettingsViewModel @Inject constructor(
     private val runWhenAgentIdle: RunWhenAgentIdleUseCase,
     private val testConnection: RemoteAgentConnectionTester,
 ) : ViewModel() {
+    internal var ioDispatcher: CoroutineDispatcher = Dispatchers.IO
     private val localState = MutableStateFlow(LocalState())
 
     private val _effects = MutableSharedFlow<A2aSettingsEffect>(extraBufferCapacity = 1)
     val effects = _effects.asSharedFlow()
 
     // 仓库接口即 feature↔data 的契约边界；配置读写不再包一层透传 use case。
-    val uiState = combine(repository.observeAgents(), localState, runWhenAgentIdle.state) {
-            agents, local, runtimeState ->
+    val uiState = combine(repository.observeAgents(), localState, runWhenAgentIdle.state, repository.storageError) {
+            agents, local, runtimeState, storageError ->
         A2aSettingsUiState(
             agents = agents,
             editor = local.editor,
             editorCard = local.editorCardSnapshot,
-            isMutationBlocked = runtimeState.isBusy,
+            isMutationBlocked = runtimeState.isBusy || storageError,
             isTestingConnection = local.isTestingConnection,
-            connectionError = local.connectionError,
+            connectionError = if (storageError) "a2a.storage_error" else local.connectionError,
             menuServerId = local.menuAgentId?.takeIf { id -> agents.any { it.id == id } },
         )
     }.stateIn(
@@ -80,41 +86,55 @@ class A2aSettingsViewModel @Inject constructor(
         }
     }
 
-    /**
-     * 保存前先实时探测连通性：卡片不可达则停留在编辑器并展示错误，严格阻止保存；
-     * 探测成功时把最新卡片快照随配置一并持久化。探测是只读网络调用，
-     * 不经过 [runWhenAgentIdle] 的 agent 忙碌门控。
-     */
+    /** 新建需探测成功；已有配置可离线修改，并清除过期卡片快照。 */
     private fun saveEditor() {
         val draft = localState.value.editor ?: return
-        if (draft.name.isBlank() || draft.endpointUrl.isBlank()) return
         if (localState.value.isTestingConnection) return
+        val agent = draft.toAgent()
+        val validationError = validate(agent)
+        if (validationError != null) {
+            localState.update { it.copy(connectionError = validationError) }
+            return
+        }
+        localState.update { it.copy(isTestingConnection = true, connectionError = null) }
         viewModelScope.launch {
-            localState.update { it.copy(isTestingConnection = true, connectionError = null) }
-            val result = probeSafely { testConnection.test(draft.toAgent()) }
-            if (result.reachable) {
-                try {
-                    runWhenAgentIdle {
-                        repository.save(draft.toAgent().copy(cardSnapshot = result.card))
-                        localState.update { it.copy(isTestingConnection = false) }
-                        _effects.tryEmit(A2aSettingsEffect.Saved)
+            try {
+                val card = if (draft.isNew) {
+                    val result = probeSafely { testConnection.test(agent) }
+                    if (!result.reachable) {
+                        localState.update { it.copy(connectionError = result.errorMessage ?: DEFAULT_CONNECTION_ERROR) }
+                        return@launch
                     }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    localState.update {
-                        it.copy(isTestingConnection = false, connectionError = DEFAULT_SAVE_ERROR)
-                    }
+                    result.card
+                } else null
+                runWhenAgentIdle {
+                    withContext(ioDispatcher) { repository.save(agent.copy(cardSnapshot = card)) }
+                    _effects.tryEmit(A2aSettingsEffect.Saved)
                 }
-            } else {
-                localState.update {
-                    it.copy(
-                        isTestingConnection = false,
-                        connectionError = result.errorMessage ?: DEFAULT_CONNECTION_ERROR,
-                    )
-                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                localState.update { it.copy(connectionError = DEFAULT_SAVE_ERROR) }
+            } finally {
+                localState.update { it.copy(isTestingConnection = false) }
             }
         }
+    }
+
+    private fun validate(agent: RemoteAgentConfig): String? {
+        if (agent.name.isEmpty() || agent.name == "user" || !AGENT_NAME.matches(agent.name)) {
+            return "a2a.invalid_name"
+        }
+        val uri = try { URI(agent.endpointUrl) } catch (_: URISyntaxException) { null }
+        if (uri == null || uri.scheme?.lowercase() !in setOf("http", "https") ||
+            uri.host.isNullOrBlank() || uri.userInfo != null || uri.fragment != null ||
+            uri.port < -1 || uri.port > 65535
+        ) return "a2a.invalid_url"
+        if (agent.bearerToken.any { it == '\r' || it == '\n' }) return "a2a.invalid_token"
+        if (repository.currentAgents().any { it.id != agent.id && it.name.trim() == agent.name }) {
+            return "a2a.duplicate_name"
+        }
+        return null
     }
 
     /** 编辑器内的主动测试：成功后立即用最新卡片快照刷新详情区，失败展示错误。 */
@@ -124,16 +144,14 @@ class A2aSettingsViewModel @Inject constructor(
         if (localState.value.isTestingConnection) return
         viewModelScope.launch {
             localState.update { it.copy(isTestingConnection = true, connectionError = null) }
-            val result = probeSafely { testConnection.test(draft.toAgent()) }
-            localState.update {
-                if (result.reachable) {
-                    it.copy(isTestingConnection = false, editorCardSnapshot = result.card)
-                } else {
-                    it.copy(
-                        isTestingConnection = false,
-                        connectionError = result.errorMessage ?: DEFAULT_CONNECTION_ERROR,
-                    )
+            try {
+                val result = probeSafely { testConnection.test(draft.toAgent()) }
+                localState.update {
+                    if (result.reachable) it.copy(editorCardSnapshot = result.card)
+                    else it.copy(connectionError = result.errorMessage ?: DEFAULT_CONNECTION_ERROR)
                 }
+            } finally {
+                localState.update { it.copy(isTestingConnection = false) }
             }
         }
     }
@@ -147,9 +165,9 @@ class A2aSettingsViewModel @Inject constructor(
     }
 
     /** 远程 agent 属于外部边界；任何非取消异常都转为可展示结果，避免逃出 ViewModel 协程。 */
-    private suspend fun probeSafely(block: suspend () -> RemoteAgentProbeResult?): RemoteAgentProbeResult =
+    private suspend fun probeSafely(block: suspend () -> RemoteAgentProbeResult): RemoteAgentProbeResult =
         try {
-            block() ?: RemoteAgentProbeResult(reachable = false, errorMessage = DEFAULT_CONNECTION_ERROR)
+            block()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -157,7 +175,15 @@ class A2aSettingsViewModel @Inject constructor(
         }
 
     private fun mutate(block: () -> Unit) {
-        viewModelScope.launch { runWhenAgentIdle { block() } }
+        viewModelScope.launch {
+            try {
+                runWhenAgentIdle { withContext(ioDispatcher) { block() } }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                localState.update { it.copy(connectionError = DEFAULT_SAVE_ERROR) }
+            }
+        }
     }
 
     /** 编辑器与配置菜单的本地交互状态。 */
@@ -170,6 +196,7 @@ class A2aSettingsViewModel @Inject constructor(
     )
 
     private companion object {
+        val AGENT_NAME = Regex("_?[a-zA-Z0-9]*([. _-][a-zA-Z0-9]+)*")
         const val DEFAULT_CONNECTION_ERROR = "a2a.connection_error"
         const val DEFAULT_SAVE_ERROR = "a2a.save_error"
     }

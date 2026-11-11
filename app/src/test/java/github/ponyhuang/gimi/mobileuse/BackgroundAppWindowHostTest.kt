@@ -32,28 +32,28 @@ class BackgroundAppWindowHostTest {
         }
     }
 
-    @Test fun executionCompletionKeepsSmallWindowAndBubbleWhileDisplayExists() = runTest {
+    @Test fun executionCompletionKeepsExpandedPreviewAndThumbnailWhileDisplayExists() = runTest {
         host.start()
         runCurrent()
         session.value = MobileDisplaySession("s1", "chat", 10, 1080, 2400)
         runCurrent()
-        assertEquals(BackgroundAppPresentation.BUBBLE, host.presentation.value)
-        host.open()
         assertEquals(BackgroundAppPresentation.SMALL_WINDOW, host.presentation.value)
+        host.open()
+        assertEquals(BackgroundAppPresentation.EXPANDED_WINDOW, host.presentation.value)
         session.value = session.value!!.copy(completionVersion = 1)
         runCurrent()
-        assertEquals(BackgroundAppPresentation.SMALL_WINDOW, host.presentation.value)
+        assertEquals(BackgroundAppPresentation.EXPANDED_WINDOW, host.presentation.value)
         assertEquals("s1", session.value?.id)
         host.open()
-        assertEquals(BackgroundAppPresentation.SMALL_WINDOW, host.presentation.value)
+        assertEquals(BackgroundAppPresentation.EXPANDED_WINDOW, host.presentation.value)
         session.value = session.value!!.copy(width = 2400, height = 1080)
         runCurrent()
-        assertEquals(BackgroundAppPresentation.SMALL_WINDOW, host.presentation.value)
+        assertEquals(BackgroundAppPresentation.EXPANDED_WINDOW, host.presentation.value)
         host.collapse()
-        assertEquals(BackgroundAppPresentation.BUBBLE, host.presentation.value)
+        assertEquals(BackgroundAppPresentation.SMALL_WINDOW, host.presentation.value)
         session.value = session.value!!.copy(completionVersion = 2)
         runCurrent()
-        assertEquals(BackgroundAppPresentation.BUBBLE, host.presentation.value)
+        assertEquals(BackgroundAppPresentation.SMALL_WINDOW, host.presentation.value)
     }
 
     @Test fun fullscreenStaysOnCompletionAndNewSessionGetsItsOwnEntry() = runTest {
@@ -66,7 +66,7 @@ class BackgroundAppWindowHostTest {
         assertEquals(BackgroundAppPresentation.FULLSCREEN, host.presentation.value)
         session.value = MobileDisplaySession("s2", "chat2", 11, 1080, 2400)
         runCurrent()
-        assertEquals(BackgroundAppPresentation.BUBBLE, host.presentation.value)
+        assertEquals(BackgroundAppPresentation.SMALL_WINDOW, host.presentation.value)
         session.value = null
         runCurrent()
         assertEquals(BackgroundAppPresentation.HIDDEN, host.presentation.value)
@@ -76,9 +76,9 @@ class BackgroundAppWindowHostTest {
         session.value = MobileDisplaySession("s1", "chat", 10, 1080, 2400, completionVersion = 1)
         host.start()
         runCurrent()
-        assertEquals(BackgroundAppPresentation.BUBBLE, host.presentation.value)
-        host.open()
         assertEquals(BackgroundAppPresentation.SMALL_WINDOW, host.presentation.value)
+        host.open()
+        assertEquals(BackgroundAppPresentation.EXPANDED_WINDOW, host.presentation.value)
     }
     @Test fun enablingSmallWindowWithoutPermissionRoutesWithoutSavingPreference() {
         val windowHost = host

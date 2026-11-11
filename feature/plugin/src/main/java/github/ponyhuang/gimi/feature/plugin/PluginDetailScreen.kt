@@ -49,7 +49,16 @@ import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
+
+/** 远端订阅目录里的 repoUrl 不可信：只放行受信任主机的 https 链接。 */
+private fun String.isTrustedRepoLink(): Boolean {
+    val uri = Uri.parse(this)
+    val host = uri.host?.lowercase()
+    return uri.scheme == "https" && host != null && host in TRUSTED_REPO_HOSTS
+}
+
+private val TRUSTED_REPO_HOSTS: Set<String> = setOf("github.com", "www.github.com")
 
 @Composable
 fun PluginDetailRoute(
@@ -106,7 +115,10 @@ fun PluginDetailRoute(
             isLoading = state.isLoadingCatalog,
             onAction = viewModel::onAction,
             onNavigateToConfig = onNavigateToConfig,
-            onOpenUrl = { url -> runCatching { uriHandler.openUri(url) } },
+            onOpenUrl = { url ->
+                // repoUrl 来自远端订阅目录，不可信：只放行受信任 https 主机，其余直接忽略。
+                if (url.isTrustedRepoLink()) uriHandler.openUri(url)
+            },
             modifier = scaffoldModifier.then(modifier),
         )
     }
@@ -361,7 +373,7 @@ private fun previewDetailItem(installed: Boolean) = PluginListItemUi(
 @Preview(name = "详情 · 深色", showBackground = true, widthDp = 390, heightDp = 900, locale = "zh", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PluginDetailScreenPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PluginDetailScreen(
             item = previewDetailItem(installed = false),
             installedIcon = null,
@@ -377,7 +389,7 @@ private fun PluginDetailScreenPreview() {
 @Preview(name = "详情 · 已安装", showBackground = true, widthDp = 390, heightDp = 900, locale = "zh")
 @Composable
 private fun PluginDetailScreenInstalledPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PluginDetailScreen(
             item = previewDetailItem(installed = true),
             installedIcon = null,
@@ -407,7 +419,7 @@ private fun PluginDetailUpdateFailedPreview() {
 @Composable
 private fun PluginDetailUpdateFixture(installState: PluginInstallUiState) {
     val fixture = previewDetailItem(installed = true)
-    AsssistantaiTheme {
+    GimiTheme {
         PluginDetailScreen(
             item = fixture.copy(
                 catalog = fixture.catalog?.copy(versionCode = 61L, versionName = "1.1.0"),

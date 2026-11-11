@@ -12,7 +12,7 @@ import github.ponyhuang.gimi.domain.assistant.model.AssistantMessage
 import github.ponyhuang.gimi.domain.assistant.model.AssistantMessageAuthor
 import github.ponyhuang.gimi.domain.assistant.model.AssistantSessionState
 import github.ponyhuang.gimi.domain.assistant.model.shouldShowConversation
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 助手界面在不同宿主中的承载方式。 */
 enum class AssistantSurfaceMode {
@@ -88,7 +88,7 @@ fun AssistantSurface(
 @Preview(showBackground = true)
 @Composable
 private fun AssistantSurfaceCapsulePreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         AssistantSurface(
             state = AssistantSessionState(),
             mode = AssistantSurfaceMode.SHEET,
@@ -101,7 +101,7 @@ private fun AssistantSurfaceCapsulePreview() {
 @Preview(showBackground = true)
 @Composable
 private fun AssistantSurfacePanelPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         AssistantSurface(
             state = AssistantSessionState(
                 messages = listOf(

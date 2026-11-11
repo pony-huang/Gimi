@@ -1,6 +1,7 @@
 <resources>
     <string name="netease_app_name">Gimi NetEase Cloud Music Plugin</string>
     <string name="netease_app_id">App ID</string>
+    <string name="netease_client_secret">Client Secret (required for token refresh)</string>
     <string name="netease_private_key">Private Key</string>
     <string name="netease_network_error">NetEase request failed. Check network or credentials, or sign in again.</string>
     <string name="netease_config_error">Check App ID and PKCS#8 private key (PEM or Base64)</string>

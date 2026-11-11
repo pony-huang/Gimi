@@ -1,6 +1,5 @@
 package github.ponyhuang.gimi.feature.chat
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -44,7 +43,7 @@ import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.conversation.model.UserInputKind
 import github.ponyhuang.gimi.domain.conversation.model.UserInputRequest
 import github.ponyhuang.gimi.ui.components.FunctionIcon
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /**
  * 停靠在输入栏中的挂起操作面板：Agent 等待用户答复（授权 / 内容输入 / 选项选择）时，
@@ -297,7 +296,7 @@ private fun PendingPanelContainer(
             shape = RoundedCornerShape(24.dp),
             // 与胶囊同为中性容器色：面板是输入栏的替身，不能比胶囊更“重”。
             color = chatCapsuleColor(),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+            border = chatCapsuleBorder(),
             tonalElevation = 0.dp,
         ) {
             Column(
@@ -340,7 +339,7 @@ private val PanelButtonPadding = PaddingValues(horizontal = 16.dp, vertical = 6.
 @Preview(showBackground = true, widthDp = 390, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PendingChoicePanelPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             PendingChoicePanel(
                 request = UserInputRequest(
@@ -368,7 +367,7 @@ private fun PendingChoicePanelPreview() {
 @Preview(showBackground = true, widthDp = 390, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun PendingInputPanelPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PendingInputPanel(
             request = UserInputRequest(
                 callId = "call-input-1",
@@ -385,7 +384,7 @@ private fun PendingInputPanelPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun PendingConfirmationPanelPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PendingConfirmationPanel(
             request = PendingToolConfirmation(
                 confirmationCallId = "call-1",
@@ -404,7 +403,7 @@ private fun PendingConfirmationPanelPreview() {
 @Preview(showBackground = true)
 @Composable
 private fun PendingConfirmationPanelMinimalPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PendingConfirmationPanel(
             request = PendingToolConfirmation(
                 confirmationCallId = "call-2",

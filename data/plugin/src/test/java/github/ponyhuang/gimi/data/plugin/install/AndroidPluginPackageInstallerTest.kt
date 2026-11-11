@@ -96,6 +96,24 @@ class AndroidPluginPackageInstallerTest {
     }
 
     @Test
+    fun missingSha256IsRejectedBeforeDownloading() = runTest {
+        val directory = temporaryFolder.newFolder()
+        assertFailure(PluginInstallFailure.CHECKSUM_MISMATCH) {
+            installer(directory).downloadAndVerify(asset.copy(sha256 = null), "plugin.test", 61L) {}
+        }
+        assertTrue(directory.listFiles().orEmpty().isEmpty())
+    }
+
+    @Test
+    fun signatureMismatchIsRejectedAndCleanedUp() = runTest {
+        val directory = temporaryFolder.newFolder()
+        assertFailure(PluginInstallFailure.INVALID_PACKAGE) {
+            installer(directory, signatureMatches = false).downloadAndVerify(asset, "plugin.test", 61L) {}
+        }
+        assertTrue(directory.listFiles().orEmpty().isEmpty())
+    }
+
+    @Test
     fun invalidDownloadUrlAndOversizedMetadataFailBeforeWriting() = runTest {
         val directory = temporaryFolder.newFolder()
         val installer = installer(directory)
@@ -113,6 +131,7 @@ class AndroidPluginPackageInstallerTest {
         archivePackage: String? = "plugin.test",
         archiveVersion: Long = 61L,
         error: Exception? = null,
+        signatureMatches: Boolean = true,
     ): AndroidPluginPackageInstaller {
         val context = mockk<Context>()
         val packages = mockk<PackageManager>()
@@ -134,7 +153,11 @@ class AndroidPluginPackageInstallerTest {
             arg<(Float) -> Unit>(4)(0.42f)
             error?.let { throw it }
         }
-        return AndroidPluginPackageInstaller(context, downloader, storage)
+        // 下载后必须与宿主同签名；测试默认放行，签名拒绝路径单独覆盖。
+        val apkInstaller = mockk<github.ponyhuang.gimi.core.apk.ApkInstaller> {
+            every { hasSameSignature(any()) } returns signatureMatches
+        }
+        return AndroidPluginPackageInstaller(context, downloader, apkInstaller, storage)
     }
 
     private suspend fun assertFailure(expected: PluginInstallFailure, block: suspend () -> Unit) {

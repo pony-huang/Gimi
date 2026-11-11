@@ -5,9 +5,11 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionCallback
 import github.ponyhuang.gimi.domain.plugin.model.PluginActionExecution
+import github.ponyhuang.gimi.domain.plugin.model.PluginConfigFieldDescriptor
 import github.ponyhuang.gimi.domain.plugin.repository.PluginRepository
 import github.ponyhuang.gimi.feature.plugin.R
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -58,12 +60,19 @@ class PluginConfigViewModel @Inject constructor(
             is PluginConfigAction.SetValue -> _state.update { state ->
                 state.copy(
                     fields = state.fields.map { field ->
-                        if (field.key == action.key) field.copy(value = action.value) else field
+                        if (field.key == action.key) {
+                            field.copy(value = sanitizeFieldValue(field, action.value))
+                        } else {
+                            field
+                        }
                     },
                 )
             }
             PluginConfigAction.Save -> {
-                val values = _state.value.fields.associate { field -> field.key to field.value }
+                // 落库前按字段声明清洗：select 只允许选项值，文本限长，防止越权/超长值直接 configure 给插件。
+                val values = _state.value.fields.associate { field ->
+                    field.key to sanitizeFieldValue(field, field.value)
+                }
                 repository.updateConfig(_state.value.pluginId, values)
                 viewModelScope.launch {
                     mutableEffects.emit(PluginConfigEffect.ShowToast(messageRes = R.string.plugin_config_saved))
@@ -75,49 +84,74 @@ class PluginConfigViewModel @Inject constructor(
         }
     }
 
+    /** SELECT 字段限定 options 内的值；TEXT 限长，避免超长载荷直落持久层。 */
+    private fun sanitizeFieldValue(field: PluginConfigFieldUiState, value: String): String = when (field.kind) {
+        PluginConfigFieldDescriptor.Kind.SELECT ->
+            if (value in field.options) value else field.options.firstOrNull().orEmpty()
+        else -> value.take(MAX_FIELD_VALUE_LENGTH)
+    }
+
     /**
      * 执行配置页动作。插件可直接返回最终结果，或请求宿主进入交互页并等待通用参数回调。
      */
     private fun runAction(actionId: String) {
-        if (_state.value.isAnyActionRunning) return
-        viewModelScope.launch {
-            if (actionId == OAUTH_LOGIN_ACTION) {
-                val current = _state.value
-                // 授权必须使用当前表单值，避免用户多点一次保存或误用旧凭证。
-                repository.updateConfig(current.pluginId, current.fields.associate { it.key to it.value })
-            }
-            _state.update { state ->
+        // 在 update 的原子重算里同时完成互斥判定与置位：连点竞态下最多有一个调用拿到 running 位。
+        var claimed = false
+        _state.update { state ->
+            if (state.isAnyActionRunning || state.actions.none { it.id == actionId }) {
+                state
+            } else {
+                claimed = true
                 state.copy(
                     actions = state.actions.map { action ->
                         if (action.id == actionId) action.copy(running = true) else action
                     },
                 )
             }
-            val execution = repository.runAction(_state.value.pluginId, actionId)
-            _state.update { state ->
-                state.copy(
-                    actions = state.actions.map { action ->
-                        if (action.id == actionId) action.copy(running = false) else action
-                    },
-                )
-            }
-            when (execution) {
-                is PluginActionExecution.Completed -> {
-                    mutableEffects.emit(PluginConfigEffect.ShowToast(message = execution.outcome.message))
+        }
+        if (!claimed) return
+        viewModelScope.launch {
+            try {
+                if (actionId == OAUTH_LOGIN_ACTION) {
+                    val current = _state.value
+                    // 授权必须使用当前表单值，避免用户多点一次保存或误用旧凭证。
+                    repository.updateConfig(current.pluginId, current.fields.associate { it.key to it.value })
                 }
-                is PluginActionExecution.AwaitingCallback -> {
-                    val request = execution.request
-                    _state.update {
-                        it.copy(
-                            callback = PluginActionCallbackUiState(
-                                actionId = actionId,
-                                handlerId = request.handlerId,
-                                parameters = request.parameters,
-                            ),
-                        )
+                val execution = repository.runAction(_state.value.pluginId, actionId)
+                when (execution) {
+                    is PluginActionExecution.Completed -> {
+                        mutableEffects.emit(PluginConfigEffect.ShowToast(message = execution.outcome.message))
                     }
+                    is PluginActionExecution.AwaitingCallback -> {
+                        val request = execution.request
+                        _state.update {
+                            it.copy(
+                                callback = PluginActionCallbackUiState(
+                                    actionId = actionId,
+                                    handlerId = request.handlerId,
+                                    parameters = request.parameters,
+                                ),
+                            )
+                        }
+                    }
+                    null -> Unit
                 }
-                null -> Unit
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                // 动作失败不能静默：不抛出（launch 内异常会崩宿主），以失败提示收尾。
+                mutableEffects.emit(
+                    PluginConfigEffect.ShowToast(message = error.message ?: error.toString()),
+                )
+            } finally {
+                // 无论成败/取消都必须复位 running 位，否则动作按钮永久禁用。
+                _state.update { state ->
+                    state.copy(
+                        actions = state.actions.map { action ->
+                            if (action.id == actionId) action.copy(running = false) else action
+                        },
+                    )
+                }
             }
         }
     }
@@ -125,13 +159,28 @@ class PluginConfigViewModel @Inject constructor(
     /** 把宿主交互生成的通用参数信封回传插件。 */
     private fun receiveActionCallback(actionId: String, values: Map<String, String>) {
         viewModelScope.launch {
-            _state.update { it.copy(callback = null) }
-            val outcome = repository.onActionCallback(
-                pluginId = _state.value.pluginId,
-                actionId = actionId,
-                callback = PluginActionCallback(values),
-            )
-            outcome?.let { mutableEffects.emit(PluginConfigEffect.ShowToast(message = it.message)) }
+            try {
+                val outcome = repository.onActionCallback(
+                    pluginId = _state.value.pluginId,
+                    actionId = actionId,
+                    callback = PluginActionCallback(values),
+                )
+                outcome?.let { mutableEffects.emit(PluginConfigEffect.ShowToast(message = it.message)) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                mutableEffects.emit(
+                    PluginConfigEffect.ShowToast(message = error.message ?: error.toString()),
+                )
+            } finally {
+                // 回调页只在回传动作完结（成功/失败/取消）后关闭，失败时不丢失交互现场。
+                _state.update { it.copy(callback = null) }
+            }
         }
+    }
+
+    private companion object {
+        const val OAUTH_LOGIN_ACTION: String = "oauth_login"
+        const val MAX_FIELD_VALUE_LENGTH: Int = 4_096
     }
 }

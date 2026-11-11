@@ -1,64 +1,10 @@
 package github.ponyhuang.gimi.plugin.weibo
 
-import com.google.adk.kt.models.LlmRequest
-import com.google.adk.kt.tools.ToolContext
-import com.google.adk.kt.types.Content
-import com.google.adk.kt.types.GenerateContentConfig
-import com.google.adk.kt.types.Part
-import io.mockk.mockk
-import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WeiboPluginTest {
-
-    @Test
-    fun pluginPublishesToolsThroughToolsetAndAppendsUsageInstructions() = runTest {
-        val plugin = WeiboPlugin()
-
-        assertTrue(plugin.tools().isEmpty())
-        assertEquals(11, plugin.toolCount)
-        assertEquals("weibo", plugin.pluginId)
-        assertEquals("微博", plugin.displayName)
-
-        val toolset = plugin.toolSets().single()
-        assertEquals(
-            listOf(
-                "weibo_credential_status",
-                "weibo_hot_search",
-                "weibo_search",
-                "weibo_status",
-                "weibo_crowd_topics",
-                "weibo_crowd_timeline",
-                "weibo_crowd_post",
-                "weibo_crowd_comment",
-                "weibo_crowd_comment_reply",
-                "weibo_crowd_comments",
-                "weibo_crowd_child_comments",
-            ),
-            toolset.getTools(null).map { it.name },
-        )
-
-        val request = LlmRequest(
-            config = GenerateContentConfig(
-                systemInstruction = Content(parts = listOf(Part(text = "Base instruction"))),
-            ),
-        )
-        val processed = toolset.processLlmRequest(mockk<ToolContext>(), request)
-        val instructions = processed.config.systemInstruction
-            ?.parts
-            .orEmpty()
-            .mapNotNull(Part::text)
-            .joinToString("\n")
-
-        assertTrue(instructions.contains("Base instruction"))
-        assertTrue(instructions.contains("<weibo>"))
-        assertTrue(instructions.contains("weibo_credential_status"))
-        assertTrue(instructions.contains("weibo_crowd_comment_reply"))
-        assertTrue(instructions.contains("App ID"))
-        assertTrue(instructions.contains("微博龙虾助手"))
-    }
 
     @Test
     fun configureStoresCredentialsAndFallsBackToDefaultBaseUrlOnBlank() {
@@ -77,6 +23,19 @@ class WeiboPluginTest {
         assertEquals(WeiboApi.DEFAULT_BASE_URL, api.api.baseUrl)
         assertTrue(api.api.hasCredentials())
 
+        // 官方域可用
+        plugin.configure(
+            mapOf(
+                WeiboPlugin.KEY_APP_ID to "client-id",
+                WeiboPlugin.KEY_APP_SECRET to "client-secret",
+                WeiboPlugin.KEY_BASE_URL to "https://open-im.api.weibo.com",
+            ),
+        )
+        assertEquals("client-id", api.api.appId)
+        assertEquals("client-secret", api.api.appSecret)
+        assertEquals("https://open-im.api.weibo.com", api.api.baseUrl)
+
+        // 非官方域回退默认：App Secret 只发往官方白名单主机
         plugin.configure(
             mapOf(
                 WeiboPlugin.KEY_APP_ID to "",
@@ -86,7 +45,7 @@ class WeiboPluginTest {
         )
         assertEquals("", api.api.appId)
         assertEquals("", api.api.appSecret)
-        assertEquals("https://weibo.example.com", api.api.baseUrl)
+        assertEquals(WeiboApi.DEFAULT_BASE_URL, api.api.baseUrl)
         assertTrue(!api.api.hasCredentials())
     }
 

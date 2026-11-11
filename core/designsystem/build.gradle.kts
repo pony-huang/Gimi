@@ -8,6 +8,9 @@ android {
 }
 
 dependencies {
+    // VoicePickerPage / VoicePickerDialog 是经 AGENTS.md 豁免的共享业务组件：公开签名使用 domain:voice 的
+    // TtsVoice/VoiceCategory/VoiceGender，需要把领域类型传递给消费方编译类路径。
+    api(project(":domain:voice"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.animation)
     implementation(libs.androidx.compose.animation.core)
@@ -24,4 +27,6 @@ dependencies {
     implementation(libs.multiplatform.markdown.renderer.code)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
+
+    testImplementation(libs.junit)
 }

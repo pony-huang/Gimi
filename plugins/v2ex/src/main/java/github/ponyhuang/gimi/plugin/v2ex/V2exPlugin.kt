@@ -56,7 +56,24 @@ class V2exPlugin(
 
     override fun configure(values: Map<String, String>) {
         api.token = values[KEY_TOKEN].orEmpty()
-        api.baseUrl = values[KEY_BASE_URL]?.takeIf(String::isNotBlank) ?: V2exApi.DEFAULT_BASE_URL
+        api.baseUrl = values[KEY_BASE_URL]?.takeIf(String::isNotBlank)
+            ?.takeIf(::isAllowedBaseUrl)
+            ?: V2exApi.DEFAULT_BASE_URL
+    }
+
+    /**
+     * 基址白名单：Bearer token 会发往该主机，只允许官方域的 https 地址，
+     * 防止配置把 token 引到任意主机。
+     */
+    private fun isAllowedBaseUrl(value: String): Boolean {
+        // java.net.URI 而非 android.net.Uri：JVM 单测环境可直接解析。
+        val uri = try {
+            java.net.URI(value)
+        } catch (_: java.net.URISyntaxException) {
+            return false
+        }
+        val host = uri.host?.lowercase() ?: return false
+        return uri.scheme == "https" && host in ALLOWED_BASE_HOSTS
     }
 
     /** 当前生效的 token（供测试断言 configure 行为）。 */
@@ -89,5 +106,8 @@ class V2exPlugin(
         const val KEY_TOKEN: String = "token"
         const val KEY_BASE_URL: String = "base_url"
         const val ACTION_TOKEN_SETTINGS: String = "link:token_settings"
+
+        /** token 只发往官方域。 */
+        val ALLOWED_BASE_HOSTS: Set<String> = setOf("v2ex.com", "www.v2ex.com")
     }
 }

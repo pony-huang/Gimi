@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.StateFlow
 enum class AgentTaskSource {
     CHAT,
     SYSTEM_ASSISTANT,
+    REALTIME_VOICE,
 }
 
 enum class AgentTaskPhase {

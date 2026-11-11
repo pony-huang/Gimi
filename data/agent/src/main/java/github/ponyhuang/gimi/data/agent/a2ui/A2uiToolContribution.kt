@@ -17,7 +17,7 @@ import kotlinx.coroutines.currentCoroutineContext
 /**
  * UI 能力在两种工具模式下均可直接访问；不加入推荐生成的业务工具目录。
  *
- * 开关取自「个性化服务」设置：关闭时不声明 [GenerateA2uiTool]，模型既看不到工具声明
+ * 开关取自「个性化选项」设置：关闭时不声明 [GenerateA2uiTool]，模型既看不到工具声明
  * 也收不到 A2UI 指令；同时开关进入 revision，使已缓存的运行时在下次发送时重建。
  */
 class A2uiToolContribution @Inject constructor(
@@ -27,7 +27,7 @@ class A2uiToolContribution @Inject constructor(
 ) : AgentContribution {
     override val id = "a2ui"
     override fun revision(): Any? = a2uiEnabled()
-    override fun tools(spec: AgentBuildSpec): List<BaseTool> = if (a2uiEnabled()) {
+    override fun tools(spec: AgentBuildSpec): List<BaseTool> = if (spec.a2uiSupported && a2uiEnabled()) {
         listOf(
             GenerateA2uiTool(A2uiGeneration(models.createModel(models.selectModelConfig(spec.selection)), protocol), protocol),
         )
@@ -89,14 +89,19 @@ internal class GenerateA2uiTool(
                 "use Image instead of Markdown image syntax (![alt](url)). " +
                 "Call generate_a2ui with the matching type in component_names and media URLs in changes. " +
                 "Pass component_names for the needed types and all relevant facts in changes; the UI sub-agent " +
-                "does not receive this conversation. For any device or setting update, " +
-                "on/off or yes/no control, or confirmation of such a change, you MUST also call generate_a2ui " +
+                "does not receive this conversation. For routine discrete control operations (on/off or toggle, " +
+                "start/stop, next/previous step, or next/previous track), execute the business tool directly; " +
+                "once it confirms success, give one brief textual acknowledgment of the completed action " +
+                "without an additional result response or generate_a2ui call. " +
+                "This includes actions submitted from an existing A2UI card. " +
+                "On failure, uncertain outcome, or required input or confirmation, provide the necessary feedback. " +
+                "For other device or setting updates, or required confirmation of such a change, call generate_a2ui " +
                 "to show the affected control with its current state and enable/disable/apply/cancel actions. " +
                 "Answer ordinary prose in Markdown. " +
                 "Generated cards are displayed separately; do not repeat their JSON as text. " +
                 "UI actions arrive as a2ui_interaction JSON user messages; use their submitted data as user input. " +
-                "After executing a submitted control action, update the referenced surface with the tool-confirmed " +
-                "state so the user can reverse or adjust it. " +
+                "For submitted control actions outside the routine-success exception, update the referenced surface " +
+                "with the tool-confirmed state so the user can reverse or adjust it. " +
                 "A CheckBox or DateTimeInput only edits local data; include a primary Button event action that " +
                 "applies the displayed choice. " +
                 "When requesting a date/time form, ask for the catalog DateTimeInput picker, not hour/minute TextFields " +
@@ -264,6 +269,9 @@ internal fun a2uiResponseRoutingInstructions(capabilities: A2uiCapabilities): St
         Agree / Disagree, Like / Dislike, Save / Skip, or Want to visit / Not this place.
         Each item link needs its own contextual label, such as View note, Open map, View menu or Open design.
         Do not rebuild this browsing experience with repeated Cards, or a Markdown-only list.
+        Deck events carry a round number starting at 0; events with round > 0 repeat already-decided
+        itemIds after the user restarted browsing locally, so treat them as re-review and confirm
+        before re-running side-effect tools for the same item.
         Use normal Markdown or a simpler native component for one final recommendation, a non-comparative fact
         list, detailed prose, or when the request does not involve reviewing alternatives.
     """.trimIndent() else ""
@@ -283,13 +291,21 @@ internal fun a2uiResponseRoutingInstructions(capabilities: A2uiCapabilities): St
         $optionDeckRouting
 
         A2UI CONTROL ROUTING (MANDATORY):
-        For every request to change a device or app setting, controllable state, alarm, reminder, timer, or
+        Routine discrete control operations are direct commands that change an existing state or advance/reverse
+        one step: on/off or toggle, start/stop, next/previous step, and next/previous track. Execute the business
+        tool directly. If its result confirms success and no user input or confirmation remains, give one brief
+        textual acknowledgment of the completed action without an additional result response or generate_a2ui
+        call, including creation or update of a control surface. This exception also applies to
+        a2ui_interaction submissions.
+        Never assume success: failures, uncertain outcomes, and requests needing input or authorization still
+        require appropriate feedback or confirmation. Do not bypass required authorization.
+        For all other requests to change a device or app setting, controllable state, alarm, reminder, timer, or
         schedule - including enable, disable, on/off, toggle, set, change, schedule, create, edit, or delete -
         call generate_a2ui in the same turn in addition to the business action. If the change requires
         confirmation, use the A2UI control as the confirmation instead of asking in plain text, then perform
         the action after the user submits it.
-        This includes flashlight on/off, mobile data on/off, Wi-Fi or Bluetooth state, alarms, reminders,
-        and timers. A short Markdown summary may accompany the card, but a Markdown-only answer is not
+        This includes creating or editing alarms, reminders, timers, and schedules, and configuring settings
+        beyond routine discrete controls. A short Markdown summary may accompany the card, but a Markdown-only answer is not
         sufficient; if the business action has already completed, still render the resulting control
         instead of replying with text only. A yes/no question or confirmation about such a controllable
         state must be presented with A2UI actions (confirm/cancel or enable/disable), not plain text.

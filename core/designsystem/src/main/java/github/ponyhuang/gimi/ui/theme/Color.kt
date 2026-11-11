@@ -2,72 +2,69 @@ package github.ponyhuang.gimi.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// ── DeepSeek-inspired brand + neutral palette ────────────────
-// The chat experience deliberately uses a stable neutral palette instead of
-// Material You colours, so conversation surfaces remain recognisable across
-// devices and wallpapers.
-val DeepSeekBlue = Color(0xFF4D6BFE)
-val DeepSeekBlueContainer = Color(0xFFE3E8FF)
-val DeepSeekBlueDarkContainer = Color(0xFF27366D)
-val ChatGptDarkBackground = Color(0xFF131315)
-val ChatGptDarkSurface = Color(0xFF1B1B1E)
-val ChatGptDarkSurfaceVariant = Color(0xFF26262A)
-val ChatGptDarkText = Color(0xFFE6E6E6)
-val ChatGptDarkMutedText = Color(0xFFA3A3A8)
-val ChatGptLightBackground = Color(0xFFFFFFFF)
-val ChatGptLightSurface = Color(0xFFF7F7F8)
-val ChatGptLightSurfaceVariant = Color(0xFFEDEDED)
-val ChatGptLightText = Color(0xFF1F1F1F)
-val ChatGptLightMutedText = Color(0xFF6E6E6E)
+// ── 品牌常量 ────────────────────────────────────────────────
+// BrandBlue 是规范里的品牌标准蓝，只用于焦点环、品牌图形与非文字强调；
+// 普通字号的可访问主操作色另用 BrandPrimaryLight / BrandPrimaryDark。
+val BrandBlue = Color(0xFF4D6BFE)
+val BrandPrimaryLight = Color(0xFF3D5BDB)
+val BrandPrimaryDark = Color(0xFFAEBBFF)
 
-// Neutral surface container ramp. Without these, M3 falls back to the purple-tinted
-// baseline defaults and bottom sheets/cards drift away from the neutral theme.
-val ChatGptLightSurfaceDim = Color(0xFFE4E4E5)
-val ChatGptLightSurfaceBright = Color(0xFFFFFFFF)
-val ChatGptLightSurfaceContainerLowest = Color(0xFFFFFFFF)
-val ChatGptLightSurfaceContainerLow = Color(0xFFFAFAFA)
-val ChatGptLightSurfaceContainer = Color(0xFFF3F3F4)
-val ChatGptLightSurfaceContainerHigh = Color(0xFFEDEDEE)
-val ChatGptLightSurfaceContainerHighest = Color(0xFFE5E5E6)
-val ChatGptDarkSurfaceDim = Color(0xFF0E0E10)
-val ChatGptDarkSurfaceBright = Color(0xFF38383D)
-val ChatGptDarkSurfaceContainerLowest = Color(0xFF0F0F12)
-val ChatGptDarkSurfaceContainerLow = Color(0xFF17171A)
-val ChatGptDarkSurfaceContainer = Color(0xFF1F1F23)
-val ChatGptDarkSurfaceContainerHigh = Color(0xFF27272C)
-val ChatGptDarkSurfaceContainerHighest = Color(0xFF303036)
+/**
+ * 强描边：输入框与控件边界需要达到 3:1 非文字对比度时使用。
+ *
+ * M3 的 `ColorScheme` 没有对应的强描边角色，普通边界仍走 `outline`；
+ * 该色值是规范核心色板表的一部分，供后续强化边界时取用。
+ */
+val BrandOutlineStrong = Color(0xFF737373)
+
+// 主色容器：选中项、轻量强调与标签底色，按主题成对使用。
+val BrandBlueContainer = Color(0xFFE3E8FF)
+val BrandBlueDarkContainer = Color(0xFF27366D)
+
+// ── 中性色板（浅色）─────────────────────────────────────────
+val NeutralLightBackground = Color(0xFFFFFFFF)
+val NeutralLightSurface = Color(0xFFF7F7F7)
+val NeutralLightSurfaceVariant = Color(0xFFEDEDED)
+val NeutralLightText = Color(0xFF1F1F1F)
+val NeutralLightMutedText = Color(0xFF666666)
+val NeutralLightOutline = Color(0xFFD4D4D4)
+
+// ── 中性色板（深色）─────────────────────────────────────────
+val NeutralDarkBackground = Color(0xFF000000)
+val NeutralDarkSurface = Color(0xFF141414)
+val NeutralDarkSurfaceVariant = Color(0xFF242424)
+val NeutralDarkText = Color(0xFFF5F5F5)
+val NeutralDarkMutedText = Color(0xFFA3A3A3)
+val NeutralDarkOutline = Color(0xFF3D3D3D)
+
+// ── 中性表面色阶 ────────────────────────────────────────────
+// 固定这组灰阶，避免 Material 默认紫色渗入到底色、卡片与底部面板。
+val NeutralLightSurfaceDim = Color(0xFFE4E4E4)
+val NeutralLightSurfaceBright = Color(0xFFFFFFFF)
+val NeutralLightSurfaceContainerLowest = Color(0xFFFFFFFF)
+val NeutralLightSurfaceContainerLow = Color(0xFFFAFAFA)
+val NeutralLightSurfaceContainer = Color(0xFFF5F5F5)
+val NeutralLightSurfaceContainerHigh = Color(0xFFF0F0F0)
+val NeutralLightSurfaceContainerHighest = Color(0xFFE9E9E9)
+val NeutralDarkSurfaceDim = Color(0xFF0A0A0A)
+val NeutralDarkSurfaceBright = Color(0xFF383838)
+val NeutralDarkSurfaceContainerLowest = Color(0xFF000000)
+val NeutralDarkSurfaceContainerLow = Color(0xFF0F0F0F)
+val NeutralDarkSurfaceContainer = Color(0xFF141414)
+val NeutralDarkSurfaceContainerHigh = Color(0xFF1A1A1A)
+val NeutralDarkSurfaceContainerHighest = Color(0xFF242424)
 
 // ── Preference (settings) canvas & group card ────────────────
-// One UI 风格设置页配色：浅色为浅灰画布 + 纯白分组卡片；深色画布沿用全局底色，
+// One UI 风格设置页配色：浅色为浅灰画布 + 纯白分组卡片；深色画布纯黑，
 // 卡片比画布略亮一档，保证分组层次在暗色下仍可辨。
-val PreferenceCanvasLight = Color(0xFFF2F3F5)
-val PreferenceCanvasDark = ChatGptDarkBackground
+val PreferenceCanvasLight = Color(0xFFF5F5F5)
+val PreferenceCanvasDark = NeutralDarkBackground
 val PreferenceGroupCardLight = Color(0xFFFFFFFF)
-val PreferenceGroupCardDark = Color(0xFF1E1E23)
+val PreferenceGroupCardDark = Color(0xFF141414)
 
-// ── Legacy brand colours ─────────────────────────────────────
-val Blue10 = Color(0xFF000F5E)
-val Blue20 = Color(0xFF001E92)
-val Blue30 = Color(0xFF002ECC)
-val Blue40 = Color(0xFF1546F6)
-val Blue80 = Color(0xFFB8C3FF)
-val Blue90 = Color(0xFFDDE1FF)
-
-// ── DarkBlue (secondary) ─────────────────────────────────────
-val DarkBlue10 = Color(0xFF00036B)
-val DarkBlue20 = Color(0xFF000BA6)
-val DarkBlue30 = Color(0xFF1026D3)
-val DarkBlue40 = Color(0xFF3648EA)
-val DarkBlue80 = Color(0xFFBBC2FF)
-val DarkBlue90 = Color(0xFFDEE0FF)
-
-// ── Yellow (tertiary) ────────────────────────────────────────
-val Yellow10 = Color(0xFF261900)
-val Yellow20 = Color(0xFF402D00)
-val Yellow30 = Color(0xFF5C4200)
-val Yellow40 = Color(0xFF7A5900)
-val Yellow80 = Color(0xFFFABD1B)
-val Yellow90 = Color(0xFFFFDE9C)
+// ── 装饰性插画色 ────────────────────────────────────────────
+// 非语义角色：只用于插画自身的装饰配色，不参与品牌强调层级。
+val IllustrationSunAmber = Color(0xFFFABD1B)
 
 // ── Red (error) ──────────────────────────────────────────────
 val Red10 = Color(0xFF410001)
@@ -76,29 +73,3 @@ val Red30 = Color(0xFF930006)
 val Red40 = Color(0xFFBA1B1B)
 val Red80 = Color(0xFFFFB4A9)
 val Red90 = Color(0xFFFFDAD4)
-
-// ── Grey (background / surface) ──────────────────────────────
-val Grey10 = Color(0xFF191C1D)
-val Grey20 = Color(0xFF2D3132)
-val Grey80 = Color(0xFFC4C7C7)
-val Grey90 = Color(0xFFE0E3E3)
-val Grey95 = Color(0xFFEFF1F1)
-val Grey99 = Color(0xFFFBFDFD)
-
-// ── BlueGrey (surfaceVariant / outline) ──────────────────────
-val BlueGrey30 = Color(0xFF45464F)
-val BlueGrey50 = Color(0xFF767680)
-val BlueGrey60 = Color(0xFF90909A)
-val BlueGrey80 = Color(0xFFC6C5D0)
-val BlueGrey90 = Color(0xFFE2E1EC)
-
-// ── Warm Amber (user bubble) ─────────────────────────────────
-// 低饱和度的暖琥珀 / 奶油杏，专用于用户聊天气泡，降低长时间阅读的视觉疲劳。
-// 故意独立于 Brand primary —— 即便系统开启 Material You 动态色，气泡仍保持温暖。
-val WarmAmber10 = Color(0xFF3D2200) // 最深底色（保留）
-val WarmAmber20 = Color(0xFF5A3A1C) // Light 主题下的 onContainer：深咖
-val WarmAmber30 = Color(0xFF7C4F1D) // 中等暗（保留）
-val WarmAmber40 = Color(0xFFB5825A) // Dark 主题下的 container：柔和焦糖
-val WarmAmber80 = Color(0xFFD9A06A) // 较亮琥珀（保留）
-val WarmAmber90 = Color(0xFFFFE2C0) // Light 主题下的 container：暖奶油杏
-val WarmAmber95 = Color(0xFFFFEDD2) // 浅暖米（保留）

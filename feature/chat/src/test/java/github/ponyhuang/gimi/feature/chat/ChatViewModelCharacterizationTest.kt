@@ -27,8 +27,6 @@ import github.ponyhuang.gimi.domain.conversation.model.TextPart
 import github.ponyhuang.gimi.domain.conversation.usecase.PrepareChatTurnUseCase
 import github.ponyhuang.gimi.domain.conversation.usecase.PrepareChatSendUseCase
 import github.ponyhuang.gimi.domain.conversation.usecase.ValidateChatAttachmentsUseCase
-import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
-import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationRepository
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
 import github.ponyhuang.gimi.domain.conversation.repository.NoAvailableAssistantModelException
@@ -51,10 +49,10 @@ import github.ponyhuang.gimi.domain.mcp.repository.McpRepository
 import github.ponyhuang.gimi.domain.memory.model.MemoryOperation
 import github.ponyhuang.gimi.domain.memory.model.MemoryRuntimeFailure
 import github.ponyhuang.gimi.domain.memory.repository.MemoryRuntimeStatus
-import github.ponyhuang.gimi.domain.speech.model.SpeechPlaybackState
-import github.ponyhuang.gimi.domain.speech.repository.SpeechPlaybackRepository
-import github.ponyhuang.gimi.domain.speech.repository.SpeechRecognitionRepository
-import github.ponyhuang.gimi.domain.speech.repository.SpeechSettingsRepository
+import github.ponyhuang.gimi.domain.voice.model.SpeechPlaybackState
+import github.ponyhuang.gimi.domain.voice.repository.SpeechPlaybackRepository
+import github.ponyhuang.gimi.domain.voice.repository.SpeechRecognitionRepository
+import github.ponyhuang.gimi.domain.voice.repository.SpeechSettingsRepository
 import github.ponyhuang.gimi.domain.toolauthorization.model.ToolDescriptor
 import github.ponyhuang.gimi.domain.toolauthorization.repository.ToolAuthorizationRepository
 import io.mockk.coEvery
@@ -1477,6 +1475,26 @@ class ChatViewModelCharacterizationTest {
     }
 
     @Test
+    fun selectingAnEffortWhileThinkingIsOffSavesBothChangesTogether() = runTest {
+        val fixture = fixture(configured = true)
+        fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
+        advanceUntilIdle()
+        fixture.viewModel.onAction(ChatAction.SetThinkingEnabled(false))
+        advanceUntilIdle()
+        val disabled = requireNotNull(fixture.viewModel.uiState.value.toolConfiguration)
+        val effort = github.ponyhuang.gimi.domain.conversation.model.ReasoningEffort.HIGH
+
+        fixture.viewModel.onAction(ChatAction.SetReasoningEffort(effort))
+        advanceUntilIdle()
+
+        val expected = disabled.copy(thinkingEnabled = true, reasoningEffort = effort)
+        assertEquals(expected, fixture.viewModel.uiState.value.toolConfiguration)
+        coVerify(exactly = 1) {
+            fixture.conversations.setConversationToolConfiguration(any(), expected)
+        }
+    }
+
+    @Test
     fun thinkingSwitchPreservesSelectedEffortAcrossDisableAndEnable() = runTest {
         val fixture = fixture(configured = true)
         fixture.viewModel.onAction(ChatAction.RestoreOrCreateSession)
@@ -2030,10 +2048,6 @@ class ChatViewModelCharacterizationTest {
         val agent = agentOverride ?: mockk<ChatAgentRepository> {
             coEvery { createExecution(any(), any(), any(), any()) } returns execution
         }
-        val appearance = mockk<AppearanceRepository> {
-            every { themeMode } returns MutableStateFlow(ThemeMode.SYSTEM)
-            every { setThemeMode(any()) } returns Unit
-        }
         val recognition = recognitionOverride ?: mockk<SpeechRecognitionRepository>(relaxed = true) {
             every { availability } returns MutableStateFlow(false)
         }
@@ -2138,7 +2152,6 @@ class ChatViewModelCharacterizationTest {
                 repository = conversations,
                 sessionResolver = sessionResolver,
                 modelServices = catalog,
-                appearanceRepository = appearance,
                 toolApproval = toolApproval,
                 speechRecognitionRepository = recognition,
                 speechPlaybackController = playback,
@@ -2168,7 +2181,6 @@ class ChatViewModelCharacterizationTest {
             execution = execution,
             attachments = attachments,
             agent = agent,
-            appearance = appearance,
             toolApproval = toolApproval,
             mcpRepository = mcpRepository,
             playback = playback,
@@ -2278,7 +2290,6 @@ class ChatViewModelCharacterizationTest {
         val execution: ChatAgentExecution,
         val attachments: ChatAttachmentRepository,
         val agent: ChatAgentRepository,
-        val appearance: AppearanceRepository,
         val toolApproval: FakeToolApprovalRepository,
         val mcpRepository: McpRepository,
         val playback: SpeechPlaybackRepository,

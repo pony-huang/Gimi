@@ -18,21 +18,27 @@ import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import github.ponyhuang.gimi.core.notifications.AppNotificationManager
+import github.ponyhuang.gimi.data.voice.runtime.RealtimeVoiceCallService
 import github.ponyhuang.gimi.domain.appearance.AppearanceRepository
 import github.ponyhuang.gimi.domain.appearance.ThemeMode
 import github.ponyhuang.gimi.domain.assistant.repository.AssistantSessionCoordinator
 import github.ponyhuang.gimi.domain.permissions.model.AppPermission
 import github.ponyhuang.gimi.domain.permissions.repository.PermissionRepository
 import github.ponyhuang.gimi.domain.plugin.runtime.PluginLoadNotices
+import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceCallController
 import github.ponyhuang.gimi.feature.chat.sharedImageUris
 import github.ponyhuang.gimi.navigation.MainScreen
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import github.ponyhuang.gimi.voice.AssistantPanelInteractor
 import javax.inject.Inject
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -49,10 +55,15 @@ class MainActivity : ComponentActivity() {
     lateinit var appNotificationManager: AppNotificationManager
     @Inject
     lateinit var permissionRepository: PermissionRepository
+    @Inject
+    lateinit var voiceCallController: RealtimeVoiceCallController
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) {}
+    ) { requestNotificationPermissionInFlight = false }
+
+    // 系统权限框还在等待作答时，通话前台提示不能叠 Toast 或再次申请；回调返回后复位。
+    private var requestNotificationPermissionInFlight = false
 
     private val sharedMediaUris = mutableStateOf<List<Uri>>(emptyList())
     private val openChatRequest = mutableStateOf(0)
@@ -62,17 +73,21 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         backgroundAppWindowHost.ensureService()
         appNotificationManager.cancelPendingInteractionNotifications()
+        // 后台启动受限或系统回收过服务时，应用重新可见即可补齐通话的前台优先级。
+        voiceCallController.ensureForeground()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestNotificationPermissionOnFreshInstall()
+        consumeReturnToVoiceCall(intent)
         sharedMediaUris.value = savedInstanceState
             ?.getStringArrayList(KEY_SHARED_MEDIA_URIS)
             ?.map(Uri::parse)
             ?: sharedImageUris(intent)
         if (savedInstanceState == null && intent.action == ACTION_OPEN_PERMISSIONS) openPermissionsRequest.value += 1
         if (intent.action == ACTION_OPEN_CURRENT_CHAT) openChatRequest.value += 1
+        observeVoiceCallNotificationPermission()
         enableEdgeToEdge()
         setContent {
             val incompatiblePluginMessage = stringResource(R.string.plugin_incompatible_upgrade)
@@ -104,7 +119,7 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
             }
-            AsssistantaiTheme(darkTheme = darkTheme) {
+            GimiTheme(darkTheme = darkTheme) {
                 androidx.compose.foundation.layout.Box {
                     MainScreen(
                         assistantSessionCoordinator = assistantSessionCoordinator,
@@ -120,6 +135,62 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** 通话启动的同时确保状态栏通知可见；首次安装已申请过，这里覆盖升级安装与被拒后的引导。 */
+    private fun observeVoiceCallNotificationPermission() {
+        // 与插件通知一致以 RESUMED 门控：避免后台期间弹权限对话框或 Toast；
+        // 通话期间每次回到前台最多提示一次。
+        lifecycleScope.launch {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                var promptedWhileActive = false
+                voiceCallController.state
+                    .map { it.active }
+                    .distinctUntilChanged()
+                    .collect { active ->
+                        if (!active) {
+                            promptedWhileActive = false
+                        } else if (!promptedWhileActive) {
+                            promptedWhileActive = true
+                            ensureCallNotificationPermission()
+                        }
+                    }
+            }
+        }
+    }
+
+    private fun ensureCallNotificationPermission() {
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) return
+        // onCreate 的首次申请可能还没作答；此时既不能叠 Toast，也不能重复 launch。
+        if (requestNotificationPermissionInFlight) return
+        val permission = AppPermission.PostNotifications
+        if (shouldRequestNotificationPermission(
+                sdkInt = android.os.Build.VERSION.SDK_INT,
+                granted = false,
+                previouslyRequested = permissionRepository.wasRequested(permission),
+            )
+        ) {
+            permissionRepository.recordRequested(setOf(permission))
+            launchNotificationPermissionRequest()
+            return
+        }
+        // 曾申请过但未授予：可能是普通拒绝（系统仍可再弹），也可能是永久拒绝或
+        // 申请框还挂着时进程被杀。前者补弹一次系统框，其余只能引导去设置。
+        if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+            launchNotificationPermissionRequest()
+            return
+        }
+        // 已被拒绝：系统不会再弹权限框，也不能静默失败，否则用户会以为后台通话丢了通知。
+        Toast.makeText(this, R.string.voice_call_notification_permission, Toast.LENGTH_LONG).show()
+    }
+
+    private fun launchNotificationPermissionRequest() {
+        requestNotificationPermissionInFlight = true
+        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
     private fun requestNotificationPermissionOnFreshInstall() {
         val permission = AppPermission.PostNotifications
         if (!shouldRequestNotificationPermission(
@@ -133,12 +204,13 @@ class MainActivity : ComponentActivity() {
         ) return
 
         permissionRepository.recordRequested(setOf(permission))
-        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        launchNotificationPermissionRequest()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        consumeReturnToVoiceCall(intent)
         when (intent.action) {
             Intent.ACTION_SEND,
             Intent.ACTION_SEND_MULTIPLE
@@ -146,6 +218,13 @@ class MainActivity : ComponentActivity() {
             ACTION_OPEN_PERMISSIONS -> openPermissionsRequest.value += 1
             ACTION_OPEN_CURRENT_CHAT -> openChatRequest.value += 1
         }
+    }
+
+    /** 常驻通知的点击只请求返回语音页；请求驻留在通话状态里，等页面可见时再消费。 */
+    private fun consumeReturnToVoiceCall(intent: Intent) {
+        if (!intent.getBooleanExtra(RealtimeVoiceCallService.EXTRA_RETURN_TO_VOICE_CALL, false)) return
+        voiceCallController.requestReturnToCall()
+        intent.removeExtra(RealtimeVoiceCallService.EXTRA_RETURN_TO_VOICE_CALL)
     }
 
     private fun consumeSharedMedia() {

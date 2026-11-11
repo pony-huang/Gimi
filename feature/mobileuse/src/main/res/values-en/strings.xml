@@ -24,11 +24,12 @@
     <string name="mobile_use_text_input_required">Enable the “Gimi” Accessibility service.</string>
     <string name="mobile_use_text_input_settings">Open Accessibility settings</string>
     <string name="mobile_use_busy_title">Background control in use</string>
-    <string name="mobile_use_busy_detail">A background app is open for a chat. Open it from the bubble, or close it before using another chat.</string>
+    <string name="mobile_use_busy_detail">A background app is open for a chat. Tap its preview to open it, or close it before using another chat.</string>
     <string name="mobile_use_unsupported_title">Device unsupported</string>
     <string name="mobile_use_unsupported_detail">This device does not support independent background app control.</string>
     <string name="background_app_title">Background app</string>
     <string name="background_app_open">Show background app</string>
+    <string name="background_app_expand_preview">Enlarge background app preview</string>
     <string name="background_app_back">Back</string>
     <string name="background_app_drag">Move window</string>
     <string name="background_app_collapse">Collapse</string>

@@ -31,7 +31,8 @@ import kotlinx.coroutines.withTimeout
  *
  * 失败降级：首次 `getTools` 即连通性探测。单个 server 加载失败（含超时）只丢弃该
  * server 的工具并记录到失败缓存，不再把异常抛给 ADK runner（避免会话中出现
- * "Failed to load tools." 错误气泡）；跳过的 server 经 [McpSkipReporter] 发布给 UI。
+ * "Failed to load tools." 错误气泡）；跳过的 server 经 [McpSkipReporter] 发布给 UI，
+ * 由 UI 观察该全局快照自行做会话内的去重提示。
  * 失败缓存以 registry 缓存的 handles 列表实例为键 —— 配置变更（revision bump）后
  * registry 重建列表，缓存自然失效并重新探测。
  */
@@ -76,11 +77,13 @@ class ConversationMcpToolset @Inject constructor(
                 .flatten()
         }
 
-        // 发布当前 resolution 下全部被跳过的 server（含此前已知失败的），
-        // 由 UI 按 (sessionId, serverId) 去重提示。
-        if (newlySkipped.isNotEmpty()) {
+        // 发布当前 resolution 下全部被跳过的 server（含此前已知失败的）：
+        // 即使本轮没有新增失败（全部命中已知失败缓存），也要重新发布完整集合，
+        // 避免 UI 残留上一次 resolution 的过期跳过快照。
+        val failedServerIds = probeMutex.withLock { failuresFor(handles).toSet() }
+        if (failedServerIds.isNotEmpty()) {
             val allSkipped = handles
-                .filter { it.serverId in probeMutex.withLock { failuresFor(handles) } }
+                .filter { it.serverId in failedServerIds }
                 .map { handle ->
                     newlySkipped.firstOrNull { it.serverId == handle.serverId }
                         ?: McpSkippedServer(handle.serverId, handle.displayName)

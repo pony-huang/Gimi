@@ -1,54 +1,92 @@
 package github.ponyhuang.gimi.data.agent.a2a
 
+import java.net.URI
 import org.a2aproject.sdk.client.http.A2AHttpClient
 
-/**
- * 为全部请求注入单个静态请求头的 [A2AHttpClient] 装饰器。
- *
- * a2a-java 传输层只在构建 builder 时经 [A2AHttpClient.createGet]/[createPost]/[createDelete]
- * 拿到请求 builder，调用方无法从外部追加鉴权头；本类在 builder 创建时即写入
- * [headerName]/[headerValue]，后续链式调用原样透传给被装饰实现。
- */
-class StaticHeaderA2AHttpClient(
+/** 仅允许向配置的同源端点发送静态凭据；所有链式调用保留地址校验包装。 */
+internal class StaticHeaderA2AHttpClient(
     private val delegate: A2AHttpClient,
     private val headerName: String,
-    private val headerValue: String,
+    headerValue: String,
+    endpointUrl: String,
 ) : A2AHttpClient {
+    private val headerValue = headerValue.trim().also {
+        require(it.none { char -> char == '\r' || char == '\n' }) { "Invalid credential header" }
+    }
+    private val origin = URI(endpointUrl)
 
-    override fun createGet(): A2AHttpClient.GetBuilder = HeaderGetBuilder(delegate.createGet(), headerName, headerValue)
+    private fun checkOrigin(url: String) {
+        val target = URI(url)
+        fun port(uri: URI) = if (uri.port >= 0) uri.port else if (uri.scheme.equals("https", true)) 443 else 80
+        require(
+            target.scheme?.lowercase() in setOf("http", "https") &&
+            target.scheme.equals(origin.scheme, true) && target.host != null &&
+            target.host.equals(origin.host, true) && port(target) == port(origin) && target.userInfo == null
+        ) { "Remote agent interface must use the configured origin" }
+    }
 
-    override fun createPost(): A2AHttpClient.PostBuilder = HeaderPostBuilder(delegate.createPost(), headerName, headerValue)
+    override fun createGet(): A2AHttpClient.GetBuilder = HeaderGetBuilder(delegate.createGet())
 
-    override fun createDelete(): A2AHttpClient.DeleteBuilder =
-        HeaderDeleteBuilder(delegate.createDelete(), headerName, headerValue)
-
-    private class HeaderGetBuilder(
-        private val delegate: A2AHttpClient.GetBuilder,
-        headerName: String,
-        headerValue: String,
-    ) : A2AHttpClient.GetBuilder by delegate {
+    private inner class HeaderGetBuilder(
+        private val builder: A2AHttpClient.GetBuilder,
+    ) : A2AHttpClient.GetBuilder by builder {
         init {
-            delegate.addHeader(headerName, headerValue)
+            builder.addHeader(headerName, headerValue)
+        }
+        override fun url(url: String): A2AHttpClient.GetBuilder = apply {
+            checkOrigin(url)
+            builder.url(url)
+        }
+        override fun addHeader(name: String, value: String): A2AHttpClient.GetBuilder = apply {
+            builder.addHeader(name, value)
+        }
+        override fun addHeaders(headers: Map<String, String>): A2AHttpClient.GetBuilder = apply {
+            builder.addHeaders(headers)
         }
     }
 
-    private class HeaderPostBuilder(
-        private val delegate: A2AHttpClient.PostBuilder,
-        headerName: String,
-        headerValue: String,
-    ) : A2AHttpClient.PostBuilder by delegate {
+    override fun createPost(): A2AHttpClient.PostBuilder = HeaderPostBuilder(delegate.createPost())
+
+    private inner class HeaderPostBuilder(
+        private val builder: A2AHttpClient.PostBuilder,
+    ) : A2AHttpClient.PostBuilder by builder {
         init {
-            delegate.addHeader(headerName, headerValue)
+            builder.addHeader(headerName, headerValue)
+        }
+        override fun url(url: String): A2AHttpClient.PostBuilder = apply {
+            checkOrigin(url)
+            builder.url(url)
+        }
+        override fun addHeader(name: String, value: String): A2AHttpClient.PostBuilder = apply {
+            builder.addHeader(name, value)
+        }
+        override fun addHeaders(headers: Map<String, String>): A2AHttpClient.PostBuilder = apply {
+            builder.addHeaders(headers)
+        }
+        override fun body(body: String): A2AHttpClient.PostBuilder = apply { builder.body(body) }
+        override fun followRedirects(follow: Boolean): A2AHttpClient.PostBuilder = apply {
+            require(!follow) { "Remote agent redirects are disabled" }
+            builder.followRedirects(false)
         }
     }
 
-    private class HeaderDeleteBuilder(
-        private val delegate: A2AHttpClient.DeleteBuilder,
-        headerName: String,
-        headerValue: String,
-    ) : A2AHttpClient.DeleteBuilder by delegate {
+    override fun createDelete(): A2AHttpClient.DeleteBuilder = HeaderDeleteBuilder(delegate.createDelete())
+
+    private inner class HeaderDeleteBuilder(
+        private val builder: A2AHttpClient.DeleteBuilder,
+    ) : A2AHttpClient.DeleteBuilder by builder {
         init {
-            delegate.addHeader(headerName, headerValue)
+            builder.addHeader(headerName, headerValue)
+        }
+        override fun url(url: String): A2AHttpClient.DeleteBuilder = apply {
+            checkOrigin(url)
+            builder.url(url)
+        }
+        override fun addHeader(name: String, value: String): A2AHttpClient.DeleteBuilder = apply {
+            builder.addHeader(name, value)
+        }
+        override fun addHeaders(headers: Map<String, String>): A2AHttpClient.DeleteBuilder = apply {
+            builder.addHeaders(headers)
         }
     }
 }

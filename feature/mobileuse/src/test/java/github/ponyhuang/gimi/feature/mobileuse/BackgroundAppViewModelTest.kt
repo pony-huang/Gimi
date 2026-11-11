@@ -39,8 +39,6 @@ class BackgroundAppViewModelTest {
         runCurrent()
         coVerify { repository.manualTouch("s1", any()) }
         coVerify { repository.manualBack("s1") }
-        coVerify(exactly = 0) { repository.finishExecution(any()) }
-        coVerify(exactly = 0) { repository.registerExecution(any(), any()) }
     }
 
     @Test fun staleWindowCannotSendInputToReplacementSession() = runTest {

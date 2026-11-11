@@ -52,30 +52,14 @@ class MobileObservationGuardTest {
     }
 
     @Test
-    fun animationDoesNotPreventValidatedNativeClickButCoordinatesRemainBlocked() {
+    fun unstableObservationBlocksCoordinatesButNavigationStaysAllowed() {
         val element = MobileElement("a1", "accessibility", MobileBounds(10, 20, 30, 40), actions = listOf("click"))
         val target = MobileNodeTarget(element, emptyList(), element, emptyList(), element)
         val snapshot = native.copy(targets = mapOf("a1" to target))
-        guard.record(MobileObservedScreen("animated", "owner", 4, 100, frame, snapshot, listOf(element), pixelActionsAllowed = false))
+        guard.record(MobileObservedScreen("animated", "owner", 4, 100, frame, snapshot, listOf(element), actionsAllowed = false))
         val animated = CapturedMobileFrame(1080, 2400, 200, 2, 1, byteArrayOf(2), intArrayOf(43))
-        assertNull(guard.rejection("owner", 4, "animated", 200, animated, snapshot.copy(revision = 1), nativeElementId = "a1"))
         assertEquals("unstable_coordinate_target", guard.rejection("owner", 4, "animated", 200, animated, snapshot))
-        assertEquals("nodes_changed", guard.rejection("owner", 4, "animated", 200, animated, snapshot.copy(targets = emptyMap()), nativeElementId = "a1"))
         assertNull(guard.rejection("owner", 4, "animated", 200, animated, snapshot, navigation = true))
-    }
-
-    @Test
-    fun timerUpdateDoesNotInvalidateUnchangedNativeButtonOrBack() {
-        val button = MobileElement("pause", "accessibility", MobileBounds(10, 20, 30, 40), actions = listOf("click"))
-        val timer = button.copy(id = "timer", text = "01:19", actions = emptyList())
-        fun target(element: MobileElement) = MobileNodeTarget(element, emptyList(), element, emptyList(), element)
-        val before = native.copy(targets = mapOf("pause" to target(button), "timer" to target(timer)))
-        val after = before.copy(revision = 1, targets = before.targets + ("timer" to target(timer.copy(text = "01:20"))))
-        guard.record(MobileObservedScreen("player", "owner", 4, 100, frame, before, listOf(button, timer)))
-        assertNull(guard.rejection("owner", 4, "player", 200, frame, after, nativeElementId = "pause"))
-        assertNull(guard.rejection("owner", 4, "player", 200, frame, after, navigation = true))
-        val moved = after.copy(targets = after.targets + ("pause" to target(button.copy(bounds = MobileBounds(40, 20, 60, 40)))))
-        assertEquals("nodes_changed", guard.rejection("owner", 4, "player", 200, frame, moved, nativeElementId = "pause"))
     }
 
     @Test
@@ -85,7 +69,7 @@ class MobileObservationGuardTest {
         val animated = CapturedMobileFrame(1080, 2400, 200, 2, 1, byteArrayOf(2), samples.copyOf().apply { this[0] = 200 })
         val webView = MobileAccessibilitySnapshot("accessibility_unavailable")
         val region = MobileBounds(400, 1000, 500, 1100)
-        guard.record(MobileObservedScreen("web", "owner", 4, 100, before, webView, emptyList(), swipeActionsAllowed = true))
+        guard.record(MobileObservedScreen("web", "owner", 4, 100, before, webView, emptyList()))
         assertNull(guard.rejection("owner", 4, "web", 200, animated, webView, coordinateBounds = region, swipe = true))
         assertNull(guard.rejection("owner", 4, "web", 200, animated, webView, coordinateBounds = region))
         val changedTarget = CapturedMobileFrame(1080, 2400, 200, 3, 1, byteArrayOf(3), samples.copyOf().apply { this[42 * 64 + 26] = 200 })
@@ -140,6 +124,30 @@ class MobileObservationGuardTest {
         val region = MobileBounds(400, 1000, 500, 1100)
         assertNull(guard.rejection("owner", 4, "feed", 200, frame, updated, coordinateBounds = region, swipe = true))
         assertEquals("nodes_changed", guard.rejection("owner", 4, "feed", 200, frame, replaced, coordinateBounds = region, swipe = true))
+    }
+
+    @Test
+    fun textInputIgnoresAnimationButRejectsChangedFocusSelectionWindowAndGeometry() {
+        val field = MobileElement("field", "accessibility", MobileBounds(10, 20, 300, 80),
+            text = "query", focused = true, editable = true, selectionStart = 5, selectionEnd = 5)
+        fun target(element: MobileElement) = MobileNodeTarget(element, listOf(0), element, null, null)
+        val window = MobileWindowState(1, 1, MobileBounds(0, 0, 1080, 2400), focused = true)
+        val before = native.copy(windows = listOf(window), targets = mapOf("field" to target(field)))
+        guard.record(MobileObservedScreen("typing", "owner", 4, 100, frame, before, listOf(field), actionsAllowed = false))
+        val animated = CapturedMobileFrame(1080, 2400, 200, 2, 1, byteArrayOf(2), intArrayOf(43))
+        fun reject(snapshot: MobileAccessibilitySnapshot, picture: CapturedMobileFrame = animated) =
+            guard.rejection("owner", 4, "typing", 200, picture, snapshot, textInput = true)
+        val updated = before.copy(revision = 9, targets = before.targets + ("timer" to target(field.copy(id = "timer", focused = false, text = "00:10"))))
+        assertNull(reject(updated))
+        assertEquals("text_focus_changed", reject(before.copy(targets = emptyMap())))
+        for (changed in listOf(field.copy(id = "other"), field.copy(selectionStart = 0), field.copy(text = "edited"),
+            field.copy(bounds = MobileBounds(20, 20, 310, 80)), field.copy(resourceId = "other"))) {
+            assertEquals("text_target_changed", reject(before.copy(targets = mapOf(changed.id to target(changed)))))
+        }
+        assertEquals("nodes_changed", reject(before.copy(windows = listOf(window.copy(focused = false)))))
+        assertEquals("frame_changed", reject(before, CapturedMobileFrame(1080, 2400, 200, 2, 2, byteArrayOf(2), intArrayOf(43))))
+        guard.awaitFrameAfter(200)
+        assertEquals("no_post_action_frame", reject(before))
     }
 
     @Test

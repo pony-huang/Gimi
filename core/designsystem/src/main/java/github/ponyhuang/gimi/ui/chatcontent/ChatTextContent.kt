@@ -25,7 +25,7 @@ import com.mikepenz.markdown.model.rememberStreamingMarkdownState
 import dev.snipme.highlights.Highlights
 import dev.snipme.highlights.model.SyntaxThemes
 import github.ponyhuang.gimi.ui.theme.markdownContentTypography
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.ReceiveChannel
 
@@ -197,7 +197,7 @@ private fun ChatTextContentBody(
     uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ChatTextContentPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         ChatTextContent("""
             ## 文件分析
 

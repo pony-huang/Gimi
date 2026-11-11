@@ -1,12 +1,17 @@
+@file:OptIn(com.google.adk.kt.annotations.ExperimentalLiveApi::class)
+
 package github.ponyhuang.gimi.data.agent.execution
 
 import com.google.adk.kt.models.LlmRequest
 import com.google.adk.kt.models.LlmResponse
 import com.google.adk.kt.models.Model
+import com.google.adk.kt.models.LiveConnection
+import com.google.adk.kt.annotations.ExperimentalLiveApi
 import com.google.adk.kt.types.Content
 import com.google.adk.kt.types.FileData
 import com.google.adk.kt.types.Part
 import java.nio.charset.StandardCharsets
+import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
@@ -16,6 +21,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertSame
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -23,6 +29,20 @@ import org.junit.rules.TemporaryFolder
 class AttachmentResolvingModelTest {
     @get:Rule
     val temporaryFolder = TemporaryFolder()
+
+    @OptIn(ExperimentalLiveApi::class)
+    @Test
+    fun `live connect resolves attachments and forwards the original connection`() = runTest {
+        val file = temporaryFolder.newFile("live.txt").apply { writeText("live") }
+        val connection = mockk<LiveConnection>()
+        val delegate = RecordingModel(connection)
+        val request = LlmRequest(contents = listOf(Content(parts = listOf(Part(
+            fileData = FileData(mimeType = "text/plain", fileUri = file.absolutePath),
+        )))))
+        assertSame(connection, AttachmentResolvingModel(delegate).connect(request))
+        assertArrayEquals("live".toByteArray(), delegate.request?.contents?.single()?.parts?.single()?.inlineData?.data)
+        assertNotNull(request.contents.single().parts.single().fileData)
+    }
 
     @Test
     fun `local file data is resolved only in delegated request`() = runTest {
@@ -155,9 +175,15 @@ class AttachmentResolvingModelTest {
         assertTrue(resolved.text!!.contains("broken.pdf"))
     }
 
-    private class RecordingModel : Model {
+    private class RecordingModel(private val connection: LiveConnection? = null) : Model {
         override val name: String = "recording"
         var request: LlmRequest? = null
+
+        @OptIn(ExperimentalLiveApi::class)
+        override suspend fun connect(request: LlmRequest): LiveConnection {
+            this.request = request
+            return checkNotNull(connection)
+        }
 
         override fun generateContent(request: LlmRequest, stream: Boolean): Flow<LlmResponse> {
             this.request = request

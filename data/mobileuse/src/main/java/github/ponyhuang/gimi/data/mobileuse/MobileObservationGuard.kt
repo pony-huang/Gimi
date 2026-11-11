@@ -12,9 +12,8 @@ internal data class MobileObservedScreen(
     val frame: CapturedMobileFrame,
     val native: MobileAccessibilitySnapshot,
     val elements: List<MobileElement>,
-    val pixelActionsAllowed: Boolean = true,
-    val nativeActionsAllowed: Boolean = true,
-    val swipeActionsAllowed: Boolean = pixelActionsAllowed,
+    /** 观察后是否允许坐标类动作（点按/手势）；文本输入不走该门槛，由焦点与选区复核把关。 */
+    val actionsAllowed: Boolean = true,
 )
 
 /** 将观察与后续动作绑定；动作一旦尝试就消费快照，观察失败不会重新开放同一次操作。 */
@@ -35,8 +34,8 @@ internal class MobileObservationGuard {
     fun rejection(
         owner: String, displayId: Int, observationId: String, nowMs: Long,
         currentFrame: CapturedMobileFrame?, currentNative: MobileAccessibilitySnapshot,
-        nativeElementId: String? = null, navigation: Boolean = false,
-        coordinateBounds: MobileBounds? = null, swipe: Boolean = false,
+        navigation: Boolean = false,
+        coordinateBounds: MobileBounds? = null, swipe: Boolean = false, textInput: Boolean = false,
     ): String? {
         val previous = latest ?: return "no_actionable_observation"
         if (previous.id != observationId || previous.owner != owner || previous.displayId != displayId) {
@@ -47,13 +46,17 @@ internal class MobileObservationGuard {
             previous.frame.height != currentFrame.height || previous.frame.generation != currentFrame.generation
         ) return "frame_changed"
         if (!navigation && requiredFrameAfterMs?.let { currentFrame.capturedAtMs <= it } == true) return "no_post_action_frame"
-        if (nativeElementId != null && !previous.nativeActionsAllowed) return "unstable_native_target"
-        if (!navigation && nativeElementId == null &&
-            !(if (swipe) previous.swipeActionsAllowed else previous.pixelActionsAllowed)
-        ) return "unstable_coordinate_target"
+        if (!navigation && !textInput && !previous.actionsAllowed) return "unstable_coordinate_target"
         if (!currentNative.consistent || previous.native.status != currentNative.status ||
             previous.native.windows != currentNative.windows
         ) return "nodes_changed"
+        if (textInput) {
+            val target = previous.native.focusedTextTarget() ?: return "text_focus_unavailable"
+            val current = currentNative.focusedTextTarget() ?: return "text_focus_changed"
+            // 输入依赖同一个编辑节点及选区；光标闪烁、广告像素和无关节点刷新无需整屏一致。
+            if (target.path != current.path || target.ownElement != current.ownElement) return "text_target_changed"
+            return null
+        }
         // 返回不选择具体内容；滑动只复核起点区域的控件结构，不等待动画或计时文字停止。
         if (navigation) return null
         if (swipe) {
@@ -63,22 +66,16 @@ internal class MobileObservationGuard {
             ) return "nodes_changed"
             return null
         }
-        if (nativeElementId != null) {
-            val target = previous.native.targets[nativeElementId] ?: return "unknown_native_target"
-            // 只核对标签及实际接收动作的节点，其他节点刷新不使该目标失效。
-            if (target != currentNative.targets[nativeElementId]) return "nodes_changed"
-        } else {
-            if (coordinateBounds == null) {
-                if (!previous.frame.jpeg.contentEquals(currentFrame.jpeg)) return "frame_changed"
-                if (previous.native.targets != currentNative.targets || previous.native.revision != currentNative.revision) {
-                    return "nodes_changed"
-                }
-            } else {
-                if (!MobileFrameStability.sameRegion(previous.frame, currentFrame, coordinateBounds)) return "frame_changed"
-                if (localTargets(previous.native, coordinateBounds, currentFrame) !=
-                    localTargets(currentNative, coordinateBounds, currentFrame)
-                ) return "nodes_changed"
+        if (coordinateBounds == null) {
+            if (!previous.frame.jpeg.contentEquals(currentFrame.jpeg)) return "frame_changed"
+            if (previous.native.targets != currentNative.targets || previous.native.revision != currentNative.revision) {
+                return "nodes_changed"
             }
+        } else {
+            if (!MobileFrameStability.sameRegion(previous.frame, currentFrame, coordinateBounds)) return "frame_changed"
+            if (localTargets(previous.native, coordinateBounds, currentFrame) !=
+                localTargets(currentNative, coordinateBounds, currentFrame)
+            ) return "nodes_changed"
         }
         return null
     }

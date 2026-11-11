@@ -10,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -29,11 +30,11 @@ import github.ponyhuang.gimi.ui.preference.PreferenceListItem
 import github.ponyhuang.gimi.ui.preference.PreferencePageContainer
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /**
- * 「关于」页：顶部展示应用名称与当前版本，下方列表提供检查更新（内联状态）与项目主页入口。
- * 日志入口提供最近一天的诊断记录查看与导出。
+ * 「关于」页：顶部展示应用名称与当前版本，下方列表提供检查更新（内联状态）、项目主页、
+ * 隐私政策（wiki 内嵌展示）与日志入口。
  */
 @Composable
 fun AboutScreen(
@@ -41,6 +42,7 @@ fun AboutScreen(
     updateState: UpdateUiState,
     onUpdateAction: (UpdateAction) -> Unit,
     onOpenProjectPage: () -> Unit,
+    onOpenPrivacyPolicy: () -> Unit,
     onOpenLogs: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -82,6 +84,13 @@ fun AboutScreen(
                     onClick = onOpenProjectPage,
                 )
                 PreferenceListItem(
+                    icon = Icons.Default.PrivacyTip,
+                    title = stringResource(R.string.about_privacy_title),
+                    subtitle = stringResource(R.string.about_privacy_subtitle),
+                    showDivider = true,
+                    onClick = onOpenPrivacyPolicy,
+                )
+                PreferenceListItem(
                     icon = Icons.Default.Description,
                     title = stringResource(R.string.logs_title),
                     subtitle = stringResource(R.string.logs_subtitle),
@@ -110,13 +119,14 @@ private fun updateSubtitle(updateState: UpdateUiState): String = when (val statu
 @Preview(name = "Tablet", device = Devices.TABLET, showBackground = true)
 @Composable
 private fun AboutScreenPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PreferenceScaffold(style = PreferenceStyle.Compact, title = stringResource(R.string.settings_about_title), onBack = {}) { modifier ->
             AboutScreen(
                 appVersionName = "1.0.0",
                 updateState = UpdateUiState(currentVersionName = "1.0.0"),
                 onUpdateAction = {},
                 onOpenProjectPage = {},
+                onOpenPrivacyPolicy = {},
                 onOpenLogs = {},
                 modifier = modifier,
             )
@@ -127,7 +137,7 @@ private fun AboutScreenPreview() {
 @Preview(name = "Phone-发现新版本", device = Devices.PHONE, showBackground = true)
 @Composable
 private fun AboutScreenAvailablePreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         PreferenceScaffold(style = PreferenceStyle.Compact, title = stringResource(R.string.settings_about_title), onBack = {}) { modifier ->
             AboutScreen(
                 appVersionName = "1.0.0",
@@ -137,6 +147,7 @@ private fun AboutScreenAvailablePreview() {
                 ),
                 onUpdateAction = {},
                 onOpenProjectPage = {},
+                onOpenPrivacyPolicy = {},
                 onOpenLogs = {},
                 modifier = modifier,
             )

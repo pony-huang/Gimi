@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.feature.settings.R
-import github.ponyhuang.gimi.ui.theme.AsssistantaiTheme
+import github.ponyhuang.gimi.ui.theme.GimiTheme
 
 /** 无副作用日志弹窗：有界可复制正文、加载/失败/空状态和导出入口。 */
 @Composable
@@ -91,7 +91,7 @@ fun LogsDialog(
 @Preview(name = "日志-深色", showBackground = true, uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun LogsDialogPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         LogsDialog(
             state = LogsUiState(visible = true, content = "10:24:01 INFO 应用启动\n10:24:12 WARN 网络中断"),
             onClose = {}, onRetry = {}, onExport = {},
@@ -102,25 +102,25 @@ private fun LogsDialogPreview() {
 @Preview(name = "日志-空", showBackground = true)
 @Composable
 private fun LogsEmptyPreview() {
-    AsssistantaiTheme { LogsDialog(LogsUiState(visible = true), {}, {}, {}) }
+    GimiTheme { LogsDialog(LogsUiState(visible = true), {}, {}, {}) }
 }
 
 @Preview(name = "日志-加载", showBackground = true)
 @Composable
 private fun LogsLoadingPreview() {
-    AsssistantaiTheme { LogsDialog(LogsUiState(visible = true, loading = true), {}, {}, {}) }
+    GimiTheme { LogsDialog(LogsUiState(visible = true, loading = true), {}, {}, {}) }
 }
 
 @Preview(name = "日志-失败", showBackground = true)
 @Composable
 private fun LogsFailedPreview() {
-    AsssistantaiTheme { LogsDialog(LogsUiState(visible = true, failed = true), {}, {}, {}) }
+    GimiTheme { LogsDialog(LogsUiState(visible = true, failed = true), {}, {}, {}) }
 }
 
 @Preview(name = "日志-截断及导出中", showBackground = true)
 @Composable
 private fun LogsTruncatedPreview() {
-    AsssistantaiTheme {
+    GimiTheme {
         LogsDialog(LogsUiState(visible = true, content = "10:24:01 INFO 应用启动", truncated = true, exporting = true), {}, {}, {})
     }
 }

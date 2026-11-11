@@ -30,6 +30,8 @@ class ZhihuApiTest {
         server = MockWebServer()
         server.start()
         api = ZhihuApi(baseUrl = server.url("").toString().trimEnd('/'))
+        // 上传白名单指向临时目录：测试文件都在其下创建。
+        api.uploadRoots = listOf(tempFolder.root)
     }
 
     @After
@@ -127,10 +129,21 @@ class ZhihuApiTest {
 
     @Test
     fun upload_rejectsMissingFile() {
+        val missing = File(tempFolder.root, "no/such/file.pdf")
         val error = assertThrows(IllegalStateException::class.java) {
-            api.knowledgeUpload("secret", "no/such/file.pdf", null)
+            api.knowledgeUpload("secret", missing.absolutePath, null)
         }
         assertTrue(error.message?.contains("文件不存在") == true)
+    }
+
+    @Test
+    fun upload_rejectsPathOutsideWhitelistedRoots() {
+        // 白名单外的路径（如任意用户目录）一律拒绝上传。
+        val outside = File(System.getProperty("java.io.tmpdir"), "outside-allowlist.txt")
+        val error = assertThrows(IllegalStateException::class.java) {
+            api.knowledgeUpload("secret", outside.absolutePath, null)
+        }
+        assertTrue(error.message?.contains("允许的上传目录") == true)
     }
 
     @Test

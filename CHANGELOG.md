@@ -2,7 +2,7 @@
 
 版本 PR 根据 Conventional Commits 自动生成后续版本记录；合并前请整理用户可见的变化与升级注意事项。
 
-## [1.1.0-beta.1](https://github.com/pony-huang/Gimi/compare/v1.0.0-beta.1...v1.1.0-beta.1) (2026-11-12)
+## [1.0.0-beta.2](https://github.com/pony-huang/Gimi/compare/v1.0.0-beta.1...v1.0.0-beta.2) (2026-11-12)
 
 
 ### Features

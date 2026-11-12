@@ -10,6 +10,7 @@ import com.google.adk.kt.types.GenerateContentConfig
 import com.google.adk.kt.types.LiveConnectConfig
 import com.google.adk.kt.types.Modality
 import com.google.adk.kt.types.Role
+import github.ponyhuang.gimi.data.agent.AgentPrompts
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -72,7 +73,7 @@ class AdkVoiceAudioBackend @Inject constructor(
 
     override suspend fun openDuplex(configuration: RealtimeVoiceConfiguration): RealtimeVoiceDuplexSession {
         check(configuration.mode.isRealtimeEngine) { "openDuplex 仅支持 Realtime 模式" }
-        // 与简单聊天同源的人设来源：可选用户预设（官方或自建）替换人设层，输出底线始终叠加。
+        // 轻聊使用预设；实时助手使用助手指令与共用语音表达契约。
         // 实时助手：会话开启前解析授权可执行的工具桥（可能探测 MCP，移到 IO 执行，
         // 不阻塞主线程）；解析失败退化为无工具的实时轻聊。实时轻聊恒无工具。
         val tools = if (configuration.mode == RealtimeVoiceMode.RealtimeAssistant) {
@@ -442,13 +443,11 @@ class AdkVoiceAudioBackend @Inject constructor(
 
         /**
          * 实时助手的工具播报节奏（不可替换层末段，仅携带工具桥时拼接）：函数调用
-         * 不会进入语音播报，模型必须先用一句话预告将要做什么，结果回来后用口语
-         * 汇总，失败时给出替代帮助；禁止朗读原始工具输出与错误码。
+         * 不会进入语音播报；具体等待预告和结果汇总由共用语音表达契约约束。
          */
-        internal const val REALTIME_ASSISTANT_TOOL_RULES = " You can call the tools declared in this session when they help." +
-            " Function calls themselves are never spoken aloud, so before calling a tool briefly announce in one short sentence what you are about to do and vary the wording;" +
-            " after the result comes back, summarize the outcome first and then the next step without reciting raw data;" +
-            " if a tool fails, explain in plain words and offer another way to help, never read out error codes or technical details."
+        internal const val REALTIME_ASSISTANT_TOOL_RULES =
+            " You can call the tools declared in this session when they help." +
+                " Function calls themselves are never spoken aloud."
 
         /**
          * 助手模式但本次无可用声明时的中性约束：只禁止虚构已完成的外部动作，
@@ -469,8 +468,12 @@ class AdkVoiceAudioBackend @Inject constructor(
             assistantMode: Boolean,
             hasDeclarations: Boolean,
         ): String = buildString {
-            append(preset ?: VOICE_INSTRUCTION)
-            append(VOICE_OUTPUT_RULES)
+            if (assistantMode) {
+                append(AgentPrompts.defaultAssistantInstruction(voiceResponse = true))
+            } else {
+                append(preset ?: VOICE_INSTRUCTION)
+                append(VOICE_OUTPUT_RULES)
+            }
             append(
                 when {
                     hasDeclarations -> REALTIME_ASSISTANT_TOOL_RULES

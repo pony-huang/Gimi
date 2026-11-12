@@ -68,6 +68,7 @@ class AgentChatRunner(
      * @property toolAccessMode 工具声明加载模式。
      * @property thinkingEnabled 是否开启思考，防止复用开关状态不同的 Agent。
      * @property reasoningEffort 当前会话的推理强度。
+     * @property voiceResponse 是否使用语音表达契约，防止与文字格式的运行时混用。
      * @property revision 构建时的外部配置版本（各贡献方 revision 的组合，
      *   含工具授权/MCP/模型目录/插件运行时）。
      */
@@ -77,6 +78,7 @@ class AgentChatRunner(
         val reasoningEffort: ReasoningEffort,
         val thinkingEnabled: Boolean,
         val instructionSuffix: String,
+        val voiceResponse: Boolean,
         val a2uiSupported: Boolean,
         val revision: Any,
     )
@@ -121,6 +123,7 @@ class AgentChatRunner(
         toolConfiguration: ConversationToolConfiguration? = null,
         a2uiCapabilities: github.ponyhuang.gimi.domain.a2ui.A2uiCapabilities? = null,
         instructionSuffix: String = "",
+        voiceResponse: Boolean = false,
     ): AgentChatExecution {
         val toolAccessMode = toolAccessRepository.defaultToolAccessMode.value
         val reasoningEffort = toolConfiguration?.reasoningEffort ?: ReasoningEffort.MEDIUM
@@ -128,7 +131,7 @@ class AgentChatRunner(
         val buildConfiguration = configuration()
         // 无 capabilities 的执行端（如实时语音）不声明 generate_a2ui；构建产物按此分键缓存。
         val a2uiSupported = a2uiCapabilities != null
-        val key = AgentKey(selection, toolAccessMode, reasoningEffort, thinkingEnabled, instructionSuffix, a2uiSupported, buildConfiguration.revision)
+        val key = AgentKey(selection, toolAccessMode, reasoningEffort, thinkingEnabled, instructionSuffix, voiceResponse, a2uiSupported, buildConfiguration.revision)
         return runnerMutex.withLock {
             val runtime = runtimes[key] ?: factory(
                 AgentBuildSpec(
@@ -138,6 +141,7 @@ class AgentChatRunner(
                     thinkingEnabled = thinkingEnabled,
                     pluginRuntime = buildConfiguration.pluginRuntime,
                     instructionSuffix = instructionSuffix,
+                    voiceResponse = voiceResponse,
                     a2uiSupported = a2uiSupported,
                 ),
             ).let { agentRuntime ->

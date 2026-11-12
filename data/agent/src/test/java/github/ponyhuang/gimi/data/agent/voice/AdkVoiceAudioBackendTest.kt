@@ -288,7 +288,9 @@ class AdkVoiceAudioBackendTest {
         val presetAssistant = AdkVoiceAudioBackend.realtimeInstructions(
             preset = "你是一个语音助手", assistantMode = true, hasDeclarations = true,
         )
-        assertTrue(presetAssistant.startsWith("你是一个语音助手"))
+        assertFalse("你是一个语音助手" in presetAssistant)
+        assertTrue("<voice_response>" in presetAssistant)
+        assertFalse("<response_format>" in presetAssistant)
         assertFalse("You have no tools" in presetAssistant)
     }
 }

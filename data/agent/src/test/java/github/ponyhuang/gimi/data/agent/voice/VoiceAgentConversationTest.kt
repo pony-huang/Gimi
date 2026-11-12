@@ -82,7 +82,7 @@ class VoiceAgentConversationTest {
         coEvery { execution.send(any(), any(), any()) } returns send
         coEvery { execution.respondToToolConfirmation(any(), any()) } returns resume
         coEvery { execution.respondToInputRequest(any(), any(), any()) } returns inputResume
-        coEvery { runner.createExecution(any(), any(), any(), any(), any(), any(), any()) } returns execution
+        coEvery { runner.createExecution(any(), any(), any(), any(), any(), any(), any(), voiceResponse = true) } returns execution
         coEvery { conversations.conversationToolConfiguration("conv") } returns null
         return execution
     }

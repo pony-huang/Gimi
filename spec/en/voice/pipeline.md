@@ -399,3 +399,8 @@ outright.
 `phase=Failed` (session and UI both survive). `retry()` rebuilds the recording
 stream and the entire DSP chain and runs `start()` again rather than merely
 resuming playback.
+
+
+### Assistant voice presentation
+
+Both Chat and RealtimeAssistant use the assistant instructions with a shared voice response contract. The text response format is replaced during assembly, and Chat includes `voiceResponse` in its runtime cache key. RealtimeAssistant ignores light-chat presets. Replies lead with the conclusion and continue in short natural sentences. Hands-on guidance waits after the current step. Quick actions report results directly, while noticeable waits receive a brief overall announcement. Explicit requests for detail remain supported. Complete code, documents, and links are delivered through available tools, with spoken summaries and tool-confirmed access locations. If delivery is unavailable, the assistant explains the limitation. RealtimeAssistant has no persisted chat transcript. The existing cascaded sentence buffer handles TTS segmentation; native realtime audio uses provider-generated speech.

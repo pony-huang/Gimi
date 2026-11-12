@@ -21,6 +21,7 @@ import github.ponyhuang.gimi.pluginapi.AgentPlugin
  *   保证插件 revision（缓存键组成部分）与实际装配的插件一致。
  * @property instructionSuffix 追加在默认助手指令之后的场景化补充（如实时语音的朗读要求）；
  *   参与缓存键，不同后缀各自构建 Agent。
+ * @property voiceResponse 是否采用语音输出契约；参与缓存键，避免复用文字格式指令。
  * @property a2uiSupported 调用方是否提供 A2UI 渲染能力（执行时传入 capabilities）。
  *   为 false 时不声明 `generate_a2ui`，避免语音等无渲染端看到必然失败的工具；参与缓存键。
  */
@@ -32,4 +33,5 @@ data class AgentBuildSpec(
     val thinkingEnabled: Boolean = true,
     val instructionSuffix: String = "",
     val a2uiSupported: Boolean = true,
+    val voiceResponse: Boolean = false,
 )

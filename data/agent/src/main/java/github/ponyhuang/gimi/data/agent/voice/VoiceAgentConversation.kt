@@ -135,7 +135,7 @@ class VoiceAgentConversation @Inject constructor(
             allowConfirmationRequiredTools = true,
             toolConfiguration = conversations.conversationToolConfiguration(conversationId),
             a2uiCapabilities = null,
-            instructionSuffix = VOICE_CHAT_INSTRUCTION,
+            voiceResponse = true,
         )
 
         /**
@@ -184,14 +184,5 @@ class VoiceAgentConversation @Inject constructor(
 
     private companion object {
         private const val TAG = "VoiceAgentConversation"
-
-        /** 追加到完整助手指令之后的语音场景约束：口语化人设 + TTS 输出底线 + 听不清时的确认策略 + 工具播报节奏。提示词统一用英文撰写（与主指令一致），回复语言由主指令的用户语言规则约束。后缀参与 Agent 缓存键，语音与文字聊天各持一份。 */
-        const val VOICE_CHAT_INSTRUCTION = "\n\n<realtime_voice>" +
-            "\n- You are talking with the user in a real-time voice call; your replies are read aloud by text-to-speech." +
-            "\n- Speak like a real person: colloquial and warm; natural interjections such as \"okay\" and \"mm-hmm\" are fine. Answer simple questions in one or two sentences; when explaining or comparing, give the conclusion first, then the reasons; keep complex topics in flowing narration." +
-            "\n- Speak only natural, conversational sentences; never use Markdown, lists, numbering, code blocks, parenthetical asides, emoji, or any other written formatting or symbols; when enumerating, connect naturally with \"first..., then...\"." +
-            "\n- Ask only one question at a time; if you did not hear clearly or are unsure, confirm briefly in one short sentence, never repeat the same confirmation, and never guess." +
-            "\n- Keep using tools as usual: before a call, announce briefly in one short sentence what you are about to do and vary the wording; after it completes, summarize the result first and then the next step without reciting raw data; if it fails, explain in plain words and offer another way to help, never read out error codes or technical details." +
-            "\n</realtime_voice>"
     }
 }

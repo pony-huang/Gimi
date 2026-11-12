@@ -94,6 +94,24 @@ class AgentChatRunnerCacheTest {
     }
 
     @Test
+    fun voiceAndTextUseSeparateRuntimesAndReuseTheirOwnConfiguration() = runTest {
+        val builtSpecs = mutableListOf<AgentBuildSpec>()
+        val runner = AgentChatRunner(
+            factory = { spec -> builtSpecs += spec; runtime(spec.selection) },
+            sessionService = mockk<SessionService>(relaxed = true),
+            artifactService = null,
+            memoryService = InMemoryMemoryService(),
+            toolAccessRepository = FakeToolAccessRepository(),
+        )
+        runner.createExecution("user", "session")
+        runner.createExecution("user", "session", voiceResponse = true)
+        runner.createExecution("user", "session")
+        runner.createExecution("user", "session", voiceResponse = true)
+
+        assertEquals(listOf(false, true), builtSpecs.map { it.voiceResponse })
+    }
+
+    @Test
     fun thinkingSwitchUsesSeparateRuntimeAndReusesOriginalWhenRestored() = runTest {
         val builtSpecs = mutableListOf<AgentBuildSpec>()
         val runner = AgentChatRunner(

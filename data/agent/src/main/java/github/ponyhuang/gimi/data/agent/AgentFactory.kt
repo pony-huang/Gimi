@@ -91,7 +91,7 @@ class AgentFactory @Inject constructor(
                 ThinkingConfig(includeThoughts = false, thinkingBudget = 0)
             },
         ),
-        instruction = Instruction(AgentPrompts.defaultAssistantInstruction() + spec.instructionSuffix),
+        instruction = Instruction(AgentPrompts.defaultAssistantInstruction(voiceResponse = spec.voiceResponse) + spec.instructionSuffix),
         tools = contributions.tools(spec),
         toolsets = toolsets,
         subAgents = subAgents,

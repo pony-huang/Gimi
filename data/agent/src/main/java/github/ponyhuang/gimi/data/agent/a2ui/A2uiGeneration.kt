@@ -22,7 +22,6 @@ internal class A2uiGeneration(private val model: Model, private val protocol: A2
         val allowedTypes = Json.parseToJsonElement(scoped.schemaJson).jsonObject["components"]?.jsonObject?.keys
         val weatherRouting = weatherRoutingInstructions(scoped)
         val musicPlayerRouting = musicPlayerRoutingInstructions(scoped)
-        val optionDeckRouting = optionDeckRoutingInstructions(scoped)
         val inputRouting = inputRoutingInstructions(scoped)
         val containerRouting = containerRoutingInstructions(scoped)
         val tableRouting = tableRoutingInstructions(scoped)
@@ -61,7 +60,6 @@ internal class A2uiGeneration(private val model: Model, private val protocol: A2
                         Before calling render_a2ui, review the tree for narrow-screen readability and remove redundant elements.
                         $weatherRouting
                         $musicPlayerRouting
-                        $optionDeckRouting
                         $containerRouting
                         $tableRouting
                         Catalog: ${scoped.schemaJson}
@@ -233,57 +231,6 @@ private fun musicPlayerRoutingInstructions(capabilities: A2uiCapabilities): Stri
           trackUri as a one-element ids array. Use only tools available for that provider; never substitute Spotify
           tools for another service. After mutations fetch fresh playback/library state and update
           the same surface. Tool acceptance alone is not proof playback changed.
-    """.trimIndent()
-}
-
-/**
- * 目录包含 OptionDeck 时，把需要逐项比较的候选方案路由到原生横向卡组。
- *
- * 模型会倾向于用 Card/Text/List 拼静态列表；组件的接受/拒绝需要由宿主发出
- * server event 再回到主 Agent，因此这里固定数据形状、场景动作和事件契约。
- */
-private fun optionDeckRoutingInstructions(capabilities: A2uiCapabilities): String {
-    val available = runCatching {
-        Json.parseToJsonElement(capabilities.schemaJson)
-            .jsonObject["components"]
-            ?.jsonObject
-            ?.containsKey("OptionDeck") == true
-    }.getOrDefault(false)
-    if (!available) return ""
-    return """
-        OPTION DECK ROUTING (HIGHEST PRIORITY):
-        When the requested UI compares plans one by one and asks the user to react to each option,
-        such as travel itineraries, design directions, social recommendations, nearby stores or places,
-        restaurants, courses, gifts or proposals,
-        do NOT build the layout from Card, Text, List, Row, or Button.
-        Use exactly one native OptionDeck component as root.
-        It has one required property named `deck`. Prefer a data binding:
-        {"id":"root","component":"OptionDeck","deck":{"path":"/deck"}}
-        Put the candidates under data.deck:
-        {"deck":{"title":"杭州周末路线","acceptLabel":"想去","rejectLabel":"换个地方",
-        "items":[{"id":"west-lake","title":"西湖两日慢游","meta":"2 天 1 夜",
-        "description":"避开拥挤时段，预留雨天替代路线。","tags":["慢节奏","西湖周边"],
-        "emoji":"🧭","link":{"label":"查看完整路线","url":"https://..."}}]}}
-        Requirements:
-        - items needs at least 2 and at most 12 options; every id must be unique and stable.
-        - title, meta, description, tags (at most 3) and emoji or imageUrl are optional per item;
-          fill them from real tool results or well-known facts, never invent businesses or places.
-        - acceptLabel and rejectLabel are required and must fit the content domain. Examples:
-          travel: 想去 / 换个地方; design review: 赞同 / 不赞同; dining: 喜欢 / 不喜欢;
-          social posts: 收藏 / 略过; nearby stores: 想去 / 换一家.
-          Do not use generic like/dislike wording when a more natural domain action is clear.
-        - Each optional link object needs a domain-specific label and an absolute http/https URL.
-          Examples: 查看完整路线, 打开设计稿, 查看菜单, 查看笔记, 打开地图. Do not invent destinations.
-        - Use the user's language for all visible labels and copy.
-        - The component renders horizontal browsing, progress and the exhausted state; do not add
-          duplicate decision buttons and do not wrap it in a generic Card.
-        - It emits option_accept / option_reject (context: itemId, index, title, actionLabel, round)
-          for every decision and option_exhausted (context: accepted, rejected, total, round) when
-          the deck is finished. Run the matching business tools and update the same surface.
-          round starts at 0 and increases when the user restarts the deck locally; decisions with
-          round > 0 repeat earlier itemIds, so treat them as re-review and confirm before re-running
-          side-effect tools.
-        - To offer another round, update the deck property in place with a new candidate list.
     """.trimIndent()
 }
 

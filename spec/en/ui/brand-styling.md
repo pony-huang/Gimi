@@ -4,7 +4,7 @@ English · [简体中文](../../zh/ui/brand-styling.md)
 
 Established: 2026-11-10. Audience: agents and developers designing Gimi UI, previews, illustrations, diagrams, and other branded visual artifacts.
 
-> This revision is the target brand and theme specification. Its core palette landed in `core/designsystem` on 2026-11-10: `Color.kt` provides the brand and neutral constants, both `ColorScheme` values in `Theme.kt` follow the core palette table, and the user-bubble colors in `UserBubbleTheme` were calibrated to match. Current executable behavior remains defined by the active assignments in `GimiTheme`. New screens follow the tables below; when they diverge, update the theme implementation explicitly instead of hard-coding hex colors inside features. Maintain light, dark, and interaction-state previews according to [Preview-first UI design review](preview-first-design-review.md).
+> This revision is the target brand and theme specification. Its core palette is live in `core/designsystem`: `Color.kt` provides the brand and neutral constants, both `ColorScheme` values in `Theme.kt` follow the core palette table, and the user-bubble colors in `UserBubbleTheme` follow this document. Current executable behavior remains defined by the active assignments in `GimiTheme`. New screens follow the tables below; when they diverge, update the theme implementation explicitly instead of hard-coding hex colors inside features. Maintain light, dark, and interaction-state previews according to [Preview-first UI design review](preview-first-design-review.md).
 
 ## Scope and visual direction
 
@@ -33,13 +33,13 @@ Design principles:
 
 All source paths below are relative to the repository root:
 
-- `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/theme/Color.kt`: palette constants and legacy-name migration.
+- `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/theme/Color.kt`: palette constants.
 - `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/theme/Theme.kt`: active role mapping in `GimiLightColorScheme`, `GimiDarkColorScheme`, and `GimiTheme`.
 - `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/theme/Type.kt`: typography configuration.
 - `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/theme/UserBubbleTheme.kt`: dedicated neutral user-message roles.
 - `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/components/` and `ui/preference/` beside it: existing component geometry and spacing.
 
-Use the target tables in this document for new designs and migration; read source when investigating current production behavior. Differences during migration must be resolved through explicit theme changes, never through hard-coded hex values inside features. The theme remains a fixed light/dark scheme; wallpaper-derived dynamic color stays disabled.
+Use the target tables in this document for new designs; read source when investigating current production behavior. Differences must be resolved through explicit theme changes, never through hard-coded hex values inside features. The theme remains a fixed light/dark scheme; wallpaper-derived dynamic color stays disabled.
 
 ## Color architecture and naming
 
@@ -52,10 +52,10 @@ Color has three layers that must not be interchanged:
 Naming rules:
 
 - Name new accessible action constants `BrandPrimaryLight` / `BrandPrimaryDark`. Keep `BrandBlue` as the brand constant; do not create synonymous aliases such as `GimiBlue`, `AccentBlue`, or `BrandPrimary`.
-- Gradually rename `ChatGptLight*` / `ChatGptDark*` neutral constants to `NeutralLight*` / `NeutralDark*`. This changes ownership and naming only; it does not introduce another palette.
+- Active neutral constants use the `NeutralLight*` / `NeutralDark*` naming, not historical prefixes such as `ChatGpt*`. This governs naming only; it does not introduce another palette.
 - `GimiTheme` is the product theme API and retains the Gimi name. `GimiLightColorScheme` / `GimiDarkColorScheme` describe the visual scheme and may remain.
 - `secondary` is neutral. `tertiary` is not a second decorative accent. It may map to the `primary` family for Material component compatibility, but must not establish an independent colored system.
-- Legacy `Blue*`, `Yellow*`, and `WarmAmber*` constants do not describe the target brand. Remove them only after checking references; do not restore old palettes based on their names.
+- Do not restore legacy constants such as `Blue*`, `Yellow*`, or `WarmAmber*`, and do not recreate old palettes based on their names.
 
 ## Core palette and theme roles
 
@@ -158,15 +158,10 @@ These values verify the state rules; they do not require additional literals in 
 - Blue belongs to interface emphasis around marks, not to modifications of third-party artwork. Provider logos retain their original artwork, proportions, and brand colors.
 - When external material includes a third-party service name or mark, copy must clearly identify the service or model provider and avoid wording that implies an unsupported affiliation, partnership, or endorsement.
 
-## Implementation migration and acceptance
+## Acceptance
 
-Landing status (2026-11-10): items 1–3 are done. `Color.kt` keeps `BrandBlue` and adds `BrandPrimaryLight` / `BrandPrimaryDark`; the active neutral constants are renamed to `NeutralLight*` / `NeutralDark*`; and the legacy palette constants (`Blue*`, `DarkBlue*`, `Yellow*`, `Grey*`, `BlueGrey*`, `WarmAmber*`) were removed after a reference check. Both `ColorScheme` values in `Theme.kt` follow the core palette table and explicitly override `surfaceTint` and `outlineVariant` to keep Material's baseline purple and blue-tinted elevation out. `LocalUserBubbleColors` stays neutral with calibrated dark values. Items 4–6 remain open: the interaction-state previews are not yet covered by this specification, and focus-ring and state-layer contrast still need on-device verification.
+- Maintain production `@Preview` fixtures when adding or changing UI, covering at least light/dark themes; primary-button default/hover/pressed/focus/disabled/loading states; selected items; input focus/error; links; and user bubbles.
+- Check real Chinese fonts, user text sizing, long content, dark-mode safe insets, and focus visibility on devices. Retest contrast for state layers and custom controls rather than assuming Material defaults pass automatically.
+- Use the same role names and values in external documents, presentations, and diagrams.
 
-1. In `Color.kt`, retain `BrandBlue = #4D6BFE`, add accessible light/dark primary-action constants, and move active neutral colors to `NeutralLight*` / `NeutralDark*` names.
-2. In `Theme.kt`, update both `ColorScheme` values according to the core palette, including the neutral surface ramp, `inversePrimary`, secondary roles, and error pairs. Do not override brand colors inside features.
-3. Keep `LocalUserBubbleColors` neutral. Before removing legacy constants, search all references and distinguish active assignments, unused constants, and stale comments.
-4. Update production `@Preview` fixtures to cover at least light/dark themes; primary-button default/hover/pressed/focus/disabled/loading states; selected items; input focus/error; links; and user bubbles.
-5. Check real Chinese fonts, user text sizing, long content, dark-mode safe insets, and focus visibility. Retest contrast for state layers and custom controls rather than assuming Material defaults pass automatically.
-6. Use the same role names and values in external documents, presentations, and diagrams. Never describe the target specification as production-complete before implementation.
-
-Delivery checklist: the main background and surface hierarchy are clear; blue is used only for emphasis; canonical brand blue is not confused with accessible action colors; states have non-color cues; boundaries between Gimi and third-party brands are explicit; and Chinese/English values match. Documentation-only changes require diff, link, and value checks, not an app build. Actual UI migration still requires the preview and proportional verification workflow.
+Delivery checklist: the main background and surface hierarchy are clear; blue is used only for emphasis; canonical brand blue is not confused with accessible action colors; states have non-color cues; boundaries between Gimi and third-party brands are explicit; and Chinese/English values match. Documentation-only changes require diff, link, and value checks, not an app build. Actual UI changes still require the preview and proportional verification workflow.

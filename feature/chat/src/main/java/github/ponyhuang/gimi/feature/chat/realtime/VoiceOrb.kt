@@ -109,17 +109,25 @@ internal fun VoiceOrb(
     val speaking = state.phase == RealtimeVoicePhase.Speaking
     // 思考组含模式切换与识别中；Idle/Closed（待启动、连接中）归入缓动态而非漩涡。
     val thinking = switching || state.phase == RealtimeVoicePhase.Thinking || state.phase == RealtimeVoicePhase.Transcribing
-    val calm = !quiet && !speaking && !thinking
+    val listening = state.listening && !quiet && !speaking && !thinking
+    val calm = !quiet && !speaking && !thinking && !listening
     val rawLevel = when {
         quiet || thinking || calm -> 0f
         speaking -> state.outputLevel.coerceIn(0f, 1f)
-        state.listening -> state.inputLevel.coerceIn(0f, 1f)
-        else -> 0f
+        else -> state.inputLevel.coerceIn(0f, 1f)
     }
     val level by animateFloatAsState(
         // 略提高轻声区间的视觉响应，零输入仍为零；只放大展示，不改录放音增益。
         targetValue = (rawLevel.pow(.58f) * 1.22f).coerceAtMost(1f),
         animationSpec = tween(80, easing = LinearEasing), label = "voiceLevel",
+    )
+    val inputContraction by animateFloatAsState(
+        targetValue = if (listening) (rawLevel.pow(.58f) * 1.22f).coerceAtMost(1f) else 0f,
+        animationSpec = tween(120, easing = LinearEasing), label = "voiceInputContraction",
+    )
+    val expansion by animateFloatAsState(
+        targetValue = if (speaking) (rawLevel.pow(.58f) * 1.22f).coerceAtMost(1f) else 0f,
+        animationSpec = tween(80, easing = LinearEasing), label = "voiceExpansion",
     )
     val dim by animateFloatAsState(
         targetValue = when {
@@ -147,23 +155,22 @@ internal fun VoiceOrb(
     val transition = if (!quiet && !preview) rememberInfiniteTransition(label = "voiceParticles") else null
     // Compose 动画运行时跟随系统动画时长缩放，关闭动画时不运行手写帧循环；
     // 双循环周期不同但粒子角度为整数倍相位，循环复位时投影连续不跳变。
-    val yaw = if (transition != null) {
-        transition.animateFloat(
-            initialValue = 0f, targetValue = 2f * PI.toFloat(),
-            animationSpec = infiniteRepeatable(tween(48000, easing = LinearEasing)), label = "voiceYaw",
-        )
-    } else remember { mutableFloatStateOf(PreviewYaw) }
-    val swirlPhase = if (transition != null) {
-        transition.animateFloat(
-            initialValue = 0f, targetValue = 2f * PI.toFloat(),
-            animationSpec = infiniteRepeatable(tween(16000, easing = LinearEasing)), label = "voiceSwirl",
-        )
-    } else remember { mutableFloatStateOf(PreviewSwirl) }
+    val yaw = transition?.animateFloat(
+        initialValue = 0f, targetValue = 2f * PI.toFloat(),
+        animationSpec = infiniteRepeatable(tween(48000, easing = LinearEasing)), label = "voiceYaw",
+    )
+        ?: remember { mutableFloatStateOf(PreviewYaw) }
+    val swirlPhase = transition?.animateFloat(
+        initialValue = 0f, targetValue = 2f * PI.toFloat(),
+        animationSpec = infiniteRepeatable(tween(16000, easing = LinearEasing)), label = "voiceSwirl",
+    )
+        ?: remember { mutableFloatStateOf(PreviewSwirl) }
     val particles = remember { VoiceParticleField(ParticleCount) }
     Box(modifier, contentAlignment = Alignment.Center) {
         Canvas(Modifier.matchParentSize()) {
             drawParticleOrb(
-                particles, yaw.value, swirlPhase.value, level, dim, trail, contract, tintStrength, ink,
+                particles, yaw.value, swirlPhase.value, level, inputContraction, expansion,
+                dim, trail, contract, tintStrength, ink,
             )
         }
         Crossfade(targetState = statusText, animationSpec = tween(200), label = "voiceStatus") { text ->
@@ -184,6 +191,8 @@ private fun DrawScope.drawParticleOrb(
     yaw: Float,
     swirlPhase: Float,
     level: Float,
+    inputContraction: Float,
+    expansion: Float,
     dim: Float,
     trail: Float,
     contract: Float,
@@ -191,9 +200,11 @@ private fun DrawScope.drawParticleOrb(
     ink: Color,
 ) {
     val center = Offset(size.width / 2f, size.height / 2f)
-    // 呼吸与电平只改半径不改球心；思考态轻微收缩
+    // 用户说话时整体等比例内收，粒子球与柔光共用半径，始终保持球形和固定球心。
+    // 输入与输出分别平滑归零，让停顿、打断和播报切换时尺寸连续恢复。
     val breathing = 1f + .018f * sin(swirlPhase * 3f)
-    val orbR = size.minDimension * .47f * contract * breathing
+    val voiceScale = 1f + expansion * .05f - inputContraction * .22f
+    val orbR = size.minDimension * .47f * contract * breathing * voiceScale
     // 球区柔光：云团整体与背景拉开一档明度（浅色场景是淡墨晕，深色场景是浅墨光晕）
     drawCircle(
         Brush.radialGradient(
@@ -227,7 +238,7 @@ private fun DrawScope.drawParticleOrb(
         val z = bx * sn + bz * cs
         val y2 = by * ct - z * st
         val z2 = by * st + z * ct
-        val radius = orbR * jit * (1f + level * .05f)
+        val radius = orbR * jit
         val px = center.x + x * radius
         val py = center.y + y2 * radius
         val d01 = (z2 + 1f) * .5f

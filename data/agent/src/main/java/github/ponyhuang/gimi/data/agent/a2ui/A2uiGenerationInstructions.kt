@@ -71,7 +71,11 @@ internal fun tableRoutingInstructions(capabilities: A2uiCapabilities): String {
         When the catalog provides DataTable and the request is a comparison, metrics table, or structured
         query result, prefer DataTable over manually aligning Text/Row/List components. Keep specialized
         weather and music requests on their matching native components. DataTable is read-only:
-        do not use it for editable forms or controls. Use one required table property, preferably
+        do not use it for editable forms or controls. Use exactly one native DataTable component as the
+        root; do not wrap it in a generic Card. Do NOT add a separate Text title above the table or a
+        summary/footer/count Text below it: the component already renders its own heading, and the
+        client adds card-level actions. If a total is needed, append it as the last row of the table.
+        Use one required table property, preferably
         {"id":"root","component":"DataTable","table":{"path":"/table"}}.
         Example data: {"table":{"heading":"用量","columns":[{"label":"模型"},
         {"label":"请求数","align":"end"}],"rows":[["Model A","128"],["Model B","64"]]}}.

@@ -944,4 +944,3 @@ pathParams / queryParams / bodyParams : 按位置分类的参数定义
 - 文档详情：`GET https://interface.music.163.com/api/openplatform/developer/apidoc/get?docId=<id>`
 - CLI 包：`@music163/ncm-cli@0.1.7`（<https://www.npmjs.com/package/@music163/ncm-cli>）
 - 官方 Agent Skills：<https://github.com/NetEase/skills>
-- 本地参考材料（仅本机环境可用）：`ncm-cli-api.md`、`analysis/ncm-openapi-reference.md`、`analysis/ncm-openapi-endpoints-all.md`（位于 `E:/workplace/ncm/`）

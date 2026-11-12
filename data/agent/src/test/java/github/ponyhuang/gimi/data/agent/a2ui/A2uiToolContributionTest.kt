@@ -67,37 +67,6 @@ class A2uiToolContributionTest {
     }
 
     @Test
-    fun optionDeckRoutingCoversSocialAndNearbyPlaceResults() {
-        val capabilities = A2uiCapabilities(
-            catalogId = "catalog",
-            schemaJson = """{
-              "components": {
-                "Text": {},
-                "Card": {},
-                "Column": {},
-                "OptionDeck": {
-                  "description": "Compare plans, social posts, nearby stores or places one at a time"
-                }
-              }
-            }""",
-        )
-
-        val instruction = a2uiResponseRoutingInstructions(capabilities)
-
-        assertTrue(instruction.contains("OPTION DECK ROUTING"))
-        assertTrue(instruction.contains("social notes"))
-        assertTrue(instruction.contains("nearby place-search stores and places"))
-        assertTrue(instruction.contains("Save / Skip"))
-        assertTrue(instruction.contains("Want to visit / Not this place"))
-        assertTrue(instruction.contains("\"OptionDeck\" in component_names"))
-        assertFalse(
-            a2uiResponseRoutingInstructions(
-                A2uiCapabilities("catalog", """{"components":{"Text":{},"Card":{}}}"""),
-            ).contains("OPTION DECK ROUTING"),
-        )
-    }
-
-    @Test
     fun newsDigestMentioningRainAndTemperatureDoesNotRequireWeatherCard() {
         val changes = """
             Render today's news digest.

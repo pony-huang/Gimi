@@ -4,7 +4,7 @@
 
 制定日期：2026-11-10。读者：设计 Gimi UI、预览、插画、示意图及其他品牌视觉产物的代理与开发者。
 
-> 本版是目标品牌与主题规范。核心色板已于 2026-11-10 在 `core/designsystem` 落地：`Color.kt` 提供品牌与中性常量，`Theme.kt` 的两套 `ColorScheme` 按核心色板表生效，`UserBubbleTheme` 的用户气泡色同步校准；当前可执行行为以 `GimiTheme` 的生效赋值为准。后续新增界面以本文表格为准，出现差异时显式更新主题实现，不得在 feature 内硬编码十六进制颜色来“对齐设计稿”。实现期间按[预览优先的 UI 设计评审](preview-first-design-review.md)维护浅色、深色和交互状态预览。
+> 本版是目标品牌与主题规范。核心色板在 `core/designsystem` 生效：`Color.kt` 提供品牌与中性常量，`Theme.kt` 的两套 `ColorScheme` 按核心色板表生效，`UserBubbleTheme` 的用户气泡色按本文校准；当前可执行行为以 `GimiTheme` 的生效赋值为准。新增界面以本文表格为准，出现差异时显式更新主题实现，不得在 feature 内硬编码十六进制颜色来“对齐设计稿”。界面改动按[预览优先的 UI 设计评审](preview-first-design-review.md)维护浅色、深色和交互状态预览。
 
 ## 适用范围与视觉方向
 
@@ -33,13 +33,13 @@
 
 以下路径均相对仓库根目录：
 
-- `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/theme/Color.kt`：调色板常量及旧命名迁移。
+- `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/theme/Color.kt`：调色板常量。
 - `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/theme/Theme.kt`：`GimiLightColorScheme`、`GimiDarkColorScheme` 与 `GimiTheme` 的生效角色映射。
 - `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/theme/Type.kt`：字体配置。
 - `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/theme/UserBubbleTheme.kt`：用户消息专用中性色角色。
 - `core/designsystem/src/main/java/github/ponyhuang/gimi/ui/components/` 及同级 `ui/preference/`：已有组件几何与间距。
 
-新设计和迁移以本文目标表为准；排查线上行为时读取源码。迁移期间出现差异时，应显式更新主题实现，不得在 feature 内硬编码十六进制颜色来“对齐设计稿”。当前主题保持固定浅色／深色方案，不启用壁纸动态色。
+新设计以本文目标表为准；排查线上行为时读取源码。出现差异时，应显式更新主题实现，不得在 feature 内硬编码十六进制颜色来“对齐设计稿”。当前主题保持固定浅色／深色方案，不启用壁纸动态色。
 
 ## 色彩架构与命名
 
@@ -52,10 +52,10 @@
 命名规则：
 
 - 新增可访问主操作常量使用 `BrandPrimaryLight` / `BrandPrimaryDark`；品牌常量继续命名为 `BrandBlue`，不得再创建 `GimiBlue`、`AccentBlue`、`BrandPrimary` 等同义别名。
-- 将 `ChatGptLight*` / `ChatGptDark*` 中性色常量逐步更名为 `NeutralLight*` / `NeutralDark*`，仅改变命名归属，不引入另一套色值。
+- 生效中性色常量使用 `NeutralLight*` / `NeutralDark*` 命名，不使用 `ChatGpt*` 等历史前缀；仅改变命名归属，不引入另一套色值。
 - `GimiTheme` 是产品主题 API，保持 Gimi 命名；`GimiLightColorScheme` / `GimiDarkColorScheme` 描述视觉方案，可以保留。
 - `secondary` 使用中性色；`tertiary` 不作为第二种装饰强调色。为兼容 Material 组件，可映射到 `primary` 色阶，但不得据此创造独立彩色体系。
-- 旧 `Blue*`、`Yellow*`、`WarmAmber*` 常量不代表目标品牌。确认无引用后再删除，不凭名称恢复旧配色。
+- 不得恢复 `Blue*`、`Yellow*`、`WarmAmber*` 等旧常量，也不凭名称重建旧配色。
 
 ## 核心色板与主题角色
 
@@ -158,15 +158,10 @@
 - 蓝色用于标识周围的界面强调，而不是修改第三方标识本身。提供商标志保留原始图案、比例和品牌颜色。
 - 外部物料包含第三方服务名称或标识时，文案必须明确其服务或模型提供方身份，不使用可能造成隶属、联名或授权误解的表述。
 
-## 实施迁移与验收
+## 验收
 
-落地状态（2026-11-10）：第 1–3 项已完成——`Color.kt` 保留 `BrandBlue` 并新增 `BrandPrimaryLight` / `BrandPrimaryDark`，生效中性色已更名为 `NeutralLight*` / `NeutralDark*`，遗留调色板常量（`Blue*` / `DarkBlue*` / `Yellow*` / `Grey*` / `BlueGrey*` / `WarmAmber*`）在核对引用后删除；`Theme.kt` 两套 `ColorScheme` 按核心色板表生效，并显式覆盖 `surfaceTint` 与 `outlineVariant`，阻断 Material 基线紫色与蓝色抬升染；`LocalUserBubbleColors` 保持中性并校准深色值。第 4–6 项仍待补齐：交互状态预览尚未按本规范铺齐，焦点环与状态层对比度仍需在真机复核。
+- 新增或修改 UI 时维护生产 `@Preview`，至少覆盖浅色／深色，主按钮默认／悬停／按下／焦点／禁用／加载，选中项，输入框焦点／错误，链接和用户气泡。
+- 真机检查真实中文字体、用户字号、长文本、深色安全区域和焦点可见性；对状态层和自定义控件复测对比度，不以默认 Material 状态自动合格为假设。
+- 外部文档、演示和示意图使用相同角色名称和色值。
 
-1. 在 `Color.kt` 保留 `BrandBlue = #4D6BFE`，新增浅色／深色可访问主操作常量，并将生效中性色归入 `NeutralLight*` / `NeutralDark*` 命名。
-2. 在 `Theme.kt` 按核心色板更新两个 `ColorScheme`，同步中性表面色阶、`inversePrimary`、次要角色及错误配对；不在 feature 内覆盖品牌色。
-3. 保持 `LocalUserBubbleColors` 为中性色。清理旧常量前全局搜索引用，区分生效赋值、未使用常量和过期注释。
-4. 更新生产 `@Preview`，至少覆盖浅色／深色、主按钮默认／悬停／按下／焦点／禁用／加载、选中项、输入框焦点／错误、链接和用户气泡。
-5. 检查真实中文字体、用户字号、长文本、深色安全区域和焦点可见性。对状态层和自定义控件复测对比度，不以默认 Material 状态自动合格为假设。
-6. 外部文档、演示和示意图使用相同角色名称和色值；不得把目标规范尚未实施描述为“生产 UI 已统一”。
-
-交付检查：主背景与表面层级清晰；蓝色只承担强调；品牌蓝与普通文字主操作色没有混用；状态具有非颜色提示；Gimi 与第三方品牌边界明确；中英文规范数值一致。纯文档修改只需差异、链接和数值检查，不要求为文字修改构建应用；实际 UI 迁移仍需遵守预览与适度验证流程。
+交付检查：主背景与表面层级清晰；蓝色只承担强调；品牌蓝与普通文字主操作色没有混用；状态具有非颜色提示；Gimi 与第三方品牌边界明确；中英文规范数值一致。纯文档修改只需差异、链接和数值检查，不要求为文字修改构建应用；实际 UI 改动仍需遵守预览与适度验证流程。

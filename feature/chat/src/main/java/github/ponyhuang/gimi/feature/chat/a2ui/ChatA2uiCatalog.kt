@@ -11,7 +11,6 @@ import coil3.compose.AsyncImage
 internal fun chatA2uiCatalog(openUrl: (String) -> Unit): A2uiCatalog {
     val defaults = MaterialA2uiBasicCatalogV1Defaults
     val musicPlayer = ChatA2uiMusicPlayer(openUrl)
-    val optionDeck = ChatA2uiOptionDeck(openUrl)
     return A2uiCatalog(
         catalogId = "https://gimi.app/a2ui/catalogs/chat/v1",
         components = listOf(
@@ -22,7 +21,6 @@ internal fun chatA2uiCatalog(openUrl: (String) -> Unit): A2uiCatalog {
             ChatA2uiWeatherToday,
             musicPlayer,
             ChatA2uiDataTable,
-            optionDeck,
             defaults.image { url, description, scale, modifier, onError ->
                 AsyncImage(model = url, contentDescription = description, contentScale = scale,
                     modifier = modifier, onError = { onError(it.result.throwable) })

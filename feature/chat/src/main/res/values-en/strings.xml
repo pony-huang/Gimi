@@ -214,6 +214,7 @@
     <string name="chat_timeline_tool_awaiting_confirmation">Awaiting confirmation</string>
     <string name="chat_timeline_tool_unknown">Status unknown</string>
     <string name="chat_drawer_manage">Manage</string>
+    <string name="chat_drawer_recent_conversations">Recent conversations</string>
     <string name="chat_drawer_done">Done</string>
     <string name="chat_drawer_search">Search conversations</string>
     <string name="chat_drawer_clear_search">Clear search</string>
@@ -222,6 +223,7 @@
     <string name="chat_drawer_select_all">Select all</string>
     <string name="chat_drawer_deselect_all">Deselect all</string>
     <string name="chat_drawer_delete_count">Delete %1$d conversations</string>
+    <string name="chat_drawer_delete_selected">Delete</string>
     <string name="chat_drawer_deleting">Deleting…</string>
     <string name="chat_drawer_delete_confirm_title">Delete %1$d conversations?</string>
     <string name="chat_drawer_delete_confirm_message">This cannot be undone. The current conversation and active conversations will be kept.</string>
@@ -267,25 +269,16 @@
     <string name="chat_player_artwork">Album artwork</string>
     <string name="chat_player_generic_name">Music</string>
 
-    <!-- A2UI discovery deck -->
-    <string name="chat_option_deck_default_title">Options to compare</string>
-    <string name="chat_option_deck_position">%1$d / %2$d</string>
-    <string name="chat_option_deck_item_image">Option image</string>
-    <string name="chat_option_deck_open_image">View image</string>
-    <string name="chat_option_deck_close_image">Close image</string>
-    <string name="chat_option_deck_browse_hint">Swipe horizontally to browse. Tap a button to submit your choice.</string>
-    <string name="chat_option_deck_empty_title">You have reviewed this round</string>
-    <string name="chat_option_deck_empty_summary">%1$d accepted · %2$d skipped</string>
-    <string name="chat_option_deck_empty_restart">Review again</string>
-
     <!-- A2UI news list -->
     <!-- A2UI read-only data table -->
-    <string name="chat_table_default_heading">Data table</string>
-    <string name="chat_table_row_count">%1$d rows</string>
+    <string name="chat_table_default_heading">Table</string>
     <string name="chat_table_empty">No data</string>
-    <string name="chat_table_scroll_horizontal">Scroll horizontally to see all columns</string>
-    <string name="chat_table_scroll_vertical">Scroll vertically to see all rows</string>
-    <string name="chat_table_scroll_both">Scroll horizontally for columns, vertically for rows</string>
+    <string name="chat_table_copy">Copy table</string>
+    <string name="chat_table_export_image">Save as image</string>
+    <string name="chat_table_expand">View fullscreen</string>
+    <string name="chat_table_share">Share table</string>
+    <string name="chat_table_close">Close</string>
+    <string name="chat_table_export_failed">Failed to export table</string>
     <string name="chat_timeline_steps">%1$d steps</string>
     <string name="chat_timeline_elapsed">%1$.1f s total</string>
     <string name="chat_player_playing">Now playing</string>
@@ -362,15 +355,11 @@
     <string name="voice_device_switching">%1$s · Switching</string>
     <string name="voice_device_failed">Could not switch devices. Current: %1$s</string>
     <string name="voice_device_disconnected">Headset disconnected. Current: %1$s</string>
+    <!-- Mode titles stay short; the pipeline (cascaded or end-to-end Realtime) is noted in each description. -->
     <string name="voice_mode_simple">Quick chat</string>
     <string name="voice_mode_chat">Assistant</string>
     <string name="voice_mode_realtime">Realtime</string>
     <string name="voice_mode_realtime_assistant">Realtime assistant</string>
-    <!-- Mode list titles annotated with the voice pipeline each mode relies on. -->
-    <string name="voice_mode_simple_pipeline">Quick chat (LLM + TTS + ASR/SST)</string>
-    <string name="voice_mode_chat_pipeline">Assistant (LLM + TTS + ASR/SST)</string>
-    <string name="voice_mode_realtime_pipeline">Realtime (Realtime)</string>
-    <string name="voice_mode_realtime_assistant_pipeline">Realtime assistant (Realtime)</string>
     <string name="voice_mode_entry">Chat modes</string>
     <string name="voice_mode_current">Current: %1$s</string>
     <string name="voice_sheet_back">Back</string>
@@ -403,8 +392,8 @@
     <string name="voice_capability_tts">speech synthesis</string>
     <string name="voice_capability_not_supported">This model has no %1$s integration</string>
     <string name="voice_realtime_unavailable">Configure a Realtime model in Default models first.</string>
-    <string name="voice_realtime_mode_detail">Full-duplex realtime voice: server-side turn detection, audio in and out. Not saved.</string>
-    <string name="voice_realtime_assistant_mode_detail">Full-duplex realtime voice: server-side turn detection, audio in and out. Authorized tools are available during the call. Not saved.</string>
+    <string name="voice_realtime_mode_detail">End-to-end Realtime, audio in and out, nothing saved</string>
+    <string name="voice_realtime_assistant_mode_detail">End-to-end Realtime, authorized tools, nothing saved yet</string>
     <string name="voice_reconnect_notice">Reconnected</string>
     <string name="voice_tool_running">Calling tool %1$s</string>
     <string name="voice_mode_switching">Switching modes</string>
@@ -424,8 +413,8 @@
     <string name="voice_more_options_blocked">End the call before opening more options</string>
     <string name="voice_mode_selected">Selected</string>
     <string name="voice_chat_unavailable">Open a chat with a configured model first</string>
-    <string name="voice_simple_mode_detail">For this conversation only; no chat history</string>
-    <string name="voice_chat_mode_detail">Full assistant with all tools; text is saved to this chat</string>
+    <string name="voice_simple_mode_detail">Cascaded LLM+TTS+ASR, nothing saved</string>
+    <string name="voice_chat_mode_detail">Cascaded LLM+TTS+ASR, tools on, text stays in this chat</string>
     <string name="voice_prompt_presets">Quick chat prompts</string>
     <string name="voice_prompt_preset_none">No preset</string>
     <string name="voice_prompt_preset_none_detail">Use the built-in voice style</string>

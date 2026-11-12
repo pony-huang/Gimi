@@ -8,6 +8,56 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RecentConversationsStateTest {
+    @Test
+    fun closingSearchClearsQueryAndRestoresFullList() {
+        val searching = state().reduceRecentConversations(RecentConversationsAction.OpenSearch)
+            .reduceRecentConversations(RecentConversationsAction.Search("camera"))
+        assertTrue(searching.recentConversations.isSearching)
+        val closed = searching.reduceRecentConversations(RecentConversationsAction.CloseSearch).recentConversations
+        assertFalse(closed.isSearching)
+        assertEquals("", closed.query)
+        assertEquals(conversations, closed.visibleConversations(conversations))
+    }
+
+    @Test
+    fun selectingSearchResultsAndFinishingSelectionRetainsSearch() {
+        val finished = state().reduceRecentConversations(RecentConversationsAction.OpenSearch)
+            .reduceRecentConversations(RecentConversationsAction.Search("camera"))
+            .reduceRecentConversations(RecentConversationsAction.StartSelection("camera"))
+            .reduceRecentConversations(RecentConversationsAction.FinishSelection).recentConversations
+        assertTrue(finished.isSearching)
+        assertEquals("camera", finished.query)
+        assertFalse(finished.isSelecting)
+        assertTrue(finished.selectedIds.isEmpty())
+    }
+
+    @Test
+    fun closingDrawerResetsSearchSelectionAndConfirmation() {
+        val closed = state().reduceRecentConversations(RecentConversationsAction.OpenSearch)
+            .reduceRecentConversations(RecentConversationsAction.Search("camera"))
+            .reduceRecentConversations(RecentConversationsAction.StartSelection("camera"))
+            .reduceRecentConversations(RecentConversationsAction.RequestDeletion)
+            .reduceRecentConversations(RecentConversationsAction.DrawerClosed).recentConversations
+        assertEquals(RecentConversationsState(), closed)
+    }
+
+    @Test
+    fun closingDrawerDuringDeletionResetsInteractionAndKeepsDeletionInFlight() {
+        val deleting = state().copy(recentConversations = RecentConversationsState(
+            query = "camera",
+            isSearching = true,
+            isSelecting = true,
+            selectedIds = setOf("camera"),
+            pendingDeletionIds = setOf("camera"),
+            isDeleting = true,
+        ))
+        assertEquals(
+            RecentConversationsState(isDeleting = true),
+            deleting.reduceRecentConversations(RecentConversationsAction.DrawerClosed).recentConversations,
+        )
+        assertEquals(deleting, deleting.reduceRecentConversations(RecentConversationsAction.CloseSearch))
+    }
+
     private val conversations = listOf(
         Conversation(id = "current", title = "当前会话"),
         Conversation(id = "camera", title = "Camera settings", lastMessage = "相机屏幕偏橙"),

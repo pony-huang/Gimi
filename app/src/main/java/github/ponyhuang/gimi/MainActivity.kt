@@ -3,14 +3,17 @@ package github.ponyhuang.gimi
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -118,6 +121,23 @@ class MainActivity : ComponentActivity() {
                 ThemeMode.SYSTEM -> isSystemInDarkTheme()
                 ThemeMode.LIGHT -> false
                 ThemeMode.DARK -> true
+            }
+            // 系统栏图标深浅必须跟随应用内所选主题，而不是系统 uiMode：
+            // onCreate 的 enableEdgeToEdge() 只按系统深浅决定一次，手动锁定夜间
+            // 而系统处于白天时状态栏仍是深色图标，在深色背景上不可见。
+            // 主题模式变化时重新应用，深浅判断被 lambda 覆盖为 darkTheme。
+            DisposableEffect(darkTheme) {
+                enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.auto(
+                        lightScrim = Color.TRANSPARENT,
+                        darkScrim = Color.TRANSPARENT,
+                    ) { darkTheme },
+                    navigationBarStyle = SystemBarStyle.auto(
+                        lightScrim = DEFAULT_NAV_LIGHT_SCRIM,
+                        darkScrim = DEFAULT_NAV_DARK_SCRIM,
+                    ) { darkTheme },
+                )
+                onDispose {}
             }
             GimiTheme(darkTheme = darkTheme) {
                 androidx.compose.foundation.layout.Box {
@@ -251,5 +271,10 @@ class MainActivity : ComponentActivity() {
         const val KEY_SHARED_MEDIA_URIS = "shared_media_uris"
         const val ACTION_OPEN_PERMISSIONS = "github.ponyhuang.gimi.action.OPEN_PERMISSIONS"
         const val ACTION_OPEN_CURRENT_CHAT = "github.ponyhuang.gimi.action.OPEN_CURRENT_CHAT"
+
+        // 与 androidx.activity EdgeToEdge 的导航栏默认 scrim 保持一致，
+        // 仅把深浅判断从系统 uiMode 覆盖为应用内主题。
+        private val DEFAULT_NAV_LIGHT_SCRIM = Color.argb(0xe6, 0xFF, 0xFF, 0xFF)
+        private val DEFAULT_NAV_DARK_SCRIM = Color.argb(0x80, 0x1B, 0x1B, 0x1B)
     }
 }

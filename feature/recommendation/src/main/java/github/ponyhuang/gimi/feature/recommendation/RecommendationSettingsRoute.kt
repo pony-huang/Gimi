@@ -9,7 +9,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import github.ponyhuang.gimi.ui.preference.PreferenceScaffold
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
 
-/** 「个性化选项」页：承载语音、对话界面、工具加载与设备控制等偏好开关。 */
+/** 「个性化选项」页：承载提示词、对话界面、工具加载与设备控制等偏好开关。 */
 @Composable
 fun RecommendationSettingsRoute(
     onBack: () -> Unit,

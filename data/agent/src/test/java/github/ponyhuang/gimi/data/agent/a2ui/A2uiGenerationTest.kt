@@ -107,25 +107,21 @@ class A2uiGenerationTest {
     }
 
     @Test
-    fun optionDeckCapabilityAddsContextualActionsAndEventContract() = runTest {
+    fun tableCapabilityAddsRootOnlyRoutingWithoutTitleOrFooterChrome() = runTest {
         val model = FakeModel()
-        val schema = """{"components":{"OptionDeck":{}}}"""
+        val schema = """{"components":{"DataTable":{}}}"""
 
         A2uiGeneration(model, acceptingProtocol()).generate(
             surfaceId = "surface",
             capabilities = A2uiCapabilities("catalog", schema),
-            instruction = "推荐几家周末值得试的餐厅",
-            requestedComponents = setOf("OptionDeck"),
+            instruction = "对比两个模型的用量",
+            requestedComponents = setOf("DataTable"),
         )
 
         val prompt = model.requests.single().config.systemInstruction!!.parts.single().text!!
-        assertTrue(prompt.contains("OPTION DECK ROUTING"))
-        assertTrue(prompt.contains("\"deck\":{\"path\":\"/deck\"}"))
-        assertTrue(prompt.contains("acceptLabel"))
-        assertTrue(prompt.contains("rejectLabel"))
-        assertTrue(prompt.contains("option_accept"))
-        assertTrue(prompt.contains("option_exhausted"))
-        assertTrue(prompt.contains("at least 2 and at most 12"))
+        assertTrue(prompt.contains("exactly one native DataTable component as the"))
+        assertTrue(prompt.contains("Do NOT add a separate Text title"))
+        assertTrue(prompt.contains("summary/footer/count Text"))
     }
 
     @Test

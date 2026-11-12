@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Phonelink
 import androidx.compose.material.icons.filled.Rule
 import androidx.compose.runtime.Composable
@@ -31,9 +31,9 @@ import github.ponyhuang.gimi.ui.theme.GimiTheme
 /**
  * 「个性化选项」页：按用户实际使用频率排列分组。
  *
- * 顺序为「推荐 → 语音 → 对话界面 → 工具 → 设备控制 → 主题」：
+ * 顺序为「推荐 → 提示词 → 对话界面 → 工具 → 设备控制 → 主题」：
  * 推荐更新是应用的主动能力，失败需要立刻被看到，因此置顶并独立成页；
- * 语音是一等交互方式、简单聊天预设会被反复调整，排在第二；
+ * 提示词分组收纳简单聊天预设，会被反复调整，排在第二；
  * 对话界面与工具影响每轮对话的呈现与上下文开销，属于常调但非日常项；
  * 设备控制（Shizuku）用于一次性接入；主题模式统一放在页面底部。
  */
@@ -64,11 +64,11 @@ fun RecommendationSettingsScreen(
                     )
                 }
             }
-            item { PreferenceSectionTitle(stringResource(R.string.recommendation_voice_section)) }
+            item { PreferenceSectionTitle(stringResource(R.string.recommendation_prompt_section)) }
             item {
                 PreferenceGroupCard {
                     PreferenceListItem(
-                        icon = Icons.Default.Mic,
+                        icon = Icons.Default.EditNote,
                         title = stringResource(R.string.recommendation_simple_chat_title),
                         subtitle = stringResource(R.string.recommendation_simple_chat_subtitle),
                         onClick = onOpenSimpleChatPromptSettings,
@@ -94,23 +94,10 @@ fun RecommendationSettingsScreen(
             item { PreferenceSectionNote(stringResource(R.string.recommendation_tool_loading_note)) }
             item {
                 PreferenceGroupCard {
-                    PreferenceSwitchItem(
-                        icon = Icons.Default.Rule,
-                        title = stringResource(R.string.recommendation_tool_loading_title),
-                        subtitle = stringResource(
-                            if (state.toolAccessMode == ToolAccessMode.ALWAYS_AVAILABLE) {
-                                R.string.recommendation_tool_loading_always
-                            } else {
-                                R.string.recommendation_tool_loading_on_demand
-                            },
-                        ),
-                        checked = state.toolAccessMode == ToolAccessMode.ALWAYS_AVAILABLE,
-                        onCheckedChange = { enabled ->
-                            onAction(
-                                RecommendationSettingsAction.SetToolAccessMode(
-                                    if (enabled) ToolAccessMode.ALWAYS_AVAILABLE else ToolAccessMode.ON_DEMAND,
-                                ),
-                            )
+                    ToolLoadingSegmentedGroup(
+                        toolAccessMode = state.toolAccessMode,
+                        onToolAccessModeChange = { mode ->
+                            onAction(RecommendationSettingsAction.SetToolAccessMode(mode))
                         },
                     )
                 }

@@ -20,9 +20,9 @@ import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoicePhase
 import github.ponyhuang.gimi.domain.voice.repository.RealtimeVoiceState
 import github.ponyhuang.gimi.ui.theme.GimiTheme
 
-/** 对比轻声、较强输入、回答和静音：粒子球坐在当前主题画布上，预览使用固定相位与真实电平范围。 */
-@Preview(name = "Orb response light", widthDp = 400, heightDp = 220, locale = "zh-rCN")
-@Preview(name = "Orb response dark", widthDp = 400, heightDp = 220, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+/** 对比无输入、轻声内收、强声内收、回答和静音，保持球形并使用固定相位与真实电平范围。 */
+@Preview(name = "Orb response light", widthDp = 500, heightDp = 220, locale = "zh-rCN")
+@Preview(name = "Orb response dark", widthDp = 500, heightDp = 220, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun VoiceOrbResponsePreview() {
     GimiTheme {
@@ -30,8 +30,9 @@ private fun VoiceOrbResponsePreview() {
         Box(Modifier.fillMaxWidth().voiceSceneBackground(scene).padding(8.dp)) {
             Row(Modifier.align(Alignment.Center), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(
-                    "我在听" to RealtimeVoiceState(phase = RealtimeVoicePhase.Listening, listening = true, inputLevel = .06f),
-                    "我在听" to RealtimeVoiceState(phase = RealtimeVoicePhase.Listening, listening = true, inputLevel = .38f),
+                    "无输入" to RealtimeVoiceState(phase = RealtimeVoicePhase.Listening, listening = true),
+                    "轻声" to RealtimeVoiceState(phase = RealtimeVoicePhase.Listening, listening = true, inputLevel = .06f),
+                    "较强输入" to RealtimeVoiceState(phase = RealtimeVoicePhase.Listening, listening = true, inputLevel = .38f),
                     "正在播报" to RealtimeVoiceState(phase = RealtimeVoicePhase.Speaking, outputLevel = .5f),
                     "麦克风已静音" to RealtimeVoiceState(phase = RealtimeVoicePhase.Listening, muted = true),
                 ).forEach { (label, state) ->
@@ -60,6 +61,18 @@ private fun VoiceIdlePreview() {
 private fun VoiceIdleChatUnavailablePreview() {
     GimiTheme {
         RealtimeVoiceScreen(RealtimeVoiceUiState(chatAvailable = false), started = false,
+            onStartCall = {}, onToggleMute = {}, onEnd = {})
+    }
+}
+
+/** 待启动态 + 助手模式（已绑定会话）：新建会话是唯一可点的右胶囊动作，通话设备仍不可切。 */
+@Preview(name = "Idle assistant ready light", widthDp = 400, heightDp = 864, locale = "zh-rCN")
+@Preview(name = "Idle assistant ready dark", widthDp = 400, heightDp = 864, locale = "zh-rCN", uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun VoiceIdleAssistantReadyPreview() {
+    GimiTheme {
+        RealtimeVoiceScreen(RealtimeVoiceUiState(mode = RealtimeVoiceMode.Chat, chatAvailable = true,
+            conversationTitle = "当前聊天"), started = false,
             onStartCall = {}, onToggleMute = {}, onEnd = {})
     }
 }

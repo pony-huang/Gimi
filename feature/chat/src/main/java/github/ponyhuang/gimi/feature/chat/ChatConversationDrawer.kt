@@ -1,9 +1,17 @@
 package github.ponyhuang.gimi.feature.chat
 
+import android.content.res.Configuration
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,7 +39,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
@@ -58,6 +65,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -73,7 +81,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.ponyhuang.gimi.domain.conversation.model.Conversation
 import github.ponyhuang.gimi.ui.components.GimiListDefaults
-import github.ponyhuang.gimi.ui.components.GimiSearchField
 import github.ponyhuang.gimi.ui.preference.preferenceCanvasColor
 import github.ponyhuang.gimi.ui.preference.preferenceGroupCardColor
 import github.ponyhuang.gimi.ui.preference.PreferenceStyle
@@ -92,6 +99,9 @@ private val DrawerRowMinHeight = GimiListDefaults.MinHeight
 /** 底部渐隐高度：容纳右下角齿轮按钮及其留白。 */
 private val DrawerFooterHeight = 88.dp
 
+/** 会话列表顶端的渐隐高度，柔化滚动内容与固定区头之间的边界。 */
+private val DrawerTopFadeHeight = 24.dp
+
 /** 常用功能行几何：图标 + 文字，与设置页列表行同一套语言。 */
 private val DrawerFunctionRowMinHeight = 56.dp
 private val DrawerFunctionIconSize = 22.dp
@@ -105,8 +115,8 @@ private val DrawerGearButtonSize = 48.dp
  * 历史对话抽屉 —— 预测性返回进度抽屉（[PredictiveBackDrawer]）的内容编排。
  *
  * 视觉与设置页 / "添加到聊天"面板同一套 One UI 语言：画布灰底承载白色分组卡片。
- * 结构自上而下：常用功能入口（新对话 / 语音通话 / 个性化）→ 搜索 + 管理 →
- * 历史会话分组卡片，右下角是设置齿轮（含更新提醒点）。
+ * 结构自上而下：顶部搜索入口 → 常用功能入口（新对话 / 语音通话 / 个性化）→ 最近会话 + 管理（多选期间换成
+ * 取消 / 已选数 / 全选 / 删除）→ 历史会话分组卡片，右下角是设置齿轮（含更新提醒点）。
  * 夜间模式等外观配置已移至设置的"个性化"分组，抽屉不再直接切换。
  *
  * 作为根级组合包装 [content]，宿主屏幕（如 Scaffold）放在 [content] 内部。
@@ -150,6 +160,9 @@ fun ChatDrawer(
     onExportConversation: (String) -> Unit = {},
     onDeleteConversation: (String) -> Unit = {},
     onOpenChange: (Boolean) -> Unit = {},
+    searchFocusRequester: FocusRequester = remember { FocusRequester() },
+    onSearchExpanded: () -> Unit = {},
+    onSearchSubmit: () -> Unit = {},
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
@@ -164,7 +177,7 @@ fun ChatDrawer(
         open = open,
         gesturesEnabled = gesturesEnabled,
         // 多选期间返回键应优先结束选择（由调用方的 BackHandler 处理），这里让出返回手势。
-        backHandlerEnabled = !recentState.isSelecting,
+        backHandlerEnabled = !recentState.isSelecting && !recentState.isSearching,
         onOpenChange = onOpenChange,
         modifier = modifier,
         drawerContent = {
@@ -187,6 +200,9 @@ fun ChatDrawer(
                         exportState = exportState,
                         onExportConversation = onExportConversation,
                         onDeleteConversation = onDeleteConversation,
+                        searchFocusRequester = searchFocusRequester,
+                        onSearchExpanded = onSearchExpanded,
+                        onSearchSubmit = onSearchSubmit,
                     )
                 }
             }
@@ -198,7 +214,7 @@ fun ChatDrawer(
 // ── 抽屉内容 ─────────────────────────────────────────────────────
 
 /**
- * 抽屉面板的内容：常用功能入口 + 搜索/管理区头 + 历史对话分组卡片 + 右下角齿轮。
+ * 抽屉面板的内容：顶部搜索入口、可收起的功能区、最近会话管理与列表、底部设置。
  */
 @Composable
 private fun HistoryDrawerContent(
@@ -217,6 +233,9 @@ private fun HistoryDrawerContent(
     exportState: SessionExportUiState = SessionExportUiState(hasConversations = true),
     onExportConversation: (String) -> Unit = {},
     onDeleteConversation: (String) -> Unit = {},
+    searchFocusRequester: FocusRequester = remember { FocusRequester() },
+    onSearchExpanded: () -> Unit = {},
+    onSearchSubmit: () -> Unit = {},
 ) {
     val visible = recentState.visibleConversations(conversations)
     val eligible = deletableConversationIds(conversations, currentSessionId, conversationTaskStatuses)
@@ -224,6 +243,9 @@ private fun HistoryDrawerContent(
     val visibleEligible = visible.map { it.id }.toSet().intersect(eligible)
     val allSelected = visibleEligible.isNotEmpty() && selectedIds.containsAll(visibleEligible)
     val canvas = preferenceCanvasColor()
+    val topFadeBrush = remember(canvas) {
+        Brush.verticalGradient(listOf(canvas, Color.Transparent))
+    }
     // 与聊天页底部 composer 渐隐同源：列表末尾在齿轮区后方柔和消失。
     val bottomFadeBrush = remember(canvas) {
         Brush.verticalGradient(
@@ -239,35 +261,61 @@ private fun HistoryDrawerContent(
     Column(Modifier.fillMaxHeight().statusBarsPadding()) {
         // 隐形焦点承接点：抽屉打开后初始焦点落在这里，避免进入搜索框唤起输入法。
         Box(Modifier.size(1.dp).focusable())
-        // 常用功能：图标 + 文字的紧凑入口行，免滚动直达高频操作。
-        DrawerFunctionEntry(
-            icon = Icons.Default.Add,
-            label = stringResource(R.string.chat_drawer_new_conversation),
-            isFirst = true,
-            isLast = false,
-            onClick = onNewConversationClick,
+        DrawerSearchHeader(
+            expanded = recentState.isSearching,
+            query = recentState.query,
+            enabled = !recentState.isDeleting,
+            selecting = recentState.isSelecting,
+            focusRequester = searchFocusRequester,
+            onOpen = { onRecentAction(RecentConversationsAction.OpenSearch) },
+            onClose = { onRecentAction(RecentConversationsAction.CloseSearch) },
+            onQueryChange = { onRecentAction(RecentConversationsAction.Search(it)) },
+            onExpanded = onSearchExpanded,
+            onSearch = onSearchSubmit,
         )
-        DrawerFunctionEntry(
-            icon = Icons.Default.Call,
-            label = stringResource(R.string.chat_drawer_voice_call),
-            isFirst = false,
-            isLast = false,
-            onClick = onVoiceCallClick,
-        )
-        DrawerFunctionEntry(
-            icon = Icons.Default.Palette,
-            label = stringResource(R.string.chat_drawer_personalize),
-            isFirst = false,
-            isLast = true,
-            onClick = onPersonalizeClick,
-        )
-        Spacer(Modifier.height(12.dp))
-        // 历史区头：搜索 + 管理并排；多选期间换成已选数 + 全选/取消全选。
+        AnimatedVisibility(
+            visible = !recentState.isSearching,
+            enter = fadeIn(tween(180)) + expandVertically(tween(280), expandFrom = Alignment.Top),
+            exit = fadeOut(tween(140)) + shrinkVertically(tween(280), shrinkTowards = Alignment.Top),
+        ) {
+            Column {
+                // 常用功能：图标 + 文字的紧凑入口行，免滚动直达高频操作。
+                DrawerFunctionEntry(
+                    icon = Icons.Default.Add,
+                    label = stringResource(R.string.chat_drawer_new_conversation),
+                    isFirst = true,
+                    isLast = false,
+                    onClick = onNewConversationClick,
+                )
+                DrawerFunctionEntry(
+                    icon = Icons.Default.Call,
+                    label = stringResource(R.string.chat_drawer_voice_call),
+                    isFirst = false,
+                    isLast = false,
+                    onClick = onVoiceCallClick,
+                )
+                DrawerFunctionEntry(
+                    icon = Icons.Default.Palette,
+                    label = stringResource(R.string.chat_drawer_personalize),
+                    isFirst = false,
+                    isLast = true,
+                    onClick = onPersonalizeClick,
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+        }
+        // 历史区头：最近会话 + 管理；搜索期间同步收起，多选时显示选择工具栏。
         if (recentState.isSelecting) {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                TextButton(
+                    enabled = !recentState.isDeleting,
+                    onClick = { onRecentAction(RecentConversationsAction.FinishSelection) },
+                ) {
+                    Text(stringResource(R.string.chat_drawer_cancel))
+                }
                 Text(
                     text = stringResource(R.string.chat_drawer_selected_count, selectedIds.size),
                     style = MaterialTheme.typography.bodyMedium,
@@ -280,32 +328,49 @@ private fun HistoryDrawerContent(
                 ) {
                     Text(stringResource(if (allSelected) R.string.chat_drawer_deselect_all else R.string.chat_drawer_select_all))
                 }
+                // 批量删除入口：先弹确认框（RequestDeletion 固化待删集合），确认后才真正删除。
+                // 红色跟随可用态：未勾选或删除中时置灰，避免禁用态看起来仍可点击。
+                val deleteEnabled = selectedIds.isNotEmpty() && !recentState.isDeleting
+                TextButton(
+                    enabled = deleteEnabled,
+                    onClick = { onRecentAction(RecentConversationsAction.RequestDeletion) },
+                ) {
+                    Text(
+                        text = stringResource(
+                            if (recentState.isDeleting) R.string.chat_drawer_deleting
+                            else R.string.chat_drawer_delete_selected,
+                        ),
+                        color = when {
+                            recentState.isDeleting -> MaterialTheme.colorScheme.onSurfaceVariant
+                            deleteEnabled -> MaterialTheme.colorScheme.error
+                            else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        },
+                    )
+                }
             }
         } else {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
+            AnimatedVisibility(
+                visible = !recentState.isSearching,
+                enter = fadeIn(tween(180)) + expandVertically(tween(280), expandFrom = Alignment.Top),
+                exit = fadeOut(tween(140)) + shrinkVertically(tween(280), shrinkTowards = Alignment.Top),
             ) {
-                GimiSearchField(
-                    value = recentState.query,
-                    onValueChange = { onRecentAction(RecentConversationsAction.Search(it)) },
-                    modifier = Modifier.weight(1f),
-                    enabled = !recentState.isDeleting,
-                    placeholder = stringResource(R.string.chat_drawer_search),
-                    trailingIcon = {
-                        if (recentState.query.isNotEmpty()) {
-                            IconButton(onClick = { onRecentAction(RecentConversationsAction.Search("")) }) {
-                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.chat_drawer_clear_search))
-                            }
-                        }
-                    },
-                )
-                TextButton(
-                    enabled = !recentState.isDeleting && conversations.isNotEmpty(),
-                    onClick = { onRecentAction(RecentConversationsAction.StartSelection()) },
-                    modifier = Modifier.padding(start = 4.dp),
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(stringResource(R.string.chat_drawer_manage))
+                    Text(
+                        text = stringResource(R.string.chat_drawer_recent_conversations),
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    TextButton(
+                        enabled = !recentState.isDeleting && conversations.isNotEmpty(),
+                        onClick = { onRecentAction(RecentConversationsAction.StartSelection()) },
+                        modifier = Modifier.padding(start = 4.dp),
+                    ) {
+                        Text(stringResource(R.string.chat_drawer_manage))
+                    }
                 }
             }
         }
@@ -313,7 +378,7 @@ private fun HistoryDrawerContent(
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = 12.dp, bottom = DrawerFooterHeight),
+                contentPadding = PaddingValues(top = 12.dp, bottom = if (recentState.isSearching) 16.dp else DrawerFooterHeight),
             ) {
                 if (visible.isEmpty()) {
                     item {
@@ -344,42 +409,52 @@ private fun HistoryDrawerContent(
                         canDelete = conversation.id in eligible,
                         onExport = { onExportConversation(conversation.id) },
                         onDelete = { onDeleteConversation(conversation.id) },
+                        onLongClick = if (recentState.isSearching) {
+                            { onRecentAction(RecentConversationsAction.StartSelection(conversation.id)) }
+                        } else null,
                     )
                 }
             }
+            // 遮罩只绘制背景渐变，不接管触摸；向上滚动的会话在区头下方自然淡出。
             Box(
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(DrawerFooterHeight)
-                    .background(bottomFadeBrush),
+                Modifier.align(Alignment.TopCenter).fillMaxWidth().height(DrawerTopFadeHeight)
+                    .background(topFadeBrush),
             )
-            // 右下角齿轮：唯一的设置入口；有未发现的新版本时点亮提醒点。
-            Box(
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 20.dp, bottom = 20.dp),
-            ) {
-                Surface(
-                    shape = CircleShape,
-                    color = preferenceGroupCardColor(),
-                    shadowElevation = 2.dp,
+            if (!recentState.isSearching) {
+                Box(
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(DrawerFooterHeight)
+                        .background(bottomFadeBrush),
+                )
+                // 右下角齿轮：唯一的设置入口；有未发现的新版本时点亮提醒点。
+                Box(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 20.dp, bottom = 20.dp),
                 ) {
-                    IconButton(
-                        onClick = onSettingsClick,
-                        modifier = Modifier.size(DrawerGearButtonSize),
+                    Surface(
+                        shape = CircleShape,
+                        color = preferenceGroupCardColor(),
+                        shadowElevation = 2.dp,
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.chat_settings),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        IconButton(
+                            onClick = onSettingsClick,
+                            modifier = Modifier.size(DrawerGearButtonSize),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.chat_settings),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    if (showUpdateBadge) {
+                        Box(
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .size(10.dp)
+                                .background(MaterialTheme.colorScheme.error, CircleShape),
                         )
                     }
-                }
-                if (showUpdateBadge) {
-                    Box(
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .size(10.dp)
-                            .background(MaterialTheme.colorScheme.error, CircleShape),
-                    )
                 }
             }
         }
@@ -486,6 +561,7 @@ private fun ConversationListItem(
     canDelete: Boolean = true,
     onExport: () -> Unit = {},
     onDelete: () -> Unit = {},
+    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var showActions by remember(conversation.id) { mutableStateOf(false) }
@@ -530,8 +606,8 @@ private fun ConversationListItem(
                     else Modifier.combinedClickable(
                         enabled = enabled,
                         onClick = onClick,
-                        onLongClickLabel = stringResource(R.string.session_export_actions),
-                        onLongClick = { showActions = true },
+                        onLongClickLabel = stringResource(if (onLongClick != null) R.string.chat_drawer_manage else R.string.session_export_actions),
+                        onLongClick = { if (onLongClick != null) onLongClick() else showActions = true },
                     ),
                 )
                 .padding(horizontal = DrawerGroupHorizontalPadding, vertical = 10.dp),
@@ -645,12 +721,18 @@ private fun ConversationActionsMenu(
                 onExport()
             },
         )
+        // 删除项在当前会话/任务进行中被禁用；红色必须跟随置灰，否则禁用态看起来仍可点击。
+        val deleteColor = if (canDelete) {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        }
         DropdownMenuItem(
             text = {
-                Text(stringResource(R.string.session_delete_single), color = MaterialTheme.colorScheme.error)
+                Text(stringResource(R.string.session_delete_single), color = deleteColor)
             },
             leadingIcon = {
-                Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Default.Delete, contentDescription = null, tint = deleteColor)
             },
             enabled = canDelete,
             onClick = {
@@ -694,6 +776,7 @@ private fun formatRelativeTime(timestamp: Long): String {
 // ── 预览 ────────────────────────────────────────────────────────
 
 @Preview(showBackground = true, showSystemUi = true, name = "打开")
+@Preview(showBackground = true, showSystemUi = true, name = "打开 · 深色", uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun ChatDrawerPreview() {
     val sampleConversations = listOf(
@@ -782,28 +865,38 @@ private fun ChatDrawerClosedPreview() {
     }
 }
 
-@Preview(name = "最近 · 紧凑多选", widthDp = 360, heightDp = 780, showBackground = true)
+@Preview(name = "最近 · 紧凑多选", widthDp = 320, heightDp = 780, showBackground = true)
+@Preview(name = "最近 · 紧凑多选 · 深色", widthDp = 320, heightDp = 780, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun RecentSelectionPreview() = RecentContentPreview(
     recentState = RecentConversationsState(isSelecting = true, selectedIds = setOf("1", "3", "4")),
 )
 
-@Preview(name = "最近 · 搜索", widthDp = 360, heightDp = 780, showBackground = true)
+@Preview(name = "最近 · 搜索", widthDp = 320, heightDp = 780, showBackground = true)
+@Preview(name = "最近 · 搜索 · 深色", widthDp = 320, heightDp = 780, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun RecentSearchPreview() = RecentContentPreview(recentState = RecentConversationsState(query = "相机"))
+private fun RecentSearchPreview() = RecentContentPreview(recentState = RecentConversationsState(query = "相机", isSearching = true))
+
+@Preview(name = "最近 · 搜索多选", widthDp = 320, heightDp = 780)
+@Preview(name = "最近 · 搜索多选 · 深色", widthDp = 320, heightDp = 780, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun RecentSearchSelectionPreview() = RecentContentPreview(
+    recentState = RecentConversationsState(query = "相机", isSearching = true, isSelecting = true, selectedIds = setOf("5")),
+)
 
 @Preview(name = "最近 · 深色", widthDp = 360, heightDp = 780, showBackground = true)
 @Composable
 private fun RecentDarkPreview() = RecentContentPreview(darkTheme = true)
 
-@Preview(name = "最近 · 搜索无结果", widthDp = 360, heightDp = 780, showBackground = true)
+@Preview(name = "最近 · 搜索无结果", widthDp = 320, heightDp = 780, showBackground = true)
+@Preview(name = "最近 · 搜索无结果 · 深色", widthDp = 320, heightDp = 780, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun RecentNoResultsPreview() = RecentContentPreview(recentState = RecentConversationsState(query = "不存在"))
+private fun RecentNoResultsPreview() = RecentContentPreview(recentState = RecentConversationsState(query = "不存在", isSearching = true))
 
 @Composable
 private fun RecentContentPreview(
     recentState: RecentConversationsState = RecentConversationsState(),
-    darkTheme: Boolean = false,
+    darkTheme: Boolean = isSystemInDarkTheme(),
 ) {
     val fixtures = listOf(
         "帮我开空调", "播放周杰伦夜曲", "微信小程序斗地主挂机未完成", "广州早茶推荐清单",

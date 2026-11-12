@@ -1,6 +1,6 @@
 # Agent 业务执行
 
-校对日期：2026-11-07，基于 `feature/realtime-voice` 分支。读者：修改聊天/agent 执行、工具接线、运行生命周期或确认行为的 agent 与开发者。英文版：[English](../../en/agent/agent-execution.md)。
+校对日期：2026-11-07。读者：修改聊天/agent 执行、工具接线、运行生命周期或确认行为的 agent 与开发者。英文版：[English](../../en/agent/agent-execution.md)。
 
 新增 `AgentContribution`、改动运行生命周期/确认语义、或触碰事件管线之前，先读本文。语音子系统见[实时语音系统](../voice/realtime-voice-system.md)；A2UI 生成/渲染管线见 [A2UI 业务执行](../a2ui/a2ui-execution.md)；AppFunctions 工具族见 [AppFunctions](../appfunctions.md)。
 
@@ -47,7 +47,7 @@ Flow<ADK Event>
 
 1. **`AgentBuildSpec`** —— 不可变构建输入：模型 `selection`、`toolAccessMode`（`ALWAYS_AVAILABLE`/`ON_DEMAND`）、`reasoningEffort`、`thinkingEnabled`、`pluginRuntime` 快照、`instructionSuffix`、`a2uiSupported`。
 2. **`AgentContribution` SPI** —— contribution 是自声明的 capability 拥有者：`id`、`revision()`（缓存键输入；无外部可变配置时返回 null）、`toolsets(spec)`（挂在 `LlmAgent.toolsets` 上的命名工具集——`ALWAYS_AVAILABLE` 下常驻，`ON_DEMAND` 下大多转为检索候选）、`tools(spec)`（直接附加的工具）、`candidateSources(spec)`（`ON_DEMAND` 下进 `ToolSearchToolset` 的检索候选源）、`subAgents(spec)`（模型经 `transfer_to_agent` 委派的非 LLM 子能力）、`toolCatalog(context)`（给推荐/能力目录等旁路消费的扁平枚举——与 agent 构建解耦）。`AgentContributionRegistry` 聚合 `Set<AgentContribution>`（Hilt `@IntoSet`），按 `id` 排序保证确定性，重复 id 直接失败。现有 contribution 类型（注册 id）：app function（`appfunctions`）、a2ui、sandbox（E2B）、local、mcp、official、skill、plugin、base（记忆/用户输入）、model catalog（仅 revision）、remote agent（仅 sub-agent）、delegate tasks（子任务）、direct phone（`direct_phone`，仅 sub-agent，后端报告可用时才挂载）。各自加载什么属于实现细节，需要时读对应类。
-3. **`AgentFactory` + `AgentChatRunner`** —— 工厂解析模型（`AgentLLMModelFactory`，回退链：显式选择 → 聊天页选择 → 第一个启用服务；全无则报错并指向设置页），用 `AgentPrompts.defaultAssistantInstruction() + spec.instructionSuffix`、思考配置、聚合的工具/工具集/子代理以及全局 `RemoteAgentFailureRecovery` 回调构建 ADK `LlmAgent`。`ON_DEMAND` 模式下追加 `ToolSearchToolset`（ObjectBox + 向量检索，视为可重建缓存、永不迁移）。Runner 以 LRU 缓存至多 10 个 `SharedRuntime`，键为 `AgentKey(selection, toolAccessMode, reasoningEffort, thinkingEnabled, instructionSuffix, a2uiSupported, revision)`——其中 `revision` 是单一合并值：`AgentBuildConfigurationSnapshot` 在查缓存时捕获全部 contribution 的 `revision()` 输出，其 `pluginRuntime` 快照就是实际参与装配的内容——返回每回合的 `AgentChatExecution`。
+3. **`AgentFactory` + `AgentChatRunner`** —— 工厂解析模型（`AgentLLMModelFactory`，回退链：显式选择 → 聊天页选择 → 第一个启用服务；全无则报错并指向设置页），用 `AgentPrompts.defaultAssistantInstruction() + spec.instructionSuffix`、思考配置、聚合的工具/工具集/子代理以及全局 `RemoteAgentFailureRecovery` 回调构建 ADK `LlmAgent`。`ON_DEMAND` 模式下追加 `ToolSearchToolset`（ObjectBox + 向量检索，视为可重建缓存、永不迁移；实现原理见[工具搜索](tool-search.md)）。Runner 以 LRU 缓存至多 10 个 `SharedRuntime`，键为 `AgentKey(selection, toolAccessMode, reasoningEffort, thinkingEnabled, instructionSuffix, a2uiSupported, revision)`——其中 `revision` 是单一合并值：`AgentBuildConfigurationSnapshot` 在查缓存时捕获全部 contribution 的 `revision()` 输出，其 `pluginRuntime` 快照就是实际参与装配的内容——返回每回合的 `AgentChatExecution`。
 
 **注册**：每个 contribution 在 `di/AgentContributionModule.kt` 一行 `@Binds @IntoSet`（subtasks 在自己模块绑定）。新增工具/配置源 = 实现 `AgentContribution` + 一行绑定，不改编排代码。这个抽象模块多绑定是既定可用的模式——下文「坑」里 `@Binds` 不聚合的问题指 data 模块里其他普通单例绑定。加完绑定后要验证 contribution 真的进了集合（如注册表重复 id 报错或工具目录输出）。
 

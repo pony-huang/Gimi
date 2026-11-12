@@ -5,12 +5,14 @@ import github.ponyhuang.gimi.domain.conversation.model.Conversation
 /**
  * 最近会话的搜索、多选和删除进度。
  *
+ * @property isSearching 搜索入口展开状态；退出搜索或关闭抽屉时清空关键词。
  * @property selectedIds 勾选集合，包含被搜索隐藏的选择；展示和删除时过滤受保护会话。
  * @property pendingDeletionIds 打开确认框时固化的 ID 集合，确认后再次检查删除资格。
  * @property isDeleting 批量删除期间锁定搜索和勾选，防止重复提交。
  */
 data class RecentConversationsState(
     val query: String = "",
+    val isSearching: Boolean = false,
     val isSelecting: Boolean = false,
     val selectedIds: Set<String> = emptySet(),
     val pendingDeletionIds: Set<String> = emptySet(),
@@ -19,6 +21,12 @@ data class RecentConversationsState(
 
 /** 最近会话面板交互；真实删除只由 ViewModel 执行。 */
 sealed interface RecentConversationsAction {
+    /** 展开搜索入口。 */
+    data object OpenSearch : RecentConversationsAction
+    /** 退出搜索并清空查询。 */
+    data object CloseSearch : RecentConversationsAction
+    /** 抽屉关闭时重置交互；正在进行的删除继续执行。 */
+    data object DrawerClosed : RecentConversationsAction
     /** 更新标题/末条消息搜索词。 */
     data class Search(val query: String) : RecentConversationsAction
     /** 进入多选；带 sessionId 时同时预选该会话。 */
@@ -61,10 +69,17 @@ internal fun deletableConversationIds(
 
 internal fun ChatUiState.reduceRecentConversations(action: RecentConversationsAction): ChatUiState {
     val state = recentConversations
+    // 关闭是生命周期收尾，即使删除还在执行也要清掉隐藏面板的搜索和选择状态。
+    if (action == RecentConversationsAction.DrawerClosed) {
+        return copy(recentConversations = RecentConversationsState(isDeleting = state.isDeleting))
+    }
     if (state.isDeleting) return this
     val eligible = deletableConversationIds()
     val selected = state.selectedIds.intersect(eligible)
     val next = when (action) {
+        RecentConversationsAction.OpenSearch -> state.copy(isSearching = true)
+        RecentConversationsAction.CloseSearch -> state.copy(query = "", isSearching = false)
+        RecentConversationsAction.DrawerClosed -> return this
         is RecentConversationsAction.Search -> state.copy(query = action.query)
         is RecentConversationsAction.StartSelection -> state.copy(
             isSelecting = true,

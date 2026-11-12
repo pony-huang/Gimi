@@ -224,6 +224,7 @@
     <string name="chat_timeline_tool_awaiting_confirmation">等待确认</string>
     <string name="chat_timeline_tool_unknown">状态未知</string>
     <string name="chat_drawer_manage">管理</string>
+    <string name="chat_drawer_recent_conversations">最近会话</string>
     <string name="chat_drawer_done">完成</string>
     <string name="chat_drawer_search">搜索会话</string>
     <string name="chat_drawer_clear_search">清除搜索</string>
@@ -232,6 +233,7 @@
     <string name="chat_drawer_select_all">全选</string>
     <string name="chat_drawer_deselect_all">取消全选</string>
     <string name="chat_drawer_delete_count">删除 %1$d 个会话</string>
+    <string name="chat_drawer_delete_selected">删除</string>
     <string name="chat_drawer_deleting">正在删除…</string>
     <string name="chat_drawer_delete_confirm_title">删除 %1$d 个会话？</string>
     <string name="chat_drawer_delete_confirm_message">删除后无法恢复。当前会话和运行中的会话不会被删除。</string>
@@ -277,25 +279,16 @@
     <string name="chat_player_artwork">专辑封面</string>
     <string name="chat_player_generic_name">音乐</string>
 
-    <!-- A2UI 发现卡组 -->
-    <string name="chat_option_deck_default_title">待选方案</string>
-    <string name="chat_option_deck_position">%1$d / %2$d</string>
-    <string name="chat_option_deck_item_image">方案图片</string>
-    <string name="chat_option_deck_open_image">查看大图</string>
-    <string name="chat_option_deck_close_image">关闭大图</string>
-    <string name="chat_option_deck_browse_hint">左右滑动浏览；点击按钮提交选择。</string>
-    <string name="chat_option_deck_empty_title">这一轮都看完啦</string>
-    <string name="chat_option_deck_empty_summary">接受 %1$d · 跳过 %2$d</string>
-    <string name="chat_option_deck_empty_restart">再看一遍</string>
-
     <!-- A2UI 新闻列表 -->
     <!-- A2UI 只读数据表格 -->
-    <string name="chat_table_default_heading">数据表格</string>
-    <string name="chat_table_row_count">%1$d 行</string>
+    <string name="chat_table_default_heading">表格</string>
     <string name="chat_table_empty">暂无数据</string>
-    <string name="chat_table_scroll_horizontal">左右滑动查看全部列</string>
-    <string name="chat_table_scroll_vertical">上下滑动查看全部行</string>
-    <string name="chat_table_scroll_both">左右滑动查看列，上下滑动查看行</string>
+    <string name="chat_table_copy">复制表格</string>
+    <string name="chat_table_export_image">保存为图片</string>
+    <string name="chat_table_expand">全屏查看</string>
+    <string name="chat_table_share">分享表格</string>
+    <string name="chat_table_close">关闭</string>
+    <string name="chat_table_export_failed">表格导出失败</string>
     <string name="chat_timeline_steps">%1$d 个步骤</string>
     <string name="chat_timeline_elapsed">共 %1$.1f 秒</string>
     <string name="chat_player_playing">正在播放</string>
@@ -372,15 +365,11 @@
     <string name="voice_device_switching">%1$s · 切换中</string>
     <string name="voice_device_failed">设备切换失败，当前使用：%1$s</string>
     <string name="voice_device_disconnected">耳机已断开，当前使用：%1$s</string>
+    <!-- 模式标题只用短名；管线（级联或端到端 Realtime）在各模式的说明文案中标注。 -->
     <string name="voice_mode_simple">轻聊</string>
     <string name="voice_mode_chat">助手</string>
     <string name="voice_mode_realtime">实时</string>
     <string name="voice_mode_realtime_assistant">实时助手</string>
-    <!-- 模式选择列表的标题：括注当前模式依赖的语音管线（级联或 Realtime）。 -->
-    <string name="voice_mode_simple_pipeline">轻聊（LLM + TTS + ASR/SST）</string>
-    <string name="voice_mode_chat_pipeline">助手（LLM + TTS + ASR/SST）</string>
-    <string name="voice_mode_realtime_pipeline">实时（Realtime）</string>
-    <string name="voice_mode_realtime_assistant_pipeline">实时助手（Realtime）</string>
     <string name="voice_mode_entry">聊天模式</string>
     <string name="voice_mode_current">当前：%1$s</string>
     <string name="voice_sheet_back">返回</string>
@@ -413,8 +402,8 @@
     <string name="voice_capability_tts">语音合成</string>
     <string name="voice_capability_not_supported">该模型未接入%1$s</string>
     <string name="voice_realtime_unavailable">请先在默认模型中配置 Realtime 模型</string>
-    <string name="voice_realtime_mode_detail">全双工实时语音：服务端判轮、音频直进直出，不保存记录</string>
-    <string name="voice_realtime_assistant_mode_detail">全双工实时语音：服务端判轮、音频直进直出；可调用已授权工具，暂不保存记录</string>
+    <string name="voice_realtime_mode_detail">端到端 Realtime，音频直进直出，不保存记录</string>
+    <string name="voice_realtime_assistant_mode_detail">端到端 Realtime，可用已授权工具，暂不保存记录</string>
     <string name="voice_reconnect_notice">已重新连接</string>
     <string name="voice_tool_running">正在调用工具 %1$s</string>
     <string name="voice_mode_switching">正在切换模式</string>
@@ -434,8 +423,8 @@
     <string name="voice_more_options_blocked">通话中不能打开更多选项，请先结束通话</string>
     <string name="voice_mode_selected">已选择</string>
     <string name="voice_chat_unavailable">请先打开一个已配置模型的聊天</string>
-    <string name="voice_simple_mode_detail">只用于本次对话，不写入聊天记录</string>
-    <string name="voice_chat_mode_detail">接入完整助手与全部工具，文字保存到当前聊天</string>
+    <string name="voice_simple_mode_detail">级联 LLM+TTS+ASR，只聊此刻，不保存记录</string>
+    <string name="voice_chat_mode_detail">级联 LLM+TTS+ASR，可用工具，文字保留在当前会话</string>
     <string name="voice_prompt_presets">轻聊预设</string>
     <string name="voice_prompt_preset_none">不使用预设</string>
     <string name="voice_prompt_preset_none_detail">使用内置语音风格</string>

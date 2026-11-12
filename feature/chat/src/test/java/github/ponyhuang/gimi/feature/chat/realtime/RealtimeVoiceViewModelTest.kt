@@ -2,7 +2,10 @@ package github.ponyhuang.gimi.feature.chat.realtime
 
 import app.cash.turbine.test
 import github.ponyhuang.gimi.core.testing.MainDispatcherRule
+import github.ponyhuang.gimi.domain.conversation.model.Conversation
+import github.ponyhuang.gimi.domain.conversation.model.ConversationToolConfiguration
 import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionResolver
+import github.ponyhuang.gimi.domain.conversation.repository.ConversationSessionSnapshot
 import github.ponyhuang.gimi.domain.conversation.testing.FakeAgentRuntimeGate
 import github.ponyhuang.gimi.domain.conversation.usecase.ObserveConversationsUseCase
 import github.ponyhuang.gimi.domain.conversation.usecase.RunWhenAgentIdleUseCase
@@ -23,6 +26,8 @@ import github.ponyhuang.gimi.domain.voice.repository.SimpleChatPromptPreset
 import github.ponyhuang.gimi.domain.voice.repository.SimpleChatPromptRepository
 import github.ponyhuang.gimi.domain.voice.repository.TtsVoiceRepository
 import github.ponyhuang.gimi.domain.voice.repository.VoiceCapabilityResolver
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -38,11 +43,12 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * 模式抽屉的三条回归线：
+ * 模式抽屉与会话的回归线：
  * 1. Realtime 可用性只看默认模型配置，不跟通话状态快照走（待启动/挂断后也必须可用）；
  * 2. 语音开启后不允许更换任何模式，只有待启动态能预选并在「开始通话」时生效；
  * 3. 轻聊预设的选中态经抽屉暴露并写穿到仓库，通话中被 mutate 闸门拒绝；
- * 4. 预选模式写穿到模式仓库，下次进入语音页恢复，通话中的被拒预选不落盘。
+ * 4. 预选模式写穿到模式仓库，下次进入语音页恢复，通话中的被拒预选不落盘；
+ * 5. 新建会话仅待启动态可用：助手模式创建并换绑待启动参数，通话中与轻聊/实时模式一律拒绝。
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RealtimeVoiceViewModelTest {
@@ -213,11 +219,80 @@ class RealtimeVoiceViewModelTest {
         assertEquals(RealtimeVoiceMode.Simple, modeRepository.lastMode.value)
     }
 
+    @Test
+    fun newSessionInReadyStateRebindsTheFreshlyCreatedAssistantConversation() = runTest {
+        val selection = ModelSelection("qwen", "chat", "chat-model")
+        val newSelection = ModelSelection("qwen", "chat", "new-model")
+        val sessionResolver = mockk<ConversationSessionResolver> {
+            coEvery { createAndActivate() } returns ConversationSessionSnapshot(
+                "new-conversation", newSelection, ConversationToolConfiguration(),
+            )
+        }
+        val observeConversations = mockk<ObserveConversationsUseCase>()
+        every { observeConversations() } returns MutableStateFlow(
+            listOf(Conversation(id = "new-conversation", title = "新对话")),
+        )
+        val controller = mockk<RealtimeVoiceCallController>(relaxed = true) {
+            every { state } returns MutableStateFlow(RealtimeVoiceCallState())
+        }
+        val viewModel = viewModel(
+            controller = controller,
+            sessionResolver = sessionResolver,
+            observeConversations = observeConversations,
+        )
+        viewModel.selectMode(RealtimeVoiceMode.Chat)
+        viewModel.prepare("old-conversation", selection, "当前聊天")
+        viewModel.newSession()
+
+        viewModel.uiState.test {
+            awaitItem() // stateIn 的初始空状态
+            // 换绑完成：待启动态展示的会话标题来自新建会话。
+            while (awaitItem().conversationTitle != "新对话") {
+                // 继续等待
+            }
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        // 「开始通话」即绑定新会话：待启动参数的 id、模型、标题已被整体换绑。
+        viewModel.startCall()
+        verify { controller.start("new-conversation", newSelection, "新对话", RealtimeVoiceMode.Chat) }
+    }
+
+    @Test
+    fun newSessionIsBlockedWhileCallIsActive() = runTest {
+        val callState = MutableStateFlow(RealtimeVoiceCallState(active = true, mode = RealtimeVoiceMode.Chat))
+        val sessionResolver = mockk<ConversationSessionResolver>(relaxed = true)
+        val viewModel = viewModel(
+            controller = mockk(relaxed = true) { every { state } returns callState },
+            sessionResolver = sessionResolver,
+        )
+        viewModel.prepare("old-conversation", ModelSelection("qwen", "chat", "chat-model"), "当前聊天")
+
+        viewModel.newSession()
+
+        // 通话中不支持新建：重建会话会打断采集/播放，必须先结束通话（UI 置灰，这里是兜底）。
+        coVerify(exactly = 0) { sessionResolver.createAndActivate() }
+    }
+
+    @Test
+    fun newSessionIsNoOpForModesWithoutPersistence() = runTest {
+        val sessionResolver = mockk<ConversationSessionResolver>(relaxed = true)
+        val viewModel = viewModel(sessionResolver = sessionResolver)
+        viewModel.prepare("old-conversation", ModelSelection("qwen", "chat", "chat-model"), "当前聊天")
+
+        // 默认预选轻聊：轻聊/实时/实时助手的内存会话随每次起呼新建，无持久化会话可换。
+        viewModel.newSession()
+
+        coVerify(exactly = 0) { sessionResolver.createAndActivate() }
+    }
+
     private fun viewModel(
         settings: DefaultModelSettings = configuredRealtimeSettings(),
         controller: RealtimeVoiceCallController = mockk(relaxed = true) {
             every { state } returns MutableStateFlow(RealtimeVoiceCallState())
         },
+        sessionResolver: ConversationSessionResolver = mockk(relaxed = true),
+        observeConversations: ObserveConversationsUseCase = mockk(relaxed = true),
         promptPresets: SimpleChatPromptRepository = FakePresetRepository(),
         modeRepository: RealtimeVoiceModeRepository = FakeModeRepository(),
     ): RealtimeVoiceViewModel {
@@ -228,8 +303,8 @@ class RealtimeVoiceViewModelTest {
         every { observeSettings() } returns MutableStateFlow(settings)
         return RealtimeVoiceViewModel(
             controller = controller,
-            sessionResolver = mockk<ConversationSessionResolver>(relaxed = true),
-            observeConversations = mockk<ObserveConversationsUseCase>(relaxed = true),
+            sessionResolver = sessionResolver,
+            observeConversations = observeConversations,
             updateSettings = mockk<UpdateDefaultModelSettingsUseCase>(relaxed = true),
             runWhenAgentIdle = RunWhenAgentIdleUseCase(FakeAgentRuntimeGate()),
             ttsVoiceRepository = mockk<TtsVoiceRepository>(relaxed = true),

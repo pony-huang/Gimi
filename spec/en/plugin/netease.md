@@ -947,4 +947,3 @@ The developer documentation lists 282 endpoints, grouped below by capability. **
 - Document detail: `GET https://interface.music.163.com/api/openplatform/developer/apidoc/get?docId=<id>`
 - CLI package: `@music163/ncm-cli@0.1.7` (<https://www.npmjs.com/package/@music163/ncm-cli>)
 - Official Agent Skills: <https://github.com/NetEase/skills>
-- Local reference material (available on this machine only): `ncm-cli-api.md`, `analysis/ncm-openapi-reference.md`, `analysis/ncm-openapi-endpoints-all.md` (under `E:/workplace/ncm/`)

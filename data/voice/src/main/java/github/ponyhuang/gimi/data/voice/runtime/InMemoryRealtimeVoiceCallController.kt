@@ -193,17 +193,6 @@ class InMemoryRealtimeVoiceCallController @Inject constructor(
         }
     }
 
-    override fun restart(conversationId: String?, title: String) {
-        val current = mutableState.value
-        if (!current.active || current.switching || current.ending) return
-        if (current.mode == RealtimeVoiceMode.Chat && !conversationId.isNullOrBlank()) {
-            // 助手模式换绑新建的持久化会话（创建由调用方完成）；轻聊与实时模式无持久化，直接重开。
-            targetId = conversationId
-            mutableState.update { it.copy(conversationTitle = title) }
-        }
-        switchTo(current.mode)
-    }
-
     /**
      * 解析当前生效的 Realtime 默认选择与其音色覆盖。
      *

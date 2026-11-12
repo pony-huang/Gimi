@@ -1,6 +1,6 @@
 # A2UI 业务执行
 
-校对日期：2026-11-07，基于 `feature/realtime-voice` 分支。读者：改动 A2UI 生成链路、协议校验、聊天 catalog 组件、或升级 androidx a2ui 依赖的 agent 与开发者。英文版：[English](../../en/a2ui/a2ui-execution.md)。
+校对日期：2026-11-07。读者：改动 A2UI 生成链路、协议校验、聊天 catalog 组件、或升级 androidx a2ui 依赖的 agent 与开发者。英文版：[English](../../en/a2ui/a2ui-execution.md)。
 
 新增/修改 catalog 组件、改 `generate_a2ui` 工具契约、改 surface 生命周期/重试语义、或升级协议依赖之前，先读本文。本文吸收了根 `AGENTS.md` 原有的 "Compose A2UI (agentic UI) reference" 一节。
 
@@ -51,7 +51,7 @@ A2uiSurface (material3-a2ui) 在所属 MessageBubble 内渲染卡片
 
 ## 生成链路（data/agent/a2ui）
 
-- **工具契约**：`generate_a2ui(intent, target_surface_id, changes, component_names)`。`processLlmRequest` 注入动态路由指令（由能力 schema 生成）：A2UI 强制场景 vs Markdown、逐组件路由（容器、表格、天气、音乐、选项卡）、以及如何处理 `a2ui_interaction` 提交。
+- **工具契约**：`generate_a2ui(intent, target_surface_id, changes, component_names)`。`processLlmRequest` 注入动态路由指令（由能力 schema 生成）：A2UI 强制场景 vs Markdown、逐组件路由（容器、表格、天气、音乐）、以及如何处理 `a2ui_interaction` 提交。
 - **catalog 收缩**：生成 schema 只含基础组件 + 请求组件 + 其 `$ref` 闭包；未被引用的 `$defs` 被剥离（否则 schema 的任意组件构造会把整个 catalog 拖进每次校验）。更新时经 `previousComponentNames` 保活先前组件。
 - **子代理**：隔离的纯 UI agent（自备模型、无业务工具），强制单次 `render_a2ui` 调用（`Mode.ANY`）。校验失败时把错误文本追加为纠错提示重试一次；二次失败返回工具失败。网络/SDK 错误绝不重试。
 - **异步创建**：`A2uiCreateScope` 立即返回 `pending`，生成在旁路 scope 进行；runner 流结束后结果归档为事件——取消经 `NonCancellable` 持久化为 CANCELLED，失败持久化为 FAILED（保留重试入口）。
@@ -63,7 +63,7 @@ A2uiSurface (material3-a2ui) 在所属 MessageBubble 内渲染卡片
 
 ## 渲染链路（feature/chat/a2ui）
 
-- **Catalog**：`chatA2uiCatalog` —— catalogId `https://gimi.app/a2ui/catalogs/chat/v1`，inline，Material Basic Catalog 原语 + 自定义组件：`ChatA2uiText/Button`、容器（`Disclosure`/`Tabs`/`DetailSheet`）、`WeatherToday`、`MusicPlayer`、`DataTable`、`OptionDeck`、媒体渲染器（coil3 图片、视频/音频播放）、画廊预览。自定义组件覆写 `isReady` 实现逐组件加载态；`ChatA2uiChild` 渲染 Success/Loading/Error。
+- **Catalog**：`chatA2uiCatalog` —— catalogId `https://gimi.app/a2ui/catalogs/chat/v1`，inline，Material Basic Catalog 原语 + 自定义组件：`ChatA2uiText/Button`、容器（`Disclosure`/`Tabs`/`DetailSheet`）、`WeatherToday`、`MusicPlayer`、`DataTable`、媒体渲染器（coil3 图片、视频/音频播放）、画廊预览。自定义组件覆写 `isReady` 实现逐组件加载态；`ChatA2uiChild` 渲染 Success/Loading/Error。
 - **协调器**：每会话一个官方 `A2uiMessageProcessor`；提交经 `canSubmit` 门控（agent 未在运行）。`sync` 对重放记录做差异：仅数据变化只补丁 `updateDataModel`（删除仍在显示的 surface 会因必需绑定缺失导致 Compose 崩溃）；否则删除 + 重推。出站客户端事件变成 `A2uiInteraction` 聊天回合（草稿不进历史）。
 - **宿主 UI**：`ChatA2uiContent` 无状态，按 surface id 渲染，另有 `A2uiTaskStatus` 占位卡（转圈/失败/取消 + 重试）。surface 在 `ChatScreen`/`MessageBubble` 按所属消息过滤。`ChatA2uiTheme` 只覆写字号/形状——应用配色与系统字体缩放直通。
 
@@ -92,6 +92,5 @@ A2uiSurface (material3-a2ui) 在所属 MessageBubble 内渲染卡片
 ## 坑
 
 - 能力开关进 `AgentKey`（`a2uiSupported`），因此无能力执行（如实时语音）永不声明 `generate_a2ui`；设置开关进 a2ui contribution 的 `revision()` 以重建缓存运行时。
-- OptionDeck 事件的 `round` 从 0 起；`round > 0` 表示本地重启的卡组在重复 itemIds——重跑有副作用的工具前视为需重新过目。
 - `ChatA2uiSubmissionTest` 用 mockk 把 `ProtocolJsonReader` 替换进官方解析器（JVM 没有 Android JsonReader）——脆弱但有意为之，不要「顺手简化」掉。
 - 完成事件作者是 `a2ui_generation` 而非模型；历史映射对该作者有特判。

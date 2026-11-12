@@ -213,9 +213,12 @@ fun ModelTitleAndPicker(
         }
     }
     var showModelPicker by remember { mutableStateOf(false) }
-    // chip 上的思考强度标签：思考开启时显示档位名，关闭或无配置时省略。
+    // OpenAI Chat Completions 协议不支持推理强度；未解析出模型时按不支持处理。
+    val reasoningSupported = displayedModel?.service?.apiProtocol != ApiProtocol.OpenaiChatcompletions
+    // chip 上的思考强度标签：思考开启且当前协议支持时显示档位名，否则省略。
+    // 会话里留存的档位在切到不支持协议的模型后不再展示，切回后原样恢复。
     val effortLabel = toolConfiguration?.let {
-        if (it.thinkingEnabled) reasoningEffortLabel(it.reasoningEffort) else null
+        if (it.thinkingEnabled && reasoningSupported) reasoningEffortLabel(it.reasoningEffort) else null
     }
 
     // 模型选择器由宿主决定可用宽度；输入框内保持左对齐并在窄屏省略长名称。
@@ -269,8 +272,7 @@ fun ModelTitleAndPicker(
                 onPickerVisibilityChange(false)
             },
             toolConfiguration = toolConfiguration,
-            // OpenAI Chat Completions 协议不支持推理强度；未解析出模型时同样隐藏控件。
-            reasoningSupported = displayedModel?.service?.apiProtocol != ApiProtocol.OpenaiChatcompletions,
+            reasoningSupported = reasoningSupported,
             reasoningEnabled = reasoningEnabled,
             onReasoningEffortChange = onReasoningEffortChange,
             onThinkingEnabledChange = onThinkingEnabledChange,
@@ -397,6 +399,74 @@ private fun ModelTitleAndPickerPreview() {
             onConfigureModels = {},
             onSelectModel = {},
             onModelSwitchBlocked = {},
+        )
+    }
+}
+
+/** Anthropic 协议服务 fixture：思考强度档位在支持协议下应正常显示。 */
+private fun previewAnthropicModelServices(): List<LLMModelSetting> = listOf(
+    LLMModelSetting(
+        id = "anthropic",
+        name = "Anthropic",
+        isEnabled = true,
+        apiKey = "sk-preview",
+        apiBaseUrl = "https://api.anthropic.com",
+        apiProtocol = ApiProtocol.Anthropic,
+        anthropicBaseUrl = "https://api.anthropic.com",
+        groups = listOf(
+            ModelGroup(
+                id = "claude",
+                name = "Claude",
+                models = listOf(Model(id = "claude-sonnet", name = "Claude Sonnet")),
+            ),
+        ),
+    ),
+)
+
+@Preview(name = "chip · 思考开启且协议支持", showBackground = true)
+@Composable
+private fun ModelTitleAndPickerEffortVisiblePreview() {
+    GimiTheme {
+        ModelTitleAndPicker(
+            services = previewAnthropicModelServices(),
+            currentSelection = ModelSelection(
+                serviceId = "anthropic",
+                groupId = "claude",
+                modelId = "claude-sonnet",
+            ),
+            loadState = CatalogLoadState.Ready,
+            isAgentRunning = false,
+            onConfigureModels = {},
+            onSelectModel = {},
+            onModelSwitchBlocked = {},
+            toolConfiguration = ConversationToolConfiguration(
+                thinkingEnabled = true,
+                reasoningEffort = ReasoningEffort.LOW,
+            ),
+        )
+    }
+}
+
+@Preview(name = "chip · ChatCompletions 隐藏思考强度", showBackground = true)
+@Composable
+private fun ModelTitleAndPickerEffortHiddenPreview() {
+    GimiTheme {
+        ModelTitleAndPicker(
+            services = previewModelServices(),
+            currentSelection = ModelSelection(
+                serviceId = "deepseek",
+                groupId = "deepseek",
+                modelId = "deepseekv4-flash",
+            ),
+            loadState = CatalogLoadState.Ready,
+            isAgentRunning = false,
+            onConfigureModels = {},
+            onSelectModel = {},
+            onModelSwitchBlocked = {},
+            toolConfiguration = ConversationToolConfiguration(
+                thinkingEnabled = true,
+                reasoningEffort = ReasoningEffort.LOW,
+            ),
         )
     }
 }

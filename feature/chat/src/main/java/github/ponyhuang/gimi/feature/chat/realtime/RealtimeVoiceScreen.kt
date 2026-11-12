@@ -241,20 +241,12 @@ private fun modeTitleRes(mode: RealtimeVoiceMode): Int = when (mode) {
     RealtimeVoiceMode.RealtimeAssistant -> R.string.voice_mode_realtime_assistant
 }
 
-/** 模式选择列表的标题：括注该模式依赖的语音管线（级联 LLM + TTS + ASR/SST 或原生 Realtime）。 */
-@StringRes
-private fun modePipelineTitleRes(mode: RealtimeVoiceMode): Int = when (mode) {
-    RealtimeVoiceMode.Simple -> R.string.voice_mode_simple_pipeline
-    RealtimeVoiceMode.Chat -> R.string.voice_mode_chat_pipeline
-    RealtimeVoiceMode.Realtime -> R.string.voice_mode_realtime_pipeline
-    RealtimeVoiceMode.RealtimeAssistant -> R.string.voice_mode_realtime_assistant_pipeline
-}
-
 /**
  * 实时语音展示页：整屏主题画布（浅色白→浅灰、深色黑→深灰），墨色粒子球居中承载状态文字。
  * 顶栏两胶囊：左（回聊天）+ 右（新建会话｜通话设备），中性底色与描边适配主题场景；
  * 字幕和动效只消费真实会话快照。底栏主按钮为「开始通话/结束通话」，静音移至侧位；
- * 懒启动下未启动时控制组按会话可用性禁用。
+ * 懒启动下未启动时控制组按会话可用性禁用；新建会话仅待启动态的助手模式可点，
+ * 通话中重建会话会打断采集/播放，与模式切换一样置灰。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -268,7 +260,7 @@ fun RealtimeVoiceScreen(
     onEnd: () -> Unit,
     // 左胶囊「回聊天」：结束通话并返回文字聊天；后台续跑只保留给系统后台切换。
     onBack: () -> Unit = {},
-    // 右胶囊「新会话」：轻聊/实时模式重开内存会话，助手模式新建持久化会话并换绑。
+    // 右胶囊「新会话」：仅待启动态可用；助手模式新建持久化会话并换绑，轻聊/实时模式无会话可换（置灰）。
     onNewSession: () -> Unit = {},
     // 底栏「更多选项」在通话中被点击：抽屉开不了，只提示先结束通话。
     onMoreOptionsBlocked: () -> Unit = {},
@@ -293,7 +285,9 @@ fun RealtimeVoiceScreen(
     val savingFailed = state.failure == RealtimeVoiceFailure.Persistence
     val starting = state.phase == RealtimeVoicePhase.Idle || state.phase == RealtimeVoicePhase.Closed
     val controlsEnabled = !starting && !failed && !uiState.switching
-    val newSessionEnabled = started && controlsEnabled
+    // 新建会话仅待启动态可用：通话中重建会话会打断采集/播放，与模式切换同因需先结束通话；
+    // 且只有助手模式有持久化会话可换，轻聊/实时模式的内存会话随每次起呼新建，直接置灰。
+    val newSessionEnabled = !started && !uiState.switching && uiState.mode == RealtimeVoiceMode.Chat
     // 语音开启后一律不能更换模式（需先结束通话）；切换期与保存失败时同样冻结菜单。
     val modesEditable = !started && !uiState.switching && !savingFailed
     var modeSheetOpen by remember { mutableStateOf(false) }
@@ -389,7 +383,7 @@ fun RealtimeVoiceScreen(
                     Surface(Modifier.matchParentSize().padding(vertical = 2.dp), shape = CircleShape,
                         color = scene.capsuleFill, border = BorderStroke(1.dp, scene.capsuleLine)) {}
                     Row(Modifier.height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-                        // 新建会话：未启动通话时不可点；禁用态用更淡的 inkDisabled 明示。
+                        // 新建会话：仅待启动态的助手模式可点；通话中与轻聊/实时模式用更淡的 inkDisabled 明示。
                         IconButton(onClick = onNewSession, enabled = newSessionEnabled, modifier = Modifier.size(48.dp)) {
                             Icon(Icons.AutoMirrored.Filled.PlaylistAdd, stringResource(R.string.voice_new_session),
                                 modifier = Modifier.size(24.dp),
@@ -793,6 +787,7 @@ private fun VoiceSettingsPage(
 
 /**
  * 模式抽屉二级页：四个模式条目，各带一行详细说明；不可用的置灰并给出原因。
+ * 标题只用短名，管线信息（级联或端到端 Realtime）由说明文案承载，避免长标题挤占行宽。
  * 点选即切换，抽屉不关闭，选中标记原地更新。
  * 语音开启后四个模式全部禁点并统一给出「先结束通话」提示——此时不再按配置可用性解释置灰原因，
  * 避免把「已配置 Realtime 模型」误说成「请先配置」。
@@ -836,7 +831,7 @@ private fun VoiceModeSheetOptions(
                 GimiSheetOptionRow(
                     selected = current == mode,
                     enabled = available && interactionEnabled,
-                    label = stringResource(modePipelineTitleRes(mode)),
+                    label = stringResource(modeTitleRes(mode)),
                     description = description,
                     onClick = { onSelectMode(mode) },
                     icon = modeIcon(mode),

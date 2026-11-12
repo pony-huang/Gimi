@@ -124,33 +124,6 @@ class InMemoryRealtimeVoiceCallControllerTest {
     }
 
     @Test
-    fun restartReopensTheSameModeAndChatRebindsTheNewConversation() = runTest {
-        val configurations = mutableListOf<RealtimeVoiceConfiguration>()
-        val sessions = ArrayDeque<RealtimeVoiceSession>(listOf(FakeSession(), FakeSession(), FakeSession()))
-        val controller = InMemoryRealtimeVoiceCallController(object : RealtimeVoiceRepository {
-            override fun createSession(configuration: RealtimeVoiceConfiguration): RealtimeVoiceSession {
-                configurations += configuration
-                return sessions.removeFirst()
-            }
-        }, mockk(relaxed = true), NoRealtimeSupport, RecordingForeground())
-        val selection = ModelSelection("service", "group", "model")
-        // 懒启动：预选助手模式直接按该模式建立会话。
-        controller.start("current", selection, "当前聊天", RealtimeVoiceMode.Chat)
-        advanceUntilIdle()
-        assertEquals(RealtimeVoiceMode.Chat, configurations.last().mode)
-        // 重开会话：助手模式换绑新会话；轻聊/实时模式重开内存会话。
-        controller.restart("fresh", "新会话")
-        advanceUntilIdle()
-        assertEquals(RealtimeVoiceMode.Chat, configurations.last().mode)
-        assertEquals("fresh", configurations.last().conversationId)
-        assertEquals("新会话", controller.state.value.conversationTitle)
-        assertTrue(controller.state.value.active)
-        assertFalse(controller.state.value.switching)
-        controller.end()
-        advanceUntilIdle()
-    }
-
-    @Test
     fun lazyStartFallsBackToSimpleWhenThePreselectedModeLacksItsPrerequisites() = runTest {
         val configurations = mutableListOf<RealtimeVoiceConfiguration>()
         val sessions = ArrayDeque<RealtimeVoiceSession>(listOf(FakeSession(), FakeSession()))

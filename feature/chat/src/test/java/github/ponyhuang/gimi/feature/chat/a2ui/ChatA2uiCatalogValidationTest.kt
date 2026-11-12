@@ -136,44 +136,4 @@ class ChatA2uiCatalogValidationTest {
 
         AndroidxA2uiProtocol().validate(document, capabilities)
     }
-
-    @Test
-    fun exportedCatalogValidatesOptionDeckWithContextualActionsAndLinks() = runTest {
-        val catalog = chatA2uiCatalog(openUrl = {})
-        val capabilities = A2uiCapabilities(catalog.id, catalog.toJsonSchemaString())
-        val deck = """
-            {
-              "title":"发布会视觉方向",
-              "acceptLabel":"赞同",
-              "rejectLabel":"不赞同",
-              "items":[
-                {
-                  "id":"calm-blue",
-                  "title":"克制的深蓝视觉",
-                  "description":"适合强调技术感和可信度。",
-                  "tags":["视觉设计","发布会"],
-                  "link":{"label":"查看设计稿","url":"https://example.com/design/calm-blue"}
-                },
-                {
-                  "id":"warm-paper",
-                  "title":"纸张质感的暖色视觉",
-                  "description":"突出内容和人本身的温度。"
-                }
-              ]
-            }
-        """.trimIndent()
-        for (property in listOf(deck, """{"path":"/deck"}""")) {
-            AndroidxA2uiProtocol().validate(
-                A2uiDocument(
-                    surfaceId = "option-deck-surface",
-                    messages = listOf(
-                        """{"version":"v0.9.1","createSurface":{"surfaceId":"option-deck-surface","catalogId":"${catalog.id}","sendDataModel":true}}""",
-                        """{"version":"v0.9.1","updateDataModel":{"surfaceId":"option-deck-surface","path":"/","value":{"deck":$deck}}}""",
-                        """{"version":"v0.9.1","updateComponents":{"surfaceId":"option-deck-surface","components":[{"id":"root","component":"OptionDeck","deck":$property}]}}""",
-                    ),
-                ),
-                capabilities,
-            )
-        }
-    }
 }

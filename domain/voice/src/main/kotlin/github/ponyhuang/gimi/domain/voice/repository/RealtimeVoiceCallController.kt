@@ -17,13 +17,6 @@ interface RealtimeVoiceCallController {
      */
     fun start(conversationId: String?, selection: ModelSelection?, title: String, mode: RealtimeVoiceMode)
 
-    /**
-     * 重开一个新会话：结束当前语音会话并以相同模式重建。
-     * 助手（Chat）模式可换绑新的持久化会话 [conversationId]（新建会话由调用方完成）；
-     * 其余模式忽略该参数，直接重开内存会话。
-     */
-    fun restart(conversationId: String?, title: String)
-
     /** 应用重新可见时补齐前台优先级；后台启动受限后由此重试，不重启通话。 */
     fun ensureForeground()
 

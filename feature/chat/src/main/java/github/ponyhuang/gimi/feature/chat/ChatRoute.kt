@@ -8,6 +8,8 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,6 +18,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -76,6 +81,11 @@ fun ChatRoute(
     // 抽屉目标开关状态：手势提交（预测性返回、拖拽、遮罩点击）经 onOpenChange 回写，
     // 程序化开关（入口点击、返回收尾）直接赋值；动画收尾由 PredictiveBackDrawer 统一处理。
     var drawerOpen by rememberSaveable { mutableStateOf(false) }
+    val searchFocusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    var searchHadFocus by remember { mutableStateOf(false) }
+    val imeVisible = WindowInsets.isImeVisible
     // 语音页外部打开请求计数：抽屉"语音通话"入口递增，RealtimeVoiceHost 消费后清零。
     var voiceOpenRequest by rememberSaveable { mutableStateOf(0) }
     // 语音页是全屏覆盖层：其可见期间关闭抽屉手势，避免边缘滑动被覆盖层误捕获；
@@ -145,9 +155,23 @@ fun ChatRoute(
     BackHandler(enabled = drawerOpen && uiState.recentConversations.isSelecting && !uiState.recentConversations.isDeleting) {
         viewModel.onAction(ChatAction.RecentConversations(RecentConversationsAction.FinishSelection))
     }
+    // 输入法显示时让系统先处理返回；抽屉自身的预测性返回在搜索期间让出。
+    BackHandler(
+        enabled = drawerOpen && uiState.recentConversations.isSearching &&
+            !uiState.recentConversations.isSelecting && !imeVisible && !uiState.recentConversations.isDeleting,
+    ) {
+        viewModel.onAction(ChatAction.RecentConversations(RecentConversationsAction.CloseSearch))
+    }
+    LaunchedEffect(drawerOpen, uiState.recentConversations.isSearching, uiState.recentConversations.isSelecting) {
+        if (searchHadFocus && (!drawerOpen || !uiState.recentConversations.isSearching || uiState.recentConversations.isSelecting)) {
+            focusManager.clearFocus(force = true)
+            keyboard?.hide()
+            searchHadFocus = false
+        }
+    }
     LaunchedEffect(drawerOpen) {
         if (!drawerOpen) {
-            viewModel.onAction(ChatAction.RecentConversations(RecentConversationsAction.FinishSelection))
+            viewModel.onAction(ChatAction.RecentConversations(RecentConversationsAction.DrawerClosed))
         }
     }
 
@@ -155,6 +179,15 @@ fun ChatRoute(
         open = drawerOpen,
         gesturesEnabled = !voicePageVisible,
         onOpenChange = { drawerOpen = it },
+        searchFocusRequester = searchFocusRequester,
+        onSearchExpanded = {
+            if (drawerOpen && uiState.recentConversations.isSearching && !uiState.recentConversations.isSelecting) {
+                searchFocusRequester.requestFocus()
+                searchHadFocus = true
+                keyboard?.show()
+            }
+        },
+        onSearchSubmit = { keyboard?.hide() },
         conversations = uiState.conversations,
         currentSessionId = currentSessionId,
         conversationTaskStatuses = uiState.conversationTaskStatuses,

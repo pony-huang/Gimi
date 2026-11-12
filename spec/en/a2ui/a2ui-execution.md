@@ -1,6 +1,6 @@
 # A2UI business execution
 
-Reviewed: 2026-11-07 against branch `feature/realtime-voice`. Audience: agents and developers touching the A2UI generation chain, protocol validation, chat catalog components, or upgrading the androidx a2ui artifacts. Chinese companion: [中文说明](../../zh/a2ui/a2ui-execution.md).
+Reviewed: 2026-11-07. Audience: agents and developers touching the A2UI generation chain, protocol validation, chat catalog components, or upgrading the androidx a2ui artifacts. Chinese companion: [中文说明](../../zh/a2ui/a2ui-execution.md).
 
 Read this before adding or changing a catalog component, altering the `generate_a2ui` tool contract, changing surface lifecycle/retry semantics, or upgrading protocol artifacts. This document absorbs the former "Compose A2UI (agentic UI) reference" section of the root `AGENTS.md`.
 
@@ -51,7 +51,7 @@ Conversation plumbing: `ChatRunModels` carries a2ui views; `A2uiTaskMessages` re
 
 ## Generation chain (data/agent/a2ui)
 
-- **Tool contract**: `generate_a2ui(intent, target_surface_id, changes, component_names)`. `processLlmRequest` injects a dynamic routing instruction (built from the capabilities schema): when A2UI is mandatory vs Markdown, per-component routing (containers, tables, weather, music, option deck), and how to handle `a2ui_interaction` submissions.
+- **Tool contract**: `generate_a2ui(intent, target_surface_id, changes, component_names)`. `processLlmRequest` injects a dynamic routing instruction (built from the capabilities schema): when A2UI is mandatory vs Markdown, per-component routing (containers, tables, weather, music), and how to handle `a2ui_interaction` submissions.
 - **Catalog scoping**: the generation schema contains only base components + requested components + their `$ref` closure; unreferenced `$defs` are stripped (otherwise the schema's any-component construct would drag the full catalog into every validation). Prior components stay alive on updates via `previousComponentNames`.
 - **Sub-agent**: isolated UI-only agent (own model, no business tools), forced single `render_a2ui` call (`Mode.ANY`). On validation failure, one self-correction retry appends the error text; a second failure returns a tool failure. Network/SDK errors are never retried.
 - **Async create**: `A2uiCreateScope` returns `pending` immediately and generates on a side scope; after the runner flow ends, results are archived as events — cancellation persists CANCELLED via `NonCancellable`, failures persist FAILED (so the retry entry stays).
@@ -63,7 +63,7 @@ Conversation plumbing: `ChatRunModels` carries a2ui views; `A2uiTaskMessages` re
 
 ## Rendering chain (feature/chat/a2ui)
 
-- **Catalog**: `chatA2uiCatalog` — catalogId `https://gimi.app/a2ui/catalogs/chat/v1`, inline, combining Material Basic Catalog primitives with custom components: `ChatA2uiText/Button`, containers (`Disclosure`/`Tabs`/`DetailSheet`), `WeatherToday`, `MusicPlayer`, `DataTable`, `OptionDeck`, media renderers (coil3 image, video/audio players), gallery preview. Custom components override `isReady` for per-component loading states; `ChatA2uiChild` renders Success/Loading/Error.
+- **Catalog**: `chatA2uiCatalog` — catalogId `https://gimi.app/a2ui/catalogs/chat/v1`, inline, combining Material Basic Catalog primitives with custom components: `ChatA2uiText/Button`, containers (`Disclosure`/`Tabs`/`DetailSheet`), `WeatherToday`, `MusicPlayer`, `DataTable`, media renderers (coil3 image, video/audio players), gallery preview. Custom components override `isReady` for per-component loading states; `ChatA2uiChild` renders Success/Loading/Error.
 - **Coordinator**: one session-scoped official `A2uiMessageProcessor`; submissions gated by `canSubmit` (agent not running). `sync` diffs replayed records: data-only changes patch just `updateDataModel` (deleting a displayed surface crashes Compose on required bindings); otherwise delete + re-push. Outbound client events become `A2uiInteraction` chat turns (not persisted to history as drafts).
 - **Host UI**: stateless surface host in `ChatA2uiContent` keyed by surface id, plus `A2uiTaskStatus` placeholder cards (spinner/failed/cancelled + retry). Surfaces are filtered by owning message in `ChatScreen`/`MessageBubble`. `ChatA2uiTheme` overrides typography/shapes only — app color scheme and font scaling pass through.
 
@@ -92,6 +92,5 @@ Conversation plumbing: `ChatRunModels` carries a2ui views; `A2uiTaskMessages` re
 ## Gotchas
 
 - The capability flag rides `AgentKey` (`a2uiSupported`), so capability-less executions (e.g. live voice) never declare `generate_a2ui`; the settings toggle enters the a2ui contribution's `revision()` to rebuild cached runtimes.
-- OptionDeck events carry `round` starting at 0; `round > 0` means a locally restarted deck repeating itemIds — treat as re-review before re-running side-effect tools.
 - `ChatA2uiSubmissionTest` mockk-substitutes `ProtocolJsonReader` into the official parser (JVM lacks Android JsonReader) — brittle but deliberate; do not "simplify" it away.
 - Completion events are authored `a2ui_generation`, not by the model; history mapping special-cases that author.

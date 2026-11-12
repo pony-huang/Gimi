@@ -47,8 +47,6 @@ internal class GenerateA2uiTool(
     "Generate, update or delete an interactive native UI card or form. " +
         "Required for device or setting updates, on/off or yes/no controls, and confirmation of such changes. " +
         "Use native components or composable containers for structured results, collections and forms; " +
-        "When the client exposes OptionDeck and 2-12 plans, recommendations, social posts, nearby places " +
-        "or stores should be compared or chosen from, request the native OptionDeck. " +
         "use normal Markdown for prose. Select the required component_names and include complete facts. " +
         "For weather results, request the native WeatherToday component " +
         "for today only and include current conditions and today's high/low. Use Markdown for future or multi-day forecasts.",
@@ -62,16 +60,13 @@ internal class GenerateA2uiTool(
                 type = Type.STRING,
                 description = "Complete intent and facts to display; requested changes on update. For controls, " +
                     "include the user's language, affected item, complete tool-confirmed facts/current state, " +
-                    "and available actions. For OptionDeck, include the candidates, contextual accept/reject " +
-                    "labels and any tool-confirmed detail links. UI generation does not receive conversation history",
+                    "and available actions. UI generation does not receive conversation history",
             ),
             "component_names" to Schema(
                 type = Type.ARRAY,
                 items = Schema(type = Type.STRING),
                 description = "Only the component types required for this UI, from the client capabilities. " +
                     "Basic Text/Icon/Row/Column/Card/Button/Divider are always included. " +
-                    "If the client capabilities list OptionDeck, select it for multiple plans, recommendations, " +
-                    "social posts, or nearby places/stores. " +
                     "Select containers, input and native/media components explicitly. Use [] for delete",
             ),
         ), required = listOf("intent", "changes", "component_names"),
@@ -257,24 +252,6 @@ internal fun a2uiResponseRoutingInstructions(capabilities: A2uiCapabilities): St
         Prefer DateTimeInput for dates/times; include CheckBox for editable boolean state when supported.
         Keep business actions explicit and subject to the normal authorization flow.
     """.trimIndent()
-    val optionDeckRouting = if (catalogHas(capabilities, "OptionDeck")) """
-        OPTION DECK ROUTING (PRIORITIZED):
-        When the user asks to compare, browse, shortlist, or choose from multiple candidates, call
-        generate_a2ui in this turn and include "OptionDeck" in component_names. This applies to recommendations
-        that return distinct travel itineraries, design directions, restaurants, products, courses, gifts,
-        proposals, social notes, or nearby place-search stores and places, even when the result
-        could be written as a Markdown list.
-        Pass 2-12 distinct candidates in changes with title, description, metadata, tags and any confirmed links.
-        Also provide acceptLabel and rejectLabel that fit the domain, such as Want to go / Try another,
-        Agree / Disagree, Like / Dislike, Save / Skip, or Want to visit / Not this place.
-        Each item link needs its own contextual label, such as View note, Open map, View menu or Open design.
-        Do not rebuild this browsing experience with repeated Cards, or a Markdown-only list.
-        Deck events carry a round number starting at 0; events with round > 0 repeat already-decided
-        itemIds after the user restarted browsing locally, so treat them as re-review and confirm
-        before re-running side-effect tools for the same item.
-        Use normal Markdown or a simpler native component for one final recommendation, a non-comparative fact
-        list, detailed prose, or when the request does not involve reviewing alternatives.
-    """.trimIndent() else ""
     return """
         A2UI RESPONSE ROUTING:
         For an information query, if a purpose-built native component below directly matches the requested data,
@@ -287,8 +264,6 @@ internal fun a2uiResponseRoutingInstructions(capabilities: A2uiCapabilities): St
         Once an A2UI component is shown, do not duplicate its content in Markdown.
         $componentBlock
         $composition
-
-        $optionDeckRouting
 
         A2UI CONTROL ROUTING (MANDATORY):
         Routine discrete control operations are direct commands that change an existing state or advance/reverse

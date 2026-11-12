@@ -289,22 +289,27 @@ class RealtimeVoiceViewModel @Inject constructor(
     }
 
     /**
-     * 开启新的会话：助手模式复用聊天页新建会话逻辑（默认模型与工具）并换绑；
-     * 轻聊与实时模式无持久化，直接按当前模式重开内存会话。创建失败时保持原会话并提示。
+     * 新建会话：仅待启动态可用。助手模式复用聊天页新建会话逻辑（默认模型与工具），
+     * 创建后换绑待启动参数，「开始通话」即绑定新会话；轻聊与实时模式的内存会话随每次
+     * 起呼新建，无会话可换。通话中一律不支持新建：重建会话会打断采集/播放，需先结束
+     * 通话（与模式切换同因；UI 已置灰，这里是绕过 UI 时的兜底）。创建失败时保持原绑定并提示。
      */
     fun newSession() {
         val call = controller.state.value
-        if (!call.active || call.switching || call.ending) return
-        if (call.mode != RealtimeVoiceMode.Chat) {
-            controller.restart(null, "")
-            return
-        }
+        if (call.active || call.switching || call.ending) return
+        if (pendingMode.value != RealtimeVoiceMode.Chat) return
+        val arguments = startArguments.value
+        if (arguments.conversationId == null || arguments.selection == null) return
         viewModelScope.launch {
             try {
                 val snapshot = sessionResolver.createAndActivate()
                 val title = observeConversations().value
                     .firstOrNull { it.id == snapshot.sessionId }?.title.orEmpty()
-                controller.restart(snapshot.sessionId, title)
+                startArguments.value = VoiceCallArguments(
+                    conversationId = snapshot.sessionId,
+                    selection = snapshot.modelSelection,
+                    title = title,
+                )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (failure: Exception) {

@@ -114,6 +114,8 @@ internal fun ChatModelPickerSheet(
                         serviceName = serviceId?.let { id ->
                             options.firstOrNull { it.service.id == id }?.service?.name
                         },
+                        // 备注跟着当前模型协议走：一级页标题下说明为何没有思考强度控件。
+                        showReasoningNotice = !reasoningSupported,
                         onBack = { selectedServiceId = null },
                         onDismiss = onDismiss,
                     )
@@ -140,37 +142,50 @@ internal fun ChatModelPickerSheet(
 /**
  * 抽屉标题行：一级页是"选择模型"配右上角关闭，二级页是厂商名配左侧返回。
  * 标题居中由 [GimiSheetTitleRow] 保证；返回在左、关闭在右。
+ * 一级页标题下可带一行小字备注：当前模型走 OpenAI Chat Completions 协议时不支持
+ * 思考强度；二级页不重复出现（不支持时由思考强度区块自带说明文案）。
  */
 @Composable
 private fun ChatModelPickerTitle(
     serviceId: String?,
     serviceName: String?,
+    showReasoningNotice: Boolean,
     onBack: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    GimiSheetTitleRow(
-        title = if (serviceId == null) {
-            stringResource(R.string.chat_model_picker_title)
-        } else {
-            serviceName.orEmpty()
-        },
-        navigationIcon = if (serviceId == null) null else Icons.AutoMirrored.Filled.ArrowBack,
-        navigationContentDescription = if (serviceId == null) {
-            null
-        } else {
-            stringResource(R.string.chat_model_picker_back)
-        },
-        onNavigationClick = if (serviceId == null) null else ({ onBack() }),
-        trailing = {
-            if (serviceId == null) {
-                GimiSheetIconAction(
-                    icon = Icons.Default.Close,
-                    contentDescription = stringResource(R.string.chat_model_picker_close),
-                    onClick = onDismiss,
-                )
-            }
-        },
-    )
+    Column(modifier = Modifier.fillMaxWidth()) {
+        GimiSheetTitleRow(
+            title = if (serviceId == null) {
+                stringResource(R.string.chat_model_picker_title)
+            } else {
+                serviceName.orEmpty()
+            },
+            navigationIcon = if (serviceId == null) null else Icons.AutoMirrored.Filled.ArrowBack,
+            navigationContentDescription = if (serviceId == null) {
+                null
+            } else {
+                stringResource(R.string.chat_model_picker_back)
+            },
+            onNavigationClick = if (serviceId == null) null else ({ onBack() }),
+            trailing = {
+                if (serviceId == null) {
+                    GimiSheetIconAction(
+                        icon = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.chat_model_picker_close),
+                        onClick = onDismiss,
+                    )
+                }
+            },
+        )
+        if (serviceId == null && showReasoningNotice) {
+            Text(
+                text = stringResource(R.string.chat_reasoning_effort_openai_notice),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = GimiListDefaults.HorizontalPadding),
+            )
+        }
+    }
 }
 
 /** 一级页的一行厂商：所属服务 + 该服务下可用的聊天模型数。 */
@@ -520,6 +535,7 @@ private fun ChatModelPickerLevel1LightPreview() {
                     ChatModelPickerTitle(
                         serviceId = null,
                         serviceName = null,
+                        showReasoningNotice = false,
                         onBack = {},
                         onDismiss = {},
                     )
@@ -552,6 +568,7 @@ private fun ChatModelPickerLevel2LightPreview() {
                     ChatModelPickerTitle(
                         serviceId = "openai",
                         serviceName = previewModelRows().first { it.service.id == "openai" }.service.name,
+                        showReasoningNotice = false,
                         onBack = {},
                         onDismiss = {},
                     )
@@ -584,6 +601,7 @@ private fun ChatModelPickerLevel2DarkPreview() {
                     ChatModelPickerTitle(
                         serviceId = "openai",
                         serviceName = previewModelRows().first { it.service.id == "openai" }.service.name,
+                        showReasoningNotice = false,
                         onBack = {},
                         onDismiss = {},
                     )
@@ -616,6 +634,7 @@ private fun ChatModelPickerReasoningUnsupportedPreview() {
                     ChatModelPickerTitle(
                         serviceId = "openai",
                         serviceName = previewModelRows().first { it.service.id == "openai" }.service.name,
+                        showReasoningNotice = false,
                         onBack = {},
                         onDismiss = {},
                     )
@@ -638,6 +657,39 @@ private fun ChatModelPickerReasoningUnsupportedPreview() {
     }
 }
 
+@Preview(name = "一级 · 协议不支持标题备注", showBackground = true, widthDp = 393, locale = "zh")
+@Composable
+private fun ChatModelPickerLevel1ReasoningUnsupportedPreview() {
+    GimiTheme {
+        Surface(color = preferenceCanvasColor()) {
+            PreferenceStyleScope(PreferenceStyle.Compact) {
+                Column {
+                    ChatModelPickerTitle(
+                        serviceId = null,
+                        serviceName = null,
+                        showReasoningNotice = true,
+                        onBack = {},
+                        onDismiss = {},
+                    )
+                    ChatModelPickerBody(
+                        options = previewModelRows(),
+                        selection = ModelSelection("openai", "gpt", "gpt-4o"),
+                        onPick = {},
+                        toolConfiguration = ConversationToolConfiguration(),
+                        reasoningSupported = false,
+                        reasoningEnabled = true,
+                        onReasoningEffortChange = {},
+                        onThinkingEnabledChange = {},
+                        selectedServiceId = null,
+                        onSelectService = {},
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Preview(name = "一级 · 空", showBackground = true, widthDp = 393)
 @Composable
 private fun ChatModelPickerEmptyPreview() {
@@ -648,6 +700,7 @@ private fun ChatModelPickerEmptyPreview() {
                     ChatModelPickerTitle(
                         serviceId = null,
                         serviceName = null,
+                        showReasoningNotice = false,
                         onBack = {},
                         onDismiss = {},
                     )
@@ -681,6 +734,7 @@ private fun ChatModelPickerManyModelsLightPreview() {
                     ChatModelPickerTitle(
                         serviceId = "openai",
                         serviceName = previewModelRows().first { it.service.id == "openai" }.service.name,
+                        showReasoningNotice = false,
                         onBack = {},
                         onDismiss = {},
                     )

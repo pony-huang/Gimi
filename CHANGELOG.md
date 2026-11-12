@@ -2,6 +2,18 @@
 
 版本 PR 根据 Conventional Commits 自动生成后续版本记录；合并前请整理用户可见的变化与升级注意事项。
 
+## [1.1.0-beta.1](https://github.com/pony-huang/Gimi/compare/v1.0.0-beta.1...v1.1.0-beta.1) (2026-11-12)
+
+
+### Features
+
+* refine chat, voice, A2UI and personalized settings ([f3b5421](https://github.com/pony-huang/Gimi/commit/f3b5421688c834888828f09bec313d5c07c01840))
+
+
+### Bug Fixes
+
+* **voice:** unify conversational assistant responses ([7371330](https://github.com/pony-huang/Gimi/commit/73713308501353216bf6c4ad4627f4154c2d735f))
+
 ## [1.0.0-beta.1](https://github.com/pony-huang/Gimi/compare/v0.14.1...v1.0.0-beta.1) (2026-11-11)
 
 > **⚠️ 升级提醒：本次更新可能导致应用闪退。若出现闪退，请卸载后重新安装。卸载会清除应用本地数据，请提前备份重要内容。**

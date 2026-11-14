@@ -36,6 +36,12 @@ Built as a fully native Android app with Jetpack Compose.
 <td><img src="doc/screenshots/settings.png" width="220" alt="Settings" /><br /><sub>Settings</sub></td>
 <td><img src="doc/screenshots/local-environment.png" width="220" alt="Local environment" /><br /><sub>Local environment</sub></td>
 </tr>
+<tr>
+<td><img src="doc/screenshots/voice-ready.png" width="220" alt="Voice call" /><br /><sub>Voice call</sub></td>
+<td><img src="doc/screenshots/voice-listening.png" width="220" alt="Voice call with captions" /><br /><sub>Voice call with captions</sub></td>
+<td><img src="doc/screenshots/voice-ready-dark.png" width="220" alt="Voice call, dark mode" /><br /><sub>Voice call, dark mode</sub></td>
+<td><img src="doc/screenshots/voice-thinking-dark.png" width="220" alt="Realtime assistant, dark mode" /><br /><sub>Realtime assistant, dark mode</sub></td>
+</tr>
 </table>
 </div>
 

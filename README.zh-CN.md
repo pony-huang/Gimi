@@ -36,6 +36,12 @@
 <td><img src="doc/screenshots/settings.png" width="220" alt="设置" /><br /><sub>设置</sub></td>
 <td><img src="doc/screenshots/local-environment.png" width="220" alt="本地环境" /><br /><sub>本地环境</sub></td>
 </tr>
+<tr>
+<td><img src="doc/screenshots/voice-ready.png" width="220" alt="语音通话" /><br /><sub>语音通话</sub></td>
+<td><img src="doc/screenshots/voice-listening.png" width="220" alt="语音通话字幕" /><br /><sub>语音通话字幕</sub></td>
+<td><img src="doc/screenshots/voice-ready-dark.png" width="220" alt="语音通话深色模式" /><br /><sub>语音通话深色模式</sub></td>
+<td><img src="doc/screenshots/voice-thinking-dark.png" width="220" alt="实时助手深色模式" /><br /><sub>实时助手深色模式</sub></td>
+</tr>
 </table>
 </div>
 
